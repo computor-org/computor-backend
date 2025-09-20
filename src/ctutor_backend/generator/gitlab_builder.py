@@ -242,7 +242,7 @@ class GitLabBuilder:
                                 deployment.organization.name,
                                 deployment.organization.path,
                                 deployment.organization.gitlab.parent,
-                                deployment.organization.description
+                                deployment.organization.description or ""
                             )
                             result["gitlab_group"] = gitlab_group
                             result["gitlab_created"] = True
@@ -264,7 +264,7 @@ class GitLabBuilder:
                             deployment.organization.name,
                             deployment.organization.path,
                             deployment.organization.gitlab.parent,
-                            deployment.organization.description
+                            deployment.organization.description or ""
                         )
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
@@ -284,7 +284,7 @@ class GitLabBuilder:
                         deployment.organization.name,
                         deployment.organization.path,
                         deployment.organization.gitlab.parent,
-                        deployment.organization.description
+                        deployment.organization.description or ""
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
@@ -309,7 +309,7 @@ class GitLabBuilder:
                 deployment.organization.name,
                 deployment.organization.path,
                 deployment.organization.gitlab.parent,
-                deployment.organization.description
+                deployment.organization.description or ""
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
@@ -411,7 +411,7 @@ class GitLabBuilder:
                                 deployment.courseFamily.name,
                                 deployment.courseFamily.path,
                                 parent_group_id,
-                                deployment.courseFamily.description,
+                                deployment.courseFamily.description or "",
                                 parent_group
                             )
                             result["gitlab_group"] = gitlab_group
@@ -434,7 +434,7 @@ class GitLabBuilder:
                             deployment.courseFamily.name,
                             deployment.courseFamily.path,
                             parent_group_id,
-                            deployment.courseFamily.description,
+                            deployment.courseFamily.description or "",
                             parent_group
                         )
                         result["gitlab_group"] = gitlab_group
@@ -455,7 +455,7 @@ class GitLabBuilder:
                         deployment.courseFamily.name,
                         deployment.courseFamily.path,
                         parent_group_id,
-                        deployment.courseFamily.description,
+                        deployment.courseFamily.description or "",
                         parent_group
                     )
                     result["gitlab_group"] = gitlab_group
@@ -494,7 +494,7 @@ class GitLabBuilder:
                 deployment.courseFamily.name,
                 deployment.courseFamily.path,
                 parent_group_id,
-                deployment.courseFamily.description,
+                deployment.courseFamily.description or "",
                 parent_group
             )
             result["gitlab_group"] = gitlab_group
@@ -506,7 +506,7 @@ class GitLabBuilder:
             # Create course family in database
             family_data = CourseFamilyCreate(
                 title=deployment.courseFamily.name,
-                description=deployment.courseFamily.description,
+                description=deployment.courseFamily.description or "",
                 path=deployment.courseFamily.path,
                 organization_id=str(organization.id),
                 properties=CourseFamilyProperties(gitlab=gitlab_config)
@@ -599,7 +599,7 @@ class GitLabBuilder:
                                 deployment.course.name,
                                 deployment.course.path,
                                 parent_group_id,
-                                deployment.course.description,
+                                deployment.course.description or "",
                                 parent_group
                             )
                             result["gitlab_group"] = gitlab_group
@@ -622,7 +622,7 @@ class GitLabBuilder:
                             deployment.course.name,
                             deployment.course.path,
                             parent_group_id,
-                            deployment.course.description,
+                            deployment.course.description or "",
                             parent_group
                         )
                         result["gitlab_group"] = gitlab_group
@@ -643,7 +643,7 @@ class GitLabBuilder:
                         deployment.course.name,
                         deployment.course.path,
                         parent_group_id,
-                        deployment.course.description,
+                        deployment.course.description or "",
                         parent_group
                     )
                     result["gitlab_group"] = gitlab_group
@@ -719,7 +719,7 @@ class GitLabBuilder:
                 deployment.course.name,
                 deployment.course.path,
                 parent_group_id,
-                deployment.course.description,
+                deployment.course.description or "",
                 parent_group
             )
             result["gitlab_group"] = gitlab_group
@@ -731,7 +731,7 @@ class GitLabBuilder:
             # Create course in database
             course_data = CourseCreate(
                 title=deployment.course.name,
-                description=deployment.course.description,
+                description=deployment.course.description or "",
                 path=deployment.course.path,
                 course_family_id=str(course_family.id),
                 properties=CourseProperties(gitlab=gitlab_config)
