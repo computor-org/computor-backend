@@ -564,18 +564,11 @@ async def generate_student_template_activity_v2(
             if workflow_id:
                 deployment.workflow_id = workflow_id
             
-            # Add history entry with appropriate details
-            if was_deployed and force_redeploy:
-                action_details = "Force redeployment via student template generation"
-            else:
-                action_details = "Started deployment via student template generation"
-            
             history = DeploymentHistory(
                 deployment_id=deployment.id,
                 action="deploying",
-                action_details=action_details,
                 example_version_id=deployment.example_version_id,
-                meta={"force_redeploy": force_redeploy} if force_redeploy else None
+                workflow_id=workflow_id,
             )
             db.add(history)
         
@@ -707,8 +700,8 @@ async def generate_student_template_activity_v2(
                         history = DeploymentHistory(
                             deployment_id=deployment.id,
                             action="failed",
-                            action_details="Failed to clone assignments repository",
-                            example_version_id=deployment.example_version_id
+                            example_version_id=deployment.example_version_id,
+                            workflow_id=workflow_id,
                         )
                         db.add(history)
                 db.commit()
@@ -842,8 +835,8 @@ async def generate_student_template_activity_v2(
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
                             action="failed",
-                            action_details=f"Assignments {reason}",
-                            example_version_id=content.deployment.example_version_id
+                            example_version_id=content.deployment.example_version_id,
+                            workflow_id=workflow_id,
                         )
                         db.add(history)
                         errors.append(f"{str(content.path)}: {reason}")
@@ -895,8 +888,8 @@ async def generate_student_template_activity_v2(
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
                             action="failed",
-                            action_details=f"Failed to deploy: {str(e)[:200]}",
-                            example_version_id=content.deployment.example_version_id
+                            example_version_id=content.deployment.example_version_id,
+                            workflow_id=workflow_id,
                         )
                         db.add(history)
             
@@ -1011,8 +1004,8 @@ async def generate_student_template_activity_v2(
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
                             action="deployed",
-                            action_details=f"Successfully deployed to student template",
-                            example_version_id=content.deployment.example_version_id
+                            example_version_id=content.deployment.example_version_id,
+                            workflow_id=workflow_id,
                         )
                         db.add(history)
             else:
@@ -1026,8 +1019,8 @@ async def generate_student_template_activity_v2(
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
                             action="failed",
-                            action_details="Failed to push to Git repository",
-                            example_version_id=content.deployment.example_version_id
+                            example_version_id=content.deployment.example_version_id,
+                            workflow_id=workflow_id,
                         )
                         db.add(history)
             
@@ -1078,8 +1071,8 @@ async def generate_student_template_activity_v2(
                 history = DeploymentHistory(
                     deployment_id=deployment.id,
                     action="failed",
-                    action_details=f"Workflow failed: {str(e)[:200]}",
-                    example_version_id=deployment.example_version_id
+                    example_version_id=deployment.example_version_id,
+                    workflow_id=workflow_id,
                 )
                 db.add(history)
             

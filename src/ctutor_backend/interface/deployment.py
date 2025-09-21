@@ -141,13 +141,20 @@ class CourseContentDeploymentQuery(ListQuery):
 class DeploymentHistoryCreate(BaseModel):
     """Create a deployment history entry."""
     deployment_id: UUID
-    action: Literal["assigned", "reassigned", "deployed", "failed", "unassigned", "updated", "migrated"]
-    action_details: Optional[str] = None
+    action: Literal[
+        "assigned",
+        "reassigned",
+        "deploying",
+        "deployed",
+        "failed",
+        "unassigned",
+        "updated",
+        "migrated",
+    ]
     example_version_id: Optional[UUID] = None
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
     previous_example_version_id: Optional[UUID] = None
-    metadata: Optional[Dict[str, Any]] = None
     workflow_id: Optional[str] = None
     
     model_config = ConfigDict(use_enum_values=True)
@@ -158,12 +165,10 @@ class DeploymentHistoryGet(BaseModel):
     id: UUID
     deployment_id: UUID
     action: str
-    action_details: Optional[str]
     example_version_id: Optional[UUID]
     previous_example_version_id: Optional[UUID]
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = Field(None, alias="meta")  # Database column is 'meta'
     workflow_id: Optional[str]
     created_at: datetime
     created_by: Optional[UUID]

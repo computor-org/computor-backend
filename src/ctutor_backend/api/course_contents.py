@@ -31,7 +31,7 @@ from ctutor_backend.interface.deployment import (
     DeploymentWithHistory,
     DeploymentSummary,
     CourseContentDeploymentCreate,
-    DeploymentHistoryCreate
+    DeploymentHistoryCreate,
 )
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
@@ -42,6 +42,68 @@ from aiocache import BaseCache
 
 # Create the router
 course_content_router = CrudRouter(CourseContentInterface)
+
+
+def _build_deployment_with_history(
+    deployment: CourseContentDeployment,
+    db: Session,
+) -> DeploymentWithHistory:
+    """Serialize a deployment and its history for API responses."""
+    history = (
+        db.query(DeploymentHistory)
+        .filter(DeploymentHistory.deployment_id == deployment.id)
+        .order_by(DeploymentHistory.created_at.desc())
+        .all()
+    )
+
+    deployment_dict = {
+        "id": deployment.id,
+        "course_content_id": deployment.course_content_id,
+        "example_version_id": deployment.example_version_id,
+        "example_identifier": (
+            str(deployment.example_identifier)
+            if getattr(deployment, "example_identifier", None) is not None
+            else None
+        ),
+        "version_tag": deployment.version_tag,
+        "deployment_status": deployment.deployment_status,
+        "deployment_path": deployment.deployment_path,
+        "version_identifier": deployment.version_identifier,
+        "assigned_at": deployment.assigned_at,
+        "deployed_at": deployment.deployed_at,
+        "last_attempt_at": deployment.last_attempt_at,
+        "deployment_message": deployment.deployment_message,
+        "deployment_metadata": deployment.deployment_metadata,
+        "workflow_id": deployment.workflow_id,
+        "created_at": deployment.created_at,
+        "updated_at": deployment.updated_at,
+        "created_by": deployment.created_by,
+        "updated_by": deployment.updated_by,
+    }
+
+    history_dicts = []
+    for h in history:
+        history_dicts.append({
+            "id": h.id,
+            "deployment_id": h.deployment_id,
+            "action": h.action,
+            "example_version_id": h.example_version_id,
+            "previous_example_version_id": h.previous_example_version_id,
+            "example_identifier": (
+                str(h.example_identifier)
+                if getattr(h, "example_identifier", None) is not None
+                else None
+            ),
+            "version_tag": h.version_tag,
+            "workflow_id": h.workflow_id,
+            "created_at": h.created_at,
+            "created_by": h.created_by,
+        })
+
+    return DeploymentWithHistory(
+        deployment=deployment_dict,
+        history=history_dicts,
+    )
 
 
 # File operations (unchanged)
@@ -237,8 +299,30 @@ async def assign_example_to_content(
     if deployment:
         # Update existing deployment (reassignment)
         previous_version_id = deployment.example_version_id
-        deployment.example_version_id = str(example_version.id) if example_version else None
-        # Always store source identity for traceability
+        new_example_version_id = str(example_version.id) if example_version else None
+        current_identifier = (
+            str(deployment.example_identifier)
+            if getattr(deployment, "example_identifier", None) is not None
+            else None
+        )
+        same_version = previous_version_id == new_example_version_id
+        same_identifier = current_identifier == (src_identifier or None)
+        same_version_tag = deployment.version_tag == src_version_tag
+
+        if same_version and same_identifier and same_version_tag:
+            # No-op assignment; only update message if it changed
+            new_message = request.deployment_message
+            if deployment.deployment_message != new_message:
+                deployment.deployment_message = new_message
+                deployment.updated_by = (
+                    permissions.user_id if hasattr(permissions, "user_id") else None
+                )
+                deployment.updated_at = datetime.utcnow()
+                db.commit()
+            db.refresh(deployment)
+            return _build_deployment_with_history(deployment, db)
+
+        deployment.example_version_id = new_example_version_id
         from ctutor_backend.custom_types import Ltree
         deployment.example_identifier = Ltree(src_identifier) if src_identifier else None
         deployment.version_tag = src_version_tag
@@ -246,24 +330,18 @@ async def assign_example_to_content(
         deployment.deployment_message = request.deployment_message
         deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
         deployment.updated_at = datetime.utcnow()
-        
-        # Add history entry for reassignment
-        from ctutor_backend.custom_types import Ltree
+
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="reassigned" if previous_version_id else "assigned",
-            action_details=(
-                f"Assigned {example_version.example.title} v{example_version.version_tag}"
-                if example_version and example_version.example else "Assigned custom source"
-            ),
-            example_version_id=str(example_version.id) if example_version else None,
+            example_version_id=new_example_version_id,
             example_identifier=Ltree(src_identifier) if src_identifier else None,
             version_tag=src_version_tag,
             previous_example_version_id=str(previous_version_id) if previous_version_id else None,
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
         db.add(history_entry)
-        
+
     else:
         # Create new deployment
         from ctutor_backend.custom_types import Ltree
@@ -285,74 +363,21 @@ async def assign_example_to_content(
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="assigned",
-            action_details=(
-                f"Assigned {example_version.example.title} v{example_version.version_tag}"
-                if example_version and example_version.example else "Assigned custom source"
-            ),
             example_version_id=str(example_version.id) if example_version else None,
             example_identifier=Ltree(src_identifier) if src_identifier else None,
             version_tag=src_version_tag,
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
         db.add(history_entry)
-    
+
     db.commit()
     db.refresh(deployment)
-    
-    # Load history
-    history = db.query(DeploymentHistory).filter(
-        DeploymentHistory.deployment_id == deployment.id
-    ).order_by(DeploymentHistory.created_at.desc()).all()
     
     # Clear cache
     if cache:
         await cache.delete(f"course:{content.course_id}:deployments")
     
-    # Return deployment with history (exclude course_content to avoid recursion)
-    deployment_dict = {
-        "id": deployment.id,
-        "course_content_id": deployment.course_content_id,
-        "example_version_id": deployment.example_version_id,
-        "example_identifier": str(deployment.example_identifier) if getattr(deployment, 'example_identifier', None) is not None else None,
-        "version_tag": deployment.version_tag,
-        "deployment_status": deployment.deployment_status,
-        "deployment_path": deployment.deployment_path,
-        "version_identifier": deployment.version_identifier,
-        "assigned_at": deployment.assigned_at,  # Required field
-        "deployed_at": deployment.deployed_at,
-        "last_attempt_at": deployment.last_attempt_at,
-        "deployment_message": deployment.deployment_message,
-        "deployment_metadata": deployment.deployment_metadata,
-        "workflow_id": deployment.workflow_id,  # Include workflow_id
-        "created_at": deployment.created_at,
-        "updated_at": deployment.updated_at,
-        "created_by": deployment.created_by,
-        "updated_by": deployment.updated_by,
-        # Don't include course_content to avoid recursion
-    }
-    
-    # Convert history to dicts with correct field names
-    history_dicts = []
-    for h in history:
-        history_dicts.append({
-            "id": h.id,
-            "deployment_id": h.deployment_id,
-            "action": h.action,
-            "action_details": h.action_details,
-            "example_version_id": h.example_version_id,
-            "previous_example_version_id": h.previous_example_version_id,
-            "example_identifier": str(h.example_identifier) if getattr(h, 'example_identifier', None) is not None else None,
-            "version_tag": h.version_tag,
-            "meta": h.meta,  # Use the correct field name
-            "workflow_id": h.workflow_id,
-            "created_at": h.created_at,
-            "created_by": h.created_by,
-        })
-    
-    return DeploymentWithHistory(
-        deployment=deployment_dict,
-        history=history_dicts
-    )
+    return _build_deployment_with_history(deployment, db)
 
 
 @course_content_router.router.delete(
@@ -410,7 +435,6 @@ async def unassign_example_from_content(
     history_entry = DeploymentHistory(
         deployment_id=deployment.id,
         action="unassigned",
-        action_details="Example unassigned from course content",
         previous_example_version_id=str(previous_version_id) if previous_version_id else None,
         created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
     )
@@ -578,7 +602,6 @@ async def get_deployment_status_with_workflow(
         {
             "id": str(h.id),
             "action": h.action,
-            "action_details": h.action_details,
             "workflow_id": h.workflow_id,
             "created_at": h.created_at.isoformat()
         } for h in history

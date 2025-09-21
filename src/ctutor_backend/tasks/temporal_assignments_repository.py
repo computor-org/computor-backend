@@ -224,7 +224,6 @@ async def generate_assignments_repository_activity(
                             hist = DeploymentHistory(
                                 deployment_id=content.deployment.id,
                                 action="updated",
-                                action_details=f"Assignments repo updated to {head_sha[:8]}",
                                 example_version_id=content.deployment.example_version_id,
                                 example_identifier=(
                                     Ltree(str(ev.example.identifier)) if ev and ev.example
