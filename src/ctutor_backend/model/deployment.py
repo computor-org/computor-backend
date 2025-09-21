@@ -237,13 +237,7 @@ class DeploymentHistory(Base):
     action = Column(
         String(32),
         nullable=False,
-        comment="Action type: assigned, reassigned, deployed, failed, unassigned, updated"
-    )
-    
-    action_details = Column(
-        Text,
-        nullable=True,
-        comment="Detailed description of the action"
+        comment="Action type: assigned, reassigned, deploying, deployed, failed, unassigned, updated"
     )
     
     # Version tracking
@@ -271,14 +265,6 @@ class DeploymentHistory(Base):
         String(64),
         nullable=True,
         comment="Version tag of the example at action time"
-    )
-    
-    # Additional data
-    meta = Column(
-        JSONB,
-        nullable=True,
-        server_default=text("'{}'::jsonb"),
-        comment="Additional metadata about the action"
     )
     
     # Workflow tracking

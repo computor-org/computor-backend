@@ -279,13 +279,11 @@ export interface CourseContentDeploymentQuery {
  */
 export interface DeploymentHistoryCreate {
   deployment_id: string;
-  action: any;
-  action_details?: string | null;
+  action: string;
   example_version_id?: string | null;
   example_identifier?: string | null;
   version_tag?: string | null;
   previous_example_version_id?: string | null;
-  metadata?: Record<string, any> | null;
   workflow_id?: string | null;
 }
 
@@ -296,12 +294,10 @@ export interface DeploymentHistoryGet {
   id: string;
   deployment_id: string;
   action: string;
-  action_details: string | null;
   example_version_id: string | null;
   previous_example_version_id: string | null;
   example_identifier?: string | null;
   version_tag?: string | null;
-  meta?: Record<string, any> | null;
   workflow_id: string | null;
   created_at: string;
   created_by: string | null;
