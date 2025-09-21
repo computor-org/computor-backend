@@ -20,6 +20,7 @@ from .student_courses import CourseStudentInterface
 from .student_profile import StudentProfileInterface
 from .submission_group_members import SubmissionGroupMemberInterface
 from .submission_groups import SubmissionGroupInterface
+from .submissions import SubmissionCreate, SubmissionUploadResponseModel, SubmissionUploadedFile
 from .user_roles import UserRoleInterface
 from .users import UserInterface
 from .roles_claims import RoleClaimInterface
