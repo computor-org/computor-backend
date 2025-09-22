@@ -60,6 +60,15 @@ export interface CourseMemberReadinessStatus {
   has_account: boolean;
   is_ready: boolean;
   provider_account_id?: string | null;
+  provider_access_token?: string | null;
+}
+
+/**
+ * Validation parameters supplied when checking provider readiness.
+ */
+export interface CourseMemberValidationRequest {
+  /** Access token or credential used to validate provider ownership */
+  provider_access_token?: string | null;
 }
 
 export interface CourseProperties {
