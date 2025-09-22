@@ -1,10 +1,10 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List, Dict
 from uuid import UUID
 
 import logging
 from urllib.parse import urljoin
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Depends
 from gitlab import Gitlab
 from gitlab.exceptions import (
     GitlabCreateError,
@@ -39,6 +39,13 @@ from ctutor_backend.permissions.principal import Principal
 logger = logging.getLogger(__name__)
 
 user_router = APIRouter()
+
+
+COURSE_ROLE_VIEW_MAP: Dict[str, List[str]] = {
+    "_student": ["student"],
+    "_tutor": ["student", "tutor"],
+}
+ELEVATED_COURSE_ROLES = {"_lecturer", "_maintainer", "_owner"}
 
 
 def _load_member_with_provider_for_user(
@@ -460,6 +467,31 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
         user.password = encrypt_api_key(payload.password)
         db.commit()
         db.refresh(user)
+
+
+@user_router.get(
+    "/courses/{course_id}/views",
+    response_model=List[str],
+)
+async def get_course_views_for_current_user(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    course_member, *_ = _load_member_with_provider_for_user(course_id, permissions, db)
+
+    if not course_member or not course_member.course_role_id:
+        return []
+
+    role = course_member.course_role_id.lower()
+
+    if role in COURSE_ROLE_VIEW_MAP:
+        return COURSE_ROLE_VIEW_MAP[role]
+
+    if role in ELEVATED_COURSE_ROLES:
+        return ["student", "tutor", "lecturer"]
+
+    return []
 
 
 @user_router.post(
