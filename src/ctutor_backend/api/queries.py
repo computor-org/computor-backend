@@ -26,7 +26,7 @@ def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | 
             .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
             .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
     
-    query = query.filter(Result.status == 0)
+    query = query.filter(Result.status == 0, Result.test_system_id.isnot(None))
     
     if course_content_id != None:
         query = query.filter(Result.course_content_id == course_content_id)
@@ -54,7 +54,7 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
             .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
             .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
 
-    query = query.filter(Result.status == 0)
+    query = query.filter(Result.status == 0, Result.test_system_id.isnot(None))
     
     if course_content_id != None:
         query = query.filter(Result.course_content_id == course_content_id)

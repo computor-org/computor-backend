@@ -41,9 +41,11 @@ def run_test(auth: CLIAuthConfig):
 
     result = ResultGet(**custom_client.create("tests",test_create.model_dump()))
 
-    if handle_flow_runs(result.test_system_id, custom_client) == True:
-        
+    if result.test_system_id and handle_flow_runs(result.test_system_id, custom_client) == True:
+
         if click.confirm('Do you want to show test results?'):
             result = json.dumps(get_crud_client(auth,ResultInterface).get(result.id).result_json,indent=3)
             click.echo(result)
+    elif not result.test_system_id:
+        click.echo("Test run does not have an associated workflow; no status to display.")
     

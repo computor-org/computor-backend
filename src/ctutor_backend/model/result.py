@@ -33,7 +33,7 @@ class Result(Base):
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    test_system_id = Column(String(255), nullable=False)
+    test_system_id = Column(String(255), nullable=True)
     result = Column(Float(53), nullable=False)
     result_json = Column(JSONB)
     version_identifier = Column(String(2048), nullable=False)

@@ -15,7 +15,7 @@ class ResultCreate(BaseModel):
     course_content_id: str
     course_submission_group_id: str = None
     execution_backend_id: str
-    test_system_id: str
+    test_system_id: Optional[str] = None
     result: float
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
@@ -40,7 +40,7 @@ class ResultGet(BaseEntityGet):
     course_content_type_id: str
     course_submission_group_id: Optional[str] = None
     execution_backend_id: str
-    test_system_id: str
+    test_system_id: Optional[str] = None
     result: float
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
@@ -67,7 +67,7 @@ class ResultList(BaseModel):
     course_content_type_id: str
     course_submission_group_id: Optional[str] = None
     execution_backend_id: str
-    test_system_id: str
+    test_system_id: Optional[str] = None
     result: float
     version_identifier: str
     reference_version_identifier: Optional[str] = None
@@ -87,7 +87,7 @@ class ResultUpdate(BaseModel):
     result: Optional[float | None] = None
     result_json: Optional[dict | None] = None
     status: Optional[TaskStatus | None] = None
-    test_system_id: Optional[str | None] = None
+    test_system_id: Optional[str] = None
     properties: Optional[dict | None] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -230,7 +230,7 @@ class ResultDetailed(BaseModel):
     course_submission_group_id: Optional[str] = None
     submission_group_members: Optional[List[dict]] = []  # Group member info
     execution_backend_id: str
-    test_system_id: str
+    test_system_id: Optional[str] = None
     result: float
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None

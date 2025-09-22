@@ -15,7 +15,7 @@ from ctutor_backend.interface.results import (
     ResultUpdate,
     ResultQuery,
 )
-from ctutor_backend.interface.tasks import TaskStatus
+from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
 from ctutor_backend.model.result import Result
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_permissions
@@ -28,6 +28,8 @@ result_router = APIRouter(prefix="/results", tags=["results"])
 
 async def get_result_status(result: Result) -> TaskStatus:
     """Fetch the latest task status for a result from the task executor."""
+    if not result.test_system_id:
+        return map_int_to_task_status(result.status)
     try:
         task_executor = get_task_executor()
         task_info = await task_executor.get_task_status(result.test_system_id)
