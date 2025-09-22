@@ -511,6 +511,7 @@ export interface CourseContentStudentGet {
   submitted?: boolean | null;
   course_content_types: CourseContentTypeGet;
   result_count: number;
+  submission_count: number;
   max_test_runs?: number | null;
   unread_message_count?: number;
   result?: ResultStudentList | null;
@@ -531,6 +532,7 @@ export interface CourseContentStudentList {
   submitted?: boolean | null;
   course_content_type: CourseContentTypeList;
   result_count: number;
+  submission_count: number;
   max_test_runs?: number | null;
   directory?: string | null;
   color: string;
