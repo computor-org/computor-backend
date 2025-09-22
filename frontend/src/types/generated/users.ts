@@ -12,6 +12,14 @@ import type { StudentProfileGet } from './common';
 
 
 
+/**
+ * Request payload to set or update a provider account for a course member.
+ */
+export interface CourseMemberProviderAccountUpdate {
+  /** Account identifier on the external provider (e.g., GitLab username) */
+  provider_account_id: string;
+}
+
 export interface UserGroupCreate {
   /** User ID */
   user_id: string;

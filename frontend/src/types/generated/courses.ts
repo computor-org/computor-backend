@@ -46,6 +46,22 @@ export interface TutorCourseMemberList {
   user: UserList;
 }
 
+/**
+ * Readiness state for a course member to start working on provider-backed tasks.
+ */
+export interface CourseMemberReadinessStatus {
+  course_member_id: string;
+  course_id: string;
+  organization_id: string;
+  course_role_id: string;
+  provider_type?: string | null;
+  provider?: string | null;
+  requires_account: boolean;
+  has_account: boolean;
+  is_ready: boolean;
+  provider_account_id?: string | null;
+}
+
 export interface CourseProperties {
   gitlab?: GitLabConfig | null;
 }

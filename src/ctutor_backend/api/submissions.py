@@ -83,7 +83,7 @@ def _sanitize_archive_path(name: str) -> str:
 
 @submissions_router.post("", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
-    submission_payload: Annotated[str, Form(..., description="Submission metadata as JSON")],
+    submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
@@ -92,7 +92,7 @@ async def upload_submission(
     """Upload a submission file to MinIO and create a matching Result record."""
 
     try:
-        submission_data = SubmissionCreate.model_validate_json(submission_payload)
+        submission_data = SubmissionCreate.model_validate_json(submission_create)
     except ValidationError as validation_error:
         raise BadRequestException(detail=f"Invalid submission metadata: {validation_error}") from validation_error
 
