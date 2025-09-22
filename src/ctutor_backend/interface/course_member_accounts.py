@@ -12,6 +12,12 @@ class CourseMemberProviderAccountUpdate(BaseModel):
         max_length=255,
         description="Account identifier on the external provider (e.g., GitLab username)",
     )
+    provider_access_token: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=4096,
+        description="Personal access token or credential to verify provider ownership",
+    )
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -29,5 +35,17 @@ class CourseMemberReadinessStatus(BaseModel):
     has_account: bool
     is_ready: bool
     provider_account_id: Optional[str] = None
+    provider_access_token: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CourseMemberValidationRequest(BaseModel):
+    """Validation parameters supplied when checking provider readiness."""
+
+    provider_access_token: Optional[str] = Field(
+        default=None,
+        description="Access token or credential used to validate provider ownership",
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
