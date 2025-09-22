@@ -205,7 +205,6 @@ async def upload_submission(
     if archive_suffix != ".zip":
         raise BadRequestException("Only ZIP archives are supported for submissions")
 
-    manual_test_system_id = f"manual-submission-{uuid4()}"
     timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
     submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
     bucket_name = str(submission_group.id).lower()
@@ -321,7 +320,7 @@ async def upload_submission(
         course_content_id=course_content.id,
         course_content_type_id=course_content.course_content_type_id,
         execution_backend_id=course_content.execution_backend_id,
-        test_system_id=manual_test_system_id,
+        test_system_id=None,
         result=0.0,
         result_json=result_payload,
         properties=properties_payload,

@@ -205,44 +205,54 @@ async def create_test(
         if latest_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
             # Check actual Temporal workflow status
             try:
-                task_executor = get_task_executor()
-                actual_status = await task_executor.get_task_status(latest_result.test_system_id)
-                
-                # Check Temporal status
-                if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
-                    # Still running, return the existing one
-                    return build_test_run_response(latest_result)
-                elif actual_status.status == TaskStatus.FINISHED:
-                    # Workflow finished, check actual task result for errors
-                    actual_result = await task_executor.get_task_result(latest_result.test_system_id)
+                if not latest_result.test_system_id:
+                    logger.warning(
+                        "Result %s is missing a test_system_id while marked as in-progress; flagging as failed",
+                        latest_result.id,
+                    )
+                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                    db.commit()
+                    db.refresh(latest_result)
+                    # Will create a new run below
+                else:
+                    task_executor = get_task_executor()
+                    actual_status = await task_executor.get_task_status(latest_result.test_system_id)
 
-                    try:
-                        actual_result_status = TaskStatus(actual_result.status)
-                    except ValueError:
-                        actual_result_status = TaskStatus.FAILED
+                    # Check Temporal status
+                    if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                        # Still running, return the existing one
+                        return build_test_run_response(latest_result)
+                    elif actual_status.status == TaskStatus.FINISHED:
+                        # Workflow finished, check actual task result for errors
+                        actual_result = await task_executor.get_task_result(latest_result.test_system_id)
 
-                    if actual_result_status == TaskStatus.FINISHED and not actual_result.error:
-                        latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
-                        db.commit()
-                        db.refresh(latest_result)
+                        try:
+                            actual_result_status = TaskStatus(actual_result.status)
+                        except ValueError:
+                            actual_result_status = TaskStatus.FAILED
 
-                        if test_create.submit and not latest_result.submit:
-                            latest_result.submit = True
+                        if actual_result_status == TaskStatus.FINISHED and not actual_result.error:
+                            latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
                             db.commit()
                             db.refresh(latest_result)
-                        return build_test_run_response(latest_result)
 
-                    # Workflow reported an error or finished unsuccessfully
-                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
-                    db.commit()
-                    db.refresh(latest_result)
-                    # Will create a new run below
-                else:  # FAILED, CANCELLED, etc.
-                    # Update DB status to failed
-                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
-                    db.commit()
-                    db.refresh(latest_result)
-                    # Will create a new run below
+                            if test_create.submit and not latest_result.submit:
+                                latest_result.submit = True
+                                db.commit()
+                                db.refresh(latest_result)
+                            return build_test_run_response(latest_result)
+
+                        # Workflow reported an error or finished unsuccessfully
+                        latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                        db.commit()
+                        db.refresh(latest_result)
+                        # Will create a new run below
+                    else:  # FAILED, CANCELLED, etc.
+                        # Update DB status to failed
+                        latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                        db.commit()
+                        db.refresh(latest_result)
+                        # Will create a new run below
             except Exception as e:
                 # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
                 logger.warning(f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}")

@@ -155,173 +155,173 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
 
     return repositories
 
-@student_router.post("/course-contents/{course_content_id}/submit", response_model=SubmitResponse)
-async def submit_assignment(
-    course_content_id: str,
-    submit_request: SubmitRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
-    db: Session = Depends(get_db),
-    cache: BaseCache = Depends(get_redis_client)
-):
-    """
-    Create a merge request for submitting an assignment.
+# @student_router.post("/course-contents/{course_content_id}/submit", response_model=SubmitResponse)
+# async def submit_assignment(
+#     course_content_id: str,
+#     submit_request: SubmitRequest,
+#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     db: Session = Depends(get_db),
+#     cache: BaseCache = Depends(get_redis_client)
+# ):
+#     """
+#     Create a merge request for submitting an assignment.
     
-    This endpoint creates a GitLab merge request from the specified branch
-    to the submission branch for the given course content.
-    """
+#     This endpoint creates a GitLab merge request from the specified branch
+#     to the submission branch for the given course content.
+#     """
     
-    user_id = permissions.get_user_id_or_throw()
+#     user_id = permissions.get_user_id_or_throw()
     
-    # Get course content and validate access
-    course_content = await student_get_course_content_cached(
-        course_content_id, 
-        permissions, 
-        cache, 
-        db
-    )
+#     # Get course content and validate access
+#     course_content = await student_get_course_content_cached(
+#         course_content_id, 
+#         permissions, 
+#         cache, 
+#         db
+#     )
     
-    # Find the submission group for this course content that the user belongs to
-    submission_group = db.query(CourseSubmissionGroup).join(
-        CourseSubmissionGroupMember,
-        CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id
-    ).join(
-        CourseMember,
-        CourseMember.id == CourseSubmissionGroupMember.course_member_id
-    ).filter(
-        CourseSubmissionGroup.course_content_id == course_content_id,
-        CourseMember.user_id == user_id
-    ).first()
+#     # Find the submission group for this course content that the user belongs to
+#     submission_group = db.query(CourseSubmissionGroup).join(
+#         CourseSubmissionGroupMember,
+#         CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id
+#     ).join(
+#         CourseMember,
+#         CourseMember.id == CourseSubmissionGroupMember.course_member_id
+#     ).filter(
+#         CourseSubmissionGroup.course_content_id == course_content_id,
+#         CourseMember.user_id == user_id
+#     ).first()
     
-    if not submission_group:
-        raise NotFoundException(detail="No submission group found for this assignment")
+#     if not submission_group:
+#         raise NotFoundException(detail="No submission group found for this assignment")
     
-    # Check if submission group has GitLab configuration in properties
-    if not submission_group.properties or 'gitlab' not in submission_group.properties:
-        raise BadRequestException(detail="GitLab not configured for this submission group")
+#     # Check if submission group has GitLab configuration in properties
+#     if not submission_group.properties or 'gitlab' not in submission_group.properties:
+#         raise BadRequestException(detail="GitLab not configured for this submission group")
 
     
-    # First, check if there's a result for this submission group
-    from ctutor_backend.model.result import Result
+#     # First, check if there's a result for this submission group
+#     from ctutor_backend.model.result import Result
     
-    # Find the last result for this submission group
-    last_result = db.query(Result).filter(
-        Result.course_submission_group_id == submission_group.id
-    ).order_by(Result.created_at.desc()).first()
+#     # Find the last result for this submission group
+#     last_result = db.query(Result).filter(
+#         Result.course_submission_group_id == submission_group.id
+#     ).order_by(Result.created_at.desc()).first()
     
-    if not last_result:
-        raise BadRequestException(detail="No test results found. You must run tests before submitting.")
+#     if not last_result:
+#         raise BadRequestException(detail="No test results found. You must run tests before submitting.")
     
-    gitlab_config = submission_group.properties.get('gitlab', {})
+#     gitlab_config = submission_group.properties.get('gitlab', {})
     
-    # Extract GitLab URL and namespace path from submission group properties
-    gitlab_url = gitlab_config.get('url')
-    namespace_path = gitlab_config.get('full_path')
+#     # Extract GitLab URL and namespace path from submission group properties
+#     gitlab_url = gitlab_config.get('url')
+#     namespace_path = gitlab_config.get('full_path')
     
-    if not gitlab_url:
-        raise BadRequestException(detail="GitLab URL not configured in submission group")
+#     if not gitlab_url:
+#         raise BadRequestException(detail="GitLab URL not configured in submission group")
     
-    if not namespace_path:
-        raise BadRequestException(detail="GitLab namespace path not configured in submission group")
+#     if not namespace_path:
+#         raise BadRequestException(detail="GitLab namespace path not configured in submission group")
     
-    # Initialize GitLab client with the token from request
-    gitlab = Gitlab(url=gitlab_url, private_token=submit_request.gitlab_token)
+#     # Initialize GitLab client with the token from request
+#     gitlab = Gitlab(url=gitlab_url, private_token=submit_request.gitlab_token)
 
-    try:
-        projects = gitlab.projects.list(
-            search=namespace_path,  # Search by project name
-            search_namespaces=True
-        )
+#     try:
+#         projects = gitlab.projects.list(
+#             search=namespace_path,  # Search by project name
+#             search_namespaces=True
+#         )
         
-        # Filter to find exact match
-        matching_projects = [p for p in projects if p.path_with_namespace == namespace_path]
+#         # Filter to find exact match
+#         matching_projects = [p for p in projects if p.path_with_namespace == namespace_path]
         
-        if len(matching_projects) == 0:
-            raise NotFoundException(detail=f"Repository not found at path: {namespace_path}")
-        elif len(matching_projects) > 1:
-            raise InternalServerException(detail="Multiple repositories found with same path")
+#         if len(matching_projects) == 0:
+#             raise NotFoundException(detail=f"Repository not found at path: {namespace_path}")
+#         elif len(matching_projects) > 1:
+#             raise InternalServerException(detail="Multiple repositories found with same path")
         
-        project = matching_projects[0]
-    except Exception as search_error:
-        logger.error(f"Failed to find GitLab project at {namespace_path}: {search_error}")
-        raise NotFoundException(detail=f"Failed to find repository: {namespace_path}")
+#         project = matching_projects[0]
+#     except Exception as search_error:
+#         logger.error(f"Failed to find GitLab project at {namespace_path}: {search_error}")
+#         raise NotFoundException(detail=f"Failed to find repository: {namespace_path}")
     
-    # Prepare merge request data
-    mr_title = submit_request.title or f"Submission: {course_content.path}"
-    mr_description = submit_request.description or f"Assignment submission for {course_content.title}"
+#     # Prepare merge request data
+#     mr_title = submit_request.title or f"Submission: {course_content.path}"
+#     mr_description = submit_request.description or f"Assignment submission for {course_content.title}"
     
-    # The target branch is typically the submission branch for the assignment
-    target_branch = f"submission/{course_content.path}"
+#     # The target branch is typically the submission branch for the assignment
+#     target_branch = f"submission/{course_content.path}"
     
-    merge_request = None
-    merge_request_exists = False
+#     merge_request = None
+#     merge_request_exists = False
     
-    try:
-        # First check if a merge request already exists from this branch
-        existing_mrs = project.mergerequests.list(
-            source_branch=submit_request.branch_name,
-            state='opened'  # Only look for open merge requests
-        )
+#     try:
+#         # First check if a merge request already exists from this branch
+#         existing_mrs = project.mergerequests.list(
+#             source_branch=submit_request.branch_name,
+#             state='opened'  # Only look for open merge requests
+#         )
         
-        if existing_mrs:
-            # Merge request already exists, use the existing one
-            merge_request = existing_mrs[0]
-            merge_request_exists = True
-            logger.info(f"Using existing merge request {merge_request.iid} for branch {submit_request.branch_name}")
-        else:
-            # Check if target branch exists, if not use 'main' or 'master'
-            branches = project.branches.list()
-            branch_names = [b.name for b in branches]
+#         if existing_mrs:
+#             # Merge request already exists, use the existing one
+#             merge_request = existing_mrs[0]
+#             merge_request_exists = True
+#             logger.info(f"Using existing merge request {merge_request.iid} for branch {submit_request.branch_name}")
+#         else:
+#             # Check if target branch exists, if not use 'main' or 'master'
+#             branches = project.branches.list()
+#             branch_names = [b.name for b in branches]
             
-            if target_branch not in branch_names:
-                # Fallback to main or master
-                if 'main' in branch_names:
-                    target_branch = 'main'
-                elif 'master' in branch_names:
-                    target_branch = 'master'
-                else:
-                    # Use the default branch
-                    target_branch = project.default_branch
+#             if target_branch not in branch_names:
+#                 # Fallback to main or master
+#                 if 'main' in branch_names:
+#                     target_branch = 'main'
+#                 elif 'master' in branch_names:
+#                     target_branch = 'master'
+#                 else:
+#                     # Use the default branch
+#                     target_branch = project.default_branch
             
-            # Create new merge request
-            merge_request = project.mergerequests.create({
-                'source_branch': submit_request.branch_name,
-                'target_branch': target_branch,
-                'title': mr_title,
-                'description': mr_description,
-                'remove_source_branch_after_merge': False,  # Keep student's branch
-                'squash': False  # Preserve commit history
-            })
-            logger.info(f"Created new merge request {merge_request.iid} for branch {submit_request.branch_name}")
+#             # Create new merge request
+#             merge_request = project.mergerequests.create({
+#                 'source_branch': submit_request.branch_name,
+#                 'target_branch': target_branch,
+#                 'title': mr_title,
+#                 'description': mr_description,
+#                 'remove_source_branch_after_merge': False,  # Keep student's branch
+#                 'squash': False  # Preserve commit history
+#             })
+#             logger.info(f"Created new merge request {merge_request.iid} for branch {submit_request.branch_name}")
         
-        # Update the last result to mark it as submitted
-        last_result.submit = True
-        db.commit()
-        logger.info(f"Marked result {last_result.id} as submitted")
+#         # Update the last result to mark it as submitted
+#         last_result.submit = True
+#         db.commit()
+#         logger.info(f"Marked result {last_result.id} as submitted")
         
-        # Cache the merge request for quick retrieval
-        cache_key = f"{user_id}:merge_request:{course_content_id}"
-        await cache.set(cache_key, json.dumps(merge_request.asdict()), ttl=1800)
+#         # Cache the merge request for quick retrieval
+#         cache_key = f"{user_id}:merge_request:{course_content_id}"
+#         await cache.set(cache_key, json.dumps(merge_request.asdict()), ttl=1800)
         
-        # Return the response
-        return SubmitResponse(
-            merge_request_id=merge_request.id,
-            merge_request_iid=merge_request.iid,
-            web_url=merge_request.web_url,
-            source_branch=merge_request.source_branch,
-            target_branch=merge_request.target_branch,
-            title=merge_request.title,
-            state=merge_request.state
-        )
+#         # Return the response
+#         return SubmitResponse(
+#             merge_request_id=merge_request.id,
+#             merge_request_iid=merge_request.iid,
+#             web_url=merge_request.web_url,
+#             source_branch=merge_request.source_branch,
+#             target_branch=merge_request.target_branch,
+#             title=merge_request.title,
+#             state=merge_request.state
+#         )
         
-    except Exception as e:
-        logger.error(f"Failed to handle merge request: {e}")
-        # Roll back the submit flag if merge request handling failed
-        db.rollback()
+#     except Exception as e:
+#         logger.error(f"Failed to handle merge request: {e}")
+#         # Roll back the submit flag if merge request handling failed
+#         db.rollback()
         
-        # Check if it's a specific GitLab error
-        if "already exists" in str(e).lower() and not merge_request_exists:
-            raise BadRequestException(detail="A merge request from this branch already exists")
-        elif "not found" in str(e).lower():
-            raise BadRequestException(detail=f"Branch '{submit_request.branch_name}' not found in repository")
-        else:
-            raise InternalServerException(detail=f"Failed to handle merge request: {str(e)}")
+#         # Check if it's a specific GitLab error
+#         if "already exists" in str(e).lower() and not merge_request_exists:
+#             raise BadRequestException(detail="A merge request from this branch already exists")
+#         elif "not found" in str(e).lower():
+#             raise BadRequestException(detail=f"Branch '{submit_request.branch_name}' not found in repository")
+#         else:
+#             raise InternalServerException(detail=f"Failed to handle merge request: {str(e)}")
