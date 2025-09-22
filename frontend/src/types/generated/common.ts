@@ -630,7 +630,7 @@ export interface ResultCreate {
   course_content_id: string;
   course_submission_group_id?: string;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   result_json?: any | null;
   properties?: any | null;
@@ -653,7 +653,7 @@ export interface ResultGet {
   course_content_type_id: string;
   course_submission_group_id?: string | null;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   result_json?: any | null;
   properties?: any | null;
@@ -671,7 +671,7 @@ export interface ResultList {
   course_content_type_id: string;
   course_submission_group_id?: string | null;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   version_identifier: string;
   reference_version_identifier?: string | null;
@@ -723,7 +723,7 @@ export interface ResultWithGrading {
   course_content_type_id: string;
   course_submission_group_id?: string | null;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   result_json?: any | null;
   properties?: any | null;
@@ -750,7 +750,7 @@ export interface ResultDetailed {
   course_submission_group_id?: string | null;
   submission_group_members?: any[] | null;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   result_json?: any | null;
   properties?: any | null;
@@ -2204,7 +2204,7 @@ export interface TestRunResponse {
   course_content_id: string;
   course_submission_group_id?: string;
   execution_backend_id: string;
-  test_system_id: string;
+  test_system_id?: string | null;
   result: number;
   result_json?: any | null;
   properties?: any | null;

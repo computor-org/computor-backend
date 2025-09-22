@@ -27,11 +27,12 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     result_count = query[1]
     result = query[2]
     course_submission_group = query[3]
-    submitted_count = query[4] if len(query) > 4 else None
-    submission_status_int = query[5] if len(query) > 5 else None
-    submission_grading = query[6] if len(query) > 6 else None
-    content_unread_count = query[7] if len(query) > 7 else 0
-    submission_group_unread_count = query[8] if len(query) > 8 else 0
+    submission_count = query[4] if len(query) > 4 else None
+    submitted_count = query[5] if len(query) > 5 else None
+    submission_status_int = query[6] if len(query) > 6 else None
+    submission_grading = query[7] if len(query) > 7 else None
+    content_unread_count = query[8] if len(query) > 8 else 0
+    submission_group_unread_count = query[9] if len(query) > 9 else 0
 
     content_unread_count = content_unread_count or 0
     submission_group_unread_count = submission_group_unread_count or 0
@@ -175,6 +176,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         submitted=True if submitted_count not in (None, 0) else False,
         course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
         result_count=result_count if result_count is not None else 0,
+        submission_count=submission_count if submission_count is not None else 0,
         max_test_runs=course_content.max_test_runs,
         directory=directory,
         color=course_content.course_content_type.color,
@@ -202,6 +204,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         submitted=list_obj.submitted,
         course_content_types=CourseContentTypeGet.model_validate(course_content.course_content_type),
         result_count=list_obj.result_count,
+        submission_count=list_obj.submission_count,
         max_test_runs=list_obj.max_test_runs,
         unread_message_count=list_obj.unread_message_count,
         result=list_obj.result,

@@ -41,7 +41,8 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
     query = db.query(
                 Result.course_content_id,
                 func.count(Result.id).label("total_results_count"),
-                func.count(case((Result.submit == True, 1))).label("submitted_count")
+                func.count(case((Result.submit == True, 1))).label("submitted_count"),
+                func.count(case((Result.test_system_id.is_(None), 1))).label("submission_count"),
             )
 
     if user_id != None:
@@ -171,6 +172,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         results_count_sub.c.total_results_count,
         Result,
         CourseSubmissionGroup,
+        results_count_sub.c.submission_count,
         results_count_sub.c.submitted_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
@@ -281,6 +283,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         results_count_sub.c.total_results_count,
         Result,
         CourseSubmissionGroup,
+        results_count_sub.c.submission_count,
         results_count_sub.c.submitted_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
@@ -373,6 +376,7 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             results_count_sub.c.total_results_count,
             Result,
             CourseSubmissionGroup,
+            results_count_sub.c.submission_count,
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
@@ -471,6 +475,7 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             results_count_sub.c.total_results_count,
             Result,
             CourseSubmissionGroup,
+            results_count_sub.c.submission_count,
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
