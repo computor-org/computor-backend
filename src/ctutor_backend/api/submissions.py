@@ -319,7 +319,8 @@ async def upload_submission(
         course_submission_group_id=submission_group.id,
         course_content_id=course_content.id,
         course_content_type_id=course_content.course_content_type_id,
-        execution_backend_id=course_content.execution_backend_id,
+        # No execution backend is associated until a test run is triggered later
+        execution_backend_id=None,
         test_system_id=None,
         result=0.0,
         result_json=result_payload,

@@ -14,7 +14,7 @@ class ResultCreate(BaseModel):
     course_member_id: str
     course_content_id: str
     course_submission_group_id: str = None
-    execution_backend_id: str
+    execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     result_json: Optional[dict | None] = None
@@ -39,7 +39,7 @@ class ResultGet(BaseEntityGet):
     course_content_id: str
     course_content_type_id: str
     course_submission_group_id: Optional[str] = None
-    execution_backend_id: str
+    execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     result_json: Optional[dict | None] = None
@@ -66,7 +66,7 @@ class ResultList(BaseModel):
     course_content_id: str
     course_content_type_id: str
     course_submission_group_id: Optional[str] = None
-    execution_backend_id: str
+    execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     version_identifier: str

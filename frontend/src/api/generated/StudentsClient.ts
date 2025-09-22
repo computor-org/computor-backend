@@ -3,7 +3,7 @@
  * Endpoint: /students
  */
 
-import type { CourseContentStudentGet, CourseContentStudentList, CourseStudentGet, CourseStudentList, SubmitRequest, SubmitResponse } from 'types/generated';
+import type { CourseContentStudentGet, CourseContentStudentList, CourseStudentGet, CourseStudentList } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -73,15 +73,5 @@ export class StudentsClient extends BaseEndpointClient {
    */
   async getSignupInitDataStudentsRepositoriesGet(): Promise<string[]> {
     return this.client.get<string[]>(this.buildPath('repositories'));
-  }
-
-  /**
-   * Submit Assignment
-   * Create a merge request for submitting an assignment.
-   * This endpoint creates a GitLab merge request from the specified branch
-   * to the submission branch for the given course content.
-   */
-  async submitAssignmentStudentsCourseContentsCourseContentIdSubmitPost({ courseContentId, body }: { courseContentId: string; body: SubmitRequest }): Promise<SubmitResponse> {
-    return this.client.post<SubmitResponse>(this.buildPath('course-contents', courseContentId, 'submit'), body);
   }
 }
