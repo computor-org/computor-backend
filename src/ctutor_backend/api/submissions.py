@@ -154,6 +154,7 @@ async def upload_submission(
         raise BadRequestException(detail="version_identifier exceeds maximum length of 2048 characters")
 
     manual_version_identifier = trimmed_version or f"manual-{uuid4()}"
+    submit_flag = submission_data.submit
 
     non_unique_statuses = [
         map_task_status_to_int(TaskStatus.FAILED),
@@ -314,7 +315,7 @@ async def upload_submission(
     }
 
     result_record = Result(
-        submit=True,
+        submit=submit_flag,
         course_member_id=submitting_member.id,
         course_submission_group_id=submission_group.id,
         course_content_id=course_content.id,

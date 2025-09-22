@@ -11,6 +11,7 @@ class SubmissionCreate(BaseModel):
 
     course_submission_group_id: str
     version_identifier: Optional[str] = None
+    submit: bool = False
 
 
 class SubmissionUploadedFile(BaseModel):
