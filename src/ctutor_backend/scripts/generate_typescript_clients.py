@@ -115,6 +115,17 @@ class OperationMethod:
     type_dependencies: Set[str] = field(default_factory=set)
 
 
+@dataclass
+class EndpointDocEntry:
+    """Represents a single endpoint entry for documentation purposes."""
+
+    method_name: str
+    http_method: str
+    path: str
+    request_type: str
+    response_type: str
+
+
 class TypeScriptClientGenerator:
     """Generate TypeScript API client classes from interface metadata."""
 
@@ -239,6 +250,8 @@ class TypeScriptClientGenerator:
 
         generated_paths.append(self._write_index(all_clients))
 
+        self._write_markdown_summary(all_clients)
+
         self._remove_stale_files(generated_paths)
 
         return generated_paths
@@ -354,6 +367,194 @@ class TypeScriptClientGenerator:
 
         content = "\n".join(exports)
         return self._write_file("index.ts", content)
+
+    def _write_markdown_summary(self, interfaces: list[InterfaceMetadata]) -> Path:
+        """Write a markdown summary of generated endpoints."""
+
+        summary_lines: List[str] = ["# API Client Endpoint Summary"]
+        if self.include_timestamp:
+            summary_lines.append(f"_Generated on: {self._current_timestamp()}_")
+        summary_lines.append("")
+
+        wrote_section = False
+
+        for meta in interfaces:
+            entries = self._collect_endpoint_entries(meta)
+            if not entries:
+                continue
+
+            wrote_section = True
+
+            summary_lines.append(f"## {meta.client_class_name}")
+            summary_lines.append(f"- Base path: `{self._normalize_path(meta.base_path)}`")
+            if meta.is_custom:
+                summary_lines.append("- Note: custom operations discovered from OpenAPI schema")
+            summary_lines.append("")
+            summary_lines.append("| TS Method | HTTP | Path | Request | Response |")
+            summary_lines.append("| --- | --- | --- | --- | --- |")
+
+            for entry in entries:
+                summary_lines.append(
+                    f"| `{entry.method_name}` | {entry.http_method} | `{entry.path}` | {entry.request_type} | {entry.response_type} |"
+                )
+
+            summary_lines.append("")
+
+        if not wrote_section:
+            summary_lines.append("_No endpoints discovered._")
+
+        content = "\n".join(summary_lines).rstrip() + "\n"
+        path = self.output_dir / "client-endpoints.md"
+        path.write_text(content, encoding="utf-8")
+        print(f"📝 Wrote endpoint summary {path.relative_to(PROJECT_ROOT)}")
+        return path
+
+    def _collect_endpoint_entries(self, meta: InterfaceMetadata) -> List[EndpointDocEntry]:
+        entries: List[EndpointDocEntry] = []
+        base_path = self._normalize_path(meta.base_path)
+
+        if not meta.is_custom:
+            entries.extend(self._standard_operation_entries(meta, base_path))
+
+        seen: Set[Tuple[str, str]] = {(entry.http_method, entry.path) for entry in entries}
+
+        for operation in meta.extra_operations:
+            path = self._compose_path(base_path, *self._operation_segments(operation))
+            request_type = self._format_request_type(operation.body_type, optional=not operation.body_required)
+            response_type = self._format_type(operation.response_type)
+            key = (operation.http_method.upper(), path)
+            if key in seen:
+                continue
+
+            entries.append(
+                EndpointDocEntry(
+                    method_name=operation.method_name,
+                    http_method=operation.http_method.upper(),
+                    path=path,
+                    request_type=request_type,
+                    response_type=response_type,
+                )
+            )
+            seen.add(key)
+
+        return entries
+
+    def _standard_operation_entries(self, meta: InterfaceMetadata, base_path: str) -> List[EndpointDocEntry]:
+        entries: List[EndpointDocEntry] = []
+
+        if meta.create is not None:
+            request_type = self._format_type(meta.create.__name__)
+            response_model = (meta.get or meta.create)
+            response_type = self._format_type(response_model.__name__ if response_model else None)
+            entries.append(
+                EndpointDocEntry(
+                    method_name="create",
+                    http_method="POST",
+                    path=base_path,
+                    request_type=request_type,
+                    response_type=response_type,
+                )
+            )
+
+        if meta.get is not None:
+            response_type = self._format_type(meta.get.__name__)
+            entries.append(
+                EndpointDocEntry(
+                    method_name="get",
+                    http_method="GET",
+                    path=self._compose_path(base_path, "{id}"),
+                    request_type=self._format_type(None),
+                    response_type=response_type,
+                )
+            )
+
+        if meta.list_model is not None:
+            request_type = self._format_type(meta.query.__name__ if meta.query is not None else None)
+            response_type = self._format_type(f"{meta.list_model.__name__}[]")
+            entries.append(
+                EndpointDocEntry(
+                    method_name="list",
+                    http_method="GET",
+                    path=base_path,
+                    request_type=request_type,
+                    response_type=response_type,
+                )
+            )
+
+        if meta.update is not None:
+            request_type = self._format_type(meta.update.__name__)
+            response_model = (meta.get or meta.update)
+            response_type = self._format_type(response_model.__name__ if response_model else None)
+            entries.append(
+                EndpointDocEntry(
+                    method_name="update",
+                    http_method="PATCH",
+                    path=self._compose_path(base_path, "{id}"),
+                    request_type=request_type,
+                    response_type=response_type,
+                )
+            )
+
+        if meta.create is not None or meta.update is not None:
+            entries.append(
+                EndpointDocEntry(
+                    method_name="delete",
+                    http_method="DELETE",
+                    path=self._compose_path(base_path, "{id}"),
+                    request_type=self._format_type(None),
+                    response_type=self._format_type("void"),
+                )
+            )
+
+        if meta.has_archive:
+            entries.append(
+                EndpointDocEntry(
+                    method_name="archive",
+                    http_method="PATCH",
+                    path=self._compose_path(base_path, "{id}", "archive"),
+                    request_type=self._format_type(None),
+                    response_type=self._format_type("void"),
+                )
+            )
+
+        return entries
+
+    def _operation_segments(self, operation: OperationMethod) -> List[str]:
+        segments: List[str] = []
+        for segment in operation.path_segments:
+            if segment.literal is not None:
+                segments.append(segment.literal)
+            elif segment.parameter is not None:
+                segments.append(f"{{{segment.parameter.name}}}")
+        return segments
+
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        parts = [part for part in path.strip('/').split('/') if part]
+        if not parts:
+            return '/'
+        return '/' + '/'.join(parts)
+
+    def _compose_path(self, base_path: str, *segments: str) -> str:
+        base_parts = [part for part in base_path.strip('/').split('/') if part]
+        segment_parts = [segment.strip('/') for segment in segments if segment]
+        parts = base_parts + segment_parts
+        if not parts:
+            return '/'
+        return '/' + '/'.join(parts)
+
+    @staticmethod
+    def _format_request_type(value: Optional[str], optional: bool = False) -> str:
+        if not value:
+            return '—'
+        suffix = ' (optional)' if optional else ''
+        return f"`{value}`{suffix}"
+
+    @staticmethod
+    def _format_type(value: Optional[str]) -> str:
+        if not value:
+            return '—'
+        return f"`{value}`"
 
     # ------------------------------------------------------------------
     # Utility helpers
