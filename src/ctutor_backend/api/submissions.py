@@ -8,11 +8,12 @@ from pathlib import PurePosixPath
 from typing import Annotated, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 from pydantic import ValidationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from ctutor_backend.api.crud import list_db
 from ctutor_backend.api.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -35,6 +36,9 @@ from ctutor_backend.storage_security import perform_full_file_validation, saniti
 from ctutor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 from ctutor_backend.interface.submissions import (
     SubmissionCreate,
+    SubmissionInterface,
+    SubmissionListItem,
+    SubmissionQuery,
     SubmissionUploadResponseModel,
     SubmissionUploadedFile,
 )
@@ -79,6 +83,20 @@ def _sanitize_archive_path(name: str) -> str:
         raise BadRequestException("Archive contains an empty file path")
 
     return "/".join(parts)
+
+
+@submissions_router.get("", response_model=list[SubmissionListItem])
+async def list_submissions(
+    response: Response,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    params: SubmissionQuery = Depends(),
+    db: Session = Depends(get_db),
+):
+    """List manual submission results with optional filtering."""
+
+    submissions, total = await list_db(permissions, db, params, SubmissionInterface)
+    response.headers["X-Total-Count"] = str(total)
+    return submissions
 
 
 @submissions_router.post("", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
