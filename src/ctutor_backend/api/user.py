@@ -4,7 +4,7 @@ from uuid import UUID
 import logging
 from urllib.parse import urljoin
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from gitlab import Gitlab
 from gitlab.exceptions import (
     GitlabCreateError,
@@ -462,14 +462,14 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
         db.refresh(user)
 
 
-@user_router.get(
+@user_router.post(
     "/courses/{course_id}/validate",
     response_model=CourseMemberReadinessStatus,
 )
 async def validate_current_user_course(
     course_id: UUID | str,
+    validation: CourseMemberValidationRequest,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
-    validation: CourseMemberValidationRequest = Depends(),
     db: Session = Depends(get_db),
 ):
     (
@@ -481,6 +481,7 @@ async def validate_current_user_course(
     ) = _load_member_with_provider_for_user(course_id, permissions, db)
     existing_account = _get_existing_account(db, course_member.user_id, provider_url)
 
+    validation = validation or CourseMemberValidationRequest()
     provider_access_token = validation.provider_access_token
 
     if provider_type == "gitlab" and provider_url:
