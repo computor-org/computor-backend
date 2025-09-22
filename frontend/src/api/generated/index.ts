@@ -49,4 +49,5 @@ export * from './UserClient';
 export * from './InfoClient';
 export * from './TasksClient';
 export * from './SsoClient';
+export * from './SubmissionsClient';
 export * from './MiscClient';

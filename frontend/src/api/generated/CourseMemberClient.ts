@@ -32,18 +32,4 @@ export class CourseMemberClient extends BaseEndpointClient {
   async delete(id: string | number): Promise<void> {
     await this.client.delete<void>(this.buildPath(id));
   }
-
-  /**
-   * Get Protocol
-   */
-  async getProtocolCourseMembersCourseMemberIdProtocolGet({ courseMemberId }: { courseMemberId: string | string }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath(courseMemberId, 'protocol'));
-  }
-
-  /**
-   * Get Protocol 2
-   */
-  async getProtocol2CourseMembersCourseMemberIdProtocol2Get({ courseMemberId }: { courseMemberId: string | string }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath(courseMemberId, 'protocol2'));
-  }
 }

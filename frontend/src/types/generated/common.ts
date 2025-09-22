@@ -629,7 +629,7 @@ export interface ResultCreate {
   course_member_id: string;
   course_content_id: string;
   course_submission_group_id?: string;
-  execution_backend_id: string;
+  execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
   result_json?: any | null;
@@ -652,7 +652,7 @@ export interface ResultGet {
   course_content_id: string;
   course_content_type_id: string;
   course_submission_group_id?: string | null;
-  execution_backend_id: string;
+  execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
   result_json?: any | null;
@@ -670,7 +670,7 @@ export interface ResultList {
   course_content_id: string;
   course_content_type_id: string;
   course_submission_group_id?: string | null;
-  execution_backend_id: string;
+  execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
   version_identifier: string;
@@ -722,7 +722,7 @@ export interface ResultWithGrading {
   course_content_id: string;
   course_content_type_id: string;
   course_submission_group_id?: string | null;
-  execution_backend_id: string;
+  execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
   result_json?: any | null;
@@ -2203,7 +2203,7 @@ export interface TestRunResponse {
   course_member_id: string;
   course_content_id: string;
   course_submission_group_id?: string;
-  execution_backend_id: string;
+  execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
   result_json?: any | null;

@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 import logging
 from fastapi import Depends, APIRouter
 from sqlalchemy import func
@@ -34,13 +34,21 @@ class TestRunResponse(ResultCreate):
 
 def build_test_run_response(result: Result) -> TestRunResponse:
     """Convert a Result ORM instance into the API response model."""
+    execution_backend_id = (
+        str(result.execution_backend_id)
+        if result.execution_backend_id is not None
+        else None
+    )
+
     return TestRunResponse(
         id=str(result.id),
         submit=result.submit,
         course_member_id=str(result.course_member_id),
         course_content_id=str(result.course_content_id),
-        course_submission_group_id=str(result.course_submission_group_id) if result.course_submission_group_id else None,
-        execution_backend_id=str(result.execution_backend_id),
+        course_submission_group_id=str(result.course_submission_group_id)
+        if result.course_submission_group_id
+        else None,
+        execution_backend_id=execution_backend_id,
         test_system_id=result.test_system_id,
         result=result.result,
         result_json=result.result_json,
@@ -174,12 +182,99 @@ async def create_test(
 
     # Check for existing results with same commit
     # With the new partial indexes, we can have multiple failed results with the same version_identifier
-    existing_results = db.query(Result) \
+    existing_results = (
+        db.query(Result)
         .filter(
             Result.course_member_id == course_member_id,
             Result.course_content_id == assignment.id,
-            Result.version_identifier == commit
-        ).all()
+            Result.version_identifier == commit,
+        )
+        .all()
+    )
+
+    reuse_existing_result: Optional[Result] = None
+    latest_result: Optional[Result] = None
+
+    if existing_results:
+        # Sort by created_at to get the most recent
+        latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
+
+        if latest_result.test_system_id is None:
+            # Manual submission without test run yet; reuse this result entry
+            reuse_existing_result = latest_result
+        else:
+            # Check if the latest result is still running according to DB
+            # Status values: 0=COMPLETED, 1=FAILED, 2=CANCELLED, 3=SCHEDULED, 4=PENDING, 5=RUNNING, 7=PAUSED
+            if latest_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
+                # Check actual Temporal workflow status
+                try:
+                    if not latest_result.test_system_id:
+                        logger.warning(
+                            "Result %s is missing a test_system_id while marked as in-progress; flagging as failed",
+                            latest_result.id,
+                        )
+                        latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                        db.commit()
+                        db.refresh(latest_result)
+                        # Will create a new run below
+                    else:
+                        task_executor = get_task_executor()
+                        actual_status = await task_executor.get_task_status(latest_result.test_system_id)
+
+                        # Check Temporal status
+                        if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                            # Still running, return the existing one
+                            return build_test_run_response(latest_result)
+                        elif actual_status.status == TaskStatus.FINISHED:
+                            # Workflow finished, check actual task result for errors
+                            actual_result = await task_executor.get_task_result(latest_result.test_system_id)
+
+                            try:
+                                actual_result_status = TaskStatus(actual_result.status)
+                            except ValueError:
+                                actual_result_status = TaskStatus.FAILED
+
+                            if actual_result_status == TaskStatus.FINISHED and not actual_result.error:
+                                latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
+                                db.commit()
+                                db.refresh(latest_result)
+
+                                if test_create.submit and not latest_result.submit:
+                                    latest_result.submit = True
+                                    db.commit()
+                                    db.refresh(latest_result)
+                                return build_test_run_response(latest_result)
+
+                            # Workflow reported an error or finished unsuccessfully
+                            latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                            db.commit()
+                            db.refresh(latest_result)
+                            # Will create a new run below
+                        else:  # FAILED, CANCELLED, etc.
+                            # Update DB status to failed
+                            latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                            db.commit()
+                            db.refresh(latest_result)
+                            # Will create a new run below
+                except Exception as e:
+                    # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
+                    logger.warning(
+                        f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}"
+                    )
+                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                    db.commit()
+                    db.refresh(latest_result)
+                    # Will create a new run below
+
+            # If completed successfully and only updating submit flag
+            elif latest_result.status == 0:  # COMPLETED
+                if test_create.submit and not latest_result.submit:
+                    latest_result.submit = True
+                    db.commit()
+                    db.refresh(latest_result)
+                return build_test_run_response(latest_result)
+
+            # If failed/crashed/cancelled, we'll create a new run below
 
     # Get submission group
     course_submission_group = db.query(CourseSubmissionGroup) \
@@ -350,26 +445,38 @@ async def create_test(
     import uuid
     workflow_id = f"student-testing-{str(uuid.uuid4())}"
 
-    # Create result entry with the pre-generated workflow ID
-    result_create = Result(
-        submit=test_create.submit or False,  # Store submit flag as boolean
-        course_member_id=course_member_id,
-        course_submission_group_id=course_submission_group_id,
-        course_content_id=assignment.id,
-        course_content_type_id=course_content.course_content_type_id,  # Keep for now, can be removed later
-        execution_backend_id=execution_backend.id,
-        test_system_id=workflow_id,  # Use the pre-generated workflow ID
-        result=0,
-        result_json=None,
-        properties=None,
-        status=map_task_status_to_int(TaskStatus.QUEUED),  # Start as QUEUED
-        version_identifier=commit,
-        reference_version_identifier=reference_commit
-    )
+    # Create result entry with the pre-generated workflow ID or reuse a manual submission result
+    if reuse_existing_result:
+        result_record = reuse_existing_result
+        result_record.execution_backend_id = execution_backend.id
+        result_record.test_system_id = workflow_id
+        result_record.course_submission_group_id = course_submission_group_id
+        result_record.course_content_type_id = course_content.course_content_type_id
+        result_record.reference_version_identifier = reference_commit
+        result_record.status = map_task_status_to_int(TaskStatus.QUEUED)
+        result_record.result = result_record.result or 0
+        if test_create.submit and not result_record.submit:
+            result_record.submit = True
+    else:
+        result_record = Result(
+            submit=test_create.submit or False,  # Store submit flag as boolean
+            course_member_id=course_member_id,
+            course_submission_group_id=course_submission_group_id,
+            course_content_id=assignment.id,
+            course_content_type_id=course_content.course_content_type_id,  # Keep for now, can be removed later
+            execution_backend_id=execution_backend.id,
+            test_system_id=workflow_id,  # Use the pre-generated workflow ID
+            result=0,
+            result_json=None,
+            properties=None,
+            status=map_task_status_to_int(TaskStatus.QUEUED),  # Start as QUEUED
+            version_identifier=commit,
+            reference_version_identifier=reference_commit,
+        )
+        db.add(result_record)
 
-    db.add(result_create)
     db.commit()
-    db.refresh(result_create)
+    db.refresh(result_record)
 
     # Start Temporal workflow for testing with our pre-generated workflow ID
     try:
@@ -383,7 +490,7 @@ async def create_test(
                 parameters={
                     "test_job": job.model_dump(),
                     "execution_backend_properties": execution_backend.properties,
-                    "result_id": str(result_create.id)  # Pass the result ID to the workflow
+                    "result_id": str(result_record.id)  # Pass the result ID to the workflow
                 },
                 queue=execution_backend.properties.get("task_queue", "computor-tasks")
             )
@@ -395,17 +502,18 @@ async def create_test(
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
             
             # Update status to QUEUED now that task is submitted
-            result_create.status = map_task_status_to_int(TaskStatus.QUEUED)
+            result_record.status = map_task_status_to_int(TaskStatus.QUEUED)
             db.commit()
-            db.refresh(result_create)
+            db.refresh(result_record)
         else:
             raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
     except Exception as e:
         # If task submission fails, update result status to FAILED
-        result_create.status = map_task_status_to_int(TaskStatus.FAILED)
-        result_create.properties = {"error": str(e)}
+        result_record.status = map_task_status_to_int(TaskStatus.FAILED)
+        properties = result_record.properties or {}
+        result_record.properties = {**properties, "error": str(e)}
         db.commit()
-        db.refresh(result_create)
+        db.refresh(result_record)
         raise
 
-    return build_test_run_response(result_create)
+    return build_test_run_response(result_record)
