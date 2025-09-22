@@ -1,14 +1,14 @@
 # from collections import defaultdict
 # import os
 import os
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 from fastapi import Depends
 # from gitlab import Gitlab
 # from gitlab.v4.objects import ProjectCommit
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, joinedload
 
-from ctutor_backend.api.exceptions import NotFoundException
+from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 # from ctutor_backend.api.exceptions import BadRequestException, InternalServerException
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
@@ -17,10 +17,15 @@ from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.database import get_db
 # from ctutor_backend.generator.git_helper import clone_or_pull_and_checkout
 # from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
+from ctutor_backend.interface.accounts import AccountCreate
+from ctutor_backend.interface.course_member_accounts import (
+    CourseMemberProviderAccountUpdate,
+    CourseMemberReadinessStatus,
+)
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface
-from ctutor_backend.interface.courses import CourseGet
+from ctutor_backend.interface.courses import CourseGet, CourseProperties
 # from ctutor_backend.interface.git import get_git_commits
-# from ctutor_backend.interface.organizations import OrganizationProperties
+from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.api.api_builder import CrudRouter
 # from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserGet
@@ -28,11 +33,182 @@ from ctutor_backend.model.course import Course, CourseContent, CourseContentType
 from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
-from ctutor_backend.model.auth import User
+from ctutor_backend.model.auth import Account, User
 from sqlalchemy import func
 
 from ctutor_backend.settings import settings
 course_member_router = CrudRouter(CourseMemberInterface)
+
+
+def _load_course_member_with_provider(
+    course_member_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+):
+    course_member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .options(
+            joinedload(CourseMember.course).joinedload(Course.organization),
+            joinedload(CourseMember.user),
+        )
+        .filter(CourseMember.id == course_member_id)
+        .first()
+    )
+
+    if not course_member:
+        raise NotFoundException()
+
+    course = course_member.course
+    if not course:
+        raise NotFoundException(detail="Course not found for course member")
+
+    organization = course.organization
+    if not organization:
+        raise NotFoundException(detail="Organization not found for course")
+
+    org_props = (
+        OrganizationProperties(**organization.properties)
+        if organization.properties
+        else OrganizationProperties()
+    )
+
+    course_props = (
+        CourseProperties(**course.properties)
+        if course.properties
+        else CourseProperties()
+    )
+
+    provider_url: Optional[str] = None
+    if org_props.gitlab and org_props.gitlab.url:
+        provider_url = org_props.gitlab.url.strip()
+    elif course_props.gitlab and course_props.gitlab.url:
+        provider_url = course_props.gitlab.url.strip()
+
+    provider_type = "gitlab" if provider_url else None
+
+    return course_member, provider_url, provider_type
+
+
+def _get_existing_account(
+    db: Session,
+    course_member: CourseMember,
+    provider_url: Optional[str],
+):
+    if not provider_url:
+        return None
+
+    return (
+        db.query(Account)
+        .filter(
+            Account.user_id == course_member.user_id,
+            Account.provider == provider_url,
+            Account.type == "gitlab",
+        )
+        .first()
+    )
+
+
+def _build_validation_status(
+    course_member: CourseMember,
+    provider_url: Optional[str],
+    provider_type: Optional[str],
+    existing_account: Optional[Account],
+) -> CourseMemberReadinessStatus:
+    requires_account = bool(provider_url)
+    has_account = existing_account is not None
+
+    return CourseMemberReadinessStatus(
+        course_member_id=str(course_member.id),
+        course_id=str(course_member.course_id),
+        organization_id=str(course_member.course.organization_id),
+        course_role_id=course_member.course_role_id,
+        provider=provider_url,
+        provider_type=provider_type,
+        requires_account=requires_account,
+        has_account=has_account,
+        is_ready=(not requires_account) or has_account,
+        provider_account_id=existing_account.provider_account_id if existing_account else None,
+    )
+
+
+@course_member_router.router.get(
+    "/{course_member_id}/validate",
+    response_model=CourseMemberReadinessStatus,
+)
+async def validate_course_member(
+    course_member_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    course_member, provider_url, provider_type = _load_course_member_with_provider(
+        course_member_id, permissions, db
+    )
+    existing_account = _get_existing_account(db, course_member, provider_url)
+    return _build_validation_status(course_member, provider_url, provider_type, existing_account)
+
+
+@course_member_router.router.post(
+    "/{course_member_id}/register",
+    response_model=CourseMemberReadinessStatus,
+)
+async def register_course_member_provider_account(
+    course_member_id: UUID | str,
+    payload: CourseMemberProviderAccountUpdate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    course_member, provider_url, provider_type = _load_course_member_with_provider(
+        course_member_id, permissions, db
+    )
+
+    if not provider_url:
+        raise BadRequestException(
+            "Course organization does not define a GitLab provider, no account required."
+        )
+
+    provider_account_id = payload.provider_account_id.strip()
+
+    existing_account = _get_existing_account(db, course_member, provider_url)
+
+    conflicting_account = (
+        db.query(Account)
+        .filter(
+            Account.provider == provider_url,
+            Account.type == "gitlab",
+            Account.provider_account_id == provider_account_id,
+            Account.user_id != course_member.user_id,
+        )
+        .first()
+    )
+
+    if conflicting_account:
+        raise BadRequestException(
+            "Provider account ID is already linked to another user for this provider."
+        )
+
+    if existing_account:
+        if existing_account.provider_account_id == provider_account_id:
+            return _build_validation_status(
+                course_member, provider_url, provider_type, existing_account
+            )
+        existing_account.provider_account_id = provider_account_id
+        existing_account.updated_at = func.now()
+    else:
+        account_payload = AccountCreate(
+            provider=provider_url,
+            type="gitlab",
+            provider_account_id=provider_account_id,
+            user_id=str(course_member.user_id),
+        )
+        new_account = Account(**account_payload.model_dump())
+        db.add(new_account)
+        existing_account = new_account
+
+    db.commit()
+    db.refresh(existing_account)
+
+    return _build_validation_status(course_member, provider_url, provider_type, existing_account)
+
 
 @course_member_router.router.get("/{course_member_id}/protocol", response_model=dict)
 async def get_protocol(permissions: Annotated[Principal, Depends(get_current_permissions)], course_member_id: UUID | str, db: Session = Depends(get_db)):

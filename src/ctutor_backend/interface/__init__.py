@@ -21,6 +21,7 @@ from .student_profile import StudentProfileInterface
 from .submission_group_members import SubmissionGroupMemberInterface
 from .submission_groups import SubmissionGroupInterface
 from .submissions import SubmissionCreate, SubmissionUploadResponseModel, SubmissionUploadedFile
+from .course_member_accounts import CourseMemberReadinessStatus, CourseMemberProviderAccountUpdate
 from .user_roles import UserRoleInterface
 from .users import UserInterface
 from .roles_claims import RoleClaimInterface
