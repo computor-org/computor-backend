@@ -178,6 +178,7 @@ export interface StudentProfileQuery {
 export interface SubmissionCreate {
   course_submission_group_id: string;
   version_identifier?: string | null;
+  submit?: boolean;
 }
 
 /**
