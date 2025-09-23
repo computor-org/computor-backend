@@ -103,6 +103,7 @@ async def list_submissions(
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
     permissions: Annotated[Principal, Depends(get_current_permissions)],
+    response: Response,
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
@@ -191,8 +192,36 @@ async def upload_submission(
     )
 
     if duplicate_result:
-        raise BadRequestException(
-            detail="A submission already exists for this version_identifier. Please bump your version before uploading again."
+        if duplicate_result.submit != submit_flag:
+            duplicate_result.submit = submit_flag
+            db.commit()
+            db.refresh(duplicate_result)
+
+        bucket_name = str(submission_group.id).lower()
+        files_metadata: List[SubmissionUploadedFile] = []
+        total_uploaded_size = 0
+
+        if isinstance(duplicate_result.result_json, dict):
+            storage_info = duplicate_result.result_json.get("storage") or {}
+            bucket_name = storage_info.get("bucket") or bucket_name
+            files_metadata = [
+                SubmissionUploadedFile(**file_info)
+                for file_info in storage_info.get("files") or []
+                if isinstance(file_info, dict)
+            ]
+            total_uploaded_size = duplicate_result.result_json.get("total_uploaded_size") or 0
+
+        if not total_uploaded_size and isinstance(duplicate_result.properties, dict):
+            total_uploaded_size = duplicate_result.properties.get("total_uploaded_size") or 0
+
+        response.status_code = status.HTTP_200_OK
+        return SubmissionUploadResponseModel(
+            result_id=duplicate_result.id,
+            bucket_name=bucket_name,
+            files=files_metadata,
+            total_size=total_uploaded_size,
+            submitted_at=duplicate_result.updated_at,
+            version_identifier=manual_version_identifier,
         )
 
     # Check submission quota limits (if configured)
