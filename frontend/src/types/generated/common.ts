@@ -706,6 +706,10 @@ export interface ResultGet {
 }
 
 export interface ResultList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
   id: string;
   submit: boolean;
   course_member_id: string;
