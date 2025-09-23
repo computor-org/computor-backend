@@ -55,6 +55,7 @@ from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.submissions import submissions_router
 from ctutor_backend.api.examples import examples_router
+from ctutor_backend.api.extensions import extensions_router
 from ctutor_backend.api.course_member_comments import router as course_member_comments_router
 from ctutor_backend.api.messages import messages_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
@@ -314,6 +315,12 @@ app.include_router(
     examples_router,
     tags=["examples"],
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+)
+
+app.include_router(
+    extensions_router,
+    tags=["extensions"],
+    dependencies=[Depends(get_current_permissions)]
 )
 
 app.include_router(

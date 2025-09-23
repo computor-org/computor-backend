@@ -347,6 +347,7 @@ class ComputorDeploymentConfig(BaseDeployment):
     
     # Hierarchical structure - list of organizations with nested course families and courses
     organizations: List[HierarchicalOrganizationConfig] = Field(
+        default_factory=list,
         description="List of organizations with nested course families and courses"
     )
     
@@ -362,6 +363,35 @@ class ComputorDeploymentConfig(BaseDeployment):
         description="Global deployment settings"
     )
     
+    # Optional: Upload VS Code extensions from local VSIX files before deploying hierarchy
+    class ExtensionUploadConfig(BaseModel):
+        path: str = Field(description="Relative path to the .vsix package to upload")
+        publisher: Optional[str] = Field(
+            default=None,
+            description="Override publisher (defaults to manifest)",
+        )
+        name: Optional[str] = Field(
+            default=None,
+            description="Override extension name (defaults to manifest)",
+        )
+        display_name: Optional[str] = Field(
+            default=None,
+            description="Override display name stored in metadata",
+        )
+        description: Optional[str] = Field(
+            default=None,
+            description="Override description stored in metadata",
+        )
+        engine_range: Optional[str] = Field(
+            default=None,
+            description="Override VS Code engine compatibility range",
+        )
+
+    extensions_upload: Optional[List["ComputorDeploymentConfig.ExtensionUploadConfig"]] = Field(
+        default=None,
+        description="Optional list of VSIX packages to upload before deployment",
+    )
+
     # Optional: Upload examples from a local directory before deploying hierarchy
     # Each immediate subdirectory is treated as an example to upload
     class ExamplesUploadConfig(BaseModel):
@@ -375,7 +405,7 @@ class ComputorDeploymentConfig(BaseDeployment):
     
     def validate_structure(self) -> bool:
         """Validate the deployment configuration structure."""
-        return len(self.organizations) > 0
+        return bool(self.organizations or self.extensions_upload or self.examples_upload)
     
     def count_entities(self) -> Dict[str, int]:
         """Count the total number of entities to be created."""

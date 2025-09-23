@@ -29,7 +29,7 @@ from ..interface.deployments_refactored import (
 )
 from .auth import authenticate, get_crud_client, get_custom_client
 from .config import CLIAuthConfig
-from ..client.crud_client import CustomClient
+from ..client.crud_client import CustomClient, raise_if_response_is_error
 from ..interface.users import UserCreate, UserInterface, UserQuery
 from ..interface.accounts import AccountCreate, AccountInterface, AccountQuery
 from ..interface.courses import CourseInterface, CourseQuery
@@ -51,6 +51,7 @@ from ..interface.example import (
 from ..interface.course_contents import CourseContentCreate, CourseContentInterface, CourseContentQuery
 from ..interface.course_content_types import CourseContentTypeInterface, CourseContentTypeQuery
 from ..interface.course_content_kind import CourseContentKindInterface, CourseContentKindQuery
+from ..services.vsix_utils import VsixManifestError, parse_vsix_metadata
 # Deployment is handled through course-contents API, not a separate deployment endpoint
 
 
@@ -1086,6 +1087,77 @@ def _toposort_by_dependencies(subdirs: list[Path]) -> list[Path]:
     return [slug_to_dir[s] for s in ordered_slugs]
 
 
+def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAuthConfig, custom_client: CustomClient):
+    """Upload VSIX extensions defined in the deployment configuration."""
+
+    for entry in entries:
+        entry_path = Path(entry.path)
+        resolved_path = entry_path if entry_path.is_absolute() else (config_dir / entry_path).resolve()
+
+        click.echo(f"\n📦 Extension package: {resolved_path}")
+
+        if not resolved_path.exists() or not resolved_path.is_file():
+            click.echo(f"  ❌ File not found: {resolved_path}", err=True)
+            continue
+
+        try:
+            file_bytes = resolved_path.read_bytes()
+        except OSError as exc:
+            click.echo(f"  ❌ Could not read VSIX file: {exc}", err=True)
+            continue
+
+        try:
+            manifest = parse_vsix_metadata(file_bytes)
+        except VsixManifestError as exc:
+            click.echo(f"  ❌ Invalid VSIX package: {exc}", err=True)
+            continue
+
+        publisher = entry.publisher or manifest.publisher
+        name = entry.name or manifest.name
+        identity = f"{publisher}.{name}"
+        version = manifest.version
+
+        click.echo(f"  ➡️  Uploading {identity}@{version}")
+
+        engine_range = entry.engine_range or manifest.engine_range
+        display_name = entry.display_name or manifest.display_name
+        description = entry.description if entry.description is not None else manifest.description
+
+        form_data = {"version": version}
+        if engine_range:
+            form_data["engine_range"] = engine_range
+        if display_name:
+            form_data["display_name"] = display_name
+        if description:
+            form_data["description"] = description
+
+        form_data = {key: str(value) for key, value in form_data.items() if value is not None}
+
+        files = {
+            "file": (
+                resolved_path.name,
+                file_bytes,
+                "application/octet-stream",
+            )
+        }
+
+        try:
+            response = custom_client.client.post(
+                f"extensions/{identity}/versions",
+                data=form_data,
+                files=files,
+            )
+            raise_if_response_is_error(response)
+            payload = response.json()
+        except Exception as exc:
+            click.echo(f"  ❌ Upload failed: {exc}", err=True)
+            continue
+
+        uploaded_version = payload.get("version", version)
+        sha256 = payload.get("sha256", "<unknown>")
+        click.echo(f"  ✅ Uploaded version {uploaded_version} (sha256 {sha256})")
+
+
 def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CLIAuthConfig, custom_client: CustomClient):
     """Upload each subdirectory in examples_dir as a zipped example to the API.
 
@@ -1248,6 +1320,12 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
     if config.execution_backends:
         _deploy_execution_backends(config, auth)
     
+    # Optionally upload VS Code extensions prior to starting hierarchy deployment
+    if getattr(config, 'extensions_upload', None):
+        cfg_dir = Path(config_file).parent
+        click.echo("\n📦 Preparing VSIX uploads...")
+        _upload_extensions_from_config(config.extensions_upload, cfg_dir, auth, custom_client)
+
     # Optionally upload examples prior to starting hierarchy deployment
     if getattr(config, 'examples_upload', None):
         cfg_dir = Path(config_file).parent
@@ -1255,6 +1333,10 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
         resolved_path = rel_path if rel_path.is_absolute() else (cfg_dir / rel_path).resolve()
         click.echo(f"\n🔼 Preparing example uploads from: {resolved_path}")
         _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, custom_client)
+
+    if not config.organizations:
+        click.echo("\nℹ️ No hierarchy defined in configuration; skipping deployment API call.")
+        return
 
     # Deploy using API endpoint
     click.echo(f"\nStarting deployment via API...")

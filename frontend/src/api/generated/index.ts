@@ -23,6 +23,7 @@ export * from './DeploymentHistoryClient';
 export * from './ExampleClient';
 export * from './ExampleRepositoryClient';
 export * from './ExecutionBackendClient';
+export * from './ExtensionClient';
 export * from './GroupClaimClient';
 export * from './GroupClient';
 export * from './MessageClient';

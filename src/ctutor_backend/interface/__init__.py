@@ -25,6 +25,7 @@ from .course_member_accounts import CourseMemberReadinessStatus, CourseMemberPro
 from .user_roles import UserRoleInterface
 from .users import UserInterface
 from .roles_claims import RoleClaimInterface
+from .extensions import ExtensionInterface
 
 def get_all_dtos():
     def recurse(cls):

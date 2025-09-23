@@ -15,6 +15,7 @@ from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
 from ctutor_backend.interface.example import ExampleInterface
+from ctutor_backend.interface.extensions import ExtensionInterface
 from ctutor_backend.model.example import Example
 
 
@@ -60,7 +61,8 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     claims.extend(CourseFamilyInterface().claim_values())
     claims.extend(CourseInterface().claim_values())
     claims.extend(ExampleInterface().claim_values())
-    
+    claims.extend(ExtensionInterface().claim_values())
+
     # Add specific example permissions
     claims.extend([
         ("permissions", f"{Example.__tablename__}:get"),

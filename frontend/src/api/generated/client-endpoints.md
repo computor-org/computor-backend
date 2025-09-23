@@ -226,6 +226,21 @@
 | `update` | PATCH | `/execution-backends/{id}` | `ExecutionBackendUpdate` | `ExecutionBackendGet` |
 | `delete` | DELETE | `/execution-backends/{id}` | — | `void` |
 
+## ExtensionClient
+- Base path: `/extensions`
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `create` | POST | `/extensions` | `ExtensionPublishRequest` | `ExtensionMetadata` |
+| `get` | GET | `/extensions/{id}` | — | `ExtensionMetadata` |
+| `list` | GET | `/extensions` | — | `ExtensionVersionListItem[]` |
+| `update` | PATCH | `/extensions/{id}` | `ExtensionVersionYankRequest` | `ExtensionMetadata` |
+| `delete` | DELETE | `/extensions/{id}` | — | `void` |
+| `publishExtensionVersionExtensionsExtensionIdentityVersionsPost` | POST | `/extensions/{extension_identity}/versions` | — | `ExtensionPublishResponse` |
+| `listExtensionVersionsExtensionsExtensionIdentityVersionsGet` | GET | `/extensions/{extension_identity}/versions` | — | `ExtensionVersionListResponse` |
+| `downloadExtensionExtensionsExtensionIdentityDownloadGet` | GET | `/extensions/{extension_identity}/download` | — | `void` |
+| `updateExtensionVersionExtensionsExtensionIdentityVersionsVersionPatch` | PATCH | `/extensions/{extension_identity}/versions/{version}` | `ExtensionVersionYankRequest` | `ExtensionVersionDetail` |
+
 ## GroupClaimClient
 - Base path: `/group-claims`
 
@@ -543,6 +558,7 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
+| `listSubmissionsSubmissionsGet` | GET | `/submissions` | — | `SubmissionListItem[]` |
 | `uploadSubmissionSubmissionsPost` | POST | `/submissions` | — | `SubmissionUploadResponseModel` |
 
 ## MiscClient

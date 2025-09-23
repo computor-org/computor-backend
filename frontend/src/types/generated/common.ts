@@ -502,6 +502,157 @@ export interface Principal {
   claims?: Claims;
 }
 
+/**
+ * Form metadata submitted when publishing a new extension version.
+ */
+export interface ExtensionPublishRequest {
+  /** Semantic version override (defaults to manifest value) */
+  version?: string | null;
+  /** VS Code engine compatibility override */
+  engine_range?: string | null;
+  /** Friendly display name for the extension */
+  display_name?: string | null;
+  /** Optional extension description */
+  description?: string | null;
+}
+
+/**
+ * Common fields describing an extension version.
+ */
+export interface ExtensionVersionBase {
+  /** Semantic version identifier */
+  version: string;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+}
+
+/**
+ * List view of extension versions.
+ */
+export interface ExtensionVersionListItem {
+  /** Semantic version identifier */
+  version: string;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+}
+
+/**
+ * Detailed view of an extension version.
+ */
+export interface ExtensionVersionDetail {
+  /** Semantic version identifier */
+  version: string;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+  /** Object storage key for the VSIX */
+  object_key: string;
+}
+
+/**
+ * Response payload for version listing.
+ */
+export interface ExtensionVersionListResponse {
+  items?: ExtensionVersionListItem[];
+  /** Pagination cursor for the next page, if available */
+  next_cursor?: string | null;
+}
+
+/**
+ * Extension-level metadata including latest version information.
+ */
+export interface ExtensionMetadata {
+  /** Publisher identifier */
+  publisher: string;
+  /** Extension name */
+  name: string;
+  /** Friendly display name for the extension */
+  display_name?: string | null;
+  /** Extension description */
+  description?: string | null;
+  /** Database identifier for the extension */
+  id: number;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
+  /** Number of stored versions */
+  version_count: number;
+  /** Metadata for the latest available version */
+  latest_version?: ExtensionVersionListItem | null;
+}
+
+/**
+ * Request payload to (un)yank a specific version.
+ */
+export interface ExtensionVersionYankRequest {
+  /** Target yank state for the version */
+  yanked: boolean;
+}
+
+/**
+ * Response payload returned after publishing a version.
+ */
+export interface ExtensionPublishResponse {
+  /** Semantic version identifier */
+  version: string;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+  /** Object storage key for the VSIX */
+  object_key: string;
+  /** Publisher identifier */
+  publisher: string;
+  /** Extension name */
+  name: string;
+}
+
 export interface GroupCreate {
   /** Group name */
   name: string;
@@ -1909,8 +2060,25 @@ export interface ComputorDeploymentConfig {
   users?: UserAccountDeployment[];
   /** Global deployment settings */
   settings?: Record<string, any> | null;
+  /** Optional list of VSIX packages to upload before deployment */
+  extensions_upload?: ExtensionUploadConfig[] | null;
   /** If provided, uploads examples before hierarchy deployment */
   examples_upload?: ExamplesUploadConfig | null;
+}
+
+export interface ExtensionUploadConfig {
+  /** Relative path to the .vsix package to upload */
+  path: string;
+  /** Override publisher (defaults to manifest) */
+  publisher?: string | null;
+  /** Override extension name (defaults to manifest) */
+  name?: string | null;
+  /** Override display name stored in metadata */
+  display_name?: string | null;
+  /** Override description stored in metadata */
+  description?: string | null;
+  /** Override VS Code engine compatibility range */
+  engine_range?: string | null;
 }
 
 export interface ExamplesUploadConfig {
