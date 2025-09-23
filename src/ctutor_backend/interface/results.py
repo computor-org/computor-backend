@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
@@ -59,7 +59,7 @@ class ResultGet(BaseEntityGet):
             return value
         return map_int_to_task_status(value)
 
-class ResultList(BaseModel):
+class ResultList(BaseEntityList):
     id: str
     submit: bool
     course_member_id: str
