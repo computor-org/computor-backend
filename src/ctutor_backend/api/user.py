@@ -472,7 +472,6 @@ class UserPassword(BaseModel):
 @user_router.post("/password", status_code=204)
 def set_user_password(permissions: Annotated[Principal, Depends(get_current_permissions)], payload: UserPassword, db: Session = Depends(get_db)):
 
-    # TODO: add report, this should not be called from someone else
     if payload.username != None and permissions.is_admin == False:
         raise ForbiddenException()
 
@@ -481,11 +480,16 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
 
     if payload.username != None:
         user = db.query(User).filter(User.username == payload.username).first()
+
     elif payload.username == None and payload.password_old != None:
+        if payload.password == payload.password_old:
+            raise BadRequestException()
+
         user = db.query(User).filter(User.id == permissions.get_user_id_or_throw()).first()
 
         if decrypt_api_key(user.password) != payload.password_old:
             raise BadRequestException()
+
     else:
         raise ForbiddenException()
 
