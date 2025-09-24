@@ -279,7 +279,7 @@ export interface AccountQuery {
 }
 
 export interface UserPassword {
-  username: string;
+  username?: string | null;
   password: string;
 }
 
