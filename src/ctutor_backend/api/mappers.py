@@ -28,11 +28,10 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     result = query[2]
     course_submission_group = query[3]
     submission_count = query[4] if len(query) > 4 else None
-    submitted_count = query[5] if len(query) > 5 else None
-    submission_status_int = query[6] if len(query) > 6 else None
-    submission_grading = query[7] if len(query) > 7 else None
-    content_unread_count = query[8] if len(query) > 8 else 0
-    submission_group_unread_count = query[9] if len(query) > 9 else 0
+    submission_status_int = query[5] if len(query) > 5 else None
+    submission_grading = query[6] if len(query) > 6 else None
+    content_unread_count = query[7] if len(query) > 7 else 0
+    submission_group_unread_count = query[8] if len(query) > 8 else 0
 
     content_unread_count = content_unread_count or 0
     submission_group_unread_count = submission_group_unread_count or 0
@@ -152,7 +151,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             repository=repository,
             status=submission_status,
             grading=submission_grading,
-            count=submitted_count if submitted_count is not None else 0,
+            count=submission_count if submission_count is not None else 0,
             max_submissions=course_submission_group.max_submissions,
             unread_message_count=submission_group_unread_count,
         )
@@ -173,7 +172,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         course_content_kind_id=course_content.course_content_kind_id,
         position=course_content.position,
         max_group_size=course_content.max_group_size,
-        submitted=True if submitted_count not in (None, 0) else False,
+        submitted=True if submission_count not in (None, 0) else False,
         course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
         result_count=result_count if result_count is not None else 0,
         submission_count=submission_count if submission_count is not None else 0,
