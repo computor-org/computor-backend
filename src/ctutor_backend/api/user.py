@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, UnauthorizedException
+from ctutor_backend.api.exceptions import BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.accounts import AccountCreate
 from ctutor_backend.interface.course_member_accounts import (
@@ -465,28 +465,27 @@ def get_current_user(
         raise NotFoundException()
 
 class UserPassword(BaseModel):
-    username: str
+    username: Optional[str] = None
     password: str
 
 @user_router.post("/password", status_code=204)
 def set_user_password(permissions: Annotated[Principal, Depends(get_current_permissions)], payload: UserPassword, db: Session = Depends(get_db)):
 
     # TODO: add report, this should not be called from someone else
-    if permissions.is_admin == False:
-        raise NotFoundException()
+    if payload.username != None and permissions.is_admin == False:
+        raise ForbiddenException()
 
     if len(payload.password) < 6:
         raise BadRequestException()
 
-    if payload.username == None or len(payload.username) < 3:
-        raise BadRequestException()
-
-    with next(get_db()) as db:
+    if payload.username != None:
         user = db.query(User).filter(User.username == payload.username).first()
+    else:
+        user = db.query(User).filter(User.id == permissions.get_user_id_or_throw()).first()
 
-        user.password = encrypt_api_key(payload.password)
-        db.commit()
-        db.refresh(user)
+    user.password = encrypt_api_key(payload.password)
+    db.commit()
+    db.refresh(user)
 
 
 @user_router.get(
