@@ -31,7 +31,7 @@ from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.tokens import decrypt_api_key, encrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.auth import Account, User
-from ctutor_backend.model.course import Course, CourseMember
+from ctutor_backend.model.course import Course, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
@@ -314,6 +314,7 @@ def _sync_gitlab_memberships(
     course_props: CourseProperties,
     org_props: OrganizationProperties,
     gitlab_username: str,
+    db: Session,
 ):
     client = _get_gitlab_client(provider_url, org_props, course_props)
     if not client:
@@ -334,15 +335,34 @@ def _sync_gitlab_memberships(
     role = (course_member.course_role_id or "").lower()
 
     if role == "_student":
-        if member_props.gitlab and member_props.gitlab.full_path:
+        # Query all course submission groups that this course member belongs to
+        submission_group_memberships = db.query(CourseSubmissionGroupMember)\
+            .options(joinedload(CourseSubmissionGroupMember.group))\
+            .filter(CourseSubmissionGroupMember.course_member_id == course_member.id)\
+            .all()
+
+        # Collect unique repository paths from all submission groups
+        unique_repositories = set()
+        for membership in submission_group_memberships:
+            submission_group = membership.group
+            if submission_group.properties and isinstance(submission_group.properties, dict):
+                gitlab_props = submission_group.properties.get('gitlab')
+                if gitlab_props and isinstance(gitlab_props, dict):
+                    full_path = gitlab_props.get('full_path')
+                    if full_path:
+                        unique_repositories.add(full_path)
+
+        # Grant access to all unique repositories
+        for repository_path in unique_repositories:
             _ensure_project_access(
                 client,
-                member_props.gitlab.full_path,
+                repository_path,
                 gitlab_user_id,
                 40,  # Maintainer
-                "student repository",
+                "student submission repository",
             )
 
+        # Also grant access to the student template repository
         template_path = None
         if course_props.gitlab and course_props.gitlab.full_path:
             template_path = f"{course_props.gitlab.full_path}/student-template"
@@ -643,6 +663,7 @@ async def register_current_user_course_account(
             course_props,
             org_props,
             provider_account_id,
+            db,
         )
     except BadRequestException:
         raise
