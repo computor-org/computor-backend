@@ -467,6 +467,7 @@ def get_current_user(
 class UserPassword(BaseModel):
     username: Optional[str] = None
     password: str
+    password_old: Optional[str] = None
 
 @user_router.post("/password", status_code=204)
 def set_user_password(permissions: Annotated[Principal, Depends(get_current_permissions)], payload: UserPassword, db: Session = Depends(get_db)):
@@ -480,8 +481,13 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
 
     if payload.username != None:
         user = db.query(User).filter(User.username == payload.username).first()
-    else:
+    elif payload.username == None and payload.password_old != None:
         user = db.query(User).filter(User.id == permissions.get_user_id_or_throw()).first()
+
+        if decrypt_api_key(user.password) != payload.password_old:
+            raise BadRequestException()
+    else:
+        raise ForbiddenException()
 
     user.password = encrypt_api_key(payload.password)
     db.commit()

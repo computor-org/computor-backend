@@ -281,6 +281,7 @@ export interface AccountQuery {
 export interface UserPassword {
   username?: string | null;
   password: string;
+  password_old?: string | null;
 }
 
 /**
