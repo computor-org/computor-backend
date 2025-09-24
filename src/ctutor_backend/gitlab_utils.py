@@ -33,10 +33,10 @@ def construct_gitlab_http_url(gitlab_base_url: str, full_path: str) -> str:
 
     Args:
         gitlab_base_url: Base GitLab URL with protocol and port (e.g., "http://localhost:8084")
-        full_path: Full project path (e.g., "testing/itpcp/progphys/python.2026/students/emily.davis")
+        full_path: Full project path (e.g., "testing/<...>/students/emily.davis")
 
     Returns:
-        Complete HTTP clone URL (e.g., "http://localhost:8084/testing/itpcp/progphys/python.2026/students/emily.davis.git")
+        Complete HTTP clone URL (e.g., "http://localhost:8084/testing/<...>/students/emily.davis.git")
     """
     if not gitlab_base_url or not full_path:
         return None
@@ -55,11 +55,11 @@ def construct_gitlab_ssh_url(full_path: str, gitlab_host: Optional[str] = None) 
     Construct a GitLab SSH clone URL from full path.
 
     Args:
-        full_path: Full project path (e.g., "testing/itpcp/progphys/python.2026/students/emily.davis")
+        full_path: Full project path (e.g., "testing/<...>/students/emily.davis")
         gitlab_host: GitLab hostname (defaults to "localhost" if not provided)
 
     Returns:
-        SSH clone URL (e.g., "git@localhost:testing/itpcp/progphys/python.2026/students/emily.davis.git")
+        SSH clone URL (e.g., "git@localhost:testing/<...>/students/emily.davis.git")
     """
     if not full_path:
         return None
@@ -76,10 +76,10 @@ def construct_gitlab_web_url(gitlab_base_url: str, full_path: str) -> str:
 
     Args:
         gitlab_base_url: Base GitLab URL with protocol and port (e.g., "http://localhost:8084")
-        full_path: Full project path (e.g., "testing/itpcp/progphys/python.2026/students/emily.davis")
+        full_path: Full project path (e.g., "testing/<...>/students/emily.davis")
 
     Returns:
-        Complete web URL (e.g., "http://localhost:8084/testing/itpcp/progphys/python.2026/students/emily.davis")
+        Complete web URL (e.g., "http://localhost:8084/testing/<...>/students/emily.davis")
     """
     if not gitlab_base_url or not full_path:
         return None

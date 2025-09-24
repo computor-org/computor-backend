@@ -131,10 +131,10 @@ class TestStudentSubmissionGroupsUnit:
                 "properties": {
                     "gitlab": {
                         "url": "http://localhost:8084",
-                        "full_path": "testing/itpcp/progphys/python.2026/students/emily.davis"
+                        "full_path": "testing/<...>/students/emily.davis"
                     }
                 },
-                "expected_clone_url": "http://localhost:8084/testing/itpcp/progphys/python.2026/students/emily.davis.git"
+                "expected_clone_url": "http://localhost:8084/testing/<...>/students/emily.davis.git"
             }
         ]
 
