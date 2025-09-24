@@ -41,8 +41,7 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
     query = db.query(
                 Result.course_content_id,
                 func.count(Result.id).label("total_results_count"),
-                func.count(case((Result.submit == True, 1))).label("submitted_count"),
-                func.count(case((Result.test_system_id.is_(None), 1))).label("submission_count"),
+                func.count(case((Result.submit == True, 1))).label("submission_count"),
             )
 
     if user_id != None:
@@ -55,7 +54,7 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
             .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
             .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
 
-    query = query.filter(Result.status == 0, Result.test_system_id.isnot(None))
+    query = query.filter(Result.status == 0)
     
     if course_content_id != None:
         query = query.filter(Result.course_content_id == course_content_id)
@@ -173,7 +172,6 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         Result,
         CourseSubmissionGroup,
         results_count_sub.c.submission_count,
-        results_count_sub.c.submitted_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
         content_unread_column,
@@ -284,7 +282,6 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         Result,
         CourseSubmissionGroup,
         results_count_sub.c.submission_count,
-        results_count_sub.c.submitted_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
         content_unread_column,
@@ -377,7 +374,6 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             Result,
             CourseSubmissionGroup,
             results_count_sub.c.submission_count,
-            results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
             content_unread_column,
@@ -476,7 +472,6 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             Result,
             CourseSubmissionGroup,
             results_count_sub.c.submission_count,
-            results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
             content_unread_column,
