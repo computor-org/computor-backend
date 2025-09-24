@@ -192,7 +192,7 @@ async def upload_submission(
     )
 
     if duplicate_result:
-        if duplicate_result.submit != submit_flag:
+        if submit_flag is not None and duplicate_result.submit != submit_flag:
             duplicate_result.submit = submit_flag
             db.commit()
             db.refresh(duplicate_result)
@@ -362,7 +362,7 @@ async def upload_submission(
     # }
 
     result_record = Result(
-        submit=submit_flag,
+        submit=bool(submit_flag),
         course_member_id=submitting_member.id,
         course_submission_group_id=submission_group.id,
         course_content_id=course_content.id,
