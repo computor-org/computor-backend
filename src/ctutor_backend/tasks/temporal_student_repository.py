@@ -18,6 +18,7 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
 from ..interface.tokens import decrypt_api_key
 from ..gitlab_utils import gitlab_fork_project, gitlab_unprotect_branches
@@ -349,8 +350,8 @@ async def update_submission_groups(
                 "group_id": repository_info['group_id'],
                 "namespace_id": repository_info['namespace_id'],
                 "namespace_path": repository_info['namespace_path'],
-                "http_url_to_repo": repository_info.get('http_url_to_repo'),  # Add clone URL
-                "ssh_url_to_repo": repository_info.get('ssh_url_to_repo')  # Add SSH URL too
+                "http_url_to_repo": repository_info.get('http_url_to_repo'),  # Properly constructed clone URL
+                "ssh_url_to_repo": repository_info.get('ssh_url_to_repo')  # Properly constructed SSH URL
             }
             
             flag_modified(submission_group, "properties")
@@ -523,8 +524,9 @@ async def create_student_repository(
             # Keep for backward compatibility
             "gitlab_project_id": forked_project.id,
             "gitlab_project_path": forked_project.path_with_namespace,
-            "http_url_to_repo": forked_project.http_url_to_repo,
-            "ssh_url_to_repo": forked_project.ssh_url_to_repo
+            # Use properly constructed URLs instead of broken GitLab API fields
+            "http_url_to_repo": construct_gitlab_http_url(gitlab_url, forked_project.path_with_namespace),
+            "ssh_url_to_repo": construct_gitlab_ssh_url(forked_project.path_with_namespace, gitlab_url.split('://')[1].split('/')[0] if '://' in gitlab_url else 'localhost')
         }
         
         # Store repository info in course member properties
@@ -722,20 +724,22 @@ async def create_team_repository(
         repository_info = {
             "gitlab_project_id": team_project.id,
             "gitlab_project_path": team_project.path_with_namespace,
-            "http_url_to_repo": team_project.http_url_to_repo,
-            "ssh_url_to_repo": team_project.ssh_url_to_repo,
-            "web_url": team_project.web_url,
+            # Use properly constructed URLs instead of broken GitLab API fields
+            "http_url_to_repo": construct_gitlab_http_url(gitlab_url, team_project.path_with_namespace),
+            "ssh_url_to_repo": construct_gitlab_ssh_url(team_project.path_with_namespace, gitlab_url.split('://')[1].split('/')[0] if '://' in gitlab_url else 'localhost'),
+            "web_url": construct_gitlab_web_url(gitlab_url, team_project.path_with_namespace),
             "team_members": team_members,
             "gitlab": {
                 "url": gitlab_url,
                 "full_path": team_project.path_with_namespace,
                 "directory": assignment_directory,
-                "web_url": team_project.web_url,
+                "web_url": construct_gitlab_web_url(gitlab_url, team_project.path_with_namespace),
                 "group_id": gitlab_namespace_id,
                 "namespace_id": gitlab_namespace_id,
                 "namespace_path": team_project.namespace['full_path'],
-                "http_url_to_repo": team_project.http_url_to_repo,
-                "ssh_url_to_repo": team_project.ssh_url_to_repo
+                # Use properly constructed URLs instead of broken GitLab API fields
+                "http_url_to_repo": construct_gitlab_http_url(gitlab_url, team_project.path_with_namespace),
+                "ssh_url_to_repo": construct_gitlab_ssh_url(team_project.path_with_namespace, gitlab_url.split('://')[1].split('/')[0] if '://' in gitlab_url else 'localhost')
             }
         }
         

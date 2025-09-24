@@ -91,6 +91,8 @@ class TestStudentSubmissionGroupsUnit:
     
     def test_repository_clone_url_construction(self):
         """Test repository clone URL construction for different scenarios"""
+        from ctutor_backend.gitlab_utils import construct_gitlab_http_url, get_gitlab_urls_from_properties
+
         test_cases = [
             {
                 "name": "Full gitlab info provided",
@@ -114,36 +116,56 @@ class TestStudentSubmissionGroupsUnit:
                 "expected_clone_url": "https://gitlab.example.com/user/project.git"
             },
             {
-                "name": "Backward compatibility with http_url_to_repo",
+                "name": "Backward compatibility with http_url_to_repo - now using proper construction",
                 "properties": {
                     "gitlab": {
                         "url": "https://gitlab.example.com",
                         "full_path": "user/project"
                     },
-                    "http_url_to_repo": "https://gitlab.example.com/user/project.git"
+                    "http_url_to_repo": "https://gitlab.example.com/user/project.git"  # This is now ignored in favor of proper construction
                 },
                 "expected_clone_url": "https://gitlab.example.com/user/project.git"
+            },
+            {
+                "name": "Port handling in URL construction",
+                "properties": {
+                    "gitlab": {
+                        "url": "http://localhost:8084",
+                        "full_path": "testing/itpcp/progphys/python.2026/students/emily.davis"
+                    }
+                },
+                "expected_clone_url": "http://localhost:8084/testing/itpcp/progphys/python.2026/students/emily.davis.git"
             }
         ]
-        
+
         for case in test_cases:
             properties = case["properties"]
             gitlab_info = properties.get('gitlab', {})
-            http_url = properties.get('http_url_to_repo')
-            
-            # Simulate clone URL logic from students.py
-            clone_url = (
-                gitlab_info.get('clone_url') or 
-                gitlab_info.get('http_url_to_repo') or
-                http_url
-            )
-            
-            if not clone_url and gitlab_info.get('url') and gitlab_info.get('full_path'):
-                base_url = gitlab_info.get('url', '').rstrip('/')
-                full_path = gitlab_info.get('full_path', '')
-                clone_url = f"{base_url}/{full_path}.git"
-            
+
+            # Use the new utility functions for proper URL construction
+            clone_url = gitlab_info.get('clone_url')
+
+            if not clone_url:
+                # Use the utility function to construct the URL properly
+                base_url = gitlab_info.get('url')
+                full_path = gitlab_info.get('full_path')
+                if base_url and full_path:
+                    clone_url = construct_gitlab_http_url(base_url, full_path)
+
             assert clone_url == case["expected_clone_url"], f"Failed for case: {case['name']}"
+
+        # Test the get_gitlab_urls_from_properties utility function
+        test_properties = {
+            "gitlab": {
+                "url": "http://localhost:8084",
+                "full_path": "testing/group/project"
+            }
+        }
+
+        urls = get_gitlab_urls_from_properties(test_properties)
+        assert urls['http_url_to_repo'] == "http://localhost:8084/testing/group/project.git"
+        assert urls['ssh_url_to_repo'] == "git@localhost:testing/group/project.git"
+        assert urls['web_url'] == "http://localhost:8084/testing/group/project"
 
 
 @pytest.mark.unit  
