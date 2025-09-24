@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -34,6 +35,7 @@ class ExtensionVersionBase(BaseModel):
     """Common fields describing an extension version."""
 
     version: str = Field(..., description="Semantic version identifier")
+    version_number: int = Field(..., description="Sequential version number for ordering")
     engine_range: Optional[str] = Field(
         None,
         description="VS Code engine compatibility constraint",
@@ -83,7 +85,7 @@ class ExtensionMetadata(BaseModel):
         None,
         description="Extension description",
     )
-    id: int = Field(..., description="Database identifier for the extension")
+    id: UUID = Field(..., description="Database identifier for the extension")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     version_count: int = Field(..., description="Number of stored versions")

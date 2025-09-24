@@ -522,6 +522,8 @@ export interface ExtensionPublishRequest {
 export interface ExtensionVersionBase {
   /** Semantic version identifier */
   version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
   /** VS Code engine compatibility constraint */
   engine_range?: string | null;
   /** Whether the version is yanked */
@@ -544,6 +546,8 @@ export interface ExtensionVersionBase {
 export interface ExtensionVersionListItem {
   /** Semantic version identifier */
   version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
   /** VS Code engine compatibility constraint */
   engine_range?: string | null;
   /** Whether the version is yanked */
@@ -566,6 +570,8 @@ export interface ExtensionVersionListItem {
 export interface ExtensionVersionDetail {
   /** Semantic version identifier */
   version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
   /** VS Code engine compatibility constraint */
   engine_range?: string | null;
   /** Whether the version is yanked */
@@ -606,7 +612,7 @@ export interface ExtensionMetadata {
   /** Extension description */
   description?: string | null;
   /** Database identifier for the extension */
-  id: number;
+  id: string;
   /** Creation timestamp */
   created_at: string;
   /** Last update timestamp */
@@ -631,6 +637,8 @@ export interface ExtensionVersionYankRequest {
 export interface ExtensionPublishResponse {
   /** Semantic version identifier */
   version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
   /** VS Code engine compatibility constraint */
   engine_range?: string | null;
   /** Whether the version is yanked */
@@ -2055,7 +2063,7 @@ export interface ComputorDeploymentConfig {
   /** List of execution backends to create or ensure exist in the system */
   execution_backends?: ExecutionBackendConfig[] | null;
   /** List of organizations with nested course families and courses */
-  organizations: HierarchicalOrganizationConfig[];
+  organizations?: HierarchicalOrganizationConfig[];
   /** List of users with their accounts and course memberships */
   users?: UserAccountDeployment[];
   /** Global deployment settings */
