@@ -23,4 +23,4 @@ class TestCreate(BaseModel):
     provider_url: Optional[str] = None
 
     version_identifier: Optional[str] = None
-    submit: Optional[bool] = False
+    submit: Optional[bool] = None

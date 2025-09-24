@@ -109,8 +109,7 @@ async def create_test(
         Course,
         Organization,
         CourseSubmissionGroup.max_submissions,
-        results_count_subquery.c.total_results_count,
-        Example
+        results_count_subquery.c.total_results_count
     ) \
         .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id) \
         .join(Course, Course.id == CourseContent.course_id) \
@@ -157,7 +156,6 @@ async def create_test(
     organization = query_result[2]
     allowed_max_submissions = query_result[3]
     submissions = query_result[4] if query_result[4] != None else 0
-    example = query_result[5]
 
     # Check max submissions limit
     if allowed_max_submissions is not None and submissions >= allowed_max_submissions:
@@ -172,7 +170,6 @@ async def create_test(
     # Get properties
     organization_properties = OrganizationProperties(**organization.properties)
     course_properties = CourseProperties(**course.properties)
-    assignment_properties = assignment.properties
     execution_backend_id = assignment.execution_backend_id
 
     # Validate version identifier (commit)
@@ -180,54 +177,65 @@ async def create_test(
     if commit == None:
         raise BadRequestException(detail="version_identifier is required")
 
-    # Check for existing results with same commit
-    # With the new partial indexes, we can have multiple failed results with the same version_identifier
-    existing_results = (
+    # Get submission group first (needed for correct result lookup)
+    course_submission_group = db.query(CourseSubmissionGroup) \
+        .join(CourseSubmissionGroupMember, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+        .filter(
+            CourseSubmissionGroupMember.course_member_id == course_member_id,
+            CourseSubmissionGroup.course_content_id == assignment.id
+        ).first()
+
+    if not course_submission_group:
+        raise BadRequestException(detail="No submission group found for this assignment")
+
+    course_submission_group_id = course_submission_group.id
+
+    # Check for existing result with same version_identifier and submission group
+    # There should be at most 1 result per version_identifier per submission group
+    existing_result = (
         db.query(Result)
         .filter(
-            Result.course_member_id == course_member_id,
-            Result.course_content_id == assignment.id,
+            Result.course_submission_group_id == course_submission_group_id,
             Result.version_identifier == commit,
         )
-        .all()
+        .first()  # Use .first() since there should be at most 1 result
     )
 
     reuse_existing_result: Optional[Result] = None
-    latest_result: Optional[Result] = None
 
-    if existing_results:
-        # Sort by created_at to get the most recent
-        latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
-
-        if latest_result.test_system_id is None:
+    if existing_result:
+        # If the result has no test run yet (test_system_id is None), we can reuse it
+        if existing_result.test_system_id is None:
             # Manual submission without test run yet; reuse this result entry
-            reuse_existing_result = latest_result
-        else:
-            # Check if the latest result is still running according to DB
+            reuse_existing_result = existing_result
+
+        # Check if the existing result has a test running
+        elif existing_result.test_system_id is not None:
+            # Check if the existing result is still running according to DB
             # Status values: 0=COMPLETED, 1=FAILED, 2=CANCELLED, 3=SCHEDULED, 4=PENDING, 5=RUNNING, 7=PAUSED
-            if latest_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
+            if existing_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
                 # Check actual Temporal workflow status
                 try:
-                    if not latest_result.test_system_id:
+                    if not existing_result.test_system_id:
                         logger.warning(
                             "Result %s is missing a test_system_id while marked as in-progress; flagging as failed",
-                            latest_result.id,
+                            existing_result.id,
                         )
-                        latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                        existing_result.status = map_task_status_to_int(TaskStatus.FAILED)
                         db.commit()
-                        db.refresh(latest_result)
+                        db.refresh(existing_result)
                         # Will create a new run below
                     else:
                         task_executor = get_task_executor()
-                        actual_status = await task_executor.get_task_status(latest_result.test_system_id)
+                        actual_status = await task_executor.get_task_status(existing_result.test_system_id)
 
                         # Check Temporal status
                         if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                             # Still running, return the existing one
-                            return build_test_run_response(latest_result)
+                            return build_test_run_response(existing_result)
                         elif actual_status.status == TaskStatus.FINISHED:
                             # Workflow finished, check actual task result for errors
-                            actual_result = await task_executor.get_task_result(latest_result.test_system_id)
+                            actual_result = await task_executor.get_task_result(existing_result.test_system_id)
 
                             try:
                                 actual_result_status = TaskStatus(actual_result.status)
@@ -235,59 +243,48 @@ async def create_test(
                                 actual_result_status = TaskStatus.FAILED
 
                             if actual_result_status == TaskStatus.FINISHED and not actual_result.error:
-                                latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
+                                existing_result.status = map_task_status_to_int(TaskStatus.FINISHED)
                                 db.commit()
-                                db.refresh(latest_result)
+                                db.refresh(existing_result)
 
-                                if test_create.submit and not latest_result.submit:
-                                    latest_result.submit = True
+                                if test_create.submit and not existing_result.submit:
+                                    existing_result.submit = True
                                     db.commit()
-                                    db.refresh(latest_result)
-                                return build_test_run_response(latest_result)
+                                    db.refresh(existing_result)
+                                return build_test_run_response(existing_result)
 
                             # Workflow reported an error or finished unsuccessfully
-                            latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                            existing_result.status = map_task_status_to_int(TaskStatus.FAILED)
                             db.commit()
-                            db.refresh(latest_result)
+                            db.refresh(existing_result)
                             # Will create a new run below
                         else:  # FAILED, CANCELLED, etc.
                             # Update DB status to failed
-                            latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                            existing_result.status = map_task_status_to_int(TaskStatus.FAILED)
                             db.commit()
-                            db.refresh(latest_result)
+                            db.refresh(existing_result)
                             # Will create a new run below
                 except Exception as e:
                     # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
                     logger.warning(
-                        f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}"
+                        f"Could not check Temporal workflow status for {existing_result.test_system_id}: {e}"
                     )
-                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                    existing_result.status = map_task_status_to_int(TaskStatus.FAILED)
                     db.commit()
-                    db.refresh(latest_result)
+                    db.refresh(existing_result)
                     # Will create a new run below
 
             # If completed successfully and only updating submit flag
-            elif latest_result.status == 0:  # COMPLETED
-                if test_create.submit and not latest_result.submit:
-                    latest_result.submit = True
+            elif existing_result.status == 0:  # COMPLETED
+                if test_create.submit and not existing_result.submit:
+                    existing_result.submit = True
                     db.commit()
-                    db.refresh(latest_result)
-                return build_test_run_response(latest_result)
+                    db.refresh(existing_result)
+                return build_test_run_response(existing_result)
 
             # If failed/crashed/cancelled, we'll create a new run below
 
-    # Get submission group
-    course_submission_group = db.query(CourseSubmissionGroup) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .filter(
-            CourseSubmissionGroupMember.course_member_id == course_member_id,
-            CourseSubmissionGroup.course_content_id == assignment.id
-        ).first()
-    
-    if not course_submission_group:
-        raise BadRequestException(detail="No submission group found for this assignment")
-    
-    course_submission_group_id = course_submission_group.id
+    # Use submission group properties (already retrieved above)
     submission_group_properties = course_submission_group.properties or {}
 
     # Create new test execution
