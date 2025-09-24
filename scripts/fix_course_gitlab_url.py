@@ -47,7 +47,7 @@ def fix_course_gitlab_url(course_id: str, student_template_url: str):
         # Also add the projects section if missing
         if "projects" not in course.properties["gitlab"]:
             # Extract path from URL
-            # http://localhost:8084/test/itpcp/progphys/python.2026/student-template
+            # http://localhost:8084/test/<...>/student-template
             path_parts = student_template_url.replace("http://", "").replace("https://", "").split("/")
             full_path = "/".join(path_parts[1:])  # Skip the domain
             

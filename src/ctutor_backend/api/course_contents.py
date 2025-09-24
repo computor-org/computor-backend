@@ -22,6 +22,8 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 
+from ctutor_backend.model.example import Example as ExampleModel
+from ctutor_backend.custom_types import Ltree
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from ctutor_backend.database import get_db
@@ -246,8 +248,7 @@ async def assign_example_to_content(
             )
         src_identifier = request.example_identifier
         requested_tag = (request.version_tag or '').strip() if request.version_tag else None
-        from ctutor_backend.custom_types import Ltree
-        from ctutor_backend.model.example import Example as ExampleModel
+
         # Try to resolve to Example/ExampleVersion from DB
         example_row = db.query(ExampleModel).filter(ExampleModel.identifier == Ltree(src_identifier)).first()
         if example_row:
@@ -323,7 +324,6 @@ async def assign_example_to_content(
             return _build_deployment_with_history(deployment, db)
 
         deployment.example_version_id = new_example_version_id
-        from ctutor_backend.custom_types import Ltree
         deployment.example_identifier = Ltree(src_identifier) if src_identifier else None
         deployment.version_tag = src_version_tag
         deployment.deployment_status = "pending"
@@ -344,7 +344,6 @@ async def assign_example_to_content(
 
     else:
         # Create new deployment
-        from ctutor_backend.custom_types import Ltree
         deployment = CourseContentDeployment(
             course_content_id=str(content_id),
             example_version_id=str(example_version.id) if example_version else None,
@@ -359,7 +358,6 @@ async def assign_example_to_content(
         db.flush()  # Get the ID
         
         # Add initial history entry
-        from ctutor_backend.custom_types import Ltree
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="assigned",
