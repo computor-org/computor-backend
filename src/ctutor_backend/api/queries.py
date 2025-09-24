@@ -40,7 +40,7 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
 
     query = db.query(
                 Result.course_content_id,
-                func.count(Result.id).label("total_results_count"),
+                func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
                 func.count(case((Result.submit == True, 1))).label("submission_count"),
             )
 
