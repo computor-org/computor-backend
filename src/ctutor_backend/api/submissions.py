@@ -346,20 +346,20 @@ async def upload_submission(
         "total_uploaded_size": total_uploaded_size,
     }
 
-    result_payload = {
-        "manual_submission": True,
-        "archive": {
-            "original_filename": file.filename,
-            "size": file_size,
-        },
-        "storage": {
-            "bucket": bucket_name,
-            "submission_prefix": submission_prefix,
-            "files": [file_info.model_dump() for file_info in files_metadata],
-        },
-        "total_uploaded_size": total_uploaded_size,
-        "file_count": len(files_metadata),
-    }
+    # result_payload = {
+    #     "manual_submission": True,
+    #     "archive": {
+    #         "original_filename": file.filename,
+    #         "size": file_size,
+    #     },
+    #     "storage": {
+    #         "bucket": bucket_name,
+    #         "submission_prefix": submission_prefix,
+    #         "files": [file_info.model_dump() for file_info in files_metadata],
+    #     },
+    #     "total_uploaded_size": total_uploaded_size,
+    #     "file_count": len(files_metadata),
+    # }
 
     result_record = Result(
         submit=submit_flag,
@@ -371,7 +371,7 @@ async def upload_submission(
         execution_backend_id=None,
         test_system_id=None,
         result=0.0,
-        result_json=result_payload,
+        result_json=None,
         properties=properties_payload,
         status=map_task_status_to_int(TaskStatus.FINISHED),
         version_identifier=manual_version_identifier,
