@@ -20,7 +20,7 @@ from fastapi import (
 from fastapi.responses import RedirectResponse
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..api.exceptions import BadRequestException, ForbiddenException, NotFoundException
@@ -75,18 +75,6 @@ def _parse_version(value: str) -> Version:
         raise BadRequestException(f"Invalid semantic version '{value}'") from exc
 
 
-def _extract_prerelease_and_build(version_str: str) -> Tuple[Optional[str], Optional[str]]:
-    build = None
-    if "+" in version_str:
-        main, build = version_str.split("+", 1)
-    else:
-        main = version_str
-    prerelease = None
-    if "-" in main:
-        _, prerelease = main.split("-", 1)
-    return prerelease, build
-
-
 def _caret_to_specifier(base_version: str) -> SpecifierSet:
     parsed = _parse_version(base_version)
     lower = f">={base_version}"
@@ -123,16 +111,15 @@ def _coerce_specifier(value: str) -> Optional[SpecifierSet]:
         return SpecifierSet(f"=={cleaned}")
 
 
-def _encode_cursor(published_at: datetime, unique_id: int) -> str:
-    payload = f"{published_at.isoformat()}|{unique_id}"
+def _encode_cursor(version_number: int) -> str:
+    payload = str(version_number)
     return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("utf-8")
 
 
-def _decode_cursor(cursor: str) -> Tuple[datetime, int]:
+def _decode_cursor(cursor: str) -> int:
     try:
         decoded = base64.urlsafe_b64decode(cursor.encode("utf-8")).decode("utf-8")
-        timestamp_str, id_str = decoded.split("|", 1)
-        return datetime.fromisoformat(timestamp_str), int(id_str)
+        return int(decoded)
     except Exception as exc:  # noqa: BLE001
         raise BadRequestException("Invalid cursor token") from exc
 
@@ -253,7 +240,10 @@ async def publish_extension_version(
         )
 
     parsed_version = _parse_version(target_version)
-    prerelease, build = _extract_prerelease_and_build(target_version)
+    prerelease = None
+    if parsed_version.pre:
+        identifier, number = parsed_version.pre
+        prerelease = f"{identifier}{number if number is not None else ''}"
 
     resolved_display_name = publish_payload.display_name or manifest.display_name
     resolved_description = (
@@ -286,6 +276,13 @@ async def publish_extension_version(
     if existing_version:
         raise BadRequestException("Version already exists for this extension")
 
+    max_version_number = (
+        db.query(func.max(ExtensionVersion.version_number))
+        .filter(ExtensionVersion.extension_id == extension.id)
+        .scalar()
+    ) or 0
+    next_version_number = max_version_number + 1
+
     metadata = {
         "publisher": publisher,
         "name": name,
@@ -308,11 +305,8 @@ async def publish_extension_version(
     new_version = ExtensionVersion(
         extension_id=extension.id,
         version=target_version,
-        semver_major=parsed_version.major,
-        semver_minor=parsed_version.minor,
-        semver_patch=parsed_version.micro,
+        version_number=next_version_number,
         prerelease=prerelease,
-        build=build,
         engine_range=resolved_engine_range,
         size=len(file_bytes),
         sha256=sha256,
@@ -331,6 +325,7 @@ async def publish_extension_version(
         publisher=extension.publisher,
         name=extension.name,
         version=new_version.version,
+        version_number=new_version.version_number,
         engine_range=new_version.engine_range,
         yanked=new_version.yanked,
         size=new_version.size,
@@ -403,21 +398,10 @@ async def list_extension_versions(
         query = query.filter(ExtensionVersion.yanked.is_(False))
 
     if cursor:
-        cursor_time, cursor_id = _decode_cursor(cursor)
-        query = query.filter(
-            or_(
-                ExtensionVersion.published_at < cursor_time,
-                and_(
-                    ExtensionVersion.published_at == cursor_time,
-                    ExtensionVersion.id < cursor_id,
-                ),
-            )
-        )
+        cursor_version_num = _decode_cursor(cursor)
+        query = query.filter(ExtensionVersion.version_number < cursor_version_num)
 
-    query = query.order_by(
-        ExtensionVersion.published_at.desc(),
-        ExtensionVersion.id.desc(),
-    )
+    query = query.order_by(ExtensionVersion.version_number.desc())
 
     rows = query.limit(limit + 1).all()
     items = [ExtensionVersionListItem.model_validate(row) for row in rows[:limit]]
@@ -425,7 +409,7 @@ async def list_extension_versions(
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.published_at, last.id)
+        next_cursor = _encode_cursor(last.version_number)
 
     return ExtensionVersionListResponse(items=items, next_cursor=next_cursor)
 
