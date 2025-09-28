@@ -1,13 +1,12 @@
 """API endpoints for artifact grading and reviews."""
 import logging
-from typing import Annotated, List
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
-from ctutor_backend.api.crud import list_db
 from ctutor_backend.api.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -20,20 +19,21 @@ from ctutor_backend.model.artifact import (
     ArtifactReview,
     TestResult,
 )
-from ctutor_backend.model.course import CourseMember, SubmissionGroup
+from ctutor_backend.model.course import CourseMember
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.artifacts import (
     ArtifactGradeCreate,
     ArtifactGradeUpdate,
-    ArtifactGradeInterface,
+    ArtifactGradeListItem,
+    ArtifactGradeDetail,
     ArtifactReviewCreate,
     ArtifactReviewUpdate,
-    ArtifactReviewInterface,
+    ArtifactReviewListItem,
     TestResultCreate,
     TestResultUpdate,
-    TestResultInterface,
+    TestResultListItem,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ artifacts_router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 # Artifact Grade Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/grades", response_model=dict, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/grades", response_model=ArtifactGradeDetail, status_code=status.HTTP_201_CREATED)
 async def create_artifact_grade(
     artifact_id: UUID,
     grade_data: ArtifactGradeCreate,
@@ -94,14 +94,13 @@ async def create_artifact_grade(
 
     logger.info(f"Created grade {grade.id} for artifact {artifact_id}")
 
-    return {"id": grade.id, "message": "Grade created successfully"}
+    return ArtifactGradeDetail.model_validate(grade)
 
 
-@artifacts_router.get("/{artifact_id}/grades", response_model=list)
+@artifacts_router.get("/{artifact_id}/grades", response_model=list[ArtifactGradeListItem])
 async def list_artifact_grades(
     artifact_id: UUID,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """List all grades for an artifact."""
@@ -123,21 +122,10 @@ async def list_artifact_grades(
 
     response.headers["X-Total-Count"] = str(len(grades))
 
-    return [
-        {
-            "id": grade.id,
-            "artifact_id": grade.artifact_id,
-            "graded_by_course_member_id": grade.graded_by_course_member_id,
-            "score": grade.score,
-            "max_score": grade.max_score,
-            "comment": grade.comment,
-            "graded_at": grade.graded_at,
-        }
-        for grade in grades
-    ]
+    return [ArtifactGradeListItem.model_validate(grade) for grade in grades]
 
 
-@artifacts_router.patch("/grades/{grade_id}", response_model=dict)
+@artifacts_router.patch("/grades/{grade_id}", response_model=ArtifactGradeDetail)
 async def update_artifact_grade(
     grade_id: UUID,
     update_data: ArtifactGradeUpdate,
@@ -146,7 +134,9 @@ async def update_artifact_grade(
 ):
     """Update an existing grade. Only the grader can update their own grade."""
 
-    grade = db.query(ArtifactGrade).filter(ArtifactGrade.id == grade_id).first()
+    grade = db.query(ArtifactGrade).options(
+        joinedload(ArtifactGrade.graded_by)
+    ).filter(ArtifactGrade.id == grade_id).first()
 
     if not grade:
         raise NotFoundException(detail="Grade not found")
@@ -173,7 +163,7 @@ async def update_artifact_grade(
     db.commit()
     db.refresh(grade)
 
-    return {"id": grade.id, "message": "Grade updated successfully"}
+    return ArtifactGradeDetail.model_validate(grade)
 
 
 @artifacts_router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -214,7 +204,7 @@ async def delete_artifact_grade(
 # Artifact Review Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/reviews", response_model=dict, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/reviews", response_model=ArtifactReviewListItem, status_code=status.HTTP_201_CREATED)
 async def create_artifact_review(
     artifact_id: UUID,
     review_data: ArtifactReviewCreate,
@@ -256,14 +246,13 @@ async def create_artifact_review(
 
     logger.info(f"Created review {review.id} for artifact {artifact_id}")
 
-    return {"id": review.id, "message": "Review created successfully"}
+    return ArtifactReviewListItem.model_validate(review)
 
 
-@artifacts_router.get("/{artifact_id}/reviews", response_model=list)
+@artifacts_router.get("/{artifact_id}/reviews", response_model=list[ArtifactReviewListItem])
 async def list_artifact_reviews(
     artifact_id: UUID,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """List all reviews for an artifact."""
@@ -285,20 +274,10 @@ async def list_artifact_reviews(
 
     response.headers["X-Total-Count"] = str(len(reviews))
 
-    return [
-        {
-            "id": review.id,
-            "artifact_id": review.artifact_id,
-            "reviewer_course_member_id": review.reviewer_course_member_id,
-            "body": review.body,
-            "review_type": review.review_type,
-            "created_at": review.created_at,
-        }
-        for review in reviews
-    ]
+    return [ArtifactReviewListItem.model_validate(review) for review in reviews]
 
 
-@artifacts_router.patch("/reviews/{review_id}", response_model=dict)
+@artifacts_router.patch("/reviews/{review_id}", response_model=ArtifactReviewListItem)
 async def update_artifact_review(
     review_id: UUID,
     update_data: ArtifactReviewUpdate,
@@ -307,7 +286,9 @@ async def update_artifact_review(
 ):
     """Update an existing review. Only the reviewer can update their own review."""
 
-    review = db.query(ArtifactReview).filter(ArtifactReview.id == review_id).first()
+    review = db.query(ArtifactReview).options(
+        joinedload(ArtifactReview.reviewer)
+    ).filter(ArtifactReview.id == review_id).first()
 
     if not review:
         raise NotFoundException(detail="Review not found")
@@ -326,7 +307,7 @@ async def update_artifact_review(
     db.commit()
     db.refresh(review)
 
-    return {"id": review.id, "message": "Review updated successfully"}
+    return ArtifactReviewListItem.model_validate(review)
 
 
 @artifacts_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -367,7 +348,7 @@ async def delete_artifact_review(
 # Test Result Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/test", response_model=dict, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/test", response_model=TestResultListItem, status_code=status.HTTP_201_CREATED)
 async def create_test_result(
     artifact_id: UUID,
     test_data: TestResultCreate,
@@ -423,12 +404,14 @@ async def create_test_result(
             )
 
     # Create the test result
+    from ctutor_backend.interface.tasks import map_task_status_to_int
+
     test_result = TestResult(
         submission_artifact_id=artifact_id,
         course_member_id=test_data.course_member_id,
         execution_backend_id=test_data.execution_backend_id,
         test_system_id=test_data.test_system_id,
-        status=test_data.status,
+        status=map_task_status_to_int(test_data.status),
         score=test_data.score,
         max_score=test_data.max_score,
         result_json=test_data.result_json,
@@ -444,14 +427,13 @@ async def create_test_result(
 
     logger.info(f"Created test result {test_result.id} for artifact {artifact_id}")
 
-    return {"id": test_result.id, "message": "Test result created successfully"}
+    return TestResultListItem.model_validate(test_result)
 
 
-@artifacts_router.get("/{artifact_id}/tests", response_model=list)
+@artifacts_router.get("/{artifact_id}/tests", response_model=list[TestResultListItem])
 async def list_artifact_test_results(
     artifact_id: UUID,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """List all test results for an artifact."""
@@ -471,31 +453,13 @@ async def list_artifact_test_results(
 
     response.headers["X-Total-Count"] = str(len(test_results))
 
-    from ctutor_backend.interface.tasks import map_int_to_task_status
-
-    return [
-        {
-            "id": result.id,
-            "submission_artifact_id": result.submission_artifact_id,
-            "course_member_id": result.course_member_id,
-            "execution_backend_id": result.execution_backend_id,
-            "test_system_id": result.test_system_id,
-            "status": map_int_to_task_status(result.status).value,
-            "score": result.score,
-            "max_score": result.max_score,
-            "started_at": result.started_at,
-            "finished_at": result.finished_at,
-            "created_at": result.created_at,
-        }
-        for result in test_results
-    ]
+    return [TestResultListItem.model_validate(result) for result in test_results]
 
 
-@artifacts_router.patch("/tests/{test_id}", response_model=dict)
+@artifacts_router.patch("/tests/{test_id}", response_model=TestResultListItem)
 async def update_test_result(
     test_id: UUID,
     update_data: TestResultUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """Update a test result (e.g., when test completes)."""
@@ -525,4 +489,4 @@ async def update_test_result(
     db.commit()
     db.refresh(test_result)
 
-    return {"id": test_result.id, "message": "Test result updated successfully"}
+    return TestResultListItem.model_validate(test_result)
