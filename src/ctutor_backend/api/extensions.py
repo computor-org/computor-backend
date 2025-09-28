@@ -348,8 +348,8 @@ async def download_extension(
     db: Session = Depends(get_db),
     storage_service=Depends(get_storage_service),
 ):
-    if not permissions.permitted("extension", "get"):
-        raise ForbiddenException("You don't have permission to download extensions")
+    # if not permissions.permitted("extension", "get"):
+    #     raise ForbiddenException("You don't have permission to download extensions")
 
     publisher, name = _split_identity(extension_identity)
     extension = _get_extension_or_404(db, publisher, name)
@@ -385,8 +385,8 @@ async def list_extension_versions(
     permissions: Principal = Depends(get_current_permissions),
     db: Session = Depends(get_db),
 ):
-    if not permissions.permitted("extension", "list"):
-        raise ForbiddenException("You don't have permission to list extension versions")
+    # if not permissions.permitted("extension", "list"):
+    #     raise ForbiddenException("You don't have permission to list extension versions")
 
     publisher, name = _split_identity(extension_identity)
     extension = _get_extension_or_404(db, publisher, name)
@@ -421,8 +421,8 @@ async def list_extensions(
     permissions: Principal = Depends(get_current_permissions),
     db: Session = Depends(get_db),
 ):
-    if not permissions.permitted("extension", "list"):
-        raise ForbiddenException("You don't have permission to list extensions")
+    # if not permissions.permitted("extension", "list"):
+    #     raise ForbiddenException("You don't have permission to list extensions")
 
     rows = (
         db.query(Extension.publisher, Extension.name)
@@ -444,8 +444,8 @@ async def get_extension_metadata(
     permissions: Principal = Depends(get_current_permissions),
     db: Session = Depends(get_db),
 ):
-    if not permissions.permitted("extension", "get"):
-        raise ForbiddenException("You don't have permission to view extensions")
+    # if not permissions.permitted("extension", "get"):
+    #     raise ForbiddenException("You don't have permission to view extensions")
 
     publisher, name = _split_identity(extension_identity)
     extension = _get_extension_or_404(db, publisher, name)
