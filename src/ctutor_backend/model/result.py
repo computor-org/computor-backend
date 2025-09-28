@@ -16,7 +16,7 @@ class Result(Base):
         # Include course_content_id to allow same version for different assignments
         Index('result_version_identifier_member_content_partial_key', 'course_member_id', 'version_identifier', 'course_content_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
-        Index('result_version_identifier_group_content_partial_key', 'course_submission_group_id', 'version_identifier', 'course_content_id',
+        Index('result_version_identifier_group_content_partial_key', 'submission_group_id', 'version_identifier', 'course_content_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
     )
 
@@ -29,7 +29,7 @@ class Result(Base):
     properties = Column(JSONB)
     submit = Column(Boolean, nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
-    course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='SET NULL', onupdate='RESTRICT'), index=True)
+    submission_group_id = Column(ForeignKey('submission_group.id', ondelete='SET NULL', onupdate='RESTRICT'), index=True)
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
     execution_backend_id = Column(
@@ -48,7 +48,7 @@ class Result(Base):
     course_content: Mapped["CourseContent"] = relationship('CourseContent', back_populates="results", uselist=False, cascade='all,delete')
     course_content_type = relationship('CourseContentType', back_populates='results')
     course_member = relationship('CourseMember', back_populates='results')
-    course_submission_group = relationship('CourseSubmissionGroup', back_populates='results')
+    submission_group = relationship('SubmissionGroup', back_populates='results')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='results')

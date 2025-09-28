@@ -30,3 +30,4 @@ class ExecutionBackend(Base):
     course_execution_backends = relationship('CourseExecutionBackend', back_populates='execution_backend')
     course_contents = relationship('CourseContent', back_populates='execution_backend')
     results = relationship('Result', back_populates='execution_backend')
+    test_results = relationship('TestResult', back_populates='execution_backend')

@@ -18,9 +18,8 @@ from ctutor_backend.model.result import Result
 class SubmissionCreate(BaseModel):
     """Payload describing a manual submission request."""
 
-    course_submission_group_id: str
+    submission_group_id: str
     version_identifier: Optional[str] = None
-    submit: Optional[bool] = None
 
 
 class SubmissionUploadedFile(BaseModel):
@@ -35,11 +34,12 @@ class SubmissionUploadedFile(BaseModel):
 class SubmissionUploadResponseModel(BaseModel):
     """Response returned after processing a manual submission."""
 
-    result_id: UUID
-    bucket_name: str
-    files: List[SubmissionUploadedFile]
+    artifacts: List[UUID]  # List of created SubmissionArtifact IDs
+    submission_group_id: UUID
+    uploaded_by_course_member_id: UUID
     total_size: int
-    submitted_at: datetime
+    files_count: int
+    uploaded_at: datetime
     version_identifier: str
 
 

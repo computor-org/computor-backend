@@ -24,9 +24,10 @@ from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.model.course import (
     CourseContent,
     CourseMember,
-    CourseSubmissionGroup,
-    CourseSubmissionGroupMember,
+    SubmissionGroup,
+    SubmissionGroupMember,
 )
+from ctutor_backend.model.artifact import SubmissionArtifact
 from ctutor_backend.model.result import Result
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
@@ -42,6 +43,7 @@ from ctutor_backend.interface.submissions import (
     SubmissionUploadResponseModel,
     SubmissionUploadedFile,
 )
+from ctutor_backend.interface.artifacts import SubmissionArtifactInterface
 
 logger = logging.getLogger(__name__)
 
@@ -85,16 +87,16 @@ def _sanitize_archive_path(name: str) -> str:
     return "/".join(parts)
 
 
-@submissions_router.get("", response_model=list[SubmissionListItem])
+@submissions_router.get("", response_model=list)
 async def list_submissions(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
-    params: SubmissionQuery = Depends(),
+    params = Depends(),
     db: Session = Depends(get_db),
 ):
-    """List manual submission results with optional filtering."""
+    """List submission artifacts with optional filtering."""
 
-    submissions, total = await list_db(permissions, db, params, SubmissionInterface)
+    submissions, total = await list_db(permissions, db, params, SubmissionArtifactInterface)
     response.headers["X-Total-Count"] = str(total)
     return submissions
 
@@ -117,12 +119,12 @@ async def upload_submission(
 
     # Resolve submission group with permission check
     submission_group = (
-        check_course_permissions(permissions, CourseSubmissionGroup, "_student", db)
+        check_course_permissions(permissions, SubmissionGroup, "_student", db)
         .options(
-            joinedload(CourseSubmissionGroup.course_content),
-            joinedload(CourseSubmissionGroup.members).joinedload(CourseSubmissionGroupMember.course_member),
+            joinedload(SubmissionGroup.course_content),
+            joinedload(SubmissionGroup.members).joinedload(SubmissionGroupMember.course_member),
         )
-        .filter(CourseSubmissionGroup.id == submission_data.course_submission_group_id)
+        .filter(SubmissionGroup.id == submission_data.submission_group_id)
         .first()
     )
 
@@ -173,65 +175,12 @@ async def upload_submission(
         raise BadRequestException(detail="version_identifier exceeds maximum length of 2048 characters")
 
     manual_version_identifier = trimmed_version or f"manual-{uuid4()}"
-    submit_flag = submission_data.submit
-
-    non_unique_statuses = [
-        map_task_status_to_int(TaskStatus.FAILED),
-        map_task_status_to_int(TaskStatus.CANCELLED),
-        6,  # Legacy CRASHED status retained in database history
-    ]
-
-    duplicate_result = (
-        db.query(Result)
-        .filter(
-            Result.course_submission_group_id == submission_group.id,
-            Result.version_identifier == manual_version_identifier,
-            Result.status.notin_(non_unique_statuses),
-        )
-        .first()
-    )
-
-    if duplicate_result:
-        if submit_flag is not None and duplicate_result.submit != submit_flag:
-            duplicate_result.submit = submit_flag
-            db.commit()
-            db.refresh(duplicate_result)
-
-        bucket_name = str(submission_group.id).lower()
-        files_metadata: List[SubmissionUploadedFile] = []
-        total_uploaded_size = 0
-
-        if isinstance(duplicate_result.result_json, dict):
-            storage_info = duplicate_result.result_json.get("storage") or {}
-            bucket_name = storage_info.get("bucket") or bucket_name
-            files_metadata = [
-                SubmissionUploadedFile(**file_info)
-                for file_info in storage_info.get("files") or []
-                if isinstance(file_info, dict)
-            ]
-            total_uploaded_size = duplicate_result.result_json.get("total_uploaded_size") or 0
-
-        if not total_uploaded_size and isinstance(duplicate_result.properties, dict):
-            total_uploaded_size = duplicate_result.properties.get("total_uploaded_size") or 0
-
-        response.status_code = status.HTTP_200_OK
-        return SubmissionUploadResponseModel(
-            result_id=duplicate_result.id,
-            bucket_name=bucket_name,
-            files=files_metadata,
-            total_size=total_uploaded_size,
-            submitted_at=duplicate_result.updated_at,
-            version_identifier=manual_version_identifier,
-        )
 
     # Check submission quota limits (if configured)
     if submission_group.max_submissions is not None:
         submitted_count = (
-            db.query(func.count(Result.id))
-            .filter(
-                Result.course_submission_group_id == submission_group.id,
-                Result.submit == True,
-            )
+            db.query(func.count(SubmissionArtifact.id))
+            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
             .scalar()
         )
         if submitted_count >= submission_group.max_submissions:
@@ -256,7 +205,7 @@ async def upload_submission(
     timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
     submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
     bucket_name = str(submission_group.id).lower()
-    files_metadata: List[SubmissionUploadedFile] = []
+    created_artifacts: List[UUID] = []
     total_uploaded_size = 0
 
     file_data.seek(0)
@@ -322,75 +271,48 @@ async def upload_submission(
                     metadata=per_file_metadata,
                 )
 
-                files_metadata.append(
-                    SubmissionUploadedFile(
-                        object_key=object_key,
-                        size=stored.size,
-                        content_type=stored.content_type,
-                        relative_path=relative_path,
-                    )
+                # Create SubmissionArtifact record
+                artifact = SubmissionArtifact(
+                    submission_group_id=submission_group.id,
+                    uploaded_by_course_member_id=submitting_member.id,
+                    filename=relative_path,
+                    original_filename=member.filename,
+                    content_type=stored.content_type,
+                    file_size=stored.size,
+                    bucket_name=bucket_name,
+                    object_key=object_key,
+                    properties={
+                        "version_identifier": manual_version_identifier,
+                        "submission_prefix": submission_prefix,
+                        "archive_filename": file.filename or "submission.zip",
+                        "manual_submission": True,
+                    }
                 )
+
+                db.add(artifact)
+                db.flush()  # Get the ID without committing
+                created_artifacts.append(artifact.id)
                 total_uploaded_size += stored.size
 
     except zipfile.BadZipFile as exc:
         raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
 
-    if not files_metadata:
+    if not created_artifacts:
         raise BadRequestException("Failed to extract any files from the archive")
 
-    properties_payload = {
-        "submission_origin": "manual_upload",
-        "submission_prefix": submission_prefix,
-        "uploaded_by_user_id": str(principal_user_id) if principal_user_id else None,
-        "file_count": len(files_metadata),
-        "total_uploaded_size": total_uploaded_size,
-    }
-
-    # result_payload = {
-    #     "manual_submission": True,
-    #     "archive": {
-    #         "original_filename": file.filename,
-    #         "size": file_size,
-    #     },
-    #     "storage": {
-    #         "bucket": bucket_name,
-    #         "submission_prefix": submission_prefix,
-    #         "files": [file_info.model_dump() for file_info in files_metadata],
-    #     },
-    #     "total_uploaded_size": total_uploaded_size,
-    #     "file_count": len(files_metadata),
-    # }
-
-    result_record = Result(
-        submit=bool(submit_flag),
-        course_member_id=submitting_member.id,
-        course_submission_group_id=submission_group.id,
-        course_content_id=course_content.id,
-        course_content_type_id=course_content.course_content_type_id,
-        # No execution backend is associated until a test run is triggered later
-        execution_backend_id=None,
-        test_system_id=None,
-        result=0.0,
-        result_json=None,
-        properties=properties_payload,
-        status=map_task_status_to_int(TaskStatus.FINISHED),
-        version_identifier=manual_version_identifier,
-        reference_version_identifier=None,
-    )
-
-    db.add(result_record)
+    # Commit all artifacts
     db.commit()
-    db.refresh(result_record)
 
     logger.info(
-        "Created manual submission result %s for group %s", result_record.id, submission_group.id
+        "Created %d submission artifacts for group %s", len(created_artifacts), submission_group.id
     )
 
     return SubmissionUploadResponseModel(
-        result_id=result_record.id,
-        bucket_name=bucket_name,
-        files=files_metadata,
+        artifacts=created_artifacts,
+        submission_group_id=submission_group.id,
+        uploaded_by_course_member_id=submitting_member.id,
         total_size=total_uploaded_size,
-        submitted_at=result_record.created_at,
+        files_count=len(created_artifacts),
+        uploaded_at=datetime.utcnow(),
         version_identifier=manual_version_identifier,
     )

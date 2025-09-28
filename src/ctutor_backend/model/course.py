@@ -113,7 +113,7 @@ class Course(Base):
     course_groups = relationship("CourseGroup", back_populates="course", uselist=True, lazy="select")
     course_execution_backends = relationship("CourseExecutionBackend", back_populates="course", uselist=True)
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
-    course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
+    submission_groups = relationship("SubmissionGroup", back_populates="course", uselist=True)
 
 
 class CourseContentType(Base):
@@ -231,7 +231,7 @@ class CourseContent(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='course_contents')
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
-    course_submission_groups = relationship('CourseSubmissionGroup', back_populates='course_content')
+    submission_groups = relationship('SubmissionGroup', back_populates='course_content')
     # Removed: course_submission_group_members - relationship removed as course_content_id was removed from CourseSubmissionGroupMember
     
     # Example relationships (via example_version_id - DEPRECATED)
@@ -316,15 +316,24 @@ class CourseMember(Base):
                                   back_populates="transmitter", uselist=True, lazy="select")
     comments_received = relationship("CourseMemberComment", foreign_keys="CourseMemberComment.course_member_id", 
                                    back_populates="course_member", uselist=True, lazy="select")
-    submission_group_members = relationship('CourseSubmissionGroupMember', back_populates='course_member')
+    submission_group_members = relationship('SubmissionGroupMember', back_populates='course_member')
     results = relationship('Result', back_populates='course_member')
     # Messaging relationships moved to user-level author/reader in Message/MessageRead
     gradings_given = relationship('CourseSubmissionGroupGrading', back_populates='graded_by',
                                  foreign_keys='CourseSubmissionGroupGrading.graded_by_course_member_id')
 
+    # New artifact-related relationships
+    uploaded_artifacts = relationship('SubmissionArtifact', back_populates='uploaded_by',
+                                    foreign_keys='SubmissionArtifact.uploaded_by_course_member_id')
+    test_results = relationship('TestResult', back_populates='course_member')
+    artifact_grades_given = relationship('ArtifactGrade', back_populates='graded_by',
+                                       foreign_keys='ArtifactGrade.graded_by_course_member_id')
+    artifact_reviews_given = relationship('ArtifactReview', back_populates='reviewer',
+                                        foreign_keys='ArtifactReview.reviewer_course_member_id')
 
-class CourseSubmissionGroup(Base):
-    __tablename__ = 'course_submission_group'
+
+class SubmissionGroup(Base):
+    __tablename__ = 'submission_group'
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
@@ -341,14 +350,15 @@ class CourseSubmissionGroup(Base):
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     # Relationships
-    course_content = relationship('CourseContent', back_populates='course_submission_groups')
-    course = relationship('Course', back_populates='course_submission_groups')
+    course_content = relationship('CourseContent', back_populates='submission_groups')
+    course = relationship('Course', back_populates='submission_groups')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
-    members = relationship("CourseSubmissionGroupMember", back_populates="group", uselist=True)
-    results = relationship('Result', back_populates='course_submission_group')
+    members = relationship("SubmissionGroupMember", back_populates="group", uselist=True)
+    results = relationship('Result', back_populates='submission_group')
     gradings = relationship('CourseSubmissionGroupGrading', back_populates='course_submission_group',
                            cascade='all, delete-orphan')
+    submission_artifacts = relationship('SubmissionArtifact', back_populates='submission_group')
     
     # Hybrid property for the last submitted result
     @hybrid_property
@@ -368,7 +378,7 @@ class CourseSubmissionGroup(Base):
         subq = (
             select(Result.id)
             .where(
-                Result.course_submission_group_id == cls.id,
+                Result.submission_group_id == cls.id,
                 Result.submit == True
             )
             .order_by(Result.created_at.desc())
@@ -378,11 +388,11 @@ class CourseSubmissionGroup(Base):
         return subq
 
 
-class CourseSubmissionGroupMember(Base):
-    __tablename__ = 'course_submission_group_member'
+class SubmissionGroupMember(Base):
+    __tablename__ = 'submission_group_member'
     __table_args__ = (
         # Only keep the constraint that makes sense: unique member per submission group
-        Index('course_submission_group_member_key', 'course_submission_group_id', 'course_member_id', unique=True),
+        Index('submission_group_member_key', 'submission_group_id', 'course_member_id', unique=True),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -394,7 +404,7 @@ class CourseSubmissionGroupMember(Base):
     properties = Column(JSONB)
     # Removed: grading - moved to CourseSubmissionGroupGrading
     course_id = Column(ForeignKey('course.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
-    course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    submission_group_id = Column(ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
     # Removed: course_content_id - relationship is through CourseSubmissionGroup
 
@@ -402,7 +412,7 @@ class CourseSubmissionGroupMember(Base):
     # Removed relationship to course_content
     course = relationship('Course')
     course_member = relationship('CourseMember', back_populates='submission_group_members')
-    group = relationship("CourseSubmissionGroup", back_populates="members", uselist=False)
+    group = relationship("SubmissionGroup", back_populates="members", uselist=False)
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
 

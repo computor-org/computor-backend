@@ -11,8 +11,8 @@ from .course import (
     CourseGroup,
     CourseContent,
     CourseMember,
-    CourseSubmissionGroup,
-    CourseSubmissionGroupMember,
+    SubmissionGroup,
+    SubmissionGroupMember,
     CourseSubmissionGroupGrading,
     CourseMemberComment
 )
@@ -24,6 +24,7 @@ from .message import Message, MessageRead
 from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
+from .artifact import SubmissionArtifact, ResultArtifact, TestResult, ArtifactGrade, ArtifactReview
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -38,6 +39,7 @@ from . import (
     example,
     extension,
     deployment,
+    artifact,
 )
 
 __all__ = [
@@ -61,8 +63,8 @@ __all__ = [
     'CourseGroup',
     'CourseContent',
     'CourseMember',
-    'CourseSubmissionGroup',
-    'CourseSubmissionGroupMember',
+    'SubmissionGroup',
+    'SubmissionGroupMember',
     'CourseSubmissionGroupGrading',
     'CourseMemberComment',
     # Execution
@@ -91,4 +93,10 @@ __all__ = [
     # Deployment models
     'CourseContentDeployment',
     'DeploymentHistory',
+    # Artifact models
+    'SubmissionArtifact',
+    'ResultArtifact',
+    'TestResult',
+    'ArtifactGrade',
+    'ArtifactReview',
 ]
