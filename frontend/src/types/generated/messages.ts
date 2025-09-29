@@ -19,7 +19,7 @@ export interface MessageCreate {
   content: string;
   user_id?: string | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
@@ -48,7 +48,7 @@ export interface MessageGet {
   is_read?: boolean;
   user_id?: string | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
@@ -70,7 +70,7 @@ export interface MessageList {
   is_read?: boolean;
   user_id?: string | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
@@ -84,7 +84,7 @@ export interface MessageQuery {
   author_id?: string | null;
   user_id?: string | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;

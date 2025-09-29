@@ -155,17 +155,6 @@
 | --- | --- | --- | --- | --- |
 | `list` | GET | `/student-courses` | `CourseStudentQuery` | `CourseStudentList[]` |
 
-## CourseSubmissionGroupGradingClient
-- Base path: `/submission-group-gradings`
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `create` | POST | `/submission-group-gradings` | `CourseSubmissionGroupGradingCreate` | `CourseSubmissionGroupGradingGet` |
-| `get` | GET | `/submission-group-gradings/{id}` | — | `CourseSubmissionGroupGradingGet` |
-| `list` | GET | `/submission-group-gradings` | `CourseSubmissionGroupGradingQuery` | `CourseSubmissionGroupGradingList[]` |
-| `update` | PATCH | `/submission-group-gradings/{id}` | `CourseSubmissionGroupGradingUpdate` | `CourseSubmissionGroupGradingGet` |
-| `delete` | DELETE | `/submission-group-gradings/{id}` | — | `void` |
-
 ## CourseTutorClient
 - Base path: `/tutor-courses`
 
@@ -373,6 +362,17 @@
 | `update` | PATCH | `/student-profiles/{id}` | `StudentProfileUpdate` | `StudentProfileGet` |
 | `delete` | DELETE | `/student-profiles/{id}` | — | `void` |
 
+## SubmissionGroupGradingClient
+- Base path: `/submission-group-gradings`
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `create` | POST | `/submission-group-gradings` | `SubmissionGroupGradingCreate` | `SubmissionGroupGradingGet` |
+| `get` | GET | `/submission-group-gradings/{id}` | — | `SubmissionGroupGradingGet` |
+| `list` | GET | `/submission-group-gradings` | `SubmissionGroupGradingQuery` | `SubmissionGroupGradingList[]` |
+| `update` | PATCH | `/submission-group-gradings/{id}` | `SubmissionGroupGradingUpdate` | `SubmissionGroupGradingGet` |
+| `delete` | DELETE | `/submission-group-gradings/{id}` | — | `void` |
+
 ## SubmissionGroupClient
 - Base path: `/submission-groups`
 
@@ -452,7 +452,9 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `createTestTestsPost` | POST | `/tests` | `TestCreate` | `TestRunResponse` |
+| `createTestForArtifactTestsArtifactsArtifactIdTestPost` | POST | `/tests/artifacts/{artifact_id}/test` | `TestCreate` | `ResultList` |
+| `getTestStatusTestsTestResultsTestIdStatusGet` | GET | `/tests/test-results/{test_id}/status` | — | `void` |
+| `createTestLegacyTestsLegacyPost` | POST | `/tests/legacy` | `TestCreate` | `ResultList` |
 
 ## StudentsClient
 - Base path: `/students`
@@ -558,8 +560,26 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `listSubmissionsSubmissionsGet` | GET | `/submissions` | — | `SubmissionListItem[]` |
+| `listSubmissionsSubmissionsGet` | GET | `/submissions` | — | `unknown[]` |
 | `uploadSubmissionSubmissionsPost` | POST | `/submissions` | — | `SubmissionUploadResponseModel` |
+
+## ArtifactsClient
+- Base path: `/artifacts`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `createArtifactGradeArtifactsArtifactIdGradesPost` | POST | `/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
+| `listArtifactGradesArtifactsArtifactIdGradesGet` | GET | `/artifacts/{artifact_id}/grades` | — | `SubmissionGradeListItem[]` |
+| `updateArtifactGradeArtifactsGradesGradeIdPatch` | PATCH | `/artifacts/grades/{grade_id}` | `SubmissionGradeUpdate` | `SubmissionGradeDetail` |
+| `deleteArtifactGradeArtifactsGradesGradeIdDelete` | DELETE | `/artifacts/grades/{grade_id}` | — | `void` |
+| `createArtifactReviewArtifactsArtifactIdReviewsPost` | POST | `/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
+| `listArtifactReviewsArtifactsArtifactIdReviewsGet` | GET | `/artifacts/{artifact_id}/reviews` | — | `SubmissionReviewListItem[]` |
+| `updateArtifactReviewArtifactsReviewsReviewIdPatch` | PATCH | `/artifacts/reviews/{review_id}` | `SubmissionReviewUpdate` | `SubmissionReviewListItem` |
+| `deleteArtifactReviewArtifactsReviewsReviewIdDelete` | DELETE | `/artifacts/reviews/{review_id}` | — | `void` |
+| `createTestResultArtifactsArtifactIdTestPost` | POST | `/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
+| `listArtifactTestResultsArtifactsArtifactIdTestsGet` | GET | `/artifacts/{artifact_id}/tests` | — | `ResultList[]` |
+| `updateTestResultArtifactsTestsTestIdPatch` | PATCH | `/artifacts/tests/{test_id}` | `ResultUpdate` | `ResultList` |
 
 ## MiscClient
 - Base path: `/`
