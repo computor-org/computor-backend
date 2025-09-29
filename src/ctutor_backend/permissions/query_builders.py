@@ -4,7 +4,7 @@ from sqlalchemy import or_, select
 from ctutor_backend.model.course import Course, CourseMember
 from ctutor_backend.permissions.principal import course_role_hierarchy
 from ctutor_backend.model.auth import User
-
+from ctutor_backend.model.course import CourseContent
 
 class CoursePermissionQueryBuilder:
     """Utility class for building course-related permission queries"""
@@ -44,7 +44,6 @@ class CoursePermissionQueryBuilder:
         
         elif "course_content_id" in table_keys:
             # Indirect through CourseContent
-            from ctutor_backend.model.course import CourseContent
             return (
                 query.join(CourseContent, CourseContent.id == entity.course_content_id)
                 .filter(CourseContent.course_id.in_(subquery))

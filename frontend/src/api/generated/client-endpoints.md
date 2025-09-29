@@ -45,6 +45,14 @@
 | `update` | PATCH | `/course-content-kinds/{id}` | `CourseContentKindUpdate` | `CourseContentKindGet` |
 | `delete` | DELETE | `/course-content-kinds/{id}` | — | `void` |
 
+## CourseContentLecturerClient
+- Base path: `/lecturer-course-contents`
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `get` | GET | `/lecturer-course-contents/{id}` | — | `CourseContentLecturerGet` |
+| `list` | GET | `/lecturer-course-contents` | `CourseContentLecturerQuery` | `CourseContentLecturerList[]` |
+
 ## CourseContentStudentClient
 - Base path: `/student-course-contents`
 

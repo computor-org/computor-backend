@@ -1269,9 +1269,9 @@ export interface GroupClaimQuery {
  * DTO for creating a student.
  */
 export interface StudentCreate {
-  user_id?: (string | string) | null;
+  user_id?: string | null;
   user?: UserGet | null;
-  course_group_id?: (string | string) | null;
+  course_group_id?: string | null;
   course_group_title?: string | null;
   role?: string | null;
 }
@@ -1281,7 +1281,7 @@ export interface StudentCreate {
  */
 export interface ReleaseStudentsCreate {
   students?: StudentCreate[];
-  course_id: any;
+  course_id: string;
 }
 
 /**
@@ -1334,7 +1334,7 @@ export interface PendingChangesResponse {
  * Per-item override for release commit selection.
  */
 export interface ReleaseOverride {
-  course_content_id: any;
+  course_content_id: string;
   /** Commit SHA to use for this content */
   version_identifier: string;
 }
@@ -1344,9 +1344,9 @@ export interface ReleaseOverride {
  */
 export interface ReleaseSelection {
   /** Explicit list of course content IDs to release */
-  course_content_ids?: any[] | null;
+  course_content_ids?: string[] | null;
   /** Parent content ID; combined with include_descendants */
-  parent_id?: (string | string) | null;
+  parent_id?: string | null;
   /** Whether to include descendants of parent_id */
   include_descendants?: boolean;
   /** Select all contents in the course */

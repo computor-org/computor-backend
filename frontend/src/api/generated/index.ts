@@ -7,6 +7,7 @@ export * from './AccountClient';
 export * from './CourseContentDeploymentClient';
 export * from './CourseContentClient';
 export * from './CourseContentKindClient';
+export * from './CourseContentLecturerClient';
 export * from './CourseContentStudentClient';
 export * from './CourseContentTypeClient';
 export * from './CourseExecutionBackendClient';

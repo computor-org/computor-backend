@@ -347,6 +347,81 @@ export interface CourseGroupQuery {
   properties?: string | null;
 }
 
+/**
+ * Repository information for course content in lecturer view.
+ */
+export interface CourseContentRepositoryLecturerGet {
+  url?: string | null;
+  full_path?: string | null;
+}
+
+/**
+ * DTO for lecturer GET of course content with course repository info.
+ */
+export interface CourseContentLecturerGet {
+  id: string;
+  archived_at?: string | null;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  is_submittable?: boolean;
+  has_deployment?: boolean | null;
+  deployment_status?: string | null;
+  course_content_type?: CourseContentTypeGet | null;
+  repository: CourseContentRepositoryLecturerGet;
+}
+
+/**
+ * DTO for lecturer list of course content with course repository info.
+ */
+export interface CourseContentLecturerList {
+  id: string;
+  title?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  is_submittable?: boolean;
+  has_deployment?: boolean | null;
+  deployment_status?: string | null;
+  course_content_type?: CourseContentTypeList | null;
+  repository: CourseContentRepositoryLecturerGet;
+}
+
+/**
+ * Query parameters for lecturer course content.
+ */
+export interface CourseContentLecturerQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  title?: string | null;
+  path?: string | null;
+  course_id?: string | null;
+  course_content_type_id?: string | null;
+  archived?: boolean | null;
+  position?: number | null;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  /** Filter by whether content has a deployment */
+  has_deployment?: boolean | null;
+}
+
 export interface GradedByCourseMember {
   course_role_id?: string | null;
   user_id: string;
