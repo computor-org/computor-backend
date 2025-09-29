@@ -197,7 +197,8 @@ def tutor_update_course_contents(
     response = course_member_course_content_result_mapper(course_contents_result, db)
 
     # Convert to TutorGradeResponse and add artifact info
-    grade_response = TutorGradeResponse.model_validate(response.model_dump())
+    # Avoid model_dump() -> model_validate() round-trip to preserve UUID types
+    grade_response = TutorGradeResponse.model_validate(response, from_attributes=True)
     grade_response.graded_artifact_id = artifact_to_grade.id
     grade_response.graded_artifact_info = {
         "id": str(artifact_to_grade.id),
@@ -216,10 +217,10 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
         raise NotFoundException()
 
     return CourseTutorGet(
-                id=course.id,
+                id=str(course.id),
                 title=course.title,
-                course_family_id=course.course_family_id,
-                organization_id=course.organization_id,
+                course_family_id=str(course.course_family_id) if course.course_family_id else None,
+                organization_id=str(course.organization_id) if course.organization_id else None,
                 path=course.path,
                 repository=CourseTutorRepository(
                     provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
@@ -238,10 +239,10 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
 
     for course in courses:
         response_list.append(CourseTutorList(
-            id=course.id,
+            id=str(course.id),
             title=course.title,
-            course_family_id=course.course_family_id,
-            organization_id=course.organization_id,
+            course_family_id=str(course.course_family_id) if course.course_family_id else None,
+            organization_id=str(course.organization_id) if course.organization_id else None,
             path=course.path,
             repository=CourseTutorRepository(
                 provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,

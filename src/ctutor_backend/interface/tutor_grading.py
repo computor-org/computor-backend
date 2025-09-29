@@ -1,6 +1,5 @@
 """Pydantic DTOs for tutor grading operations on submission artifacts."""
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.interface.student_course_contents import CourseContentStudentList
@@ -14,7 +13,7 @@ class TutorGradeCreate(BaseModel):
     """
     # Optional artifact_id - if provided, grades this specific artifact
     # If not provided, grades the latest artifact for the submission group
-    artifact_id: Optional[UUID] = None
+    artifact_id: Optional[str] = None
 
     # Grading information
     grade: Optional[float] = Field(None, ge=0.0, le=1.0, description="Grade between 0.0 and 1.0")
@@ -48,5 +47,5 @@ class TutorGradeResponse(CourseContentStudentList):
     We extend CourseContentStudentList to maintain backward compatibility.
     """
     # Additional field to indicate which artifact was graded
-    graded_artifact_id: Optional[UUID] = None
+    graded_artifact_id: Optional[str] = None
     graded_artifact_info: Optional[dict] = None  # Additional info about the graded artifact
