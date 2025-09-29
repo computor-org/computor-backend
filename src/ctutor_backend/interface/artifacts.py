@@ -1,7 +1,6 @@
 """Pydantic DTOs for artifact-related models."""
 from datetime import datetime
 from typing import Any, List, Optional
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
@@ -29,7 +28,7 @@ class SubmissionArtifactCreate(BaseModel):
     - submission_group_id
     - version_identifier (optional)
     """
-    submission_group_id: UUID
+    submission_group_id: str
     version_identifier: Optional[str] = None
 
 
@@ -44,9 +43,9 @@ class SubmissionArtifactList(BaseEntityList):
     Essential metadata is stored in proper database columns.
     Properties field is kept for legacy compatibility and future extensibility.
     """
-    id: UUID
-    submission_group_id: UUID
-    uploaded_by_course_member_id: Optional[UUID] = None
+    id: str
+    submission_group_id: str
+    uploaded_by_course_member_id: Optional[str] = None
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
@@ -69,9 +68,9 @@ class SubmissionArtifactGet(SubmissionArtifactList):
 
 class SubmissionArtifactQuery(ListQuery):
     """Query parameters for listing submission artifacts."""
-    id: Optional[UUID] = None
-    submission_group_id: Optional[UUID] = None
-    uploaded_by_course_member_id: Optional[UUID] = None
+    id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    uploaded_by_course_member_id: Optional[str] = None
     content_type: Optional[str] = None
 
 
@@ -107,8 +106,8 @@ class SubmissionArtifactInterface(EntityInterface):
 
 class SubmissionGradeCreate(BaseModel):
     """DTO for creating submission grades."""
-    artifact_id: UUID
-    graded_by_course_member_id: UUID
+    artifact_id: str
+    graded_by_course_member_id: str
     grade: float
     status: GradingStatus = GradingStatus.NOT_REVIEWED
     comment: Optional[str] = None
@@ -123,9 +122,9 @@ class SubmissionGradeUpdate(BaseModel):
 
 class SubmissionGradeListItem(BaseEntityList):
     """List item representation for submission grades."""
-    id: UUID
-    artifact_id: UUID
-    graded_by_course_member_id: UUID
+    id: str
+    artifact_id: str
+    graded_by_course_member_id: str
     grade: float
     status: GradingStatus
     comment: Optional[str] = None
@@ -148,9 +147,9 @@ class SubmissionGradeDetail(SubmissionGradeListItem):
 
 class SubmissionGradeQuery(ListQuery):
     """Query parameters for listing submission grades."""
-    id: Optional[UUID] = None
-    artifact_id: Optional[UUID] = None
-    graded_by_course_member_id: Optional[UUID] = None
+    id: Optional[str] = None
+    artifact_id: Optional[str] = None
+    graded_by_course_member_id: Optional[str] = None
     status: Optional[GradingStatus] = None
 
 
@@ -185,8 +184,8 @@ class SubmissionGradeInterface(EntityInterface):
 
 class SubmissionReviewCreate(BaseModel):
     """DTO for creating submission reviews."""
-    artifact_id: UUID
-    reviewer_course_member_id: UUID
+    artifact_id: str
+    reviewer_course_member_id: str
     body: str
     review_type: Optional[str] = None
 
@@ -199,9 +198,9 @@ class SubmissionReviewUpdate(BaseModel):
 
 class SubmissionReviewListItem(BaseEntityList):
     """List item representation for submission reviews."""
-    id: UUID
-    artifact_id: UUID
-    reviewer_course_member_id: UUID
+    id: str
+    artifact_id: str
+    reviewer_course_member_id: str
     body: str
     review_type: Optional[str] = None
     created_at: datetime
@@ -216,9 +215,9 @@ class SubmissionReviewDetail(SubmissionReviewListItem):
 
 class SubmissionReviewQuery(ListQuery):
     """Query parameters for listing submission reviews."""
-    id: Optional[UUID] = None
-    artifact_id: Optional[UUID] = None
-    reviewer_course_member_id: Optional[UUID] = None
+    id: Optional[str] = None
+    artifact_id: Optional[str] = None
+    reviewer_course_member_id: Optional[str] = None
     review_type: Optional[str] = None
 
 
@@ -253,7 +252,7 @@ class SubmissionReviewInterface(EntityInterface):
 
 class ResultArtifactCreate(BaseModel):
     """DTO for creating result artifacts."""
-    result_id: UUID
+    result_id: str
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
@@ -263,8 +262,8 @@ class ResultArtifactCreate(BaseModel):
 
 class ResultArtifactListItem(BaseEntityList):
     """List item representation for result artifacts."""
-    id: UUID
-    result_id: UUID
+    id: str
+    result_id: str
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
@@ -277,8 +276,8 @@ class ResultArtifactListItem(BaseEntityList):
 
 class ResultArtifactQuery(ListQuery):
     """Query parameters for listing result artifacts."""
-    id: Optional[UUID] = None
-    result_id: Optional[UUID] = None
+    id: Optional[str] = None
+    result_id: Optional[str] = None
     content_type: Optional[str] = None
 
 

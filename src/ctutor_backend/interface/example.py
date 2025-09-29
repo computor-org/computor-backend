@@ -5,7 +5,6 @@ Pydantic interfaces for Example Library models.
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
-from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from ..custom_types import Ltree
@@ -22,28 +21,28 @@ class ExampleRepositoryCreate(BaseModel):
     source_url: str = Field(..., description="Repository URL (Git URL, MinIO path, etc.)")
     access_credentials: Optional[str] = Field(None, description="Encrypted credentials")
     default_version: Optional[str] = Field(None, description="Default version to sync from")
-    organization_id: Optional[UUID] = None
+    organization_id: Optional[str] = None
 
 
 class ExampleRepositoryGet(BaseEntityGet, ExampleRepositoryCreate):
     """Get example repository details."""
-    id: UUID
+    id: str
     created_at: datetime
     updated_at: datetime
-    created_by: Optional[UUID] = None
-    updated_by: Optional[UUID] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
 class ExampleRepositoryList(BaseModel):
     """List view of example repositories."""
-    id: UUID
+    id: str
     name: str
     description: Optional[str] = None
     source_type: str
     source_url: str
-    organization_id: Optional[UUID] = None
+    organization_id: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,7 +57,7 @@ class ExampleRepositoryUpdate(BaseModel):
 
 class ExampleCreate(BaseModel):
     """Create a new example."""
-    example_repository_id: UUID
+    example_repository_id: str
     directory: str = Field(..., pattern="^[a-zA-Z0-9._-]+$")
     identifier: str = Field(..., description="Hierarchical identifier with dots as separators")
     title: str
@@ -70,11 +69,11 @@ class ExampleCreate(BaseModel):
 
 class ExampleGet(BaseEntityGet, ExampleCreate):
     """Get example details."""
-    id: UUID
+    id: str
     created_at: datetime
     updated_at: datetime
-    created_by: Optional[UUID] = None
-    updated_by: Optional[UUID] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     # Relationships
     repository: Optional[ExampleRepositoryGet] = None
@@ -91,14 +90,14 @@ class ExampleGet(BaseEntityGet, ExampleCreate):
 
 class ExampleList(BaseEntityList):
     """List view of examples."""
-    id: UUID
+    id: str
     directory: str
     identifier: str
     title: str
     subject: Optional[str] = None
     category: Optional[str] = None
     tags: List[str] = []
-    example_repository_id: UUID
+    example_repository_id: str
     
     @field_validator('identifier', mode='before')
     @classmethod
@@ -120,7 +119,7 @@ class ExampleUpdate(BaseModel):
 
 class ExampleVersionCreate(BaseModel):
     """Create a new example version."""
-    example_id: UUID
+    example_id: str
     version_tag: str = Field(..., max_length=64)
     version_number: int = Field(..., ge=1)
     storage_path: str
@@ -130,22 +129,22 @@ class ExampleVersionCreate(BaseModel):
 
 class ExampleVersionGet(BaseEntityGet):
     """Get example version details."""
-    id: UUID
-    example_id: UUID
+    id: str
+    example_id: str
     version_tag: str
     version_number: int
     storage_path: str
     meta_yaml: str
     test_yaml: Optional[str] = None
     created_at: datetime
-    created_by: Optional[UUID] = None
+    created_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
 class ExampleVersionList(BaseModel):
     """List view of example versions."""
-    id: UUID
+    id: str
     version_tag: str
     version_number: int
     created_at: datetime
@@ -160,16 +159,16 @@ class ExampleVersionQuery(ListQuery):
 
 class ExampleDependencyCreate(BaseModel):
     """Create example dependency."""
-    example_id: UUID
-    depends_id: UUID
+    example_id: str
+    depends_id: str
     version_constraint: Optional[str] = Field(None, description="Version constraint (e.g., '>=1.2.0', '^2.1.0'). NULL means latest version.")
 
 
 class ExampleDependencyGet(BaseModel):
     """Get example dependency details."""
-    id: UUID
-    example_id: UUID
-    depends_id: UUID
+    id: str
+    example_id: str
+    depends_id: str
     version_constraint: Optional[str] = Field(None, description="Version constraint string")
     created_at: datetime
     
@@ -181,7 +180,7 @@ class ExampleDependencyGet(BaseModel):
 
 class ExampleQuery(ListQuery):
     """Query parameters for listing examples."""
-    repository_id: Optional[UUID] = None
+    repository_id: Optional[str] = None
     identifier: Optional[str] = Field(None, description="Filter by identifier (supports Ltree patterns with *)")
     title: Optional[str] = None
     category: Optional[str] = None
@@ -193,7 +192,7 @@ class ExampleRepositoryQuery(ListQuery):
     """Query parameters for listing repositories."""
     name: Optional[str] = None
     source_type: Optional[str] = None
-    organization_id: Optional[UUID] = None
+    organization_id: Optional[str] = None
 
 
 # Search functions
@@ -274,21 +273,21 @@ class ExampleInterface(EntityInterface):
 
 class ExampleUploadRequest(BaseModel):
     """Request to upload an example to storage."""
-    repository_id: UUID
+    repository_id: str
     directory: str = Field(..., pattern="^[a-zA-Z0-9._-]+$")
     files: Dict[str, Union[str, bytes]] = Field(..., description="Map of filename to content. Text files as UTF-8 strings, binary files as either base64-encoded strings or raw bytes. Must include meta.yaml")
 
 
 class ExampleBatchUploadRequest(BaseModel):
     """Request to upload multiple examples to storage."""
-    repository_id: UUID
+    repository_id: str
     examples: List[Dict[str, Any]] = Field(..., description="List of examples with directory and files")
 
 
 class ExampleFileSet(BaseModel):
     """Files for a single example."""
-    example_id: UUID
-    version_id: UUID
+    example_id: str
+    version_id: str
     version_tag: str
     directory: str
     identifier: str
@@ -300,8 +299,8 @@ class ExampleFileSet(BaseModel):
 
 class ExampleDownloadResponse(BaseModel):
     """Response containing downloaded example files."""
-    example_id: UUID
-    version_id: Optional[UUID] = None
+    example_id: str
+    version_id: Optional[str] = None
     version_tag: str
     files: Dict[str, str] = Field(..., description="Map of filename to content")
     meta_yaml: str

@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import List, Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -85,7 +84,7 @@ class ExtensionMetadata(BaseModel):
         None,
         description="Extension description",
     )
-    id: UUID = Field(..., description="Database identifier for the extension")
+    id: str = Field(..., description="Database identifier for the extension")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     version_count: int = Field(..., description="Number of stored versions")

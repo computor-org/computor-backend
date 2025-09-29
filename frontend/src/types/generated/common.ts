@@ -740,8 +740,8 @@ export interface TutorGradeCreate {
   artifact_id?: string | null;
   /** Grade between 0.0 and 1.0 */
   grade?: number | null;
-  /** Status: corrected, correction_necessary, improvement_possible, not_reviewed */
-  status?: string | null;
+  /** Grading status */
+  status?: GradingStatus | null;
   /** Feedback/comment for the student */
   feedback?: string | null;
 }
@@ -2784,24 +2784,6 @@ export interface CodeAbilityReport {
   properties?: any | null;
   debug?: any | null;
   tests?: CodeAbilityReportMain[] | null;
-}
-
-export interface TestRunResponse {
-  submit: boolean;
-  course_member_id: string;
-  course_content_id: string;
-  submission_group_id?: string;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  grade?: number | null;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  id: string;
 }
 
 export interface GitlabSignup {

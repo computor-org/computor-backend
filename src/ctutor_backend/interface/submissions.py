@@ -1,7 +1,6 @@
 """Pydantic DTOs and query helpers for manual submission endpoints."""
 from datetime import datetime
 from typing import Any, List, Optional
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
@@ -34,9 +33,9 @@ class SubmissionUploadedFile(BaseModel):
 class SubmissionUploadResponseModel(BaseModel):
     """Response returned after processing a manual submission."""
 
-    artifacts: List[UUID]  # List of created SubmissionArtifact IDs
-    submission_group_id: UUID
-    uploaded_by_course_member_id: UUID
+    artifacts: List[str]  # List of created SubmissionArtifact IDs
+    submission_group_id: str
+    uploaded_by_course_member_id: str
     total_size: int
     files_count: int
     uploaded_at: datetime
