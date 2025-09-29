@@ -87,7 +87,7 @@ async def create_artifact_grade(
         artifact_id=artifact_id,
         graded_by_course_member_id=grader_member.id,  # Use the authenticated grader's member ID
         grade=grade_data.grade,
-        rubric=grade_data.rubric,
+        status=grade_data.status.value if hasattr(grade_data.status, 'value') else grade_data.status,
         comment=grade_data.comment,
     )
 
@@ -178,8 +178,8 @@ async def update_artifact_grade(
     # Update fields
     if update_data.grade is not None:
         grade.grade = update_data.grade
-    if update_data.rubric is not None:
-        grade.rubric = update_data.rubric
+    if update_data.status is not None:
+        grade.status = update_data.status.value if hasattr(update_data.status, 'value') else update_data.status
     if update_data.comment is not None:
         grade.comment = update_data.comment
 

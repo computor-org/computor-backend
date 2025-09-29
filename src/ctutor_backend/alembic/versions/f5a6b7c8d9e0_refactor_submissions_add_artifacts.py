@@ -75,7 +75,7 @@ def upgrade() -> None:
         sa.Column('artifact_id', postgresql.UUID(), nullable=False),
         sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
         sa.Column('grade', sa.Float(precision=53), nullable=False),
-        sa.Column('rubric', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('status', sa.Integer(), nullable=False, server_default=sa.text('0')),
         sa.Column('comment', sa.String(length=4096), nullable=True),
         sa.ForeignKeyConstraint(['artifact_id'], ['submission_artifact.id'], ondelete='CASCADE', onupdate='RESTRICT'),
         sa.ForeignKeyConstraint(['graded_by_course_member_id'], ['course_member.id'], ondelete='RESTRICT', onupdate='RESTRICT'),

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ctutor_backend.interface.base import BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
+from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.model.artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
 
 # Forward reference imports
@@ -104,14 +105,14 @@ class SubmissionGradeCreate(BaseModel):
     artifact_id: UUID
     graded_by_course_member_id: UUID
     grade: float
-    rubric: Optional[dict[str, Any]] = None
+    status: GradingStatus = GradingStatus.NOT_REVIEWED
     comment: Optional[str] = None
 
 
 class SubmissionGradeUpdate(BaseModel):
     """DTO for updating submission grades."""
     grade: Optional[float] = None
-    rubric: Optional[dict[str, Any]] = None
+    status: Optional[GradingStatus] = None
     comment: Optional[str] = None
 
 
@@ -121,15 +122,23 @@ class SubmissionGradeListItem(BaseEntityList):
     artifact_id: UUID
     graded_by_course_member_id: UUID
     grade: float
+    status: GradingStatus
     comment: Optional[str] = None
     graded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if isinstance(value, GradingStatus):
+            return value
+        return GradingStatus(value) if value is not None else GradingStatus.NOT_REVIEWED
+
 
 class SubmissionGradeDetail(SubmissionGradeListItem):
     """Detailed view of submission grade."""
-    rubric: Optional[dict[str, Any]] = None
+    pass  # No additional fields beyond the list item
 
 
 class SubmissionGradeQuery(ListQuery):
@@ -137,6 +146,7 @@ class SubmissionGradeQuery(ListQuery):
     id: Optional[UUID] = None
     artifact_id: Optional[UUID] = None
     graded_by_course_member_id: Optional[UUID] = None
+    status: Optional[GradingStatus] = None
 
 
 def submission_grade_search(db: Session, query, params: SubmissionGradeQuery):
@@ -147,6 +157,8 @@ def submission_grade_search(db: Session, query, params: SubmissionGradeQuery):
         query = query.filter(SubmissionGrade.artifact_id == params.artifact_id)
     if params.graded_by_course_member_id is not None:
         query = query.filter(SubmissionGrade.graded_by_course_member_id == params.graded_by_course_member_id)
+    if params.status is not None:
+        query = query.filter(SubmissionGrade.status == params.status.value)
 
     return query.order_by(SubmissionGrade.graded_at.desc())
 

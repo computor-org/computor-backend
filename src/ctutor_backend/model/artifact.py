@@ -153,14 +153,14 @@ class SubmissionGrade(Base):
 
     # Grading data
     grade = Column(Float(53), nullable=False)  # Grade as percentage (0.0 to 1.0)
-    rubric = Column(JSONB, nullable=True)  # Structured rubric data
+    status = Column(Integer, nullable=False, server_default=text("0"))  # GradingStatus enum (0=not_reviewed, 1=corrected, 2=correction_necessary, 3=improvement_possible)
     comment = Column(String(4096), nullable=True)  # Grader feedback
 
     # Relationships
     artifact = relationship('SubmissionArtifact', back_populates='grades')
     graded_by: Mapped["CourseMember"] = relationship(
         'CourseMember',
-        back_populates='artifact_grades_given',
+        back_populates='submission_grades_given',
         foreign_keys=[graded_by_course_member_id]
     )
 
@@ -204,6 +204,6 @@ class SubmissionReview(Base):
     artifact = relationship('SubmissionArtifact', back_populates='reviews')
     reviewer: Mapped["CourseMember"] = relationship(
         'CourseMember',
-        back_populates='artifact_reviews_given',
+        back_populates='submission_reviews_given',
         foreign_keys=[reviewer_course_member_id]
     )
