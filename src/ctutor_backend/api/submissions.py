@@ -106,7 +106,7 @@ def _sanitize_archive_path(name: str) -> str:
 # Submission Upload Endpoint
 # ===============================
 
-@submissions_router.post("", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
+@submissions_router.post("/artifacts", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
     permissions: Annotated[Principal, Depends(get_current_permissions)],
