@@ -270,66 +270,85 @@ async def get_test_status(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
-    """Get the current status of a test execution."""
+    """Get the current status of a test execution.
 
-    result = db.query(Result).filter(Result.id == test_id).first()
+    Permission rules:
+    - Students can view their own test results (member of submission group)
+    - Tutors and higher roles can view all test results in their courses
+    """
 
-    if not result:
-        raise NotFoundException(detail="Test result not found")
-
-    # Check if user has permission to view this test
-    user_id = permissions.get_user_id()
-    course_member = db.query(CourseMember).filter(
-        CourseMember.id == test_result.course_member_id
+    # Query only the fields we need, including join to get submission group for permissions
+    result_data = db.query(
+        Result.id,
+        Result.status,
+        Result.score,
+        Result.max_score,
+        Result.started_at,
+        Result.finished_at,
+        Result.test_system_id,
+        Result.submission_artifact_id,
+        SubmissionGroup.id.label("submission_group_id"),
+        SubmissionGroup.course_id
+    ).join(
+        SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id
+    ).join(
+        SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id
+    ).filter(
+        Result.id == test_id
     ).first()
 
-    if not course_member:
-        raise NotFoundException(detail="Course member not found")
+    if not result_data:
+        raise NotFoundException(detail="Test result not found")
 
-    # Check if user is the test runner or has tutor permissions
-    if str(course_member.user_id) != str(user_id):
-        # Get artifact to find the course
-        artifact = db.query(SubmissionArtifact).filter(
-            SubmissionArtifact.id == test_result.submission_artifact_id
-        ).first()
-
-        if not artifact:
-            raise NotFoundException(detail="Submission artifact not found")
-
-        # Check if user has at least tutor permissions for this course
-        submission_group = check_course_permissions(
-            permissions, SubmissionGroup, "_tutor", db
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        # Check if user is a member of the submission group (for students)
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
         ).filter(
-            SubmissionGroup.id == artifact.submission_group_id
+            SubmissionGroupMember.submission_group_id == result_data.submission_group_id,
+            CourseMember.user_id == user_id
         ).first()
 
-        if not submission_group:
-            raise ForbiddenException(detail="You don't have permission to view this test result")
+        if not is_group_member:
+            # Not a group member, check for tutor or higher permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == result_data.course_id,
+                CourseMember.user_id == user_id
+            ).first()
 
-    # If test has a workflow ID, check Temporal status
-    if test_result.test_system_id and test_result.status in [3, 4, 5, 7]:  # Running statuses
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You don't have permission to view this test result")
+
+    # If test has a workflow ID, check Temporal status for running tests
+    status = result_data.status
+    if result_data.test_system_id and status in [3, 4, 5, 7]:  # Running statuses
         try:
             task_executor = get_task_executor()
-            actual_status = await task_executor.get_task_status(test_result.test_system_id)
+            actual_status = await task_executor.get_task_status(result_data.test_system_id)
 
             # Update database if status changed
             new_status = map_task_status_to_int(actual_status.status)
-            if new_status != test_result.status:
-                test_result.status = new_status
+            if new_status != status:
+                # Update only the status field
+                db.query(Result).filter(Result.id == test_id).update({"status": new_status})
                 db.commit()
-                db.refresh(test_result)
+                status = new_status
         except Exception as e:
             logger.warning(f"Could not check Temporal status: {e}")
 
     from ctutor_backend.interface.tasks import map_int_to_task_status
 
     return {
-        "id": str(test_result.id),
-        "status": map_int_to_task_status(test_result.status),
-        "score": test_result.score,
-        "max_score": test_result.max_score,
-        "started_at": test_result.started_at,
-        "finished_at": test_result.finished_at,
+        "id": str(result_data.id),
+        "status": map_int_to_task_status(status),
+        "score": result_data.score,
+        "max_score": result_data.max_score,
+        "started_at": result_data.started_at,
+        "finished_at": result_data.finished_at,
     }
 
 
