@@ -11,7 +11,7 @@ import logging
 import re
 import yaml
 from typing import List, Optional, Tuple
-from uuid import UUID
+# UUID type removed - using str for all IDs
 from datetime import datetime, timezone
 from ..custom_types import Ltree
 from fastapi import APIRouter, Depends, Query, HTTPException, Response
@@ -266,7 +266,7 @@ async def list_examples(
 
 @examples_router.get("/{example_id}", response_model=ExampleGet)
 async def get_example(
-    example_id: UUID,
+    example_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
     redis_client=Depends(get_redis_client),
@@ -281,7 +281,7 @@ async def get_example(
 
 @examples_router.post("/{example_id}/versions", response_model=ExampleVersionGet)
 async def create_version(
-    example_id: UUID,
+    example_id: str,
     version: ExampleVersionCreate,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -323,7 +323,7 @@ from ctutor_backend.interface.example import ExampleVersionQuery
 
 @examples_router.get("/{example_id}/versions", response_model=List[ExampleVersionList])
 async def list_versions(
-    example_id: UUID,
+    example_id: str,
     params: ExampleVersionQuery = Depends(),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -357,7 +357,7 @@ async def list_versions(
 
 @examples_router.get("/versions/{version_id}", response_model=ExampleVersionGet)
 async def get_version(
-    version_id: UUID,
+    version_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
     redis_client=Depends(get_redis_client),
@@ -395,7 +395,7 @@ async def get_version(
 
 @examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
 async def add_dependency(
-    example_id: UUID,
+    example_id: str,
     dependency: ExampleDependencyCreate,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -439,7 +439,7 @@ async def add_dependency(
 
 @examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
 async def list_dependencies(
-    example_id: UUID,
+    example_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
 ):
@@ -458,7 +458,7 @@ async def list_dependencies(
 
 @examples_router.delete("/dependencies/{dependency_id}")
 async def remove_dependency(
-    dependency_id: UUID,
+    dependency_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
 ):
@@ -734,7 +734,7 @@ async def upload_example(
 
 @examples_router.get("/{example_id}/download", response_model=ExampleDownloadResponse)
 async def download_example_latest(
-    example_id: UUID,
+    example_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -795,7 +795,7 @@ async def download_example_latest(
 
 @examples_router.get("/download/{version_id}", response_model=ExampleDownloadResponse)
 async def download_example_version(
-    version_id: UUID,
+    version_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -819,7 +819,7 @@ async def download_example_version(
     repository = example.repository
     
     # Helper function to get all dependencies with version constraints recursively
-    def get_all_dependencies_with_constraints(example_id: UUID, visited: set = None) -> List[tuple]:
+    def get_all_dependencies_with_constraints(example_id: str, visited: set = None) -> List[tuple]:
         if visited is None:
             visited = set()
         
@@ -946,7 +946,7 @@ async def download_example_version(
 
 @examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
 async def get_example_dependencies(
-    example_id: UUID,
+    example_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
 ):
@@ -970,7 +970,7 @@ async def get_example_dependencies(
 
 @examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
 async def create_example_dependency(
-    example_id: UUID,
+    example_id: str,
     dependency_data: ExampleDependencyCreate,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
@@ -1015,8 +1015,8 @@ async def create_example_dependency(
 
 @examples_router.delete("/{example_id}/dependencies/{dependency_id}")
 async def delete_example_dependency(
-    example_id: UUID,
-    dependency_id: UUID,
+    example_id: str,
+    dependency_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
 ):

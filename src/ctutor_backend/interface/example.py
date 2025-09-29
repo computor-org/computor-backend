@@ -31,7 +31,7 @@ class ExampleRepositoryGet(BaseEntityGet, ExampleRepositoryCreate):
     updated_at: datetime
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -43,7 +43,7 @@ class ExampleRepositoryList(BaseModel):
     source_type: str
     source_url: str
     organization_id: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -74,17 +74,17 @@ class ExampleGet(BaseEntityGet, ExampleCreate):
     updated_at: datetime
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
-    
+
     # Relationships
     repository: Optional[ExampleRepositoryGet] = None
     versions: Optional[List['ExampleVersionGet']] = None
     dependencies: Optional[List['ExampleDependencyGet']] = None
-    
+
     @field_validator('identifier', mode='before')
     @classmethod
     def cast_ltree_to_str(cls, value):
         return str(value)
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -98,12 +98,12 @@ class ExampleList(BaseEntityList):
     category: Optional[str] = None
     tags: List[str] = []
     example_repository_id: str
-    
+
     @field_validator('identifier', mode='before')
     @classmethod
     def cast_ltree_to_str(cls, value):
         return str(value)
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -138,7 +138,7 @@ class ExampleVersionGet(BaseEntityGet):
     test_yaml: Optional[str] = None
     created_at: datetime
     created_by: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -148,7 +148,7 @@ class ExampleVersionList(BaseModel):
     version_tag: str
     version_number: int
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -171,10 +171,10 @@ class ExampleDependencyGet(BaseModel):
     depends_id: str
     version_constraint: Optional[str] = Field(None, description="Version constraint string")
     created_at: datetime
-    
+
     # Relationship
     dependency: Optional[ExampleList] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 

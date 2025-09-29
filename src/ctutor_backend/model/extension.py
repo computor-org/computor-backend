@@ -61,7 +61,7 @@ class ExtensionVersion(Base):
         server_default=text("uuid_generate_v4()"),
     )
     extension_id = Column(
-        UUID(as_uuid=True),
+        UUID,
         ForeignKey("extension.id", ondelete="CASCADE"),
         nullable=False,
     )

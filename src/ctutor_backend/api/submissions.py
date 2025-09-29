@@ -285,8 +285,8 @@ async def upload_submission(
 async def list_submission_artifacts(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
-    submission_group_id: Optional[UUID] = None,
-    course_content_id: Optional[UUID] = None,
+    submission_group_id: Optional[str] = None,
+    course_content_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -349,7 +349,7 @@ async def list_submission_artifacts(
 
 @submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def get_submission_artifact(
-    artifact_id: UUID,
+    artifact_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -408,7 +408,7 @@ async def get_submission_artifact(
 
 @submissions_router.post("/artifacts/{artifact_id}/grades", response_model=SubmissionGradeDetail, status_code=status.HTTP_201_CREATED)
 async def create_artifact_grade(
-    artifact_id: UUID,
+    artifact_id: str,
     grade_data: SubmissionGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -461,7 +461,7 @@ async def create_artifact_grade(
 
 @submissions_router.get("/artifacts/{artifact_id}/grades", response_model=list[SubmissionGradeListItem])
 async def list_artifact_grades(
-    artifact_id: UUID,
+    artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -515,7 +515,7 @@ async def list_artifact_grades(
 
 @submissions_router.patch("/grades/{grade_id}", response_model=SubmissionGradeDetail)
 async def update_artifact_grade(
-    grade_id: UUID,
+    grade_id: str,
     update_data: SubmissionGradeUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -554,7 +554,7 @@ async def update_artifact_grade(
 
 @submissions_router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_grade(
-    grade_id: UUID,
+    grade_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -592,7 +592,7 @@ async def delete_artifact_grade(
 
 @submissions_router.post("/artifacts/{artifact_id}/reviews", response_model=SubmissionReviewListItem, status_code=status.HTTP_201_CREATED)
 async def create_artifact_review(
-    artifact_id: UUID,
+    artifact_id: str,
     review_data: SubmissionReviewCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -641,7 +641,7 @@ async def create_artifact_review(
 
 @submissions_router.get("/artifacts/{artifact_id}/reviews", response_model=list[SubmissionReviewListItem])
 async def list_artifact_reviews(
-    artifact_id: UUID,
+    artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -685,7 +685,7 @@ async def list_artifact_reviews(
 
 @submissions_router.patch("/reviews/{review_id}", response_model=SubmissionReviewListItem)
 async def update_artifact_review(
-    review_id: UUID,
+    review_id: str,
     update_data: SubmissionReviewUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -718,7 +718,7 @@ async def update_artifact_review(
 
 @submissions_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_review(
-    review_id: UUID,
+    review_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -756,7 +756,7 @@ async def delete_artifact_review(
 
 @submissions_router.post("/artifacts/{artifact_id}/test", response_model=ResultList, status_code=status.HTTP_201_CREATED)
 async def create_test_result(
-    artifact_id: UUID,
+    artifact_id: str,
     test_data: ResultCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -859,7 +859,7 @@ async def create_test_result(
 
 @submissions_router.get("/artifacts/{artifact_id}/tests", response_model=list[ResultList])
 async def list_artifact_test_results(
-    artifact_id: UUID,
+    artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -911,7 +911,7 @@ async def list_artifact_test_results(
 
 @submissions_router.patch("/tests/{test_id}", response_model=ResultList)
 async def update_test_result(
-    test_id: UUID,
+    test_id: str,
     update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),

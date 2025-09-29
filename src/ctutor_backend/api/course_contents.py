@@ -172,7 +172,7 @@ course_content_router.on_updated.append(event_wrapper)
     response_model=DeploymentWithHistory
 )
 async def assign_example_to_content(
-    content_id: UUID,
+    content_id: str,
     request: AssignExampleRequest,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
@@ -383,7 +383,7 @@ async def assign_example_to_content(
     response_model=Dict[str, str]
 )
 async def unassign_example_from_content(
-    content_id: UUID,
+    content_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
@@ -452,7 +452,7 @@ async def unassign_example_from_content(
     response_model=Dict[str, Any]
 )
 async def get_deployment_status_with_workflow(
-    content_id: UUID,
+    content_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
@@ -617,7 +617,7 @@ async def get_deployment_status_with_workflow(
     response_model=DeploymentSummary
 )
 async def get_course_deployment_summary(
-    course_id: UUID,
+    course_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
@@ -702,7 +702,7 @@ async def get_course_deployment_summary(
     response_model=Optional[DeploymentWithHistory]
 )
 async def get_content_deployment(
-    content_id: UUID,
+    content_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
