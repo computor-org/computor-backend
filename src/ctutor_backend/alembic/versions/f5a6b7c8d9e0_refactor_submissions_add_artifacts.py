@@ -16,6 +16,45 @@ branch_labels = None
 depends_on = None
 
 
+def drop_constraint_if_exists(op, constraint_name, table_name):
+    """Helper to drop a constraint only if it exists."""
+    from alembic import op as alembic_op
+    from sqlalchemy import inspect, create_engine
+
+    # Get the current connection
+    connection = op.get_bind()
+    inspector = inspect(connection)
+
+    # Get all foreign keys for the table
+    foreign_keys = inspector.get_foreign_keys(table_name)
+
+    # Check if the constraint exists
+    for fk in foreign_keys:
+        if fk['name'] == constraint_name:
+            op.drop_constraint(constraint_name, table_name, type_='foreignkey')
+            return True
+    return False
+
+
+def drop_index_if_exists(op, index_name, table_name):
+    """Helper to drop an index only if it exists."""
+    from sqlalchemy import inspect
+
+    # Get the current connection
+    connection = op.get_bind()
+    inspector = inspect(connection)
+
+    # Get all indexes for the table
+    indexes = inspector.get_indexes(table_name)
+
+    # Check if the index exists
+    for idx in indexes:
+        if idx['name'] == index_name:
+            op.drop_index(index_name, table_name)
+            return True
+    return False
+
+
 def upgrade() -> None:
     # Create new artifact tables
 
@@ -112,24 +151,32 @@ def upgrade() -> None:
                     new_column_name='submission_group_id')
 
     # Update foreign key constraints (drop old, add new)
-    op.drop_constraint('submission_group_member_course_submission_group_id_fkey', 'submission_group_member', type_='foreignkey')
+    # For submission_group_member table - try different possible constraint names
+    drop_constraint_if_exists(op, 'submission_group_member_course_submission_group_id_fkey', 'submission_group_member')
+    drop_constraint_if_exists(op, 'course_submission_group_member_course_submission_group_id_fkey', 'submission_group_member')
+    drop_constraint_if_exists(op, 'submission_group_member_submission_group_id_fkey', 'submission_group_member')
+
     op.create_foreign_key('submission_group_member_submission_group_id_fkey',
                          'submission_group_member', 'submission_group',
                          ['submission_group_id'], ['id'],
                          ondelete='CASCADE', onupdate='RESTRICT')
 
-    op.drop_constraint('result_course_submission_group_id_fkey', 'result', type_='foreignkey')
+    # For result table - try different possible constraint names
+    drop_constraint_if_exists(op, 'result_course_submission_group_id_fkey', 'result')
+    drop_constraint_if_exists(op, 'result_submission_group_id_fkey', 'result')
+
     op.create_foreign_key('result_submission_group_id_fkey',
                          'result', 'submission_group',
                          ['submission_group_id'], ['id'],
                          ondelete='SET NULL', onupdate='RESTRICT')
 
     # Update indexes
-    op.drop_index('course_submission_group_member_key', 'submission_group_member')
+    drop_index_if_exists(op, 'course_submission_group_member_key', 'submission_group_member')
+    drop_index_if_exists(op, 'submission_group_member_key', 'submission_group_member')
     op.create_index('submission_group_member_key', 'submission_group_member',
                     ['submission_group_id', 'course_member_id'], unique=True)
 
-    op.drop_index('result_version_identifier_group_content_partial_key', 'result')
+    drop_index_if_exists(op, 'result_version_identifier_group_content_partial_key', 'result')
     op.create_index('result_version_identifier_group_content_partial_key', 'result',
                     ['submission_group_id', 'version_identifier', 'course_content_id'],
                     unique=True, postgresql_where=sa.text('status NOT IN (1, 2, 6)'))
@@ -242,3 +289,5 @@ def downgrade() -> None:
     # Rename tables back
     op.rename_table('submission_group_member', 'course_submission_group_member')
     op.rename_table('submission_group', 'course_submission_group')
+
+    # Old course_submission_group_grading table no longer needed - removed from initial migration

@@ -232,7 +232,7 @@ class CourseContent(Base):
     execution_backend = relationship('ExecutionBackend', back_populates='course_contents')
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     submission_groups = relationship('SubmissionGroup', back_populates='course_content')
-    # Removed: course_submission_group_members - relationship removed as course_content_id was removed from CourseSubmissionGroupMember
+    # Removed: submission_group_members - relationship removed as course_content_id was removed from SubmissionGroupMember
     
     # Example relationships (via example_version_id - DEPRECATED)
     example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
@@ -342,7 +342,7 @@ class SubmissionGroup(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)  # Should contain gitlab/git repository info
-    # Removed: status and grading - moved to CourseSubmissionGroupGrading
+    # Removed: status and grading - moved to SubmissionGrade
     max_group_size = Column(Integer, nullable=False)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
@@ -402,11 +402,11 @@ class SubmissionGroupMember(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    # Removed: grading - moved to CourseSubmissionGroupGrading
+    # Removed: grading - moved to SubmissionGrade
     course_id = Column(ForeignKey('course.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
     submission_group_id = Column(ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    # Removed: course_content_id - relationship is through CourseSubmissionGroup
+    # Removed: course_content_id - relationship is through SubmissionGroup
 
     # Relationships
     # Removed relationship to course_content

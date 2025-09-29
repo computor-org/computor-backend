@@ -283,7 +283,7 @@ def validate_submission_group_member_api(api: ApiConfig, course_content_get: Cou
     if len(entities) == 0:
         group_entity = group_client.create(SubmissionGroupCreate(course_content_id=course_content_get.id))
 
-        entity = member_client.create(SubmissionGroupMemberCreate(course_member_id=course_member_id,course_submission_group_id=group_entity.id))
+        entity = member_client.create(SubmissionGroupMemberCreate(course_member_id=course_member_id,submission_group_id=group_entity.id))
     else:
         entity = client.get(entities[0].id)
 

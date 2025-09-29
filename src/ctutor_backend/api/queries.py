@@ -221,15 +221,15 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         )
 
     course_contents_query = course_contents_query.options(
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.user),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.course_role),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
@@ -331,15 +331,15 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         )
 
     query = query.options(
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.user),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.course_role),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
@@ -415,15 +415,15 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
         )
 
     course_contents_query = course_contents_query.options(
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.user),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.course_role),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
@@ -515,15 +515,15 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         )
 
     query = query.options(
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.user),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.gradings)
         .joinedload(SubmissionGroupGrading.graded_by)
         .joinedload(CourseMember.course_role),
-        joinedload(CourseContent.course_submission_groups)
+        joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),

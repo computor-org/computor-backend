@@ -26,7 +26,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     course_content = query[0]
     result_count = query[1]
     result = query[2]
-    course_submission_group = query[3]
+    submission_group = query[3]
     submission_count = query[4] if len(query) > 4 else None
     submission_status_int = query[5] if len(query) > 5 else None
     submission_grading = query[6] if len(query) > 6 else None
@@ -73,8 +73,8 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     #     directory = props.get("gitlab", {}).get("directory")
 
     repository = None
-    if course_submission_group != None and course_submission_group.properties != None:
-        gitlab_info = course_submission_group.properties.get('gitlab', {})
+    if submission_group != None and submission_group.properties != None:
+        gitlab_info = submission_group.properties.get('gitlab', {})
         base_url = gitlab_info.get('url', '').rstrip('/')
         full_path = gitlab_info.get('full_path', '')
         clone_url = f"{base_url}/{full_path}.git"
@@ -99,9 +99,9 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         )
 
     gradings_payload = []
-    if course_submission_group is not None and getattr(course_submission_group, 'gradings', None):
+    if submission_group is not None and getattr(submission_group, 'gradings', None):
         sorted_gradings = sorted(
-            course_submission_group.gradings,
+            submission_group.gradings,
             key=lambda g: g.created_at,
             reverse=True,
         )
@@ -126,14 +126,14 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
 
     submission_group_payload = None
     submission_group_detail = None
-    if course_submission_group is not None:
+    if submission_group is not None:
         submission_group_base = dict(
-            id=str(course_submission_group.id),
+            id=str(submission_group.id),
             course_content_title=None,
             course_content_path=None,
             example_identifier=None,
-            max_group_size=course_submission_group.max_group_size,
-            current_group_size=len(course_submission_group.members) if getattr(course_submission_group, 'members', None) else 1,
+            max_group_size=submission_group.max_group_size,
+            current_group_size=len(submission_group.members) if getattr(submission_group, 'members', None) else 1,
             members=[
                 SubmissionGroupMemberBasic(
                     id=str(member.id),
@@ -146,13 +146,13 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                         else None
                     ),
                 )
-                for member in getattr(course_submission_group, 'members', [])
+                for member in getattr(submission_group, 'members', [])
             ],
             repository=repository,
             status=submission_status,
             grading=submission_grading,
             count=submission_count if submission_count is not None else 0,
-            max_submissions=course_submission_group.max_submissions,
+            max_submissions=submission_group.max_submissions,
             unread_message_count=submission_group_unread_count,
         )
 

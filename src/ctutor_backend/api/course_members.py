@@ -68,9 +68,9 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #         CourseContentType.slug,
 #     ) \
 #         .select_from(CourseMember) \
-#             .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-#                 .join(CourseSubmissionGroup,CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-#                     .join(Result,Result.course_submission_group_id == CourseSubmissionGroup.id) \
+#             .join(SubmissionGroupMember, SubmissionGroupMember.course_member_id == CourseMember.id) \
+#                 .join(SubmissionGroup,SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
+#                     .join(Result,Result.submission_group_id == SubmissionGroup.id) \
 #                         .join(CourseContent,CourseContent.id == Result.course_content_id) \
 #                             .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
 #                                 .group_by(
@@ -96,17 +96,18 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #     protocol["results"] = json_result
 
 #     # Get latest grading for each submission group
-#     latest_grading_sub = (
-#         db.query(
-#             CourseSubmissionGroupGrading.course_submission_group_id,
-#             CourseSubmissionGroupGrading.grading.label("latest_grading"),
-#             CourseSubmissionGroupGrading.status.label("latest_status"),
-#             func.row_number().over(
-#                 partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
-#                 order_by=CourseSubmissionGroupGrading.created_at.desc()
-#             ).label('rn')
-#         )
-#     ).subquery()
+#     # TODO: Update to use SubmissionGrade instead of old SubmissionGroupGrading
+#     # latest_grading_sub = (
+#     #     db.query(
+#     #         SubmissionGrade.artifact_id,
+#     #         SubmissionGrade.grade.label("latest_grading"),
+#     #         SubmissionGrade.status.label("latest_status"),
+#     #         func.row_number().over(
+#     #             partition_by=SubmissionGrade.artifact_id,
+#     #             order_by=SubmissionGrade.created_at.desc()
+#     #         ).label('rn')
+#     #     )
+#     # ).subquery()
 
 #     latest_result_sub = (
 #         db.query(
@@ -117,14 +118,14 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #             func.max(Result.created_at).label("latest_result_date")
 #         )
 #         .select_from(Result)
-#         .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id)
-#         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id)
+#         .join(SubmissionGroup, Result.submission_group_id == SubmissionGroup.id)
+#         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
 #         .outerjoin(
 #             latest_grading_sub,
-#             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+#             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id) &
 #             (latest_grading_sub.c.rn == 1)
 #         )
-#         .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
+#         .filter(SubmissionGroupMember.course_member_id == course_member_id)
 #         .group_by(
 #             Result.course_content_id,
 #             Result.result,
@@ -140,9 +141,9 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #             func.count().filter(Result.submit == True).label("submitted_count")
 #         )
 #         .select_from(Result)
-#         .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id)
-#         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id)
-#         .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
+#         .join(SubmissionGroup, Result.submission_group_id == SubmissionGroup.id)
+#         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+#         .filter(SubmissionGroupMember.course_member_id == course_member_id)
 #         .group_by(Result.course_content_id)
 #     ).subquery()
 
@@ -182,9 +183,9 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #             func.bool_or(Result.id.isnot(None)).label("attempted"),
 #             func.bool_or(Result.submit == True).label("submitted")
 #         )
-#         .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id)
-#         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id)
-#         .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
+#         .join(SubmissionGroup, Result.submission_group_id == SubmissionGroup.id)
+#         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+#         .filter(SubmissionGroupMember.course_member_id == course_member_id)
 #         .group_by(Result.course_content_id)
 #     ).subquery()
 

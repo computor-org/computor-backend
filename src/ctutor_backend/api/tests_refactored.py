@@ -14,7 +14,7 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.results import ResultCreate, ResultListItem
+from ctutor_backend.interface.results import ResultCreate, ResultList
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.interface.tests import TestCreate, TestJob
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 tests_router = APIRouter()
 
 
-@tests_router.post("/artifacts/{artifact_id}/test", response_model=ResultListItem)
+@tests_router.post("/artifacts/{artifact_id}/test", response_model=ResultList)
 async def create_test_for_artifact(
     artifact_id: str,
     test_create: TestCreate,
@@ -100,7 +100,7 @@ async def create_test_for_artifact(
 
                     if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                         # Still running, return the existing one
-                        return ResultListItem.model_validate(existing_test)
+                        return ResultList.model_validate(existing_test)
                 except Exception as e:
                     logger.warning(f"Could not check Temporal status: {e}")
 
@@ -261,7 +261,7 @@ async def create_test_for_artifact(
         db.refresh(result)
         raise
 
-    return ResultListItem.model_validate(result)
+    return ResultList.model_validate(result)
 
 
 @tests_router.get("/test-results/{test_id}/status")
@@ -333,7 +333,7 @@ async def get_test_status(
     }
 
 
-@tests_router.post("/legacy", response_model=ResultListItem)
+@tests_router.post("/legacy", response_model=ResultList)
 async def create_test_legacy(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],

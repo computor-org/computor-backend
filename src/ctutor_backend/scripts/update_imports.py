@@ -30,8 +30,8 @@ MODEL_MAPPINGS = {
     'CourseGroup': 'sqlalchemy_models.course',
     'CourseContent': 'sqlalchemy_models.course',
     'CourseMember': 'sqlalchemy_models.course',
-    'CourseSubmissionGroup': 'sqlalchemy_models.course',
-    'CourseSubmissionGroupMember': 'sqlalchemy_models.course',
+    'SubmissionGroup': 'sqlalchemy_models.course',
+    'SubmissionGroupMember': 'sqlalchemy_models.course',
     'CourseMemberComment': 'sqlalchemy_models.course',
     
     # Execution

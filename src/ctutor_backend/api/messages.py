@@ -30,8 +30,8 @@ async def create_message(
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
-    # At least one target is recommended (user_id, course_member_id, course_submission_group_id, course_group_id)
-    if not any(model_dump.get(k) for k in ['user_id', 'course_member_id', 'course_submission_group_id', 'course_group_id', 'course_content_id', 'course_id']):
+    # At least one target is recommended (user_id, course_member_id, submission_group_id, course_group_id)
+    if not any(model_dump.get(k) for k in ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']):
         # Allow user-only message by setting user_id to current user if nothing else provided
         model_dump['user_id'] = permissions.user_id
 

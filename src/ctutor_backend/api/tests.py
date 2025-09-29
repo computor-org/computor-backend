@@ -178,17 +178,17 @@ async def create_test(
         raise BadRequestException(detail="version_identifier is required")
 
     # Get submission group first (needed for correct result lookup)
-    course_submission_group = db.query(SubmissionGroup) \
+    submission_group = db.query(SubmissionGroup) \
         .join(SubmissionGroupMember, SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
         .filter(
             SubmissionGroupMember.course_member_id == course_member_id,
             SubmissionGroup.course_content_id == assignment.id
         ).first()
 
-    if not course_submission_group:
+    if not submission_group:
         raise BadRequestException(detail="No submission group found for this assignment")
 
-    submission_group_id = course_submission_group.id
+    submission_group_id = submission_group.id
 
     # Check for existing result with same version_identifier and submission group
     # There should be at most 1 result per version_identifier per submission group
@@ -285,7 +285,7 @@ async def create_test(
             # If failed/crashed/cancelled, we'll create a new run below
 
     # Use submission group properties (already retrieved above)
-    submission_group_properties = course_submission_group.properties or {}
+    submission_group_properties = submission_group.properties or {}
 
     # Create new test execution
     # Build repository configurations for GitLab

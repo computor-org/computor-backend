@@ -94,7 +94,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
     if student_cm is None:
         raise NotFoundException()
 
-    course_submission_group = (
+    submission_group = (
         db.query(SubmissionGroup)
         .join(
             SubmissionGroupMember,
@@ -107,7 +107,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         .first()
     )
 
-    if course_submission_group is None:
+    if submission_group is None:
         raise NotFoundException()
 
     # 2) Resolve the grader's course member (the current user in the same course)
@@ -125,7 +125,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
 
     # 3) Get the last submitted result if we want to link the grading to it
     last_result_id = None
-    last_result = course_submission_group.last_submitted_result
+    last_result = submission_group.last_submitted_result
     if last_result:
         # Hybrid property returns a Result model instance in Python mode
         # or the UUID when evaluated via SQL expression; normalise to ID.
@@ -145,7 +145,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
 
     # 5) Create grading if payload includes grading/status
     new_grading = SubmissionGroupGrading(
-            submission_group_id=course_submission_group.id,
+            submission_group_id=submission_group.id,
             graded_by_course_member_id=grader_cm.id,
             grading=course_member_update.grading if course_member_update.grading != None else 0,
             status=grading_status.value,  # Use integer value of enum

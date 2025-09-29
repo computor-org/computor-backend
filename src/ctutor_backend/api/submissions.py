@@ -224,7 +224,7 @@ async def upload_submission(
                 )
 
             storage_meta_base: dict[str, str] = {
-                "course_submission_group_id": str(submission_group.id),
+                "submission_group_id": str(submission_group.id),
                 "course_content_id": str(course_content.id),
                 "course_member_id": str(submitting_member.id),
                 "archive_filename": file.filename or "submission.zip",
