@@ -1,6 +1,6 @@
 """Pydantic DTOs for tutor grading operations on submission artifacts."""
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.interface.student_course_contents import CourseContentStudentList
 
@@ -17,27 +17,8 @@ class TutorGradeCreate(BaseModel):
 
     # Grading information
     grade: Optional[float] = Field(None, ge=0.0, le=1.0, description="Grade between 0.0 and 1.0")
-    status: Optional[str] = Field(
-        None,
-        description="Status: corrected, correction_necessary, improvement_possible, not_reviewed"
-    )
+    status: Optional[GradingStatus] = Field(None, description="Grading status")
     feedback: Optional[str] = Field(None, description="Feedback/comment for the student")
-
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, v):
-        """Validate status string."""
-        if v is not None:
-            valid_statuses = {
-                "corrected",
-                "correction_necessary",
-                "correction_possible",  # Alias for improvement_possible
-                "improvement_possible",
-                "not_reviewed"
-            }
-            if v not in valid_statuses:
-                raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
-        return v
 
 
 class TutorGradeResponse(CourseContentStudentList):

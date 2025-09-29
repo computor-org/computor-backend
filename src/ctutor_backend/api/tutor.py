@@ -158,17 +158,8 @@ def tutor_update_course_contents(
         if artifact_to_grade is None:
             raise NotFoundException(detail="No submission artifact found for this submission group. Student must submit first.")
 
-    # 4) Map status string to GradingStatus enum value
-    grading_status = GradingStatus.NOT_REVIEWED  # Default
-    if grade_data.status:
-        status_map = {
-            "corrected": GradingStatus.CORRECTED,
-            "correction_necessary": GradingStatus.CORRECTION_NECESSARY,
-            "correction_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
-            "improvement_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
-            "not_reviewed": GradingStatus.NOT_REVIEWED
-        }
-        grading_status = status_map.get(grade_data.status, GradingStatus.NOT_REVIEWED)
+    # 4) Get grading status (now using GradingStatus enum directly)
+    grading_status = grade_data.status if grade_data.status is not None else GradingStatus.NOT_REVIEWED
 
     # 5) Create a new artifact-based grade
     # Check if grading data is provided
