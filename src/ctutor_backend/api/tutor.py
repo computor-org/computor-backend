@@ -144,17 +144,22 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         }
         grading_status = status_map.get(course_member_update.status, GradingStatus.NOT_REVIEWED)
 
-    # 5) Create grading if payload includes grading/status
-    new_grading = SubmissionGroupGrading(
-            submission_group_id=submission_group.id,
-            graded_by_course_member_id=grader_cm.id,
-            grading=course_member_update.grading if course_member_update.grading != None else 0,
-            status=grading_status.value,  # Use integer value of enum
-            feedback=getattr(course_member_update, 'feedback', None),  # Add feedback if provided
-            result_id=last_result_id  # Link to the last submitted result
-    )
-    db.add(new_grading)
-    db.commit()
+    # 5) TODO: Grading now needs to be done through submission artifacts
+    # The old SubmissionGroupGrading has been removed
+    # For now, we'll skip creating the grading until the frontend is updated
+    # to use the artifact-based grading system via /submissions/artifacts/{id}/grades
+
+    # new_grading = SubmissionGrade(
+    #     artifact_id=...,  # Need to determine which artifact to grade
+    #     graded_by_course_member_id=grader_cm.id,
+    #     grade=course_member_update.grading if course_member_update.grading != None else 0.0,
+    #     status=grading_status.value,
+    #     comment=getattr(course_member_update, 'feedback', None),
+    # )
+    # db.add(new_grading)
+    # db.commit()
+
+    logger.warning("Grading through course content endpoint is deprecated. Use /submissions/artifacts/{id}/grades instead")
         
     # 6) Return fresh data using shared mapper and latest grading subquery
     reader_user_id = permissions.get_user_id_or_throw()
