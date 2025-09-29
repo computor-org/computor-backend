@@ -106,7 +106,7 @@ def _sanitize_archive_path(name: str) -> str:
 # Submission Upload Endpoint
 # ===============================
 
-@submissions_router.post("/upload", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
+@submissions_router.post("", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
     permissions: Annotated[Principal, Depends(get_current_permissions)],
@@ -206,12 +206,7 @@ async def upload_submission(
     if archive_suffix != ".zip":
         raise BadRequestException("Only ZIP archives are supported for submissions")
 
-    timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
-    submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
-    bucket_name = str(submission_group.id).lower()
-    created_artifacts: List[UUID] = []
-    total_uploaded_size = 0
-
+    # Validate the ZIP file content
     file_data.seek(0)
     try:
         with zipfile.ZipFile(file_data) as archive:
@@ -226,79 +221,57 @@ async def upload_submission(
                 raise BadRequestException(
                     f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
                 )
-
-            for member in members:
-                relative_path = _sanitize_archive_path(member.filename)
-                member_size = member.file_size
-                if member_size > MAX_UPLOAD_SIZE:
-                    raise BadRequestException(
-                        f"Archive entry '{member.filename}' exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
-                    )
-
-                with archive.open(member, "r") as source:
-                    extracted_bytes = source.read()
-
-                extracted_stream = io.BytesIO(extracted_bytes)
-                content_type = (
-                    mimetypes.guess_type(relative_path)[0]
-                    or "application/octet-stream"
-                )
-
-                object_key = f"{submission_prefix}/{relative_path}"
-
-                # Minimal metadata for MinIO - only what's needed for storage operations
-                # All detailed information is stored in the database SubmissionArtifact record
-                storage_metadata = {
-                    "submission_group_id": str(submission_group.id),
-                    "relative_path": relative_path,
-                }
-
-                extracted_stream.seek(0)
-                stored = await storage_service.upload_file(
-                    file_data=extracted_stream,
-                    object_key=object_key,
-                    bucket_name=bucket_name,
-                    content_type=content_type,
-                    metadata=storage_metadata,
-                )
-
-                # Create SubmissionArtifact record
-                # Properties kept minimal - all essential data is in proper database columns
-                artifact = SubmissionArtifact(
-                    submission_group_id=submission_group.id,
-                    uploaded_by_course_member_id=submitting_member.id,
-                    content_type=stored.content_type,
-                    file_size=stored.size,
-                    bucket_name=bucket_name,
-                    object_key=object_key,
-                    version_identifier=manual_version_identifier,  # Now a proper column
-                    properties={}  # Keep empty for future extensibility and legacy compatibility
-                )
-
-                db.add(artifact)
-                db.flush()  # Get the ID without committing
-                created_artifacts.append(artifact.id)
-                total_uploaded_size += stored.size
-
     except zipfile.BadZipFile as exc:
         raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
 
-    if not created_artifacts:
-        raise BadRequestException("Failed to extract any files from the archive")
+    # Store the entire ZIP file as a single artifact
+    timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
+    submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
+    bucket_name = str(submission_group.id).lower()
+    object_key = f"{submission_prefix}/{file.filename or 'submission.zip'}"
 
-    # Commit all artifacts
+    # Minimal metadata for MinIO
+    storage_metadata = {
+        "submission_group_id": str(submission_group.id),
+        "version_identifier": manual_version_identifier,
+    }
+
+    # Upload the entire ZIP file to MinIO
+    file_data.seek(0)
+    stored = await storage_service.upload_file(
+        file_data=file_data,
+        object_key=object_key,
+        bucket_name=bucket_name,
+        content_type="application/zip",
+        metadata=storage_metadata,
+    )
+
+    # Create single SubmissionArtifact record for the ZIP file
+    artifact = SubmissionArtifact(
+        submission_group_id=submission_group.id,
+        uploaded_by_course_member_id=submitting_member.id,
+        content_type=stored.content_type,
+        file_size=stored.size,
+        bucket_name=bucket_name,
+        object_key=object_key,
+        version_identifier=manual_version_identifier,
+        properties={}  # Keep empty for future extensibility and legacy compatibility
+    )
+
+    db.add(artifact)
     db.commit()
+    db.refresh(artifact)
 
     logger.info(
-        "Created %d submission artifacts for group %s", len(created_artifacts), submission_group.id
+        "Created submission artifact %s for group %s", artifact.id, submission_group.id
     )
 
     return SubmissionUploadResponseModel(
-        artifacts=created_artifacts,
+        artifacts=[artifact.id],
         submission_group_id=submission_group.id,
         uploaded_by_course_member_id=submitting_member.id,
-        total_size=total_uploaded_size,
-        files_count=len(created_artifacts),
+        total_size=stored.size,
+        files_count=1,  # Single ZIP file
         uploaded_at=datetime.utcnow(),
         version_identifier=manual_version_identifier,
     )
