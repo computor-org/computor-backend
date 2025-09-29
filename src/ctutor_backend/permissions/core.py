@@ -46,7 +46,7 @@ from ctutor_backend.model.message import Message
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.artifact import (
     SubmissionArtifact, TestResult, ResultArtifact,
-    ArtifactGrade, ArtifactReview
+    SubmissionGrade, SubmissionReview
 )
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
 from ctutor_backend.model.group import Group, GroupClaim, UserGroup
@@ -103,8 +103,8 @@ def initialize_permission_handlers():
     permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))
     permission_registry.register(TestResult, CourseMemberPermissionHandler(TestResult))
     permission_registry.register(ResultArtifact, CourseMemberPermissionHandler(ResultArtifact))
-    permission_registry.register(ArtifactGrade, CourseMemberPermissionHandler(ArtifactGrade))
-    permission_registry.register(ArtifactReview, CourseMemberPermissionHandler(ArtifactReview))
+    permission_registry.register(SubmissionGrade, CourseMemberPermissionHandler(SubmissionGrade))
+    permission_registry.register(SubmissionReview, CourseMemberPermissionHandler(SubmissionReview))
 
 
 def check_admin(permissions: Principal) -> bool:

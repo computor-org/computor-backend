@@ -45,10 +45,8 @@ class SubmissionArtifact(Base):
         nullable=True  # Nullable in case the member is removed later
     )
 
-    # File information
-    filename = Column(String(255), nullable=False)
-    original_filename = Column(String(255), nullable=True)  # Original name before sanitization
-    content_type = Column(String(120), nullable=True)
+    # File information (removed filename since we upload zip archives)
+    content_type = Column(String(120), nullable=True)  # Should typically be 'application/zip'
     file_size = Column(BigInteger, nullable=False)
 
     # Storage information (MinIO/S3)
@@ -69,8 +67,8 @@ class SubmissionArtifact(Base):
         foreign_keys=[uploaded_by_course_member_id]
     )
     test_results = relationship('TestResult', back_populates='submission_artifact', cascade='all, delete-orphan')
-    grades = relationship('ArtifactGrade', back_populates='artifact', cascade='all, delete-orphan')
-    reviews = relationship('ArtifactReview', back_populates='artifact', cascade='all, delete-orphan')
+    grades = relationship('SubmissionGrade', back_populates='artifact', cascade='all, delete-orphan')
+    reviews = relationship('SubmissionReview', back_populates='artifact', cascade='all, delete-orphan')
 
 
 class ResultArtifact(Base):
@@ -103,8 +101,7 @@ class ResultArtifact(Base):
         nullable=False
     )
 
-    # File information
-    filename = Column(String(255), nullable=False)
+    # File information (removed filename since results may be archives too)
     content_type = Column(String(120), nullable=True)
     file_size = Column(BigInteger, nullable=False)
 
@@ -163,8 +160,7 @@ class TestResult(Base):
     # Test execution data
     test_system_id = Column(String(255), nullable=True)
     status = Column(Integer, nullable=False)  # Same status enum as Result
-    score = Column(Float(53), nullable=False, server_default=text("0.0"))
-    max_score = Column(Float(53), nullable=True)
+    result = Column(Float(53), nullable=True)  # Test result as percentage (0.0 to 1.0)
 
     # Test results and metadata
     result_json = Column(JSONB, nullable=True)  # Detailed test results
@@ -182,17 +178,17 @@ class TestResult(Base):
     result_artifacts = relationship('ResultArtifact', back_populates='test_result', cascade='all, delete-orphan')
 
 
-class ArtifactGrade(Base):
+class SubmissionGrade(Base):
     """
     Tracks grading information for submission artifacts.
 
     Multiple grades per artifact are allowed (e.g., different graders, re-grading).
     """
-    __tablename__ = 'artifact_grade'
+    __tablename__ = 'submission_grade'
     __table_args__ = (
-        Index('artifact_grade_artifact_idx', 'artifact_id'),
-        Index('artifact_grade_grader_idx', 'graded_by_course_member_id'),
-        Index('artifact_grade_graded_at_idx', 'graded_at'),
+        Index('submission_grade_artifact_idx', 'artifact_id'),
+        Index('submission_grade_grader_idx', 'graded_by_course_member_id'),
+        Index('submission_grade_graded_at_idx', 'graded_at'),
     )
 
     # Primary key and versioning
@@ -215,8 +211,7 @@ class ArtifactGrade(Base):
     )
 
     # Grading data
-    score = Column(Float(53), nullable=False)
-    max_score = Column(Float(53), nullable=False)
+    grade = Column(Float(53), nullable=False)  # Grade as percentage (0.0 to 1.0)
     rubric = Column(JSONB, nullable=True)  # Structured rubric data
     comment = Column(String(4096), nullable=True)  # Grader feedback
 
@@ -229,17 +224,17 @@ class ArtifactGrade(Base):
     )
 
 
-class ArtifactReview(Base):
+class SubmissionReview(Base):
     """
     Tracks review/feedback for submission artifacts.
 
     Multiple reviews per artifact are allowed (peer review, instructor feedback, etc.).
     """
-    __tablename__ = 'artifact_review'
+    __tablename__ = 'submission_review'
     __table_args__ = (
-        Index('artifact_review_artifact_idx', 'artifact_id'),
-        Index('artifact_review_reviewer_idx', 'reviewer_course_member_id'),
-        Index('artifact_review_created_at_idx', 'created_at'),
+        Index('submission_review_artifact_idx', 'artifact_id'),
+        Index('submission_review_reviewer_idx', 'reviewer_course_member_id'),
+        Index('submission_review_created_at_idx', 'created_at'),
     )
 
     # Primary key and versioning

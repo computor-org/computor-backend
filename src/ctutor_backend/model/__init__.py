@@ -24,7 +24,7 @@ from .message import Message, MessageRead
 from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
-from .artifact import SubmissionArtifact, ResultArtifact, TestResult, ArtifactGrade, ArtifactReview
+from .artifact import SubmissionArtifact, ResultArtifact, TestResult, SubmissionGrade, SubmissionReview
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -97,6 +97,6 @@ __all__ = [
     'SubmissionArtifact',
     'ResultArtifact',
     'TestResult',
-    'ArtifactGrade',
-    'ArtifactReview',
+    'SubmissionGrade',
+    'SubmissionReview',
 ]

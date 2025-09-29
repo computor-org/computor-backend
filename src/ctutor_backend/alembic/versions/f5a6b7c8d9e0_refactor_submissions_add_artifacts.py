@@ -28,8 +28,6 @@ def upgrade() -> None:
         sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('submission_group_id', postgresql.UUID(), nullable=False),
         sa.Column('uploaded_by_course_member_id', postgresql.UUID(), nullable=True),
-        sa.Column('filename', sa.String(length=255), nullable=False),
-        sa.Column('original_filename', sa.String(length=255), nullable=True),
         sa.Column('content_type', sa.String(length=120), nullable=True),
         sa.Column('file_size', sa.BigInteger(), nullable=False),
         sa.Column('bucket_name', sa.String(length=255), nullable=False),
@@ -51,8 +49,7 @@ def upgrade() -> None:
         sa.Column('execution_backend_id', postgresql.UUID(), nullable=True),
         sa.Column('test_system_id', sa.String(length=255), nullable=True),
         sa.Column('status', sa.Integer(), nullable=False),
-        sa.Column('score', sa.Float(precision=53), server_default=sa.text('0.0'), nullable=False),
-        sa.Column('max_score', sa.Float(precision=53), nullable=True),
+        sa.Column('result', sa.Float(precision=53), nullable=True),
         sa.Column('result_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('log_text', sa.String(), nullable=True),
@@ -71,7 +68,6 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('test_result_id', postgresql.UUID(), nullable=False),
-        sa.Column('filename', sa.String(length=255), nullable=False),
         sa.Column('content_type', sa.String(length=120), nullable=True),
         sa.Column('file_size', sa.BigInteger(), nullable=False),
         sa.Column('bucket_name', sa.String(length=255), nullable=False),
@@ -81,8 +77,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
 
-    # Create artifact_grade table
-    op.create_table('artifact_grade',
+    # Create submission_grade table
+    op.create_table('submission_grade',
         sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
         sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -90,8 +86,7 @@ def upgrade() -> None:
         sa.Column('graded_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('artifact_id', postgresql.UUID(), nullable=False),
         sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
-        sa.Column('score', sa.Float(precision=53), nullable=False),
-        sa.Column('max_score', sa.Float(precision=53), nullable=False),
+        sa.Column('grade', sa.Float(precision=53), nullable=False),
         sa.Column('rubric', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('comment', sa.String(length=4096), nullable=True),
         sa.ForeignKeyConstraint(['artifact_id'], ['submission_artifact.id'], ondelete='CASCADE', onupdate='RESTRICT'),
@@ -99,8 +94,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
 
-    # Create artifact_review table
-    op.create_table('artifact_review',
+    # Create submission_review table
+    op.create_table('submission_review',
         sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
         sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -177,24 +172,24 @@ def upgrade() -> None:
     op.create_index('result_artifact_test_result_idx', 'result_artifact', ['test_result_id'])
     op.create_index('result_artifact_created_at_idx', 'result_artifact', ['created_at'])
 
-    op.create_index('artifact_grade_artifact_idx', 'artifact_grade', ['artifact_id'])
-    op.create_index('artifact_grade_grader_idx', 'artifact_grade', ['graded_by_course_member_id'])
-    op.create_index('artifact_grade_graded_at_idx', 'artifact_grade', ['graded_at'])
+    op.create_index('submission_grade_artifact_idx', 'submission_grade', ['artifact_id'])
+    op.create_index('submission_grade_grader_idx', 'submission_grade', ['graded_by_course_member_id'])
+    op.create_index('submission_grade_graded_at_idx', 'submission_grade', ['graded_at'])
 
-    op.create_index('artifact_review_artifact_idx', 'artifact_review', ['artifact_id'])
-    op.create_index('artifact_review_reviewer_idx', 'artifact_review', ['reviewer_course_member_id'])
-    op.create_index('artifact_review_created_at_idx', 'artifact_review', ['created_at'])
+    op.create_index('submission_review_artifact_idx', 'submission_review', ['artifact_id'])
+    op.create_index('submission_review_reviewer_idx', 'submission_review', ['reviewer_course_member_id'])
+    op.create_index('submission_review_created_at_idx', 'submission_review', ['created_at'])
 
 
 def downgrade() -> None:
     # Drop indexes for new tables
-    op.drop_index('artifact_review_created_at_idx', 'artifact_review')
-    op.drop_index('artifact_review_reviewer_idx', 'artifact_review')
-    op.drop_index('artifact_review_artifact_idx', 'artifact_review')
+    op.drop_index('submission_review_created_at_idx', 'submission_review')
+    op.drop_index('submission_review_reviewer_idx', 'submission_review')
+    op.drop_index('submission_review_artifact_idx', 'submission_review')
 
-    op.drop_index('artifact_grade_graded_at_idx', 'artifact_grade')
-    op.drop_index('artifact_grade_grader_idx', 'artifact_grade')
-    op.drop_index('artifact_grade_artifact_idx', 'artifact_grade')
+    op.drop_index('submission_grade_graded_at_idx', 'submission_grade')
+    op.drop_index('submission_grade_grader_idx', 'submission_grade')
+    op.drop_index('submission_grade_artifact_idx', 'submission_grade')
 
     op.drop_index('result_artifact_created_at_idx', 'result_artifact')
     op.drop_index('result_artifact_test_result_idx', 'result_artifact')
@@ -209,8 +204,8 @@ def downgrade() -> None:
     op.drop_index('submission_artifact_submission_group_idx', 'submission_artifact')
 
     # Drop new tables
-    op.drop_table('artifact_review')
-    op.drop_table('artifact_grade')
+    op.drop_table('submission_review')
+    op.drop_table('submission_grade')
     op.drop_table('result_artifact')
     op.drop_table('test_result')
     op.drop_table('submission_artifact')

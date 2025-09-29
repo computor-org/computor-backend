@@ -326,10 +326,10 @@ class CourseMember(Base):
     uploaded_artifacts = relationship('SubmissionArtifact', back_populates='uploaded_by',
                                     foreign_keys='SubmissionArtifact.uploaded_by_course_member_id')
     test_results = relationship('TestResult', back_populates='course_member')
-    artifact_grades_given = relationship('ArtifactGrade', back_populates='graded_by',
-                                       foreign_keys='ArtifactGrade.graded_by_course_member_id')
-    artifact_reviews_given = relationship('ArtifactReview', back_populates='reviewer',
-                                        foreign_keys='ArtifactReview.reviewer_course_member_id')
+    artifact_grades_given = relationship('SubmissionGrade', back_populates='graded_by',
+                                       foreign_keys='SubmissionGrade.graded_by_course_member_id')
+    artifact_reviews_given = relationship('SubmissionReview', back_populates='reviewer',
+                                        foreign_keys='SubmissionReview.reviewer_course_member_id')
 
 
 class SubmissionGroup(Base):

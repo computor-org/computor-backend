@@ -15,8 +15,8 @@ from ctutor_backend.api.exceptions import (
 from ctutor_backend.database import get_db
 from ctutor_backend.model.artifact import (
     SubmissionArtifact,
-    ArtifactGrade,
-    ArtifactReview,
+    SubmissionGrade,
+    SubmissionReview,
     TestResult,
 )
 from ctutor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
@@ -24,13 +24,13 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.artifacts import (
-    ArtifactGradeCreate,
-    ArtifactGradeUpdate,
-    ArtifactGradeListItem,
-    ArtifactGradeDetail,
-    ArtifactReviewCreate,
-    ArtifactReviewUpdate,
-    ArtifactReviewListItem,
+    SubmissionGradeCreate,
+    SubmissionGradeUpdate,
+    SubmissionGradeListItem,
+    SubmissionGradeDetail,
+    SubmissionReviewCreate,
+    SubmissionReviewUpdate,
+    SubmissionReviewListItem,
     TestResultCreate,
     TestResultUpdate,
     TestResultListItem,
@@ -45,10 +45,10 @@ artifacts_router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 # Artifact Grade Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/grades", response_model=ArtifactGradeDetail, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/grades", response_model=SubmissionGradeDetail, status_code=status.HTTP_201_CREATED)
 async def create_artifact_grade(
     artifact_id: UUID,
-    grade_data: ArtifactGradeCreate,
+    grade_data: SubmissionGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -81,7 +81,7 @@ async def create_artifact_grade(
         raise BadRequestException(detail="Score cannot exceed max_score")
 
     # Create the grade (use the grader's course member id)
-    grade = ArtifactGrade(
+    grade = SubmissionGrade(
         artifact_id=artifact_id,
         graded_by_course_member_id=grader_member.id,  # Use the authenticated grader's member ID
         score=grade_data.score,
@@ -96,10 +96,10 @@ async def create_artifact_grade(
 
     logger.info(f"Created grade {grade.id} for artifact {artifact_id}")
 
-    return ArtifactGradeDetail.model_validate(grade)
+    return SubmissionGradeDetail.model_validate(grade)
 
 
-@artifacts_router.get("/{artifact_id}/grades", response_model=list[ArtifactGradeListItem])
+@artifacts_router.get("/{artifact_id}/grades", response_model=list[SubmissionGradeListItem])
 async def list_artifact_grades(
     artifact_id: UUID,
     response: Response,
@@ -142,29 +142,29 @@ async def list_artifact_grades(
                 raise ForbiddenException(detail="You don't have permission to view these grades")
 
     # Get grades for this artifact
-    grades = db.query(ArtifactGrade).options(
-        joinedload(ArtifactGrade.graded_by)
+    grades = db.query(SubmissionGrade).options(
+        joinedload(SubmissionGrade.graded_by)
     ).filter(
-        ArtifactGrade.artifact_id == artifact_id
-    ).order_by(ArtifactGrade.graded_at.desc()).all()
+        SubmissionGrade.artifact_id == artifact_id
+    ).order_by(SubmissionGrade.graded_at.desc()).all()
 
     response.headers["X-Total-Count"] = str(len(grades))
 
-    return [ArtifactGradeListItem.model_validate(grade) for grade in grades]
+    return [SubmissionGradeListItem.model_validate(grade) for grade in grades]
 
 
-@artifacts_router.patch("/grades/{grade_id}", response_model=ArtifactGradeDetail)
+@artifacts_router.patch("/grades/{grade_id}", response_model=SubmissionGradeDetail)
 async def update_artifact_grade(
     grade_id: UUID,
-    update_data: ArtifactGradeUpdate,
+    update_data: SubmissionGradeUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
 
-    grade = db.query(ArtifactGrade).options(
-        joinedload(ArtifactGrade.graded_by)
-    ).filter(ArtifactGrade.id == grade_id).first()
+    grade = db.query(SubmissionGrade).options(
+        joinedload(SubmissionGrade.graded_by)
+    ).filter(SubmissionGrade.id == grade_id).first()
 
     if not grade:
         raise NotFoundException(detail="Grade not found")
@@ -191,7 +191,7 @@ async def update_artifact_grade(
     db.commit()
     db.refresh(grade)
 
-    return ArtifactGradeDetail.model_validate(grade)
+    return SubmissionGradeDetail.model_validate(grade)
 
 
 @artifacts_router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -202,7 +202,7 @@ async def delete_artifact_grade(
 ):
     """Delete a grade. Only the grader or an admin can delete."""
 
-    grade = db.query(ArtifactGrade).filter(ArtifactGrade.id == grade_id).first()
+    grade = db.query(SubmissionGrade).filter(SubmissionGrade.id == grade_id).first()
 
     if not grade:
         raise NotFoundException(detail="Grade not found")
@@ -232,10 +232,10 @@ async def delete_artifact_grade(
 # Artifact Review Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/reviews", response_model=ArtifactReviewListItem, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/reviews", response_model=SubmissionReviewListItem, status_code=status.HTTP_201_CREATED)
 async def create_artifact_review(
     artifact_id: UUID,
-    review_data: ArtifactReviewCreate,
+    review_data: SubmissionReviewCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -265,7 +265,7 @@ async def create_artifact_review(
         raise ForbiddenException(detail="You must be a course member to review artifacts")
 
     # Create the review (use authenticated user's course member id)
-    review = ArtifactReview(
+    review = SubmissionReview(
         artifact_id=artifact_id,
         reviewer_course_member_id=course_member.id,  # Use the authenticated reviewer's member ID
         body=review_data.body,
@@ -278,10 +278,10 @@ async def create_artifact_review(
 
     logger.info(f"Created review {review.id} for artifact {artifact_id}")
 
-    return ArtifactReviewListItem.model_validate(review)
+    return SubmissionReviewListItem.model_validate(review)
 
 
-@artifacts_router.get("/{artifact_id}/reviews", response_model=list[ArtifactReviewListItem])
+@artifacts_router.get("/{artifact_id}/reviews", response_model=list[SubmissionReviewListItem])
 async def list_artifact_reviews(
     artifact_id: UUID,
     response: Response,
@@ -314,29 +314,29 @@ async def list_artifact_reviews(
             raise ForbiddenException(detail="You must be a course member to view reviews")
 
     # Get reviews for this artifact
-    reviews = db.query(ArtifactReview).options(
-        joinedload(ArtifactReview.reviewer)
+    reviews = db.query(SubmissionReview).options(
+        joinedload(SubmissionReview.reviewer)
     ).filter(
-        ArtifactReview.artifact_id == artifact_id
-    ).order_by(ArtifactReview.created_at.desc()).all()
+        SubmissionReview.artifact_id == artifact_id
+    ).order_by(SubmissionReview.created_at.desc()).all()
 
     response.headers["X-Total-Count"] = str(len(reviews))
 
-    return [ArtifactReviewListItem.model_validate(review) for review in reviews]
+    return [SubmissionReviewListItem.model_validate(review) for review in reviews]
 
 
-@artifacts_router.patch("/reviews/{review_id}", response_model=ArtifactReviewListItem)
+@artifacts_router.patch("/reviews/{review_id}", response_model=SubmissionReviewListItem)
 async def update_artifact_review(
     review_id: UUID,
-    update_data: ArtifactReviewUpdate,
+    update_data: SubmissionReviewUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """Update an existing review. Only the reviewer can update their own review."""
 
-    review = db.query(ArtifactReview).options(
-        joinedload(ArtifactReview.reviewer)
-    ).filter(ArtifactReview.id == review_id).first()
+    review = db.query(SubmissionReview).options(
+        joinedload(SubmissionReview.reviewer)
+    ).filter(SubmissionReview.id == review_id).first()
 
     if not review:
         raise NotFoundException(detail="Review not found")
@@ -355,7 +355,7 @@ async def update_artifact_review(
     db.commit()
     db.refresh(review)
 
-    return ArtifactReviewListItem.model_validate(review)
+    return SubmissionReviewListItem.model_validate(review)
 
 
 @artifacts_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -366,7 +366,7 @@ async def delete_artifact_review(
 ):
     """Delete a review. Only the reviewer or an admin can delete."""
 
-    review = db.query(ArtifactReview).filter(ArtifactReview.id == review_id).first()
+    review = db.query(SubmissionReview).filter(SubmissionReview.id == review_id).first()
 
     if not review:
         raise NotFoundException(detail="Review not found")

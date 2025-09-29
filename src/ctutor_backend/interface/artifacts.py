@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ctutor_backend.interface.base import BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
-from ctutor_backend.model.artifact import SubmissionArtifact, ResultArtifact, TestResult, ArtifactGrade, ArtifactReview
+from ctutor_backend.model.artifact import SubmissionArtifact, ResultArtifact, TestResult, SubmissionGrade, SubmissionReview
 
 
 # ===============================
@@ -18,7 +18,6 @@ from ctutor_backend.model.artifact import SubmissionArtifact, ResultArtifact, Te
 class SubmissionArtifactCreate(BaseModel):
     """DTO for creating submission artifacts."""
     submission_group_id: UUID
-    filename: str
     original_filename: Optional[str] = None
     content_type: Optional[str] = None
     file_size: int
@@ -29,7 +28,6 @@ class SubmissionArtifactCreate(BaseModel):
 
 class SubmissionArtifactUpdate(BaseModel):
     """DTO for updating submission artifacts."""
-    filename: Optional[str] = None
     properties: Optional[dict[str, Any]] = None
 
 
@@ -38,7 +36,6 @@ class SubmissionArtifactListItem(BaseEntityList):
     id: UUID
     submission_group_id: UUID
     uploaded_by_course_member_id: Optional[UUID] = None
-    filename: str
     original_filename: Optional[str] = None
     content_type: Optional[str] = None
     file_size: int
@@ -64,7 +61,6 @@ class SubmissionArtifactQuery(ListQuery):
     id: Optional[UUID] = None
     submission_group_id: Optional[UUID] = None
     uploaded_by_course_member_id: Optional[UUID] = None
-    filename: Optional[str] = None
     content_type: Optional[str] = None
 
 
@@ -76,8 +72,6 @@ def submission_artifact_search(db: Session, query, params: SubmissionArtifactQue
         query = query.filter(SubmissionArtifact.submission_group_id == params.submission_group_id)
     if params.uploaded_by_course_member_id is not None:
         query = query.filter(SubmissionArtifact.uploaded_by_course_member_id == params.uploaded_by_course_member_id)
-    if params.filename is not None:
-        query = query.filter(SubmissionArtifact.filename.ilike(f"%{params.filename}%"))
     if params.content_type is not None:
         query = query.filter(SubmissionArtifact.content_type == params.content_type)
 
@@ -106,8 +100,7 @@ class TestResultCreate(BaseModel):
     execution_backend_id: Optional[UUID] = None
     test_system_id: Optional[str] = None
     status: TaskStatus
-    score: float = 0.0
-    max_score: Optional[float] = None
+    result: float = 0.0
     result_json: Optional[dict[str, Any]] = None
     properties: Optional[dict[str, Any]] = None
     log_text: Optional[str] = None
@@ -118,8 +111,7 @@ class TestResultCreate(BaseModel):
 class TestResultUpdate(BaseModel):
     """DTO for updating test results."""
     status: Optional[TaskStatus] = None
-    score: Optional[float] = None
-    max_score: Optional[float] = None
+    result: Optional[float] = None
     result_json: Optional[dict[str, Any]] = None
     properties: Optional[dict[str, Any]] = None
     log_text: Optional[str] = None
@@ -134,8 +126,7 @@ class TestResultListItem(BaseEntityList):
     execution_backend_id: Optional[UUID] = None
     test_system_id: Optional[str] = None
     status: TaskStatus
-    score: float
-    max_score: Optional[float] = None
+    result: float
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     version_identifier: Optional[str] = None
@@ -200,95 +191,92 @@ class TestResultInterface(EntityInterface):
 
 
 # ===============================
-# ArtifactGrade DTOs
+# SubmissionGrade DTOs
 # ===============================
 
-class ArtifactGradeCreate(BaseModel):
-    """DTO for creating artifact grades."""
+class SubmissionGradeCreate(BaseModel):
+    """DTO for creating submission grades."""
     artifact_id: UUID
     graded_by_course_member_id: UUID
-    score: float
-    max_score: float
+    grade: float
     rubric: Optional[dict[str, Any]] = None
     comment: Optional[str] = None
 
 
-class ArtifactGradeUpdate(BaseModel):
-    """DTO for updating artifact grades."""
-    score: Optional[float] = None
-    max_score: Optional[float] = None
+class SubmissionGradeUpdate(BaseModel):
+    """DTO for updating submission grades."""
+    grade: Optional[float] = None
     rubric: Optional[dict[str, Any]] = None
     comment: Optional[str] = None
 
 
-class ArtifactGradeListItem(BaseEntityList):
-    """List item representation for artifact grades."""
+class SubmissionGradeListItem(BaseEntityList):
+    """List item representation for submission grades."""
     id: UUID
     artifact_id: UUID
     graded_by_course_member_id: UUID
-    score: float
-    max_score: float
+    grade: float
     comment: Optional[str] = None
     graded_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class ArtifactGradeDetail(ArtifactGradeListItem):
-    """Detailed view of artifact grade."""
+class SubmissionGradeDetail(SubmissionGradeListItem):
+    """Detailed view of submission grade."""
     rubric: Optional[dict[str, Any]] = None
 
 
-class ArtifactGradeQuery(ListQuery):
-    """Query parameters for listing artifact grades."""
+class SubmissionGradeQuery(ListQuery):
+    """Query parameters for listing submission grades."""
     id: Optional[UUID] = None
     artifact_id: Optional[UUID] = None
     graded_by_course_member_id: Optional[UUID] = None
 
 
-def artifact_grade_search(db: Session, query, params: ArtifactGradeQuery):
-    """Apply filters for artifact grade listings."""
+def submission_grade_search(db: Session, query, params: SubmissionGradeQuery):
+    """Apply filters for submission grade listings."""
     if params.id is not None:
-        query = query.filter(ArtifactGrade.id == params.id)
+        query = query.filter(SubmissionGrade.id == params.id)
     if params.artifact_id is not None:
-        query = query.filter(ArtifactGrade.artifact_id == params.artifact_id)
+        query = query.filter(SubmissionGrade.artifact_id == params.artifact_id)
     if params.graded_by_course_member_id is not None:
-        query = query.filter(ArtifactGrade.graded_by_course_member_id == params.graded_by_course_member_id)
+        query = query.filter(SubmissionGrade.graded_by_course_member_id == params.graded_by_course_member_id)
 
-    return query.order_by(ArtifactGrade.graded_at.desc())
+    return query.order_by(SubmissionGrade.graded_at.desc())
 
 
-class ArtifactGradeInterface(EntityInterface):
-    """Entity interface for artifact grades."""
-    model = ArtifactGrade
-    list = ArtifactGradeListItem
-    get = ArtifactGradeDetail
-    create = ArtifactGradeCreate
-    update = ArtifactGradeUpdate
-    query = ArtifactGradeQuery
-    search = artifact_grade_search
+class SubmissionGradeInterface(EntityInterface):
+    """Entity interface for submission grades."""
+    model = SubmissionGrade
+    list = SubmissionGradeListItem
+    get = SubmissionGradeDetail
+    create = SubmissionGradeCreate
+    update = SubmissionGradeUpdate
+    query = SubmissionGradeQuery
+    search = submission_grade_search
 
 
 # ===============================
-# ArtifactReview DTOs
+# SubmissionReview DTOs
 # ===============================
 
-class ArtifactReviewCreate(BaseModel):
-    """DTO for creating artifact reviews."""
+class SubmissionReviewCreate(BaseModel):
+    """DTO for creating submission reviews."""
     artifact_id: UUID
     reviewer_course_member_id: UUID
     body: str
     review_type: Optional[str] = None
 
 
-class ArtifactReviewUpdate(BaseModel):
-    """DTO for updating artifact reviews."""
+class SubmissionReviewUpdate(BaseModel):
+    """DTO for updating submission reviews."""
     body: Optional[str] = None
     review_type: Optional[str] = None
 
 
-class ArtifactReviewListItem(BaseEntityList):
-    """List item representation for artifact reviews."""
+class SubmissionReviewListItem(BaseEntityList):
+    """List item representation for submission reviews."""
     id: UUID
     artifact_id: UUID
     reviewer_course_member_id: UUID
@@ -299,42 +287,42 @@ class ArtifactReviewListItem(BaseEntityList):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ArtifactReviewDetail(ArtifactReviewListItem):
-    """Detailed view of artifact review."""
+class SubmissionReviewDetail(SubmissionReviewListItem):
+    """Detailed view of submission review."""
     pass  # Same as list item for now
 
 
-class ArtifactReviewQuery(ListQuery):
-    """Query parameters for listing artifact reviews."""
+class SubmissionReviewQuery(ListQuery):
+    """Query parameters for listing submission reviews."""
     id: Optional[UUID] = None
     artifact_id: Optional[UUID] = None
     reviewer_course_member_id: Optional[UUID] = None
     review_type: Optional[str] = None
 
 
-def artifact_review_search(db: Session, query, params: ArtifactReviewQuery):
-    """Apply filters for artifact review listings."""
+def submission_review_search(db: Session, query, params: SubmissionReviewQuery):
+    """Apply filters for submission review listings."""
     if params.id is not None:
-        query = query.filter(ArtifactReview.id == params.id)
+        query = query.filter(SubmissionReview.id == params.id)
     if params.artifact_id is not None:
-        query = query.filter(ArtifactReview.artifact_id == params.artifact_id)
+        query = query.filter(SubmissionReview.artifact_id == params.artifact_id)
     if params.reviewer_course_member_id is not None:
-        query = query.filter(ArtifactReview.reviewer_course_member_id == params.reviewer_course_member_id)
+        query = query.filter(SubmissionReview.reviewer_course_member_id == params.reviewer_course_member_id)
     if params.review_type is not None:
-        query = query.filter(ArtifactReview.review_type == params.review_type)
+        query = query.filter(SubmissionReview.review_type == params.review_type)
 
-    return query.order_by(ArtifactReview.created_at.desc())
+    return query.order_by(SubmissionReview.created_at.desc())
 
 
-class ArtifactReviewInterface(EntityInterface):
-    """Entity interface for artifact reviews."""
-    model = ArtifactReview
-    list = ArtifactReviewListItem
-    get = ArtifactReviewDetail
-    create = ArtifactReviewCreate
-    update = ArtifactReviewUpdate
-    query = ArtifactReviewQuery
-    search = artifact_review_search
+class SubmissionReviewInterface(EntityInterface):
+    """Entity interface for submission reviews."""
+    model = SubmissionReview
+    list = SubmissionReviewListItem
+    get = SubmissionReviewDetail
+    create = SubmissionReviewCreate
+    update = SubmissionReviewUpdate
+    query = SubmissionReviewQuery
+    search = submission_review_search
 
 
 # ===============================
@@ -344,7 +332,6 @@ class ArtifactReviewInterface(EntityInterface):
 class ResultArtifactCreate(BaseModel):
     """DTO for creating result artifacts."""
     test_result_id: UUID
-    filename: str
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
@@ -356,7 +343,6 @@ class ResultArtifactListItem(BaseEntityList):
     """List item representation for result artifacts."""
     id: UUID
     test_result_id: UUID
-    filename: str
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
@@ -371,7 +357,6 @@ class ResultArtifactQuery(ListQuery):
     """Query parameters for listing result artifacts."""
     id: Optional[UUID] = None
     test_result_id: Optional[UUID] = None
-    filename: Optional[str] = None
     content_type: Optional[str] = None
 
 
@@ -381,8 +366,6 @@ def result_artifact_search(db: Session, query, params: ResultArtifactQuery):
         query = query.filter(ResultArtifact.id == params.id)
     if params.test_result_id is not None:
         query = query.filter(ResultArtifact.test_result_id == params.test_result_id)
-    if params.filename is not None:
-        query = query.filter(ResultArtifact.filename.ilike(f"%{params.filename}%"))
     if params.content_type is not None:
         query = query.filter(ResultArtifact.content_type == params.content_type)
 
