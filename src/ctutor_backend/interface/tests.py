@@ -1,5 +1,4 @@
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel
 from ctutor_backend.interface.repositories import Repository
 
@@ -16,10 +15,10 @@ class TestJob(BaseModel):
 
 class TestCreate(BaseModel):
     # Primary way to specify what to test - provide the artifact ID directly
-    artifact_id: Optional[UUID] = None
+    artifact_id: Optional[str] = None
 
     # Alternative: specify submission group and optionally version to find artifact
-    submission_group_id: Optional[UUID] = None
+    submission_group_id: Optional[str] = None
     version_identifier: Optional[str] = None  # If not provided with submission_group_id, uses latest
 
     # Legacy fields for backward compatibility
