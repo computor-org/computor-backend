@@ -22,14 +22,15 @@ if TYPE_CHECKING:
 # ===============================
 
 class SubmissionArtifactCreate(BaseModel):
-    """DTO for creating submission artifacts."""
+    """DTO for creating submission artifacts.
+
+    This is used internally when processing submission uploads.
+    The upload endpoint accepts SubmissionCreate which only has:
+    - submission_group_id
+    - version_identifier (optional)
+    """
     submission_group_id: UUID
-    original_filename: Optional[str] = None
-    content_type: Optional[str] = None
-    file_size: int
-    bucket_name: str
-    object_key: str
-    properties: Optional[dict[str, Any]] = None
+    version_identifier: Optional[str] = None
 
 
 class SubmissionArtifactUpdate(BaseModel):
@@ -37,23 +38,25 @@ class SubmissionArtifactUpdate(BaseModel):
     properties: Optional[dict[str, Any]] = None
 
 
-class SubmissionArtifactListItem(BaseEntityList):
-    """List item representation for submission artifacts."""
+class SubmissionArtifactList(BaseEntityList):
+    """List item representation for submission artifacts.
+
+    Note: filename and original_filename are stored in the properties JSONB field
+    """
     id: UUID
     submission_group_id: UUID
     uploaded_by_course_member_id: Optional[UUID] = None
-    original_filename: Optional[str] = None
     content_type: Optional[str] = None
     file_size: int
     bucket_name: str
     object_key: str
     uploaded_at: datetime
-    properties: Optional[dict[str, Any]] = None
+    properties: Optional[dict[str, Any]] = None  # Contains: filename, original_filename, version_identifier, etc.
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class SubmissionArtifactDetail(SubmissionArtifactListItem):
+class SubmissionArtifactGet(SubmissionArtifactList):
     """Detailed view of submission artifact with related data."""
     test_results_count: Optional[int] = None
     grades_count: Optional[int] = None
@@ -87,8 +90,8 @@ def submission_artifact_search(db: Session, query, params: SubmissionArtifactQue
 class SubmissionArtifactInterface(EntityInterface):
     """Entity interface for submission artifacts."""
     model = SubmissionArtifact
-    list = SubmissionArtifactListItem
-    get = SubmissionArtifactDetail
+    list = SubmissionArtifactList
+    get = SubmissionArtifactGet
     create = SubmissionArtifactCreate
     update = SubmissionArtifactUpdate
     query = SubmissionArtifactQuery

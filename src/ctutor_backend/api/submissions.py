@@ -36,6 +36,8 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.artifacts import (
+    SubmissionArtifactList,
+    SubmissionArtifactGet,
     SubmissionGradeCreate,
     SubmissionGradeUpdate,
     SubmissionGradeListItem,
@@ -108,7 +110,6 @@ def _sanitize_archive_path(name: str) -> str:
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
     permissions: Annotated[Principal, Depends(get_current_permissions)],
-    response: Response,
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
@@ -275,16 +276,18 @@ async def upload_submission(
                 )
 
                 # Create SubmissionArtifact record
+                # Note: filename and original_filename are stored in properties since
+                # the model doesn't have these columns (we upload zip archives)
                 artifact = SubmissionArtifact(
                     submission_group_id=submission_group.id,
                     uploaded_by_course_member_id=submitting_member.id,
-                    filename=relative_path,
-                    original_filename=member.filename,
                     content_type=stored.content_type,
                     file_size=stored.size,
                     bucket_name=bucket_name,
                     object_key=object_key,
                     properties={
+                        "filename": relative_path,  # The sanitized path within the archive
+                        "original_filename": member.filename,  # The original path from the archive
                         "version_identifier": manual_version_identifier,
                         "submission_prefix": submission_prefix,
                         "archive_filename": file.filename or "submission.zip",
@@ -325,7 +328,7 @@ async def upload_submission(
 # Artifact Listing Endpoints
 # ===============================
 
-@submissions_router.get("/artifacts", response_model=list)
+@submissions_router.get("/artifacts", response_model=List[SubmissionArtifactList])
 async def list_submission_artifacts(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
@@ -387,27 +390,11 @@ async def list_submission_artifacts(
 
     response.headers["X-Total-Count"] = str(total)
 
-    # Convert to response format
-    return [
-        {
-            "id": str(artifact.id),
-            "submission_group_id": str(artifact.submission_group_id),
-            "uploaded_by_course_member_id": str(artifact.uploaded_by_course_member_id),
-            "filename": artifact.filename,
-            "original_filename": artifact.original_filename,
-            "content_type": artifact.content_type,
-            "file_size": artifact.file_size,
-            "bucket_name": artifact.bucket_name,
-            "object_key": artifact.object_key,
-            "properties": artifact.properties,
-            "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
-            "updated_at": artifact.updated_at.isoformat() if artifact.updated_at else None,
-        }
-        for artifact in artifacts
-    ]
+    # Return using Pydantic model
+    return [SubmissionArtifactList.model_validate(artifact) for artifact in artifacts]
 
 
-@submissions_router.get("/artifacts/{artifact_id}", response_model=dict)
+@submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def get_submission_artifact(
     artifact_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
@@ -446,22 +433,20 @@ async def get_submission_artifact(
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to view this artifact")
 
-    return {
-        "id": str(artifact.id),
-        "submission_group_id": str(artifact.submission_group_id),
-        "uploaded_by_course_member_id": str(artifact.uploaded_by_course_member_id),
-        "filename": artifact.filename,
-        "original_filename": artifact.original_filename,
-        "content_type": artifact.content_type,
-        "file_size": artifact.file_size,
-        "bucket_name": artifact.bucket_name,
-        "object_key": artifact.object_key,
-        "properties": artifact.properties,
-        "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
-        "updated_at": artifact.updated_at.isoformat() if artifact.updated_at else None,
-        "grades_count": len(artifact.grades) if hasattr(artifact, 'grades') else 0,
-        "reviews_count": len(artifact.reviews) if hasattr(artifact, 'reviews') else 0,
-    }
+    # Create the response with additional computed fields
+    artifact_get = SubmissionArtifactGet.model_validate(artifact)
+
+    # Add computed fields for the detailed view
+    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
+    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
+    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
+
+    # Calculate average grade if there are grades
+    if hasattr(artifact, 'grades') and artifact.grades:
+        grades = [g.grade for g in artifact.grades if g.grade is not None]
+        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
+
+    return artifact_get
 
 
 # ===============================

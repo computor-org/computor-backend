@@ -54,7 +54,6 @@ from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.submissions import submissions_router
-from ctutor_backend.api.artifacts import artifacts_router
 from ctutor_backend.api.examples import examples_router
 from ctutor_backend.api.extensions import extensions_router
 from ctutor_backend.api.course_member_comments import router as course_member_comments_router
@@ -327,12 +326,6 @@ app.include_router(
 app.include_router(
     submissions_router,
     tags=["submissions"],
-    dependencies=[Depends(get_current_permissions)]
-)
-
-app.include_router(
-    artifacts_router,
-    tags=["artifacts"],
     dependencies=[Depends(get_current_permissions)]
 )
 
