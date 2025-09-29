@@ -1,11 +1,18 @@
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, Float, 
+    BigInteger, Boolean, Column, DateTime, Float,
     ForeignKey, Index, Integer, String, text
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
+from typing import TYPE_CHECKING
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .artifact import SubmissionArtifact, ResultArtifact
+    from .course import CourseContent, CourseContentType, CourseMember, SubmissionGroup, SubmissionGroupGrading
+    from .execution import ExecutionBackend
+    from .auth import User
 
 
 class Result(Base):
@@ -17,6 +24,12 @@ class Result(Base):
         Index('result_version_identifier_member_content_partial_key', 'course_member_id', 'version_identifier', 'course_content_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
         Index('result_version_identifier_group_content_partial_key', 'submission_group_id', 'version_identifier', 'course_content_id',
+              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
+        # New indexes from TestResult for artifact-based testing
+        Index('result_submission_artifact_idx', 'submission_artifact_id'),
+        Index('result_created_at_idx', 'created_at'),
+        # Prevent multiple successful tests of same artifact by same member
+        Index('result_artifact_unique_success', 'submission_artifact_id', 'course_member_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
     )
 
@@ -27,8 +40,11 @@ class Result(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    submit = Column(Boolean, nullable=False)
+    submit = Column(Boolean, nullable=False, server_default=text("false"))  # Deprecated - kept for backward compatibility
+
+    # Foreign keys
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
+    submission_artifact_id = Column(ForeignKey('submission_artifact.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     submission_group_id = Column(ForeignKey('submission_group.id', ondelete='SET NULL', onupdate='RESTRICT'), index=True)
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
@@ -37,8 +53,13 @@ class Result(Base):
         nullable=True,
     )
     test_system_id = Column(String(255), nullable=True)
-    result = Column(Float(53), nullable=False)
+    # Test execution data
+    grade = Column(Float(53), nullable=True)  # Grade as percentage (0.0 to 1.0)
+    result = Column(Float(53), nullable=True)  # Deprecated alias for grade, kept for backward compatibility
     result_json = Column(JSONB)
+    log_text = Column(String, nullable=True)  # Test execution logs
+    started_at = Column(DateTime(True), nullable=True)
+    finished_at = Column(DateTime(True), nullable=True)
     version_identifier = Column(String(2048), nullable=False)
     # Reference commit used for the assignment (from assignments repo)
     reference_version_identifier = Column(String(64), nullable=True)
@@ -53,3 +74,7 @@ class Result(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='results')
     gradings = relationship('SubmissionGroupGrading', back_populates='result', foreign_keys='SubmissionGroupGrading.result_id')
+
+    # New artifact relationships
+    submission_artifact: Mapped["SubmissionArtifact"] = relationship('SubmissionArtifact', back_populates='test_results')
+    result_artifacts = relationship('ResultArtifact', back_populates='result', cascade='all, delete-orphan')

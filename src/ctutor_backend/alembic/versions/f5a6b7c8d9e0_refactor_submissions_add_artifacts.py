@@ -36,30 +36,18 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
 
-    # Create test_result table
-    op.create_table('test_result',
-        sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
-        sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('submission_artifact_id', postgresql.UUID(), nullable=False),
-        sa.Column('course_member_id', postgresql.UUID(), nullable=False),
-        sa.Column('execution_backend_id', postgresql.UUID(), nullable=True),
-        sa.Column('test_system_id', sa.String(length=255), nullable=True),
-        sa.Column('status', sa.Integer(), nullable=False),
-        sa.Column('result', sa.Float(precision=53), nullable=True),
-        sa.Column('result_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column('log_text', sa.String(), nullable=True),
-        sa.Column('version_identifier', sa.String(length=2048), nullable=True),
-        sa.Column('reference_version_identifier', sa.String(length=64), nullable=True),
-        sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], ondelete='RESTRICT', onupdate='RESTRICT'),
-        sa.ForeignKeyConstraint(['execution_backend_id'], ['execution_backend.id'], ondelete='RESTRICT', onupdate='RESTRICT'),
-        sa.ForeignKeyConstraint(['submission_artifact_id'], ['submission_artifact.id'], ondelete='CASCADE', onupdate='RESTRICT'),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # Add new columns to result table for artifact-based testing
+    op.add_column('result', sa.Column('submission_artifact_id', postgresql.UUID(), nullable=True))
+    op.add_column('result', sa.Column('grade', sa.Float(precision=53), nullable=True))
+    op.add_column('result', sa.Column('log_text', sa.String(), nullable=True))
+    op.add_column('result', sa.Column('started_at', sa.DateTime(timezone=True), nullable=True))
+    op.add_column('result', sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True))
+
+    # Add foreign key constraint for submission_artifact_id
+    op.create_foreign_key('result_submission_artifact_id_fkey',
+                         'result', 'submission_artifact',
+                         ['submission_artifact_id'], ['id'],
+                         ondelete='CASCADE', onupdate='RESTRICT')
 
     # Create result_artifact table
     op.create_table('result_artifact',
@@ -67,13 +55,13 @@ def upgrade() -> None:
         sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('test_result_id', postgresql.UUID(), nullable=False),
+        sa.Column('result_id', postgresql.UUID(), nullable=False),
         sa.Column('content_type', sa.String(length=120), nullable=True),
         sa.Column('file_size', sa.BigInteger(), nullable=False),
         sa.Column('bucket_name', sa.String(length=255), nullable=False),
         sa.Column('object_key', sa.String(length=2048), nullable=False),
         sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.ForeignKeyConstraint(['test_result_id'], ['test_result.id'], ondelete='CASCADE', onupdate='RESTRICT'),
+        sa.ForeignKeyConstraint(['result_id'], ['result.id'], ondelete='CASCADE', onupdate='RESTRICT'),
         sa.PrimaryKeyConstraint('id')
     )
 
@@ -162,14 +150,14 @@ def upgrade() -> None:
     op.create_index('submission_artifact_uploaded_by_idx', 'submission_artifact', ['uploaded_by_course_member_id'])
     op.create_index('submission_artifact_uploaded_at_idx', 'submission_artifact', ['uploaded_at'])
 
-    op.create_index('test_result_submission_artifact_idx', 'test_result', ['submission_artifact_id'])
-    op.create_index('test_result_course_member_idx', 'test_result', ['course_member_id'])
-    op.create_index('test_result_created_at_idx', 'test_result', ['created_at'])
-    op.create_index('test_result_unique_success', 'test_result',
+    # Add new indexes to result table for artifact-based testing
+    op.create_index('result_submission_artifact_idx', 'result', ['submission_artifact_id'])
+    op.create_index('result_created_at_idx', 'result', ['created_at'])
+    op.create_index('result_artifact_unique_success', 'result',
                     ['submission_artifact_id', 'course_member_id'],
                     unique=True, postgresql_where=sa.text('status NOT IN (1, 2, 6)'))
 
-    op.create_index('result_artifact_test_result_idx', 'result_artifact', ['test_result_id'])
+    op.create_index('result_artifact_result_idx', 'result_artifact', ['result_id'])
     op.create_index('result_artifact_created_at_idx', 'result_artifact', ['created_at'])
 
     op.create_index('submission_grade_artifact_idx', 'submission_grade', ['artifact_id'])
@@ -192,22 +180,31 @@ def downgrade() -> None:
     op.drop_index('submission_grade_artifact_idx', 'submission_grade')
 
     op.drop_index('result_artifact_created_at_idx', 'result_artifact')
-    op.drop_index('result_artifact_test_result_idx', 'result_artifact')
+    op.drop_index('result_artifact_result_idx', 'result_artifact')
 
-    op.drop_index('test_result_unique_success', 'test_result')
-    op.drop_index('test_result_created_at_idx', 'test_result')
-    op.drop_index('test_result_course_member_idx', 'test_result')
-    op.drop_index('test_result_submission_artifact_idx', 'test_result')
+    # Drop indexes from result table
+    op.drop_index('result_artifact_unique_success', 'result')
+    op.drop_index('result_created_at_idx', 'result')
+    op.drop_index('result_submission_artifact_idx', 'result')
 
     op.drop_index('submission_artifact_uploaded_at_idx', 'submission_artifact')
     op.drop_index('submission_artifact_uploaded_by_idx', 'submission_artifact')
     op.drop_index('submission_artifact_submission_group_idx', 'submission_artifact')
 
+    # Drop foreign key constraint from result table
+    op.drop_constraint('result_submission_artifact_id_fkey', 'result', type_='foreignkey')
+
+    # Drop new columns from result table
+    op.drop_column('result', 'submission_artifact_id')
+    op.drop_column('result', 'grade')
+    op.drop_column('result', 'log_text')
+    op.drop_column('result', 'started_at')
+    op.drop_column('result', 'finished_at')
+
     # Drop new tables
     op.drop_table('submission_review')
     op.drop_table('submission_grade')
     op.drop_table('result_artifact')
-    op.drop_table('test_result')
     op.drop_table('submission_artifact')
 
     # Rename back the column names

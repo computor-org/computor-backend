@@ -66,7 +66,7 @@ class SubmissionArtifact(Base):
         back_populates='uploaded_artifacts',
         foreign_keys=[uploaded_by_course_member_id]
     )
-    test_results = relationship('TestResult', back_populates='submission_artifact', cascade='all, delete-orphan')
+    test_results = relationship('Result', back_populates='submission_artifact', cascade='all, delete-orphan')
     grades = relationship('SubmissionGrade', back_populates='artifact', cascade='all, delete-orphan')
     reviews = relationship('SubmissionReview', back_populates='artifact', cascade='all, delete-orphan')
 
@@ -83,7 +83,7 @@ class ResultArtifact(Base):
     """
     __tablename__ = 'result_artifact'
     __table_args__ = (
-        Index('result_artifact_test_result_idx', 'test_result_id'),
+        Index('result_artifact_result_idx', 'result_id'),
         Index('result_artifact_created_at_idx', 'created_at'),
     )
 
@@ -96,8 +96,8 @@ class ResultArtifact(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
 
     # Foreign keys
-    test_result_id = Column(
-        ForeignKey('test_result.id', ondelete='CASCADE', onupdate='RESTRICT'),
+    result_id = Column(
+        ForeignKey('result.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False
     )
 
@@ -113,70 +113,11 @@ class ResultArtifact(Base):
     properties = Column(JSONB, nullable=True)
 
     # Relationships
-    test_result = relationship('TestResult', back_populates='result_artifacts')
+    result = relationship('Result', back_populates='result_artifacts')
 
 
-class TestResult(Base):
-    """
-    Tracks test execution results for submission artifacts.
-
-    Replaces the Result model for tracking test executions.
-    Each submission artifact can have multiple test results (but typically just one).
-    """
-    __tablename__ = 'test_result'
-    __table_args__ = (
-        Index('test_result_submission_artifact_idx', 'submission_artifact_id'),
-        Index('test_result_course_member_idx', 'course_member_id'),
-        Index('test_result_created_at_idx', 'created_at'),
-        # Unique constraint to prevent multiple tests of same artifact by same member (unless failed/cancelled/crashed)
-        Index('test_result_unique_success', 'submission_artifact_id', 'course_member_id',
-              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
-    )
-
-    # Primary key and versioning
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-
-    # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    started_at = Column(DateTime(True), nullable=True)
-    finished_at = Column(DateTime(True), nullable=True)
-
-    # Foreign keys
-    submission_artifact_id = Column(
-        ForeignKey('submission_artifact.id', ondelete='CASCADE', onupdate='RESTRICT'),
-        nullable=False
-    )
-    course_member_id = Column(
-        ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
-        nullable=False
-    )
-    execution_backend_id = Column(
-        ForeignKey('execution_backend.id', ondelete='RESTRICT', onupdate='RESTRICT'),
-        nullable=True
-    )
-
-    # Test execution data
-    test_system_id = Column(String(255), nullable=True)
-    status = Column(Integer, nullable=False)  # Same status enum as Result
-    result = Column(Float(53), nullable=True)  # Test result as percentage (0.0 to 1.0)
-
-    # Test results and metadata
-    result_json = Column(JSONB, nullable=True)  # Detailed test results
-    properties = Column(JSONB, nullable=True)  # Additional metadata
-    log_text = Column(String, nullable=True)  # Test execution logs
-
-    # Version information
-    version_identifier = Column(String(2048), nullable=True)
-    reference_version_identifier = Column(String(64), nullable=True)
-
-    # Relationships
-    submission_artifact = relationship('SubmissionArtifact', back_populates='test_results')
-    course_member: Mapped["CourseMember"] = relationship('CourseMember', back_populates='test_results')
-    execution_backend = relationship('ExecutionBackend', back_populates='test_results')
-    result_artifacts = relationship('ResultArtifact', back_populates='test_result', cascade='all, delete-orphan')
-
+# TestResult has been removed - we're using the Result model instead
+# The Result model in result.py now handles all test execution tracking
 
 class SubmissionGrade(Base):
     """

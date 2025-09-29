@@ -14,9 +14,11 @@ class ResultCreate(BaseModel):
     course_member_id: str
     course_content_id: str
     submission_group_id: str = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
@@ -39,9 +41,11 @@ class ResultGet(BaseEntityGet):
     course_content_id: str
     course_content_type_id: str
     submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
@@ -66,9 +70,11 @@ class ResultList(BaseEntityList):
     course_content_id: str
     course_content_type_id: str
     submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     version_identifier: str
     reference_version_identifier: Optional[str] = None
     status: TaskStatus
@@ -85,6 +91,7 @@ class ResultList(BaseEntityList):
 class ResultUpdate(BaseModel):
     submit: Optional[bool | None] = None
     result: Optional[float | None] = None
+    grade: Optional[float | None] = None
     result_json: Optional[dict | None] = None
     status: Optional[TaskStatus | None] = None
     test_system_id: Optional[str] = None
@@ -107,12 +114,14 @@ class ResultQuery(ListQuery):
     course_content_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
     submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str ] = None
     version_identifier: Optional[str] = None
     status: Optional[TaskStatus] = None
     latest: Optional[bool] = False
     result: Optional[float] = None
+    grade: Optional[float] = None
     result_json: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -150,6 +159,10 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         query = query.filter(Result.submission_group_id == params.submission_group_id)
         latest_group_by_conditions.append(Result.submission_group_id)
         latest_join_by_conditions.append(lambda subquery: Result.submission_group_id == subquery.c.submission_group_id)
+    if params.submission_artifact_id != None:
+        query = query.filter(Result.submission_artifact_id == params.submission_artifact_id)
+        latest_group_by_conditions.append(Result.submission_artifact_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_artifact_id == subquery.c.submission_artifact_id)
     if params.execution_backend_id != None:
         query = query.filter(Result.execution_backend_id == params.execution_backend_id)
         latest_group_by_conditions.append(Result.execution_backend_id)
@@ -170,6 +183,10 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         query = query.filter(Result.result == params.result)
         latest_group_by_conditions.append(Result.result)
         latest_join_by_conditions.append(lambda subquery: Result.result == subquery.c.result)
+    if params.grade != None:
+        query = query.filter(Result.grade == params.grade)
+        latest_group_by_conditions.append(Result.grade)
+        latest_join_by_conditions.append(lambda subquery: Result.grade == subquery.c.grade)
 
     if params.result_json != None:
         result_json = json.loads(params.result_json)

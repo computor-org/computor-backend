@@ -14,14 +14,15 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.artifacts import TestResultCreate, TestResultListItem
+from ctutor_backend.interface.results import ResultCreate, ResultListItem
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
-from ctutor_backend.model.artifact import SubmissionArtifact, TestResult
+from ctutor_backend.model.artifact import SubmissionArtifact
+from ctutor_backend.model.result import Result
 from ctutor_backend.model.course import (
     Course, CourseContent, CourseContentType, CourseExecutionBackend,
     CourseMember, SubmissionGroup, SubmissionGroupMember, CourseFamily
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 tests_router = APIRouter()
 
 
-@tests_router.post("/artifacts/{artifact_id}/test", response_model=TestResultListItem)
+@tests_router.post("/artifacts/{artifact_id}/test", response_model=ResultListItem)
 async def create_test_for_artifact(
     artifact_id: str,
     test_create: TestCreate,
@@ -80,11 +81,11 @@ async def create_test_for_artifact(
 
     # Check for existing test results for this artifact by this member
     # Apply test limitation: prevent multiple successful tests
-    existing_test = db.query(TestResult).filter(
+    existing_test = db.query(Result).filter(
         and_(
-            TestResult.submission_artifact_id == artifact_id,
-            TestResult.course_member_id == course_member.id,
-            ~TestResult.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
+            Result.submission_artifact_id == artifact_id,
+            Result.course_member_id == course_member.id,
+            ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
         )
     ).first()
 
@@ -99,7 +100,7 @@ async def create_test_for_artifact(
 
                     if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                         # Still running, return the existing one
-                        return TestResultListItem.model_validate(existing_test)
+                        return ResultListItem.model_validate(existing_test)
                 except Exception as e:
                     logger.warning(f"Could not check Temporal status: {e}")
 
@@ -112,8 +113,8 @@ async def create_test_for_artifact(
 
     # Check max test runs limit for the submission group
     if submission_group.max_test_runs is not None:
-        test_count = db.query(func.count(TestResult.id)).filter(
-            TestResult.submission_artifact_id == artifact_id
+        test_count = db.query(func.count(Result.id)).filter(
+            Result.submission_artifact_id == artifact_id
         ).scalar()
 
         if test_count >= submission_group.max_test_runs:
@@ -206,14 +207,13 @@ async def create_test_for_artifact(
     workflow_id = f"student-testing-{str(uuid.uuid4())}"
 
     # Create test result record
-    test_result = TestResult(
+    result = Result(
         submission_artifact_id=artifact.id,
         course_member_id=course_member.id,
         execution_backend_id=execution_backend.id,
         test_system_id=workflow_id,
         status=map_task_status_to_int(TaskStatus.QUEUED),
-        score=0.0,
-        max_score=None,
+        grade=0.0,
         result_json=None,
         properties={
             "submission_group_id": str(submission_group.id),
@@ -225,9 +225,9 @@ async def create_test_for_artifact(
         reference_version_identifier=deployment.version_identifier,
     )
 
-    db.add(test_result)
+    db.add(result)
     db.commit()
-    db.refresh(test_result)
+    db.refresh(result)
 
     # Start Temporal workflow for testing
     try:
@@ -240,8 +240,8 @@ async def create_test_for_artifact(
                 parameters={
                     "test_job": job.model_dump(),
                     "execution_backend_properties": execution_backend.properties,
-                    "test_result_id": str(test_result.id),  # Updated to use test_result
-                    "artifact_id": str(artifact.id),  # Include artifact reference
+                    "result_id": str(result.id),
+                    "artifact_id": str(artifact.id),
                 },
                 queue=execution_backend.properties.get("task_queue", "computor-tasks")
             )
@@ -254,14 +254,14 @@ async def create_test_for_artifact(
             raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported")
 
     except Exception as e:
-        # If task submission fails, update test result status to FAILED
-        test_result.status = map_task_status_to_int(TaskStatus.FAILED)
-        test_result.properties = {**test_result.properties, "error": str(e)}
+        # If task submission fails, update result status to FAILED
+        result.status = map_task_status_to_int(TaskStatus.FAILED)
+        result.properties = {**result.properties, "error": str(e)}
         db.commit()
-        db.refresh(test_result)
+        db.refresh(result)
         raise
 
-    return TestResultListItem.model_validate(test_result)
+    return ResultListItem.model_validate(result)
 
 
 @tests_router.get("/test-results/{test_id}/status")
@@ -272,9 +272,9 @@ async def get_test_status(
 ):
     """Get the current status of a test execution."""
 
-    test_result = db.query(TestResult).filter(TestResult.id == test_id).first()
+    result = db.query(Result).filter(Result.id == test_id).first()
 
-    if not test_result:
+    if not result:
         raise NotFoundException(detail="Test result not found")
 
     # Check if user has permission to view this test
@@ -333,7 +333,7 @@ async def get_test_status(
     }
 
 
-@tests_router.post("/legacy", response_model=TestResultListItem)
+@tests_router.post("/legacy", response_model=ResultListItem)
 async def create_test_legacy(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],

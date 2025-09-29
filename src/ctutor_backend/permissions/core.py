@@ -45,7 +45,7 @@ from ctutor_backend.model.result import Result
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.artifact import (
-    SubmissionArtifact, TestResult, ResultArtifact,
+    SubmissionArtifact, ResultArtifact,
     SubmissionGrade, SubmissionReview
 )
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
@@ -101,7 +101,6 @@ def initialize_permission_handlers():
 
     # Artifact models - use CourseMemberPermissionHandler for course-scoped access
     permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))
-    permission_registry.register(TestResult, CourseMemberPermissionHandler(TestResult))
     permission_registry.register(ResultArtifact, CourseMemberPermissionHandler(ResultArtifact))
     permission_registry.register(SubmissionGrade, CourseMemberPermissionHandler(SubmissionGrade))
     permission_registry.register(SubmissionReview, CourseMemberPermissionHandler(SubmissionReview))

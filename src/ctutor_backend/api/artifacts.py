@@ -17,8 +17,8 @@ from ctutor_backend.model.artifact import (
     SubmissionArtifact,
     SubmissionGrade,
     SubmissionReview,
-    TestResult,
 )
+from ctutor_backend.model.result import Result
 from ctutor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
@@ -31,9 +31,11 @@ from ctutor_backend.interface.artifacts import (
     SubmissionReviewCreate,
     SubmissionReviewUpdate,
     SubmissionReviewListItem,
-    TestResultCreate,
-    TestResultUpdate,
-    TestResultListItem,
+)
+from ctutor_backend.interface.results import (
+    ResultCreate,
+    ResultUpdate,
+    ResultList,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,16 +78,15 @@ async def create_artifact_grade(
     if not grader_member:
         raise ForbiddenException(detail="You must be a tutor or instructor to grade artifacts")
 
-    # Validate score
-    if grade_data.score > grade_data.max_score:
-        raise BadRequestException(detail="Score cannot exceed max_score")
+    # Validate grade
+    if grade_data.grade < 0.0 or grade_data.grade > 1.0:
+        raise BadRequestException(detail="Grade must be between 0.0 and 1.0")
 
     # Create the grade (use the grader's course member id)
     grade = SubmissionGrade(
         artifact_id=artifact_id,
         graded_by_course_member_id=grader_member.id,  # Use the authenticated grader's member ID
-        score=grade_data.score,
-        max_score=grade_data.max_score,
+        grade=grade_data.grade,
         rubric=grade_data.rubric,
         comment=grade_data.comment,
     )
@@ -175,18 +176,16 @@ async def update_artifact_grade(
         raise ForbiddenException(detail="You can only update your own grades")
 
     # Update fields
-    if update_data.score is not None:
-        grade.score = update_data.score
-    if update_data.max_score is not None:
-        grade.max_score = update_data.max_score
+    if update_data.grade is not None:
+        grade.grade = update_data.grade
     if update_data.rubric is not None:
         grade.rubric = update_data.rubric
     if update_data.comment is not None:
         grade.comment = update_data.comment
 
-    # Validate score
-    if grade.score > grade.max_score:
-        raise BadRequestException(detail="Score cannot exceed max_score")
+    # Validate grade
+    if grade.grade < 0.0 or grade.grade > 1.0:
+        raise BadRequestException(detail="Grade must be between 0.0 and 1.0")
 
     db.commit()
     db.refresh(grade)
@@ -396,10 +395,10 @@ async def delete_artifact_review(
 # Test Result Endpoints
 # ===============================
 
-@artifacts_router.post("/{artifact_id}/test", response_model=TestResultListItem, status_code=status.HTTP_201_CREATED)
+@artifacts_router.post("/{artifact_id}/test", response_model=ResultList, status_code=status.HTTP_201_CREATED)
 async def create_test_result(
     artifact_id: UUID,
-    test_data: TestResultCreate,
+    test_data: ResultCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
@@ -447,11 +446,11 @@ async def create_test_result(
             raise ForbiddenException(detail="Students can only test their own submissions")
 
     # Check test limitations (prevent multiple successful tests by same member)
-    existing_test = db.query(TestResult).filter(
+    existing_test = db.query(Result).filter(
         and_(
-            TestResult.submission_artifact_id == artifact_id,
-            TestResult.course_member_id == test_data.course_member_id,
-            ~TestResult.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
+            Result.submission_artifact_id == artifact_id,
+            Result.course_member_id == test_data.course_member_id,
+            ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
         )
     ).first()
 
@@ -464,8 +463,8 @@ async def create_test_result(
     # Check max test runs limit if configured
     submission_group = artifact.submission_group
     if submission_group.max_test_runs is not None:
-        test_count = db.query(TestResult).filter(
-            TestResult.submission_artifact_id == artifact_id
+        test_count = db.query(Result).filter(
+            Result.submission_artifact_id == artifact_id
         ).count()
 
         if test_count >= submission_group.max_test_runs:
@@ -476,14 +475,13 @@ async def create_test_result(
     # Create the test result (use authenticated user's course member id)
     from ctutor_backend.interface.tasks import map_task_status_to_int
 
-    test_result = TestResult(
+    result = Result(
         submission_artifact_id=artifact_id,
         course_member_id=course_member.id,  # Use authenticated user's course member ID
         execution_backend_id=test_data.execution_backend_id,
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
-        score=test_data.score,
-        max_score=test_data.max_score,
+        grade=test_data.grade,
         result_json=test_data.result_json,
         properties=test_data.properties,
         log_text=test_data.log_text,
@@ -491,16 +489,16 @@ async def create_test_result(
         reference_version_identifier=test_data.reference_version_identifier,
     )
 
-    db.add(test_result)
+    db.add(result)
     db.commit()
-    db.refresh(test_result)
+    db.refresh(result)
 
-    logger.info(f"Created test result {test_result.id} for artifact {artifact_id}")
+    logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
-    return TestResultListItem.model_validate(test_result)
+    return ResultList.model_validate(result)
 
 
-@artifacts_router.get("/{artifact_id}/tests", response_model=list[TestResultListItem])
+@artifacts_router.get("/{artifact_id}/tests", response_model=list[ResultList])
 async def list_artifact_test_results(
     artifact_id: UUID,
     response: Response,
@@ -543,27 +541,27 @@ async def list_artifact_test_results(
                 raise ForbiddenException(detail="You can only view test results for your own submissions")
 
     # Get test results for this artifact
-    test_results = db.query(TestResult).filter(
-        TestResult.submission_artifact_id == artifact_id
-    ).order_by(TestResult.created_at.desc()).all()
+    results = db.query(Result).filter(
+        Result.submission_artifact_id == artifact_id
+    ).order_by(Result.created_at.desc()).all()
 
-    response.headers["X-Total-Count"] = str(len(test_results))
+    response.headers["X-Total-Count"] = str(len(results))
 
-    return [TestResultListItem.model_validate(result) for result in test_results]
+    return [ResultList.model_validate(result) for result in results]
 
 
-@artifacts_router.patch("/tests/{test_id}", response_model=TestResultListItem)
+@artifacts_router.patch("/tests/{test_id}", response_model=ResultList)
 async def update_test_result(
     test_id: UUID,
-    update_data: TestResultUpdate,
+    update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
 
-    test_result = db.query(TestResult).filter(TestResult.id == test_id).first()
+    result = db.query(Result).filter(Result.id == test_id).first()
 
-    if not test_result:
+    if not result:
         raise NotFoundException(detail="Test result not found")
 
     # Check permissions - either admin (service account) or the test runner
@@ -573,7 +571,7 @@ async def update_test_result(
     if not is_admin:
         # Check if user is the one who ran the test
         course_member = db.query(CourseMember).filter(
-            CourseMember.id == test_result.course_member_id
+            CourseMember.id == result.course_member_id
         ).first()
 
         if not course_member or str(course_member.user_id) != str(user_id):
@@ -582,21 +580,19 @@ async def update_test_result(
     # Update fields
     if update_data.status is not None:
         from ctutor_backend.interface.tasks import map_task_status_to_int
-        test_result.status = map_task_status_to_int(update_data.status)
-    if update_data.score is not None:
-        test_result.score = update_data.score
-    if update_data.max_score is not None:
-        test_result.max_score = update_data.max_score
+        result.status = map_task_status_to_int(update_data.status)
+    if update_data.grade is not None:
+        result.grade = update_data.grade
     if update_data.result_json is not None:
-        test_result.result_json = update_data.result_json
+        result.result_json = update_data.result_json
     if update_data.properties is not None:
-        test_result.properties = update_data.properties
+        result.properties = update_data.properties
     if update_data.log_text is not None:
-        test_result.log_text = update_data.log_text
+        result.log_text = update_data.log_text
     if update_data.finished_at is not None:
-        test_result.finished_at = update_data.finished_at
+        result.finished_at = update_data.finished_at
 
     db.commit()
-    db.refresh(test_result)
+    db.refresh(result)
 
-    return TestResultListItem.model_validate(test_result)
+    return ResultList.model_validate(result)
