@@ -21,7 +21,7 @@ from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status, m
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseFamily
+from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseMember, SubmissionGroup, SubmissionGroupMember, CourseFamily
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
@@ -45,8 +45,8 @@ def build_test_run_response(result: Result) -> TestRunResponse:
         submit=result.submit,
         course_member_id=str(result.course_member_id),
         course_content_id=str(result.course_content_id),
-        course_submission_group_id=str(result.course_submission_group_id)
-        if result.course_submission_group_id
+        submission_group_id=str(result.submission_group_id)
+        if result.submission_group_id
         else None,
         execution_backend_id=execution_backend_id,
         test_system_id=result.test_system_id,
@@ -108,7 +108,7 @@ async def create_test(
         CourseContent,
         Course,
         Organization,
-        CourseSubmissionGroup.max_submissions,
+        SubmissionGroup.max_submissions,
         results_count_subquery.c.total_results_count
     ) \
         .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id) \
@@ -117,8 +117,8 @@ async def create_test(
         .join(CourseFamily, CourseFamily.id == Course.course_family_id) \
         .join(Organization, Organization.id == CourseFamily.organization_id) \
         .join(CourseExecutionBackend, CourseExecutionBackend.course_id == CourseContent.course_id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+        .join(SubmissionGroupMember, SubmissionGroupMember.course_member_id == CourseMember.id) \
+        .join(SubmissionGroup, SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
         .outerjoin(CourseContentDeployment, CourseContentDeployment.course_content_id == CourseContent.id) \
         .outerjoin(ExampleVersion, ExampleVersion.id == CourseContentDeployment.example_version_id) \
         .outerjoin(Example, Example.id == ExampleVersion.example_id) \
@@ -178,24 +178,24 @@ async def create_test(
         raise BadRequestException(detail="version_identifier is required")
 
     # Get submission group first (needed for correct result lookup)
-    course_submission_group = db.query(CourseSubmissionGroup) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+    course_submission_group = db.query(SubmissionGroup) \
+        .join(SubmissionGroupMember, SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
         .filter(
-            CourseSubmissionGroupMember.course_member_id == course_member_id,
-            CourseSubmissionGroup.course_content_id == assignment.id
+            SubmissionGroupMember.course_member_id == course_member_id,
+            SubmissionGroup.course_content_id == assignment.id
         ).first()
 
     if not course_submission_group:
         raise BadRequestException(detail="No submission group found for this assignment")
 
-    course_submission_group_id = course_submission_group.id
+    submission_group_id = course_submission_group.id
 
     # Check for existing result with same version_identifier and submission group
     # There should be at most 1 result per version_identifier per submission group
     existing_result = (
         db.query(Result)
         .filter(
-            Result.course_submission_group_id == course_submission_group_id,
+            Result.submission_group_id == submission_group_id,
             Result.version_identifier == commit,
         )
         .first()  # Use .first() since there should be at most 1 result
@@ -371,7 +371,7 @@ async def create_test(
         result_record = reuse_existing_result
         result_record.execution_backend_id = execution_backend.id
         result_record.test_system_id = workflow_id
-        result_record.course_submission_group_id = course_submission_group_id
+        result_record.submission_group_id = submission_group_id
         result_record.course_content_type_id = course_content.course_content_type_id
         result_record.reference_version_identifier = reference_commit
         result_record.status = map_task_status_to_int(TaskStatus.QUEUED)
@@ -382,7 +382,7 @@ async def create_test(
         result_record = Result(
             submit=test_create.submit or False,  # Store submit flag as boolean
             course_member_id=course_member_id,
-            course_submission_group_id=course_submission_group_id,
+            submission_group_id=submission_group_id,
             course_content_id=assignment.id,
             course_content_type_id=course_content.course_content_type_id,  # Keep for now, can be removed later
             execution_backend_id=execution_backend.id,

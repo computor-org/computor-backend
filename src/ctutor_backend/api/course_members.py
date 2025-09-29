@@ -24,7 +24,7 @@ from ctutor_backend.api.api_builder import CrudRouter
 # from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseMember, CourseMemberComment, CourseRole
-from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroup, SubmissionGroupMember, SubmissionGroupGrading
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.auth import User

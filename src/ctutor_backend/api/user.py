@@ -31,7 +31,7 @@ from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.tokens import decrypt_api_key, encrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.auth import Account, User
-from ctutor_backend.model.course import Course, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
@@ -336,9 +336,9 @@ def _sync_gitlab_memberships(
 
     if role == "_student":
         # Query all course submission groups that this course member belongs to
-        submission_group_memberships = db.query(CourseSubmissionGroupMember)\
-            .options(joinedload(CourseSubmissionGroupMember.group))\
-            .filter(CourseSubmissionGroupMember.course_member_id == course_member.id)\
+        submission_group_memberships = db.query(SubmissionGroupMember)\
+            .options(joinedload(SubmissionGroupMember.group))\
+            .filter(SubmissionGroupMember.course_member_id == course_member.id)\
             .all()
 
         # Collect unique repository paths from all submission groups

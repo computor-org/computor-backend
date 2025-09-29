@@ -38,12 +38,16 @@ from ctutor_backend.model.course import (
     Course, CourseFamily, CourseMember, CourseContent,
     CourseContentType, CourseContentKind, CourseRole, CourseGroup,
     CourseExecutionBackend, CourseMemberComment,
-    CourseSubmissionGroup, CourseSubmissionGroupMember
+    SubmissionGroup, SubmissionGroupMember
 )
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.execution import ExecutionBackend
+from ctutor_backend.model.artifact import (
+    SubmissionArtifact, TestResult, ResultArtifact,
+    ArtifactGrade, ArtifactReview
+)
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
 from ctutor_backend.model.group import Group, GroupClaim, UserGroup
 from ctutor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
@@ -71,8 +75,8 @@ def initialize_permission_handlers():
     permission_registry.register(CourseGroup, CourseMemberPermissionHandler(CourseGroup))
     permission_registry.register(CourseExecutionBackend, CourseContentPermissionHandler(CourseExecutionBackend))
     permission_registry.register(CourseMemberComment, CourseMemberPermissionHandler(CourseMemberComment))
-    permission_registry.register(CourseSubmissionGroup, CourseMemberPermissionHandler(CourseSubmissionGroup))
-    permission_registry.register(CourseSubmissionGroupMember, CourseMemberPermissionHandler(CourseSubmissionGroupMember))
+    permission_registry.register(SubmissionGroup, CourseMemberPermissionHandler(SubmissionGroup))
+    permission_registry.register(SubmissionGroupMember, CourseMemberPermissionHandler(SubmissionGroupMember))
     
     # Read-only entities
     permission_registry.register(CourseRole, ReadOnlyPermissionHandler(CourseRole))
@@ -94,6 +98,13 @@ def initialize_permission_handlers():
     permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
     permission_registry.register(Result, ResultPermissionHandler(Result))
     permission_registry.register(Message, MessagePermissionHandler(Message))
+
+    # Artifact models - use CourseMemberPermissionHandler for course-scoped access
+    permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))
+    permission_registry.register(TestResult, CourseMemberPermissionHandler(TestResult))
+    permission_registry.register(ResultArtifact, CourseMemberPermissionHandler(ResultArtifact))
+    permission_registry.register(ArtifactGrade, CourseMemberPermissionHandler(ArtifactGrade))
+    permission_registry.register(ArtifactReview, CourseMemberPermissionHandler(ArtifactReview))
 
 
 def check_admin(permissions: Principal) -> bool:

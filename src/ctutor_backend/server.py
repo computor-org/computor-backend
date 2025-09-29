@@ -13,7 +13,7 @@ from ctutor_backend.redis_cache import get_redis_client
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
-from ctutor_backend.api.tests import tests_router
+from ctutor_backend.api.tests_refactored import tests_router
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.sso import sso_router
 from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig

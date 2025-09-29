@@ -20,7 +20,7 @@ from ctutor_backend.interface.student_courses import CourseStudentInterface, Cou
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, SubmissionGroup, SubmissionGroupMember, SubmissionGroupGrading
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentInterface,
@@ -88,21 +88,21 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
-    # Create a new CourseSubmissionGroupGrading entry before querying latest grading
+    # Create a new SubmissionGroupGrading entry before querying latest grading
     # 1) Resolve the student's course member and related submission group for this content
     student_cm = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
     if student_cm is None:
         raise NotFoundException()
 
     course_submission_group = (
-        db.query(CourseSubmissionGroup)
+        db.query(SubmissionGroup)
         .join(
-            CourseSubmissionGroupMember,
-            CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id,
+            SubmissionGroupMember,
+            SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
         )
         .filter(
-            CourseSubmissionGroupMember.course_member_id == course_member_id,
-            CourseSubmissionGroup.course_content_id == course_content_id,
+            SubmissionGroupMember.course_member_id == course_member_id,
+            SubmissionGroup.course_content_id == course_content_id,
         )
         .first()
     )
@@ -144,8 +144,8 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         grading_status = status_map.get(course_member_update.status, GradingStatus.NOT_REVIEWED)
 
     # 5) Create grading if payload includes grading/status
-    new_grading = CourseSubmissionGroupGrading(
-            course_submission_group_id=course_submission_group.id,
+    new_grading = SubmissionGroupGrading(
+            submission_group_id=course_submission_group.id,
             graded_by_course_member_id=grader_cm.id,
             grading=course_member_update.grading if course_member_update.grading != None else 0,
             status=grading_status.value,  # Use integer value of enum

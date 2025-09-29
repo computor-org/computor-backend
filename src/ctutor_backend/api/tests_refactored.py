@@ -9,9 +9,10 @@ from fastapi import Depends, APIRouter
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
+from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.principal import Principal
+from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.artifacts import TestResultCreate, TestResultListItem
 from ctutor_backend.interface.repositories import Repository
@@ -21,7 +22,6 @@ from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.model.artifact import SubmissionArtifact, TestResult
-from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import (
     Course, CourseContent, CourseContentType, CourseExecutionBackend,
     CourseMember, SubmissionGroup, SubmissionGroupMember, CourseFamily
@@ -49,7 +49,7 @@ async def create_test_for_artifact(
     Create and execute a test for a submission artifact.
     Tests are executed via Temporal workflows.
     """
-    user_id = permissions.user_id
+    user_id = permissions.get_user_id()
 
     # Get the submission artifact
     artifact = db.query(SubmissionArtifact).filter(
@@ -59,24 +59,24 @@ async def create_test_for_artifact(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Get the submission group and related data
-    submission_group = db.query(SubmissionGroup).filter(
+    # Get the submission group with permission check
+    submission_group = check_course_permissions(
+        permissions, SubmissionGroup, "_student", db
+    ).filter(
         SubmissionGroup.id == artifact.submission_group_id
     ).first()
 
     if not submission_group:
-        raise NotFoundException(detail="Submission group not found")
+        raise NotFoundException(detail="Submission group not found or access denied")
 
     # Get course member who is running the test
-    course_member = db.query(CourseMember).join(
-        User, User.id == CourseMember.user_id
-    ).filter(
-        User.id == user_id,
+    course_member = db.query(CourseMember).filter(
+        CourseMember.user_id == user_id,
         CourseMember.course_id == submission_group.course_id
     ).first()
 
     if not course_member:
-        raise NotFoundException(detail="Course member not found")
+        raise NotFoundException(detail="You are not a member of this course")
 
     # Check for existing test results for this artifact by this member
     # Apply test limitation: prevent multiple successful tests
@@ -278,16 +278,33 @@ async def get_test_status(
         raise NotFoundException(detail="Test result not found")
 
     # Check if user has permission to view this test
-    # (They must be the test runner or have appropriate permissions)
-    user_id = permissions.user_id
+    user_id = permissions.get_user_id()
     course_member = db.query(CourseMember).filter(
         CourseMember.id == test_result.course_member_id
     ).first()
 
-    if course_member and str(course_member.user_id) != str(user_id):
-        # Check if user has instructor/tutor permissions
-        # This would be expanded based on your permission system
-        pass
+    if not course_member:
+        raise NotFoundException(detail="Course member not found")
+
+    # Check if user is the test runner or has tutor permissions
+    if str(course_member.user_id) != str(user_id):
+        # Get artifact to find the course
+        artifact = db.query(SubmissionArtifact).filter(
+            SubmissionArtifact.id == test_result.submission_artifact_id
+        ).first()
+
+        if not artifact:
+            raise NotFoundException(detail="Submission artifact not found")
+
+        # Check if user has at least tutor permissions for this course
+        submission_group = check_course_permissions(
+            permissions, SubmissionGroup, "_tutor", db
+        ).filter(
+            SubmissionGroup.id == artifact.submission_group_id
+        ).first()
+
+        if not submission_group:
+            raise ForbiddenException(detail="You don't have permission to view this test result")
 
     # If test has a workflow ID, check Temporal status
     if test_result.test_system_id and test_result.status in [3, 4, 5, 7]:  # Running statuses
@@ -329,15 +346,18 @@ async def create_test_legacy(
     This endpoint is maintained for backwards compatibility but should
     be replaced with the artifact-based approach.
     """
-    user_id = permissions.user_id
+    user_id = permissions.get_user_id()
 
-    # Find course member and submission group based on test parameters
-    course_member = db.query(CourseMember).join(
-        User, User.id == CourseMember.user_id
-    ).filter(User.id == user_id).first()
+    if not user_id:
+        raise ForbiddenException(detail="User authentication required")
+
+    # Find course member for the authenticated user
+    course_member = db.query(CourseMember).filter(
+        CourseMember.user_id == user_id
+    ).first()
 
     if not course_member:
-        raise NotFoundException(detail="Course member not found")
+        raise NotFoundException(detail="You are not a member of any courses")
 
     # Find course content
     course_content = None
@@ -368,8 +388,10 @@ async def create_test_legacy(
     if not course_content:
         raise NotFoundException(detail="Assignment not found")
 
-    # Find submission group
-    submission_group = db.query(SubmissionGroup).join(
+    # Find submission group with permission check
+    submission_group = check_course_permissions(
+        permissions, SubmissionGroup, "_student", db
+    ).join(
         SubmissionGroupMember,
         SubmissionGroupMember.submission_group_id == SubmissionGroup.id
     ).filter(
@@ -378,7 +400,7 @@ async def create_test_legacy(
     ).first()
 
     if not submission_group:
-        raise BadRequestException(detail="No submission group found for this assignment")
+        raise BadRequestException(detail="No submission group found for this assignment or access denied")
 
     # Create a placeholder artifact for this test
     # This represents a "direct test" without an uploaded file

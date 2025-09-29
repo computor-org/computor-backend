@@ -546,7 +546,7 @@ class ResultPermissionHandler(PermissionHandler):
     
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         from ctutor_backend.model.result import Result
-        from ctutor_backend.model.course import CourseContent, CourseMember, CourseSubmissionGroupMember
+        from ctutor_backend.model.course import CourseContent, CourseMember, SubmissionGroupMember
         from sqlalchemy.orm import aliased
         from sqlalchemy import or_, and_
         
@@ -577,9 +577,9 @@ class ResultPermissionHandler(PermissionHandler):
                     or_(
                         Result.course_member_id == CourseMember.id,
                         # Also include results from submission groups the user belongs to
-                        Result.course_submission_group_id.in_(
-                            db.query(CourseSubmissionGroupMember.course_submission_group_id)
-                            .filter(CourseSubmissionGroupMember.course_member_id == CourseMember.id)
+                        Result.submission_group_id.in_(
+                            db.query(SubmissionGroupMember.submission_group_id)
+                            .filter(SubmissionGroupMember.course_member_id == CourseMember.id)
                         )
                     )
                 )
@@ -657,7 +657,7 @@ class MessagePermissionHandler(PermissionHandler):
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         from sqlalchemy import or_, and_
         from ctutor_backend.permissions.query_builders import CoursePermissionQueryBuilder
-        from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseGroup, CourseMember, CourseSubmissionGroup, CourseContent
+        from ctutor_backend.model.course import SubmissionGroupMember, CourseGroup, CourseMember, SubmissionGroup, CourseContent
 
         base = db.query(self.entity)
 
@@ -676,11 +676,11 @@ class MessagePermissionHandler(PermissionHandler):
 
         # Submission group messages for groups principal belongs to
         sgm_subq = (
-            db.query(CourseSubmissionGroupMember.course_submission_group_id)
-            .join(CourseMember, CourseMember.id == CourseSubmissionGroupMember.course_member_id)
+            db.query(SubmissionGroupMember.submission_group_id)
+            .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
             .filter(CourseMember.user_id == principal.user_id)
         )
-        filters.append(self.entity.course_submission_group_id.in_(sgm_subq))
+        filters.append(self.entity.submission_group_id.in_(sgm_subq))
 
         # Course group messages (memberships via course_member.course_group_id)
         cg_subq = (
@@ -713,8 +713,8 @@ class MessagePermissionHandler(PermissionHandler):
             )
             # From submission group
             filters.append(
-                self.entity.course_submission_group_id.in_(
-                    db.query(CourseSubmissionGroup.id).filter(CourseSubmissionGroup.course_id.in_(permitted_courses))
+                self.entity.submission_group_id.in_(
+                    db.query(SubmissionGroup.id).filter(SubmissionGroup.course_id.in_(permitted_courses))
                 )
             )
             # From course group

@@ -319,8 +319,8 @@ class CourseMember(Base):
     submission_group_members = relationship('SubmissionGroupMember', back_populates='course_member')
     results = relationship('Result', back_populates='course_member')
     # Messaging relationships moved to user-level author/reader in Message/MessageRead
-    gradings_given = relationship('CourseSubmissionGroupGrading', back_populates='graded_by',
-                                 foreign_keys='CourseSubmissionGroupGrading.graded_by_course_member_id')
+    gradings_given = relationship('SubmissionGroupGrading', back_populates='graded_by',
+                                 foreign_keys='SubmissionGroupGrading.graded_by_course_member_id')
 
     # New artifact-related relationships
     uploaded_artifacts = relationship('SubmissionArtifact', back_populates='uploaded_by',
@@ -356,7 +356,7 @@ class SubmissionGroup(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     members = relationship("SubmissionGroupMember", back_populates="group", uselist=True)
     results = relationship('Result', back_populates='submission_group')
-    gradings = relationship('CourseSubmissionGroupGrading', back_populates='course_submission_group',
+    gradings = relationship('SubmissionGroupGrading', back_populates='submission_group',
                            cascade='all, delete-orphan')
     submission_artifacts = relationship('SubmissionArtifact', back_populates='submission_group')
     
@@ -417,7 +417,7 @@ class SubmissionGroupMember(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
-class CourseSubmissionGroupGrading(Base):
+class SubmissionGroupGrading(Base):
     """
     Tracks grading information for course submission groups.
     
@@ -429,10 +429,10 @@ class CourseSubmissionGroupGrading(Base):
     - Feedback/comments on the grading
     - Reference to the specific result that was graded
     """
-    __tablename__ = 'course_submission_group_grading'
+    __tablename__ = 'submission_group_grading'
     __table_args__ = (
         # Ensure we can quickly find all gradings for a submission group
-        Index('idx_grading_submission_group', 'course_submission_group_id'),
+        Index('idx_grading_submission_group', 'submission_group_id'),
         # Ensure we can find all gradings by a specific grader
         Index('idx_grading_graded_by', 'graded_by_course_member_id'),
         # Index for finding gradings by result
@@ -448,8 +448,8 @@ class CourseSubmissionGroupGrading(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     
     # Foreign keys
-    course_submission_group_id = Column(
-        ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'),
+    submission_group_id = Column(
+        ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False
     )
     graded_by_course_member_id = Column(
@@ -467,8 +467,8 @@ class CourseSubmissionGroupGrading(Base):
     feedback = Column(String(4096), nullable=True)  # Feedback/comments from the grader
     
     # Relationships
-    course_submission_group = relationship(
-        'CourseSubmissionGroup',
+    submission_group = relationship(
+        'SubmissionGroup',
         back_populates='gradings'
     )
     graded_by = relationship(
@@ -483,7 +483,7 @@ class CourseSubmissionGroupGrading(Base):
     )
     
     def __repr__(self):
-        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status}, has_feedback={bool(self.feedback)})>"
+        return f"<SubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status}, has_feedback={bool(self.feedback)})>"
 
 
 class CourseMemberComment(Base):

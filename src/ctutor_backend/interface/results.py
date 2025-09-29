@@ -4,7 +4,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
-from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
+from ctutor_backend.model import CourseContentType, SubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
@@ -13,7 +13,7 @@ class ResultCreate(BaseModel):
     submit: bool
     course_member_id: str
     course_content_id: str
-    course_submission_group_id: str = None
+    submission_group_id: str = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
@@ -38,7 +38,7 @@ class ResultGet(BaseEntityGet):
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
@@ -65,7 +65,7 @@ class ResultList(BaseEntityList):
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
@@ -106,7 +106,7 @@ class ResultQuery(ListQuery):
     course_member_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str ] = None
     version_identifier: Optional[str] = None
@@ -136,20 +136,20 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         latest_join_by_conditions.append(lambda subquery: Result.course_member_id == subquery.c.course_member_id)
 
     if params.course_member_id != None:
-        query = query.join(CourseSubmissionGroupMember,CourseSubmissionGroupMember.course_submission_group_id == Result.course_submission_group_id) \
-            .filter(CourseSubmissionGroupMember.course_member_id == params.course_member_id)
+        query = query.join(SubmissionGroupMember,SubmissionGroupMember.submission_group_id == Result.submission_group_id) \
+            .filter(SubmissionGroupMember.course_member_id == params.course_member_id)
 
-        latest_group_by_conditions.append(Result.course_submission_group_id)
-        latest_join_by_conditions.append(lambda subquery: Result.course_submission_group_id == subquery.c.course_submission_group_id)
+        latest_group_by_conditions.append(Result.submission_group_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_group_id == subquery.c.submission_group_id)
 
     if params.course_content_id != None:
         query = query.filter(Result.course_content_id == params.course_content_id)
     if params.course_content_type_id != None:
         query = query.filter(Result.course_content_type_id == params.course_content_type_id)
-    if params.course_submission_group_id != None:
-        query = query.filter(Result.course_submission_group_id == params.course_submission_group_id)
-        latest_group_by_conditions.append(Result.course_submission_group_id)
-        latest_join_by_conditions.append(lambda subquery: Result.course_submission_group_id == subquery.c.course_submission_group_id)
+    if params.submission_group_id != None:
+        query = query.filter(Result.submission_group_id == params.submission_group_id)
+        latest_group_by_conditions.append(Result.submission_group_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_group_id == subquery.c.submission_group_id)
     if params.execution_backend_id != None:
         query = query.filter(Result.execution_backend_id == params.execution_backend_id)
         latest_group_by_conditions.append(Result.execution_backend_id)
@@ -227,7 +227,7 @@ class ResultDetailed(BaseModel):
     course_content_title: Optional[str] = None
     course_content_path: Optional[str] = None
     course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     submission_group_members: Optional[List[dict]] = []  # Group member info
     execution_backend_id: str
     test_system_id: Optional[str] = None

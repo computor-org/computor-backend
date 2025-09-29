@@ -19,7 +19,7 @@ from ctutor_backend.model.artifact import (
     ArtifactReview,
     TestResult,
 )
-from ctutor_backend.model.course import CourseMember
+from ctutor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
@@ -56,32 +56,34 @@ async def create_artifact_grade(
 
     # Get the artifact and verify permissions
     artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
+        joinedload(SubmissionArtifact.submission_group).joinedload(SubmissionGroup.course)
     ).filter(SubmissionArtifact.id == artifact_id).first()
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user has grading permissions (instructor/tutor)
+    # Check if user has grading permissions (must be at least tutor)
     course = artifact.submission_group.course
-    course_members = check_course_permissions(
+
+    # Query for course member with tutor or higher permission
+    grader_member = check_course_permissions(
         permissions, CourseMember, "_tutor", db
     ).filter(
         CourseMember.course_id == course.id,
         CourseMember.user_id == permissions.get_user_id()
     ).first()
 
-    if not course_members:
-        raise ForbiddenException(detail="You don't have permission to grade in this course")
+    if not grader_member:
+        raise ForbiddenException(detail="You must be a tutor or instructor to grade artifacts")
 
     # Validate score
     if grade_data.score > grade_data.max_score:
         raise BadRequestException(detail="Score cannot exceed max_score")
 
-    # Create the grade
+    # Create the grade (use the grader's course member id)
     grade = ArtifactGrade(
         artifact_id=artifact_id,
-        graded_by_course_member_id=grade_data.graded_by_course_member_id,
+        graded_by_course_member_id=grader_member.id,  # Use the authenticated grader's member ID
         score=grade_data.score,
         max_score=grade_data.max_score,
         rubric=grade_data.rubric,
@@ -101,17 +103,43 @@ async def create_artifact_grade(
 async def list_artifact_grades(
     artifact_id: UUID,
     response: Response,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
-    """List all grades for an artifact."""
+    """List all grades for an artifact. Students can view their own grades, tutors/instructors can view all."""
 
-    # Verify artifact exists
-    artifact = db.query(SubmissionArtifact).filter(
+    # Verify artifact exists and get submission group
+    artifact = db.query(SubmissionArtifact).options(
+        joinedload(SubmissionArtifact.submission_group)
+    ).filter(
         SubmissionArtifact.id == artifact_id
     ).first()
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
+
+    # Check permissions - students can only see grades for their own submissions
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        # Check if user is a member of the submission group or has tutor/instructor permissions
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
+        ).filter(
+            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_group_member:
+            # Check for tutor/instructor permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == artifact.submission_group.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You don't have permission to view these grades")
 
     # Get grades for this artifact
     grades = db.query(ArtifactGrade).options(
@@ -182,17 +210,17 @@ async def delete_artifact_grade(
     # Check permissions
     principal_user_id = permissions.get_user_id()
     if str(grade.graded_by.user_id) != str(principal_user_id):
-        # Check if user is admin/instructor
+        # Check if user is instructor (higher permission needed to delete others' grades)
         course = grade.artifact.submission_group.course
-        is_admin = check_course_permissions(
-            permissions, CourseMember, "_instructor", db
+        is_instructor = check_course_permissions(
+            permissions, CourseMember, "_lecturer", db  # Use _lecturer for instructor role
         ).filter(
             CourseMember.course_id == course.id,
             CourseMember.user_id == principal_user_id
         ).first()
 
-        if not is_admin:
-            raise ForbiddenException(detail="You can only delete your own grades")
+        if not is_instructor:
+            raise ForbiddenException(detail="Only instructors can delete other people's grades")
 
     db.delete(grade)
     db.commit()
@@ -221,10 +249,14 @@ async def create_artifact_review(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user is a course member
+    # Check if user is a course member (any role can review)
     course = artifact.submission_group.course
     principal_user_id = permissions.get_user_id()
-    course_member = db.query(CourseMember).filter(
+
+    # Use check_course_permissions to find the course member (works for any role)
+    course_member = check_course_permissions(
+        permissions, CourseMember, "_student", db  # _student is the minimum role
+    ).filter(
         CourseMember.course_id == course.id,
         CourseMember.user_id == principal_user_id
     ).first()
@@ -232,10 +264,10 @@ async def create_artifact_review(
     if not course_member:
         raise ForbiddenException(detail="You must be a course member to review artifacts")
 
-    # Create the review
+    # Create the review (use authenticated user's course member id)
     review = ArtifactReview(
         artifact_id=artifact_id,
-        reviewer_course_member_id=review_data.reviewer_course_member_id,
+        reviewer_course_member_id=course_member.id,  # Use the authenticated reviewer's member ID
         body=review_data.body,
         review_type=review_data.review_type,
     )
@@ -253,17 +285,33 @@ async def create_artifact_review(
 async def list_artifact_reviews(
     artifact_id: UUID,
     response: Response,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
-    """List all reviews for an artifact."""
+    """List all reviews for an artifact. Any course member can view reviews."""
 
-    # Verify artifact exists
-    artifact = db.query(SubmissionArtifact).filter(
+    # Verify artifact exists and get course info
+    artifact = db.query(SubmissionArtifact).options(
+        joinedload(SubmissionArtifact.submission_group)
+    ).filter(
         SubmissionArtifact.id == artifact_id
     ).first()
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
+
+    # Check if user is a course member (any role can view reviews)
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        is_course_member = check_course_permissions(
+            permissions, CourseMember, "_student", db  # _student is minimum role
+        ).filter(
+            CourseMember.course_id == artifact.submission_group.course_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_course_member:
+            raise ForbiddenException(detail="You must be a course member to view reviews")
 
     # Get reviews for this artifact
     reviews = db.query(ArtifactReview).options(
@@ -326,17 +374,17 @@ async def delete_artifact_review(
     # Check permissions
     principal_user_id = permissions.get_user_id()
     if str(review.reviewer.user_id) != str(principal_user_id):
-        # Check if user is admin/instructor
+        # Check if user is instructor (higher permission needed to delete others' reviews)
         course = review.artifact.submission_group.course
-        is_admin = check_course_permissions(
-            permissions, CourseMember, "_instructor", db
+        is_instructor = check_course_permissions(
+            permissions, CourseMember, "_lecturer", db  # Use _lecturer for instructor role
         ).filter(
             CourseMember.course_id == course.id,
             CourseMember.user_id == principal_user_id
         ).first()
 
-        if not is_admin:
-            raise ForbiddenException(detail="You can only delete your own reviews")
+        if not is_instructor:
+            raise ForbiddenException(detail="Only instructors can delete other people's reviews")
 
     db.delete(review)
     db.commit()
@@ -365,16 +413,38 @@ async def create_test_result(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user has permission to run tests
+    # Check if user has permission to run tests (students can test their own, tutors/instructors can test any)
     principal_user_id = permissions.get_user_id()
     course = artifact.submission_group.course
-    course_member = db.query(CourseMember).filter(
+
+    # First check if user is a course member at all
+    course_member = check_course_permissions(
+        permissions, CourseMember, "_student", db
+    ).filter(
         CourseMember.course_id == course.id,
         CourseMember.user_id == principal_user_id
     ).first()
 
     if not course_member:
         raise ForbiddenException(detail="You must be a course member to run tests")
+
+    # Check if student is testing their own submission
+    is_own_submission = db.query(SubmissionGroupMember).filter(
+        SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+        SubmissionGroupMember.course_member_id == course_member.id
+    ).first()
+
+    if not is_own_submission:
+        # If not their own submission, they need tutor or higher permissions
+        has_test_permission = check_course_permissions(
+            permissions, CourseMember, "_tutor", db
+        ).filter(
+            CourseMember.course_id == course.id,
+            CourseMember.user_id == principal_user_id
+        ).first()
+
+        if not has_test_permission:
+            raise ForbiddenException(detail="Students can only test their own submissions")
 
     # Check test limitations (prevent multiple successful tests by same member)
     existing_test = db.query(TestResult).filter(
@@ -403,12 +473,12 @@ async def create_test_result(
                 detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
             )
 
-    # Create the test result
+    # Create the test result (use authenticated user's course member id)
     from ctutor_backend.interface.tasks import map_task_status_to_int
 
     test_result = TestResult(
         submission_artifact_id=artifact_id,
-        course_member_id=test_data.course_member_id,
+        course_member_id=course_member.id,  # Use authenticated user's course member ID
         execution_backend_id=test_data.execution_backend_id,
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
@@ -434,17 +504,43 @@ async def create_test_result(
 async def list_artifact_test_results(
     artifact_id: UUID,
     response: Response,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
-    """List all test results for an artifact."""
+    """List all test results for an artifact. Students see their own, tutors/instructors see all."""
 
-    # Verify artifact exists
-    artifact = db.query(SubmissionArtifact).filter(
+    # Verify artifact exists and get course info
+    artifact = db.query(SubmissionArtifact).options(
+        joinedload(SubmissionArtifact.submission_group)
+    ).filter(
         SubmissionArtifact.id == artifact_id
     ).first()
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
+
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        # Check if user is a member of the submission group
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
+        ).filter(
+            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_group_member:
+            # If not in the group, check for tutor/instructor permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == artifact.submission_group.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You can only view test results for your own submissions")
 
     # Get test results for this artifact
     test_results = db.query(TestResult).filter(
@@ -460,14 +556,28 @@ async def list_artifact_test_results(
 async def update_test_result(
     test_id: UUID,
     update_data: TestResultUpdate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
-    """Update a test result (e.g., when test completes)."""
+    """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
 
     test_result = db.query(TestResult).filter(TestResult.id == test_id).first()
 
     if not test_result:
         raise NotFoundException(detail="Test result not found")
+
+    # Check permissions - either admin (service account) or the test runner
+    user_id = permissions.get_user_id()
+    is_admin = permissions.has_claim("_admin")
+
+    if not is_admin:
+        # Check if user is the one who ran the test
+        course_member = db.query(CourseMember).filter(
+            CourseMember.id == test_result.course_member_id
+        ).first()
+
+        if not course_member or str(course_member.user_id) != str(user_id):
+            raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
     # Update fields
     if update_data.status is not None:

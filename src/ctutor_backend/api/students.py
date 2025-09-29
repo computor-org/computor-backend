@@ -23,7 +23,7 @@ from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import Course, CourseContent, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 student_router = APIRouter()
@@ -181,14 +181,14 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
 #     )
     
 #     # Find the submission group for this course content that the user belongs to
-#     submission_group = db.query(CourseSubmissionGroup).join(
-#         CourseSubmissionGroupMember,
-#         CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id
+#     submission_group = db.query(SubmissionGroup).join(
+#         SubmissionGroupMember,
+#         SubmissionGroupMember.submission_group_id == SubmissionGroup.id
 #     ).join(
 #         CourseMember,
-#         CourseMember.id == CourseSubmissionGroupMember.course_member_id
+#         CourseMember.id == SubmissionGroupMember.course_member_id
 #     ).filter(
-#         CourseSubmissionGroup.course_content_id == course_content_id,
+#         SubmissionGroup.course_content_id == course_content_id,
 #         CourseMember.user_id == user_id
 #     ).first()
     
@@ -205,7 +205,7 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
     
 #     # Find the last result for this submission group
 #     last_result = db.query(Result).filter(
-#         Result.course_submission_group_id == submission_group.id
+#         Result.submission_group_id == submission_group.id
 #     ).order_by(Result.created_at.desc()).first()
     
 #     if not last_result:

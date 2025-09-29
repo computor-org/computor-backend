@@ -6,7 +6,7 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeGet, 
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.model.course import CourseContent
-from ctutor_backend.model.course import CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import CourseContentKind, CourseContentType, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.model.auth import User
 from ..custom_types import Ltree
 
@@ -286,7 +286,7 @@ def post_create(course_content: CourseContent, db: Session):
             logger.warning(f"Could not find CourseMember {course_member_id}")
             continue
             
-        submission_group = CourseSubmissionGroup(
+        submission_group = SubmissionGroup(
             course_id=course_content.course_id,
             course_content_id=course_content.id,
             max_group_size=course_content.max_group_size or 1,
@@ -327,8 +327,8 @@ def post_create(course_content: CourseContent, db: Session):
         db.commit()
         db.refresh(submission_group)
         
-        submission_group_member = CourseSubmissionGroupMember(
-            course_submission_group_id = submission_group.id,
+        submission_group_member = SubmissionGroupMember(
+            submission_group_id = submission_group.id,
             course_member_id = course_member.id,  # Use the course_member object's id
             course_id = course_content.course_id  # Add course_id for consistency
         )

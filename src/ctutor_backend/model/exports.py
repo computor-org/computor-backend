@@ -6,7 +6,7 @@ from datetime import timedelta
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroup, SubmissionGroupMember, SubmissionGroupGrading
 from ctutor_backend.model.result import Result
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -15,12 +15,12 @@ def db_export_course_member_grading(db: Session, course_member_id: str | None = 
 
     # Subquery to get the latest grading for each submission group
     latest_grading_sub = db.query(
-        CourseSubmissionGroupGrading.course_submission_group_id,
-        CourseSubmissionGroupGrading.status,
-        CourseSubmissionGroupGrading.grading,
+        SubmissionGroupGrading.submission_group_id,
+        SubmissionGroupGrading.status,
+        SubmissionGroupGrading.grading,
         func.row_number().over(
-            partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
-            order_by=CourseSubmissionGroupGrading.created_at.desc()
+            partition_by=SubmissionGroupGrading.submission_group_id,
+            order_by=SubmissionGroupGrading.created_at.desc()
         ).label('rn')
     ).subquery()
 
@@ -34,16 +34,16 @@ def db_export_course_member_grading(db: Session, course_member_id: str | None = 
         User.given_name,
         User.family_name
     ) \
-    .select_from(CourseSubmissionGroup) \
-    .join(CourseSubmissionGroupMember,CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-    .join(CourseMember,CourseMember.id == CourseSubmissionGroupMember.course_member_id) \
-    .join(CourseContent,CourseContent.id == CourseSubmissionGroup.course_content_id) \
+    .select_from(SubmissionGroup) \
+    .join(SubmissionGroupMember,SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
+    .join(CourseMember,CourseMember.id == SubmissionGroupMember.course_member_id) \
+    .join(CourseContent,CourseContent.id == SubmissionGroup.course_content_id) \
     .join(Course,Course.id == CourseContent.course_id) \
     .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
     .join(User,User.id == CourseMember.user_id) \
     .outerjoin(
         latest_grading_sub,
-        (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+        (latest_grading_sub.c.submission_group_id == SubmissionGroup.id) &
         (latest_grading_sub.c.rn == 1)
     )
     
@@ -85,9 +85,9 @@ def db_export_course_member_results(db: Session, course_member_id: str | None = 
     .join(CourseContent,CourseContent.id == Result.course_content_id) \
     .join(Course,Course.id == CourseContent.course_id) \
     .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
-    .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id) \
-    .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
-    .join(CourseMember,CourseMember.id == CourseSubmissionGroupMember.course_member_id) \
+    .join(SubmissionGroup, Result.submission_group_id == SubmissionGroup.id) \
+    .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
+    .join(CourseMember,CourseMember.id == SubmissionGroupMember.course_member_id) \
     .join(CourseGroup,CourseGroup.id == CourseMember.course_group_id) \
     .join(User,User.id == CourseMember.user_id)
     

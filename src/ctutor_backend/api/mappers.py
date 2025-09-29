@@ -10,9 +10,9 @@ from ctutor_backend.interface.student_course_contents import (
     SubmissionGroupRepository,
     SubmissionGroupMemberBasic,
 )
-from ctutor_backend.interface.grading import GradingStatus, CourseSubmissionGroupGradingList
+from ctutor_backend.interface.grading import GradingStatus, SubmissionGroupGradingList
 from ctutor_backend.interface.tasks import map_int_to_task_status
-from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseMember, CourseContent, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroupMember, CourseMember, CourseContent, SubmissionGroupGrading
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.deployment import CourseContentDeployment
 from ctutor_backend.model.example import ExampleVersion, Example
@@ -106,7 +106,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             reverse=True,
         )
         for grading in sorted_gradings:
-            gradings_payload.append(CourseSubmissionGroupGradingList.model_validate(grading))
+            gradings_payload.append(SubmissionGroupGradingList.model_validate(grading))
 
         if gradings_payload:
             latest_grading_value = gradings_payload[0].grading

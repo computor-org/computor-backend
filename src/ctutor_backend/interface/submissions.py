@@ -50,7 +50,7 @@ class SubmissionListItem(BaseEntityList):
     submit: bool
     course_member_id: str
     course_content_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: str
@@ -76,7 +76,7 @@ class SubmissionQuery(ListQuery):
     id: Optional[str] = None
     submit: Optional[bool] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
@@ -96,8 +96,8 @@ def submission_search(db: Session, query, params: SubmissionQuery):
         query = query.filter(Result.submit == params.submit)
     if params.course_member_id is not None:
         query = query.filter(Result.course_member_id == params.course_member_id)
-    if params.course_submission_group_id is not None:
-        query = query.filter(Result.course_submission_group_id == params.course_submission_group_id)
+    if params.submission_group_id is not None:
+        query = query.filter(Result.submission_group_id == params.submission_group_id)
     if params.course_content_id is not None:
         query = query.filter(Result.course_content_id == params.course_content_id)
     if params.execution_backend_id is not None:
