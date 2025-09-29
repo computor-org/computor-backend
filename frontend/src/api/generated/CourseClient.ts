@@ -3,7 +3,7 @@
  * Endpoint: /courses
  */
 
-import type { CourseCreate, CourseExecutionBackendGet, CourseGet, CourseList, CourseQuery, CourseUpdate } from 'types/generated';
+import type { CourseCreate, CourseGet, CourseList, CourseQuery, CourseUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -31,19 +31,5 @@ export class CourseClient extends BaseEndpointClient {
 
   async delete(id: string | number): Promise<void> {
     await this.client.delete<void>(this.buildPath(id));
-  }
-
-  /**
-   * Patch Course Execution Backend
-   */
-  async patchCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdPatch({ courseId, executionBackendId, body }: { courseId: string | string; executionBackendId: string | string; body: Record<string, unknown> & Record<string, unknown> }): Promise<CourseExecutionBackendGet> {
-    return this.client.patch<CourseExecutionBackendGet>(this.buildPath(courseId, 'execution-backends', executionBackendId), body);
-  }
-
-  /**
-   * Delete Course Execution Backend
-   */
-  async deleteCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdDelete({ courseId, executionBackendId }: { courseId: string | string; executionBackendId: string | string }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    return this.client.delete<Record<string, unknown> & Record<string, unknown>>(this.buildPath(courseId, 'execution-backends', executionBackendId));
   }
 }

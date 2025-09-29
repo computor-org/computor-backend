@@ -3,7 +3,7 @@
  * Endpoint: /results
  */
 
-import type { ResultCreate, ResultGet, ResultList, ResultQuery, ResultUpdate, TaskStatus } from 'types/generated';
+import type { ResultCreate, ResultGet, ResultList, ResultQuery, ResultUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -31,12 +31,5 @@ export class ResultClient extends BaseEndpointClient {
 
   async delete(id: string | number): Promise<void> {
     await this.client.delete<void>(this.buildPath(id));
-  }
-
-  /**
-   * Result Status
-   */
-  async resultStatusResultsResultIdStatusGet({ resultId }: { resultId: string | string }): Promise<TaskStatus> {
-    return this.client.get<TaskStatus>(this.buildPath(resultId, 'status'));
   }
 }

@@ -32,19 +32,4 @@ export class UserRoleClient extends BaseEndpointClient {
   async delete(id: string | number): Promise<void> {
     await this.client.delete<void>(this.buildPath(id));
   }
-
-  /**
-   * Get User Role
-   * Get a specific user role by user_id and role_id
-   */
-  async getUserRoleUserRolesUsersUserIdRolesRoleIdGet({ userId, roleId }: { userId: string | string; roleId: string | string }): Promise<UserRoleGet> {
-    return this.client.get<UserRoleGet>(this.buildPath('users', userId, 'roles', roleId));
-  }
-
-  /**
-   * Delete User Role
-   */
-  async deleteUserRoleUserRolesUsersUserIdRolesRoleIdDelete({ userId, roleId }: { userId: string | string; roleId: string | string }): Promise<UserRoleList[]> {
-    return this.client.delete<UserRoleList[]>(this.buildPath('users', userId, 'roles', roleId));
-  }
 }

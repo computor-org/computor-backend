@@ -35,19 +35,6 @@ export interface BasicAuthConfig {
   password: string;
 }
 
-/**
- * SSO Bearer token credentials.
- */
-export interface SSOAuthCredentials {
-  token: string;
-  scheme?: string;
-}
-
-export interface HeaderAuthCredentials {
-  type: any;
-  credentials: any;
-}
-
 export interface OrganizationUpdateTokenQuery {
   type: string;
 }

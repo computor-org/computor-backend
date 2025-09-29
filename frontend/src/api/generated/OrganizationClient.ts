@@ -3,7 +3,7 @@
  * Endpoint: /organizations
  */
 
-import type { OrganizationCreate, OrganizationGet, OrganizationList, OrganizationQuery, OrganizationUpdate, OrganizationUpdateTokenUpdate } from 'types/generated';
+import type { OrganizationCreate, OrganizationGet, OrganizationList, OrganizationQuery, OrganizationUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -35,22 +35,5 @@ export class OrganizationClient extends BaseEndpointClient {
 
   async archive(id: string | number): Promise<void> {
     await this.client.patch<void>(this.buildPath(id, 'archive'));
-  }
-
-  /**
-   * Patch Organizations Token
-   */
-  async patchOrganizationsTokenOrganizationsOrganizationIdTokenPatch({ organizationId, type, body }: { organizationId: string | string; type: string; body: OrganizationUpdateTokenUpdate }): Promise<void> {
-    const queryParams: Record<string, unknown> = {
-      type,
-    };
-    return this.client.patch<void>(this.buildPath(organizationId, 'token'), body, { params: queryParams });
-  }
-
-  /**
-   * Route Organizations
-   */
-  async routeOrganizationsOrganizationsIdArchivePatch({ id }: { id: string | string }): Promise<void> {
-    return this.client.patch<void>(this.buildPath(id, 'archive'));
   }
 }

@@ -8,7 +8,7 @@
 
 
 
-import type { CourseExecutionBackendConfig, CourseSignupResponse, GradedByCourseMember } from './courses';
+import type { CourseContentTypeList, CourseExecutionBackendConfig, CourseSignupResponse, GradedByCourseMember, ResultStudentList, SubmissionGroupStudentList } from './courses';
 
 import type { ExampleVersionList } from './examples';
 
@@ -728,6 +728,51 @@ export interface GroupQuery {
   group_type?: GroupType | null;
   /** Filter by archived status */
   archived?: boolean | null;
+}
+
+/**
+ * DTO for creating a grade through the tutor endpoint.
+ * 
+ * This is used when a tutor grades a student's submission for a specific course content.
+ * The endpoint will automatically find the latest artifact for the submission group.
+ */
+export interface TutorGradeCreate {
+  artifact_id?: string | null;
+  /** Grade between 0.0 and 1.0 */
+  grade?: number | null;
+  /** Status: corrected, correction_necessary, improvement_possible, not_reviewed */
+  status?: string | null;
+  /** Feedback/comment for the student */
+  feedback?: string | null;
+}
+
+/**
+ * Response after creating a grade through the tutor endpoint.
+ * 
+ * Returns the updated course content information with the new grade applied.
+ * We extend CourseContentStudentList to maintain backward compatibility.
+ */
+export interface TutorGradeResponse {
+  id: string;
+  title?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  submitted?: boolean | null;
+  course_content_type: CourseContentTypeList;
+  result_count: number;
+  submission_count: number;
+  max_test_runs?: number | null;
+  directory?: string | null;
+  color: string;
+  result?: ResultStudentList | null;
+  submission_group?: SubmissionGroupStudentList | null;
+  unread_message_count?: number;
+  graded_artifact_id?: string | null;
+  graded_artifact_info?: any | null;
 }
 
 export interface ListQuery {
@@ -1619,15 +1664,15 @@ export interface SubmissionGroupMemberQuery {
 
 /**
  * DTO for creating submission artifacts.
+ * 
+ * This is used internally when processing submission uploads.
+ * The upload endpoint accepts SubmissionCreate which only has:
+ * - submission_group_id
+ * - version_identifier (optional)
  */
 export interface SubmissionArtifactCreate {
   submission_group_id: string;
-  original_filename?: string | null;
-  content_type?: string | null;
-  file_size: number;
-  bucket_name: string;
-  object_key: string;
-  properties?: Record<string, any> | null;
+  version_identifier?: string | null;
 }
 
 /**
@@ -1639,8 +1684,10 @@ export interface SubmissionArtifactUpdate {
 
 /**
  * List item representation for submission artifacts.
+ * 
+ * Note: filename and original_filename are stored in the properties JSONB field
  */
-export interface SubmissionArtifactListItem {
+export interface SubmissionArtifactList {
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1648,7 +1695,6 @@ export interface SubmissionArtifactListItem {
   id: string;
   submission_group_id: string;
   uploaded_by_course_member_id?: string | null;
-  original_filename?: string | null;
   content_type?: string | null;
   file_size: number;
   bucket_name: string;
@@ -1660,7 +1706,7 @@ export interface SubmissionArtifactListItem {
 /**
  * Detailed view of submission artifact with related data.
  */
-export interface SubmissionArtifactDetail {
+export interface SubmissionArtifactGet {
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1668,7 +1714,6 @@ export interface SubmissionArtifactDetail {
   id: string;
   submission_group_id: string;
   uploaded_by_course_member_id?: string | null;
-  original_filename?: string | null;
   content_type?: string | null;
   file_size: number;
   bucket_name: string;

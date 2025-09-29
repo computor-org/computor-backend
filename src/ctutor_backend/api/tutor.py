@@ -1,8 +1,9 @@
 import json
+import logging
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel
-from sqlalchemy import case
+from sqlalchemy import case, desc
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from aiocache import SimpleMemoryCache
@@ -21,7 +22,7 @@ from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCours
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, SubmissionGroup, SubmissionGroupMember
-# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
+from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentInterface,
@@ -33,8 +34,11 @@ from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentGet,
 )
 from ctutor_backend.interface.grading import GradingStatus
+from ctutor_backend.interface.tutor_grading import TutorGradeCreate, TutorGradeResponse
 from ctutor_backend.model.result import Result
 from ctutor_backend.redis_cache import get_redis_client
+
+logger = logging.getLogger(__name__)
 
 _tutor_cache = SimpleMemoryCache()
 
@@ -83,8 +87,14 @@ def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annota
 
     return response_list
 
-@tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentList)
-def tutor_update_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, course_member_update: CourseContentStudentUpdate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+@tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
+def tutor_update_course_contents(
+    course_content_id: UUID | str,
+    course_member_id: UUID | str,
+    grade_data: TutorGradeCreate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
     
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
@@ -124,17 +134,33 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         # Fallback safety: forbid if we cannot resolve grader identity in course
         raise ForbiddenException()
 
-    # 3) Get the last submitted result if we want to link the grading to it
-    last_result_id = None
-    last_result = submission_group.last_submitted_result
-    if last_result:
-        # Hybrid property returns a Result model instance in Python mode
-        # or the UUID when evaluated via SQL expression; normalise to ID.
-        last_result_id = getattr(last_result, "id", last_result)
+    # 3) Determine which artifact to grade
+    if grade_data.artifact_id:
+        # Specific artifact requested - verify it belongs to this submission group
+        artifact_to_grade = (
+            db.query(SubmissionArtifact)
+            .filter(
+                SubmissionArtifact.id == grade_data.artifact_id,
+                SubmissionArtifact.submission_group_id == submission_group.id
+            )
+            .first()
+        )
+        if artifact_to_grade is None:
+            raise NotFoundException(detail="Specified artifact not found or doesn't belong to this submission group")
+    else:
+        # Get the latest submission artifact for this submission group
+        artifact_to_grade = (
+            db.query(SubmissionArtifact)
+            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
+            .order_by(SubmissionArtifact.created_at.desc())
+            .first()
+        )
+        if artifact_to_grade is None:
+            raise NotFoundException(detail="No submission artifact found for this submission group. Student must submit first.")
 
     # 4) Map status string to GradingStatus enum value
     grading_status = GradingStatus.NOT_REVIEWED  # Default
-    if course_member_update.status:
+    if grade_data.status:
         status_map = {
             "corrected": GradingStatus.CORRECTED,
             "correction_necessary": GradingStatus.CORRECTION_NECESSARY,
@@ -142,29 +168,44 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
             "improvement_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
             "not_reviewed": GradingStatus.NOT_REVIEWED
         }
-        grading_status = status_map.get(course_member_update.status, GradingStatus.NOT_REVIEWED)
+        grading_status = status_map.get(grade_data.status, GradingStatus.NOT_REVIEWED)
 
-    # 5) TODO: Grading now needs to be done through submission artifacts
-    # The old SubmissionGroupGrading has been removed
-    # For now, we'll skip creating the grading until the frontend is updated
-    # to use the artifact-based grading system via /submissions/artifacts/{id}/grades
+    # 5) Create a new artifact-based grade
+    # Check if grading data is provided
+    if grade_data.grade is not None or grade_data.status is not None:
+        # Grade validation is already done by Pydantic Field validator (0.0 to 1.0)
+        grade_value = grade_data.grade if grade_data.grade is not None else 0.0
 
-    # new_grading = SubmissionGrade(
-    #     artifact_id=...,  # Need to determine which artifact to grade
-    #     graded_by_course_member_id=grader_cm.id,
-    #     grade=course_member_update.grading if course_member_update.grading != None else 0.0,
-    #     status=grading_status.value,
-    #     comment=getattr(course_member_update, 'feedback', None),
-    # )
-    # db.add(new_grading)
-    # db.commit()
+        # Create the new grade for the artifact
+        new_grading = SubmissionGrade(
+            artifact_id=artifact_to_grade.id,
+            graded_by_course_member_id=grader_cm.id,
+            grade=grade_value,
+            status=grading_status.value,
+            comment=grade_data.feedback,
+        )
+        db.add(new_grading)
+        db.commit()
 
-    logger.warning("Grading through course content endpoint is deprecated. Use /submissions/artifacts/{id}/grades instead")
+        logger.info(f"Created grade for artifact {artifact_to_grade.id} by grader {grader_cm.id}")
         
     # 6) Return fresh data using shared mapper and latest grading subquery
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
-    return course_member_course_content_result_mapper(course_contents_result, db)
+
+    # Map the result and enhance with graded artifact info
+    response = course_member_course_content_result_mapper(course_contents_result, db)
+
+    # Convert to TutorGradeResponse and add artifact info
+    grade_response = TutorGradeResponse.model_validate(response.model_dump())
+    grade_response.graded_artifact_id = artifact_to_grade.id
+    grade_response.graded_artifact_info = {
+        "id": str(artifact_to_grade.id),
+        "created_at": artifact_to_grade.created_at.isoformat() if artifact_to_grade.created_at else None,
+        "properties": artifact_to_grade.properties,
+    }
+
+    return grade_response
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
