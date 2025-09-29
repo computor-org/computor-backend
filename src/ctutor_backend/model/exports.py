@@ -6,23 +6,32 @@ from datetime import timedelta
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import SubmissionGroup, SubmissionGroupMember, SubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroup, SubmissionGroupMember
+# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
+from ctutor_backend.model.artifact import SubmissionGrade
 from ctutor_backend.model.result import Result
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 def db_export_course_member_grading(db: Session, course_member_id: str | None = None) -> pd.DataFrame:
+    """
+    TODO: Migrate to use SubmissionGrade from artifact model
+    The new model uses artifact_id instead of submission_group_id
+    """
+    # Temporarily return empty dataframe - needs migration
+    return pd.DataFrame()
 
-    # Subquery to get the latest grading for each submission group
-    latest_grading_sub = db.query(
-        SubmissionGroupGrading.submission_group_id,
-        SubmissionGroupGrading.status,
-        SubmissionGroupGrading.grading,
-        func.row_number().over(
-            partition_by=SubmissionGroupGrading.submission_group_id,
-            order_by=SubmissionGroupGrading.created_at.desc()
-        ).label('rn')
-    ).subquery()
+    # Original code commented out - needs migration to artifact-based system:
+    # # Subquery to get the latest grading for each submission group
+    # latest_grading_sub = db.query(
+    #     SubmissionGroupGrading.submission_group_id,
+    #     SubmissionGroupGrading.status,
+    #     SubmissionGroupGrading.grading,
+    #     func.row_number().over(
+    #         partition_by=SubmissionGroupGrading.submission_group_id,
+    #         order_by=SubmissionGroupGrading.created_at.desc()
+    #     ).label('rn')
+    # ).subquery()
 
     data = db.query(
         Course.id,

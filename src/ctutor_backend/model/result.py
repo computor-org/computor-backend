@@ -73,7 +73,7 @@ class Result(Base):
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='results')
-    gradings = relationship('SubmissionGroupGrading', back_populates='result', foreign_keys='SubmissionGroupGrading.result_id')
+    # Gradings moved to SubmissionGrade tied to artifacts
 
     # New artifact relationships
     submission_artifact: Mapped["SubmissionArtifact"] = relationship('SubmissionArtifact', back_populates='test_results')

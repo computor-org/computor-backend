@@ -20,7 +20,8 @@ from ctutor_backend.interface.student_courses import CourseStudentInterface, Cou
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, SubmissionGroup, SubmissionGroupMember, SubmissionGroupGrading
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, SubmissionGroup, SubmissionGroupMember
+# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentInterface,

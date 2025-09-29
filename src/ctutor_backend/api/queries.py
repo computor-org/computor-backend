@@ -1,12 +1,15 @@
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy import func, case, select, and_, literal
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import SubmissionGroupMember
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, SubmissionGroup, SubmissionGroupGrading
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, SubmissionGroup
+# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
 from ctutor_backend.model.message import Message, MessageRead
 
 def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session, submission: Optional[bool] = None):
@@ -61,25 +64,24 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
     
     return query.group_by(Result.course_content_id).subquery()
 
+# TODO: Migrate to new SubmissionGrade artifact-based system
 def latest_grading_subquery(db: Session):
     """
     Latest grading per submission group using window function with deterministic ordering.
     Returns columns: submission_group_id, status, grading, rn (rn=1 is latest).
+
+    NOTE: This needs to be migrated to use SubmissionGrade from artifact module
+    which is tied to artifacts, not submission groups directly.
     """
+    # Temporarily return an empty subquery to avoid errors
     return db.query(
-        SubmissionGroupGrading.submission_group_id,
-        SubmissionGroupGrading.status,
-        SubmissionGroupGrading.grading,
-        SubmissionGroupGrading.created_at,
-        SubmissionGroupGrading.id,
-        func.row_number().over(
-            partition_by=SubmissionGroupGrading.submission_group_id,
-            order_by=[
-                SubmissionGroupGrading.created_at.desc(),
-                SubmissionGroupGrading.id.desc(),
-            ],
-        ).label('rn')
-    ).subquery()
+        SubmissionGroup.id.label('submission_group_id'),
+        sa.literal(0).label('status'),
+        sa.literal(0.0).label('grading'),
+        sa.literal(datetime.now()).label('created_at'),
+        SubmissionGroup.id.label('id'),
+        sa.literal(1).label('rn')
+    ).filter(sa.literal(False)).subquery()  # Always empty for now
 
 
 def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
@@ -221,14 +223,15 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         )
 
     course_contents_query = course_contents_query.options(
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.user),
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.course_role),
+        # TODO: Migrate grading joinedloads to new SubmissionGrade system
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.user),
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.course_role),
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
@@ -331,14 +334,15 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         )
 
     query = query.options(
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.user),
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.course_role),
+        # TODO: Migrate grading joinedloads to new SubmissionGrade system
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.user),
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.course_role),
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
@@ -415,14 +419,15 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
         )
 
     course_contents_query = course_contents_query.options(
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.user),
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.course_role),
+        # TODO: Migrate grading joinedloads to new SubmissionGrade system
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.user),
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.course_role),
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
@@ -515,14 +520,15 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         )
 
     query = query.options(
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.user),
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.gradings)
-        .joinedload(SubmissionGroupGrading.graded_by)
-        .joinedload(CourseMember.course_role),
+        # TODO: Migrate grading joinedloads to new SubmissionGrade system
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.user),
+        # joinedload(CourseContent.submission_groups)
+        # .joinedload(SubmissionGroup.gradings)
+        # .joinedload(SubmissionGroupGrading.graded_by)
+        # .joinedload(CourseMember.course_role),
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)

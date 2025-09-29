@@ -5,7 +5,8 @@ from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
-from ctutor_backend.model.course import SubmissionGroupGrading, CourseMember
+from ctutor_backend.model.course import CourseMember
+from ctutor_backend.model.artifact import SubmissionGrade
 
 class GradingAuthor(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
@@ -107,38 +108,28 @@ class SubmissionGroupGradingQuery(ListQuery):
 
 
 def grading_search(db: Session, query, params: Optional[SubmissionGroupGradingQuery]):
-    """Search function for gradings."""
-    query = query.options(
-        joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.user),
-        joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.course_role),
-    )
+    """Search function for gradings.
 
-    if params.id is not None:
-        query = query.filter(SubmissionGroupGrading.id == params.id)
-    if params.submission_group_id is not None:
-        query = query.filter(SubmissionGroupGrading.submission_group_id == params.submission_group_id)
-    if params.graded_by_course_member_id is not None:
-        query = query.filter(SubmissionGroupGrading.graded_by_course_member_id == params.graded_by_course_member_id)
-    if params.result_id is not None:
-        query = query.filter(SubmissionGroupGrading.result_id == params.result_id)
-    if params.status is not None:
-        query = query.filter(SubmissionGroupGrading.status == params.status)
-    if params.min_grade is not None:
-        query = query.filter(SubmissionGroupGrading.grading >= params.min_grade)
-    if params.max_grade is not None:
-        query = query.filter(SubmissionGroupGrading.grading <= params.max_grade)
-    if params.has_feedback is not None:
-        if params.has_feedback:
-            query = query.filter(SubmissionGroupGrading.feedback.isnot(None))
-        else:
-            query = query.filter(SubmissionGroupGrading.feedback.is_(None))
-    
-    # Order by creation date, most recent first
-    query = query.order_by(SubmissionGroupGrading.created_at.desc())
-    
-    return query
+    TODO: Migrate to use SubmissionGrade from artifact model
+    """
+    # Temporarily disabled - needs migration to new artifact-based system
+    return query.filter(False)  # Return empty result
+
+    # Original code commented out:
+    # query = query.options(
+    #     joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.user),
+    #     joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.course_role),
+    # )
+    # if params.id is not None:
+    #     query = query.filter(SubmissionGroupGrading.id == params.id)
+    # Commented out rest of function - needs migration
+    # if params.submission_group_id is not None:
+    #     query = query.filter(SubmissionGroupGrading.submission_group_id == params.submission_group_id)
+    # ... rest of filters
+    # return query
 
 
+# TODO: Migrate this interface to use SubmissionGrade from artifact model
 class SubmissionGroupGradingInterface(EntityInterface):
     create = SubmissionGroupGradingCreate
     get = SubmissionGroupGradingGet
@@ -147,7 +138,7 @@ class SubmissionGroupGradingInterface(EntityInterface):
     query = SubmissionGroupGradingQuery
     search = grading_search
     endpoint = "submission-group-gradings"
-    model = SubmissionGroupGrading
+    model = SubmissionGrade  # Changed to use new model
     cache_ttl = 60  # 1 minute - gradings may change frequently
 
 

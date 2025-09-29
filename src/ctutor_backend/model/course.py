@@ -319,8 +319,7 @@ class CourseMember(Base):
     submission_group_members = relationship('SubmissionGroupMember', back_populates='course_member')
     results = relationship('Result', back_populates='course_member')
     # Messaging relationships moved to user-level author/reader in Message/MessageRead
-    gradings_given = relationship('SubmissionGroupGrading', back_populates='graded_by',
-                                 foreign_keys='SubmissionGroupGrading.graded_by_course_member_id')
+    # Gradings moved to SubmissionGrade in artifact.py
 
     # New artifact-related relationships
     uploaded_artifacts = relationship('SubmissionArtifact', back_populates='uploaded_by',
@@ -356,8 +355,7 @@ class SubmissionGroup(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     members = relationship("SubmissionGroupMember", back_populates="group", uselist=True)
     results = relationship('Result', back_populates='submission_group')
-    gradings = relationship('SubmissionGroupGrading', back_populates='submission_group',
-                           cascade='all, delete-orphan')
+    # Gradings moved to SubmissionGrade tied to artifacts
     submission_artifacts = relationship('SubmissionArtifact', back_populates='submission_group')
     
     # Hybrid property for the last submitted result
@@ -417,74 +415,7 @@ class SubmissionGroupMember(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
-class SubmissionGroupGrading(Base):
-    """
-    Tracks grading information for course submission groups.
-    
-    This table records:
-    - The actual grade (0.0 to 1.0)
-    - The grading status (using GradingStatus enum: 0=not_reviewed, 1=corrected, 2=correction_necessary, 3=improvement_possible)
-    - Who performed the grading (staff member/tutor/lecturer)
-    - When the grading occurred
-    - Feedback/comments on the grading
-    - Reference to the specific result that was graded
-    """
-    __tablename__ = 'submission_group_grading'
-    __table_args__ = (
-        # Ensure we can quickly find all gradings for a submission group
-        Index('idx_grading_submission_group', 'submission_group_id'),
-        # Ensure we can find all gradings by a specific grader
-        Index('idx_grading_graded_by', 'graded_by_course_member_id'),
-        # Index for finding gradings by result
-        Index('idx_grading_result', 'result_id'),
-    )
-
-    # Primary key and versioning
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    
-    # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    
-    # Foreign keys
-    submission_group_id = Column(
-        ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'),
-        nullable=False
-    )
-    graded_by_course_member_id = Column(
-        ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
-        nullable=False
-    )
-    result_id = Column(
-        ForeignKey('result.id', ondelete='SET NULL', onupdate='RESTRICT'),
-        nullable=True  # Nullable because grading might be done without a specific result
-    )
-    
-    # Grading data
-    grading = Column(Float(53), nullable=False)  # Value between 0.0 and 1.0
-    status = Column(Integer, nullable=False, server_default=text("0"))  # GradingStatus enum values
-    feedback = Column(String(4096), nullable=True)  # Feedback/comments from the grader
-    
-    # Relationships
-    submission_group = relationship(
-        'SubmissionGroup',
-        back_populates='gradings'
-    )
-    graded_by = relationship(
-        'CourseMember',
-        back_populates='gradings_given',
-        foreign_keys=[graded_by_course_member_id]
-    )
-    result = relationship(
-        'Result',
-        back_populates='gradings',
-        foreign_keys=[result_id]
-    )
-    
-    def __repr__(self):
-        return f"<SubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status}, has_feedback={bool(self.feedback)})>"
-
+# SubmissionGroupGrading removed - replaced by SubmissionGrade in artifact.py
 
 class CourseMemberComment(Base):
     __tablename__ = 'course_member_comment'

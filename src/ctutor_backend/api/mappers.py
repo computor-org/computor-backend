@@ -12,7 +12,8 @@ from ctutor_backend.interface.student_course_contents import (
 )
 from ctutor_backend.interface.grading import GradingStatus, SubmissionGroupGradingList
 from ctutor_backend.interface.tasks import map_int_to_task_status
-from ctutor_backend.model.course import SubmissionGroupMember, CourseMember, CourseContent, SubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroupMember, CourseMember, CourseContent
+# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.deployment import CourseContentDeployment
 from ctutor_backend.model.example import ExampleVersion, Example

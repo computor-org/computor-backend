@@ -791,6 +791,7 @@ def upgrade() -> None:
     op.create_index('result_artifact_result_idx', 'result_artifact', ['result_id'])
     op.create_index('result_artifact_created_at_idx', 'result_artifact', ['created_at'])
 
+    # New artifact-based grading table (replaces old submission_group_grading)
     op.create_table('submission_grade',
         sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
         sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
