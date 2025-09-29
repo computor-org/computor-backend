@@ -33,32 +33,72 @@ from ctutor_backend.model.deployment import CourseContentDeployment
 from ctutor_backend.model.example import Example, ExampleVersion
 from ctutor_backend.custom_types import Ltree
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
+from ctutor_backend.interface.tasks import map_int_to_task_status
 
 logger = logging.getLogger(__name__)
 
 tests_router = APIRouter()
 
 
-@tests_router.post("/artifacts/{artifact_id}/test", response_model=ResultList)
+@tests_router.post("", response_model=ResultList)
 async def create_test_for_artifact(
-    artifact_id: str,
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
     """
     Create and execute a test for a submission artifact.
+
+    Ways to specify what to test:
+    1. Provide artifact_id directly
+    2. Provide submission_group_id + version_identifier to find specific version
+    3. Provide submission_group_id only to test the latest submission
+
     Tests are executed via Temporal workflows.
     """
     user_id = permissions.get_user_id()
 
-    # Get the submission artifact
-    artifact = db.query(SubmissionArtifact).filter(
-        SubmissionArtifact.id == artifact_id
-    ).first()
+    # Determine which artifact to test
+    artifact = None
 
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
+    if test_create.artifact_id:
+        # Direct artifact ID provided
+        artifact = db.query(SubmissionArtifact).filter(
+            SubmissionArtifact.id == test_create.artifact_id
+        ).first()
+
+        if not artifact:
+            raise NotFoundException(detail="Submission artifact not found")
+
+    elif test_create.submission_group_id:
+        # Find artifact by submission group and optional version
+        if test_create.version_identifier:
+            # Find specific version
+            artifact = db.query(SubmissionArtifact).filter(
+                SubmissionArtifact.submission_group_id == test_create.submission_group_id,
+                SubmissionArtifact.version_identifier == test_create.version_identifier
+            ).order_by(SubmissionArtifact.created_at.desc()).first()
+
+            if not artifact:
+                raise NotFoundException(
+                    detail=f"No artifact found for submission group {test_create.submission_group_id} "
+                           f"with version {test_create.version_identifier}"
+                )
+        else:
+            # Get latest submission for the group
+            artifact = db.query(SubmissionArtifact).filter(
+                SubmissionArtifact.submission_group_id == test_create.submission_group_id
+            ).order_by(SubmissionArtifact.created_at.desc()).first()
+
+            if not artifact:
+                raise NotFoundException(
+                    detail=f"No artifacts found for submission group {test_create.submission_group_id}. "
+                           f"Student must submit first."
+                )
+    else:
+        raise BadRequestException(
+            detail="Must provide either artifact_id or submission_group_id to identify what to test"
+        )
 
     # Get the submission group with permission check
     submission_group = check_course_permissions(
@@ -83,7 +123,7 @@ async def create_test_for_artifact(
     # Apply test limitation: prevent multiple successful tests
     existing_test = db.query(Result).filter(
         and_(
-            Result.submission_artifact_id == artifact_id,
+            Result.submission_artifact_id == artifact.id,
             Result.course_member_id == course_member.id,
             ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
         )
@@ -114,7 +154,7 @@ async def create_test_for_artifact(
     # Check max test runs limit for the submission group
     if submission_group.max_test_runs is not None:
         test_count = db.query(func.count(Result.id)).filter(
-            Result.submission_artifact_id == artifact_id
+            Result.submission_artifact_id == artifact.id
         ).scalar()
 
         if test_count >= submission_group.max_test_runs:
@@ -163,12 +203,12 @@ async def create_test_for_artifact(
             detail="Student repository not configured. Please ensure repository has been created."
         )
 
-    # Use version identifier from artifact properties or from test request
+    # Use version identifier from artifact column, test request, or properties fallback
     artifact_properties = artifact.properties or {}
     version_identifier = (
         test_create.version_identifier or
-        artifact_properties.get('version_identifier') or
-        artifact_properties.get('commit')
+        artifact.version_identifier or  # Use the proper column first
+        artifact_properties.get('commit')  # Fallback for legacy data
     )
 
     if not version_identifier:
@@ -218,7 +258,7 @@ async def create_test_for_artifact(
         properties={
             "submission_group_id": str(submission_group.id),
             "course_content_id": str(course_content.id),
-            "artifact_filename": artifact.filename,
+            "artifact_id": str(artifact.id),  # Store artifact ID instead of non-existent filename
         },
         log_text=None,
         version_identifier=version_identifier,
@@ -264,9 +304,9 @@ async def create_test_for_artifact(
     return ResultList.model_validate(result)
 
 
-@tests_router.get("/test-results/{test_id}/status")
+@tests_router.get("/status/{result_id}")
 async def get_test_status(
-    test_id: str,
+    result_id: str,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
@@ -281,10 +321,7 @@ async def get_test_status(
     result_data = db.query(
         Result.id,
         Result.status,
-        Result.score,
-        Result.max_score,
         Result.started_at,
-        Result.finished_at,
         Result.test_system_id,
         Result.submission_artifact_id,
         SubmissionGroup.id.label("submission_group_id"),
@@ -294,7 +331,7 @@ async def get_test_status(
     ).join(
         SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id
     ).filter(
-        Result.id == test_id
+        Result.id == result_id
     ).first()
 
     if not result_data:
@@ -334,119 +371,14 @@ async def get_test_status(
             new_status = map_task_status_to_int(actual_status.status)
             if new_status != status:
                 # Update only the status field
-                db.query(Result).filter(Result.id == test_id).update({"status": new_status})
+                db.query(Result).filter(Result.id == result_id).update({"status": new_status})
                 db.commit()
                 status = new_status
         except Exception as e:
             logger.warning(f"Could not check Temporal status: {e}")
 
-    from ctutor_backend.interface.tasks import map_int_to_task_status
-
     return {
         "id": str(result_data.id),
         "status": map_int_to_task_status(status),
-        "score": result_data.score,
-        "max_score": result_data.max_score,
         "started_at": result_data.started_at,
-        "finished_at": result_data.finished_at,
     }
-
-
-@tests_router.post("/legacy", response_model=ResultList)
-async def create_test_legacy(
-    test_create: TestCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
-    db: Session = Depends(get_db)
-):
-    """
-    Legacy endpoint for creating tests without an artifact.
-    This creates a temporary artifact and then runs the test.
-
-    This endpoint is maintained for backwards compatibility but should
-    be replaced with the artifact-based approach.
-    """
-    user_id = permissions.get_user_id()
-
-    if not user_id:
-        raise ForbiddenException(detail="User authentication required")
-
-    # Find course member for the authenticated user
-    course_member = db.query(CourseMember).filter(
-        CourseMember.user_id == user_id
-    ).first()
-
-    if not course_member:
-        raise NotFoundException(detail="You are not a member of any courses")
-
-    # Find course content
-    course_content = None
-
-    if test_create.course_content_id:
-        course_content = db.query(CourseContent).filter(
-            CourseContent.id == test_create.course_content_id
-        ).first()
-    elif test_create.course_content_path:
-        course_content = db.query(CourseContent).filter(
-            CourseContent.path == Ltree(test_create.course_content_path)
-        ).first()
-    elif test_create.directory:
-        # Look up by example directory
-        course_content = db.query(CourseContent).join(
-            CourseContentDeployment,
-            CourseContentDeployment.course_content_id == CourseContent.id
-        ).join(
-            ExampleVersion,
-            ExampleVersion.id == CourseContentDeployment.example_version_id
-        ).join(
-            Example,
-            Example.id == ExampleVersion.example_id
-        ).filter(
-            Example.directory == test_create.directory
-        ).first()
-
-    if not course_content:
-        raise NotFoundException(detail="Assignment not found")
-
-    # Find submission group with permission check
-    submission_group = check_course_permissions(
-        permissions, SubmissionGroup, "_student", db
-    ).join(
-        SubmissionGroupMember,
-        SubmissionGroupMember.submission_group_id == SubmissionGroup.id
-    ).filter(
-        SubmissionGroupMember.course_member_id == course_member.id,
-        SubmissionGroup.course_content_id == course_content.id
-    ).first()
-
-    if not submission_group:
-        raise BadRequestException(detail="No submission group found for this assignment or access denied")
-
-    # Create a placeholder artifact for this test
-    # This represents a "direct test" without an uploaded file
-    artifact = SubmissionArtifact(
-        submission_group_id=submission_group.id,
-        uploaded_by_course_member_id=course_member.id,
-        filename="direct-test",
-        original_filename="direct-test",
-        content_type="application/x-test",
-        file_size=0,
-        bucket_name="test-artifacts",
-        object_key=f"direct-test-{uuid.uuid4()}",
-        properties={
-            "type": "direct_test",
-            "version_identifier": test_create.version_identifier,
-            "legacy_test": True,
-        }
-    )
-
-    db.add(artifact)
-    db.commit()
-    db.refresh(artifact)
-
-    # Now create test using the artifact-based endpoint logic
-    return await create_test_for_artifact(
-        artifact_id=str(artifact.id),
-        test_create=test_create,
-        permissions=permissions,
-        db=db
-    )

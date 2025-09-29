@@ -227,16 +227,6 @@ async def upload_submission(
                     f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
                 )
 
-            storage_meta_base: dict[str, str] = {
-                "submission_group_id": str(submission_group.id),
-                "course_content_id": str(course_content.id),
-                "course_member_id": str(submitting_member.id),
-                "archive_filename": file.filename or "submission.zip",
-                "manual_submission": "true",
-                "submission_prefix": submission_prefix,
-                "submission_version": manual_version_identifier,
-            }
-
             for member in members:
                 relative_path = _sanitize_archive_path(member.filename)
                 member_size = member.file_size
@@ -255,15 +245,12 @@ async def upload_submission(
                 )
 
                 object_key = f"{submission_prefix}/{relative_path}"
-                per_file_metadata = {
-                    key: str(value)
-                    for key, value in (
-                        storage_meta_base
-                        | {
-                            "relative_path": relative_path,
-                            "file_size": str(member_size),
-                        }
-                    ).items()
+
+                # Minimal metadata for MinIO - only what's needed for storage operations
+                # All detailed information is stored in the database SubmissionArtifact record
+                storage_metadata = {
+                    "submission_group_id": str(submission_group.id),
+                    "relative_path": relative_path,
                 }
 
                 extracted_stream.seek(0)
@@ -272,12 +259,11 @@ async def upload_submission(
                     object_key=object_key,
                     bucket_name=bucket_name,
                     content_type=content_type,
-                    metadata=per_file_metadata,
+                    metadata=storage_metadata,
                 )
 
                 # Create SubmissionArtifact record
-                # Note: filename and original_filename are stored in properties since
-                # the model doesn't have these columns (we upload zip archives)
+                # Properties kept minimal - all essential data is in proper database columns
                 artifact = SubmissionArtifact(
                     submission_group_id=submission_group.id,
                     uploaded_by_course_member_id=submitting_member.id,
@@ -285,14 +271,8 @@ async def upload_submission(
                     file_size=stored.size,
                     bucket_name=bucket_name,
                     object_key=object_key,
-                    properties={
-                        "filename": relative_path,  # The sanitized path within the archive
-                        "original_filename": member.filename,  # The original path from the archive
-                        "version_identifier": manual_version_identifier,
-                        "submission_prefix": submission_prefix,
-                        "archive_filename": file.filename or "submission.zip",
-                        "manual_submission": True,
-                    }
+                    version_identifier=manual_version_identifier,  # Now a proper column
+                    properties={}  # Keep empty for future extensibility and legacy compatibility
                 )
 
                 db.add(artifact)

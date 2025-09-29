@@ -24,6 +24,7 @@ class SubmissionArtifact(Base):
         Index('submission_artifact_submission_group_idx', 'submission_group_id'),
         Index('submission_artifact_uploaded_by_idx', 'uploaded_by_course_member_id'),
         Index('submission_artifact_uploaded_at_idx', 'uploaded_at'),
+        Index('submission_artifact_version_idx', 'version_identifier'),
     )
 
     # Primary key and versioning
@@ -53,8 +54,11 @@ class SubmissionArtifact(Base):
     bucket_name = Column(String(255), nullable=False)
     object_key = Column(String(2048), nullable=False)  # Path within the bucket
 
+    # Version tracking
+    version_identifier = Column(String(255), nullable=True)  # Git commit hash or version tag
+
     # Metadata and properties
-    properties = Column(JSONB, nullable=True)  # Additional metadata (version_identifier, etc.)
+    properties = Column(JSONB, nullable=True)  # Additional metadata
 
     # Relationships
     submission_group: Mapped["SubmissionGroup"] = relationship(

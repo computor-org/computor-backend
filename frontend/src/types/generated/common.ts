@@ -1125,13 +1125,15 @@ export interface GradingSummary {
 }
 
 export interface TestCreate {
+  artifact_id?: string | null;
+  submission_group_id?: string | null;
+  version_identifier?: string | null;
   course_member_id?: string | null;
   course_content_id?: string | null;
   course_content_path?: string | null;
   directory?: string | null;
   project?: string | null;
   provider_url?: string | null;
-  version_identifier?: string | null;
   submit?: boolean | null;
 }
 
@@ -1685,7 +1687,8 @@ export interface SubmissionArtifactUpdate {
 /**
  * List item representation for submission artifacts.
  * 
- * Note: filename and original_filename are stored in the properties JSONB field
+ * Essential metadata is stored in proper database columns.
+ * Properties field is kept for legacy compatibility and future extensibility.
  */
 export interface SubmissionArtifactList {
   /** Creation timestamp */
@@ -1700,6 +1703,7 @@ export interface SubmissionArtifactList {
   bucket_name: string;
   object_key: string;
   uploaded_at: string;
+  version_identifier?: string | null;
   properties?: Record<string, any> | null;
 }
 
@@ -1719,6 +1723,7 @@ export interface SubmissionArtifactGet {
   bucket_name: string;
   object_key: string;
   uploaded_at: string;
+  version_identifier?: string | null;
   properties?: Record<string, any> | null;
   test_results_count?: number | null;
   grades_count?: number | null;
@@ -2779,13 +2784,6 @@ export interface CodeAbilityReport {
   properties?: any | null;
   debug?: any | null;
   tests?: CodeAbilityReportMain[] | null;
-}
-
-export interface VSCExtensionConfig {
-  project_id: number;
-  gitlab_url: string;
-  file_path: string;
-  download_link: string;
 }
 
 export interface TestRunResponse {

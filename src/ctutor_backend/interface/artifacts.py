@@ -41,7 +41,8 @@ class SubmissionArtifactUpdate(BaseModel):
 class SubmissionArtifactList(BaseEntityList):
     """List item representation for submission artifacts.
 
-    Note: filename and original_filename are stored in the properties JSONB field
+    Essential metadata is stored in proper database columns.
+    Properties field is kept for legacy compatibility and future extensibility.
     """
     id: UUID
     submission_group_id: UUID
@@ -51,7 +52,8 @@ class SubmissionArtifactList(BaseEntityList):
     bucket_name: str
     object_key: str
     uploaded_at: datetime
-    properties: Optional[dict[str, Any]] = None  # Contains: filename, original_filename, version_identifier, etc.
+    version_identifier: Optional[str] = None
+    properties: Optional[dict[str, Any]] = None  # Additional metadata
 
     model_config = ConfigDict(from_attributes=True)
 
