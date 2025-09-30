@@ -42,7 +42,7 @@ from .core import (
 
 from .auth import (
     get_current_principal,
-    get_current_permissions,  # Backward compatibility alias
+    get_current_principal,  # Backward compatibility alias
     AuthenticationService,
     PrincipalBuilder,
     get_auth_credentials,
@@ -87,7 +87,7 @@ __all__ = [
     
     # Authentication
     "get_current_principal",
-    "get_current_permissions",
+    "get_current_principal",
     "AuthenticationService",
     "PrincipalBuilder",
     "get_auth_credentials",

@@ -145,7 +145,7 @@ python -c "from ctutor_backend.permissions.integration import toggle_system; tog
 
 ### Phase 3: Full Migration
 1. Update all imports from `api.permissions` to `permissions`
-2. Update all `get_current_permissions` to `get_current_principal`
+2. Update all `get_current_principal` to `get_current_principal`
 3. Remove old system files
 4. Remove integration layer
 
@@ -237,7 +237,7 @@ hierarchy = CourseRoleHierarchy({
 
 When ready to migrate, these files will need updates:
 - All files importing from `ctutor_backend.api.permissions`
-- All files using `get_current_permissions` dependency
+- All files using `get_current_principal` dependency
 - API endpoints using `check_permissions`
 - CRUD operations in `api/crud.py`
 

@@ -32,7 +32,7 @@ from ctutor_backend.interface.tokens import decrypt_api_key, encrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.auth import Account, User
 from ctutor_backend.model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 
@@ -454,7 +454,7 @@ def _fetch_gitlab_user_profile(
 
 @user_router.get("", response_model=UserGet)
 def get_current_user(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """Get the current authenticated user"""
@@ -470,7 +470,7 @@ class UserPassword(BaseModel):
     password_old: Optional[str] = None
 
 @user_router.post("/password", status_code=204)
-def set_user_password(permissions: Annotated[Principal, Depends(get_current_permissions)], payload: UserPassword, db: Session = Depends(get_db)):
+def set_user_password(permissions: Annotated[Principal, Depends(get_current_principal)], payload: UserPassword, db: Session = Depends(get_db)):
 
     if payload.username != None and permissions.is_admin == False:
         raise ForbiddenException()
@@ -503,7 +503,7 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
     response_model=List[str],
 )
 async def get_course_views_for_current_user(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Get available views based on roles across all courses for the current user."""
@@ -544,7 +544,7 @@ async def get_course_views_for_current_user(
 async def validate_current_user_course(
     course_id: UUID | str,
     validation: CourseMemberValidationRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     (
@@ -595,7 +595,7 @@ async def validate_current_user_course(
 async def register_current_user_course_account(
     course_id: UUID | str,
     payload: CourseMemberProviderAccountUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     (

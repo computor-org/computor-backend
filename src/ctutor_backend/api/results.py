@@ -17,7 +17,7 @@ from ctutor_backend.interface.results import (
 )
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
 from ctutor_backend.model.result import Result
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.tasks import get_task_executor
@@ -41,7 +41,7 @@ async def get_result_status(result: Result) -> TaskStatus:
 @result_router.get("", response_model=list[ResultList])
 async def list_results(
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     params: ResultQuery = Depends(),
     db: Session = Depends(get_db),
 ) -> list[ResultList]:
@@ -52,7 +52,7 @@ async def list_results(
 
 @result_router.get("/{result_id}", response_model=ResultGet)
 async def get_result(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     result_id: UUID | str,
     db: Session = Depends(get_db),
 ) -> ResultGet:
@@ -62,7 +62,7 @@ async def get_result(
 @result_router.post("", response_model=ResultGet, status_code=status.HTTP_201_CREATED)
 async def create_result(
     payload: ResultCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> ResultGet:
     return await create_db(
@@ -79,7 +79,7 @@ async def create_result(
 async def update_result(
     result_id: UUID | str,
     payload: ResultUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> ResultGet:
     return update_db(
@@ -96,7 +96,7 @@ async def update_result(
 @result_router.delete("/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(
     result_id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     delete_db(permissions, db, result_id, ResultInterface.model)
@@ -104,7 +104,7 @@ async def delete_result(
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
 async def result_status(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     result_id: UUID | str,
     db: Session = Depends(get_db),
 ):

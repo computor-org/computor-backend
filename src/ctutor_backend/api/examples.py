@@ -35,7 +35,7 @@ from ..interface.example import (
     ExampleQuery,
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
-from ..permissions.auth import get_current_permissions
+from ..permissions.auth import get_current_principal
 from ..api.crud import get_id_db, list_db
 from ..api.exceptions import (
     NotFoundException,
@@ -246,7 +246,7 @@ def _encode_for_response(filename: str, data: bytes, content_type: Optional[str]
 async def list_examples(
     response: Response,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     params: ExampleQuery = Depends(),
     redis_client=Depends(get_redis_client),
 ):
@@ -268,7 +268,7 @@ async def list_examples(
 async def get_example(
     example_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
     """Get a specific example."""
@@ -284,7 +284,7 @@ async def create_version(
     example_id: str,
     version: ExampleVersionCreate,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Create a new version for an example."""
     # Check permissions
@@ -326,7 +326,7 @@ async def list_versions(
     example_id: str,
     params: ExampleVersionQuery = Depends(),
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
     """List all versions of an example."""
@@ -359,7 +359,7 @@ async def list_versions(
 async def get_version(
     version_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
     """Get a specific version."""
@@ -398,7 +398,7 @@ async def add_dependency(
     example_id: str,
     dependency: ExampleDependencyCreate,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Add a dependency to an example."""
     # Check permissions
@@ -441,7 +441,7 @@ async def add_dependency(
 async def list_dependencies(
     example_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """List all dependencies of an example."""
     # Check permissions
@@ -460,7 +460,7 @@ async def list_dependencies(
 async def remove_dependency(
     dependency_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Remove a dependency."""
     # Check permissions
@@ -496,7 +496,7 @@ async def remove_dependency(
 async def upload_example(
     request: ExampleUploadRequest,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
     """Upload an example to storage (MinIO)."""
@@ -737,7 +737,7 @@ async def download_example_latest(
     example_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
     """Download the latest version of an example from storage, optionally with all dependencies."""
@@ -798,7 +798,7 @@ async def download_example_version(
     version_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
     """Download a specific example version from storage, optionally with all dependencies."""
@@ -948,7 +948,7 @@ async def download_example_version(
 async def get_example_dependencies(
     example_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Get all dependencies for an example with version constraints."""
     # Check permissions
@@ -973,7 +973,7 @@ async def create_example_dependency(
     example_id: str,
     dependency_data: ExampleDependencyCreate,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Create a new dependency relationship between examples."""
     # Check permissions
@@ -1018,7 +1018,7 @@ async def delete_example_dependency(
     example_id: str,
     dependency_id: str,
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
 ):
     """Delete a dependency relationship between examples."""
     # Check permissions

@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.api.sso import sso_router
 from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig
 from sqlalchemy.orm import Session
@@ -213,7 +213,7 @@ app.include_router(
     course_execution_backend_router,
     prefix="/course-execution-backends",
     tags=["course execution backends"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 CrudRouter(CourseContentKindInterface).register_routes(app)
@@ -227,35 +227,35 @@ app.include_router(
     system_router,
     prefix="/system",
     tags=["system"],
-    dependencies=[Depends(get_current_permissions),Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
 app.include_router(
     tests_router,
     prefix="/tests",
     tags=["tests"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(
     student_router,
     prefix="/students",
     tags=["students"],
-    dependencies=[Depends(get_current_permissions),Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
 app.include_router(
     tutor_router,
     prefix="/tutors",
     tags=["tutors"],
-    dependencies=[Depends(get_current_permissions),Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
 app.include_router(
     lecturer_router,
     prefix="/lecturers",
     tags=["lecturers"],
-    dependencies=[Depends(get_current_permissions),Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
 app.include_router(
@@ -297,7 +297,7 @@ app.include_router(
 app.include_router(
     tasks_router,
     tags=["tasks"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(
@@ -308,39 +308,39 @@ app.include_router(
 app.include_router(
     storage_router,
     tags=["storage"],
-    dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
 )
 
 app.include_router(
     examples_router,
     tags=["examples"],
-    dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+    dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
 )
 
 app.include_router(
     extensions_router,
     tags=["extensions"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(
     submissions_router,
     tags=["submissions"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(
     course_member_comments_router,
     prefix="/course-member-comments",
     tags=["course member comments"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(
     messages_router,
     prefix="/messages",
     tags=["messages"],
-    dependencies=[Depends(get_current_permissions)]
+    dependencies=[Depends(get_current_principal)]
 )
 
 

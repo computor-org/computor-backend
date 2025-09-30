@@ -183,7 +183,7 @@ def auth_type_switch(request: Request) -> GLPAuthConfig | HTTPBasicCredentials |
 
     raise UnauthorizedException()
 
-async def get_current_permissions(credentials: Annotated[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | dict, Depends(auth_type_switch)]):
+async def get_current_principal(credentials: Annotated[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | dict, Depends(auth_type_switch)]):
 
     if credentials.__class__ == HTTPBasicCredentials:
         return get_permissions_from_basic_auth(credentials)

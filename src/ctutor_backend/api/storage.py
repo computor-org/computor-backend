@@ -23,7 +23,7 @@ from ..interface.storage import (
     StorageInterface
 )
 from ..services.storage_service import get_storage_service
-from ..permissions.auth import get_current_permissions
+from ..permissions.auth import get_current_principal
 from ..api.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from ..redis_cache import get_redis_client
 from ..storage_security import sanitize_filename, perform_full_file_validation
@@ -41,7 +41,7 @@ async def upload_file(
     bucket_name: Optional[str] = Form(None),
     metadata: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Upload a file to storage with security validation"""
@@ -123,7 +123,7 @@ async def upload_file(
 async def download_file(
     object_key: str,
     bucket_name: Optional[str] = Query(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Download a file from storage"""
@@ -152,7 +152,7 @@ async def download_file(
 @storage_router.get("/objects", response_model=List[StorageObjectList])
 async def list_objects(
     query: StorageObjectQuery = Depends(),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service),
     redis_client = Depends(get_redis_client)
 ):
@@ -208,7 +208,7 @@ async def list_objects(
 async def get_object_info(
     object_key: str,
     bucket_name: Optional[str] = Query(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Get metadata for a specific object"""
@@ -247,7 +247,7 @@ async def get_object_info(
 async def delete_object(
     object_key: str,
     bucket_name: Optional[str] = Query(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service),
     redis_client = Depends(get_redis_client)
 ):
@@ -276,7 +276,7 @@ async def copy_object(
     source_bucket: Optional[str] = Form(None),
     dest_bucket: Optional[str] = Form(None),
     metadata: Optional[str] = Form(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Copy an object within or between buckets"""
@@ -311,7 +311,7 @@ async def copy_object(
 @storage_router.post("/presigned-url", response_model=PresignedUrlResponse)
 async def generate_presigned_url(
     request: PresignedUrlRequest,
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Generate a presigned URL for direct object access"""
@@ -336,7 +336,7 @@ async def generate_presigned_url(
 
 @storage_router.get("/buckets", response_model=List[BucketInfo])
 async def list_buckets(
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """List all available buckets"""
@@ -350,7 +350,7 @@ async def list_buckets(
 @storage_router.post("/buckets", response_model=BucketInfo)
 async def create_bucket(
     bucket: BucketCreate,
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Create a new storage bucket"""
@@ -368,7 +368,7 @@ async def create_bucket(
 async def delete_bucket(
     bucket_name: str,
     force: bool = Query(False, description="Force delete even if bucket is not empty"),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):
     """Delete a storage bucket"""
@@ -384,7 +384,7 @@ async def delete_bucket(
 @storage_router.get("/buckets/{bucket_name}/stats", response_model=StorageUsageStats)
 async def get_bucket_stats(
     bucket_name: str,
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service),
     redis_client = Depends(get_redis_client)
 ):

@@ -32,7 +32,7 @@ from ctutor_backend.model.course import (
 from ctutor_backend.services.storage_service import get_storage_service
 from ctutor_backend.storage_security import perform_full_file_validation, sanitize_filename
 from ctutor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.artifacts import (
@@ -110,7 +110,7 @@ def _sanitize_archive_path(name: str) -> str:
 @submissions_router.post("/artifacts", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
@@ -286,7 +286,7 @@ async def upload_submission(
 @submissions_router.get("/artifacts", response_model=List[SubmissionArtifactList])
 async def list_submission_artifacts(
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     submission_group_id: Optional[str] = None,
     course_content_id: Optional[str] = None,
     limit: int = 100,
@@ -352,7 +352,7 @@ async def list_submission_artifacts(
 @submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def get_submission_artifact(
     artifact_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Get details of a specific submission artifact."""
@@ -408,7 +408,7 @@ async def get_submission_artifact(
 async def update_submission_artifact(
     artifact_id: str,
     update_data: SubmissionArtifactUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Update a submission artifact (e.g., change submit status)."""
@@ -477,7 +477,7 @@ async def update_submission_artifact(
 async def create_artifact_grade(
     artifact_id: str,
     grade_data: SubmissionGradeCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Create a grade for an artifact. Requires instructor/tutor permissions."""
@@ -530,7 +530,7 @@ async def create_artifact_grade(
 async def list_artifact_grades(
     artifact_id: str,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """List all grades for an artifact. Students can view their own grades, tutors/instructors can view all."""
@@ -584,7 +584,7 @@ async def list_artifact_grades(
 async def update_artifact_grade(
     grade_id: str,
     update_data: SubmissionGradeUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
@@ -622,7 +622,7 @@ async def update_artifact_grade(
 @submissions_router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_grade(
     grade_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Delete a grade. Only the grader or an admin can delete."""
@@ -661,7 +661,7 @@ async def delete_artifact_grade(
 async def create_artifact_review(
     artifact_id: str,
     review_data: SubmissionReviewCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Create a review for an artifact."""
@@ -710,7 +710,7 @@ async def create_artifact_review(
 async def list_artifact_reviews(
     artifact_id: str,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """List all reviews for an artifact. Any course member can view reviews."""
@@ -754,7 +754,7 @@ async def list_artifact_reviews(
 async def update_artifact_review(
     review_id: str,
     update_data: SubmissionReviewUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Update an existing review. Only the reviewer can update their own review."""
@@ -786,7 +786,7 @@ async def update_artifact_review(
 @submissions_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_review(
     review_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Delete a review. Only the reviewer or an admin can delete."""
@@ -825,7 +825,7 @@ async def delete_artifact_review(
 async def create_test_result(
     artifact_id: str,
     test_data: ResultCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Create a test result for an artifact. Checks for test limitations."""
@@ -928,7 +928,7 @@ async def create_test_result(
 async def list_artifact_test_results(
     artifact_id: str,
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """List all test results for an artifact. Students see their own, tutors/instructors see all."""
@@ -980,7 +980,7 @@ async def list_artifact_test_results(
 async def update_test_result(
     test_id: str,
     update_data: ResultUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""

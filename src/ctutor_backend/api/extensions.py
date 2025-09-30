@@ -35,7 +35,7 @@ from ..interface.extensions import (
     ExtensionVersionYankRequest,
 )
 from ..model.extension import Extension, ExtensionVersion
-from ..permissions.auth import get_current_permissions
+from ..permissions.auth import get_current_principal
 from ..permissions.principal import Principal
 from ..services.storage_service import get_storage_service
 from ..services.vsix_utils import VsixManifestError, parse_vsix_metadata
@@ -194,7 +194,7 @@ async def publish_extension_version(
     file: UploadFile = File(...),
     display_name: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
     storage_service=Depends(get_storage_service),
 ):
@@ -344,7 +344,7 @@ async def publish_extension_version(
 async def download_extension(
     extension_identity: str,
     version: Optional[str] = Query(None, description="Version specifier or 'latest'"),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
     storage_service=Depends(get_storage_service),
 ):
@@ -382,7 +382,7 @@ async def list_extension_versions(
     include_yanked: bool = Query(False),
     limit: int = Query(50, ge=1, le=100),
     cursor: Optional[str] = Query(None),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     # if not permissions.permitted("extension", "list"):
@@ -418,7 +418,7 @@ async def list_extension_versions(
 async def list_extensions(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     # if not permissions.permitted("extension", "list"):
@@ -441,7 +441,7 @@ async def list_extensions(
 )
 async def get_extension_metadata(
     extension_identity: str,
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     # if not permissions.permitted("extension", "get"):
@@ -496,7 +496,7 @@ async def update_extension_version(
     extension_identity: str,
     version: str,
     payload: ExtensionVersionYankRequest,
-    permissions: Principal = Depends(get_current_permissions),
+    permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     if not permissions.permitted("extension", "update"):

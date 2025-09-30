@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from ctutor_backend.permissions.principal import Principal, Claims
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 
 
@@ -198,7 +198,7 @@ def create_test_app(user: Principal, mock_db: Session) -> FastAPI:
     """Create a test FastAPI app with mocked dependencies"""
     from ctutor_backend.server import app
     
-    app.dependency_overrides[get_current_permissions] = lambda: user
+    app.dependency_overrides[get_current_principal] = lambda: user
     app.dependency_overrides[get_db] = lambda: mock_db
     
     return app

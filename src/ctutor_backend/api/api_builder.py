@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from ctutor_backend.api.crud import archive_db, create_db, filter_db, get_id_db, list_db, update_db, delete_db
 from typing import Annotated, Optional
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.base import EntityInterface
@@ -34,7 +34,7 @@ class CrudRouter:
         self.on_archived = []
 
     def create(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], entity: self.dto.create, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], entity: self.dto.create, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
             entity_created = await create_db(permissions, db, entity, self.dto.model, self.dto.get, self.dto.post_create)
 
             # Clear related cache entries
@@ -47,7 +47,7 @@ class CrudRouter:
         return route
     
     def get(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
             # Check cache first
             # cache_key = f"{self.dto.model.__tablename__}:get:{permissions.user_id}:{id}"
             # cached_result = await cache.get(cache_key)
@@ -64,7 +64,7 @@ class CrudRouter:
         return route
 
     def list(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], cache: Annotated[BaseCache, Depends(get_redis_client)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], cache: Annotated[BaseCache, Depends(get_redis_client)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             # Generate cache key based on params and user permissions
             # import hashlib
             # params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
@@ -90,7 +90,7 @@ class CrudRouter:
         return route
     
     def update(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, entity: self.dto.update, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, entity: self.dto.update, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
             entity_updated = update_db(permissions, db, id, entity, self.dto.model, self.dto.get, None, self.dto.post_update)
 
             # Clear related cache entries
@@ -103,7 +103,7 @@ class CrudRouter:
         return route
 
     def delete(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)):
+        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)):
 
             entity_deleted = None
             if len(self.on_deleted) > 0:
@@ -123,7 +123,7 @@ class CrudRouter:
     
     def archive(self):  
         if hasattr(self.dto.model, "archived_at"):   
-            async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, db: Session = Depends(get_db)):
+            async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, db: Session = Depends(get_db)):
 
                 if len(self.on_archived) > 0:
 
@@ -138,7 +138,7 @@ class CrudRouter:
             return None
 
     def filter(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], filters: Optional[dict] = None, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], filters: Optional[dict] = None, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             return await filter_db(permissions, db, self.dto.model, params, self.dto.search, filters)
         return route
 
@@ -147,24 +147,24 @@ class CrudRouter:
         scope_name = self.path.replace("/","").replace("_"," ")
 
         self.router.add_api_route("", self.create(), methods=["POST"], 
-                    status_code=status.HTTP_201_CREATED, name=f"{self.create.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_201_CREATED, name=f"{self.create.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.get(), methods=["GET"], 
-                    status_code=status.HTTP_200_OK, name=f"{self.get.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_200_OK, name=f"{self.get.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         self.router.add_api_route("", self.list(), methods=["GET"], 
-                    status_code=status.HTTP_200_OK, name=f"{self.list.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_200_OK, name=f"{self.list.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.update(), methods=["PATCH"], 
-                    status_code=status.HTTP_200_OK, name=f"{self.update.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_200_OK, name=f"{self.update.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.delete(), methods=["DELETE"], 
-                    status_code=status.HTTP_204_NO_CONTENT, name=f"{self.delete.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_204_NO_CONTENT, name=f"{self.delete.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         archive_fun = self.archive()
         
         if archive_fun != None:
             self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"], 
-                status_code=status.HTTP_204_NO_CONTENT, name=f"{archive_fun.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_permissions)])
+                status_code=status.HTTP_204_NO_CONTENT, name=f"{archive_fun.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         # self.router.add_api_route("-filtered", self.filter(), methods=["GET"],
-        #         status_code=status.HTTP_200_OK, name=f"{self.filter.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+        #         status_code=status.HTTP_200_OK, name=f"{self.filter.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
 
         app.include_router(
             self.router,
@@ -218,13 +218,13 @@ class LookUpRouter:
         self.router = APIRouter()
         
     def get(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], id: str, db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], id: str, db: Session = Depends(get_db)) -> self.dto.get:
             return await get_id_db(permissions, db, id, self.dto)
         return route
 
     
     def list(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             list_result, total = await list_db(permissions, db, params, self.dto)
             response.headers["X-Total-Count"] = str(total)
             return list_result
@@ -235,9 +235,9 @@ class LookUpRouter:
         scope_name = self.path.replace("/","").replace("_"," ")
 
         self.router.add_api_route(f"/{{{LookUpRouter.id_type}}}", self.get(), methods=["GET"], 
-                    status_code=status.HTTP_200_OK, name=f"{self.get.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_200_OK, name=f"{self.get.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         self.router.add_api_route("", self.list(), methods=["GET"], 
-                    status_code=status.HTTP_200_OK, name=f"{self.list.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_permissions)])
+                    status_code=status.HTTP_200_OK, name=f"{self.list.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
         
         app.include_router(
             self.router,

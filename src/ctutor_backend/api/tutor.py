@@ -12,7 +12,7 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeList
 from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface, CourseMemberProperties, CourseMemberQuery
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import allowed_course_role_ids
 from ctutor_backend.api.exceptions import BadRequestException, ForbiddenException, InternalServerException, NotFoundException
@@ -59,7 +59,7 @@ async def set_cached_data(course_id: str, data: dict):
 tutor_router = APIRouter()
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
-def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
     
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
@@ -70,7 +70,7 @@ def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: U
     return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
-def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
@@ -92,7 +92,7 @@ def tutor_update_course_contents(
     course_content_id: UUID | str,
     course_member_id: UUID | str,
     grade_data: TutorGradeCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     
@@ -200,7 +200,7 @@ def tutor_update_course_contents(
     return grade_response
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
-async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course = check_course_permissions(permissions,Course,"_tutor",db).filter(Course.id == course_id).first()
 
@@ -220,7 +220,7 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
             )
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
-def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     query = check_course_permissions(permissions,Course,"_tutor",db)
 
@@ -244,7 +244,7 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
     return response_list
 
 # @tutor_router.get("/courses/{course_id}/current", response_model=CourseMemberGet)
-# async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+# async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
 #     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(Course.id == course_id, CourseMember.user_id == permissions.get_user_id_or_throw()).first()
 
@@ -254,7 +254,7 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
 #     return CourseMemberGet(**course_member.__dict__)
 
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
-def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first()
 
@@ -286,7 +286,7 @@ def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotate
     return tutor_course_member
 
 @tutor_router.get("/course-members", response_model=list[TutorCourseMemberList])
-def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseMemberQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseMemberQuery = Depends(), db: Session = Depends(get_db)):
 
     subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Depends
 from typing import Dict, List, Any, Optional, Annotated
 
 from ctutor_backend.api.exceptions import ForbiddenException
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.tasks import (
     get_task_executor,
@@ -21,7 +21,7 @@ tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 @tasks_router.get("", response_model=Dict[str, Any])
 async def list_tasks(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tasks to return"),
     offset: int = Query(0, ge=0, description="Number of tasks to skip"),
     status: Optional[str] = Query(None, description="Filter by task status (PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED)")
@@ -65,7 +65,7 @@ async def list_tasks(
 
 @tasks_router.post("/submit", response_model=Dict[str, str])
 async def submit_task(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     submission: TaskSubmission
 ):
     """
@@ -110,7 +110,7 @@ async def submit_task(
 
 @tasks_router.get("/{task_id}", response_model=TaskInfo)
 async def get_task(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     task_id: str
 ):
     """
@@ -136,7 +136,7 @@ async def get_task(
 
 @tasks_router.get("/{task_id}/status", response_model=TaskInfo)
 async def get_task_status(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     task_id: str
 ):
     """
@@ -176,7 +176,7 @@ async def get_task_status(
 
 @tasks_router.get("/{task_id}/result", response_model=TaskResult)
 async def get_task_result(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     task_id: str
 ):
     """
@@ -216,7 +216,7 @@ async def get_task_result(
 
 @tasks_router.delete("/{task_id}/cancel")
 async def cancel_task(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     task_id: str
 ):
     """
@@ -262,7 +262,7 @@ async def cancel_task(
 
 @tasks_router.delete("/{task_id}")
 async def delete_task(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     task_id: str
 ):
     """
@@ -321,7 +321,7 @@ async def delete_task(
 
 @tasks_router.get("/types", response_model=List[str])
 async def list_task_types(
-    permissions: Annotated[Principal, Depends(get_current_permissions)]
+    permissions: Annotated[Principal, Depends(get_current_principal)]
 ):
     """
     Get list of available task types.
@@ -350,7 +350,7 @@ async def list_task_types(
 
 @tasks_router.get("/workers/status", response_model=Dict[str, Any])
 async def get_worker_status(
-    permissions: Annotated[Principal, Depends(get_current_permissions)]
+    permissions: Annotated[Principal, Depends(get_current_principal)]
 ):
     """
     Get Temporal worker and queue status information.

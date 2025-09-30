@@ -268,7 +268,7 @@ async def get_current_principal(
 ) -> Principal:
     """
     Main dependency for getting the current authenticated principal.
-    This replaces get_current_permissions from the old system.
+    This replaces get_current_principal from the old system.
     """
     
     with next(get_db()) as db:
@@ -305,10 +305,6 @@ async def get_current_principal(
         
         else:
             raise UnauthorizedException("Unknown authentication type")
-
-
-# Backward compatibility aliases
-get_current_permissions = get_current_principal
 
 
 class HeaderAuthCredentials(BaseModel):

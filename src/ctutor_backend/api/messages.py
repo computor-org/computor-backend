@@ -8,7 +8,7 @@ from ctutor_backend.api.crud import get_id_db, list_db, update_db, delete_db, cr
 from ctutor_backend.api.exceptions import BadRequestException
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.messages import MessageInterface, MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.message import MessageRead
@@ -19,7 +19,7 @@ messages_router = APIRouter()
 
 @messages_router.post("", response_model=MessageGet, status_code=status.HTTP_201_CREATED)
 async def create_message(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     payload: MessageCreate,
     db: Session = Depends(get_db),
 ):
@@ -49,7 +49,7 @@ async def create_message(
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
     id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     message = await get_id_db(permissions, db, id, MessageInterface)
@@ -72,7 +72,7 @@ async def get_message(
 
 @messages_router.get("", response_model=list[MessageList])
 async def list_messages(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     params: MessageQuery = Depends(),
     db: Session = Depends(get_db),
@@ -104,7 +104,7 @@ async def list_messages(
 async def update_message(
     id: UUID | str,
     payload: MessageUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     return update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
@@ -113,7 +113,7 @@ async def update_message(
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
     id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     delete_db(permissions, db, id, MessageInterface.model)
@@ -123,7 +123,7 @@ async def delete_message(
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_read(
     id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     # Ensure user has visibility on the message
@@ -144,7 +144,7 @@ async def mark_message_read(
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_unread(
     id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     # Ensure user has visibility on the message

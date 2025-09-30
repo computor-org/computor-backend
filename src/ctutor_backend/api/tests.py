@@ -10,7 +10,7 @@ from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.database import get_db
@@ -43,7 +43,7 @@ tests_router = APIRouter()
 @tests_router.post("", response_model=ResultList)
 async def create_test_run(
     test_create: TestCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """
@@ -307,7 +307,7 @@ async def create_test_run(
 @tests_router.get("/status/{result_id}")
 async def get_test_status(
     result_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """Get the current status of a test execution.

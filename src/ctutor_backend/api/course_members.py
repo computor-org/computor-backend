@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, aliased, joinedload
 
 from ctutor_backend.api.exceptions import NotFoundException
 # from ctutor_backend.api.exceptions import BadRequestException, InternalServerException
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 # from ctutor_backend.api.queries import latest_result_subquery, results_count_subquery
@@ -35,7 +35,7 @@ course_member_router = CrudRouter(CourseMemberInterface)
 
 
 # @course_member_router.router.get("/{course_member_id}/protocol", response_model=dict)
-# async def get_protocol(permissions: Annotated[Principal, Depends(get_current_permissions)], course_member_id: UUID | str, db: Session = Depends(get_db)):
+# async def get_protocol(permissions: Annotated[Principal, Depends(get_current_principal)], course_member_id: UUID | str, db: Session = Depends(get_db)):
 
 #     if check_course_permissions(permissions,CourseMember,"_maintainer",db).filter(CourseMember.id == course_member_id).first() == None:
 #         raise NotFoundException()
@@ -296,7 +296,7 @@ course_member_router = CrudRouter(CourseMemberInterface)
 #     return protocol
 
 # @course_member_router.router.get("/{course_member_id}/protocol2", response_model=dict)
-# async def get_protocol_2(permissions: Annotated[Principal, Depends(get_current_permissions)], course_member_id: UUID | str, db: Session = Depends(get_db)):
+# async def get_protocol_2(permissions: Annotated[Principal, Depends(get_current_principal)], course_member_id: UUID | str, db: Session = Depends(get_db)):
     
 #     if check_course_permissions(permissions,CourseMember,"_maintainer",db).filter(CourseMember.id == course_member_id).first() == None:
 #         raise NotFoundException()

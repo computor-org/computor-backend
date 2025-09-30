@@ -180,7 +180,7 @@ def mock_check_permissions(monkeypatch):
 def test_client_factory(mock_db, mock_check_permissions):
     """Factory fixture for creating test clients with mocked dependencies"""
     from ctutor_backend.server import app
-    from ctutor_backend.permissions.auth import get_current_permissions
+    from ctutor_backend.permissions.auth import get_current_principal
     from ctutor_backend.database import get_db
     
     def _create_test_client(user_type: str) -> TestClient:
@@ -190,14 +190,14 @@ def test_client_factory(mock_db, mock_check_permissions):
         principal = TEST_USERS[user_type]()
         
         # Create override functions
-        def override_get_current_permissions():
+        def override_get_current_principal():
             return principal
         
         def override_get_db():
             yield mock_db
         
         # Apply overrides
-        app.dependency_overrides[get_current_permissions] = override_get_current_permissions
+        app.dependency_overrides[get_current_principal] = override_get_current_principal
         app.dependency_overrides[get_db] = override_get_db
         
         client = TestClient(app)

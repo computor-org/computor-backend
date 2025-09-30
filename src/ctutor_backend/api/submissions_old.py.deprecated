@@ -29,7 +29,7 @@ from ctutor_backend.model.course import (
 )
 from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade, SubmissionReview
 from ctutor_backend.model.result import Result
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.services.storage_service import get_storage_service
@@ -90,7 +90,7 @@ def _sanitize_archive_path(name: str) -> str:
 @submissions_router.get("", response_model=list)
 async def list_submissions(
     response: Response,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     params = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -104,7 +104,7 @@ async def list_submissions(
 @submissions_router.post("", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),

@@ -18,7 +18,7 @@ from sqlalchemy import and_, or_
 
 from pydantic import BaseModel, Field
 
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 
@@ -115,7 +115,7 @@ class CourseContentFileQuery(BaseModel):
 
 @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
 async def get_course_content_meta(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     course_content_id: UUID | str,
     file_query: CourseContentFileQuery = Depends(),
     db: Session = Depends(get_db)
@@ -174,7 +174,7 @@ course_content_router.on_updated.append(event_wrapper)
 async def assign_example_to_content(
     content_id: str,
     request: AssignExampleRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
@@ -384,7 +384,7 @@ async def assign_example_to_content(
 )
 async def unassign_example_from_content(
     content_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
@@ -453,7 +453,7 @@ async def unassign_example_from_content(
 )
 async def get_deployment_status_with_workflow(
     content_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """
@@ -618,7 +618,7 @@ async def get_deployment_status_with_workflow(
 )
 async def get_course_deployment_summary(
     course_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
@@ -703,7 +703,7 @@ async def get_course_deployment_summary(
 )
 async def get_content_deployment(
     content_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """

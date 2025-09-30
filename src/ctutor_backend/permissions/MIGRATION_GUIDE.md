@@ -71,7 +71,7 @@ Old imports:
 ```python
 from ctutor_backend.interface.permissions import Principal, build_claim_actions
 from ctutor_backend.api.permissions import check_permissions
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.api.auth import get_current_principal
 ```
 
 New imports:
@@ -90,7 +90,7 @@ Old pattern:
 ```python
 @router.get("/users")
 async def list_users(
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     query = check_permissions(permissions, User, "list", db)
