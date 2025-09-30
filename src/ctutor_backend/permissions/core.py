@@ -52,6 +52,7 @@ from ctutor_backend.model.artifact import (
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
 from ctutor_backend.model.group import Group, GroupClaim, UserGroup
 from ctutor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
+from ctutor_backend.model.language import Language
 
 
 def initialize_permission_handlers():
@@ -82,6 +83,7 @@ def initialize_permission_handlers():
     # Read-only entities
     permission_registry.register(CourseRole, ReadOnlyPermissionHandler(CourseRole))
     permission_registry.register(CourseContentKind, ReadOnlyPermissionHandler(CourseContentKind))
+    permission_registry.register(Language, ReadOnlyPermissionHandler(Language))
     
     # Example entities (read-only for most users)
     permission_registry.register(Example, ReadOnlyPermissionHandler(Example))

@@ -38,16 +38,16 @@ export class MessageClient extends BaseEndpointClient {
   }
 
   /**
-   * Mark Message Read
-   */
-  async markMessageReadMessagesIdReadsPost({ id }: { id: string | string }): Promise<void> {
-    return this.client.post<void>(this.buildPath(id, 'reads'));
-  }
-
-  /**
    * Mark Message Unread
    */
   async markMessageUnreadMessagesIdReadsDelete({ id }: { id: string | string }): Promise<void> {
     return this.client.delete<void>(this.buildPath(id, 'reads'));
+  }
+
+  /**
+   * Mark Message Read
+   */
+  async markMessageReadMessagesIdReadsPost({ id }: { id: string | string }): Promise<void> {
+    return this.client.post<void>(this.buildPath(id, 'reads'));
   }
 }

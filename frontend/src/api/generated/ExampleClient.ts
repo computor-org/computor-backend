@@ -34,75 +34,11 @@ export class ExampleClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Version
-   * Create a new version for an example.
-   */
-  async createVersionExamplesExampleIdVersionsPost({ exampleId, body }: { exampleId: string; body: ExampleVersionCreate }): Promise<ExampleVersionGet> {
-    return this.client.post<ExampleVersionGet>(this.buildPath(exampleId, 'versions'), body);
-  }
-
-  /**
-   * List Versions
-   * List all versions of an example.
-   */
-  async listVersionsExamplesExampleIdVersionsGet({ exampleId, skip, limit, versionTag }: { exampleId: string; skip?: number | null; limit?: number | null; versionTag?: string | null }): Promise<ExampleVersionList[]> {
-    const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
-      version_tag: versionTag,
-    };
-    return this.client.get<ExampleVersionList[]>(this.buildPath(exampleId, 'versions'), { params: queryParams });
-  }
-
-  /**
-   * Get Version
-   * Get a specific version.
-   */
-  async getVersionExamplesVersionsVersionIdGet({ versionId }: { versionId: string }): Promise<ExampleVersionGet> {
-    return this.client.get<ExampleVersionGet>(this.buildPath('versions', versionId));
-  }
-
-  /**
-   * Create Example Dependency
-   * Create a new dependency relationship between examples.
-   */
-  async createExampleDependencyExamplesExampleIdDependenciesPost({ exampleId, body }: { exampleId: string; body: ExampleDependencyCreate }): Promise<ExampleDependencyGet> {
-    return this.client.post<ExampleDependencyGet>(this.buildPath(exampleId, 'dependencies'), body);
-  }
-
-  /**
-   * Get Example Dependencies
-   * Get all dependencies for an example with version constraints.
-   */
-  async getExampleDependenciesExamplesExampleIdDependenciesGet({ exampleId }: { exampleId: string }): Promise<ExampleDependencyGet[]> {
-    return this.client.get<ExampleDependencyGet[]>(this.buildPath(exampleId, 'dependencies'));
-  }
-
-  /**
    * Remove Dependency
    * Remove a dependency.
    */
   async removeDependencyExamplesDependenciesDependencyIdDelete({ dependencyId }: { dependencyId: string }): Promise<void> {
     return this.client.delete<void>(this.buildPath('dependencies', dependencyId));
-  }
-
-  /**
-   * Upload Example
-   * Upload an example to storage (MinIO).
-   */
-  async uploadExampleExamplesUploadPost({ body }: { body: ExampleUploadRequest }): Promise<ExampleVersionGet> {
-    return this.client.post<ExampleVersionGet>(this.buildPath('upload'), body);
-  }
-
-  /**
-   * Download Example Latest
-   * Download the latest version of an example from storage, optionally with all dependencies.
-   */
-  async downloadExampleLatestExamplesExampleIdDownloadGet({ exampleId, withDependencies }: { exampleId: string; withDependencies?: boolean }): Promise<ExampleDownloadResponse> {
-    const queryParams: Record<string, unknown> = {
-      with_dependencies: withDependencies,
-    };
-    return this.client.get<ExampleDownloadResponse>(this.buildPath(exampleId, 'download'), { params: queryParams });
   }
 
   /**
@@ -117,10 +53,74 @@ export class ExampleClient extends BaseEndpointClient {
   }
 
   /**
+   * Upload Example
+   * Upload an example to storage (MinIO).
+   */
+  async uploadExampleExamplesUploadPost({ body }: { body: ExampleUploadRequest }): Promise<ExampleVersionGet> {
+    return this.client.post<ExampleVersionGet>(this.buildPath('upload'), body);
+  }
+
+  /**
+   * Get Version
+   * Get a specific version.
+   */
+  async getVersionExamplesVersionsVersionIdGet({ versionId }: { versionId: string }): Promise<ExampleVersionGet> {
+    return this.client.get<ExampleVersionGet>(this.buildPath('versions', versionId));
+  }
+
+  /**
+   * Get Example Dependencies
+   * Get all dependencies for an example with version constraints.
+   */
+  async getExampleDependenciesExamplesExampleIdDependenciesGet({ exampleId }: { exampleId: string }): Promise<ExampleDependencyGet[]> {
+    return this.client.get<ExampleDependencyGet[]>(this.buildPath(exampleId, 'dependencies'));
+  }
+
+  /**
+   * Create Example Dependency
+   * Create a new dependency relationship between examples.
+   */
+  async createExampleDependencyExamplesExampleIdDependenciesPost({ exampleId, body }: { exampleId: string; body: ExampleDependencyCreate }): Promise<ExampleDependencyGet> {
+    return this.client.post<ExampleDependencyGet>(this.buildPath(exampleId, 'dependencies'), body);
+  }
+
+  /**
    * Delete Example Dependency
    * Delete a dependency relationship between examples.
    */
-  async deleteExampleDependencyExamplesExampleIdDependenciesDependencyIdDelete({ exampleId, dependencyId }: { exampleId: string; dependencyId: string }): Promise<void> {
+  async deleteExampleDependencyExamplesExampleIdDependenciesDependencyIdDelete({ dependencyId, exampleId }: { dependencyId: string; exampleId: string }): Promise<void> {
     return this.client.delete<void>(this.buildPath(exampleId, 'dependencies', dependencyId));
+  }
+
+  /**
+   * Download Example Latest
+   * Download the latest version of an example from storage, optionally with all dependencies.
+   */
+  async downloadExampleLatestExamplesExampleIdDownloadGet({ exampleId, withDependencies }: { exampleId: string; withDependencies?: boolean }): Promise<ExampleDownloadResponse> {
+    const queryParams: Record<string, unknown> = {
+      with_dependencies: withDependencies,
+    };
+    return this.client.get<ExampleDownloadResponse>(this.buildPath(exampleId, 'download'), { params: queryParams });
+  }
+
+  /**
+   * List Versions
+   * List all versions of an example.
+   */
+  async listVersionsExamplesExampleIdVersionsGet({ exampleId, limit, skip, versionTag }: { exampleId: string; limit?: number | null; skip?: number | null; versionTag?: string | null }): Promise<ExampleVersionList[]> {
+    const queryParams: Record<string, unknown> = {
+      limit,
+      skip,
+      version_tag: versionTag,
+    };
+    return this.client.get<ExampleVersionList[]>(this.buildPath(exampleId, 'versions'), { params: queryParams });
+  }
+
+  /**
+   * Create Version
+   * Create a new version for an example.
+   */
+  async createVersionExamplesExampleIdVersionsPost({ exampleId, body }: { exampleId: string; body: ExampleVersionCreate }): Promise<ExampleVersionGet> {
+    return this.client.post<ExampleVersionGet>(this.buildPath(exampleId, 'versions'), body);
   }
 }

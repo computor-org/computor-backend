@@ -13,29 +13,27 @@ export class LecturersClient extends BaseEndpointClient {
   }
 
   /**
-   * Lecturer Get Courses
+   * Lecturer List Course Contents
+   * List course contents with course repository information.
    */
-  async lecturerGetCoursesLecturersCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseGet> {
-    return this.client.get<CourseGet>(this.buildPath('courses', courseId));
-  }
-
-  /**
-   * Lecturer List Courses
-   */
-  async lecturerListCoursesLecturersCoursesGet({ skip, limit, id, title, description, path, courseFamilyId, organizationId, providerUrl, fullPath }: { skip?: number | null; limit?: number | null; id?: string | null; title?: string | null; description?: string | null; path?: string | null; courseFamilyId?: string | null; organizationId?: string | null; providerUrl?: string | null; fullPath?: string | null }): Promise<CourseList[]> {
+  async lecturerListCourseContentsLecturersCourseContentsGet({ archived, courseContentTypeId, courseId, executionBackendId, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, path, position, skip, title }: { archived?: boolean | null; courseContentTypeId?: string | null; courseId?: string | null; executionBackendId?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; path?: string | null; position?: number | null; skip?: number | null; title?: string | null }): Promise<CourseContentLecturerList[]> {
     const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
+      archived,
+      course_content_type_id: courseContentTypeId,
+      course_id: courseId,
+      execution_backend_id: executionBackendId,
+      has_deployment: hasDeployment,
       id,
-      title,
-      description,
+      limit,
+      max_group_size: maxGroupSize,
+      max_submissions: maxSubmissions,
+      max_test_runs: maxTestRuns,
       path,
-      course_family_id: courseFamilyId,
-      organization_id: organizationId,
-      provider_url: providerUrl,
-      full_path: fullPath,
+      position,
+      skip,
+      title,
     };
-    return this.client.get<CourseList[]>(this.buildPath('courses'), { params: queryParams });
+    return this.client.get<CourseContentLecturerList[]>(this.buildPath('course-contents'), { params: queryParams });
   }
 
   /**
@@ -47,26 +45,28 @@ export class LecturersClient extends BaseEndpointClient {
   }
 
   /**
-   * Lecturer List Course Contents
-   * List course contents with course repository information.
+   * Lecturer List Courses
    */
-  async lecturerListCourseContentsLecturersCourseContentsGet({ skip, limit, id, title, path, courseId, courseContentTypeId, archived, position, maxGroupSize, maxTestRuns, maxSubmissions, executionBackendId, hasDeployment }: { skip?: number | null; limit?: number | null; id?: string | null; title?: string | null; path?: string | null; courseId?: string | null; courseContentTypeId?: string | null; archived?: boolean | null; position?: number | null; maxGroupSize?: number | null; maxTestRuns?: number | null; maxSubmissions?: number | null; executionBackendId?: string | null; hasDeployment?: boolean | null }): Promise<CourseContentLecturerList[]> {
+  async lecturerListCoursesLecturersCoursesGet({ courseFamilyId, description, fullPath, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
+      course_family_id: courseFamilyId,
+      description,
+      full_path: fullPath,
       id,
-      title,
+      limit,
+      organization_id: organizationId,
       path,
-      course_id: courseId,
-      course_content_type_id: courseContentTypeId,
-      archived,
-      position,
-      max_group_size: maxGroupSize,
-      max_test_runs: maxTestRuns,
-      max_submissions: maxSubmissions,
-      execution_backend_id: executionBackendId,
-      has_deployment: hasDeployment,
+      provider_url: providerUrl,
+      skip,
+      title,
     };
-    return this.client.get<CourseContentLecturerList[]>(this.buildPath('course-contents'), { params: queryParams });
+    return this.client.get<CourseList[]>(this.buildPath('courses'), { params: queryParams });
+  }
+
+  /**
+   * Lecturer Get Courses
+   */
+  async lecturerGetCoursesLecturersCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseGet> {
+    return this.client.get<CourseGet>(this.buildPath('courses', courseId));
   }
 }

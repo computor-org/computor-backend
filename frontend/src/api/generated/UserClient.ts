@@ -21,6 +21,20 @@ export class UserClient extends BaseEndpointClient {
   }
 
   /**
+   * Register Current User Course Account
+   */
+  async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
+    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
+  }
+
+  /**
+   * Validate Current User Course
+   */
+  async validateCurrentUserCourseUserCoursesCourseIdValidatePost({ courseId, body }: { courseId: string | string; body: CourseMemberValidationRequest }): Promise<CourseMemberReadinessStatus> {
+    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'validate'), body);
+  }
+
+  /**
    * Set User Password
    */
   async setUserPasswordUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
@@ -33,19 +47,5 @@ export class UserClient extends BaseEndpointClient {
    */
   async getCourseViewsForCurrentUserUserViewsGet(): Promise<string[]> {
     return this.client.get<string[]>(this.buildPath('views'));
-  }
-
-  /**
-   * Validate Current User Course
-   */
-  async validateCurrentUserCourseUserCoursesCourseIdValidatePost({ courseId, body }: { courseId: string | string; body: CourseMemberValidationRequest }): Promise<CourseMemberReadinessStatus> {
-    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'validate'), body);
-  }
-
-  /**
-   * Register Current User Course Account
-   */
-  async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
-    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
   }
 }

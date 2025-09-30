@@ -13,6 +13,53 @@ export class TutorsClient extends BaseEndpointClient {
   }
 
   /**
+   * Tutor List Course Members
+   */
+  async tutorListCourseMembersTutorsCourseMembersGet({ courseGroupId, courseId, courseRoleId, familyName, givenName, id, limit, skip, userId }: { courseGroupId?: string | null; courseId?: string | null; courseRoleId?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; limit?: number | null; skip?: number | null; userId?: string | null }): Promise<TutorCourseMemberList[]> {
+    const queryParams: Record<string, unknown> = {
+      course_group_id: courseGroupId,
+      course_id: courseId,
+      course_role_id: courseRoleId,
+      family_name: familyName,
+      given_name: givenName,
+      id,
+      limit,
+      skip,
+      user_id: userId,
+    };
+    return this.client.get<TutorCourseMemberList[]>(this.buildPath('course-members'), { params: queryParams });
+  }
+
+  /**
+   * Tutor Get Course Members
+   */
+  async tutorGetCourseMembersTutorsCourseMembersCourseMemberIdGet({ courseMemberId }: { courseMemberId: string | string }): Promise<TutorCourseMemberGet> {
+    return this.client.get<TutorCourseMemberGet>(this.buildPath('course-members', courseMemberId));
+  }
+
+  /**
+   * Tutor List Course Contents
+   */
+  async tutorListCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsGet({ courseMemberId, ascendants, courseContentTypeId, courseId, descendants, directory, id, limit, nlevel, path, project, providerUrl, skip, title }: { courseMemberId: string | string; ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; id?: string | null; limit?: number | null; nlevel?: number | null; path?: string | null; project?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseContentStudentList[]> {
+    const queryParams: Record<string, unknown> = {
+      ascendants,
+      course_content_type_id: courseContentTypeId,
+      course_id: courseId,
+      descendants,
+      directory,
+      id,
+      limit,
+      nlevel,
+      path,
+      project,
+      provider_url: providerUrl,
+      skip,
+      title,
+    };
+    return this.client.get<CourseContentStudentList[]>(this.buildPath('course-members', courseMemberId, 'course-contents'), { params: queryParams });
+  }
+
+  /**
    * Tutor Get Course Contents
    */
   async tutorGetCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet({ courseContentId, courseMemberId }: { courseContentId: string | string; courseMemberId: string | string }): Promise<CourseContentStudentGet> {
@@ -27,25 +74,23 @@ export class TutorsClient extends BaseEndpointClient {
   }
 
   /**
-   * Tutor List Course Contents
+   * Tutor List Courses
    */
-  async tutorListCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsGet({ courseMemberId, skip, limit, id, title, path, courseId, courseContentTypeId, directory, project, providerUrl, nlevel, descendants, ascendants }: { courseMemberId: string | string; skip?: number | null; limit?: number | null; id?: string | null; title?: string | null; path?: string | null; courseId?: string | null; courseContentTypeId?: string | null; directory?: string | null; project?: string | null; providerUrl?: string | null; nlevel?: number | null; descendants?: string | null; ascendants?: string | null }): Promise<CourseContentStudentList[]> {
+  async tutorListCoursesTutorsCoursesGet({ courseFamilyId, description, fullPath, fullPathStudent, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; fullPathStudent?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseTutorList[]> {
     const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
+      course_family_id: courseFamilyId,
+      description,
+      full_path: fullPath,
+      full_path_student: fullPathStudent,
       id,
-      title,
+      limit,
+      organization_id: organizationId,
       path,
-      course_id: courseId,
-      course_content_type_id: courseContentTypeId,
-      directory,
-      project,
       provider_url: providerUrl,
-      nlevel,
-      descendants,
-      ascendants,
+      skip,
+      title,
     };
-    return this.client.get<CourseContentStudentList[]>(this.buildPath('course-members', courseMemberId, 'course-contents'), { params: queryParams });
+    return this.client.get<CourseTutorList[]>(this.buildPath('courses'), { params: queryParams });
   }
 
   /**
@@ -53,50 +98,5 @@ export class TutorsClient extends BaseEndpointClient {
    */
   async tutorGetCoursesTutorsCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseTutorGet> {
     return this.client.get<CourseTutorGet>(this.buildPath('courses', courseId));
-  }
-
-  /**
-   * Tutor List Courses
-   */
-  async tutorListCoursesTutorsCoursesGet({ skip, limit, id, title, description, path, courseFamilyId, organizationId, providerUrl, fullPath, fullPathStudent }: { skip?: number | null; limit?: number | null; id?: string | null; title?: string | null; description?: string | null; path?: string | null; courseFamilyId?: string | null; organizationId?: string | null; providerUrl?: string | null; fullPath?: string | null; fullPathStudent?: string | null }): Promise<CourseTutorList[]> {
-    const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
-      id,
-      title,
-      description,
-      path,
-      course_family_id: courseFamilyId,
-      organization_id: organizationId,
-      provider_url: providerUrl,
-      full_path: fullPath,
-      full_path_student: fullPathStudent,
-    };
-    return this.client.get<CourseTutorList[]>(this.buildPath('courses'), { params: queryParams });
-  }
-
-  /**
-   * Tutor Get Course Members
-   */
-  async tutorGetCourseMembersTutorsCourseMembersCourseMemberIdGet({ courseMemberId }: { courseMemberId: string | string }): Promise<TutorCourseMemberGet> {
-    return this.client.get<TutorCourseMemberGet>(this.buildPath('course-members', courseMemberId));
-  }
-
-  /**
-   * Tutor List Course Members
-   */
-  async tutorListCourseMembersTutorsCourseMembersGet({ skip, limit, id, userId, courseId, courseGroupId, courseRoleId, givenName, familyName }: { skip?: number | null; limit?: number | null; id?: string | null; userId?: string | null; courseId?: string | null; courseGroupId?: string | null; courseRoleId?: string | null; givenName?: string | null; familyName?: string | null }): Promise<TutorCourseMemberList[]> {
-    const queryParams: Record<string, unknown> = {
-      skip,
-      limit,
-      id,
-      user_id: userId,
-      course_id: courseId,
-      course_group_id: courseGroupId,
-      course_role_id: courseRoleId,
-      given_name: givenName,
-      family_name: familyName,
-    };
-    return this.client.get<TutorCourseMemberList[]>(this.buildPath('course-members'), { params: queryParams });
   }
 }

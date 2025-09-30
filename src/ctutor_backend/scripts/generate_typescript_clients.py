@@ -152,7 +152,8 @@ class TypeScriptClientGenerator:
         seen: Set[type] = set()
 
         for module in self._iter_interface_modules():
-            for attr in module.__dict__.values():
+            # Sort module attributes for deterministic iteration
+            for attr in sorted(module.__dict__.values(), key=lambda x: getattr(x, '__name__', str(x))):
                 if not inspect.isclass(attr):
                     continue
 
@@ -569,13 +570,15 @@ class TypeScriptClientGenerator:
         paths = schema.get('paths', {})
         custom_clients: Dict[str, InterfaceMetadata] = {}
 
-        for raw_path, path_item in paths.items():
+        # Sort paths for deterministic output
+        for raw_path, path_item in sorted(paths.items()):
             if not isinstance(path_item, dict):
                 continue
 
             path_parameters = path_item.get('parameters', [])
 
-            for http_method, operation in path_item.items():
+            # Sort HTTP methods for deterministic output
+            for http_method, operation in sorted(path_item.items()):
                 method = http_method.lower()
                 if method == 'parameters':
                     continue
@@ -595,7 +598,8 @@ class TypeScriptClientGenerator:
                 if op_metadata:
                     descriptor.extra_operations.append(op_metadata)
 
-        return list(custom_clients.values())
+        # Sort custom clients by name for deterministic output
+        return sorted(custom_clients.values(), key=lambda x: x.name)
 
     def _load_openapi_schema(self) -> Dict[str, Any]:
         try:
@@ -823,7 +827,8 @@ class TypeScriptClientGenerator:
             key = (param.get('name'), param.get('in'))
             combined[key] = param
 
-        return list(combined.values())
+        # Sort combined parameters by name for deterministic output
+        return sorted(combined.values(), key=lambda p: (p.get('name', ''), p.get('in', '')))
 
     def _relative_path_segments(
         self,
@@ -972,7 +977,8 @@ class TypeScriptClientGenerator:
 
             if properties:
                 parts: List[str] = []
-                for name, prop_schema in properties.items():
+                # Sort properties for deterministic output
+                for name, prop_schema in sorted(properties.items()):
                     prop_type, prop_deps = self._schema_to_ts(prop_schema)
                     deps |= prop_deps
                     optional = '?' if name not in required else ''

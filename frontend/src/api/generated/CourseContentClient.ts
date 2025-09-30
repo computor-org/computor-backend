@@ -38,6 +38,24 @@ export class CourseContentClient extends BaseEndpointClient {
   }
 
   /**
+   * Get Course Deployment Summary
+   * Get deployment summary for a course.
+   * Shows statistics about example deployments in the course.
+   */
+  async getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet({ courseId }: { courseId: string }): Promise<DeploymentSummary> {
+    return this.client.get<DeploymentSummary>(this.buildPath('courses', courseId, 'deployment-summary'));
+  }
+
+  /**
+   * Get Deployment Status With Workflow
+   * Get detailed deployment status including Temporal workflow information.
+   * Returns deployment data and checks the Temporal workflow status if one is running.
+   */
+  async getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet({ contentId }: { contentId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('deployment', contentId));
+  }
+
+  /**
    * Get Course Content Meta
    * Get file content from course content directory.
    */
@@ -59,6 +77,15 @@ export class CourseContentClient extends BaseEndpointClient {
   }
 
   /**
+   * Get Content Deployment
+   * Get deployment information for specific course content.
+   * Returns deployment record with full history if exists.
+   */
+  async getContentDeploymentCourseContentsContentIdDeploymentGet({ contentId }: { contentId: string }): Promise<DeploymentWithHistory | null> {
+    return this.client.get<DeploymentWithHistory | null>(this.buildPath(contentId, 'deployment'));
+  }
+
+  /**
    * Unassign Example From Content
    * Remove example assignment from course content.
    * This updates the deployment record to unassigned status.
@@ -66,33 +93,6 @@ export class CourseContentClient extends BaseEndpointClient {
    */
   async unassignExampleFromContentCourseContentsContentIdExampleDelete({ contentId }: { contentId: string }): Promise<Record<string, unknown> & Record<string, string>> {
     return this.client.delete<Record<string, unknown> & Record<string, string>>(this.buildPath(contentId, 'example'));
-  }
-
-  /**
-   * Get Deployment Status With Workflow
-   * Get detailed deployment status including Temporal workflow information.
-   * Returns deployment data and checks the Temporal workflow status if one is running.
-   */
-  async getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet({ contentId }: { contentId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('deployment', contentId));
-  }
-
-  /**
-   * Get Course Deployment Summary
-   * Get deployment summary for a course.
-   * Shows statistics about example deployments in the course.
-   */
-  async getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet({ courseId }: { courseId: string }): Promise<DeploymentSummary> {
-    return this.client.get<DeploymentSummary>(this.buildPath('courses', courseId, 'deployment-summary'));
-  }
-
-  /**
-   * Get Content Deployment
-   * Get deployment information for specific course content.
-   * Returns deployment record with full history if exists.
-   */
-  async getContentDeploymentCourseContentsContentIdDeploymentGet({ contentId }: { contentId: string }): Promise<DeploymentWithHistory | null> {
-    return this.client.get<DeploymentWithHistory | null>(this.buildPath(contentId, 'deployment'));
   }
 
   /**

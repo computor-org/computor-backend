@@ -33,12 +33,12 @@
 | `update` | PATCH | `/course-contents/{id}` | `CourseContentUpdate` | `CourseContentGet` |
 | `delete` | DELETE | `/course-contents/{id}` | — | `void` |
 | `archive` | PATCH | `/course-contents/{id}/archive` | — | `void` |
+| `getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet` | GET | `/course-contents/courses/{course_id}/deployment-summary` | — | `DeploymentSummary` |
+| `getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet` | GET | `/course-contents/deployment/{content_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `getCourseContentMetaCourseContentsFilesCourseContentIdGet` | GET | `/course-contents/files/{course_content_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `assignExampleToContentCourseContentsContentIdAssignExamplePost` | POST | `/course-contents/{content_id}/assign-example` | `AssignExampleRequest` | `DeploymentWithHistory` |
-| `unassignExampleFromContentCourseContentsContentIdExampleDelete` | DELETE | `/course-contents/{content_id}/example` | — | `Record<string, unknown> & Record<string, string>` |
-| `getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet` | GET | `/course-contents/deployment/{content_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet` | GET | `/course-contents/courses/{course_id}/deployment-summary` | — | `DeploymentSummary` |
 | `getContentDeploymentCourseContentsContentIdDeploymentGet` | GET | `/course-contents/{content_id}/deployment` | — | `DeploymentWithHistory | null` |
+| `unassignExampleFromContentCourseContentsContentIdExampleDelete` | DELETE | `/course-contents/{content_id}/example` | — | `Record<string, unknown> & Record<string, string>` |
 
 ## CourseContentKindClient
 - Base path: `/course-content-kinds`
@@ -115,8 +115,8 @@
 | `list` | GET | `/courses` | `CourseQuery` | `CourseList[]` |
 | `update` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
 | `delete` | DELETE | `/courses/{id}` | — | `void` |
-| `patchCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdPatch` | PATCH | `/courses/{course_id}/execution-backends/{execution_backend_id}` | `Record<string, unknown> & Record<string, unknown>` | `CourseExecutionBackendGet` |
 | `deleteCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdDelete` | DELETE | `/courses/{course_id}/execution-backends/{execution_backend_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `patchCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdPatch` | PATCH | `/courses/{course_id}/execution-backends/{execution_backend_id}` | `Record<string, unknown> & Record<string, unknown>` | `CourseExecutionBackendGet` |
 
 ## CourseMemberCommentClient
 - Base path: `/course-member-comments`
@@ -182,16 +182,16 @@
 | `list` | GET | `/examples` | `ExampleQuery` | `ExampleList[]` |
 | `update` | PATCH | `/examples/{id}` | `ExampleUpdate` | `ExampleGet` |
 | `delete` | DELETE | `/examples/{id}` | — | `void` |
-| `createVersionExamplesExampleIdVersionsPost` | POST | `/examples/{example_id}/versions` | `ExampleVersionCreate` | `ExampleVersionGet` |
-| `listVersionsExamplesExampleIdVersionsGet` | GET | `/examples/{example_id}/versions` | — | `ExampleVersionList[]` |
-| `getVersionExamplesVersionsVersionIdGet` | GET | `/examples/versions/{version_id}` | — | `ExampleVersionGet` |
-| `createExampleDependencyExamplesExampleIdDependenciesPost` | POST | `/examples/{example_id}/dependencies` | `ExampleDependencyCreate` | `ExampleDependencyGet` |
-| `getExampleDependenciesExamplesExampleIdDependenciesGet` | GET | `/examples/{example_id}/dependencies` | — | `ExampleDependencyGet[]` |
 | `removeDependencyExamplesDependenciesDependencyIdDelete` | DELETE | `/examples/dependencies/{dependency_id}` | — | `void` |
-| `uploadExampleExamplesUploadPost` | POST | `/examples/upload` | `ExampleUploadRequest` | `ExampleVersionGet` |
-| `downloadExampleLatestExamplesExampleIdDownloadGet` | GET | `/examples/{example_id}/download` | — | `ExampleDownloadResponse` |
 | `downloadExampleVersionExamplesDownloadVersionIdGet` | GET | `/examples/download/{version_id}` | — | `ExampleDownloadResponse` |
+| `uploadExampleExamplesUploadPost` | POST | `/examples/upload` | `ExampleUploadRequest` | `ExampleVersionGet` |
+| `getVersionExamplesVersionsVersionIdGet` | GET | `/examples/versions/{version_id}` | — | `ExampleVersionGet` |
+| `getExampleDependenciesExamplesExampleIdDependenciesGet` | GET | `/examples/{example_id}/dependencies` | — | `ExampleDependencyGet[]` |
+| `createExampleDependencyExamplesExampleIdDependenciesPost` | POST | `/examples/{example_id}/dependencies` | `ExampleDependencyCreate` | `ExampleDependencyGet` |
 | `deleteExampleDependencyExamplesExampleIdDependenciesDependencyIdDelete` | DELETE | `/examples/{example_id}/dependencies/{dependency_id}` | — | `void` |
+| `downloadExampleLatestExamplesExampleIdDownloadGet` | GET | `/examples/{example_id}/download` | — | `ExampleDownloadResponse` |
+| `listVersionsExamplesExampleIdVersionsGet` | GET | `/examples/{example_id}/versions` | — | `ExampleVersionList[]` |
+| `createVersionExamplesExampleIdVersionsPost` | POST | `/examples/{example_id}/versions` | `ExampleVersionCreate` | `ExampleVersionGet` |
 
 ## ExampleRepositoryClient
 - Base path: `/example-repositories`
@@ -225,9 +225,9 @@
 | `list` | GET | `/extensions` | — | `ExtensionVersionListItem[]` |
 | `update` | PATCH | `/extensions/{id}` | `ExtensionVersionYankRequest` | `ExtensionMetadata` |
 | `delete` | DELETE | `/extensions/{id}` | — | `void` |
-| `publishExtensionVersionExtensionsExtensionIdentityVersionsPost` | POST | `/extensions/{extension_identity}/versions` | — | `ExtensionPublishResponse` |
-| `listExtensionVersionsExtensionsExtensionIdentityVersionsGet` | GET | `/extensions/{extension_identity}/versions` | — | `ExtensionVersionListResponse` |
 | `downloadExtensionExtensionsExtensionIdentityDownloadGet` | GET | `/extensions/{extension_identity}/download` | — | `void` |
+| `listExtensionVersionsExtensionsExtensionIdentityVersionsGet` | GET | `/extensions/{extension_identity}/versions` | — | `ExtensionVersionListResponse` |
+| `publishExtensionVersionExtensionsExtensionIdentityVersionsPost` | POST | `/extensions/{extension_identity}/versions` | — | `ExtensionPublishResponse` |
 | `updateExtensionVersionExtensionsExtensionIdentityVersionsVersionPatch` | PATCH | `/extensions/{extension_identity}/versions/{version}` | `ExtensionVersionYankRequest` | `ExtensionVersionDetail` |
 
 ## GroupClaimClient
@@ -274,8 +274,8 @@
 | `update` | PATCH | `/messages/{id}` | `MessageUpdate` | `MessageGet` |
 | `delete` | DELETE | `/messages/{id}` | — | `void` |
 | `archive` | PATCH | `/messages/{id}/archive` | — | `void` |
-| `markMessageReadMessagesIdReadsPost` | POST | `/messages/{id}/reads` | — | `void` |
 | `markMessageUnreadMessagesIdReadsDelete` | DELETE | `/messages/{id}/reads` | — | `void` |
+| `markMessageReadMessagesIdReadsPost` | POST | `/messages/{id}/reads` | — | `void` |
 
 ## OrganizationClient
 - Base path: `/organizations`
@@ -350,17 +350,17 @@
 | `list` | GET | `/storage` | `StorageObjectQuery` | `StorageObjectList[]` |
 | `update` | PATCH | `/storage/{id}` | `StorageObjectUpdate` | `StorageObjectGet` |
 | `delete` | DELETE | `/storage/{id}` | — | `void` |
-| `uploadFileStorageUploadPost` | POST | `/storage/upload` | — | `StorageObjectGet` |
-| `downloadFileStorageDownloadObjectKeyGet` | GET | `/storage/download/{object_key}` | — | `void` |
-| `listObjectsStorageObjectsGet` | GET | `/storage/objects` | — | `StorageObjectList[]` |
-| `getObjectInfoStorageObjectsObjectKeyGet` | GET | `/storage/objects/{object_key}` | — | `StorageObjectGet` |
-| `deleteObjectStorageObjectsObjectKeyDelete` | DELETE | `/storage/objects/{object_key}` | — | `void` |
-| `copyObjectStorageCopyPost` | POST | `/storage/copy` | — | `void` |
-| `generatePresignedUrlStoragePresignedUrlPost` | POST | `/storage/presigned-url` | `PresignedUrlRequest` | `PresignedUrlResponse` |
 | `listBucketsStorageBucketsGet` | GET | `/storage/buckets` | — | `BucketInfo[]` |
 | `createBucketStorageBucketsPost` | POST | `/storage/buckets` | `BucketCreate` | `BucketInfo` |
 | `deleteBucketStorageBucketsBucketNameDelete` | DELETE | `/storage/buckets/{bucket_name}` | — | `void` |
 | `getBucketStatsStorageBucketsBucketNameStatsGet` | GET | `/storage/buckets/{bucket_name}/stats` | — | `StorageUsageStats` |
+| `copyObjectStorageCopyPost` | POST | `/storage/copy` | — | `void` |
+| `downloadFileStorageDownloadObjectKeyGet` | GET | `/storage/download/{object_key}` | — | `void` |
+| `listObjectsStorageObjectsGet` | GET | `/storage/objects` | — | `StorageObjectList[]` |
+| `deleteObjectStorageObjectsObjectKeyDelete` | DELETE | `/storage/objects/{object_key}` | — | `void` |
+| `getObjectInfoStorageObjectsObjectKeyGet` | GET | `/storage/objects/{object_key}` | — | `StorageObjectGet` |
+| `generatePresignedUrlStoragePresignedUrlPost` | POST | `/storage/presigned-url` | `PresignedUrlRequest` | `PresignedUrlResponse` |
+| `uploadFileStorageUploadPost` | POST | `/storage/upload` | — | `StorageObjectGet` |
 
 ## StudentProfileClient
 - Base path: `/student-profiles`
@@ -439,8 +439,89 @@
 | `list` | GET | `/user-roles` | `UserRoleQuery` | `UserRoleList[]` |
 | `update` | PATCH | `/user-roles/{id}` | `UserRoleUpdate` | `UserRoleGet` |
 | `delete` | DELETE | `/user-roles/{id}` | — | `void` |
-| `getUserRoleUserRolesUsersUserIdRolesRoleIdGet` | GET | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleGet` |
 | `deleteUserRoleUserRolesUsersUserIdRolesRoleIdDelete` | DELETE | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleList[]` |
+| `getUserRoleUserRolesUsersUserIdRolesRoleIdGet` | GET | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleGet` |
+
+## AuthenticationClient
+- Base path: `/auth`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listAllPluginsAuthAdminPluginsGet` | GET | `/auth/admin/plugins` | — | `void` |
+| `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `void` |
+| `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `void` |
+| `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `void` |
+| `loginWithCredentialsAuthLoginPost` | POST | `/auth/login` | `LocalLoginRequest` | `LocalLoginResponse` |
+| `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
+| `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
+| `refreshTokenAuthRefreshPost` | POST | `/auth/refresh` | `TokenRefreshRequest` | `TokenRefreshResponse` |
+| `refreshLocalTokenAuthRefreshLocalPost` | POST | `/auth/refresh/local` | `LocalTokenRefreshRequest` | `LocalTokenRefreshResponse` |
+| `registerUserAuthRegisterPost` | POST | `/auth/register` | `UserRegistrationRequest` | `UserRegistrationResponse` |
+| `ssoSuccessAuthSuccessGet` | GET | `/auth/success` | — | `void` |
+| `handleCallbackAuthProviderCallbackGet` | GET | `/auth/{provider}/callback` | — | `void` |
+| `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
+
+## LecturersClient
+- Base path: `/lecturers`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `lecturerListCourseContentsLecturersCourseContentsGet` | GET | `/lecturers/course-contents` | — | `CourseContentLecturerList[]` |
+| `lecturerGetCourseContentsLecturersCourseContentsCourseContentIdGet` | GET | `/lecturers/course-contents/{course_content_id}` | — | `CourseContentLecturerGet` |
+| `lecturerListCoursesLecturersCoursesGet` | GET | `/lecturers/courses` | — | `CourseList[]` |
+| `lecturerGetCoursesLecturersCoursesCourseIdGet` | GET | `/lecturers/courses/{course_id}` | — | `CourseGet` |
+
+## MiscClient
+- Base path: `/`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getStatusHeadHead` | HEAD | `/` | — | `void` |
+
+## SignupClient
+- Base path: `/signup`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `gitlabSignupSignupGitlabPost` | POST | `/signup/gitlab` | `GitlabSignup` | `GitlabSignupResponse` |
+
+## StudentsClient
+- Base path: `/students`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `studentListCourseContentsStudentsCourseContentsGet` | GET | `/students/course-contents` | — | `CourseContentStudentList[]` |
+| `studentGetCourseContentStudentsCourseContentsCourseContentIdGet` | GET | `/students/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
+| `studentListCoursesStudentsCoursesGet` | GET | `/students/courses` | — | `CourseStudentList[]` |
+| `studentGetCourseStudentsCoursesCourseIdGet` | GET | `/students/courses/{course_id}` | — | `CourseStudentGet` |
+| `getSignupInitDataStudentsRepositoriesGet` | GET | `/students/repositories` | — | `string[]` |
+
+## SubmissionsClient
+- Base path: `/submissions`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listSubmissionArtifactsSubmissionsArtifactsGet` | GET | `/submissions/artifacts` | — | `SubmissionArtifactList[]` |
+| `uploadSubmissionSubmissionsArtifactsPost` | POST | `/submissions/artifacts` | — | `SubmissionUploadResponseModel` |
+| `getSubmissionArtifactSubmissionsArtifactsArtifactIdGet` | GET | `/submissions/artifacts/{artifact_id}` | — | `SubmissionArtifactGet` |
+| `updateSubmissionArtifactSubmissionsArtifactsArtifactIdPatch` | PATCH | `/submissions/artifacts/{artifact_id}` | `SubmissionArtifactUpdate` | `SubmissionArtifactGet` |
+| `listArtifactGradesSubmissionsArtifactsArtifactIdGradesGet` | GET | `/submissions/artifacts/{artifact_id}/grades` | — | `SubmissionGradeListItem[]` |
+| `createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost` | POST | `/submissions/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
+| `listArtifactReviewsSubmissionsArtifactsArtifactIdReviewsGet` | GET | `/submissions/artifacts/{artifact_id}/reviews` | — | `SubmissionReviewListItem[]` |
+| `createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost` | POST | `/submissions/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
+| `createTestResultSubmissionsArtifactsArtifactIdTestPost` | POST | `/submissions/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
+| `listArtifactTestResultsSubmissionsArtifactsArtifactIdTestsGet` | GET | `/submissions/artifacts/{artifact_id}/tests` | — | `ResultList[]` |
+| `deleteArtifactGradeSubmissionsGradesGradeIdDelete` | DELETE | `/submissions/grades/{grade_id}` | — | `void` |
+| `updateArtifactGradeSubmissionsGradesGradeIdPatch` | PATCH | `/submissions/grades/{grade_id}` | `SubmissionGradeUpdate` | `SubmissionGradeDetail` |
+| `deleteArtifactReviewSubmissionsReviewsReviewIdDelete` | DELETE | `/submissions/reviews/{review_id}` | — | `void` |
+| `updateArtifactReviewSubmissionsReviewsReviewIdPatch` | PATCH | `/submissions/reviews/{review_id}` | `SubmissionReviewUpdate` | `SubmissionReviewListItem` |
+| `updateTestResultSubmissionsTestsTestIdPatch` | PATCH | `/submissions/tests/{test_id}` | `ResultUpdate` | `ResultList` |
 
 ## SystemClient
 - Base path: `/system`
@@ -448,14 +529,30 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `createOrganizationAsyncSystemDeployOrganizationsPost` | POST | `/system/deploy/organizations` | `OrganizationTaskRequest` | `TaskResponse` |
+| `generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost` | POST | `/system/courses/{course_id}/generate-assignments` | `GenerateAssignmentsRequest` | `GenerateAssignmentsResponse` |
+| `generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost` | POST | `/system/courses/{course_id}/generate-student-template` | `GenerateTemplateRequest` | `GenerateTemplateResponse` |
+| `getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet` | GET | `/system/courses/{course_id}/gitlab-status` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `createCourseFamilyAsyncSystemDeployCourseFamiliesPost` | POST | `/system/deploy/course-families` | `CourseFamilyTaskRequest` | `TaskResponse` |
 | `createCourseAsyncSystemDeployCoursesPost` | POST | `/system/deploy/courses` | `CourseTaskRequest` | `TaskResponse` |
-| `generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost` | POST | `/system/courses/{course_id}/generate-student-template` | `GenerateTemplateRequest` | `GenerateTemplateResponse` |
-| `generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost` | POST | `/system/courses/{course_id}/generate-assignments` | `GenerateAssignmentsRequest` | `GenerateAssignmentsResponse` |
-| `getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet` | GET | `/system/courses/{course_id}/gitlab-status` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `createOrganizationAsyncSystemDeployOrganizationsPost` | POST | `/system/deploy/organizations` | `OrganizationTaskRequest` | `TaskResponse` |
 | `createHierarchySystemHierarchyCreatePost` | POST | `/system/hierarchy/create` | `Record<string, unknown> & Record<string, unknown>` | `Record<string, unknown> & Record<string, unknown>` |
 | `getHierarchyStatusSystemHierarchyStatusWorkflowIdGet` | GET | `/system/hierarchy/status/{workflow_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+
+## TasksClient
+- Base path: `/tasks`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listTasksTasksGet` | GET | `/tasks` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `submitTaskTasksSubmitPost` | POST | `/tasks/submit` | `TaskSubmission` | `Record<string, unknown> & Record<string, string>` |
+| `listTaskTypesTasksTypesGet` | GET | `/tasks/types` | — | `string[]` |
+| `getWorkerStatusTasksWorkersStatusGet` | GET | `/tasks/workers/status` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `deleteTaskTasksTaskIdDelete` | DELETE | `/tasks/{task_id}` | — | `void` |
+| `getTaskTasksTaskIdGet` | GET | `/tasks/{task_id}` | — | `TaskInfo` |
+| `cancelTaskTasksTaskIdCancelDelete` | DELETE | `/tasks/{task_id}/cancel` | — | `void` |
+| `getTaskResultTasksTaskIdResultGet` | GET | `/tasks/{task_id}/result` | — | `TaskResult` |
+| `getTaskStatusTasksTaskIdStatusGet` | GET | `/tasks/{task_id}/status` | — | `TaskInfo` |
 
 ## TestsClient
 - Base path: `/tests`
@@ -466,50 +563,19 @@
 | `createTestRunTestsPost` | POST | `/tests` | `TestCreate` | `ResultList` |
 | `getTestStatusTestsStatusResultIdGet` | GET | `/tests/status/{result_id}` | — | `void` |
 
-## StudentsClient
-- Base path: `/students`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `studentGetCourseContentStudentsCourseContentsCourseContentIdGet` | GET | `/students/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
-| `studentListCourseContentsStudentsCourseContentsGet` | GET | `/students/course-contents` | — | `CourseContentStudentList[]` |
-| `studentListCoursesStudentsCoursesGet` | GET | `/students/courses` | — | `CourseStudentList[]` |
-| `studentGetCourseStudentsCoursesCourseIdGet` | GET | `/students/courses/{course_id}` | — | `CourseStudentGet` |
-| `getSignupInitDataStudentsRepositoriesGet` | GET | `/students/repositories` | — | `string[]` |
-
 ## TutorsClient
 - Base path: `/tutors`
 - Note: custom operations discovered from OpenAPI schema
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
+| `tutorListCourseMembersTutorsCourseMembersGet` | GET | `/tutors/course-members` | — | `TutorCourseMemberList[]` |
+| `tutorGetCourseMembersTutorsCourseMembersCourseMemberIdGet` | GET | `/tutors/course-members/{course_member_id}` | — | `TutorCourseMemberGet` |
+| `tutorListCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsGet` | GET | `/tutors/course-members/{course_member_id}/course-contents` | — | `CourseContentStudentList[]` |
 | `tutorGetCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet` | GET | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
 | `tutorUpdateCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdPatch` | PATCH | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | `TutorGradeCreate` | `TutorGradeResponse` |
-| `tutorListCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsGet` | GET | `/tutors/course-members/{course_member_id}/course-contents` | — | `CourseContentStudentList[]` |
-| `tutorGetCoursesTutorsCoursesCourseIdGet` | GET | `/tutors/courses/{course_id}` | — | `CourseTutorGet` |
 | `tutorListCoursesTutorsCoursesGet` | GET | `/tutors/courses` | — | `CourseTutorList[]` |
-| `tutorGetCourseMembersTutorsCourseMembersCourseMemberIdGet` | GET | `/tutors/course-members/{course_member_id}` | — | `TutorCourseMemberGet` |
-| `tutorListCourseMembersTutorsCourseMembersGet` | GET | `/tutors/course-members` | — | `TutorCourseMemberList[]` |
-
-## LecturersClient
-- Base path: `/lecturers`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `lecturerGetCoursesLecturersCoursesCourseIdGet` | GET | `/lecturers/courses/{course_id}` | — | `CourseGet` |
-| `lecturerListCoursesLecturersCoursesGet` | GET | `/lecturers/courses` | — | `CourseList[]` |
-| `lecturerGetCourseContentsLecturersCourseContentsCourseContentIdGet` | GET | `/lecturers/course-contents/{course_content_id}` | — | `CourseContentLecturerGet` |
-| `lecturerListCourseContentsLecturersCourseContentsGet` | GET | `/lecturers/course-contents` | — | `CourseContentLecturerList[]` |
-
-## SignupClient
-- Base path: `/signup`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `gitlabSignupSignupGitlabPost` | POST | `/signup/gitlab` | `GitlabSignup` | `GitlabSignupResponse` |
+| `tutorGetCoursesTutorsCoursesCourseIdGet` | GET | `/tutors/courses/{course_id}` | — | `CourseTutorGet` |
 
 ## UserClient
 - Base path: `/user`
@@ -518,73 +584,7 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `getCurrentUserUserGet` | GET | `/user` | — | `UserGet` |
+| `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
+| `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
 | `setUserPasswordUserPasswordPost` | POST | `/user/password` | `UserPassword` | `void` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
-| `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
-| `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
-
-## TasksClient
-- Base path: `/tasks`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `listTasksTasksGet` | GET | `/tasks` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `submitTaskTasksSubmitPost` | POST | `/tasks/submit` | `TaskSubmission` | `Record<string, unknown> & Record<string, string>` |
-| `getTaskTasksTaskIdGet` | GET | `/tasks/{task_id}` | — | `TaskInfo` |
-| `deleteTaskTasksTaskIdDelete` | DELETE | `/tasks/{task_id}` | — | `void` |
-| `getTaskStatusTasksTaskIdStatusGet` | GET | `/tasks/{task_id}/status` | — | `TaskInfo` |
-| `getTaskResultTasksTaskIdResultGet` | GET | `/tasks/{task_id}/result` | — | `TaskResult` |
-| `cancelTaskTasksTaskIdCancelDelete` | DELETE | `/tasks/{task_id}/cancel` | — | `void` |
-| `listTaskTypesTasksTypesGet` | GET | `/tasks/types` | — | `string[]` |
-| `getWorkerStatusTasksWorkersStatusGet` | GET | `/tasks/workers/status` | — | `Record<string, unknown> & Record<string, unknown>` |
-
-## AuthenticationClient
-- Base path: `/auth`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `loginWithCredentialsAuthLoginPost` | POST | `/auth/login` | `LocalLoginRequest` | `LocalLoginResponse` |
-| `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
-| `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
-| `handleCallbackAuthProviderCallbackGet` | GET | `/auth/{provider}/callback` | — | `void` |
-| `ssoSuccessAuthSuccessGet` | GET | `/auth/success` | — | `void` |
-| `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
-| `listAllPluginsAuthAdminPluginsGet` | GET | `/auth/admin/plugins` | — | `void` |
-| `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `void` |
-| `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `void` |
-| `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `void` |
-| `registerUserAuthRegisterPost` | POST | `/auth/register` | `UserRegistrationRequest` | `UserRegistrationResponse` |
-| `refreshLocalTokenAuthRefreshLocalPost` | POST | `/auth/refresh/local` | `LocalTokenRefreshRequest` | `LocalTokenRefreshResponse` |
-| `refreshTokenAuthRefreshPost` | POST | `/auth/refresh` | `TokenRefreshRequest` | `TokenRefreshResponse` |
-
-## SubmissionsClient
-- Base path: `/submissions`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `uploadSubmissionSubmissionsArtifactsPost` | POST | `/submissions/artifacts` | — | `SubmissionUploadResponseModel` |
-| `listSubmissionArtifactsSubmissionsArtifactsGet` | GET | `/submissions/artifacts` | — | `SubmissionArtifactList[]` |
-| `getSubmissionArtifactSubmissionsArtifactsArtifactIdGet` | GET | `/submissions/artifacts/{artifact_id}` | — | `SubmissionArtifactGet` |
-| `updateSubmissionArtifactSubmissionsArtifactsArtifactIdPatch` | PATCH | `/submissions/artifacts/{artifact_id}` | `SubmissionArtifactUpdate` | `SubmissionArtifactGet` |
-| `createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost` | POST | `/submissions/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
-| `listArtifactGradesSubmissionsArtifactsArtifactIdGradesGet` | GET | `/submissions/artifacts/{artifact_id}/grades` | — | `SubmissionGradeListItem[]` |
-| `updateArtifactGradeSubmissionsGradesGradeIdPatch` | PATCH | `/submissions/grades/{grade_id}` | `SubmissionGradeUpdate` | `SubmissionGradeDetail` |
-| `deleteArtifactGradeSubmissionsGradesGradeIdDelete` | DELETE | `/submissions/grades/{grade_id}` | — | `void` |
-| `createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost` | POST | `/submissions/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
-| `listArtifactReviewsSubmissionsArtifactsArtifactIdReviewsGet` | GET | `/submissions/artifacts/{artifact_id}/reviews` | — | `SubmissionReviewListItem[]` |
-| `updateArtifactReviewSubmissionsReviewsReviewIdPatch` | PATCH | `/submissions/reviews/{review_id}` | `SubmissionReviewUpdate` | `SubmissionReviewListItem` |
-| `deleteArtifactReviewSubmissionsReviewsReviewIdDelete` | DELETE | `/submissions/reviews/{review_id}` | — | `void` |
-| `createTestResultSubmissionsArtifactsArtifactIdTestPost` | POST | `/submissions/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
-| `listArtifactTestResultsSubmissionsArtifactsArtifactIdTestsGet` | GET | `/submissions/artifacts/{artifact_id}/tests` | — | `ResultList[]` |
-| `updateTestResultSubmissionsTestsTestIdPatch` | PATCH | `/submissions/tests/{test_id}` | `ResultUpdate` | `ResultList` |
-
-## MiscClient
-- Base path: `/`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `getStatusHeadHead` | HEAD | `/` | — | `void` |

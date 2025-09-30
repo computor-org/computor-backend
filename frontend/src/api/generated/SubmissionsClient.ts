@@ -13,25 +13,25 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
+   * List Submission Artifacts
+   * List submission artifacts with optional filtering.
+   */
+  async listSubmissionArtifactsSubmissionsArtifactsGet({ courseContentId, limit, offset, submissionGroupId }: { courseContentId?: string | null; limit?: number; offset?: number; submissionGroupId?: string | null }): Promise<SubmissionArtifactList[]> {
+    const queryParams: Record<string, unknown> = {
+      course_content_id: courseContentId,
+      limit,
+      offset,
+      submission_group_id: submissionGroupId,
+    };
+    return this.client.get<SubmissionArtifactList[]>(this.buildPath('artifacts'), { params: queryParams });
+  }
+
+  /**
    * Upload Submission
    * Upload a submission file to MinIO and create matching SubmissionArtifact records.
    */
   async uploadSubmissionSubmissionsArtifactsPost(): Promise<SubmissionUploadResponseModel> {
     return this.client.post<SubmissionUploadResponseModel>(this.buildPath('artifacts'));
-  }
-
-  /**
-   * List Submission Artifacts
-   * List submission artifacts with optional filtering.
-   */
-  async listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId, courseContentId, limit, offset }: { submissionGroupId?: string | null; courseContentId?: string | null; limit?: number; offset?: number }): Promise<SubmissionArtifactList[]> {
-    const queryParams: Record<string, unknown> = {
-      submission_group_id: submissionGroupId,
-      course_content_id: courseContentId,
-      limit,
-      offset,
-    };
-    return this.client.get<SubmissionArtifactList[]>(this.buildPath('artifacts'), { params: queryParams });
   }
 
   /**
@@ -51,14 +51,6 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Artifact Grade
-   * Create a grade for an artifact. Requires instructor/tutor permissions.
-   */
-  async createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost({ artifactId, body }: { artifactId: string; body: SubmissionGradeCreate }): Promise<SubmissionGradeDetail> {
-    return this.client.post<SubmissionGradeDetail>(this.buildPath('artifacts', artifactId, 'grades'), body);
-  }
-
-  /**
    * List Artifact Grades
    * List all grades for an artifact. Students can view their own grades, tutors/instructors can view all.
    */
@@ -67,27 +59,11 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Update Artifact Grade
-   * Update an existing grade. Only the grader can update their own grade.
+   * Create Artifact Grade
+   * Create a grade for an artifact. Requires instructor/tutor permissions.
    */
-  async updateArtifactGradeSubmissionsGradesGradeIdPatch({ gradeId, body }: { gradeId: string; body: SubmissionGradeUpdate }): Promise<SubmissionGradeDetail> {
-    return this.client.patch<SubmissionGradeDetail>(this.buildPath('grades', gradeId), body);
-  }
-
-  /**
-   * Delete Artifact Grade
-   * Delete a grade. Only the grader or an admin can delete.
-   */
-  async deleteArtifactGradeSubmissionsGradesGradeIdDelete({ gradeId }: { gradeId: string }): Promise<void> {
-    return this.client.delete<void>(this.buildPath('grades', gradeId));
-  }
-
-  /**
-   * Create Artifact Review
-   * Create a review for an artifact.
-   */
-  async createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost({ artifactId, body }: { artifactId: string; body: SubmissionReviewCreate }): Promise<SubmissionReviewListItem> {
-    return this.client.post<SubmissionReviewListItem>(this.buildPath('artifacts', artifactId, 'reviews'), body);
+  async createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost({ artifactId, body }: { artifactId: string; body: SubmissionGradeCreate }): Promise<SubmissionGradeDetail> {
+    return this.client.post<SubmissionGradeDetail>(this.buildPath('artifacts', artifactId, 'grades'), body);
   }
 
   /**
@@ -99,19 +75,11 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Update Artifact Review
-   * Update an existing review. Only the reviewer can update their own review.
+   * Create Artifact Review
+   * Create a review for an artifact.
    */
-  async updateArtifactReviewSubmissionsReviewsReviewIdPatch({ reviewId, body }: { reviewId: string; body: SubmissionReviewUpdate }): Promise<SubmissionReviewListItem> {
-    return this.client.patch<SubmissionReviewListItem>(this.buildPath('reviews', reviewId), body);
-  }
-
-  /**
-   * Delete Artifact Review
-   * Delete a review. Only the reviewer or an admin can delete.
-   */
-  async deleteArtifactReviewSubmissionsReviewsReviewIdDelete({ reviewId }: { reviewId: string }): Promise<void> {
-    return this.client.delete<void>(this.buildPath('reviews', reviewId));
+  async createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost({ artifactId, body }: { artifactId: string; body: SubmissionReviewCreate }): Promise<SubmissionReviewListItem> {
+    return this.client.post<SubmissionReviewListItem>(this.buildPath('artifacts', artifactId, 'reviews'), body);
   }
 
   /**
@@ -128,6 +96,38 @@ export class SubmissionsClient extends BaseEndpointClient {
    */
   async listArtifactTestResultsSubmissionsArtifactsArtifactIdTestsGet({ artifactId }: { artifactId: string }): Promise<ResultList[]> {
     return this.client.get<ResultList[]>(this.buildPath('artifacts', artifactId, 'tests'));
+  }
+
+  /**
+   * Delete Artifact Grade
+   * Delete a grade. Only the grader or an admin can delete.
+   */
+  async deleteArtifactGradeSubmissionsGradesGradeIdDelete({ gradeId }: { gradeId: string }): Promise<void> {
+    return this.client.delete<void>(this.buildPath('grades', gradeId));
+  }
+
+  /**
+   * Update Artifact Grade
+   * Update an existing grade. Only the grader can update their own grade.
+   */
+  async updateArtifactGradeSubmissionsGradesGradeIdPatch({ gradeId, body }: { gradeId: string; body: SubmissionGradeUpdate }): Promise<SubmissionGradeDetail> {
+    return this.client.patch<SubmissionGradeDetail>(this.buildPath('grades', gradeId), body);
+  }
+
+  /**
+   * Delete Artifact Review
+   * Delete a review. Only the reviewer or an admin can delete.
+   */
+  async deleteArtifactReviewSubmissionsReviewsReviewIdDelete({ reviewId }: { reviewId: string }): Promise<void> {
+    return this.client.delete<void>(this.buildPath('reviews', reviewId));
+  }
+
+  /**
+   * Update Artifact Review
+   * Update an existing review. Only the reviewer can update their own review.
+   */
+  async updateArtifactReviewSubmissionsReviewsReviewIdPatch({ reviewId, body }: { reviewId: string; body: SubmissionReviewUpdate }): Promise<SubmissionReviewListItem> {
+    return this.client.patch<SubmissionReviewListItem>(this.buildPath('reviews', reviewId), body);
   }
 
   /**
