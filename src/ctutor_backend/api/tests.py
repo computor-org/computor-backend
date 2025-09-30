@@ -249,6 +249,7 @@ async def create_test_run(
     # Create test result record
     result = Result(
         submission_artifact_id=artifact.id,
+        submission_group_id=submission_group.id,
         course_member_id=course_member.id,
         course_content_id=course_content.id,
         course_content_type_id=course_content.course_content_type_id,
