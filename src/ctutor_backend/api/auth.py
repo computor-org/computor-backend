@@ -1,5 +1,10 @@
 """
-Generic SSO authentication API endpoints.
+Authentication API endpoints for both local and SSO authentication.
+
+This module provides:
+- Local username/password authentication with Bearer tokens
+- SSO/OAuth authentication with multiple providers
+- Token refresh and logout functionality
 """
 
 import secrets
@@ -10,9 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from ctutor_backend.database import get_db
-from ctutor_backend.permissions.auth import get_current_principal
+from ctutor_backend.permissions.auth import get_current_principal, AuthenticationService
 from ctutor_backend.api.exceptions import UnauthorizedException, BadRequestException, NotFoundException
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.model.auth import User, Account
@@ -21,12 +27,24 @@ from ctutor_backend.plugins import PluginMetadata, AuthStatus, UserInfo
 from ctutor_backend.plugins.registry import get_plugin_registry
 from ctutor_backend.redis_cache import get_redis_client
 from ctutor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
+from ctutor_backend.interface.auth import (
+    LocalLoginRequest,
+    LocalLoginResponse,
+    LogoutResponse,
+    LocalTokenRefreshRequest,
+    LocalTokenRefreshResponse
+)
+from ctutor_backend.interface.tokens import decrypt_api_key
 import json
 import logging
 
 logger = logging.getLogger(__name__)
 
-sso_router = APIRouter(prefix="/auth")
+auth_router = APIRouter(prefix="/auth")
+
+# Token TTL configuration
+ACCESS_TOKEN_TTL = 86400  # 24 hours
+REFRESH_TOKEN_TTL = 604800  # 7 days
 
 
 class ProviderInfo(BaseModel):
@@ -91,7 +109,83 @@ class TokenRefreshResponse(BaseModel):
     refresh_token: Optional[str] = Field(None, description="New refresh token if rotated")
 
 
-@sso_router.get("/providers", response_model=List[ProviderInfo])
+@auth_router.post("/login", response_model=LocalLoginResponse)
+async def login_with_credentials(
+    request: LocalLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Login with username and password to obtain Bearer tokens.
+
+    This endpoint authenticates users with local credentials and returns
+    access and refresh tokens that can be used for subsequent API requests.
+
+    The access token should be included in the Authorization header as:
+    `Authorization: Bearer <access_token>`
+    """
+    try:
+        # Authenticate using the AuthenticationService
+        auth_result = AuthenticationService.authenticate_basic(
+            request.username,
+            request.password,
+            db
+        )
+
+        # Generate session tokens
+        access_token = secrets.token_urlsafe(32)
+        refresh_token = secrets.token_urlsafe(32)
+
+        # Store session in Redis
+        redis_client = await get_redis_client()
+
+        # Store access token session
+        access_session_data = {
+            "user_id": str(auth_result.user_id),
+            "provider": "local",
+            "created_at": str(datetime.now(timezone.utc)),
+            "token_type": "access"
+        }
+
+        await redis_client.set(
+            f"sso_session:{access_token}",
+            json.dumps(access_session_data),
+            ttl=ACCESS_TOKEN_TTL
+        )
+
+        # Store refresh token session
+        refresh_session_data = {
+            "user_id": str(auth_result.user_id),
+            "provider": "local",
+            "created_at": str(datetime.now(timezone.utc)),
+            "token_type": "refresh",
+            "access_token": access_token
+        }
+
+        await redis_client.set(
+            f"refresh_token:{refresh_token}",
+            json.dumps(refresh_session_data),
+            ttl=REFRESH_TOKEN_TTL
+        )
+
+        logger.info(f"Local login successful for user {auth_result.user_id}")
+
+        return LocalLoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=ACCESS_TOKEN_TTL,
+            user_id=str(auth_result.user_id),
+            token_type="Bearer"
+        )
+
+    except UnauthorizedException as e:
+        logger.warning(f"Login failed: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+
+@auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers():
     """
     List available authentication providers.
@@ -120,7 +214,7 @@ async def list_providers():
     return providers
 
 
-@sso_router.get("/{provider}/login")
+@auth_router.get("/{provider}/login")
 async def initiate_login(
     provider: str,
     redirect_uri: Optional[str] = Query(None, description="Redirect URI after authentication"),
@@ -180,7 +274,7 @@ async def initiate_login(
         raise HTTPException(status_code=500, detail=f"Failed to initiate login: {str(e)}")
 
 
-@sso_router.get("/{provider}/callback", name="handle_callback")
+@auth_router.get("/{provider}/callback", name="handle_callback")
 async def handle_callback(
     provider: str,
     code: str = Query(..., description="Authorization code"),
@@ -368,102 +462,97 @@ async def handle_callback(
         return RedirectResponse(url=error_url, status_code=302)
 
 
-@sso_router.get("/success", name="sso_success")
+@auth_router.get("/success", name="sso_success")
 async def sso_success():
     """Default success page after SSO authentication."""
     return {"message": "Authentication successful", "status": "success"}
 
 
-@sso_router.get("/me", dependencies=[Depends(get_current_principal)])
-async def get_current_user_info(
-    principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-):
-    """
-    Get current authenticated user information.
-    
-    This endpoint can be used to test SSO authentication and retrieve
-    the current user's details and roles.
-    """
-    # Get user from database
-    user = db.query(User).filter(User.id == principal.user_id).first()
-    
-    if not user:
-        raise NotFoundException("User not found")
-    
-    # Get user's accounts
-    accounts = db.query(Account).filter(Account.user_id == user.id).all()
-    
-    # Get user roles
-    user_roles = db.query(UserRole).filter(UserRole.user_id == user.id).all()
-    role_names = [ur.role.id for ur in user_roles if ur.role]
-    
-    return {
-        "user": {
-            "id": str(user.id),
-            "username": user.username,
-            "email": user.email,
-            "given_name": user.given_name,
-            "family_name": user.family_name,
-            "user_type": user.user_type
-        },
-        "roles": role_names + principal.roles,  # Include both DB roles and principal roles
-        "principal_roles": principal.roles,  # Original principal roles
-        "db_roles": role_names,  # Roles from database
-        "accounts": [
-            {
-                "provider": acc.provider,
-                "type": acc.type,
-                "provider_account_id": acc.provider_account_id
-            }
-            for acc in accounts
-        ],
-        "authenticated_via": "sso" if any(acc.provider in ["keycloak", "gitlab"] for acc in accounts) else "basic"
-    }
-
-
-@sso_router.post("/{provider}/logout")
+@auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
-    provider: str,
+    request: Request,
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ):
     """
-    Logout from a specific provider.
-    
-    Revokes tokens and performs provider-specific logout if supported.
+    Logout from current session.
+
+    This endpoint works with any authentication type:
+    - Local authentication (Bearer tokens)
+    - SSO authentication (provider tokens)
+
+    The Bearer token from the Authorization header will be invalidated.
     """
-    registry = get_plugin_registry()
     redis_client = await get_redis_client()
-    
-    # Check if provider exists and is enabled
-    if provider not in registry.get_enabled_plugins():
-        raise NotFoundException(f"Authentication provider not found or not enabled: {provider}")
-    
-    # Get stored tokens
-    token_key = f"sso_token:{provider}:{principal.user_id}"
-    token_data_raw = await redis_client.get(token_key)
-    
-    if token_data_raw:
-        token_data = json.loads(token_data_raw)
-        access_token = token_data.get("access_token")
-        
-        if access_token:
+
+    # Extract token from Authorization header
+    authorization = request.headers.get("Authorization")
+    current_token = None
+    provider_name = None
+
+    if authorization and authorization.startswith("Bearer "):
+        current_token = authorization.replace("Bearer ", "")
+
+    if current_token:
+        # Check if this is a local session token
+        session_key = f"sso_session:{current_token}"
+        session_data_raw = await redis_client.get(session_key)
+
+        if session_data_raw:
             try:
-                # Perform provider logout
-                plugin = registry.get_plugin(provider)
-                if plugin:
-                    await plugin.logout(access_token)
-            except Exception as e:
-                logger.error(f"Failed to logout from {provider}: {e}")
-        
-        # Delete stored tokens
-        await redis_client.delete(token_key)
-    
-    return {"message": "Logout successful", "provider": provider}
+                session_data = json.loads(session_data_raw)
+                provider_name = session_data.get("provider", "unknown")
+
+                # Delete the access token session
+                await redis_client.delete(session_key)
+                logger.info(f"Deleted session for user {principal.user_id}, provider: {provider_name}")
+
+                # If this was a local login, also try to find and delete the refresh token
+                if provider_name == "local":
+                    # Search for refresh tokens associated with this access token
+                    # Note: This is a simplified approach - in production you might want to store
+                    # the relationship between access and refresh tokens differently
+                    pass
+
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse session data during logout")
+
+        # Also check for SSO provider tokens
+        if principal.user_id:
+            # Try to delete provider-specific tokens for all known providers
+            registry = get_plugin_registry()
+            for provider in registry.get_enabled_plugins():
+                token_key = f"sso_token:{provider}:{principal.user_id}"
+                token_data_raw = await redis_client.get(token_key)
+
+                if token_data_raw:
+                    try:
+                        token_data = json.loads(token_data_raw)
+                        access_token = token_data.get("access_token")
+
+                        if access_token:
+                            # Perform provider logout
+                            plugin = registry.get_plugin(provider)
+                            if plugin and hasattr(plugin, 'logout'):
+                                try:
+                                    await plugin.logout(access_token)
+                                    logger.info(f"Performed provider logout for {provider}")
+                                except Exception as e:
+                                    logger.error(f"Failed to logout from {provider}: {e}")
+
+                        # Delete stored tokens
+                        await redis_client.delete(token_key)
+                        provider_name = provider
+                    except Exception as e:
+                        logger.error(f"Error processing provider tokens during logout: {e}")
+
+    return LogoutResponse(
+        message="Logout successful",
+        provider=provider_name
+    )
 
 
-@sso_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
+@auth_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
 async def list_all_plugins(principal: Principal = Depends(get_current_principal)):
     """
     List all available plugins (admin only).
@@ -493,7 +582,7 @@ async def list_all_plugins(principal: Principal = Depends(get_current_principal)
     return plugins
 
 
-@sso_router.post("/admin/plugins/{plugin_name}/enable", dependencies=[Depends(get_current_principal)])
+@auth_router.post("/admin/plugins/{plugin_name}/enable", dependencies=[Depends(get_current_principal)])
 async def enable_plugin(
     plugin_name: str,
     principal: Principal = Depends(get_current_principal)
@@ -516,7 +605,7 @@ async def enable_plugin(
         return {"message": f"Plugin {plugin_name} enabled but failed to load: {e}"}
 
 
-@sso_router.post("/admin/plugins/{plugin_name}/disable", dependencies=[Depends(get_current_principal)])
+@auth_router.post("/admin/plugins/{plugin_name}/disable", dependencies=[Depends(get_current_principal)])
 async def disable_plugin(
     plugin_name: str,
     principal: Principal = Depends(get_current_principal)
@@ -537,7 +626,7 @@ async def disable_plugin(
     return {"message": f"Plugin {plugin_name} disabled"}
 
 
-@sso_router.post("/admin/plugins/reload", dependencies=[Depends(get_current_principal)])
+@auth_router.post("/admin/plugins/reload", dependencies=[Depends(get_current_principal)])
 async def reload_plugins(principal: Principal = Depends(get_current_principal)):
     """Reload all plugins (admin only)."""
     # Check admin permission
@@ -553,7 +642,7 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)):
     }
 
 
-@sso_router.post("/register", response_model=UserRegistrationResponse)
+@auth_router.post("/register", response_model=UserRegistrationResponse)
 async def register_user(
     request: UserRegistrationRequest,
     db: Session = Depends(get_db)
@@ -653,16 +742,103 @@ async def register_user(
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
-@sso_router.post("/refresh", response_model=TokenRefreshResponse)
+@auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
+async def refresh_local_token(
+    request: LocalTokenRefreshRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh local access token using refresh token.
+
+    This endpoint allows users to refresh their session token for local
+    (username/password) authentication using the refresh token obtained
+    during initial login.
+    """
+    redis_client = await get_redis_client()
+
+    # Get refresh token data from Redis
+    refresh_key = f"refresh_token:{request.refresh_token}"
+    refresh_data_raw = await redis_client.get(refresh_key)
+
+    if not refresh_data_raw:
+        raise UnauthorizedException("Invalid or expired refresh token")
+
+    try:
+        refresh_data = json.loads(refresh_data_raw)
+        user_id = refresh_data.get("user_id")
+
+        if not user_id:
+            raise UnauthorizedException("Invalid refresh token data")
+
+        # Verify user still exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise NotFoundException("User not found")
+
+        # Generate new access token
+        new_access_token = secrets.token_urlsafe(32)
+
+        # Store new access token session
+        access_session_data = {
+            "user_id": str(user_id),
+            "provider": "local",
+            "created_at": str(datetime.now(timezone.utc)),
+            "token_type": "access",
+            "refreshed_at": str(datetime.now(timezone.utc))
+        }
+
+        await redis_client.set(
+            f"sso_session:{new_access_token}",
+            json.dumps(access_session_data),
+            ttl=ACCESS_TOKEN_TTL
+        )
+
+        # Update the old access token reference in refresh token if it exists
+        old_access_token = refresh_data.get("access_token")
+        if old_access_token:
+            # Delete old access token
+            await redis_client.delete(f"sso_session:{old_access_token}")
+
+        # Update refresh token with new access token reference
+        refresh_data["access_token"] = new_access_token
+        refresh_data["refreshed_at"] = str(datetime.now(timezone.utc))
+
+        await redis_client.set(
+            refresh_key,
+            json.dumps(refresh_data),
+            ttl=REFRESH_TOKEN_TTL
+        )
+
+        logger.info(f"Token refreshed for user {user_id}")
+
+        return LocalTokenRefreshResponse(
+            access_token=new_access_token,
+            expires_in=ACCESS_TOKEN_TTL,
+            refresh_token=request.refresh_token,  # Same refresh token
+            token_type="Bearer"
+        )
+
+    except json.JSONDecodeError:
+        raise UnauthorizedException("Invalid refresh token format")
+    except UnauthorizedException:
+        raise
+    except NotFoundException:
+        raise
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        raise HTTPException(status_code=500, detail="Token refresh failed")
+
+
+@auth_router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(
     request: TokenRefreshRequest,
     db: Session = Depends(get_db)
 ):
     """
     Refresh SSO access token using refresh token.
-    
+
     This endpoint allows users to refresh their session token using
-    the refresh token obtained during initial authentication.
+    the refresh token obtained during initial SSO authentication.
     """
     registry = get_plugin_registry()
     redis_client = await get_redis_client()

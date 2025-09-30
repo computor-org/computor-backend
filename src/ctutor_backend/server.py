@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
 from ctutor_backend.permissions.auth import get_current_principal
-from ctutor_backend.api.sso import sso_router
+from ctutor_backend.api.auth import auth_router
 from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig
 from sqlalchemy.orm import Session
 from ctutor_backend.database import get_db
@@ -301,8 +301,8 @@ app.include_router(
 )
 
 app.include_router(
-    sso_router,
-    tags=["sso", "authentication"]
+    auth_router,
+    tags=["authentication", "sso"]
 )
 
 app.include_router(

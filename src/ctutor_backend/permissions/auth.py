@@ -1,6 +1,26 @@
 """
-Refactored authentication module that works with the new permission system.
-This module provides a cleaner interface for authentication and principal creation.
+Authentication module for the Computor platform.
+
+This module provides authentication services and principal creation for three authentication methods:
+
+1. **Bearer Token Authentication (Recommended)**
+   - Used after login via POST /auth/login
+   - Tokens stored in Redis with configurable TTL
+   - Supports both local and SSO authentication
+   - Format: `Authorization: Bearer <token>`
+
+2. **Basic Authentication (For automation/scripts only)**
+   - Direct username/password authentication
+   - Should NOT be used by frontend applications
+   - Useful for API clients, CLI tools, CI/CD
+   - Format: `Authorization: Basic <base64(username:password)>`
+
+3. **SSO/OAuth Authentication**
+   - Keycloak, GitLab, and other OAuth providers
+   - Uses Bearer tokens after OAuth flow completes
+   - Managed through /auth/{provider}/login endpoints
+
+All authentication methods create a Principal object with user claims and permissions.
 """
 
 import datetime
