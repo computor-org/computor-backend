@@ -243,16 +243,6 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_pri
 
     return response_list
 
-# @tutor_router.get("/courses/{course_id}/current", response_model=CourseMemberGet)
-# async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
-
-#     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(Course.id == course_id, CourseMember.user_id == permissions.get_user_id_or_throw()).first()
-
-#     if course_member == None:
-#         raise NotFoundException()
-
-#     return CourseMemberGet(**course_member.__dict__)
-
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 

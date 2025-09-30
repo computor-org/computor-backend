@@ -40,6 +40,7 @@ from ctutor_backend.api.system import system_router
 from ctutor_backend.api.course_contents import course_content_router
 from ctutor_backend.settings import settings 
 from ctutor_backend.api.students import student_router
+from ctutor_backend.api.student_profiles import student_profile_router
 from ctutor_backend.api.results import result_router
 from ctutor_backend.api.tutor import tutor_router
 from ctutor_backend.api.lecturer import lecturer_router
@@ -242,6 +243,13 @@ app.include_router(
     prefix="/students",
     tags=["students"],
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
+)
+
+app.include_router(
+    student_profile_router,
+    prefix="/student-profiles",
+    tags=["student-profiles"],
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(

@@ -91,30 +91,59 @@ class AccountPermissionHandler(PermissionHandler):
 
 class ProfilePermissionHandler(PermissionHandler):
     """Permission handler for Profile entity"""
-    
+
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
+
         # Users can view and update their own profile
         if action in ["list", "get", "update"]:
             return True
-        
+
         return False
-    
+
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
             return db.query(self.entity)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
-        
+
         if action in ["list", "get", "update"]:
             return db.query(self.entity).filter(self.entity.user_id == principal.user_id)
-        
+
+        raise ForbiddenException(detail={"entity": self.resource_name})
+
+
+class StudentProfilePermissionHandler(PermissionHandler):
+    """Permission handler for StudentProfile entity"""
+
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+        if self.check_admin(principal):
+            return True
+
+        if self.check_general_permission(principal, action):
+            return True
+
+        # Users can view and update their own student profile
+        if action in ["list", "get", "update"]:
+            return True
+
+        return False
+
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        if self.check_admin(principal):
+            return db.query(self.entity)
+
+        if self.check_general_permission(principal, action):
+            return db.query(self.entity)
+
+        if action in ["list", "get", "update"]:
+            return db.query(self.entity).filter(self.entity.user_id == principal.user_id)
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 

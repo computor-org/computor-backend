@@ -1,0 +1,3308 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Organizations Schemas",
+  "description": "Auto-generated JSON schemas for organizations models",
+  "category": "organizations",
+  "models": {
+    "OrganizationProperties": {
+      "$defs": {
+        "GitLabConfig": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Token"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationProperties",
+      "type": "object",
+      "x-model-name": "OrganizationProperties"
+    },
+    "OrganizationPropertiesGet": {
+      "$defs": {
+        "GitLabConfigGet": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            }
+          },
+          "title": "GitLabConfigGet",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfigGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationPropertiesGet",
+      "type": "object",
+      "x-model-name": "OrganizationPropertiesGet"
+    },
+    "OrganizationCreate": {
+      "$defs": {
+        "GitLabConfig": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Token"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        },
+        "OrganizationProperties": {
+          "additionalProperties": true,
+          "properties": {
+            "gitlab": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitLabConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "OrganizationProperties",
+          "type": "object"
+        },
+        "OrganizationType": {
+          "enum": [
+            "user",
+            "community",
+            "organization"
+          ],
+          "title": "OrganizationType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "path": {
+          "description": "Hierarchical path (ltree format)",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID (for user type organizations)",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number/identifier",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email address",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal/ZIP code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationCreate",
+      "type": "object",
+      "x-model-name": "OrganizationCreate"
+    },
+    "OrganizationGet": {
+      "$defs": {
+        "GitLabConfigGet": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            }
+          },
+          "title": "GitLabConfigGet",
+          "type": "object"
+        },
+        "OrganizationPropertiesGet": {
+          "additionalProperties": true,
+          "properties": {
+            "gitlab": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitLabConfigGet"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "OrganizationPropertiesGet",
+          "type": "object"
+        },
+        "OrganizationType": {
+          "enum": [
+            "user",
+            "community",
+            "organization"
+          ],
+          "title": "OrganizationType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationPropertiesGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationGet",
+      "type": "object",
+      "x-model-name": "OrganizationGet"
+    },
+    "OrganizationList": {
+      "$defs": {
+        "OrganizationType": {
+          "enum": [
+            "user",
+            "community",
+            "organization"
+          ],
+          "title": "OrganizationType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationList",
+      "type": "object",
+      "x-model-name": "OrganizationList"
+    },
+    "OrganizationUpdate": {
+      "$defs": {
+        "GitLabConfig": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Token"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        },
+        "OrganizationProperties": {
+          "additionalProperties": true,
+          "properties": {
+            "gitlab": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitLabConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "OrganizationProperties",
+          "type": "object"
+        },
+        "OrganizationType": {
+          "enum": [
+            "user",
+            "community",
+            "organization"
+          ],
+          "title": "OrganizationType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "organization_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country"
+        }
+      },
+      "title": "OrganizationUpdate",
+      "type": "object",
+      "x-model-name": "OrganizationUpdate"
+    },
+    "OrganizationQuery": {
+      "$defs": {
+        "GitLabConfig": {
+          "properties": {
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settings"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Full Path"
+            },
+            "directory": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Directory"
+            },
+            "registry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Registry"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Synced At"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Token"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        },
+        "OrganizationProperties": {
+          "additionalProperties": true,
+          "properties": {
+            "gitlab": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitLabConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "OrganizationProperties",
+          "type": "object"
+        },
+        "OrganizationType": {
+          "enum": [
+            "user",
+            "community",
+            "organization"
+          ],
+          "title": "OrganizationType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "organization_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationProperties"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country"
+        }
+      },
+      "title": "OrganizationQuery",
+      "type": "object",
+      "x-model-name": "OrganizationQuery"
+    },
+    "OrganizationTaskRequest": {
+      "$defs": {
+        "GitLabCredentials": {
+          "description": "GitLab connection credentials.",
+          "properties": {
+            "gitlab_url": {
+              "title": "Gitlab Url",
+              "type": "string"
+            },
+            "gitlab_token": {
+              "title": "Gitlab Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "gitlab_url",
+            "gitlab_token"
+          ],
+          "title": "GitLabCredentials",
+          "type": "object"
+        }
+      },
+      "description": "Request to create an organization via Temporal workflow.",
+      "properties": {
+        "organization": {
+          "additionalProperties": true,
+          "title": "Organization",
+          "type": "object"
+        },
+        "gitlab": {
+          "$ref": "#/$defs/GitLabCredentials"
+        },
+        "parent_group_id": {
+          "title": "Parent Group Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "organization",
+        "gitlab",
+        "parent_group_id"
+      ],
+      "title": "OrganizationTaskRequest",
+      "type": "object",
+      "x-model-name": "OrganizationTaskRequest"
+    },
+    "OrganizationConfig": {
+      "$defs": {
+        "GitHubConfig": {
+          "description": "GitHub repository configuration (future support).",
+          "properties": {
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub instance URL",
+              "title": "Url"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub API token",
+              "title": "Token"
+            },
+            "organization": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub organization",
+              "title": "Organization"
+            }
+          },
+          "title": "GitHubConfig",
+          "type": "object"
+        },
+        "GitLabConfig": {
+          "description": "GitLab repository configuration.",
+          "properties": {
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab instance URL",
+              "title": "Url"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab API token",
+              "title": "Token"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Parent group ID",
+              "title": "Parent"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Full path in GitLab",
+              "title": "Full Path"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab group ID",
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Parent group ID",
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Namespace ID",
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Namespace path",
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Web URL",
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Visibility level",
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last sync timestamp",
+              "title": "Last Synced At"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        }
+      },
+      "description": "Organization configuration.",
+      "properties": {
+        "name": {
+          "description": "Organization display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "description": "Organization path/slug",
+          "title": "Path",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Organization-specific settings",
+          "title": "Settings"
+        },
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GitLab configuration"
+        },
+        "github": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitHubConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GitHub configuration (future)"
+        }
+      },
+      "required": [
+        "name",
+        "path"
+      ],
+      "title": "OrganizationConfig",
+      "type": "object",
+      "x-model-name": "OrganizationConfig"
+    },
+    "HierarchicalOrganizationConfig": {
+      "$defs": {
+        "CourseContentConfig": {
+          "description": "Configuration for course content (assignments, units, etc.).",
+          "properties": {
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Title of the course content (defaults from example if submittable)",
+              "title": "Title"
+            },
+            "path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Hierarchical path using dots (optional; generated when omitted)",
+              "title": "Path"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Description of the content",
+              "title": "Description"
+            },
+            "content_type": {
+              "description": "Slug of the course content type (must match a defined content_type)",
+              "title": "Content Type",
+              "type": "string"
+            },
+            "position": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Position for ordering (defaults to auto-increment)",
+              "title": "Position"
+            },
+            "max_group_size": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum group size for submissions",
+              "title": "Max Group Size"
+            },
+            "max_test_runs": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum test runs allowed",
+              "title": "Max Test Runs"
+            },
+            "max_submissions": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum submissions allowed",
+              "title": "Max Submissions"
+            },
+            "example_identifier": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Example identifier (e.g., 'week1.fibonacci') - required for submittable content",
+              "title": "Example Identifier"
+            },
+            "example_version_tag": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Version tag of the example (e.g., 'v1.0', 'latest') - defaults to latest",
+              "title": "Example Version Tag"
+            },
+            "execution_backend": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Override execution backend slug for this content",
+              "title": "Execution Backend"
+            },
+            "contents": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/CourseContentConfig"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nested course contents (for units containing assignments)",
+              "title": "Contents"
+            },
+            "properties": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Additional properties for the content",
+              "title": "Properties"
+            }
+          },
+          "required": [
+            "content_type"
+          ],
+          "title": "CourseContentConfig",
+          "type": "object"
+        },
+        "CourseContentTypeConfig": {
+          "description": "Course content type configuration for deployment.",
+          "properties": {
+            "slug": {
+              "description": "Unique identifier for the content type",
+              "title": "Slug",
+              "type": "string"
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Display title for the content type",
+              "title": "Title"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Description of the content type",
+              "title": "Description"
+            },
+            "color": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "green",
+              "description": "Display color (hex, rgb, hsl, or named color)",
+              "title": "Color"
+            },
+            "properties": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Additional properties",
+              "title": "Properties"
+            },
+            "kind": {
+              "description": "ID of the course content kind (e.g., 'assignment', 'unit')",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          "required": [
+            "slug",
+            "kind"
+          ],
+          "title": "CourseContentTypeConfig",
+          "type": "object"
+        },
+        "CourseProjects": {
+          "description": "Configuration for course-related GitLab projects.",
+          "properties": {
+            "tests": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "tests",
+              "description": "Path for tests project",
+              "title": "Tests"
+            },
+            "student_template": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "student-template",
+              "description": "Path for student template project",
+              "title": "Student Template"
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "reference",
+              "description": "Path for reference solution project",
+              "title": "Reference"
+            },
+            "examples": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "examples",
+              "description": "Path for examples project",
+              "title": "Examples"
+            },
+            "documents": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "documents",
+              "description": "Path for documents project",
+              "title": "Documents"
+            }
+          },
+          "title": "CourseProjects",
+          "type": "object"
+        },
+        "ExecutionBackendReference": {
+          "description": "Reference to an execution backend by slug for linking to courses.",
+          "properties": {
+            "slug": {
+              "description": "Slug of the execution backend to link",
+              "title": "Slug",
+              "type": "string"
+            },
+            "properties": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Course-specific overrides for this backend (optional)",
+              "title": "Properties"
+            }
+          },
+          "required": [
+            "slug"
+          ],
+          "title": "ExecutionBackendReference",
+          "type": "object"
+        },
+        "GitHubConfig": {
+          "description": "GitHub repository configuration (future support).",
+          "properties": {
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub instance URL",
+              "title": "Url"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub API token",
+              "title": "Token"
+            },
+            "organization": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitHub organization",
+              "title": "Organization"
+            }
+          },
+          "title": "GitHubConfig",
+          "type": "object"
+        },
+        "GitLabConfig": {
+          "description": "GitLab repository configuration.",
+          "properties": {
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab instance URL",
+              "title": "Url"
+            },
+            "token": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab API token",
+              "title": "Token"
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Parent group ID",
+              "title": "Parent"
+            },
+            "full_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Full path in GitLab",
+              "title": "Full Path"
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "GitLab group ID",
+              "title": "Group Id"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Parent group ID",
+              "title": "Parent Id"
+            },
+            "namespace_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Namespace ID",
+              "title": "Namespace Id"
+            },
+            "namespace_path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Namespace path",
+              "title": "Namespace Path"
+            },
+            "web_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Web URL",
+              "title": "Web Url"
+            },
+            "visibility": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Visibility level",
+              "title": "Visibility"
+            },
+            "last_synced_at": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last sync timestamp",
+              "title": "Last Synced At"
+            }
+          },
+          "title": "GitLabConfig",
+          "type": "object"
+        },
+        "HierarchicalCourseConfig": {
+          "description": "Course configuration for hierarchical deployment.",
+          "properties": {
+            "name": {
+              "description": "Course display name",
+              "title": "Name",
+              "type": "string"
+            },
+            "path": {
+              "description": "Course path/slug",
+              "title": "Path",
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Course description",
+              "title": "Description"
+            },
+            "projects": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CourseProjects"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Course project structure"
+            },
+            "execution_backends": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/ExecutionBackendReference"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "References to execution backends to link to this course (by slug)",
+              "title": "Execution Backends"
+            },
+            "content_types": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/CourseContentTypeConfig"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Course content types to be created (assignments, units, etc.)",
+              "title": "Content Types"
+            },
+            "contents": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/CourseContentConfig"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Course contents hierarchy (assignments, units, etc.)",
+              "title": "Contents"
+            },
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Course-specific settings",
+              "title": "Settings"
+            }
+          },
+          "required": [
+            "name",
+            "path"
+          ],
+          "title": "HierarchicalCourseConfig",
+          "type": "object"
+        },
+        "HierarchicalCourseFamilyConfig": {
+          "description": "Course family configuration with nested courses.",
+          "properties": {
+            "name": {
+              "description": "Course family display name",
+              "title": "Name",
+              "type": "string"
+            },
+            "path": {
+              "description": "Course family path/slug",
+              "title": "Path",
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Course family description",
+              "title": "Description"
+            },
+            "settings": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Course family-specific settings",
+              "title": "Settings"
+            },
+            "courses": {
+              "description": "List of courses in this course family",
+              "items": {
+                "$ref": "#/$defs/HierarchicalCourseConfig"
+              },
+              "title": "Courses",
+              "type": "array"
+            }
+          },
+          "required": [
+            "name",
+            "path"
+          ],
+          "title": "HierarchicalCourseFamilyConfig",
+          "type": "object"
+        }
+      },
+      "description": "Organization configuration with nested course families.",
+      "properties": {
+        "name": {
+          "description": "Organization display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "description": "Organization path/slug",
+          "title": "Path",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Organization-specific settings",
+          "title": "Settings"
+        },
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GitLab configuration"
+        },
+        "github": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitHubConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "GitHub configuration (future)"
+        },
+        "course_families": {
+          "description": "List of course families in this organization",
+          "items": {
+            "$ref": "#/$defs/HierarchicalCourseFamilyConfig"
+          },
+          "title": "Course Families",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "path"
+      ],
+      "title": "HierarchicalOrganizationConfig",
+      "type": "object",
+      "x-model-name": "HierarchicalOrganizationConfig"
+    }
+  },
+  "enums": {
+    "OrganizationType": {
+      "type": "string",
+      "enum": [
+        "user",
+        "community",
+        "organization"
+      ],
+      "x-enum-name": "OrganizationType",
+      "x-is-enum": true
+    }
+  }
+}

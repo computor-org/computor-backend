@@ -1,0 +1,1815 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Users Schemas",
+  "description": "Auto-generated JSON schemas for users models",
+  "category": "users",
+  "models": {
+    "CourseMemberProviderAccountUpdate": {
+      "description": "Request payload to set or update a provider account for a course member.",
+      "properties": {
+        "provider_account_id": {
+          "description": "Account identifier on the external provider (e.g., GitLab username)",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Provider Account Id",
+          "type": "string"
+        },
+        "provider_access_token": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Personal access token or credential to verify provider ownership",
+          "title": "Provider Access Token"
+        }
+      },
+      "required": [
+        "provider_account_id"
+      ],
+      "title": "CourseMemberProviderAccountUpdate",
+      "type": "object",
+      "x-model-name": "CourseMemberProviderAccountUpdate"
+    },
+    "UserGroupCreate": {
+      "properties": {
+        "user_id": {
+          "description": "User ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "group_id": {
+          "description": "Group ID",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "transient": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Whether this is a transient membership",
+          "title": "Transient"
+        }
+      },
+      "required": [
+        "user_id",
+        "group_id"
+      ],
+      "title": "UserGroupCreate",
+      "type": "object",
+      "x-model-name": "UserGroupCreate"
+    },
+    "UserGroupGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "user_id": {
+          "description": "User ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "group_id": {
+          "description": "Group ID",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "transient": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether this is transient membership",
+          "title": "Transient"
+        }
+      },
+      "required": [
+        "user_id",
+        "group_id"
+      ],
+      "title": "UserGroupGet",
+      "type": "object",
+      "x-model-name": "UserGroupGet"
+    },
+    "UserGroupList": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "user_id": {
+          "description": "User ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "group_id": {
+          "description": "Group ID",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "transient": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether this is transient membership",
+          "title": "Transient"
+        }
+      },
+      "required": [
+        "user_id",
+        "group_id"
+      ],
+      "title": "UserGroupList",
+      "type": "object",
+      "x-model-name": "UserGroupList"
+    },
+    "UserGroupUpdate": {
+      "properties": {
+        "transient": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether this is transient membership",
+          "title": "Transient"
+        }
+      },
+      "title": "UserGroupUpdate",
+      "type": "object",
+      "x-model-name": "UserGroupUpdate"
+    },
+    "UserGroupQuery": {
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by user ID",
+          "title": "User Id"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by group ID",
+          "title": "Group Id"
+        },
+        "transient": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by transient status",
+          "title": "Transient"
+        }
+      },
+      "title": "UserGroupQuery",
+      "type": "object",
+      "x-model-name": "UserGroupQuery"
+    },
+    "UserRoleCreate": {
+      "properties": {
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "role_id": {
+          "title": "Role Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "role_id"
+      ],
+      "title": "UserRoleCreate",
+      "type": "object",
+      "x-model-name": "UserRoleCreate"
+    },
+    "UserRoleGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "role_id": {
+          "title": "Role Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "role_id"
+      ],
+      "title": "UserRoleGet",
+      "type": "object",
+      "x-model-name": "UserRoleGet"
+    },
+    "UserRoleList": {
+      "properties": {
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "role_id": {
+          "title": "Role Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "role_id"
+      ],
+      "title": "UserRoleList",
+      "type": "object",
+      "x-model-name": "UserRoleList"
+    },
+    "UserRoleUpdate": {
+      "properties": {
+        "role_id": {
+          "title": "Role Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role_id"
+      ],
+      "title": "UserRoleUpdate",
+      "type": "object",
+      "x-model-name": "UserRoleUpdate"
+    },
+    "UserRoleQuery": {
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Id"
+        },
+        "role_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role Id"
+        }
+      },
+      "title": "UserRoleQuery",
+      "type": "object",
+      "x-model-name": "UserRoleQuery"
+    },
+    "UserCreate": {
+      "$defs": {
+        "UserTypeEnum": {
+          "enum": [
+            "user",
+            "token"
+          ],
+          "title": "UserTypeEnum",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User ID (UUID will be generated if not provided)",
+          "title": "Id"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User number/identifier",
+          "title": "Number"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "user",
+          "description": "Type of user account"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "maxLength": 50,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional user properties",
+          "title": "Properties"
+        }
+      },
+      "title": "UserCreate",
+      "type": "object",
+      "x-model-name": "UserCreate"
+    },
+    "UserGet": {
+      "$defs": {
+        "StudentProfileGet": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "student_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Student Id"
+            },
+            "student_email": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Student Email"
+            },
+            "user_id": {
+              "title": "User Id",
+              "type": "string"
+            },
+            "created_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Creation timestamp",
+              "title": "Created At"
+            },
+            "updated_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Update timestamp",
+              "title": "Updated At"
+            },
+            "created_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Created By"
+            },
+            "updated_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updated By"
+            }
+          },
+          "required": [
+            "id",
+            "user_id"
+          ],
+          "title": "StudentProfileGet",
+          "type": "object"
+        },
+        "UserTypeEnum": {
+          "enum": [
+            "user",
+            "token"
+          ],
+          "title": "UserTypeEnum",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "User unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User number/identifier",
+          "title": "Number"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of user account"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional user properties",
+          "title": "Properties"
+        },
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp when user was archived",
+          "title": "Archived At"
+        },
+        "student_profiles": {
+          "default": [],
+          "description": "Associated student profiles",
+          "items": {
+            "$ref": "#/$defs/StudentProfileGet"
+          },
+          "title": "Student Profiles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "UserGet",
+      "type": "object",
+      "x-model-name": "UserGet"
+    },
+    "UserList": {
+      "$defs": {
+        "UserTypeEnum": {
+          "enum": [
+            "user",
+            "token"
+          ],
+          "title": "UserTypeEnum",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "id": {
+          "description": "User unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of user account"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Archive timestamp",
+          "title": "Archived At"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "UserList",
+      "type": "object",
+      "x-model-name": "UserList"
+    },
+    "UserUpdate": {
+      "properties": {
+        "given_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User number/identifier",
+          "title": "Number"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "maxLength": 50,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional user properties",
+          "title": "Properties"
+        }
+      },
+      "title": "UserUpdate",
+      "type": "object",
+      "x-model-name": "UserUpdate"
+    },
+    "UserQuery": {
+      "$defs": {
+        "UserTypeEnum": {
+          "enum": [
+            "user",
+            "token"
+          ],
+          "title": "UserTypeEnum",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Properties"
+        },
+        "archived": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Archived"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username"
+        }
+      },
+      "title": "UserQuery",
+      "type": "object",
+      "x-model-name": "UserQuery"
+    },
+    "AccountCreate": {
+      "properties": {
+        "provider": {
+          "description": "Authentication provider name",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of authentication account",
+          "title": "Type",
+          "type": "string"
+        },
+        "provider_account_id": {
+          "description": "Account ID from the provider",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Provider Account Id",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Associated user ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-specific properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "provider",
+        "type",
+        "provider_account_id",
+        "user_id"
+      ],
+      "title": "AccountCreate",
+      "type": "object",
+      "x-model-name": "AccountCreate"
+    },
+    "AccountGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Account unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Authentication provider name",
+          "title": "Provider",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of authentication account",
+          "title": "Type",
+          "type": "string"
+        },
+        "provider_account_id": {
+          "description": "Account ID from the provider",
+          "title": "Provider Account Id",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Associated user ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-specific properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "type",
+        "provider_account_id",
+        "user_id"
+      ],
+      "title": "AccountGet",
+      "type": "object",
+      "x-model-name": "AccountGet"
+    },
+    "AccountList": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "id": {
+          "description": "Account unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Authentication provider name",
+          "title": "Provider",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of authentication account",
+          "title": "Type",
+          "type": "string"
+        },
+        "provider_account_id": {
+          "description": "Account ID from the provider",
+          "title": "Provider Account Id",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Associated user ID",
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "type",
+        "provider_account_id",
+        "user_id"
+      ],
+      "title": "AccountList",
+      "type": "object",
+      "x-model-name": "AccountList"
+    },
+    "AccountUpdate": {
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Authentication provider name",
+          "title": "Provider"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of authentication account",
+          "title": "Type"
+        },
+        "provider_account_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Account ID from the provider",
+          "title": "Provider Account Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-specific properties",
+          "title": "Properties"
+        }
+      },
+      "title": "AccountUpdate",
+      "type": "object",
+      "x-model-name": "AccountUpdate"
+    },
+    "AccountQuery": {
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "provider_account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Account Id"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Properties"
+        }
+      },
+      "title": "AccountQuery",
+      "type": "object",
+      "x-model-name": "AccountQuery"
+    },
+    "UserPassword": {
+      "properties": {
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        },
+        "password_old": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password Old"
+        }
+      },
+      "required": [
+        "password"
+      ],
+      "title": "UserPassword",
+      "type": "object",
+      "x-model-name": "UserPassword"
+    },
+    "UserRegistrationRequest": {
+      "description": "User registration request.",
+      "properties": {
+        "username": {
+          "description": "Username",
+          "maxLength": 50,
+          "minLength": 3,
+          "title": "Username",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "title": "Email",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password",
+          "minLength": 8,
+          "title": "Password",
+          "type": "string"
+        },
+        "given_name": {
+          "description": "First name",
+          "minLength": 1,
+          "title": "Given Name",
+          "type": "string"
+        },
+        "family_name": {
+          "description": "Last name",
+          "minLength": 1,
+          "title": "Family Name",
+          "type": "string"
+        },
+        "provider": {
+          "default": "keycloak",
+          "description": "Authentication provider to register with",
+          "title": "Provider",
+          "type": "string"
+        },
+        "send_verification_email": {
+          "default": true,
+          "description": "Send email verification",
+          "title": "Send Verification Email",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "username",
+        "email",
+        "password",
+        "given_name",
+        "family_name"
+      ],
+      "title": "UserRegistrationRequest",
+      "type": "object",
+      "x-model-name": "UserRegistrationRequest"
+    },
+    "UserRegistrationResponse": {
+      "description": "Response after successful user registration.",
+      "properties": {
+        "user_id": {
+          "description": "User ID in Computor",
+          "title": "User Id",
+          "type": "string"
+        },
+        "provider_user_id": {
+          "description": "User ID in authentication provider",
+          "title": "Provider User Id",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username",
+          "title": "Username",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "title": "Email",
+          "type": "string"
+        },
+        "message": {
+          "description": "Success message",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "provider_user_id",
+        "username",
+        "email",
+        "message"
+      ],
+      "title": "UserRegistrationResponse",
+      "type": "object",
+      "x-model-name": "UserRegistrationResponse"
+    }
+  },
+  "enums": {
+    "UserTypeEnum": {
+      "type": "string",
+      "enum": [
+        "user",
+        "token"
+      ],
+      "x-enum-name": "UserTypeEnum",
+      "x-is-enum": true
+    }
+  }
+}

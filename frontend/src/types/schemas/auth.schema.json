@@ -1,0 +1,410 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Auth Schemas",
+  "description": "Auto-generated JSON schemas for auth models",
+  "category": "auth",
+  "models": {
+    "MessageAuthor": {
+      "properties": {
+        "given_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Author's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Author's family name",
+          "title": "Family Name"
+        }
+      },
+      "title": "MessageAuthor",
+      "type": "object",
+      "x-model-name": "MessageAuthor"
+    },
+    "GradingAuthor": {
+      "properties": {
+        "given_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Author's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Author's family name",
+          "title": "Family Name"
+        }
+      },
+      "title": "GradingAuthor",
+      "type": "object",
+      "x-model-name": "GradingAuthor"
+    },
+    "AuthConfig": {
+      "properties": {},
+      "title": "AuthConfig",
+      "type": "object",
+      "x-model-name": "AuthConfig"
+    },
+    "GLPAuthConfig": {
+      "properties": {
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "token": {
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "token"
+      ],
+      "title": "GLPAuthConfig",
+      "type": "object",
+      "x-model-name": "GLPAuthConfig"
+    },
+    "BasicAuthConfig": {
+      "properties": {
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "BasicAuthConfig",
+      "type": "object",
+      "x-model-name": "BasicAuthConfig"
+    },
+    "LocalLoginRequest": {
+      "description": "Request model for local username/password login.",
+      "properties": {
+        "username": {
+          "description": "Username or email",
+          "minLength": 1,
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password",
+          "minLength": 1,
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "LocalLoginRequest",
+      "type": "object",
+      "x-model-name": "LocalLoginRequest"
+    },
+    "LocalLoginResponse": {
+      "description": "Response model after successful local login.",
+      "properties": {
+        "access_token": {
+          "description": "Bearer access token for API requests",
+          "title": "Access Token",
+          "type": "string"
+        },
+        "refresh_token": {
+          "description": "Refresh token to obtain new access token",
+          "title": "Refresh Token",
+          "type": "string"
+        },
+        "expires_in": {
+          "description": "Access token expiration time in seconds",
+          "title": "Expires In",
+          "type": "integer"
+        },
+        "user_id": {
+          "description": "User ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "token_type": {
+          "default": "Bearer",
+          "description": "Token type",
+          "title": "Token Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "access_token",
+        "refresh_token",
+        "expires_in",
+        "user_id"
+      ],
+      "title": "LocalLoginResponse",
+      "type": "object",
+      "x-model-name": "LocalLoginResponse"
+    },
+    "LocalTokenRefreshRequest": {
+      "description": "Request model for refreshing local session token.",
+      "properties": {
+        "refresh_token": {
+          "description": "Refresh token from initial authentication",
+          "title": "Refresh Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "refresh_token"
+      ],
+      "title": "LocalTokenRefreshRequest",
+      "type": "object",
+      "x-model-name": "LocalTokenRefreshRequest"
+    },
+    "LocalTokenRefreshResponse": {
+      "description": "Response model after successful token refresh.",
+      "properties": {
+        "access_token": {
+          "description": "New Bearer access token",
+          "title": "Access Token",
+          "type": "string"
+        },
+        "expires_in": {
+          "description": "Token expiration time in seconds",
+          "title": "Expires In",
+          "type": "integer"
+        },
+        "refresh_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New refresh token if rotated",
+          "title": "Refresh Token"
+        },
+        "token_type": {
+          "default": "Bearer",
+          "description": "Token type",
+          "title": "Token Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "access_token",
+        "expires_in"
+      ],
+      "title": "LocalTokenRefreshResponse",
+      "type": "object",
+      "x-model-name": "LocalTokenRefreshResponse"
+    },
+    "OrganizationUpdateTokenQuery": {
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "OrganizationUpdateTokenQuery",
+      "type": "object",
+      "x-model-name": "OrganizationUpdateTokenQuery"
+    },
+    "OrganizationUpdateTokenUpdate": {
+      "properties": {
+        "token": {
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "title": "OrganizationUpdateTokenUpdate",
+      "type": "object",
+      "x-model-name": "OrganizationUpdateTokenUpdate"
+    },
+    "LoginRequest": {
+      "description": "Login request for SSO.",
+      "properties": {
+        "provider": {
+          "description": "Provider name",
+          "title": "Provider",
+          "type": "string"
+        },
+        "redirect_uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Redirect URI after login",
+          "title": "Redirect Uri"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "title": "LoginRequest",
+      "type": "object",
+      "x-model-name": "LoginRequest"
+    },
+    "SSOAuthResponse": {
+      "description": "Response after successful SSO authentication.",
+      "properties": {
+        "user_id": {
+          "description": "User ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "account_id": {
+          "description": "Account ID",
+          "title": "Account Id",
+          "type": "string"
+        },
+        "access_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Access token if available",
+          "title": "Access Token"
+        },
+        "is_new_user": {
+          "description": "Whether this is a new user",
+          "title": "Is New User",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "user_id",
+        "account_id",
+        "is_new_user"
+      ],
+      "title": "SSOAuthResponse",
+      "type": "object",
+      "x-model-name": "SSOAuthResponse"
+    },
+    "TokenRefreshRequest": {
+      "description": "Token refresh request.",
+      "properties": {
+        "refresh_token": {
+          "description": "Refresh token from initial authentication",
+          "title": "Refresh Token",
+          "type": "string"
+        },
+        "provider": {
+          "default": "keycloak",
+          "description": "Authentication provider",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "refresh_token"
+      ],
+      "title": "TokenRefreshRequest",
+      "type": "object",
+      "x-model-name": "TokenRefreshRequest"
+    },
+    "TokenRefreshResponse": {
+      "description": "Response after successful token refresh.",
+      "properties": {
+        "access_token": {
+          "description": "New access token",
+          "title": "Access Token",
+          "type": "string"
+        },
+        "expires_in": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Token expiration time in seconds",
+          "title": "Expires In"
+        },
+        "refresh_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New refresh token if rotated",
+          "title": "Refresh Token"
+        }
+      },
+      "required": [
+        "access_token"
+      ],
+      "title": "TokenRefreshResponse",
+      "type": "object",
+      "x-model-name": "TokenRefreshResponse"
+    }
+  },
+  "enums": {}
+}

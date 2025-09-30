@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Schema Index",
+  "description": "Index of all exported Pydantic schemas",
+  "categories": [
+    "auth",
+    "users",
+    "courses",
+    "organizations",
+    "roles",
+    "sso",
+    "tasks",
+    "examples",
+    "messages",
+    "common"
+  ],
+  "total_models": 394,
+  "total_enums": 12
+}

@@ -13,6 +13,7 @@ from ctutor_backend.permissions.handlers_impl import (
     UserPermissionHandler,
     AccountPermissionHandler,
     ProfilePermissionHandler,
+    StudentProfilePermissionHandler,
     CoursePermissionHandler,
     OrganizationPermissionHandler,
     CourseFamilyPermissionHandler,
@@ -60,7 +61,7 @@ def initialize_permission_handlers():
     permission_registry.register(User, UserPermissionHandler(User))
     permission_registry.register(Account, AccountPermissionHandler(Account))
     permission_registry.register(Profile, ProfilePermissionHandler(Profile))
-    permission_registry.register(StudentProfile, ProfilePermissionHandler(StudentProfile))
+    permission_registry.register(StudentProfile, StudentProfilePermissionHandler(StudentProfile))
     permission_registry.register(UserSession, ProfilePermissionHandler(UserSession))
     
     # Organization and Course hierarchy
