@@ -4,19 +4,21 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
-from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
+from ctutor_backend.model import CourseContentType, SubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
 
 class ResultCreate(BaseModel):
-    submit: bool
     course_member_id: str
     course_content_id: str
-    course_submission_group_id: str = None
+    submission_group_id: str = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
@@ -34,14 +36,15 @@ class ResultCreate(BaseModel):
 
 class ResultGet(BaseEntityGet):
     id: str
-    submit: bool
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
@@ -61,14 +64,15 @@ class ResultGet(BaseEntityGet):
 
 class ResultList(BaseEntityList):
     id: str
-    submit: bool
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
+    grade: Optional[float] = None
     version_identifier: str
     reference_version_identifier: Optional[str] = None
     status: TaskStatus
@@ -83,8 +87,8 @@ class ResultList(BaseEntityList):
         return map_int_to_task_status(value)
     
 class ResultUpdate(BaseModel):
-    submit: Optional[bool | None] = None
     result: Optional[float | None] = None
+    grade: Optional[float | None] = None
     result_json: Optional[dict | None] = None
     status: Optional[TaskStatus | None] = None
     test_system_id: Optional[str] = None
@@ -101,18 +105,19 @@ class ResultUpdate(BaseModel):
 
 class ResultQuery(ListQuery):
     id: Optional[str] = None
-    submit: Optional[bool] = None
     submitter_id: Optional[str] = None
     course_member_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    submission_artifact_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str ] = None
     version_identifier: Optional[str] = None
     status: Optional[TaskStatus] = None
     latest: Optional[bool] = False
     result: Optional[float] = None
+    grade: Optional[float] = None
     result_json: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -128,28 +133,30 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         query = query.filter(Result.id == params.id)
         latest_group_by_conditions.append(Result.id)
         latest_join_by_conditions.append(lambda subquery: Result.id == subquery.c.id)
-    if params.submit != None:
-        query = query.filter(Result.submit == params.submit)
     if params.submitter_id != None:
         query = query.filter(Result.course_member_id == params.submitter_id)
         latest_group_by_conditions.append(Result.course_member_id)
         latest_join_by_conditions.append(lambda subquery: Result.course_member_id == subquery.c.course_member_id)
 
     if params.course_member_id != None:
-        query = query.join(CourseSubmissionGroupMember,CourseSubmissionGroupMember.course_submission_group_id == Result.course_submission_group_id) \
-            .filter(CourseSubmissionGroupMember.course_member_id == params.course_member_id)
+        query = query.join(SubmissionGroupMember,SubmissionGroupMember.submission_group_id == Result.submission_group_id) \
+            .filter(SubmissionGroupMember.course_member_id == params.course_member_id)
 
-        latest_group_by_conditions.append(Result.course_submission_group_id)
-        latest_join_by_conditions.append(lambda subquery: Result.course_submission_group_id == subquery.c.course_submission_group_id)
+        latest_group_by_conditions.append(Result.submission_group_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_group_id == subquery.c.submission_group_id)
 
     if params.course_content_id != None:
         query = query.filter(Result.course_content_id == params.course_content_id)
     if params.course_content_type_id != None:
         query = query.filter(Result.course_content_type_id == params.course_content_type_id)
-    if params.course_submission_group_id != None:
-        query = query.filter(Result.course_submission_group_id == params.course_submission_group_id)
-        latest_group_by_conditions.append(Result.course_submission_group_id)
-        latest_join_by_conditions.append(lambda subquery: Result.course_submission_group_id == subquery.c.course_submission_group_id)
+    if params.submission_group_id != None:
+        query = query.filter(Result.submission_group_id == params.submission_group_id)
+        latest_group_by_conditions.append(Result.submission_group_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_group_id == subquery.c.submission_group_id)
+    if params.submission_artifact_id != None:
+        query = query.filter(Result.submission_artifact_id == params.submission_artifact_id)
+        latest_group_by_conditions.append(Result.submission_artifact_id)
+        latest_join_by_conditions.append(lambda subquery: Result.submission_artifact_id == subquery.c.submission_artifact_id)
     if params.execution_backend_id != None:
         query = query.filter(Result.execution_backend_id == params.execution_backend_id)
         latest_group_by_conditions.append(Result.execution_backend_id)
@@ -170,6 +177,10 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         query = query.filter(Result.result == params.result)
         latest_group_by_conditions.append(Result.result)
         latest_join_by_conditions.append(lambda subquery: Result.result == subquery.c.result)
+    if params.grade != None:
+        query = query.filter(Result.grade == params.grade)
+        latest_group_by_conditions.append(Result.grade)
+        latest_join_by_conditions.append(lambda subquery: Result.grade == subquery.c.grade)
 
     if params.result_json != None:
         result_json = json.loads(params.result_json)
@@ -217,34 +228,34 @@ class ResultWithGrading(ResultGet):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ResultDetailed(BaseModel):
-    """Detailed result information including submission group and grading."""
-    id: str
-    submit: bool
-    course_member_id: str
-    course_member_name: Optional[str] = None  # Name of the submitter
-    course_content_id: str
-    course_content_title: Optional[str] = None
-    course_content_path: Optional[str] = None
-    course_content_type_id: str
-    course_submission_group_id: Optional[str] = None
-    submission_group_members: Optional[List[dict]] = []  # Group member info
-    execution_backend_id: str
-    test_system_id: Optional[str] = None
-    result: float
-    result_json: Optional[dict | None] = None
-    properties: Optional[dict | None] = None
-    version_identifier: str
-    reference_version_identifier: Optional[str] = None
-    status: TaskStatus
+# class ResultDetailed(BaseModel):
+#     """Detailed result information including submission group and grading."""
+#     id: str
+#     submit: bool
+#     course_member_id: str
+#     course_member_name: Optional[str] = None  # Name of the submitter
+#     course_content_id: str
+#     course_content_title: Optional[str] = None
+#     course_content_path: Optional[str] = None
+#     course_content_type_id: str
+#     submission_group_id: Optional[str] = None
+#     submission_group_members: Optional[List[dict]] = []  # Group member info
+#     execution_backend_id: str
+#     test_system_id: Optional[str] = None
+#     result: float
+#     result_json: Optional[dict | None] = None
+#     properties: Optional[dict | None] = None
+#     version_identifier: str
+#     reference_version_identifier: Optional[str] = None
+#     status: TaskStatus
     
-    # Grading information
-    gradings: List[dict] = []  # All gradings for this result
-    latest_grade: Optional[float] = None
-    latest_grading_status: Optional[int] = None  # GradingStatus value
-    latest_grading_feedback: Optional[str] = None
+#     # Grading information
+#     gradings: List[dict] = []  # All gradings for this result
+#     latest_grade: Optional[float] = None
+#     latest_grading_status: Optional[int] = None  # GradingStatus value
+#     latest_grading_feedback: Optional[str] = None
     
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+#     created_at: Optional[str] = None
+#     updated_at: Optional[str] = None
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)

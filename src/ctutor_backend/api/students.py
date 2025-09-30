@@ -19,11 +19,11 @@ from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentQuery,
     CourseContentStudentGet,
 )
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import Course, CourseContent, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 student_router = APIRouter()
@@ -74,14 +74,14 @@ async def student_get_course_content_cached(course_content_id: str, permissions:
 ## MR-based course-content messages removed (deprecated)
 
 @student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
-def student_get_course_content(course_content_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+def student_get_course_content(course_content_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course_contents_result = user_course_content_query(permissions.get_user_id_or_throw(),course_content_id,db)
  
     return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
-def student_list_course_contents(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
+def student_list_course_contents(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     query = user_course_content_list_query(permissions.get_user_id_or_throw(),db)
 
@@ -95,7 +95,7 @@ def student_list_course_contents(permissions: Annotated[Principal, Depends(get_c
     return response_list
 
 @student_router.get("/courses", response_model=list[CourseStudentList])
-async def student_list_courses(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
+async def student_list_courses(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     # TODO: query should be improved: course_contents for course_group_members shall be available. All ascendant sould be included afterwards, but in one query.
 
@@ -120,7 +120,7 @@ async def student_list_courses(permissions: Annotated[Principal, Depends(get_cur
     return response_list
 
 @student_router.get("/courses/{course_id}", response_model=CourseStudentGet)
-async def student_get_course(course_id: UUID | str,permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+async def student_get_course(course_id: UUID | str,permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course = check_course_permissions(permissions,Course,"_student",db).filter(Course.id == course_id).first()
 
@@ -140,7 +140,7 @@ async def student_get_course(course_id: UUID | str,permissions: Annotated[Princi
 ## MR-based course-content messages removed (deprecated)
 
 @student_router.get("/repositories", response_model=list[str])
-async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     # TODO: only gitlab is implemented yet
     properties = [q[0] for q in db.query(CourseMember.properties) \
@@ -159,7 +159,7 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
 # async def submit_assignment(
 #     course_content_id: str,
 #     submit_request: SubmitRequest,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db),
 #     cache: BaseCache = Depends(get_redis_client)
 # ):
@@ -181,14 +181,14 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
 #     )
     
 #     # Find the submission group for this course content that the user belongs to
-#     submission_group = db.query(CourseSubmissionGroup).join(
-#         CourseSubmissionGroupMember,
-#         CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id
+#     submission_group = db.query(SubmissionGroup).join(
+#         SubmissionGroupMember,
+#         SubmissionGroupMember.submission_group_id == SubmissionGroup.id
 #     ).join(
 #         CourseMember,
-#         CourseMember.id == CourseSubmissionGroupMember.course_member_id
+#         CourseMember.id == SubmissionGroupMember.course_member_id
 #     ).filter(
-#         CourseSubmissionGroup.course_content_id == course_content_id,
+#         SubmissionGroup.course_content_id == course_content_id,
 #         CourseMember.user_id == user_id
 #     ).first()
     
@@ -205,7 +205,7 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
     
 #     # Find the last result for this submission group
 #     last_result = db.query(Result).filter(
-#         Result.course_submission_group_id == submission_group.id
+#         Result.submission_group_id == submission_group.id
 #     ).order_by(Result.created_at.desc()).first()
     
 #     if not last_result:

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.crud import update_db
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.database import get_db
@@ -19,7 +19,7 @@ from ctutor_backend.interface.courses import CourseGet, CourseInterface
 course_router = CrudRouter(CourseInterface)
 
 @course_router.router.patch("/{course_id}/execution-backends/{execution_backend_id}", response_model=CourseExecutionBackendGet)
-def patch_course_execution_backend(permissions: Annotated[Principal, Depends(get_current_permissions)], course_id: UUID | str, execution_backend_id: UUID | str, entity: dict, db: Session = Depends(get_db)):
+def patch_course_execution_backend(permissions: Annotated[Principal, Depends(get_current_principal)], course_id: UUID | str, execution_backend_id: UUID | str, entity: dict, db: Session = Depends(get_db)):
 
     query = check_permissions(permissions,CourseExecutionBackend,"update",db)
 
@@ -32,7 +32,7 @@ def patch_course_execution_backend(permissions: Annotated[Principal, Depends(get
     return update_db(db, None, entity, CourseExecutionBackend, CourseExecutionBackendUpdate, CourseExecutionBackendGet, entity_model)
 
 @course_router.router.delete("/{course_id}/execution-backends/{execution_backend_id}", response_model=dict)
-def delete_course_execution_backend(permissions: Annotated[Principal, Depends(get_current_permissions)], course_id: UUID | str, execution_backend_id: UUID | str, db: Session = Depends(get_db)):
+def delete_course_execution_backend(permissions: Annotated[Principal, Depends(get_current_principal)], course_id: UUID | str, execution_backend_id: UUID | str, db: Session = Depends(get_db)):
 
     query = check_permissions(permissions,CourseExecutionBackend,"delete",db)
 

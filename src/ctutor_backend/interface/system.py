@@ -6,7 +6,6 @@ releases, status queries, and task management.
 """
 
 from typing import List, Optional, Dict, Any
-from uuid import UUID
 from pydantic import BaseModel, Field
 
 from .deployments import ComputorDeploymentConfig
@@ -17,9 +16,9 @@ from .users import UserGet
 
 class StudentCreate(BaseModel):
     """DTO for creating a student."""
-    user_id: Optional[UUID | str] = None
+    user_id: Optional[str | str] = None
     user: Optional[UserGet] = None
-    course_group_id: Optional[UUID | str] = None
+    course_group_id: Optional[str | str] = None
     course_group_title: Optional[str] = None
     role: Optional[str] = None
 
@@ -27,7 +26,7 @@ class StudentCreate(BaseModel):
 class ReleaseStudentsCreate(BaseModel):
     """DTO for releasing multiple students."""
     students: List[StudentCreate] = []
-    course_id: UUID | str
+    course_id: str | str
 
 
 class TUGStudentExport(BaseModel):
@@ -119,18 +118,18 @@ class PendingChangesResponse(BaseModel):
 
 class ReleaseOverride(BaseModel):
     """Per-item override for release commit selection."""
-    course_content_id: UUID | str
+    course_content_id: str | str
     version_identifier: str = Field(description="Commit SHA to use for this content")
 
 
 class ReleaseSelection(BaseModel):
     """Selection of contents and commits for a release."""
     # Selection scope
-    course_content_ids: Optional[List[UUID | str]] = Field(
+    course_content_ids: Optional[List[str | str]] = Field(
         default=None,
         description="Explicit list of course content IDs to release"
     )
-    parent_id: Optional[UUID | str] = Field(
+    parent_id: Optional[str | str] = Field(
         default=None,
         description="Parent content ID; combined with include_descendants"
     )

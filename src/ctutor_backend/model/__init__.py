@@ -1,5 +1,6 @@
 from .base import Base, metadata
 from .auth import User, Account, Profile, StudentProfile, Session
+from .language import Language
 from .organization import Organization
 from .course import (
     CourseContentKind,
@@ -11,9 +12,8 @@ from .course import (
     CourseGroup,
     CourseContent,
     CourseMember,
-    CourseSubmissionGroup,
-    CourseSubmissionGroupMember,
-    CourseSubmissionGroupGrading,
+    SubmissionGroup,
+    SubmissionGroupMember,
     CourseMemberComment
 )
 from .execution import ExecutionBackend
@@ -24,10 +24,12 @@ from .message import Message, MessageRead
 from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
+from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
 
 # Import all models to ensure relationships are properly set up
 from . import (
     auth,
+    language,
     organization,
     role,
     group,
@@ -38,6 +40,7 @@ from . import (
     example,
     extension,
     deployment,
+    artifact,
 )
 
 __all__ = [
@@ -49,6 +52,8 @@ __all__ = [
     'Profile',
     'StudentProfile',
     'Session',
+    # Language
+    'Language',
     # Organization
     'Organization',
     # Course models
@@ -61,9 +66,8 @@ __all__ = [
     'CourseGroup',
     'CourseContent',
     'CourseMember',
-    'CourseSubmissionGroup',
-    'CourseSubmissionGroupMember',
-    'CourseSubmissionGroupGrading',
+    'SubmissionGroup',
+    'SubmissionGroupMember',
     'CourseMemberComment',
     # Execution
     'ExecutionBackend',
@@ -91,4 +95,9 @@ __all__ = [
     # Deployment models
     'CourseContentDeployment',
     'DeploymentHistory',
+    # Artifact models
+    'SubmissionArtifact',
+    'ResultArtifact',
+    'SubmissionGrade',
+    'SubmissionReview',
 ]

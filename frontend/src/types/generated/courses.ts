@@ -10,7 +10,7 @@
 
 import type { GradingAuthor } from './auth';
 
-import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, GradingStatus } from './common';
+import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, SubmissionGroupGradingList } from './common';
 
 import type { OrganizationGet } from './organizations';
 
@@ -85,6 +85,7 @@ export interface CourseCreate {
   description?: string | null;
   path: string;
   course_family_id: string;
+  language_code?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -94,6 +95,7 @@ export interface CourseGet {
   description?: string | null;
   path: string;
   course_family_id: string;
+  language_code?: string | null;
   properties?: CoursePropertiesGet | null;
   /** Creation timestamp */
   created_at?: string | null;
@@ -111,12 +113,14 @@ export interface CourseList {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
+  language_code?: string | null;
   properties?: CoursePropertiesGet | null;
 }
 
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
+  language_code?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -347,82 +351,85 @@ export interface CourseGroupQuery {
   properties?: string | null;
 }
 
+/**
+ * Repository information for course content in lecturer view.
+ */
+export interface CourseContentRepositoryLecturerGet {
+  url?: string | null;
+  full_path?: string | null;
+}
+
+/**
+ * DTO for lecturer GET of course content with course repository info.
+ */
+export interface CourseContentLecturerGet {
+  id: string;
+  archived_at?: string | null;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  is_submittable?: boolean;
+  has_deployment?: boolean | null;
+  deployment_status?: string | null;
+  course_content_type?: CourseContentTypeGet | null;
+  repository: CourseContentRepositoryLecturerGet;
+}
+
+/**
+ * DTO for lecturer list of course content with course repository info.
+ */
+export interface CourseContentLecturerList {
+  id: string;
+  title?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  is_submittable?: boolean;
+  has_deployment?: boolean | null;
+  deployment_status?: string | null;
+  course_content_type?: CourseContentTypeList | null;
+  repository: CourseContentRepositoryLecturerGet;
+}
+
+/**
+ * Query parameters for lecturer course content.
+ */
+export interface CourseContentLecturerQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  title?: string | null;
+  path?: string | null;
+  course_id?: string | null;
+  course_content_type_id?: string | null;
+  archived?: boolean | null;
+  position?: number | null;
+  max_group_size?: number | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
+  execution_backend_id?: string | null;
+  /** Filter by whether content has a deployment */
+  has_deployment?: boolean | null;
+}
+
 export interface GradedByCourseMember {
   course_role_id?: string | null;
   user_id: string;
   user?: GradingAuthor | null;
-}
-
-/**
- * Create a new grading for a submission group.
- */
-export interface CourseSubmissionGroupGradingCreate {
-  course_submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status?: GradingStatus;
-  feedback?: string | null;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * Full grading information.
- */
-export interface CourseSubmissionGroupGradingGet {
-  created_at: string;
-  updated_at: string;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status: GradingStatus;
-  feedback?: string | null;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * List view of grading.
- */
-export interface CourseSubmissionGroupGradingList {
-  id: string;
-  course_submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status: GradingStatus;
-  feedback?: string | null;
-  created_at: string;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * Update grading information.
- */
-export interface CourseSubmissionGroupGradingUpdate {
-  grading?: number | null;
-  status?: GradingStatus | null;
-  feedback?: string | null;
-  result_id?: string | null;
-}
-
-/**
- * Query parameters for searching gradings.
- */
-export interface CourseSubmissionGroupGradingQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  course_submission_group_id?: string | null;
-  graded_by_course_member_id?: string | null;
-  result_id?: string | null;
-  status?: GradingStatus | null;
-  min_grade?: number | null;
-  max_grade?: number | null;
-  has_feedback?: boolean | null;
 }
 
 /**
@@ -483,7 +490,7 @@ export interface SubmissionGroupStudentGet {
   count?: number;
   max_submissions?: number | null;
   unread_message_count?: number;
-  gradings?: CourseSubmissionGroupGradingList[];
+  gradings?: SubmissionGroupGradingList[];
 }
 
 export interface ResultStudentList {

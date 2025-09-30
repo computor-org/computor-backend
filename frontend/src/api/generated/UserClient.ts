@@ -21,17 +21,10 @@ export class UserClient extends BaseEndpointClient {
   }
 
   /**
-   * Set User Password
+   * Register Current User Course Account
    */
-  async setUserPasswordUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
-    return this.client.post<void>(this.buildPath('password'), body);
-  }
-
-  /**
-   * Get Course Views For Current User
-   */
-  async getCourseViewsForCurrentUserUserCoursesCourseIdViewsGet({ courseId }: { courseId: string | string }): Promise<string[]> {
-    return this.client.get<string[]>(this.buildPath('courses', courseId, 'views'));
+  async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
+    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
   }
 
   /**
@@ -42,9 +35,17 @@ export class UserClient extends BaseEndpointClient {
   }
 
   /**
-   * Register Current User Course Account
+   * Set User Password
    */
-  async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
-    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
+  async setUserPasswordUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
+    return this.client.post<void>(this.buildPath('password'), body);
+  }
+
+  /**
+   * Get Course Views For Current User
+   * Get available views based on roles across all courses for the current user.
+   */
+  async getCourseViewsForCurrentUserUserViewsGet(): Promise<string[]> {
+    return this.client.get<string[]>(this.buildPath('views'));
   }
 }

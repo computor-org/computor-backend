@@ -8,7 +8,7 @@
 
 
 
-import type { StudentProfileGet } from './common';
+import type { ProfileGet, StudentProfileGet } from './common';
 
 
 
@@ -153,6 +153,8 @@ export interface UserGet {
   archived_at?: string | null;
   /** Associated student profiles */
   student_profiles?: StudentProfileGet[];
+  /** User profile */
+  profile?: ProfileGet | null;
 }
 
 export interface UserList {
@@ -282,42 +284,6 @@ export interface UserPassword {
   username?: string | null;
   password: string;
   password_old?: string | null;
-}
-
-/**
- * User registration request.
- */
-export interface UserRegistrationRequest {
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Password */
-  password: string;
-  /** First name */
-  given_name: string;
-  /** Last name */
-  family_name: string;
-  /** Authentication provider to register with */
-  provider?: string;
-  /** Send email verification */
-  send_verification_email?: boolean;
-}
-
-/**
- * Response after successful user registration.
- */
-export interface UserRegistrationResponse {
-  /** User ID in Computor */
-  user_id: string;
-  /** User ID in authentication provider */
-  provider_user_id: string;
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Success message */
-  message: string;
 }
 
 

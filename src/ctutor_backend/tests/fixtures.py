@@ -16,7 +16,7 @@ from sqlalchemy.pool import StaticPool
 from ctutor_backend.model.base import Base
 from ctutor_backend.permissions.principal import Principal, Claims
 from ctutor_backend.database import get_db
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 
 
 # Test database setup
@@ -141,7 +141,7 @@ def test_client_factory(mock_db):
     def _create_client(principal: Principal, db: Optional[Session] = None):
         """Create a test client with the given principal and database."""
         # Override dependencies
-        app.dependency_overrides[get_current_permissions] = lambda: principal
+        app.dependency_overrides[get_current_principal] = lambda: principal
         if db is not None:
             app.dependency_overrides[get_db] = lambda: db
         elif mock_db is not None:

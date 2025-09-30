@@ -14,6 +14,14 @@ class TestJob(BaseModel):
     submission_number: int = -1
 
 class TestCreate(BaseModel):
+    # Primary way to specify what to test - provide the artifact ID directly
+    artifact_id: Optional[str] = None
+
+    # Alternative: specify submission group and optionally version to find artifact
+    submission_group_id: Optional[str] = None
+    version_identifier: Optional[str] = None  # If not provided with submission_group_id, uses latest
+
+    # Legacy fields for backward compatibility
     course_member_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_content_path: Optional[str] = None
@@ -22,5 +30,4 @@ class TestCreate(BaseModel):
     project: Optional[str] = None
     provider_url: Optional[str] = None
 
-    version_identifier: Optional[str] = None
     submit: Optional[bool] = None

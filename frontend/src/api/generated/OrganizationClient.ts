@@ -38,6 +38,13 @@ export class OrganizationClient extends BaseEndpointClient {
   }
 
   /**
+   * Route Organizations
+   */
+  async routeOrganizationsOrganizationsIdArchivePatch({ id }: { id: string | string }): Promise<void> {
+    return this.client.patch<void>(this.buildPath(id, 'archive'));
+  }
+
+  /**
    * Patch Organizations Token
    */
   async patchOrganizationsTokenOrganizationsOrganizationIdTokenPatch({ organizationId, type, body }: { organizationId: string | string; type: string; body: OrganizationUpdateTokenUpdate }): Promise<void> {
@@ -45,12 +52,5 @@ export class OrganizationClient extends BaseEndpointClient {
       type,
     };
     return this.client.patch<void>(this.buildPath(organizationId, 'token'), body, { params: queryParams });
-  }
-
-  /**
-   * Route Organizations
-   */
-  async routeOrganizationsOrganizationsIdArchivePatch({ id }: { id: string | string }): Promise<void> {
-    return this.client.patch<void>(this.buildPath(id, 'archive'));
   }
 }

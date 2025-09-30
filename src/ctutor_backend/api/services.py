@@ -4,7 +4,7 @@ import httpx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import starlette
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.api.exceptions import NotFoundException, ServiceUnavailableException
 from ctutor_backend.database import get_db
 from ctutor_backend.permissions.principal import Principal
@@ -16,7 +16,7 @@ SERVICES = {
 services_router = APIRouter()
 
 @services_router.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def service_proxy(permissions: Annotated[Principal, Depends(get_current_permissions)], service: str, path: str, request: Request, db: Session = Depends(get_db)):
+async def service_proxy(permissions: Annotated[Principal, Depends(get_current_principal)], service: str, path: str, request: Request, db: Session = Depends(get_db)):
 
     target_roles = ["_maintainer", "_owner", "_tutor"]
     result = db.query(func.count(CourseMember.course_role_id)) \

@@ -23,7 +23,7 @@ class TestStudentSubmissionGroupsUnit:
     def test_example_identifier_population_with_example(self):
         """Test that example_identifier is properly populated when course content has example"""
         from ctutor_backend.api.students import student_router
-        from ctutor_backend.model.course import CourseContent, CourseSubmissionGroup
+        from ctutor_backend.model.course import CourseContent, SubmissionGroup
         from ctutor_backend.model.example import Example
         from sqlalchemy.orm import Session
         

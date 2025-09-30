@@ -34,25 +34,6 @@ export class ExtensionClient extends BaseEndpointClient {
   }
 
   /**
-   * Publish Extension Version
-   */
-  async publishExtensionVersionExtensionsExtensionIdentityVersionsPost({ extensionIdentity }: { extensionIdentity: string }): Promise<ExtensionPublishResponse> {
-    return this.client.post<ExtensionPublishResponse>(this.buildPath(extensionIdentity, 'versions'));
-  }
-
-  /**
-   * List Extension Versions
-   */
-  async listExtensionVersionsExtensionsExtensionIdentityVersionsGet({ extensionIdentity, includeYanked, limit, cursor }: { extensionIdentity: string; includeYanked?: boolean; limit?: number; cursor?: string | null }): Promise<ExtensionVersionListResponse> {
-    const queryParams: Record<string, unknown> = {
-      include_yanked: includeYanked,
-      limit,
-      cursor,
-    };
-    return this.client.get<ExtensionVersionListResponse>(this.buildPath(extensionIdentity, 'versions'), { params: queryParams });
-  }
-
-  /**
    * Download Extension
    */
   async downloadExtensionExtensionsExtensionIdentityDownloadGet({ extensionIdentity, version }: { extensionIdentity: string; version?: string | null }): Promise<void> {
@@ -60,6 +41,25 @@ export class ExtensionClient extends BaseEndpointClient {
       version,
     };
     return this.client.get<void>(this.buildPath(extensionIdentity, 'download'), { params: queryParams });
+  }
+
+  /**
+   * List Extension Versions
+   */
+  async listExtensionVersionsExtensionsExtensionIdentityVersionsGet({ extensionIdentity, cursor, includeYanked, limit }: { extensionIdentity: string; cursor?: string | null; includeYanked?: boolean; limit?: number }): Promise<ExtensionVersionListResponse> {
+    const queryParams: Record<string, unknown> = {
+      cursor,
+      include_yanked: includeYanked,
+      limit,
+    };
+    return this.client.get<ExtensionVersionListResponse>(this.buildPath(extensionIdentity, 'versions'), { params: queryParams });
+  }
+
+  /**
+   * Publish Extension Version
+   */
+  async publishExtensionVersionExtensionsExtensionIdentityVersionsPost({ extensionIdentity }: { extensionIdentity: string }): Promise<ExtensionPublishResponse> {
+    return this.client.post<ExtensionPublishResponse>(this.buildPath(extensionIdentity, 'versions'));
   }
 
   /**

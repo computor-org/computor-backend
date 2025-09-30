@@ -17,7 +17,7 @@ from gitlab.exceptions import GitlabGetError
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from ..database import get_db
-from ..model.course import Course, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
 from ..interface.tokens import decrypt_api_key
@@ -321,8 +321,8 @@ async def update_submission_groups(
         return updated_groups
     
     for sg_id in submission_group_ids:
-        submission_group = db.query(CourseSubmissionGroup).filter(
-            CourseSubmissionGroup.id == sg_id
+        submission_group = db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == sg_id
         ).first()
         
         if submission_group:
@@ -583,8 +583,8 @@ async def create_team_repository(
         if not course:
             raise ValueError(f"Course {course_id} not found")
             
-        submission_group = db.query(CourseSubmissionGroup).filter(
-            CourseSubmissionGroup.id == submission_group_id
+        submission_group = db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == submission_group_id
         ).first()
         if not submission_group:
             raise ValueError(f"Submission group {submission_group_id} not found")

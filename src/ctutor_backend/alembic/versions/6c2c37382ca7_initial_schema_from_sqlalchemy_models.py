@@ -572,7 +572,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('course_member_key', 'course_member', ['user_id', 'course_id'], unique=True)
-    # message table moved below (after course_submission_group creation) to satisfy FKs
+    # message table moved below (after submission_group creation) to satisfy FKs
     op.create_table('course_member_comment',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -591,7 +591,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_course_member_comment_course_member_id'), 'course_member_comment', ['course_member_id'], unique=False)
     op.create_index(op.f('ix_course_member_comment_transmitter_id'), 'course_member_comment', ['transmitter_id'], unique=False)
-    op.create_table('course_submission_group',
+    op.create_table('submission_group',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -627,7 +627,7 @@ def upgrade() -> None:
     sa.Column('content', sa.String(length=16384), nullable=False),
     sa.Column('user_id', postgresql.UUID(), nullable=True),
     sa.Column('course_member_id', postgresql.UUID(), nullable=True),
-    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=True),
+    sa.Column('submission_group_id', postgresql.UUID(), nullable=True),
     sa.Column('course_group_id', postgresql.UUID(), nullable=True),
     sa.ForeignKeyConstraint(['author_id'], ['user.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
@@ -635,7 +635,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['submission_group_id'], ['submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['course_group_id'], ['course_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -643,7 +643,7 @@ def upgrade() -> None:
     op.create_index('msg_author_archived_idx', 'message', ['author_id', 'archived_at'], unique=False)
     op.create_index('msg_user_archived_idx', 'message', ['user_id', 'archived_at'], unique=False)
     op.create_index('msg_course_member_archived_idx', 'message', ['course_member_id', 'archived_at'], unique=False)
-    op.create_index('msg_submission_group_archived_idx', 'message', ['course_submission_group_id', 'archived_at'], unique=False)
+    op.create_index('msg_submission_group_archived_idx', 'message', ['submission_group_id', 'archived_at'], unique=False)
     op.create_index('msg_course_group_archived_idx', 'message', ['course_group_id', 'archived_at'], unique=False)
 
     op.create_table('message_read',
@@ -663,7 +663,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('msg_read_unique_idx', 'message_read', ['message_id', 'reader_user_id'], unique=True)
-    op.create_table('course_submission_group_member',
+    op.create_table('submission_group_member',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -672,20 +672,20 @@ def upgrade() -> None:
     sa.Column('updated_by', postgresql.UUID(), nullable=True),
     sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('course_id', postgresql.UUID(), nullable=False),
-    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=False),
+    sa.Column('submission_group_id', postgresql.UUID(), nullable=False),
     sa.Column('course_member_id', postgresql.UUID(), nullable=False),
     # removed: course_content_id (redundant, group ties to content via group table)
     # removed FK to course_content
     sa.ForeignKeyConstraint(['course_id'], ['course.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
-    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['submission_group_id'], ['submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     # removed unique index including course_content_id
-    op.create_index('course_submission_group_member_key', 'course_submission_group_member', ['course_submission_group_id', 'course_member_id'], unique=True)
-    op.create_index(op.f('ix_course_submission_group_member_course_id'), 'course_submission_group_member', ['course_id'], unique=False)
+    op.create_index('submission_group_member_key', 'submission_group_member', ['submission_group_id', 'course_member_id'], unique=True)
+    op.create_index(op.f('ix_submission_group_member_course_id'), 'submission_group_member', ['course_id'], unique=False)
     op.create_table('result',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -696,7 +696,7 @@ def upgrade() -> None:
     sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('submit', sa.Boolean(), nullable=False),
     sa.Column('course_member_id', postgresql.UUID(), nullable=False),
-    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=True),
+    sa.Column('submission_group_id', postgresql.UUID(), nullable=True),
     sa.Column('course_content_id', postgresql.UUID(), nullable=False),
     sa.Column('course_content_type_id', postgresql.UUID(), nullable=False),
     sa.Column('execution_backend_id', postgresql.UUID(), nullable=False),
@@ -706,10 +706,15 @@ def upgrade() -> None:
     sa.Column('version_identifier', sa.String(length=2048), nullable=False),
     sa.Column('reference_version_identifier', sa.String(length=64), nullable=True),
     sa.Column('status', sa.Integer(), nullable=False),
+    sa.Column('submission_artifact_id', postgresql.UUID(), nullable=True),
+    sa.Column('grade', sa.Float(precision=53), nullable=True),
+    sa.Column('log_text', sa.String(), nullable=True),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['course_content_id'], ['course_content.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['course_content_type_id'], ['course_content_type.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
-    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['submission_group_id'], ['submission_group.id'], onupdate='RESTRICT', ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['execution_backend_id'], ['execution_backend.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
@@ -717,7 +722,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_result_course_content_id'), 'result', ['course_content_id'], unique=False)
     op.create_index(op.f('ix_result_course_member_id'), 'result', ['course_member_id'], unique=False)
-    op.create_index(op.f('ix_result_course_submission_group_id'), 'result', ['course_submission_group_id'], unique=False)
+    op.create_index(op.f('ix_result_submission_group_id'), 'result', ['submission_group_id'], unique=False)
     op.create_index('result_commit_test_system_key', 'result', ['test_system_id', 'execution_backend_id'], unique=True)
     op.create_index(
         'result_version_identifier_member_content_partial_key',
@@ -729,36 +734,100 @@ def upgrade() -> None:
     op.create_index(
         'result_version_identifier_group_content_partial_key',
         'result',
-        ['course_submission_group_id', 'version_identifier', 'course_content_id'],
+        ['submission_group_id', 'version_identifier', 'course_content_id'],
         unique=True,
         postgresql_where=sa.text('status NOT IN (1, 2, 6)')
     )
 
-    # Grading table for submission groups
-    op.create_table('course_submission_group_grading',
-    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
-    sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('created_by', postgresql.UUID(), nullable=True),
-    sa.Column('updated_by', postgresql.UUID(), nullable=True),
-    sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=False),
-    sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
-    sa.Column('result_id', postgresql.UUID(), nullable=True),
-    sa.Column('grading', sa.Float(precision=53), nullable=False),
-    sa.Column('status', sa.Integer(), server_default=sa.text('0'), nullable=False),
-    sa.Column('feedback', sa.String(length=4096), nullable=True),
-    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['graded_by_course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
-    sa.ForeignKeyConstraint(['result_id'], ['result.id'], onupdate='RESTRICT', ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
+    # Add new indexes for artifact-based testing
+    op.create_index('result_submission_artifact_idx', 'result', ['submission_artifact_id'])
+    op.create_index('result_created_at_idx', 'result', ['created_at'])
+    op.create_index('result_artifact_unique_success', 'result',
+                    ['submission_artifact_id', 'course_member_id'],
+                    unique=True, postgresql_where=sa.text('status NOT IN (1, 2, 6)'))
+
+    # Create artifact tables
+    op.create_table('submission_artifact',
+        sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+        sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('submission_group_id', postgresql.UUID(), nullable=False),
+        sa.Column('uploaded_by_course_member_id', postgresql.UUID(), nullable=True),
+        sa.Column('content_type', sa.String(length=120), nullable=True),
+        sa.Column('file_size', sa.BigInteger(), nullable=False),
+        sa.Column('bucket_name', sa.String(length=255), nullable=False),
+        sa.Column('object_key', sa.String(length=2048), nullable=False),
+        sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.ForeignKeyConstraint(['submission_group_id'], ['submission_group.id'], ondelete='CASCADE', onupdate='RESTRICT'),
+        sa.ForeignKeyConstraint(['uploaded_by_course_member_id'], ['course_member.id'], ondelete='SET NULL', onupdate='RESTRICT'),
+        sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_grading_submission_group', 'course_submission_group_grading', ['course_submission_group_id'], unique=False)
-    op.create_index('idx_grading_graded_by', 'course_submission_group_grading', ['graded_by_course_member_id'], unique=False)
-    op.create_index('idx_grading_result', 'course_submission_group_grading', ['result_id'], unique=False)
+    op.create_index('submission_artifact_submission_group_idx', 'submission_artifact', ['submission_group_id'])
+    op.create_index('submission_artifact_uploaded_by_idx', 'submission_artifact', ['uploaded_by_course_member_id'])
+    op.create_index('submission_artifact_uploaded_at_idx', 'submission_artifact', ['uploaded_at'])
+
+    # Add foreign key for submission_artifact_id in result table
+    op.create_foreign_key('result_submission_artifact_id_fkey',
+                         'result', 'submission_artifact',
+                         ['submission_artifact_id'], ['id'],
+                         ondelete='CASCADE', onupdate='RESTRICT')
+
+    op.create_table('result_artifact',
+        sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+        sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('result_id', postgresql.UUID(), nullable=False),
+        sa.Column('content_type', sa.String(length=120), nullable=True),
+        sa.Column('file_size', sa.BigInteger(), nullable=False),
+        sa.Column('bucket_name', sa.String(length=255), nullable=False),
+        sa.Column('object_key', sa.String(length=2048), nullable=False),
+        sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.ForeignKeyConstraint(['result_id'], ['result.id'], ondelete='CASCADE', onupdate='RESTRICT'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('result_artifact_result_idx', 'result_artifact', ['result_id'])
+    op.create_index('result_artifact_created_at_idx', 'result_artifact', ['created_at'])
+
+    # New artifact-based grading table (replaces old submission_group_grading)
+    op.create_table('submission_grade',
+        sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+        sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('graded_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('artifact_id', postgresql.UUID(), nullable=False),
+        sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
+        sa.Column('grade', sa.Float(precision=53), nullable=False),
+        sa.Column('status', sa.Integer(), nullable=False, server_default=sa.text('0')),
+        sa.Column('comment', sa.String(length=4096), nullable=True),
+        sa.ForeignKeyConstraint(['artifact_id'], ['submission_artifact.id'], ondelete='CASCADE', onupdate='RESTRICT'),
+        sa.ForeignKeyConstraint(['graded_by_course_member_id'], ['course_member.id'], ondelete='RESTRICT', onupdate='RESTRICT'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('submission_grade_artifact_idx', 'submission_grade', ['artifact_id'])
+    op.create_index('submission_grade_grader_idx', 'submission_grade', ['graded_by_course_member_id'])
+    op.create_index('submission_grade_graded_at_idx', 'submission_grade', ['graded_at'])
+
+    op.create_table('submission_review',
+        sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+        sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('artifact_id', postgresql.UUID(), nullable=False),
+        sa.Column('reviewer_course_member_id', postgresql.UUID(), nullable=False),
+        sa.Column('body', sa.String(length=4096), nullable=False),
+        sa.Column('review_type', sa.String(length=50), nullable=True),
+        sa.ForeignKeyConstraint(['artifact_id'], ['submission_artifact.id'], ondelete='CASCADE', onupdate='RESTRICT'),
+        sa.ForeignKeyConstraint(['reviewer_course_member_id'], ['course_member.id'], ondelete='RESTRICT', onupdate='RESTRICT'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('submission_review_artifact_idx', 'submission_review', ['artifact_id'])
+    op.create_index('submission_review_reviewer_idx', 'submission_review', ['reviewer_course_member_id'])
+    op.create_index('submission_review_created_at_idx', 'submission_review', ['created_at'])
+
     # ### end Alembic commands ###
     
     # Create functions and triggers for CourseContent tree validation
@@ -978,23 +1047,46 @@ def downgrade() -> None:
     op.drop_index('idx_deployment_status', table_name='course_content_deployment')
     op.drop_table('course_content_deployment')
 
+    # Drop artifact tables
+    op.drop_index('submission_review_created_at_idx', 'submission_review')
+    op.drop_index('submission_review_reviewer_idx', 'submission_review')
+    op.drop_index('submission_review_artifact_idx', 'submission_review')
+    op.drop_table('submission_review')
+
+    op.drop_index('submission_grade_graded_at_idx', 'submission_grade')
+    op.drop_index('submission_grade_grader_idx', 'submission_grade')
+    op.drop_index('submission_grade_artifact_idx', 'submission_grade')
+    op.drop_table('submission_grade')
+
+    op.drop_index('result_artifact_created_at_idx', 'result_artifact')
+    op.drop_index('result_artifact_result_idx', 'result_artifact')
+    op.drop_table('result_artifact')
+
+    op.drop_constraint('result_submission_artifact_id_fkey', 'result', type_='foreignkey')
+
+    op.drop_index('submission_artifact_uploaded_at_idx', 'submission_artifact')
+    op.drop_index('submission_artifact_uploaded_by_idx', 'submission_artifact')
+    op.drop_index('submission_artifact_submission_group_idx', 'submission_artifact')
+    op.drop_table('submission_artifact')
+
+    # Drop new result indexes
+    op.drop_index('result_artifact_unique_success', table_name='result')
+    op.drop_index('result_created_at_idx', table_name='result')
+    op.drop_index('result_submission_artifact_idx', table_name='result')
+
     op.drop_index('result_version_identifier_member_content_partial_key', table_name='result')
     op.drop_index('result_version_identifier_group_content_partial_key', table_name='result')
-    op.drop_index('idx_grading_result', table_name='course_submission_group_grading')
-    op.drop_index('idx_grading_graded_by', table_name='course_submission_group_grading')
-    op.drop_index('idx_grading_submission_group', table_name='course_submission_group_grading')
-    op.drop_table('course_submission_group_grading')
     op.drop_index('result_commit_test_system_key', table_name='result')
-    op.drop_index(op.f('ix_result_course_submission_group_id'), table_name='result')
+    op.drop_index(op.f('ix_result_submission_group_id'), table_name='result')
     op.drop_index(op.f('ix_result_course_member_id'), table_name='result')
     op.drop_index(op.f('ix_result_course_content_id'), table_name='result')
     op.drop_table('result')
-    op.drop_index(op.f('ix_course_submission_group_member_course_id'), table_name='course_submission_group_member')
-    op.drop_index('course_submission_group_member_key', table_name='course_submission_group_member')
-    op.drop_table('course_submission_group_member')
+    op.drop_index(op.f('ix_submission_group_member_course_id'), table_name='submission_group_member')
+    op.drop_index('submission_group_member_key', table_name='submission_group_member')
+    op.drop_table('submission_group_member')
     op.drop_index('msg_read_unique_idx', table_name='message_read')
     op.drop_table('message_read')
-    op.drop_table('course_submission_group')
+    op.drop_table('submission_group')
     op.drop_index(op.f('ix_course_member_comment_transmitter_id'), table_name='course_member_comment')
     op.drop_index(op.f('ix_course_member_comment_course_member_id'), table_name='course_member_comment')
     op.drop_table('course_member_comment')

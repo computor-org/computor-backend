@@ -5,7 +5,7 @@ from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.users import UserList
 from ctutor_backend.model import CourseMember
-from ctutor_backend.model import CourseContent, CourseContentKind, CourseContentType, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model import CourseContent, CourseContentKind, CourseContentType, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.model import User
 import logging
 
@@ -135,7 +135,7 @@ async def post_create(course_member: CourseMember, db: Session):
     
     # Create submission groups for existing individual course contents
     for id, course_id, max_test_runs, max_submissions, max_group_size in course_contents:
-        submission_group = CourseSubmissionGroup(
+        submission_group = SubmissionGroup(
             course_id=course_id,
             course_content_id=id,
             max_group_size=max_group_size,
@@ -147,8 +147,8 @@ async def post_create(course_member: CourseMember, db: Session):
         db.commit()
         db.refresh(submission_group)
         
-        submission_group_member = CourseSubmissionGroupMember(
-            course_submission_group_id = submission_group.id,
+        submission_group_member = SubmissionGroupMember(
+            submission_group_id = submission_group.id,
             course_member_id = course_member.id,
             course_id = course_id  # Add course_id for consistency
         )

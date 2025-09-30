@@ -11,7 +11,7 @@ from .course_members import CourseMemberInterface
 from .course_roles import CourseRoleInterface
 from .courses import CourseInterface
 from .execution_backends import ExecutionBackendInterface
-from .grading import CourseSubmissionGroupGradingInterface, GradingStatus
+from .grading import SubmissionGroupGradingInterface, GradingStatus
 from .organizations import OrganizationInterface
 from .results import ResultInterface
 from .roles import RoleInterface

@@ -6,23 +6,32 @@ from datetime import timedelta
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import SubmissionGroup, SubmissionGroupMember
+# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
+from ctutor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from ctutor_backend.model.result import Result
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 def db_export_course_member_grading(db: Session, course_member_id: str | None = None) -> pd.DataFrame:
+    """
+    TODO: Migrate to use SubmissionGrade from artifact model
+    The new model uses artifact_id instead of submission_group_id
+    """
+    # Temporarily return empty dataframe - needs migration
+    return pd.DataFrame()
 
-    # Subquery to get the latest grading for each submission group
-    latest_grading_sub = db.query(
-        CourseSubmissionGroupGrading.course_submission_group_id,
-        CourseSubmissionGroupGrading.status,
-        CourseSubmissionGroupGrading.grading,
-        func.row_number().over(
-            partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
-            order_by=CourseSubmissionGroupGrading.created_at.desc()
-        ).label('rn')
-    ).subquery()
+    # Original code commented out - needs migration to artifact-based system:
+    # # Subquery to get the latest grading for each submission group
+    # latest_grading_sub = db.query(
+    #     SubmissionGroupGrading.submission_group_id,
+    #     SubmissionGroupGrading.status,
+    #     SubmissionGroupGrading.grading,
+    #     func.row_number().over(
+    #         partition_by=SubmissionGroupGrading.submission_group_id,
+    #         order_by=SubmissionGroupGrading.created_at.desc()
+    #     ).label('rn')
+    # ).subquery()
 
     data = db.query(
         Course.id,
@@ -34,16 +43,16 @@ def db_export_course_member_grading(db: Session, course_member_id: str | None = 
         User.given_name,
         User.family_name
     ) \
-    .select_from(CourseSubmissionGroup) \
-    .join(CourseSubmissionGroupMember,CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-    .join(CourseMember,CourseMember.id == CourseSubmissionGroupMember.course_member_id) \
-    .join(CourseContent,CourseContent.id == CourseSubmissionGroup.course_content_id) \
+    .select_from(SubmissionGroup) \
+    .join(SubmissionGroupMember,SubmissionGroup.id == SubmissionGroupMember.submission_group_id) \
+    .join(CourseMember,CourseMember.id == SubmissionGroupMember.course_member_id) \
+    .join(CourseContent,CourseContent.id == SubmissionGroup.course_content_id) \
     .join(Course,Course.id == CourseContent.course_id) \
     .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
     .join(User,User.id == CourseMember.user_id) \
     .outerjoin(
         latest_grading_sub,
-        (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+        (latest_grading_sub.c.submission_group_id == SubmissionGroup.id) &
         (latest_grading_sub.c.rn == 1)
     )
     
@@ -75,32 +84,33 @@ def db_export_course_member_results(db: Session, course_member_id: str | None = 
         CourseContent.path,
         CourseContentType.slug,
         Result.result,
-        Result.submit,
+        SubmissionArtifact.submit,
         Result.created_at,
         CourseGroup.title,
         User.given_name,
         User.family_name
     ) \
     .select_from(Result) \
+    .outerjoin(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
     .join(CourseContent,CourseContent.id == Result.course_content_id) \
     .join(Course,Course.id == CourseContent.course_id) \
     .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
-    .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id) \
-    .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
-    .join(CourseMember,CourseMember.id == CourseSubmissionGroupMember.course_member_id) \
+    .join(SubmissionGroup, Result.submission_group_id == SubmissionGroup.id) \
+    .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
+    .join(CourseMember,CourseMember.id == SubmissionGroupMember.course_member_id) \
     .join(CourseGroup,CourseGroup.id == CourseMember.course_group_id) \
     .join(User,User.id == CourseMember.user_id)
-    
+
     if course_member_id != None:
         data = data.filter(CourseMember.id == course_member_id)
-    
+
     data = data.group_by(
         Course.id,
         CourseMember.id,
         CourseContent.path,
         CourseContentType.slug,
         Result.result,
-        Result.submit,
+        SubmissionArtifact.submit,
         Result.created_at,
         CourseGroup.title,
         User.given_name,

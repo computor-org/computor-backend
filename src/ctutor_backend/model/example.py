@@ -30,7 +30,7 @@ class ExampleRepository(Base):
     __tablename__ = "example_repository"
     
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     
     # Repository information
     name = Column(String(255), nullable=False, comment="Human-readable name of the repository")
@@ -49,7 +49,7 @@ class ExampleRepository(Base):
     
     # Access control
     organization_id = Column(
-        UUID(as_uuid=True), 
+        UUID, 
         ForeignKey("organization.id"),
         comment="Organization that owns this repository"
     )
@@ -57,8 +57,8 @@ class ExampleRepository(Base):
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this repository")
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who last updated this repository")
+    created_by = Column(UUID, ForeignKey("user.id"), comment="User who created this repository")
+    updated_by = Column(UUID, ForeignKey("user.id"), comment="User who last updated this repository")
     
     # Relationships
     examples = relationship("Example", back_populates="repository", cascade="all, delete-orphan")
@@ -94,11 +94,11 @@ class Example(Base):
     __tablename__ = "example"
     
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     
     # Repository relationship
     example_repository_id = Column(
-        UUID(as_uuid=True), 
+        UUID, 
         ForeignKey("example_repository.id", ondelete="CASCADE"), 
         nullable=False,
         comment="Reference to the repository containing this example"
@@ -129,8 +129,8 @@ class Example(Base):
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this example record")
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who last updated this example record")
+    created_by = Column(UUID, ForeignKey("user.id"), comment="User who created this example record")
+    updated_by = Column(UUID, ForeignKey("user.id"), comment="User who last updated this example record")
     
     # Relationships
     repository = relationship("ExampleRepository", back_populates="examples")
@@ -183,11 +183,11 @@ class ExampleVersion(Base):
     __tablename__ = "example_version"
     
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     
     # Example relationship
     example_id = Column(
-        UUID(as_uuid=True), 
+        UUID, 
         ForeignKey("example.id", ondelete="CASCADE"), 
         nullable=False,
         comment="Reference to the example this version belongs to"
@@ -226,7 +226,7 @@ class ExampleVersion(Base):
     
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this version")
+    created_by = Column(UUID, ForeignKey("user.id"), comment="User who created this version")
     
     # Relationships
     example = relationship("Example", back_populates="versions")
@@ -282,17 +282,17 @@ class ExampleDependency(Base):
     __tablename__ = "example_dependency"
     
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     
     # Dependency relationship
     example_id = Column(
-        UUID(as_uuid=True), 
+        UUID, 
         ForeignKey("example.id", ondelete="CASCADE"), 
         nullable=False,
         comment="Example that has the dependency"
     )
     depends_id = Column(
-        UUID(as_uuid=True), 
+        UUID, 
         ForeignKey("example.id", ondelete="CASCADE"), 
         nullable=False,
         comment="Example that this depends on"

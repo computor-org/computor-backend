@@ -8,7 +8,6 @@ example assignments to course content.
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal, TYPE_CHECKING
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from uuid import UUID
 
 from ctutor_backend.interface.example import ExampleVersionList
 
@@ -34,8 +33,8 @@ class DeploymentMetadata(BaseModel):
 
 class CourseContentDeploymentCreate(BaseModel):
     """Create a new deployment (typically done automatically)."""
-    course_content_id: UUID = Field(description="Course content to deploy to")
-    example_version_id: UUID = Field(description="Example version to deploy")
+    course_content_id: str = Field(description="Course content to deploy to")
+    example_version_id: str = Field(description="Example version to deploy")
     deployment_status: Literal["pending", "deploying", "deployed", "failed", "unassigned"] = Field(
         default="pending",
         description="Initial deployment status"
@@ -63,9 +62,9 @@ class CourseContentDeploymentUpdate(BaseModel):
 
 class CourseContentDeploymentGet(BaseEntityGet):
     """Get deployment details."""
-    id: UUID
-    course_content_id: UUID
-    example_version_id: Optional[UUID]
+    id: str
+    course_content_id: str
+    example_version_id: Optional[str]
     # Source identity (works even without DB Example)
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
@@ -100,9 +99,9 @@ class CourseContentDeploymentGet(BaseEntityGet):
 
 class CourseContentDeploymentList(BaseModel):
     """List view of deployments."""
-    id: UUID
-    course_content_id: UUID
-    example_version_id: Optional[UUID]
+    id: str
+    course_content_id: str
+    example_version_id: Optional[str]
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
     deployment_status: str
@@ -129,8 +128,8 @@ class CourseContentDeploymentList(BaseModel):
 
 class CourseContentDeploymentQuery(ListQuery):
     """Query parameters for deployments."""
-    course_content_id: Optional[UUID] = None
-    example_version_id: Optional[UUID] = None
+    course_content_id: Optional[str] = None
+    example_version_id: Optional[str] = None
     deployment_status: Optional[str] = None
     deployed: Optional[bool] = None  # True for deployed_at IS NOT NULL
     failed: Optional[bool] = None  # True for status='failed'
@@ -140,7 +139,7 @@ class CourseContentDeploymentQuery(ListQuery):
 
 class DeploymentHistoryCreate(BaseModel):
     """Create a deployment history entry."""
-    deployment_id: UUID
+    deployment_id: str
     action: Literal[
         "assigned",
         "reassigned",
@@ -151,10 +150,10 @@ class DeploymentHistoryCreate(BaseModel):
         "updated",
         "migrated",
     ]
-    example_version_id: Optional[UUID] = None
+    example_version_id: Optional[str] = None
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
-    previous_example_version_id: Optional[UUID] = None
+    previous_example_version_id: Optional[str] = None
     workflow_id: Optional[str] = None
     
     model_config = ConfigDict(use_enum_values=True)
@@ -162,16 +161,16 @@ class DeploymentHistoryCreate(BaseModel):
 
 class DeploymentHistoryGet(BaseModel):
     """Get deployment history entry."""
-    id: UUID
-    deployment_id: UUID
+    id: str
+    deployment_id: str
     action: str
-    example_version_id: Optional[UUID]
-    previous_example_version_id: Optional[UUID]
+    example_version_id: Optional[str]
+    previous_example_version_id: Optional[str]
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
     workflow_id: Optional[str]
     created_at: datetime
-    created_by: Optional[UUID]
+    created_by: Optional[str]
     
     # Relationships
     example_version: Optional['ExampleVersionGet'] = None
@@ -182,8 +181,8 @@ class DeploymentHistoryGet(BaseModel):
 
 class DeploymentHistoryList(BaseModel):
     """List view of deployment history."""
-    id: UUID
-    deployment_id: UUID
+    id: str
+    deployment_id: str
     action: str
     created_at: datetime
     workflow_id: Optional[str]
@@ -203,7 +202,7 @@ class DeploymentWithHistory(BaseModel):
 
 class DeploymentSummary(BaseModel):
     """Summary of deployments for a course."""
-    course_id: UUID
+    course_id: str
     total_content: int = Field(description="Total course content items")
     submittable_content: int = Field(description="Total submittable content (assignments)")
     deployments_total: int = Field(description="Total deployments")
@@ -219,7 +218,7 @@ class AssignExampleRequest(BaseModel):
     """Request to assign an example to course content."""
     # Either provide an existing ExampleVersion ID, or supply
     # a source identifier/version_tag for custom assignments.
-    example_version_id: Optional[UUID] = Field(
+    example_version_id: Optional[str] = Field(
         None, description="Example version to assign (optional if providing identifier+version_tag)"
     )
     example_identifier: Optional[str] = Field(
@@ -233,8 +232,8 @@ class AssignExampleRequest(BaseModel):
 
 class DeployExampleRequest(BaseModel):
     """Request to deploy assigned examples."""
-    course_id: UUID = Field(description="Course to deploy examples for")
-    content_ids: Optional[List[UUID]] = Field(None, description="Specific content IDs to deploy (all if None)")
+    course_id: str = Field(description="Course to deploy examples for")
+    content_ids: Optional[List[str]] = Field(None, description="Specific content IDs to deploy (all if None)")
     force: bool = Field(False, description="Force re-deployment even if already deployed")
 
 

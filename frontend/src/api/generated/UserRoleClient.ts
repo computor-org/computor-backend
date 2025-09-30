@@ -34,17 +34,17 @@ export class UserRoleClient extends BaseEndpointClient {
   }
 
   /**
-   * Get User Role
-   * Get a specific user role by user_id and role_id
+   * Delete User Role
    */
-  async getUserRoleUserRolesUsersUserIdRolesRoleIdGet({ userId, roleId }: { userId: string | string; roleId: string | string }): Promise<UserRoleGet> {
-    return this.client.get<UserRoleGet>(this.buildPath('users', userId, 'roles', roleId));
+  async deleteUserRoleUserRolesUsersUserIdRolesRoleIdDelete({ roleId, userId }: { roleId: string | string; userId: string | string }): Promise<UserRoleList[]> {
+    return this.client.delete<UserRoleList[]>(this.buildPath('users', userId, 'roles', roleId));
   }
 
   /**
-   * Delete User Role
+   * Get User Role
+   * Get a specific user role by user_id and role_id
    */
-  async deleteUserRoleUserRolesUsersUserIdRolesRoleIdDelete({ userId, roleId }: { userId: string | string; roleId: string | string }): Promise<UserRoleList[]> {
-    return this.client.delete<UserRoleList[]>(this.buildPath('users', userId, 'roles', roleId));
+  async getUserRoleUserRolesUsersUserIdRolesRoleIdGet({ roleId, userId }: { roleId: string | string; userId: string | string }): Promise<UserRoleGet> {
+    return this.client.get<UserRoleGet>(this.buildPath('users', userId, 'roles', roleId));
   }
 }

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
 from ctutor_backend.interface.grading import GradingStatus
-from ctutor_backend.model.course import CourseSubmissionGroup
+from ctutor_backend.model.course import SubmissionGroup
 
 class SubmissionGroupProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
@@ -57,19 +57,19 @@ class SubmissionGroupQuery(ListQuery):
 
 def submission_group_search(db: Session, query, params: Optional[SubmissionGroupQuery]):
     if params.id != None:
-        query = query.filter(CourseSubmissionGroup.id == params.id)
+        query = query.filter(SubmissionGroup.id == params.id)
     if params.max_group_size != None:
-        query = query.filter(CourseSubmissionGroup.max_group_size == params.max_group_size)
+        query = query.filter(SubmissionGroup.max_group_size == params.max_group_size)
     if params.max_submissions != None:
-        query = query.filter(CourseSubmissionGroup.max_submissions == params.max_submissions)
+        query = query.filter(SubmissionGroup.max_submissions == params.max_submissions)
     if params.course_id != None:
-        query = query.filter(CourseSubmissionGroup.course_id == params.course_id)
+        query = query.filter(SubmissionGroup.course_id == params.course_id)
     if params.course_content_id != None:
-        query = query.filter(CourseSubmissionGroup.course_content_id == params.course_content_id)
-    # Note: status has been moved to CourseSubmissionGroupGrading
+        query = query.filter(SubmissionGroup.course_content_id == params.course_content_id)
+    # Note: status has been moved to SubmissionGroupGrading
     # This filter needs to be rewritten to join with the grading table
     # if params.status != None:
-    #     query = query.filter(CourseSubmissionGroup.status == params.status)
+    #     query = query.filter(SubmissionGroup.status == params.status)
         
     return query
 
@@ -81,7 +81,7 @@ class SubmissionGroupInterface(EntityInterface):
     query = SubmissionGroupQuery
     search = submission_group_search
     endpoint = "submission-groups"
-    model = CourseSubmissionGroup
+    model = SubmissionGroup
     cache_ttl = 120  # 2 minutes - submission groups change moderately frequently
 
 

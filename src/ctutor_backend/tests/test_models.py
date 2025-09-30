@@ -7,8 +7,8 @@ from ctutor_backend.model import (
     User, Account, Profile, StudentProfile, Session,
     Organization, CourseContentKind, CourseRole, CourseFamily,
     Course, CourseContentType, CourseExecutionBackend, CourseGroup,
-    CourseContent, CourseMember, CourseSubmissionGroup,
-    CourseSubmissionGroupMember, CourseMemberComment,
+    CourseContent, CourseMember, SubmissionGroup,
+    SubmissionGroupMember, CourseMemberComment,
     ExecutionBackend, Result, Role, RoleClaim, UserRole,
     Group, GroupClaim, UserGroup, Message, MessageRead
 )
@@ -41,8 +41,8 @@ class TestModelImports:
         assert CourseGroup is not None
         assert CourseContent is not None
         assert CourseMember is not None
-        assert CourseSubmissionGroup is not None
-        assert CourseSubmissionGroupMember is not None
+        assert SubmissionGroup is not None
+        assert SubmissionGroupMember is not None
         assert CourseMemberComment is not None
     
     def test_execution_models(self):

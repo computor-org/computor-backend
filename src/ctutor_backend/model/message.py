@@ -15,7 +15,7 @@ class Message(Base):
         Index('msg_author_archived_idx', 'author_id', 'archived_at'),
         Index('msg_user_archived_idx', 'user_id', 'archived_at'),
         Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
-        Index('msg_submission_group_archived_idx', 'course_submission_group_id', 'archived_at'),
+        Index('msg_submission_group_archived_idx', 'submission_group_id', 'archived_at'),
         Index('msg_course_group_archived_idx', 'course_group_id', 'archived_at'),
         Index('msg_course_content_archived_idx', 'course_content_id', 'archived_at'),
         Index('msg_course_archived_idx', 'course_id', 'archived_at'),
@@ -44,7 +44,7 @@ class Message(Base):
     # Targets (all nullable; at least one may be set; if all course-related are NULL and user_id set, it's a direct user message)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
-    course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    submission_group_id = Column(ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_group_id = Column(ForeignKey('course_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
@@ -57,7 +57,7 @@ class Message(Base):
 
     user = relationship('User', foreign_keys=[user_id])
     course_member = relationship('CourseMember', foreign_keys=[course_member_id])
-    course_submission_group = relationship('CourseSubmissionGroup', foreign_keys=[course_submission_group_id])
+    submission_group = relationship('SubmissionGroup', foreign_keys=[submission_group_id])
     course_group = relationship('CourseGroup', foreign_keys=[course_group_id])
     course_content = relationship('CourseContent', foreign_keys=[course_content_id])
     course = relationship('Course', foreign_keys=[course_id])

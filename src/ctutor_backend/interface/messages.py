@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.message import Message
-from ctutor_backend.model.course import CourseMember, CourseSubmissionGroup, CourseGroup, CourseContent
+from ctutor_backend.model.course import CourseMember, SubmissionGroup, CourseGroup, CourseContent
 
 class MessageAuthor(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
@@ -22,7 +22,7 @@ class MessageCreate(BaseModel):
     # Targets (at least one should be provided)
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
@@ -45,7 +45,7 @@ class MessageGet(BaseEntityGet):
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
@@ -65,7 +65,7 @@ class MessageList(BaseEntityList):
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
@@ -79,7 +79,7 @@ class MessageQuery(ListQuery):
     author_id: Optional[str] = None
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
@@ -97,8 +97,8 @@ def message_search(db: Session, query, params: Optional[MessageQuery]):
         query = query.filter(Message.user_id == params.user_id)
     if params.course_member_id is not None:
         query = query.filter(Message.course_member_id == params.course_member_id)
-    if params.course_submission_group_id is not None:
-        query = query.filter(Message.course_submission_group_id == params.course_submission_group_id)
+    if params.submission_group_id is not None:
+        query = query.filter(Message.submission_group_id == params.submission_group_id)
     if params.course_group_id is not None:
         query = query.filter(Message.course_group_id == params.course_group_id)
     if params.course_content_id is not None:
@@ -110,8 +110,8 @@ def message_search(db: Session, query, params: Optional[MessageQuery]):
         course_filters.append(Message.course_member_id.in_(
             db.query(CourseMember.id).filter(CourseMember.course_id == params.course_id)
         ))
-        course_filters.append(Message.course_submission_group_id.in_(
-            db.query(CourseSubmissionGroup.id).filter(CourseSubmissionGroup.course_id == params.course_id)
+        course_filters.append(Message.submission_group_id.in_(
+            db.query(SubmissionGroup.id).filter(SubmissionGroup.course_id == params.course_id)
         ))
         course_filters.append(Message.course_group_id.in_(
             db.query(CourseGroup.id).filter(CourseGroup.course_id == params.course_id)

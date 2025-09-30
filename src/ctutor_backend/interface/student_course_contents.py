@@ -7,7 +7,7 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeGet, 
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.tasks import TaskStatus
-from ctutor_backend.interface.grading import CourseSubmissionGroupGradingList
+from ctutor_backend.interface.grading import SubmissionGroupGradingList
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree
@@ -62,7 +62,7 @@ class SubmissionGroupStudentList(BaseModel):
 
 class SubmissionGroupStudentGet(SubmissionGroupStudentList):
     """Detailed submission group view including grading history."""
-    gradings: List[CourseSubmissionGroupGradingList] = Field(default_factory=list)
+    gradings: List[SubmissionGroupGradingList] = Field(default_factory=list)
 
 class ResultStudentList(BaseModel):
     execution_backend_id: Optional[str] = None

@@ -13,6 +13,7 @@ from ctutor_backend.permissions.handlers_impl import (
     UserPermissionHandler,
     AccountPermissionHandler,
     ProfilePermissionHandler,
+    StudentProfilePermissionHandler,
     CoursePermissionHandler,
     OrganizationPermissionHandler,
     CourseFamilyPermissionHandler,
@@ -38,15 +39,20 @@ from ctutor_backend.model.course import (
     Course, CourseFamily, CourseMember, CourseContent,
     CourseContentType, CourseContentKind, CourseRole, CourseGroup,
     CourseExecutionBackend, CourseMemberComment,
-    CourseSubmissionGroup, CourseSubmissionGroupMember
+    SubmissionGroup, SubmissionGroupMember
 )
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.execution import ExecutionBackend
+from ctutor_backend.model.artifact import (
+    SubmissionArtifact, ResultArtifact,
+    SubmissionGrade, SubmissionReview
+)
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
 from ctutor_backend.model.group import Group, GroupClaim, UserGroup
 from ctutor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
+from ctutor_backend.model.language import Language
 
 
 def initialize_permission_handlers():
@@ -56,7 +62,7 @@ def initialize_permission_handlers():
     permission_registry.register(User, UserPermissionHandler(User))
     permission_registry.register(Account, AccountPermissionHandler(Account))
     permission_registry.register(Profile, ProfilePermissionHandler(Profile))
-    permission_registry.register(StudentProfile, ProfilePermissionHandler(StudentProfile))
+    permission_registry.register(StudentProfile, StudentProfilePermissionHandler(StudentProfile))
     permission_registry.register(UserSession, ProfilePermissionHandler(UserSession))
     
     # Organization and Course hierarchy
@@ -71,12 +77,13 @@ def initialize_permission_handlers():
     permission_registry.register(CourseGroup, CourseMemberPermissionHandler(CourseGroup))
     permission_registry.register(CourseExecutionBackend, CourseContentPermissionHandler(CourseExecutionBackend))
     permission_registry.register(CourseMemberComment, CourseMemberPermissionHandler(CourseMemberComment))
-    permission_registry.register(CourseSubmissionGroup, CourseMemberPermissionHandler(CourseSubmissionGroup))
-    permission_registry.register(CourseSubmissionGroupMember, CourseMemberPermissionHandler(CourseSubmissionGroupMember))
+    permission_registry.register(SubmissionGroup, CourseMemberPermissionHandler(SubmissionGroup))
+    permission_registry.register(SubmissionGroupMember, CourseMemberPermissionHandler(SubmissionGroupMember))
     
     # Read-only entities
     permission_registry.register(CourseRole, ReadOnlyPermissionHandler(CourseRole))
     permission_registry.register(CourseContentKind, ReadOnlyPermissionHandler(CourseContentKind))
+    permission_registry.register(Language, ReadOnlyPermissionHandler(Language))
     
     # Example entities (read-only for most users)
     permission_registry.register(Example, ReadOnlyPermissionHandler(Example))
@@ -94,6 +101,12 @@ def initialize_permission_handlers():
     permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
     permission_registry.register(Result, ResultPermissionHandler(Result))
     permission_registry.register(Message, MessagePermissionHandler(Message))
+
+    # Artifact models - use CourseMemberPermissionHandler for course-scoped access
+    permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))
+    permission_registry.register(ResultArtifact, CourseMemberPermissionHandler(ResultArtifact))
+    permission_registry.register(SubmissionGrade, CourseMemberPermissionHandler(SubmissionGrade))
+    permission_registry.register(SubmissionReview, CourseMemberPermissionHandler(SubmissionReview))
 
 
 def check_admin(permissions: Principal) -> bool:

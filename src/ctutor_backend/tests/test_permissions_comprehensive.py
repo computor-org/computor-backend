@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 # Import permission components from new system directly
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.permissions.core import check_permissions, check_admin, check_course_permissions
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 
 
@@ -160,14 +160,14 @@ def create_test_app(mock_principal: MockPrincipal, mock_db: Session):
     from ctutor_backend.server import app
     
     # Override authentication dependency
-    def override_get_current_permissions():
+    def override_get_current_principal():
         return mock_principal
     
     # Override database dependency
     def override_get_db():
         yield mock_db
     
-    app.dependency_overrides[get_current_permissions] = override_get_current_permissions
+    app.dependency_overrides[get_current_principal] = override_get_current_principal
     app.dependency_overrides[get_db] = override_get_db
     
     return app

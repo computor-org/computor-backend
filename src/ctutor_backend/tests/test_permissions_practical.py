@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 # Import from new permission system directly
 from ctutor_backend.server import app
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 from ctutor_backend.permissions.principal import Principal, Claims
 from ctutor_backend.permissions.core import check_permissions, check_admin, check_course_permissions
@@ -140,14 +140,14 @@ def create_test_client(user_type: str) -> TestClient:
     mock_db = create_mock_db()
     
     # Create override functions
-    def override_get_current_permissions():
+    def override_get_current_principal():
         return principal
     
     def override_get_db():
         yield mock_db
     
     # Apply overrides
-    app.dependency_overrides[get_current_permissions] = override_get_current_permissions
+    app.dependency_overrides[get_current_principal] = override_get_current_principal
     app.dependency_overrides[get_db] = override_get_db
     
     # Also need to mock check_permissions to return a query mock

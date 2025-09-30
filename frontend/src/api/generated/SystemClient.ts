@@ -13,11 +13,33 @@ export class SystemClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Organization Async
-   * Create an organization asynchronously using Temporal workflows.
+   * Generate Assignments
    */
-  async createOrganizationAsyncSystemDeployOrganizationsPost({ body }: { body: OrganizationTaskRequest }): Promise<TaskResponse> {
-    return this.client.post<TaskResponse>(this.buildPath('deploy', 'organizations'), body);
+  async generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost({ courseId, body }: { courseId: string; body: GenerateAssignmentsRequest }): Promise<GenerateAssignmentsResponse> {
+    return this.client.post<GenerateAssignmentsResponse>(this.buildPath('courses', courseId, 'generate-assignments'), body);
+  }
+
+  /**
+   * Generate Student Template
+   * Generate student template from assigned examples (Git operations).
+   * This is step 2 of the two-step process. It triggers a Temporal workflow
+   * that will:
+   * 1. Download examples from MinIO based on CourseContent assignments
+   * 2. Process them according to meta.yaml rules
+   * 3. Generate the student-template repository
+   * 4. Commit and push the changes
+   */
+  async generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost({ courseId, body }: { courseId: string; body: GenerateTemplateRequest }): Promise<GenerateTemplateResponse> {
+    return this.client.post<GenerateTemplateResponse>(this.buildPath('courses', courseId, 'generate-student-template'), body);
+  }
+
+  /**
+   * Get Course Gitlab Status
+   * Check GitLab configuration status for a course.
+   * Returns information about GitLab integration and what's missing.
+   */
+  async getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet({ courseId }: { courseId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('courses', courseId, 'gitlab-status'));
   }
 
   /**
@@ -37,33 +59,11 @@ export class SystemClient extends BaseEndpointClient {
   }
 
   /**
-   * Generate Student Template
-   * Generate student template from assigned examples (Git operations).
-   * This is step 2 of the two-step process. It triggers a Temporal workflow
-   * that will:
-   * 1. Download examples from MinIO based on CourseContent assignments
-   * 2. Process them according to meta.yaml rules
-   * 3. Generate the student-template repository
-   * 4. Commit and push the changes
+   * Create Organization Async
+   * Create an organization asynchronously using Temporal workflows.
    */
-  async generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost({ courseId, body }: { courseId: string; body: GenerateTemplateRequest }): Promise<GenerateTemplateResponse> {
-    return this.client.post<GenerateTemplateResponse>(this.buildPath('courses', courseId, 'generate-student-template'), body);
-  }
-
-  /**
-   * Generate Assignments
-   */
-  async generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost({ courseId, body }: { courseId: string; body: GenerateAssignmentsRequest }): Promise<GenerateAssignmentsResponse> {
-    return this.client.post<GenerateAssignmentsResponse>(this.buildPath('courses', courseId, 'generate-assignments'), body);
-  }
-
-  /**
-   * Get Course Gitlab Status
-   * Check GitLab configuration status for a course.
-   * Returns information about GitLab integration and what's missing.
-   */
-  async getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet({ courseId }: { courseId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('courses', courseId, 'gitlab-status'));
+  async createOrganizationAsyncSystemDeployOrganizationsPost({ body }: { body: OrganizationTaskRequest }): Promise<TaskResponse> {
+    return this.client.post<TaskResponse>(this.buildPath('deploy', 'organizations'), body);
   }
 
   /**

@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sso Schemas",
+  "description": "Auto-generated JSON schemas for sso models",
+  "category": "sso",
+  "models": {
+    "ProviderInfo": {
+      "description": "Information about an authentication provider.",
+      "properties": {
+        "name": {
+          "description": "Provider name",
+          "title": "Name",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "Display name",
+          "title": "Display Name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Authentication type",
+          "title": "Type",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether provider is enabled",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "login_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Login URL if applicable",
+          "title": "Login Url"
+        }
+      },
+      "required": [
+        "name",
+        "display_name",
+        "type",
+        "enabled"
+      ],
+      "title": "ProviderInfo",
+      "type": "object",
+      "x-model-name": "ProviderInfo"
+    }
+  },
+  "enums": {}
+}

@@ -11,7 +11,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
 from ctutor_backend.model.course import Course, CourseMember, CourseMemberComment
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 
 
@@ -60,7 +60,7 @@ def _get_current_transmitter(db: Session, permissions: Principal, course_member_
 @router.get("", response_model=list[CourseMemberCommentList])
 async def list_comments(
     course_member_id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     # Admin: return without owner flag (model has no owner)
@@ -118,7 +118,7 @@ async def list_comments(
 @router.post("", response_model=list[CourseMemberCommentList])
 async def create_comment(
     payload: CommentCreate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     if permissions.is_admin:
@@ -172,7 +172,7 @@ async def create_comment(
 async def update_comment(
     course_member_comment_id: UUID | str,
     payload: CommentUpdate,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     if permissions.is_admin:
@@ -228,7 +228,7 @@ async def update_comment(
 @router.delete("/{course_member_comment_id}", response_model=list[CourseMemberCommentList])
 async def delete_comment(
     course_member_comment_id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
     if permissions.is_admin:

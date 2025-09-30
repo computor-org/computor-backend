@@ -14,6 +14,8 @@ from ctutor_backend.interface.organizations import OrganizationInterface
 from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
+from ctutor_backend.interface.student_profile import StudentProfileInterface
+from ctutor_backend.interface.profiles import ProfileInterface
 from ctutor_backend.interface.example import ExampleInterface
 from ctutor_backend.interface.extensions import ExtensionInterface
 from ctutor_backend.model.example import Example
@@ -34,17 +36,19 @@ def get_all_claim_values() -> Generator[Tuple[str, str], None, None]:
 def claims_user_manager() -> List[Tuple[str, str]]:
     """
     Generate claims for the user manager role.
-    
+
     Returns:
         List of (claim_type, claim_value) tuples for user management permissions
     """
     claims = []
-    
+
     claims.extend(UserInterface().claim_values())
     claims.extend(AccountInterface().claim_values())
+    claims.extend(ProfileInterface().claim_values())
+    claims.extend(StudentProfileInterface().claim_values())
     claims.extend(RoleClaimInterface().claim_values())
     claims.extend(UserRoleInterface().claim_values())
-    
+
     return claims
 
 

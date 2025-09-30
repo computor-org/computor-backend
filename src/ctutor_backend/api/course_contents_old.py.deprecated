@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 
@@ -27,7 +27,7 @@ class CourseContentFileQuery(BaseModel):
     filename: Optional[str] = None
 
 @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
-async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_current_permissions)], course_content_id: UUID | str, file_query: CourseContentFileQuery = Depends(), db: Session = Depends(get_db)):
+async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_current_principal)], course_content_id: UUID | str, file_query: CourseContentFileQuery = Depends(), db: Session = Depends(get_db)):
 
     if check_course_permissions(permissions,CourseContent,"_tutor",db).filter(CourseContent.id == course_content_id).first() == None:
         raise NotFoundException()
@@ -95,7 +95,7 @@ class CourseContentExampleResponse(BaseModel):
 async def assign_example_to_content(
     content_id: str,
     request: AssignExampleRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
@@ -207,7 +207,7 @@ async def assign_example_to_content(
 @course_content_router.router.delete("/{content_id}/example")
 async def remove_example_assignment(
     content_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
@@ -270,7 +270,7 @@ async def remove_example_assignment(
 # )
 # async def get_course_contents_with_examples(
 #     course_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db),
 #     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 # ):
@@ -352,7 +352,7 @@ async def remove_example_assignment(
 # )
 # async def get_available_examples(
 #     course_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db),
 #     cache: Annotated[BaseCache, Depends(get_redis_client)] = None,
 #     search: Optional[str] = None,
@@ -476,7 +476,7 @@ async def remove_example_assignment(
 # async def get_deployment_preview(
 #     course_id: str,
 #     example_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db),
 #     version: str = "latest",
 #     target_path: str = None

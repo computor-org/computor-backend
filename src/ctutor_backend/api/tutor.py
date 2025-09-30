@@ -1,8 +1,9 @@
 import json
+import logging
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel
-from sqlalchemy import case
+from sqlalchemy import case, desc
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from aiocache import SimpleMemoryCache
@@ -11,7 +12,7 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeList
 from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface, CourseMemberProperties, CourseMemberQuery
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import allowed_course_role_ids
 from ctutor_backend.api.exceptions import BadRequestException, ForbiddenException, InternalServerException, NotFoundException
@@ -20,7 +21,8 @@ from ctutor_backend.interface.student_courses import CourseStudentInterface, Cou
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, SubmissionGroup, SubmissionGroupMember
+from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentInterface,
@@ -32,8 +34,11 @@ from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentGet,
 )
 from ctutor_backend.interface.grading import GradingStatus
+from ctutor_backend.interface.tutor_grading import TutorGradeCreate, TutorGradeResponse
 from ctutor_backend.model.result import Result
 from ctutor_backend.redis_cache import get_redis_client
+
+logger = logging.getLogger(__name__)
 
 _tutor_cache = SimpleMemoryCache()
 
@@ -54,7 +59,7 @@ async def set_cached_data(course_id: str, data: dict):
 tutor_router = APIRouter()
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
-def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
     
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
@@ -65,7 +70,7 @@ def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: U
     return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
-def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
@@ -82,32 +87,38 @@ def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annota
 
     return response_list
 
-@tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentList)
-def tutor_update_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, course_member_update: CourseContentStudentUpdate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+@tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
+def tutor_update_course_contents(
+    course_content_id: UUID | str,
+    course_member_id: UUID | str,
+    grade_data: TutorGradeCreate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db)
+):
     
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
-    # Create a new CourseSubmissionGroupGrading entry before querying latest grading
+    # Create a new SubmissionGroupGrading entry before querying latest grading
     # 1) Resolve the student's course member and related submission group for this content
     student_cm = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
     if student_cm is None:
         raise NotFoundException()
 
-    course_submission_group = (
-        db.query(CourseSubmissionGroup)
+    submission_group = (
+        db.query(SubmissionGroup)
         .join(
-            CourseSubmissionGroupMember,
-            CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id,
+            SubmissionGroupMember,
+            SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
         )
         .filter(
-            CourseSubmissionGroupMember.course_member_id == course_member_id,
-            CourseSubmissionGroup.course_content_id == course_content_id,
+            SubmissionGroupMember.course_member_id == course_member_id,
+            SubmissionGroup.course_content_id == course_content_id,
         )
         .first()
     )
 
-    if course_submission_group is None:
+    if submission_group is None:
         raise NotFoundException()
 
     # 2) Resolve the grader's course member (the current user in the same course)
@@ -123,45 +134,73 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         # Fallback safety: forbid if we cannot resolve grader identity in course
         raise ForbiddenException()
 
-    # 3) Get the last submitted result if we want to link the grading to it
-    last_result_id = None
-    last_result = course_submission_group.last_submitted_result
-    if last_result:
-        # Hybrid property returns a Result model instance in Python mode
-        # or the UUID when evaluated via SQL expression; normalise to ID.
-        last_result_id = getattr(last_result, "id", last_result)
+    # 3) Determine which artifact to grade
+    if grade_data.artifact_id:
+        # Specific artifact requested - verify it belongs to this submission group
+        artifact_to_grade = (
+            db.query(SubmissionArtifact)
+            .filter(
+                SubmissionArtifact.id == grade_data.artifact_id,
+                SubmissionArtifact.submission_group_id == submission_group.id
+            )
+            .first()
+        )
+        if artifact_to_grade is None:
+            raise NotFoundException(detail="Specified artifact not found or doesn't belong to this submission group")
+    else:
+        # Get the latest submission artifact for this submission group
+        artifact_to_grade = (
+            db.query(SubmissionArtifact)
+            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
+            .order_by(SubmissionArtifact.created_at.desc())
+            .first()
+        )
+        if artifact_to_grade is None:
+            raise NotFoundException(detail="No submission artifact found for this submission group. Student must submit first.")
 
-    # 4) Map status string to GradingStatus enum value
-    grading_status = GradingStatus.NOT_REVIEWED  # Default
-    if course_member_update.status:
-        status_map = {
-            "corrected": GradingStatus.CORRECTED,
-            "correction_necessary": GradingStatus.CORRECTION_NECESSARY,
-            "correction_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
-            "improvement_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
-            "not_reviewed": GradingStatus.NOT_REVIEWED
-        }
-        grading_status = status_map.get(course_member_update.status, GradingStatus.NOT_REVIEWED)
+    # 4) Get grading status (now using GradingStatus enum directly)
+    grading_status = grade_data.status if grade_data.status is not None else GradingStatus.NOT_REVIEWED
 
-    # 5) Create grading if payload includes grading/status
-    new_grading = CourseSubmissionGroupGrading(
-            course_submission_group_id=course_submission_group.id,
+    # 5) Create a new artifact-based grade
+    # Check if grading data is provided
+    if grade_data.grade is not None or grade_data.status is not None:
+        # Grade validation is already done by Pydantic Field validator (0.0 to 1.0)
+        grade_value = grade_data.grade if grade_data.grade is not None else 0.0
+
+        # Create the new grade for the artifact
+        new_grading = SubmissionGrade(
+            artifact_id=artifact_to_grade.id,
             graded_by_course_member_id=grader_cm.id,
-            grading=course_member_update.grading if course_member_update.grading != None else 0,
-            status=grading_status.value,  # Use integer value of enum
-            feedback=getattr(course_member_update, 'feedback', None),  # Add feedback if provided
-            result_id=last_result_id  # Link to the last submitted result
-    )
-    db.add(new_grading)
-    db.commit()
+            grade=grade_value,
+            status=grading_status.value,
+            comment=grade_data.feedback,
+        )
+        db.add(new_grading)
+        db.commit()
+
+        logger.info(f"Created grade for artifact {artifact_to_grade.id} by grader {grader_cm.id}")
         
     # 6) Return fresh data using shared mapper and latest grading subquery
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
-    return course_member_course_content_result_mapper(course_contents_result, db)
+
+    # Map the result and enhance with graded artifact info
+    response = course_member_course_content_result_mapper(course_contents_result, db)
+
+    # Convert to TutorGradeResponse and add artifact info
+    # Avoid model_dump() -> model_validate() round-trip to preserve UUID types
+    grade_response = TutorGradeResponse.model_validate(response, from_attributes=True)
+    grade_response.graded_artifact_id = artifact_to_grade.id
+    grade_response.graded_artifact_info = {
+        "id": str(artifact_to_grade.id),
+        "created_at": artifact_to_grade.created_at.isoformat() if artifact_to_grade.created_at else None,
+        "properties": artifact_to_grade.properties,
+    }
+
+    return grade_response
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
-async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course = check_course_permissions(permissions,Course,"_tutor",db).filter(Course.id == course_id).first()
 
@@ -169,10 +208,10 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
         raise NotFoundException()
 
     return CourseTutorGet(
-                id=course.id,
+                id=str(course.id),
                 title=course.title,
-                course_family_id=course.course_family_id,
-                organization_id=course.organization_id,
+                course_family_id=str(course.course_family_id) if course.course_family_id else None,
+                organization_id=str(course.organization_id) if course.organization_id else None,
                 path=course.path,
                 repository=CourseTutorRepository(
                     provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
@@ -181,7 +220,7 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
             )
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
-def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
 
     query = check_course_permissions(permissions,Course,"_tutor",db)
 
@@ -191,10 +230,10 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
 
     for course in courses:
         response_list.append(CourseTutorList(
-            id=course.id,
+            id=str(course.id),
             title=course.title,
-            course_family_id=course.course_family_id,
-            organization_id=course.organization_id,
+            course_family_id=str(course.course_family_id) if course.course_family_id else None,
+            organization_id=str(course.organization_id) if course.organization_id else None,
             path=course.path,
             repository=CourseTutorRepository(
                 provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
@@ -204,18 +243,8 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
 
     return response_list
 
-# @tutor_router.get("/courses/{course_id}/current", response_model=CourseMemberGet)
-# async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
-
-#     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(Course.id == course_id, CourseMember.user_id == permissions.get_user_id_or_throw()).first()
-
-#     if course_member == None:
-#         raise NotFoundException()
-
-#     return CourseMemberGet(**course_member.__dict__)
-
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
-def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first()
 
@@ -231,7 +260,10 @@ def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotate
         result = query[2]
 
         if result != None:
-            submit = result.submit
+            # Get submit field from associated SubmissionArtifact
+            submit = False
+            if result.submission_artifact:
+                submit = result.submission_artifact.submit
             status = result.status
 
             todo = True if submit == True and status == None else False
@@ -244,7 +276,7 @@ def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotate
     return tutor_course_member
 
 @tutor_router.get("/course-members", response_model=list[TutorCourseMemberList])
-def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseMemberQuery = Depends(), db: Session = Depends(get_db)):
+def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_current_principal)], params: CourseMemberQuery = Depends(), db: Session = Depends(get_db)):
 
     subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \

@@ -8,7 +8,7 @@
 
 
 
-import type { CourseExecutionBackendConfig, CourseSignupResponse } from './courses';
+import type { CourseContentTypeList, CourseExecutionBackendConfig, CourseSignupResponse, GradedByCourseMember, ResultStudentList, SubmissionGroupStudentList } from './courses';
 
 import type { ExampleVersionList } from './examples';
 
@@ -31,6 +31,8 @@ export interface ProfileCreate {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional profile properties */
   properties?: any | null;
 }
@@ -56,6 +58,8 @@ export interface ProfileGet {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional properties */
   properties?: any | null;
 }
@@ -75,6 +79,8 @@ export interface ProfileList {
   avatar_image?: string | null;
   /** Avatar color */
   avatar_color?: number | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
 }
 
 export interface ProfileUpdate {
@@ -88,6 +94,8 @@ export interface ProfileUpdate {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional properties */
   properties?: any | null;
 }
@@ -176,9 +184,9 @@ export interface StudentProfileQuery {
  * Payload describing a manual submission request.
  */
 export interface SubmissionCreate {
-  course_submission_group_id: string;
+  submission_group_id: string;
   version_identifier?: string | null;
-  submit?: boolean | null;
+  submit?: boolean;
 }
 
 /**
@@ -195,11 +203,12 @@ export interface SubmissionUploadedFile {
  * Response returned after processing a manual submission.
  */
 export interface SubmissionUploadResponseModel {
-  result_id: string;
-  bucket_name: string;
-  files: SubmissionUploadedFile[];
+  artifacts: string[];
+  submission_group_id: string;
+  uploaded_by_course_member_id: string;
   total_size: number;
-  submitted_at: string;
+  files_count: number;
+  uploaded_at: string;
   version_identifier: string;
 }
 
@@ -215,7 +224,7 @@ export interface SubmissionListItem {
   submit: boolean;
   course_member_id: string;
   course_content_id: string;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   version_identifier: string;
@@ -235,7 +244,7 @@ export interface SubmissionQuery {
   id?: string | null;
   submit?: boolean | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   course_content_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
@@ -730,6 +739,51 @@ export interface GroupQuery {
   archived?: boolean | null;
 }
 
+/**
+ * DTO for creating a grade through the tutor endpoint.
+ * 
+ * This is used when a tutor grades a student's submission for a specific course content.
+ * The endpoint will automatically find the latest artifact for the submission group.
+ */
+export interface TutorGradeCreate {
+  artifact_id?: string | null;
+  /** Grade between 0.0 and 1.0 */
+  grade?: number | null;
+  /** Grading status */
+  status?: GradingStatus | null;
+  /** Feedback/comment for the student */
+  feedback?: string | null;
+}
+
+/**
+ * Response after creating a grade through the tutor endpoint.
+ * 
+ * Returns the updated course content information with the new grade applied.
+ * We extend CourseContentStudentList to maintain backward compatibility.
+ */
+export interface TutorGradeResponse {
+  id: string;
+  title?: string | null;
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  submitted?: boolean | null;
+  course_content_type: CourseContentTypeList;
+  result_count: number;
+  submission_count: number;
+  max_test_runs?: number | null;
+  directory?: string | null;
+  color: string;
+  result?: ResultStudentList | null;
+  submission_group?: SubmissionGroupStudentList | null;
+  unread_message_count?: number;
+  graded_artifact_id?: string | null;
+  graded_artifact_info?: any | null;
+}
+
 export interface ListQuery {
   skip?: number | null;
   limit?: number | null;
@@ -826,13 +880,14 @@ export interface OrFilter {
 }
 
 export interface ResultCreate {
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
-  course_submission_group_id?: string;
+  submission_group_id?: string;
+  submission_artifact_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
+  grade?: number | null;
   result_json?: any | null;
   properties?: any | null;
   version_identifier: string;
@@ -848,14 +903,15 @@ export interface ResultGet {
   created_by?: string | null;
   updated_by?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
+  grade?: number | null;
   result_json?: any | null;
   properties?: any | null;
   version_identifier: string;
@@ -870,22 +926,23 @@ export interface ResultList {
   /** Update timestamp */
   updated_at?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
+  grade?: number | null;
   version_identifier: string;
   reference_version_identifier?: string | null;
   status: TaskStatus;
 }
 
 export interface ResultUpdate {
-  submit?: boolean | null;
   result?: number | null;
+  grade?: number | null;
   result_json?: any | null;
   status?: TaskStatus | null;
   test_system_id?: string | null;
@@ -896,18 +953,19 @@ export interface ResultQuery {
   skip?: number | null;
   limit?: number | null;
   id?: string | null;
-  submit?: boolean | null;
   submitter_id?: string | null;
   course_member_id?: string | null;
   course_content_id?: string | null;
   course_content_type_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   version_identifier?: string | null;
   status?: TaskStatus | null;
   latest?: boolean | null;
   result?: number | null;
+  grade?: number | null;
   result_json?: string | null;
 }
 
@@ -922,14 +980,15 @@ export interface ResultWithGrading {
   created_by?: string | null;
   updated_by?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   result: number;
+  grade?: number | null;
   result_json?: any | null;
   properties?: any | null;
   version_identifier: string;
@@ -941,33 +1000,75 @@ export interface ResultWithGrading {
 }
 
 /**
- * Detailed result information including submission group and grading.
+ * Create a new grading for a submission group.
  */
-export interface ResultDetailed {
+export interface SubmissionGroupGradingCreate {
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status?: GradingStatus;
+  feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * Full grading information.
+ */
+export interface SubmissionGroupGradingGet {
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
   id: string;
-  submit: boolean;
-  course_member_id: string;
-  course_member_name?: string | null;
-  course_content_id: string;
-  course_content_title?: string | null;
-  course_content_path?: string | null;
-  course_content_type_id: string;
-  course_submission_group_id?: string | null;
-  submission_group_members?: any[] | null;
-  execution_backend_id: string;
-  test_system_id?: string | null;
-  result: number;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  gradings?: any[];
-  latest_grade?: number | null;
-  latest_grading_status?: number | null;
-  latest_grading_feedback?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: GradingStatus;
+  feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * List view of grading.
+ */
+export interface SubmissionGroupGradingList {
+  id: string;
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: GradingStatus;
+  feedback?: string | null;
+  created_at: string;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * Update grading information.
+ */
+export interface SubmissionGroupGradingUpdate {
+  grading?: number | null;
+  status?: GradingStatus | null;
+  feedback?: string | null;
+  result_id?: string | null;
+}
+
+/**
+ * Query parameters for searching gradings.
+ */
+export interface SubmissionGroupGradingQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submission_group_id?: string | null;
+  graded_by_course_member_id?: string | null;
+  result_id?: string | null;
+  status?: GradingStatus | null;
+  min_grade?: number | null;
+  max_grade?: number | null;
+  has_feedback?: boolean | null;
 }
 
 /**
@@ -997,13 +1098,15 @@ export interface GradingSummary {
 }
 
 export interface TestCreate {
+  artifact_id?: string | null;
+  submission_group_id?: string | null;
+  version_identifier?: string | null;
   course_member_id?: string | null;
   course_content_id?: string | null;
   course_content_path?: string | null;
   directory?: string | null;
   project?: string | null;
   provider_url?: string | null;
-  version_identifier?: string | null;
   submit?: boolean | null;
 }
 
@@ -1139,9 +1242,9 @@ export interface GroupClaimQuery {
  * DTO for creating a student.
  */
 export interface StudentCreate {
-  user_id?: (string | string) | null;
+  user_id?: string | null;
   user?: UserGet | null;
-  course_group_id?: (string | string) | null;
+  course_group_id?: string | null;
   course_group_title?: string | null;
   role?: string | null;
 }
@@ -1151,7 +1254,7 @@ export interface StudentCreate {
  */
 export interface ReleaseStudentsCreate {
   students?: StudentCreate[];
-  course_id: any;
+  course_id: string;
 }
 
 /**
@@ -1204,7 +1307,7 @@ export interface PendingChangesResponse {
  * Per-item override for release commit selection.
  */
 export interface ReleaseOverride {
-  course_content_id: any;
+  course_content_id: string;
   /** Commit SHA to use for this content */
   version_identifier: string;
 }
@@ -1214,9 +1317,9 @@ export interface ReleaseOverride {
  */
 export interface ReleaseSelection {
   /** Explicit list of course content IDs to release */
-  course_content_ids?: any[] | null;
+  course_content_ids?: string[] | null;
   /** Parent content ID; combined with include_descendants */
-  parent_id?: (string | string) | null;
+  parent_id?: string | null;
   /** Whether to include descendants of parent_id */
   include_descendants?: boolean;
   /** Select all contents in the course */
@@ -1482,7 +1585,7 @@ export interface SubmissionGroupMemberProperties {
 
 export interface SubmissionGroupMemberCreate {
   course_member_id: string;
-  course_submission_group_id: string;
+  submission_group_id: string;
   grading?: number | null;
   properties?: SubmissionGroupMemberProperties | null;
 }
@@ -1498,7 +1601,7 @@ export interface SubmissionGroupMemberGet {
   course_id: string;
   course_content_id: string;
   course_member_id: string;
-  course_submission_group_id: string;
+  submission_group_id: string;
   grading?: number | null;
   status?: string | null;
   properties?: SubmissionGroupMemberProperties | null;
@@ -1509,7 +1612,7 @@ export interface SubmissionGroupMemberList {
   course_id: string;
   course_content_id: string;
   course_member_id: string;
-  course_submission_group_id: string;
+  submission_group_id: string;
   grading?: number | null;
   status?: string | null;
 }
@@ -1528,10 +1631,254 @@ export interface SubmissionGroupMemberQuery {
   course_id?: string | null;
   course_content_id?: string | null;
   course_member_id?: string | null;
-  course_submission_group_id?: string | null;
+  submission_group_id?: string | null;
   grading?: number | null;
   status?: string | null;
   properties?: SubmissionGroupMemberProperties | null;
+}
+
+/**
+ * DTO for creating submission artifacts.
+ * 
+ * This is used internally when processing submission uploads.
+ * The upload endpoint accepts SubmissionCreate which only has:
+ * - submission_group_id
+ * - version_identifier (optional)
+ */
+export interface SubmissionArtifactCreate {
+  submission_group_id: string;
+  version_identifier?: string | null;
+}
+
+/**
+ * DTO for updating submission artifacts.
+ */
+export interface SubmissionArtifactUpdate {
+  submit?: boolean | null;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * List item representation for submission artifacts.
+ * 
+ * Essential metadata is stored in proper database columns.
+ * Properties field is kept for legacy compatibility and future extensibility.
+ */
+export interface SubmissionArtifactList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  submission_group_id: string;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  uploaded_at: string;
+  version_identifier?: string | null;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Detailed view of submission artifact with related data.
+ */
+export interface SubmissionArtifactGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  submission_group_id: string;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  uploaded_at: string;
+  version_identifier?: string | null;
+  properties?: Record<string, any> | null;
+  test_results_count?: number | null;
+  grades_count?: number | null;
+  reviews_count?: number | null;
+  latest_result?: ResultList | null;
+  average_grade?: number | null;
+}
+
+/**
+ * Query parameters for listing submission artifacts.
+ */
+export interface SubmissionArtifactQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submission_group_id?: string | null;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+}
+
+/**
+ * DTO for creating submission grades.
+ */
+export interface SubmissionGradeCreate {
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status?: GradingStatus;
+  comment?: string | null;
+}
+
+/**
+ * DTO for updating submission grades.
+ */
+export interface SubmissionGradeUpdate {
+  grade?: number | null;
+  status?: GradingStatus | null;
+  comment?: string | null;
+}
+
+/**
+ * List item representation for submission grades.
+ */
+export interface SubmissionGradeListItem {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status: GradingStatus;
+  comment?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Detailed view of submission grade.
+ */
+export interface SubmissionGradeDetail {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status: GradingStatus;
+  comment?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Query parameters for listing submission grades.
+ */
+export interface SubmissionGradeQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  artifact_id?: string | null;
+  graded_by_course_member_id?: string | null;
+  status?: GradingStatus | null;
+}
+
+/**
+ * DTO for creating submission reviews.
+ */
+export interface SubmissionReviewCreate {
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * DTO for updating submission reviews.
+ */
+export interface SubmissionReviewUpdate {
+  body?: string | null;
+  review_type?: string | null;
+}
+
+/**
+ * List item representation for submission reviews.
+ */
+export interface SubmissionReviewListItem {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * Detailed view of submission review.
+ */
+export interface SubmissionReviewDetail {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * Query parameters for listing submission reviews.
+ */
+export interface SubmissionReviewQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  artifact_id?: string | null;
+  reviewer_course_member_id?: string | null;
+  review_type?: string | null;
+}
+
+/**
+ * DTO for creating result artifacts.
+ */
+export interface ResultArtifactCreate {
+  result_id: string;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * List item representation for result artifacts.
+ */
+export interface ResultArtifactListItem {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  result_id: string;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Query parameters for listing result artifacts.
+ */
+export interface ResultArtifactQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  result_id?: string | null;
+  content_type?: string | null;
 }
 
 /**
@@ -1712,6 +2059,49 @@ export interface StorageUsageStats {
   total_size: number;
   /** Last statistics update timestamp */
   last_updated: string;
+}
+
+export interface LanguageCreate {
+  /** ISO 639-1 language code (2 lowercase letters) */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageGet {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageList {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageUpdate {
+  /** Language name in English */
+  name?: string | null;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by language code */
+  code?: string | null;
+  /** Filter by language name */
+  name?: string | null;
 }
 
 /**
@@ -2411,29 +2801,6 @@ export interface CodeAbilityReport {
   properties?: any | null;
   debug?: any | null;
   tests?: CodeAbilityReportMain[] | null;
-}
-
-export interface VSCExtensionConfig {
-  project_id: number;
-  gitlab_url: string;
-  file_path: string;
-  download_link: string;
-}
-
-export interface TestRunResponse {
-  submit: boolean;
-  course_member_id: string;
-  course_content_id: string;
-  course_submission_group_id?: string;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  id: string;
 }
 
 export interface GitlabSignup {

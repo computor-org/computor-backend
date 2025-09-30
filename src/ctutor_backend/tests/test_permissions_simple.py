@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import Mock, MagicMock
 
 from ctutor_backend.server import app
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
 from ctutor_backend.permissions.principal import Principal, Claims, build_claims
 from ctutor_backend.permissions.core import check_permissions, check_admin, can_perform_on_resource, can_perform_with_parents
@@ -59,7 +59,7 @@ class TestSimplePermissions:
     def test_api_with_mock_db(self, mock_db, admin_principal):
         """Test API endpoint with mock database."""
         # Override dependencies
-        app.dependency_overrides[get_current_permissions] = lambda: admin_principal
+        app.dependency_overrides[get_current_principal] = lambda: admin_principal
         app.dependency_overrides[get_db] = lambda: mock_db
         
         # Create test client

@@ -12,6 +12,7 @@ from .worker import worker
 from .generate_types import generate_types
 from .generate_clients import generate_clients
 from .generate_schema import generate_schema
+from .generate_validators import generate_validators_cmd
 from .deployment import deployment
 
 @click.group()
@@ -31,6 +32,7 @@ cli.add_command(worker,"worker")
 cli.add_command(generate_types,"generate-types")
 cli.add_command(generate_clients,"generate-clients")
 cli.add_command(generate_schema,"generate-schema")
+cli.add_command(generate_validators_cmd,"generate-validators")
 cli.add_command(deployment,"deployment")
 # cli.add_command(experiment_1,"exp")
 

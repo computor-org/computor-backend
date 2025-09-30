@@ -1,7 +1,6 @@
 """Pydantic DTOs and query helpers for manual submission endpoints."""
 from datetime import datetime
 from typing import Any, List, Optional
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
@@ -13,14 +12,15 @@ from ctutor_backend.interface.tasks import (
     map_task_status_to_int,
 )
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 
 
 class SubmissionCreate(BaseModel):
     """Payload describing a manual submission request."""
 
-    course_submission_group_id: str
+    submission_group_id: str
     version_identifier: Optional[str] = None
-    submit: Optional[bool] = None
+    submit: bool = False  # True = official submission, False = test/practice run
 
 
 class SubmissionUploadedFile(BaseModel):
@@ -35,11 +35,12 @@ class SubmissionUploadedFile(BaseModel):
 class SubmissionUploadResponseModel(BaseModel):
     """Response returned after processing a manual submission."""
 
-    result_id: UUID
-    bucket_name: str
-    files: List[SubmissionUploadedFile]
+    artifacts: List[str]  # List of created SubmissionArtifact IDs
+    submission_group_id: str
+    uploaded_by_course_member_id: str
     total_size: int
-    submitted_at: datetime
+    files_count: int
+    uploaded_at: datetime
     version_identifier: str
 
 
@@ -50,7 +51,7 @@ class SubmissionListItem(BaseEntityList):
     submit: bool
     course_member_id: str
     course_content_id: str
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: str
@@ -76,7 +77,7 @@ class SubmissionQuery(ListQuery):
     id: Optional[str] = None
     submit: Optional[bool] = None
     course_member_id: Optional[str] = None
-    course_submission_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
@@ -93,11 +94,13 @@ def submission_search(db: Session, query, params: SubmissionQuery):
     if params.id is not None:
         query = query.filter(Result.id == params.id)
     if params.submit is not None:
-        query = query.filter(Result.submit == params.submit)
+        # Join with SubmissionArtifact to filter by submit field
+        query = query.join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
+            .filter(SubmissionArtifact.submit == params.submit)
     if params.course_member_id is not None:
         query = query.filter(Result.course_member_id == params.course_member_id)
-    if params.course_submission_group_id is not None:
-        query = query.filter(Result.course_submission_group_id == params.course_submission_group_id)
+    if params.submission_group_id is not None:
+        query = query.filter(Result.submission_group_id == params.submission_group_id)
     if params.course_content_id is not None:
         query = query.filter(Result.course_content_id == params.course_content_id)
     if params.execution_backend_id is not None:

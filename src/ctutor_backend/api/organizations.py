@@ -4,7 +4,7 @@ from fastapi import Depends
 from gitlab import Gitlab
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
 
@@ -24,7 +24,7 @@ class OrganizationUpdateTokenUpdate(BaseModel):
     token: str
 
 @organization_router.router.patch("/{organization_id}/token", status_code=201)
-def patch_organizations_token(permissions: Annotated[Principal, Depends(get_current_permissions)], organization_id: UUID | str, payload: OrganizationUpdateTokenUpdate, params: OrganizationUpdateTokenQuery = Depends(),db: Session = Depends(get_db)):
+def patch_organizations_token(permissions: Annotated[Principal, Depends(get_current_principal)], organization_id: UUID | str, payload: OrganizationUpdateTokenUpdate, params: OrganizationUpdateTokenQuery = Depends(),db: Session = Depends(get_db)):
 
     query = check_permissions(permissions,Organization,"update",db)
 

@@ -10,7 +10,7 @@ import logging
 from ctutor_backend.api.crud import get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
-from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_admin, check_course_permissions, get_permitted_course_ids
 from ctutor_backend.permissions.principal import Principal
 
@@ -92,7 +92,7 @@ logger = logging.getLogger(__name__)
 #     return deployment
 
 # @system_router.post("/release/students", response_model=dict)
-# async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+# async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
 #     course_id = payload.course_id
 #     students = payload.students
@@ -151,7 +151,7 @@ logger = logging.getLogger(__name__)
 #     return {"task_id": task_id}
   
 # @system_router.post("/release/students/export", response_model=list[TUGStudentExport])
-# async def create_student_from_export(permissions: Annotated[Principal, Depends(get_current_permissions)], course_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+# async def create_student_from_export(permissions: Annotated[Principal, Depends(get_current_principal)], course_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
 
 #     if check_course_permissions(permissions,Course,"_maintainer",db).filter(Course.id == course_id).first() == None and check_admin(permissions) == False:
 #       raise NotFoundException()
@@ -341,7 +341,7 @@ logger = logging.getLogger(__name__)
 #     return {"task_id": task_id}
 
 # @system_router.post("/release/courses", response_model=dict)
-# async def release_course(payload: ReleaseCourseCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+# async def release_course(payload: ReleaseCourseCreate, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 #     if payload.course_id != None:
 #       course_id = payload.course_id
 #     elif payload.gitlab_url != None:
@@ -360,7 +360,7 @@ logger = logging.getLogger(__name__)
 #     return await create_course_client(course_id,get_computor_deployment_from_course_id_db(course_id, db),None,None,payload.descendants)
 
 # @system_router.post("/release/course-contents", response_model=dict)
-# async def release_course_content(payload: ReleaseCourseContentCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+# async def release_course_content(payload: ReleaseCourseContentCreate, permissions: Annotated[Principal, Depends(get_current_principal)], db: Session = Depends(get_db)):
 
 #     if payload.course_id != None:
 #       course_id = payload.course_id
@@ -377,7 +377,7 @@ logger = logging.getLogger(__name__)
 #     return await create_course_client(course_id, get_computor_deployment_from_course_id_db(course_id, db), payload.release_dir, payload.ascendants, payload.descendants,payload.release_dir_list)
 
 # @system_router.get("/status/{task_id}", response_model=dict)
-# async def system_job_status(task_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: StatusQuery = Depends()):
+# async def system_job_status(task_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_principal)], params: StatusQuery = Depends()):
 #     # Use Temporal task executor
 #     task_executor = get_task_executor()
     
@@ -441,7 +441,7 @@ logger = logging.getLogger(__name__)
 #    background_tasks: BackgroundTasks, 
 #    course_id: UUID | str, 
 #    course_release_update: CourseReleaseUpdate, 
-#    permissions: Annotated[Principal, Depends(get_current_permissions)],
+#    permissions: Annotated[Principal, Depends(get_current_principal)],
 #    cache: Annotated[BaseCache, Depends(get_redis_client)],
 #    db: Session = Depends(get_db)):
 
@@ -517,7 +517,7 @@ def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optiona
 @system_router.post("/deploy/organizations", response_model=TaskResponse)
 async def create_organization_async(
     request: OrganizationTaskRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """Create an organization asynchronously using Temporal workflows."""
@@ -567,7 +567,7 @@ async def create_organization_async(
 @system_router.post("/deploy/course-families", response_model=TaskResponse)
 async def create_course_family_async(
     request: CourseFamilyTaskRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """Create a course family asynchronously using Temporal workflows."""
@@ -623,7 +623,7 @@ async def create_course_family_async(
 @system_router.post("/deploy/courses", response_model=TaskResponse)
 async def create_course_async(
     request: CourseTaskRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """Create a course asynchronously using Temporal workflows."""
@@ -684,7 +684,7 @@ async def create_course_async(
 # )
 # async def get_pending_changes(
 #     course_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db)
 # ):
 #     """
@@ -772,7 +772,7 @@ async def create_course_async(
 async def generate_student_template(
     course_id: str,
     request: GenerateTemplateRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """
@@ -916,7 +916,7 @@ async def generate_student_template(
 async def generate_assignments(
     course_id: str,
     request: GenerateAssignmentsRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     # Permissions
@@ -983,7 +983,7 @@ async def generate_assignments(
 # async def bulk_assign_examples(
 #     course_id: str,
 #     request: BulkAssignExamplesRequest,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
 #     db: Session = Depends(get_db),
 #     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 # ):
@@ -1062,7 +1062,7 @@ async def generate_assignments(
 )
 async def get_course_gitlab_status(
     course_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """
@@ -1151,7 +1151,7 @@ async def get_course_gitlab_status(
 @system_router.post("/hierarchy/create", response_model=dict)
 async def create_hierarchy(
     payload: dict,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
     """
@@ -1221,7 +1221,7 @@ async def create_hierarchy(
 @system_router.get("/hierarchy/status/{workflow_id}", response_model=dict)
 async def get_hierarchy_status(
     workflow_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)]
+    permissions: Annotated[Principal, Depends(get_current_principal)]
 ):
     """
     Get the status of a deployment workflow.

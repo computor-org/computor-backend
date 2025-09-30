@@ -17,7 +17,7 @@ from ..interface.deployments_refactored import (
 )
 from ctutor_backend.permissions.principal import Principal
 from ..tasks import get_task_executor, TaskSubmission
-from .auth import get_current_permissions
+from .auth import get_current_principal
 from .permissions import check_admin
 from .exceptions import BadRequestException, ForbiddenException
 
@@ -47,7 +47,7 @@ class DeploymentResponse(BaseModel):
 @deployment_router.post("/deploy/from-config", response_model=DeploymentResponse)
 async def deploy_from_config(
     request: DeploymentRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ) -> DeploymentResponse:
     """
@@ -108,7 +108,7 @@ async def deploy_from_config(
 async def deploy_from_yaml(
     file: UploadFile = File(..., description="YAML deployment configuration file"),
     validate_only: bool = False,
-    permissions: Annotated[Principal, Depends(get_current_permissions)] = None,
+    permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db)
 ) -> DeploymentResponse:
     """
@@ -178,7 +178,7 @@ async def deploy_from_yaml(
 @deployment_router.get("/deploy/status/{workflow_id}")
 async def get_deployment_status(
     workflow_id: str,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -212,7 +212,7 @@ async def get_deployment_status(
 @deployment_router.post("/deploy/validate")
 async def validate_deployment_config(
     request: DeploymentRequest,
-    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
