@@ -2092,6 +2092,18 @@ export class CourseCreateValidator extends BaseValidator<CourseCreate> {
       "title": "Course Family Id",
       "type": "string"
     },
+    "language_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language Code"
+    },
     "properties": {
       "anyOf": [
         {
@@ -2182,6 +2194,11 @@ export class CourseCreateValidator extends BaseValidator<CourseCreate> {
       if (typeof data.course_family_id !== 'string') {
         errors.push('Field course_family_id must be a string');
       }
+    }
+
+    // Optional field: language_code
+    if ('language_code' in data && data.language_code !== undefined && data.language_code !== null) {
+      // Union type - skipping detailed validation
     }
 
     // Optional field: properties
@@ -2866,6 +2883,18 @@ export class CourseGetValidator extends BaseValidator<CourseGet> {
       "title": "Course Family Id",
       "type": "string"
     },
+    "language_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language Code"
+    },
     "properties": {
       "anyOf": [
         {
@@ -3029,6 +3058,11 @@ export class CourseGetValidator extends BaseValidator<CourseGet> {
       if (typeof data.course_family_id !== 'string') {
         errors.push('Field course_family_id must be a string');
       }
+    }
+
+    // Optional field: language_code
+    if ('language_code' in data && data.language_code !== undefined && data.language_code !== null) {
+      // Union type - skipping detailed validation
     }
 
     // Optional field: properties
@@ -3330,6 +3364,18 @@ export class CourseListValidator extends BaseValidator<CourseList> {
       "title": "Path",
       "type": "string"
     },
+    "language_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language Code"
+    },
     "properties": {
       "anyOf": [
         {
@@ -3420,6 +3466,11 @@ export class CourseListValidator extends BaseValidator<CourseList> {
       if (typeof data.path !== 'string') {
         errors.push('Field path must be a string');
       }
+    }
+
+    // Optional field: language_code
+    if ('language_code' in data && data.language_code !== undefined && data.language_code !== null) {
+      // Union type - skipping detailed validation
     }
 
     // Optional field: properties
@@ -3679,6 +3730,18 @@ export class CourseUpdateValidator extends BaseValidator<CourseUpdate> {
       "default": null,
       "title": "Description"
     },
+    "language_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language Code"
+    },
     "properties": {
       "anyOf": [
         {
@@ -3741,6 +3804,11 @@ export class CourseUpdateValidator extends BaseValidator<CourseUpdate> {
 
     // Optional field: description
     if ('description' in data && data.description !== undefined && data.description !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: language_code
+    if ('language_code' in data && data.language_code !== undefined && data.language_code !== null) {
       // Union type - skipping detailed validation
     }
 
@@ -17035,6 +17103,18 @@ export class CourseReleaseUpdateValidator extends BaseValidator<CourseReleaseUpd
           ],
           "default": null,
           "title": "Description"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
         },
         "properties": {
           "anyOf": [

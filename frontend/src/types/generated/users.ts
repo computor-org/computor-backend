@@ -153,6 +153,8 @@ export interface UserGet {
   archived_at?: string | null;
   /** Associated student profiles */
   student_profiles?: StudentProfileGet[];
+  /** User profile */
+  profile?: any | null;
 }
 
 export interface UserList {

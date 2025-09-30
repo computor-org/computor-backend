@@ -31,6 +31,8 @@ export interface ProfileCreate {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional profile properties */
   properties?: any | null;
 }
@@ -56,6 +58,8 @@ export interface ProfileGet {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional properties */
   properties?: any | null;
 }
@@ -75,6 +79,8 @@ export interface ProfileList {
   avatar_image?: string | null;
   /** Avatar color */
   avatar_color?: number | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
 }
 
 export interface ProfileUpdate {
@@ -88,6 +94,8 @@ export interface ProfileUpdate {
   bio?: string | null;
   /** User website URL */
   url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
   /** Additional properties */
   properties?: any | null;
 }
@@ -2051,6 +2059,49 @@ export interface StorageUsageStats {
   total_size: number;
   /** Last statistics update timestamp */
   last_updated: string;
+}
+
+export interface LanguageCreate {
+  /** ISO 639-1 language code (2 lowercase letters) */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageGet {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageList {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageUpdate {
+  /** Language name in English */
+  name?: string | null;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by language code */
+  code?: string | null;
+  /** Filter by language name */
+  name?: string | null;
 }
 
 /**

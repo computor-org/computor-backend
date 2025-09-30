@@ -83,6 +83,20 @@
           "description": "User website URL",
           "title": "Url"
         },
+        "language_code": {
+          "anyOf": [
+            {
+              "maxLength": 2,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
+        },
         "properties": {
           "anyOf": [
             {
@@ -234,6 +248,19 @@
           "description": "User website URL",
           "title": "Url"
         },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
+        },
         "properties": {
           "anyOf": [
             {
@@ -335,6 +362,19 @@
           "default": null,
           "description": "Avatar color",
           "title": "Avatar Color"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
         }
       },
       "required": [
@@ -418,6 +458,20 @@
           "default": null,
           "description": "User website URL",
           "title": "Url"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "maxLength": 2,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
         },
         "properties": {
           "anyOf": [
@@ -9236,730 +9290,6 @@
       "type": "object",
       "x-model-name": "GroupClaimQuery"
     },
-    "StudentCreate": {
-      "$defs": {
-        "StudentProfileGet": {
-          "properties": {
-            "id": {
-              "title": "Id",
-              "type": "string"
-            },
-            "student_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Student Id"
-            },
-            "student_email": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Student Email"
-            },
-            "user_id": {
-              "title": "User Id",
-              "type": "string"
-            },
-            "created_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Creation timestamp",
-              "title": "Created At"
-            },
-            "updated_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Update timestamp",
-              "title": "Updated At"
-            },
-            "created_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Created By"
-            },
-            "updated_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Updated By"
-            }
-          },
-          "required": [
-            "id",
-            "user_id"
-          ],
-          "title": "StudentProfileGet",
-          "type": "object"
-        },
-        "UserGet": {
-          "properties": {
-            "created_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Creation timestamp",
-              "title": "Created At"
-            },
-            "updated_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Update timestamp",
-              "title": "Updated At"
-            },
-            "created_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Created By"
-            },
-            "updated_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Updated By"
-            },
-            "id": {
-              "description": "User unique identifier",
-              "title": "Id",
-              "type": "string"
-            },
-            "given_name": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's given name",
-              "title": "Given Name"
-            },
-            "family_name": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's family name",
-              "title": "Family Name"
-            },
-            "email": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's email address",
-              "title": "Email"
-            },
-            "number": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User number/identifier",
-              "title": "Number"
-            },
-            "user_type": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/UserTypeEnum"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Type of user account"
-            },
-            "username": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Unique username",
-              "title": "Username"
-            },
-            "properties": {
-              "anyOf": [
-                {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Additional user properties",
-              "title": "Properties"
-            },
-            "archived_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Timestamp when user was archived",
-              "title": "Archived At"
-            },
-            "student_profiles": {
-              "default": [],
-              "description": "Associated student profiles",
-              "items": {
-                "$ref": "#/$defs/StudentProfileGet"
-              },
-              "title": "Student Profiles",
-              "type": "array"
-            }
-          },
-          "required": [
-            "id"
-          ],
-          "title": "UserGet",
-          "type": "object"
-        },
-        "UserTypeEnum": {
-          "enum": [
-            "user",
-            "token"
-          ],
-          "title": "UserTypeEnum",
-          "type": "string"
-        }
-      },
-      "description": "DTO for creating a student.",
-      "properties": {
-        "user_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "User Id"
-        },
-        "user": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/UserGet"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "course_group_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Course Group Id"
-        },
-        "course_group_title": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Course Group Title"
-        },
-        "role": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Role"
-        }
-      },
-      "title": "StudentCreate",
-      "type": "object",
-      "x-model-name": "StudentCreate"
-    },
-    "ReleaseStudentsCreate": {
-      "$defs": {
-        "StudentCreate": {
-          "description": "DTO for creating a student.",
-          "properties": {
-            "user_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "User Id"
-            },
-            "user": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/UserGet"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "course_group_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Course Group Id"
-            },
-            "course_group_title": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Course Group Title"
-            },
-            "role": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Role"
-            }
-          },
-          "title": "StudentCreate",
-          "type": "object"
-        },
-        "StudentProfileGet": {
-          "properties": {
-            "id": {
-              "title": "Id",
-              "type": "string"
-            },
-            "student_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Student Id"
-            },
-            "student_email": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Student Email"
-            },
-            "user_id": {
-              "title": "User Id",
-              "type": "string"
-            },
-            "created_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Creation timestamp",
-              "title": "Created At"
-            },
-            "updated_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Update timestamp",
-              "title": "Updated At"
-            },
-            "created_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Created By"
-            },
-            "updated_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Updated By"
-            }
-          },
-          "required": [
-            "id",
-            "user_id"
-          ],
-          "title": "StudentProfileGet",
-          "type": "object"
-        },
-        "UserGet": {
-          "properties": {
-            "created_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Creation timestamp",
-              "title": "Created At"
-            },
-            "updated_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Update timestamp",
-              "title": "Updated At"
-            },
-            "created_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Created By"
-            },
-            "updated_by": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Updated By"
-            },
-            "id": {
-              "description": "User unique identifier",
-              "title": "Id",
-              "type": "string"
-            },
-            "given_name": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's given name",
-              "title": "Given Name"
-            },
-            "family_name": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's family name",
-              "title": "Family Name"
-            },
-            "email": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User's email address",
-              "title": "Email"
-            },
-            "number": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "User number/identifier",
-              "title": "Number"
-            },
-            "user_type": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/UserTypeEnum"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Type of user account"
-            },
-            "username": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Unique username",
-              "title": "Username"
-            },
-            "properties": {
-              "anyOf": [
-                {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Additional user properties",
-              "title": "Properties"
-            },
-            "archived_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Timestamp when user was archived",
-              "title": "Archived At"
-            },
-            "student_profiles": {
-              "default": [],
-              "description": "Associated student profiles",
-              "items": {
-                "$ref": "#/$defs/StudentProfileGet"
-              },
-              "title": "Student Profiles",
-              "type": "array"
-            }
-          },
-          "required": [
-            "id"
-          ],
-          "title": "UserGet",
-          "type": "object"
-        },
-        "UserTypeEnum": {
-          "enum": [
-            "user",
-            "token"
-          ],
-          "title": "UserTypeEnum",
-          "type": "string"
-        }
-      },
-      "description": "DTO for releasing multiple students.",
-      "properties": {
-        "students": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/StudentCreate"
-          },
-          "title": "Students",
-          "type": "array"
-        },
-        "course_id": {
-          "title": "Course Id",
-          "type": "string"
-        }
-      },
-      "required": [
-        "course_id"
-      ],
-      "title": "ReleaseStudentsCreate",
-      "type": "object",
-      "x-model-name": "ReleaseStudentsCreate"
-    },
     "TUGStudentExport": {
       "description": "DTO for TUG student export data.",
       "properties": {
@@ -17123,6 +16453,211 @@
       "title": "StorageUsageStats",
       "type": "object",
       "x-model-name": "StorageUsageStats"
+    },
+    "LanguageCreate": {
+      "example": {
+        "code": "de",
+        "name": "German",
+        "native_name": "Deutsch"
+      },
+      "properties": {
+        "code": {
+          "description": "ISO 639-1 language code (2 lowercase letters)",
+          "maxLength": 2,
+          "minLength": 2,
+          "title": "Code",
+          "type": "string"
+        },
+        "name": {
+          "description": "Language name in English",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "native_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language name in native script",
+          "title": "Native Name"
+        }
+      },
+      "required": [
+        "code",
+        "name"
+      ],
+      "title": "LanguageCreate",
+      "type": "object",
+      "x-model-name": "LanguageCreate"
+    },
+    "LanguageGet": {
+      "properties": {
+        "code": {
+          "description": "ISO 639-1 language code",
+          "title": "Code",
+          "type": "string"
+        },
+        "name": {
+          "description": "Language name in English",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language name in native script",
+          "title": "Native Name"
+        }
+      },
+      "required": [
+        "code",
+        "name"
+      ],
+      "title": "LanguageGet",
+      "type": "object",
+      "x-model-name": "LanguageGet"
+    },
+    "LanguageList": {
+      "properties": {
+        "code": {
+          "description": "ISO 639-1 language code",
+          "title": "Code",
+          "type": "string"
+        },
+        "name": {
+          "description": "Language name in English",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language name in native script",
+          "title": "Native Name"
+        }
+      },
+      "required": [
+        "code",
+        "name"
+      ],
+      "title": "LanguageList",
+      "type": "object",
+      "x-model-name": "LanguageList"
+    },
+    "LanguageUpdate": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language name in English",
+          "title": "Name"
+        },
+        "native_name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language name in native script",
+          "title": "Native Name"
+        }
+      },
+      "title": "LanguageUpdate",
+      "type": "object",
+      "x-model-name": "LanguageUpdate"
+    },
+    "LanguageQuery": {
+      "properties": {
+        "skip": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Skip"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "title": "Limit"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by language code",
+          "title": "Code"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by language name",
+          "title": "Name"
+        }
+      },
+      "title": "LanguageQuery",
+      "type": "object",
+      "x-model-name": "LanguageQuery"
     },
     "BaseDeployment": {
       "description": "Base class for all deployment configurations.",

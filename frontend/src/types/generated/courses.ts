@@ -85,6 +85,7 @@ export interface CourseCreate {
   description?: string | null;
   path: string;
   course_family_id: string;
+  language_code?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -94,6 +95,7 @@ export interface CourseGet {
   description?: string | null;
   path: string;
   course_family_id: string;
+  language_code?: string | null;
   properties?: CoursePropertiesGet | null;
   /** Creation timestamp */
   created_at?: string | null;
@@ -111,12 +113,14 @@ export interface CourseList {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
+  language_code?: string | null;
   properties?: CoursePropertiesGet | null;
 }
 
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
+  language_code?: string | null;
   properties?: CourseProperties | null;
 }
 

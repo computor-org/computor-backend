@@ -1346,6 +1346,18 @@
           "title": "Course Family Id",
           "type": "string"
         },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
+        },
         "properties": {
           "anyOf": [
             {
@@ -2011,6 +2023,18 @@
           "title": "Course Family Id",
           "type": "string"
         },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
+        },
         "properties": {
           "anyOf": [
             {
@@ -2328,6 +2352,18 @@
           "title": "Path",
           "type": "string"
         },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
+        },
         "properties": {
           "anyOf": [
             {
@@ -2567,6 +2603,18 @@
           ],
           "default": null,
           "title": "Description"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
         },
         "properties": {
           "anyOf": [
@@ -10579,6 +10627,18 @@
               ],
               "default": null,
               "title": "Description"
+            },
+            "language_code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Language Code"
             },
             "properties": {
               "anyOf": [
