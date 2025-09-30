@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY
  */
 
-import type { AccountDeployment, AndFilter, ApiConfig, BaseDeployment, BaseEntityGet, BaseEntityList, BetweenFilter, BucketCreate, BucketInfo, BucketList, CallbackRequest, Claims, CodeAbilityBase, CodeAbilityLink, CodeAbilityMeta, CodeAbilityMetaProperties, CodeAbilityMetaProperty, CodeAbilityPerson, CodeAbilityReleaseMeta, CodeAbilityReport, CodeAbilityReportMain, CodeAbilityReportProperties, CodeAbilityReportSub, CodeAbilityReportSummary, CodeAbilitySpecification, CodeAbilityTest, CodeAbilityTestCollection, CodeAbilityTestCollectionCommon, CodeAbilityTestCommon, CodeAbilityTestProperty, CodeAbilityTestSuite, CodeAbilityUnitMeta, CommentCreate, CommentUpdate, ComputorDeploymentConfig, ContainsFilter, CourseContentDeploymentCreate, CourseContentDeploymentList, CourseContentDeploymentQuery, CourseContentDeploymentUpdate, CourseMemberDeployment, CourseMemberGitLabConfig, DeploymentHistoryCreate, DeploymentHistoryList, DeploymentMetadata, DeploymentSummary, EndswithFilter, EqualsFilter, ExecutionBackendConfig, ExecutionBackendCreate, ExecutionBackendGet, ExecutionBackendList, ExecutionBackendQuery, ExecutionBackendReference, ExecutionBackendUpdate, ExtensionMetadata, ExtensionPublishRequest, ExtensionPublishResponse, ExtensionUploadConfig, ExtensionVersionBase, ExtensionVersionDetail, ExtensionVersionListItem, ExtensionVersionListResponse, ExtensionVersionYankRequest, FileSourceConfig, FilterBase, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, GitCommit, GitHubConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, GitlabGroupProjectConfig, GitlabSignup, GitlabSignupResponse, GradingStudentView, GradingSummary, GreaterFilter, GroupClaimCreate, GroupClaimGet, GroupClaimList, GroupClaimQuery, GroupClaimUpdate, GroupCreate, GroupGet, GroupList, GroupQuery, GroupUpdate, ILikeFilter, InFilter, IsNullFilter, LanguageCreate, LanguageGet, LanguageList, LanguageQuery, LanguageUpdate, LikeFilter, ListQuery, LogoutRequest, LogoutResponse, LowerFilter, NotEqualsFilter, NotInFilter, NotNullFilter, OrFilter, PendingChange, PendingChangesResponse, PresignedUrlRequest, PresignedUrlResponse, Principal, ProfileCreate, ProfileGet, ProfileList, ProfileQuery, ProfileUpdate, ReleaseOverride, ReleaseSelection, Repository, RepositoryConfig, ResultArtifactCreate, ResultArtifactListItem, ResultArtifactQuery, ResultCreate, ResultGet, ResultList, ResultQuery, ResultStudentList, ResultUpdate, ResultWithGrading, SessionCreate, SessionGet, SessionList, SessionQuery, SessionUpdate, StartswithFilter, StatusQuery, StorageObjectCreate, StorageObjectGet, StorageObjectList, StorageObjectMetadata, StorageObjectQuery, StorageObjectUpdate, StorageUsageStats, StudentProfileCreate, StudentProfileGet, StudentProfileList, StudentProfileQuery, StudentProfileUpdate, StudentTemplateSettings, SubmissionArtifactCreate, SubmissionArtifactGet, SubmissionArtifactList, SubmissionArtifactQuery, SubmissionArtifactUpdate, SubmissionCreate, SubmissionGradeCreate, SubmissionGradeDetail, SubmissionGradeListItem, SubmissionGradeQuery, SubmissionGradeUpdate, SubmissionGroupCreate, SubmissionGroupDetailed, SubmissionGroupGet, SubmissionGroupGradingCreate, SubmissionGroupGradingGet, SubmissionGroupGradingList, SubmissionGroupGradingQuery, SubmissionGroupGradingUpdate, SubmissionGroupList, SubmissionGroupMemberBasic, SubmissionGroupMemberCreate, SubmissionGroupMemberGet, SubmissionGroupMemberList, SubmissionGroupMemberProperties, SubmissionGroupMemberQuery, SubmissionGroupMemberUpdate, SubmissionGroupProperties, SubmissionGroupQuery, SubmissionGroupRepository, SubmissionGroupStudentGet, SubmissionGroupStudentList, SubmissionGroupStudentQuery, SubmissionGroupUpdate, SubmissionGroupWithGrading, SubmissionListItem, SubmissionQuery, SubmissionReviewCreate, SubmissionReviewDetail, SubmissionReviewListItem, SubmissionReviewQuery, SubmissionReviewUpdate, SubmissionUploadResponseModel, SubmissionUploadedFile, SubmitRequest, SubmitResponse, TUGStudentExport, TestCreate, TestDependency, TutorGradeCreate, TutorGradeResponse, TypeConfig, UserAccountDeployment, UserDeployment, UsersDeploymentConfig } from '../generated/common';
+import type { AccountDeployment, AndFilter, ApiConfig, BaseDeployment, BaseEntityGet, BaseEntityList, BetweenFilter, BucketCreate, BucketInfo, BucketList, CallbackRequest, Claims, CodeAbilityBase, CodeAbilityLink, CodeAbilityMeta, CodeAbilityMetaProperties, CodeAbilityMetaProperty, CodeAbilityPerson, CodeAbilityReleaseMeta, CodeAbilityReport, CodeAbilityReportMain, CodeAbilityReportProperties, CodeAbilityReportSub, CodeAbilityReportSummary, CodeAbilitySpecification, CodeAbilityTest, CodeAbilityTestCollection, CodeAbilityTestCollectionCommon, CodeAbilityTestCommon, CodeAbilityTestProperty, CodeAbilityTestSuite, CodeAbilityUnitMeta, CommentCreate, CommentUpdate, ComputorDeploymentConfig, ContainsFilter, CourseContentDeploymentCreate, CourseContentDeploymentList, CourseContentDeploymentQuery, CourseContentDeploymentUpdate, CourseMemberDeployment, CourseMemberGitLabConfig, DeploymentHistoryCreate, DeploymentHistoryList, DeploymentMetadata, DeploymentSummary, EndswithFilter, EqualsFilter, ExecutionBackendConfig, ExecutionBackendCreate, ExecutionBackendGet, ExecutionBackendList, ExecutionBackendQuery, ExecutionBackendReference, ExecutionBackendUpdate, ExtensionMetadata, ExtensionPublishRequest, ExtensionPublishResponse, ExtensionUploadConfig, ExtensionVersionBase, ExtensionVersionDetail, ExtensionVersionListItem, ExtensionVersionListResponse, ExtensionVersionYankRequest, FileSourceConfig, FilterBase, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, GitCommit, GitHubConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, GitlabGroupProjectConfig, GitlabSignup, GitlabSignupResponse, GradingStudentView, GradingSummary, GreaterFilter, GroupClaimCreate, GroupClaimGet, GroupClaimList, GroupClaimQuery, GroupClaimUpdate, GroupCreate, GroupGet, GroupList, GroupQuery, GroupUpdate, ILikeFilter, InFilter, IsNullFilter, LanguageCreate, LanguageGet, LanguageList, LanguageQuery, LanguageUpdate, LikeFilter, ListQuery, LogoutRequest, LogoutResponse, LowerFilter, NotEqualsFilter, NotInFilter, NotNullFilter, OrFilter, PendingChange, PendingChangesResponse, PresignedUrlRequest, PresignedUrlResponse, Principal, ProfileCreate, ProfileGet, ProfileList, ProfileQuery, ProfileUpdate, ReleaseOverride, ReleaseSelection, ReleaseStudentsCreate, Repository, RepositoryConfig, ResultArtifactCreate, ResultArtifactListItem, ResultArtifactQuery, ResultCreate, ResultGet, ResultList, ResultQuery, ResultStudentList, ResultUpdate, ResultWithGrading, SessionCreate, SessionGet, SessionList, SessionQuery, SessionUpdate, StartswithFilter, StatusQuery, StorageObjectCreate, StorageObjectGet, StorageObjectList, StorageObjectMetadata, StorageObjectQuery, StorageObjectUpdate, StorageUsageStats, StudentCreate, StudentProfileCreate, StudentProfileGet, StudentProfileList, StudentProfileQuery, StudentProfileUpdate, StudentTemplateSettings, SubmissionArtifactCreate, SubmissionArtifactGet, SubmissionArtifactList, SubmissionArtifactQuery, SubmissionArtifactUpdate, SubmissionCreate, SubmissionGradeCreate, SubmissionGradeDetail, SubmissionGradeListItem, SubmissionGradeQuery, SubmissionGradeUpdate, SubmissionGroupCreate, SubmissionGroupDetailed, SubmissionGroupGet, SubmissionGroupGradingCreate, SubmissionGroupGradingGet, SubmissionGroupGradingList, SubmissionGroupGradingQuery, SubmissionGroupGradingUpdate, SubmissionGroupList, SubmissionGroupMemberBasic, SubmissionGroupMemberCreate, SubmissionGroupMemberGet, SubmissionGroupMemberList, SubmissionGroupMemberProperties, SubmissionGroupMemberQuery, SubmissionGroupMemberUpdate, SubmissionGroupProperties, SubmissionGroupQuery, SubmissionGroupRepository, SubmissionGroupStudentGet, SubmissionGroupStudentList, SubmissionGroupStudentQuery, SubmissionGroupUpdate, SubmissionGroupWithGrading, SubmissionListItem, SubmissionQuery, SubmissionReviewCreate, SubmissionReviewDetail, SubmissionReviewListItem, SubmissionReviewQuery, SubmissionReviewUpdate, SubmissionUploadResponseModel, SubmissionUploadedFile, SubmitRequest, SubmitResponse, TUGStudentExport, TestCreate, TestDependency, TutorGradeCreate, TutorGradeResponse, TypeConfig, UserAccountDeployment, UserDeployment, UsersDeploymentConfig } from '../generated/common';
 import { GradingStatus, GroupType, LanguageEnum, MergeMethod, MetaTypeEnum, QualificationEnum, ResultEnum, StatusEnum, TypeEnum } from '../generated/common';
 import { BaseValidator, ValidationError } from './BaseValidator';
 
@@ -20350,6 +20350,1265 @@ export class GroupClaimQueryValidator extends BaseValidator<GroupClaimQuery> {
         return { success: false, error };
       }
       return { success: false, error: new ValidationError('GroupClaimQuery', String(error)) };
+    }
+  }
+}
+
+/**
+ * DTO for creating a student.
+ */
+export class StudentCreateValidator extends BaseValidator<StudentCreate> {
+  private static _schema: any = null;
+
+  /**
+   * Get JSON Schema for this model
+   * Useful for form generation, validation, and documentation
+   */
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
+  "$defs": {
+    "ProfileGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Profile unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Associated user ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "avatar_color": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Avatar color as RGB integer",
+          "title": "Avatar Color"
+        },
+        "avatar_image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Avatar image URL",
+          "title": "Avatar Image"
+        },
+        "nickname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique nickname",
+          "title": "Nickname"
+        },
+        "bio": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User biography",
+          "title": "Bio"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User website URL",
+          "title": "Url"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "id",
+        "user_id"
+      ],
+      "title": "ProfileGet",
+      "type": "object"
+    },
+    "StudentProfileGet": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "student_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Student Id"
+        },
+        "student_email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Student Email"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        }
+      },
+      "required": [
+        "id",
+        "user_id"
+      ],
+      "title": "StudentProfileGet",
+      "type": "object"
+    },
+    "UserGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "User unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User number/identifier",
+          "title": "Number"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of user account"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional user properties",
+          "title": "Properties"
+        },
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp when user was archived",
+          "title": "Archived At"
+        },
+        "student_profiles": {
+          "default": [],
+          "description": "Associated student profiles",
+          "items": {
+            "$ref": "#/$defs/StudentProfileGet"
+          },
+          "title": "Student Profiles",
+          "type": "array"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProfileGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User profile"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "UserGet",
+      "type": "object"
+    },
+    "UserTypeEnum": {
+      "enum": [
+        "user",
+        "token"
+      ],
+      "title": "UserTypeEnum",
+      "type": "string"
+    }
+  },
+  "description": "DTO for creating a student.",
+  "properties": {
+    "user_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "User Id"
+    },
+    "user": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserGet"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "course_group_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Course Group Id"
+    },
+    "course_group_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Course Group Title"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Role"
+    }
+  },
+  "title": "StudentCreate",
+  "type": "object",
+  "x-model-name": "StudentCreate"
+}`);
+    }
+    return this._schema;
+  }
+
+  /**
+   * Get schema for a specific field
+   */
+  static getFieldSchema(fieldName: string): any {
+    return this.getSchema().properties?.[fieldName];
+  }
+
+  /**
+   * Check if a field is required
+   */
+  static isFieldRequired(fieldName: string): boolean {
+    return this.getSchema().required?.includes(fieldName) ?? false;
+  }
+
+  /**
+   * Get all required field names
+   */
+  static getRequiredFields(): string[] {
+    return this.getSchema().required ?? [];
+  }
+
+  /**
+   * Get all field names
+   */
+  static getFields(): string[] {
+    return Object.keys(this.getSchema().properties ?? {});
+  }
+
+  validate(data: any): StudentCreate {
+    const errors: string[] = [];
+
+    if (typeof data !== 'object' || data === null) {
+      throw new ValidationError('StudentCreate', 'Expected an object');
+    }
+
+    // Optional field: user_id
+    if ('user_id' in data && data.user_id !== undefined && data.user_id !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: user
+    if ('user' in data && data.user !== undefined && data.user !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: course_group_id
+    if ('course_group_id' in data && data.course_group_id !== undefined && data.course_group_id !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: course_group_title
+    if ('course_group_title' in data && data.course_group_title !== undefined && data.course_group_title !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: role
+    if ('role' in data && data.role !== undefined && data.role !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError('StudentCreate', errors.join('; '));
+    }
+
+    return data as StudentCreate;
+  }
+
+  safeValidate(data: any): { success: true; data: StudentCreate } | { success: false; error: ValidationError } {
+    try {
+      const validData = this.validate(data);
+      return { success: true, data: validData };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return { success: false, error };
+      }
+      return { success: false, error: new ValidationError('StudentCreate', String(error)) };
+    }
+  }
+}
+
+/**
+ * DTO for releasing multiple students.
+ */
+export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudentsCreate> {
+  private static _schema: any = null;
+
+  /**
+   * Get JSON Schema for this model
+   * Useful for form generation, validation, and documentation
+   */
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
+  "$defs": {
+    "ProfileGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Profile unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Associated user ID",
+          "title": "User Id",
+          "type": "string"
+        },
+        "avatar_color": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Avatar color as RGB integer",
+          "title": "Avatar Color"
+        },
+        "avatar_image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Avatar image URL",
+          "title": "Avatar Image"
+        },
+        "nickname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique nickname",
+          "title": "Nickname"
+        },
+        "bio": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User biography",
+          "title": "Bio"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User website URL",
+          "title": "Url"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1 language code",
+          "title": "Language Code"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties",
+          "title": "Properties"
+        }
+      },
+      "required": [
+        "id",
+        "user_id"
+      ],
+      "title": "ProfileGet",
+      "type": "object"
+    },
+    "StudentCreate": {
+      "description": "DTO for creating a student.",
+      "properties": {
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Id"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "course_group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Course Group Id"
+        },
+        "course_group_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Course Group Title"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        }
+      },
+      "title": "StudentCreate",
+      "type": "object"
+    },
+    "StudentProfileGet": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "student_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Student Id"
+        },
+        "student_email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Student Email"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        }
+      },
+      "required": [
+        "id",
+        "user_id"
+      ],
+      "title": "StudentProfileGet",
+      "type": "object"
+    },
+    "UserGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "User unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "given_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's given name",
+          "title": "Given Name"
+        },
+        "family_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's family name",
+          "title": "Family Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User's email address",
+          "title": "Email"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User number/identifier",
+          "title": "Number"
+        },
+        "user_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserTypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type of user account"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique username",
+          "title": "Username"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional user properties",
+          "title": "Properties"
+        },
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timestamp when user was archived",
+          "title": "Archived At"
+        },
+        "student_profiles": {
+          "default": [],
+          "description": "Associated student profiles",
+          "items": {
+            "$ref": "#/$defs/StudentProfileGet"
+          },
+          "title": "Student Profiles",
+          "type": "array"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProfileGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User profile"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "UserGet",
+      "type": "object"
+    },
+    "UserTypeEnum": {
+      "enum": [
+        "user",
+        "token"
+      ],
+      "title": "UserTypeEnum",
+      "type": "string"
+    }
+  },
+  "description": "DTO for releasing multiple students.",
+  "properties": {
+    "students": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StudentCreate"
+      },
+      "title": "Students",
+      "type": "array"
+    },
+    "course_id": {
+      "title": "Course Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "course_id"
+  ],
+  "title": "ReleaseStudentsCreate",
+  "type": "object",
+  "x-model-name": "ReleaseStudentsCreate"
+}`);
+    }
+    return this._schema;
+  }
+
+  /**
+   * Get schema for a specific field
+   */
+  static getFieldSchema(fieldName: string): any {
+    return this.getSchema().properties?.[fieldName];
+  }
+
+  /**
+   * Check if a field is required
+   */
+  static isFieldRequired(fieldName: string): boolean {
+    return this.getSchema().required?.includes(fieldName) ?? false;
+  }
+
+  /**
+   * Get all required field names
+   */
+  static getRequiredFields(): string[] {
+    return this.getSchema().required ?? [];
+  }
+
+  /**
+   * Get all field names
+   */
+  static getFields(): string[] {
+    return Object.keys(this.getSchema().properties ?? {});
+  }
+
+  validate(data: any): ReleaseStudentsCreate {
+    const errors: string[] = [];
+
+    if (typeof data !== 'object' || data === null) {
+      throw new ValidationError('ReleaseStudentsCreate', 'Expected an object');
+    }
+
+    // Optional field: students
+    if ('students' in data && data.students !== undefined && data.students !== null) {
+      if (!Array.isArray(data.students)) {
+        errors.push('Field students must be an array');
+      }
+    }
+
+    // Required field: course_id
+    if (!('course_id' in data)) {
+      errors.push('Missing required field: course_id');
+    } else {
+      if (typeof data.course_id !== 'string') {
+        errors.push('Field course_id must be a string');
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError('ReleaseStudentsCreate', errors.join('; '));
+    }
+
+    return data as ReleaseStudentsCreate;
+  }
+
+  safeValidate(data: any): { success: true; data: ReleaseStudentsCreate } | { success: false; error: ValidationError } {
+    try {
+      const validData = this.validate(data);
+      return { success: true, data: validData };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return { success: false, error };
+      }
+      return { success: false, error: new ValidationError('ReleaseStudentsCreate', String(error)) };
     }
   }
 }

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -221,6 +222,12 @@ class UserInterface(EntityInterface):
     endpoint = "users"
     model = User
     cache_ttl = 300  # 5 minutes cache for user data
+
+
+# Import ProfileGet after UserGet is defined to avoid circular import
+from ctutor_backend.interface.profiles import ProfileGet
+# Rebuild the model to resolve forward references
+UserGet.model_rebuild()
 
 
 def replace_special_chars(name: str) -> str:

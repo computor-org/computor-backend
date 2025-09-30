@@ -1,39 +1,51 @@
 /**
- * Auto-generated client for UserInterface.
- * Endpoint: /users
+ * Auto-generated client for UserClient.
+ * Endpoint: /user
  */
 
-import type { UserCreate, UserGet, UserList, UserQuery, UserUpdate } from 'types/generated';
+import type { CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberValidationRequest, UserGet, UserPassword } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
 export class UserClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
-    super(client, '/users');
+    super(client, '/user');
   }
 
-  async create(payload: UserCreate): Promise<UserGet> {
-    return this.client.post<UserGet>(this.basePath, payload);
+  /**
+   * Get Current User
+   * Get the current authenticated user
+   */
+  async getCurrentUserUserGet(): Promise<UserGet> {
+    return this.client.get<UserGet>(this.basePath);
   }
 
-  async get(id: string | number): Promise<UserGet> {
-    return this.client.get<UserGet>(this.buildPath(id));
+  /**
+   * Set User Password
+   */
+  async setUserPasswordUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
+    return this.client.post<void>(this.buildPath('password'), body);
   }
 
-  async list(params?: UserQuery): Promise<UserList[]> {
-    const queryParams = params ? (params as unknown as Record<string, unknown>) : undefined;
-    return this.client.get<UserList[]>(this.basePath, queryParams ? { params: queryParams } : undefined);
+  /**
+   * Get Course Views For Current User
+   * Get available views based on roles across all courses for the current user.
+   */
+  async getCourseViewsForCurrentUserUserViewsGet(): Promise<string[]> {
+    return this.client.get<string[]>(this.buildPath('views'));
   }
 
-  async update(id: string | number, payload: UserUpdate): Promise<UserGet> {
-    return this.client.patch<UserGet>(this.buildPath(id), payload);
+  /**
+   * Validate Current User Course
+   */
+  async validateCurrentUserCourseUserCoursesCourseIdValidatePost({ courseId, body }: { courseId: string | string; body: CourseMemberValidationRequest }): Promise<CourseMemberReadinessStatus> {
+    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'validate'), body);
   }
 
-  async delete(id: string | number): Promise<void> {
-    await this.client.delete<void>(this.buildPath(id));
-  }
-
-  async archive(id: string | number): Promise<void> {
-    await this.client.patch<void>(this.buildPath(id, 'archive'));
+  /**
+   * Register Current User Course Account
+   */
+  async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
+    return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
   }
 }

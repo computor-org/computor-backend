@@ -31,6 +31,7 @@ from ctutor_backend.interface.course_groups import CourseGroupInterface
 from ctutor_backend.interface.course_roles import CourseRoleInterface
 from ctutor_backend.interface.course_content_types import CourseContentTypeInterface
 from ctutor_backend.interface.course_content_kind import CourseContentKindInterface
+from ctutor_backend.interface.languages import LanguageInterface
 from ctutor_backend.api.course_execution_backend import course_execution_backend_router
 from ctutor_backend.api.courses import course_router
 from ctutor_backend.api.system import system_router
@@ -199,6 +200,7 @@ CrudRouter(CourseGroupInterface).register_routes(app)
 course_member_router.register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
+LookUpRouter(LanguageInterface).register_routes(app)
 CrudRouter(ExecutionBackendInterface).register_routes(app)
 CrudRouter(ExampleRepositoryInterface).register_routes(app)
 # CrudRouter(ExampleInterface).register_routes(app) # Examples should only be created via upload

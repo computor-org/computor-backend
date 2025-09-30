@@ -8,7 +8,7 @@
 
 
 
-import type { StudentProfileGet } from './common';
+import type { ProfileGet, StudentProfileGet } from './common';
 
 
 
@@ -154,7 +154,7 @@ export interface UserGet {
   /** Associated student profiles */
   student_profiles?: StudentProfileGet[];
   /** User profile */
-  profile?: any | null;
+  profile?: ProfileGet | null;
 }
 
 export interface UserList {
