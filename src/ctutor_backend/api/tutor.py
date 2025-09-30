@@ -270,7 +270,10 @@ def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotate
         result = query[2]
 
         if result != None:
-            submit = result.submit
+            # Get submit field from associated SubmissionArtifact
+            submit = False
+            if result.submission_artifact:
+                submit = result.submission_artifact.submit
             status = result.status
 
             todo = True if submit == True and status == None else False

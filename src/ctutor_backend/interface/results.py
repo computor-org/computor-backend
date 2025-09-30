@@ -7,10 +7,10 @@ from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityI
 from ctutor_backend.model import CourseContentType, SubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
 
 class ResultCreate(BaseModel):
-    submit: bool
     course_member_id: str
     course_content_id: str
     submission_group_id: str = None
@@ -36,7 +36,6 @@ class ResultCreate(BaseModel):
 
 class ResultGet(BaseEntityGet):
     id: str
-    submit: bool
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
@@ -65,7 +64,6 @@ class ResultGet(BaseEntityGet):
 
 class ResultList(BaseEntityList):
     id: str
-    submit: bool
     course_member_id: str
     course_content_id: str
     course_content_type_id: str
@@ -89,7 +87,6 @@ class ResultList(BaseEntityList):
         return map_int_to_task_status(value)
     
 class ResultUpdate(BaseModel):
-    submit: Optional[bool | None] = None
     result: Optional[float | None] = None
     grade: Optional[float | None] = None
     result_json: Optional[dict | None] = None
@@ -108,7 +105,6 @@ class ResultUpdate(BaseModel):
 
 class ResultQuery(ListQuery):
     id: Optional[str] = None
-    submit: Optional[bool] = None
     submitter_id: Optional[str] = None
     course_member_id: Optional[str] = None
     course_content_id: Optional[str] = None
@@ -137,8 +133,6 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
         query = query.filter(Result.id == params.id)
         latest_group_by_conditions.append(Result.id)
         latest_join_by_conditions.append(lambda subquery: Result.id == subquery.c.id)
-    if params.submit != None:
-        query = query.filter(Result.submit == params.submit)
     if params.submitter_id != None:
         query = query.filter(Result.course_member_id == params.submitter_id)
         latest_group_by_conditions.append(Result.course_member_id)
@@ -234,34 +228,34 @@ class ResultWithGrading(ResultGet):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ResultDetailed(BaseModel):
-    """Detailed result information including submission group and grading."""
-    id: str
-    submit: bool
-    course_member_id: str
-    course_member_name: Optional[str] = None  # Name of the submitter
-    course_content_id: str
-    course_content_title: Optional[str] = None
-    course_content_path: Optional[str] = None
-    course_content_type_id: str
-    submission_group_id: Optional[str] = None
-    submission_group_members: Optional[List[dict]] = []  # Group member info
-    execution_backend_id: str
-    test_system_id: Optional[str] = None
-    result: float
-    result_json: Optional[dict | None] = None
-    properties: Optional[dict | None] = None
-    version_identifier: str
-    reference_version_identifier: Optional[str] = None
-    status: TaskStatus
+# class ResultDetailed(BaseModel):
+#     """Detailed result information including submission group and grading."""
+#     id: str
+#     submit: bool
+#     course_member_id: str
+#     course_member_name: Optional[str] = None  # Name of the submitter
+#     course_content_id: str
+#     course_content_title: Optional[str] = None
+#     course_content_path: Optional[str] = None
+#     course_content_type_id: str
+#     submission_group_id: Optional[str] = None
+#     submission_group_members: Optional[List[dict]] = []  # Group member info
+#     execution_backend_id: str
+#     test_system_id: Optional[str] = None
+#     result: float
+#     result_json: Optional[dict | None] = None
+#     properties: Optional[dict | None] = None
+#     version_identifier: str
+#     reference_version_identifier: Optional[str] = None
+#     status: TaskStatus
     
-    # Grading information
-    gradings: List[dict] = []  # All gradings for this result
-    latest_grade: Optional[float] = None
-    latest_grading_status: Optional[int] = None  # GradingStatus value
-    latest_grading_feedback: Optional[str] = None
+#     # Grading information
+#     gradings: List[dict] = []  # All gradings for this result
+#     latest_grade: Optional[float] = None
+#     latest_grading_status: Optional[int] = None  # GradingStatus value
+#     latest_grading_feedback: Optional[str] = None
     
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+#     created_at: Optional[str] = None
+#     updated_at: Optional[str] = None
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)

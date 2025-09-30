@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     from .result import Result
     from .example import ExampleVersion
 
-
+from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 class GradingStatus(IntEnum):
     """Enumeration for grading status values."""
     NOT_REVIEWED = 0
@@ -362,22 +363,24 @@ class SubmissionGroup(Base):
     @hybrid_property
     def last_submitted_result(self):
         """Get the most recent submitted result for this submission group."""
-        # Python side: when results are loaded
-        submitted = [r for r in self.results if r.submit]
+        # Python side: when results are loaded, join with artifacts to check submit
+        from .artifact import SubmissionArtifact
+        submitted = [r for r in self.results if r.submission_artifact and r.submission_artifact.submit]
         if not submitted:
             return None
         return max(submitted, key=lambda r: r.created_at)
-    
+
     @last_submitted_result.expression
     def last_submitted_result(cls):
         """SQL expression for the last submitted result."""
-        from .result import Result
         # Subquery to get the ID of the most recent submitted result
+        # Join with SubmissionArtifact to check submit field
         subq = (
             select(Result.id)
+            .join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
             .where(
                 Result.submission_group_id == cls.id,
-                Result.submit == True
+                SubmissionArtifact.submit == True
             )
             .order_by(Result.created_at.desc())
             .limit(1)

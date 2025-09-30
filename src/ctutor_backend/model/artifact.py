@@ -57,6 +57,11 @@ class SubmissionArtifact(Base):
     # Version tracking
     version_identifier = Column(String(255), nullable=True)  # Git commit hash or version tag
 
+    # Submission flag - indicates if this artifact is an official submission
+    # True = official submission counted for grading
+    # False = test/practice run, not counted for grading
+    submit = Column(Boolean, nullable=False, server_default=text("false"))
+
     # Metadata and properties
     properties = Column(JSONB, nullable=True)  # Additional metadata
 

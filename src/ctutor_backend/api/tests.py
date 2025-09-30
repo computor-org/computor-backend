@@ -250,16 +250,15 @@ async def create_test_run(
     result = Result(
         submission_artifact_id=artifact.id,
         course_member_id=course_member.id,
+        course_content_id=course_content.id,
+        course_content_type_id=course_content.course_content_type_id,
         execution_backend_id=execution_backend.id,
         test_system_id=workflow_id,
         status=map_task_status_to_int(TaskStatus.QUEUED),
         grade=0.0,
+        result=0,
         result_json=None,
-        properties={
-            "submission_group_id": str(submission_group.id),
-            "course_content_id": str(course_content.id),
-            "artifact_id": str(artifact.id),  # Store artifact ID instead of non-existent filename
-        },
+        properties=None,
         log_text=None,
         version_identifier=version_identifier,
         reference_version_identifier=deployment.version_identifier,

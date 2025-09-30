@@ -12,6 +12,7 @@ from ctutor_backend.interface.tasks import (
     map_task_status_to_int,
 )
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 
 
 class SubmissionCreate(BaseModel):
@@ -92,7 +93,9 @@ def submission_search(db: Session, query, params: SubmissionQuery):
     if params.id is not None:
         query = query.filter(Result.id == params.id)
     if params.submit is not None:
-        query = query.filter(Result.submit == params.submit)
+        # Join with SubmissionArtifact to filter by submit field
+        query = query.join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
+            .filter(SubmissionArtifact.submit == params.submit)
     if params.course_member_id is not None:
         query = query.filter(Result.course_member_id == params.course_member_id)
     if params.submission_group_id is not None:

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import SubmissionGroupMember
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.artifact import SubmissionArtifact
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, SubmissionGroup
 # SubmissionGroupGrading removed - using SubmissionGrade from artifact module
@@ -30,22 +31,25 @@ def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | 
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
     
     query = query.filter(Result.status == 0, Result.test_system_id.isnot(None))
-    
+
     if course_content_id != None:
         query = query.filter(Result.course_content_id == course_content_id)
-    
+
     if submission != None:
-        query = query.filter(Result.submit == submission)
-    
+        # Join with SubmissionArtifact to filter by submit field
+        query = query.join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
+            .filter(SubmissionArtifact.submit == submission)
+
     return query.group_by(Result.course_content_id).subquery()
 
 def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
 
+    # Join with SubmissionArtifact to access submit field
     query = db.query(
                 Result.course_content_id,
                 func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
-                func.count(case((Result.submit == True, 1))).label("submission_count"),
-            )
+                func.count(case((SubmissionArtifact.submit == True, 1))).label("submission_count"),
+            ).outerjoin(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
 
     if user_id != None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
@@ -58,10 +62,10 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
 
     query = query.filter(Result.status == 0)
-    
+
     if course_content_id != None:
         query = query.filter(Result.course_content_id == course_content_id)
-    
+
     return query.group_by(Result.course_content_id).subquery()
 
 # TODO: Migrate to new SubmissionGrade artifact-based system
@@ -544,12 +548,13 @@ def course_course_member_list_query(db: Session):
                     CourseMember.id.label("course_member_id"),
                     func.max(Result.created_at).label("latest_result_date")
                 ) \
+        .join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
         .join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
         .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
         .filter(
                 Result.status == 0,
-                Result.submit == True
+                SubmissionArtifact.submit == True
         ) \
         .group_by(Result.course_content_id, CourseMember.id).subquery()
 

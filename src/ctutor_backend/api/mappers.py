@@ -89,6 +89,11 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     
     result_payload = None
     if result is not None and result.test_system_id is not None:
+        # Get submit field from associated SubmissionArtifact
+        submit_value = False
+        if result.submission_artifact:
+            submit_value = result.submission_artifact.submit
+
         result_payload = ResultStudentList(
             execution_backend_id=result.execution_backend_id,
             test_system_id=result.test_system_id,
@@ -96,7 +101,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             status=map_int_to_task_status(result.status),
             result=result.result,
             result_json=result.result_json,
-            submit=result.submit,
+            submit=submit_value,
         )
 
     gradings_payload = []

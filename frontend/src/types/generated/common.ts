@@ -871,7 +871,6 @@ export interface OrFilter {
 }
 
 export interface ResultCreate {
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   submission_group_id?: string;
@@ -895,7 +894,6 @@ export interface ResultGet {
   created_by?: string | null;
   updated_by?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
@@ -919,7 +917,6 @@ export interface ResultList {
   /** Update timestamp */
   updated_at?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
@@ -935,7 +932,6 @@ export interface ResultList {
 }
 
 export interface ResultUpdate {
-  submit?: boolean | null;
   result?: number | null;
   grade?: number | null;
   result_json?: any | null;
@@ -948,7 +944,6 @@ export interface ResultQuery {
   skip?: number | null;
   limit?: number | null;
   id?: string | null;
-  submit?: boolean | null;
   submitter_id?: string | null;
   course_member_id?: string | null;
   course_content_id?: string | null;
@@ -976,7 +971,6 @@ export interface ResultWithGrading {
   created_by?: string | null;
   updated_by?: string | null;
   id: string;
-  submit: boolean;
   course_member_id: string;
   course_content_id: string;
   course_content_type_id: string;
@@ -994,36 +988,6 @@ export interface ResultWithGrading {
   grading_ids?: string[] | null;
   latest_grading?: any | null;
   grading_count?: number;
-}
-
-/**
- * Detailed result information including submission group and grading.
- */
-export interface ResultDetailed {
-  id: string;
-  submit: boolean;
-  course_member_id: string;
-  course_member_name?: string | null;
-  course_content_id: string;
-  course_content_title?: string | null;
-  course_content_path?: string | null;
-  course_content_type_id: string;
-  submission_group_id?: string | null;
-  submission_group_members?: any[] | null;
-  execution_backend_id: string;
-  test_system_id?: string | null;
-  result: number;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  gradings?: any[];
-  latest_grade?: number | null;
-  latest_grading_status?: number | null;
-  latest_grading_feedback?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
 }
 
 /**

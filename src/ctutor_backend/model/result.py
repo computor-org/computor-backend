@@ -40,7 +40,6 @@ class Result(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    submit = Column(Boolean, nullable=False, server_default=text("false"))  # Deprecated - kept for backward compatibility
 
     # Foreign keys
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
