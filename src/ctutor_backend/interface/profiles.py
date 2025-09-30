@@ -12,6 +12,7 @@ class ProfileCreate(BaseModel):
     nickname: Optional[str] = Field(None, min_length=2, max_length=255, description="Unique nickname")
     bio: Optional[str] = Field(None, max_length=16384, description="User biography")
     url: Optional[str] = Field(None, max_length=2048, description="User website URL")
+    language_code: Optional[str] = Field(None, max_length=2, description="ISO 639-1 language code")
     properties: Optional[dict] = Field(None, description="Additional profile properties")
     
     @field_validator('nickname')
@@ -54,6 +55,7 @@ class ProfileGet(BaseEntityGet):
     nickname: Optional[str] = Field(None, description="Unique nickname")
     bio: Optional[str] = Field(None, description="User biography")
     url: Optional[str] = Field(None, description="User website URL")
+    language_code: Optional[str] = Field(None, description="ISO 639-1 language code")
     properties: Optional[dict] = Field(None, description="Additional properties")
     
     @property
@@ -81,6 +83,7 @@ class ProfileList(BaseEntityList):
     nickname: Optional[str] = Field(None, description="Unique nickname")
     avatar_image: Optional[str] = Field(None, description="Avatar image URL")
     avatar_color: Optional[int] = Field(None, description="Avatar color")
+    language_code: Optional[str] = Field(None, description="ISO 639-1 language code")
     
     @property
     def display_name(self) -> str:
@@ -95,6 +98,7 @@ class ProfileUpdate(BaseModel):
     nickname: Optional[str] = Field(None, min_length=2, max_length=255, description="Unique nickname")
     bio: Optional[str] = Field(None, max_length=16384, description="User biography")
     url: Optional[str] = Field(None, max_length=2048, description="User website URL")
+    language_code: Optional[str] = Field(None, max_length=2, description="ISO 639-1 language code")
     properties: Optional[dict] = Field(None, description="Additional properties")
     
     @field_validator('nickname')

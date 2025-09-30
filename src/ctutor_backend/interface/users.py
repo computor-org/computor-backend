@@ -1,12 +1,16 @@
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from text_unidecode import unidecode
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.student_profile import StudentProfileGet
 from ctutor_backend.model.auth import User
+
+# Forward reference for ProfileGet to avoid circular import
+if TYPE_CHECKING:
+    from ctutor_backend.interface.profiles import ProfileGet
 
 class UserTypeEnum(str, Enum):
     user = "user"
@@ -78,6 +82,7 @@ class UserGet(BaseEntityGet):
     properties: Optional[dict] = Field(None, description="Additional user properties")
     archived_at: Optional[datetime] = Field(None, description="Timestamp when user was archived")
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
+    profile: Optional['ProfileGet'] = Field(None, description="User profile")
     
     
     @property

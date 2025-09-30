@@ -27,6 +27,7 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     path: str
     course_family_id: str
+    language_code: Optional[str] = None
     properties: Optional[CourseProperties] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
@@ -36,6 +37,7 @@ class CourseGet(BaseEntityGet,CourseCreate):
     path: str
     course_family_id: str
     organization_id: str
+    language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
 
     course_family: Optional[CourseFamilyGet] = None
@@ -53,6 +55,7 @@ class CourseList(BaseModel):
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
+    language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
 
     @field_validator('path', mode='before')
@@ -65,6 +68,7 @@ class CourseList(BaseModel):
 class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    language_code: Optional[str] = None
     properties: Optional[CourseProperties] = None
 
 class CourseQuery(ListQuery):
