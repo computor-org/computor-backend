@@ -103,12 +103,14 @@ class Course(Base):
     path = Column(LtreeType, nullable=False)
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    language_code = Column(String(2), ForeignKey('language.code', ondelete='SET NULL', onupdate='CASCADE'))
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     organization = relationship('Organization', back_populates='courses')
+    language = relationship('Language', back_populates='courses')
     course_members = relationship("CourseMember", back_populates="course", uselist=True, lazy="select")
     course_content_types = relationship("CourseContentType", back_populates="course", uselist=True, lazy="select")
     course_groups = relationship("CourseGroup", back_populates="course", uselist=True, lazy="select")

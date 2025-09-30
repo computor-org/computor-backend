@@ -89,8 +89,10 @@ class Profile(Base):
     bio = Column(String(16384))
     url = Column(String(2048))
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, unique=True)
+    language_code = Column(String(2), ForeignKey('language.code', ondelete='SET NULL', onupdate='CASCADE'))
 
     user = relationship('User', back_populates='profile')
+    language = relationship('Language', back_populates='profiles')
 
 
 class StudentProfile(Base):
@@ -106,8 +108,10 @@ class StudentProfile(Base):
     student_id = Column(String(255), unique=True)
     student_email = Column(String(320), unique=True)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, unique=True)
+    organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     user = relationship('User', foreign_keys=[user_id], back_populates="student_profiles", uselist=False)
+    organization = relationship('Organization', back_populates='student_profiles')
 
 
 class Session(Base):

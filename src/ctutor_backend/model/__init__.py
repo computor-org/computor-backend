@@ -1,5 +1,6 @@
 from .base import Base, metadata
 from .auth import User, Account, Profile, StudentProfile, Session
+from .language import Language
 from .organization import Organization
 from .course import (
     CourseContentKind,
@@ -28,6 +29,7 @@ from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, Submi
 # Import all models to ensure relationships are properly set up
 from . import (
     auth,
+    language,
     organization,
     role,
     group,
@@ -50,6 +52,8 @@ __all__ = [
     'Profile',
     'StudentProfile',
     'Session',
+    # Language
+    'Language',
     # Organization
     'Organization',
     # Course models
