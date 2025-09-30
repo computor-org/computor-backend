@@ -302,3 +302,10 @@ class ResultArtifactInterface(EntityInterface):
     create = ResultArtifactCreate
     query = ResultArtifactQuery
     search = result_artifact_search
+
+
+# Import the necessary types first
+from .results import ResultList
+
+# Rebuild all models that have forward references
+SubmissionArtifactGet.model_rebuild()

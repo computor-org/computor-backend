@@ -1,6 +1,6 @@
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float,
-    ForeignKey, Index, Integer, String, text, LargeBinary
+    ForeignKey, Index, Integer, String, text, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
@@ -25,6 +25,8 @@ class SubmissionArtifact(Base):
         Index('submission_artifact_uploaded_by_idx', 'uploaded_by_course_member_id'),
         Index('submission_artifact_uploaded_at_idx', 'uploaded_at'),
         Index('submission_artifact_version_idx', 'version_identifier'),
+        Index('submission_artifact_group_version_idx', 'submission_group_id', 'version_identifier'),
+        UniqueConstraint('submission_group_id', 'version_identifier', name='uq_submission_artifact_group_version'),
     )
 
     # Primary key and versioning
