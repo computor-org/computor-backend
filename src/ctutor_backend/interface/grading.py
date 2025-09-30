@@ -75,12 +75,9 @@ class SubmissionGroupGradingList(BaseModel):
     status: GradingStatus
     feedback: Optional[str] = None
     created_at: datetime
-    graded_by_course_member: Optional[GradedByCourseMember] = Field(
-        default=None,
-        validation_alias="graded_by",
-    )
+    graded_by_course_member: Optional[GradedByCourseMember] = None
 
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(use_enum_values=True, from_attributes=True, populate_by_name=True)
 
 
 class SubmissionGroupGradingUpdate(BaseModel):

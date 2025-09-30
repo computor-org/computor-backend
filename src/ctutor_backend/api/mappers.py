@@ -10,13 +10,10 @@ from ctutor_backend.interface.student_course_contents import (
     SubmissionGroupRepository,
     SubmissionGroupMemberBasic,
 )
-from ctutor_backend.interface.grading import GradingStatus, SubmissionGroupGradingList
+from ctutor_backend.interface.grading import GradingStatus, SubmissionGroupGradingList, GradedByCourseMember
 from ctutor_backend.interface.tasks import map_int_to_task_status
-from ctutor_backend.model.course import SubmissionGroupMember, CourseMember, CourseContent
-# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
-from ctutor_backend.model.auth import User
-from ctutor_backend.model.deployment import CourseContentDeployment
-from ctutor_backend.model.example import ExampleVersion, Example
+from ctutor_backend.model.course import CourseMember
+from ctutor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -50,28 +47,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     latest_status_value = submission_status_int
     latest_grading_value = submission_grading
 
-    # Get directory from deployment's example if available, otherwise from properties
-    directory = None
-    if hasattr(course_content, 'deployment') and course_content.deployment and db:
-        # Get the example through deployment
-        from ctutor_backend.model.deployment import CourseContentDeployment
-        from ctutor_backend.model.example import Example, ExampleVersion
-        
-        deployment = course_content.deployment
-
-        directory = deployment.deployment_path
-        # if deployment.example_version_id:
-        #     # Get example version and then example
-        #     example_version = db.query(ExampleVersion).filter(
-        #         ExampleVersion.id == deployment.example_version_id
-        #     ).first()
-        #     if example_version and example_version.example:
-        #         directory = example_version.example.directory
-    
-    # Fallback to properties if no example directory found
-    # if not directory:
-    #     props = course_content.properties or {}
-    #     directory = props.get("gitlab", {}).get("directory")
+    directory = course_content.deployment.deployment_path if course_content.deployment else None
 
     repository = None
     if submission_group != None and submission_group.properties != None:
@@ -104,26 +80,36 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             submit=submit_value,
         )
 
+    # Query grades directly from database for this submission group
     gradings_payload = []
-    if submission_group is not None and getattr(submission_group, 'gradings', None):
-        sorted_gradings = sorted(
-            submission_group.gradings,
-            key=lambda g: g.created_at,
-            reverse=True,
-        )
-        for grading in sorted_gradings:
-            gradings_payload.append(SubmissionGroupGradingList.model_validate(grading))
+    if submission_group is not None:
+        grades = db.query(SubmissionGrade).join(
+            SubmissionArtifact, SubmissionArtifact.id == SubmissionGrade.artifact_id
+        ).filter(
+            SubmissionArtifact.submission_group_id == submission_group.id
+        ).options(
+            joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.user),
+            joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.course_role),
+        ).order_by(SubmissionGrade.graded_at.desc()).all()
 
-        if gradings_payload:
-            latest_grading_value = gradings_payload[0].grading
-            latest_status = gradings_payload[0].status
-            if isinstance(latest_status, GradingStatus):
-                latest_status_value = latest_status.value
-            elif latest_status is not None:
-                try:
-                    latest_status_value = int(latest_status)
-                except (TypeError, ValueError):
-                    pass
+        for grade in grades:
+            gradings_payload.append(SubmissionGroupGradingList(
+                id=str(grade.id),
+                submission_group_id=str(submission_group.id),
+                graded_by_course_member_id=str(grade.graded_by_course_member_id),
+                result_id=None,
+                grading=grade.grade,
+                status=GradingStatus(grade.status),
+                feedback=grade.comment,
+                created_at=grade.created_at,
+                graded_by_course_member=GradedByCourseMember.model_validate(grade.graded_by, from_attributes=True) if grade.graded_by else None,
+            ))
+
+    # # Update latest grading values from most recent grade
+    if gradings_payload:
+        latest_grading_value = gradings_payload[0].grading
+        latest_status = gradings_payload[0].status
+        latest_status_value = latest_status.value if isinstance(latest_status, GradingStatus) else latest_status
 
     if latest_status_value is not None:
         submission_status = status_lookup.get(int(latest_status_value), "not_reviewed")
@@ -133,41 +119,49 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     submission_group_payload = None
     submission_group_detail = None
     if submission_group is not None:
-        submission_group_base = dict(
+        members = [
+            SubmissionGroupMemberBasic(
+                id=str(member.id),
+                user_id=str(member.course_member.user_id),
+                course_member_id=str(member.course_member_id),
+                username=member.course_member.user.username if member.course_member.user else None,
+                full_name=f"{member.course_member.user.given_name} {member.course_member.user.family_name}".strip() if member.course_member.user else None,
+            )
+            for member in submission_group.members
+        ]
+
+        submission_group_payload = SubmissionGroupStudentList(
             id=str(submission_group.id),
             course_content_title=None,
             course_content_path=None,
             example_identifier=None,
             max_group_size=submission_group.max_group_size,
-            current_group_size=len(submission_group.members) if getattr(submission_group, 'members', None) else 1,
-            members=[
-                SubmissionGroupMemberBasic(
-                    id=str(member.id),
-                    user_id=member.course_member.user_id if member.course_member else '',
-                    course_member_id=str(member.course_member_id),
-                    username=member.course_member.user.username if member.course_member and member.course_member.user else None,
-                    full_name=(
-                        f"{member.course_member.user.given_name} {member.course_member.user.family_name}".strip()
-                        if member.course_member and member.course_member.user
-                        else None
-                    ),
-                )
-                for member in getattr(submission_group, 'members', [])
-            ],
+            current_group_size=len(submission_group.members),
+            members=members,
             repository=repository,
             status=submission_status,
             grading=submission_grading,
-            count=submission_count if submission_count is not None else 0,
+            count=submission_count or 0,
             max_submissions=submission_group.max_submissions,
             unread_message_count=submission_group_unread_count,
         )
 
-        submission_group_payload = SubmissionGroupStudentList(**submission_group_base)
-
-        if gradings_payload:
-            submission_group_detail = SubmissionGroupStudentGet(**submission_group_base, gradings=gradings_payload)
-        else:
-            submission_group_detail = SubmissionGroupStudentGet(**submission_group_base)
+        submission_group_detail = SubmissionGroupStudentGet(
+            id=str(submission_group.id),
+            course_content_title=None,
+            course_content_path=None,
+            example_identifier=None,
+            max_group_size=submission_group.max_group_size,
+            current_group_size=len(submission_group.members),
+            members=members,
+            repository=repository,
+            status=submission_status,
+            grading=submission_grading,
+            count=submission_count or 0,
+            max_submissions=submission_group.max_submissions,
+            unread_message_count=submission_group_unread_count,
+            gradings=gradings_payload,
+        )
 
     list_obj = CourseContentStudentList(
         id=course_content.id,

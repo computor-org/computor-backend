@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import SubmissionGroupMember
 from ctutor_backend.model.result import Result
-from ctutor_backend.model.artifact import SubmissionArtifact
+from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, SubmissionGroup
 # SubmissionGroupGrading removed - using SubmissionGrade from artifact module
@@ -258,19 +258,26 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         )
 
     course_contents_query = course_contents_query.options(
-        # TODO: Migrate grading joinedloads to new SubmissionGrade system
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.user),
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.course_role),
+        # Load submission groups with members
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
+        # Load submission groups with artifacts
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts),
+        # Load grades with grader info (separate joinedload chain)
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts)
+        .joinedload(SubmissionArtifact.grades)
+        .joinedload(SubmissionGrade.graded_by)
+        .joinedload(CourseMember.user),
+        # Also load course_role for grader
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts)
+        .joinedload(SubmissionArtifact.grades)
+        .joinedload(SubmissionGrade.graded_by)
+        .joinedload(CourseMember.course_role),
     )
 
     course_contents_result = course_contents_query.distinct().first()
@@ -373,18 +380,16 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         )
 
     query = query.options(
-        # TODO: Migrate grading joinedloads to new SubmissionGrade system
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.user),
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.course_role),
+        # Load submission groups with members
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+        # Load submission groups with artifacts and their grades
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts)
+        .joinedload(SubmissionArtifact.grades)
+        .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
     )
 
@@ -462,18 +467,16 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
         )
 
     course_contents_query = course_contents_query.options(
-        # TODO: Migrate grading joinedloads to new SubmissionGrade system
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.user),
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.course_role),
+        # Load submission groups with members
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+        # Load submission groups with artifacts and their grades
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts)
+        .joinedload(SubmissionArtifact.grades)
+        .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
     )
 
@@ -567,18 +570,16 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         )
 
     query = query.options(
-        # TODO: Migrate grading joinedloads to new SubmissionGrade system
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.user),
-        # joinedload(CourseContent.submission_groups)
-        # .joinedload(SubmissionGroup.gradings)
-        # .joinedload(SubmissionGroupGrading.graded_by)
-        # .joinedload(CourseMember.course_role),
+        # Load submission groups with members
         joinedload(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+        # Load submission groups with artifacts and their grades
+        joinedload(CourseContent.submission_groups)
+        .joinedload(SubmissionGroup.submission_artifacts)
+        .joinedload(SubmissionArtifact.grades)
+        .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
     )
 
