@@ -83,11 +83,15 @@ export function validateMetaTypeEnum(value: any): MetaTypeEnum {
  * Validator for ProfileCreate
  */
 export class ProfileCreateValidator extends BaseValidator<ProfileCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "user_id": {
       "description": "Associated user ID",
@@ -187,34 +191,37 @@ export class ProfileCreateValidator extends BaseValidator<ProfileCreate> {
   "title": "ProfileCreate",
   "type": "object",
   "x-model-name": "ProfileCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ProfileCreate {
@@ -287,11 +294,15 @@ export class ProfileCreateValidator extends BaseValidator<ProfileCreate> {
  * Validator for ProfileGet
  */
 export class ProfileGetValidator extends BaseValidator<ProfileGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -442,34 +453,37 @@ export class ProfileGetValidator extends BaseValidator<ProfileGet> {
   "title": "ProfileGet",
   "type": "object",
   "x-model-name": "ProfileGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ProfileGet {
@@ -571,11 +585,15 @@ export class ProfileGetValidator extends BaseValidator<ProfileGet> {
  * Validator for ProfileList
  */
 export class ProfileListValidator extends BaseValidator<ProfileList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -662,34 +680,37 @@ export class ProfileListValidator extends BaseValidator<ProfileList> {
   "title": "ProfileList",
   "type": "object",
   "x-model-name": "ProfileList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ProfileList {
@@ -766,11 +787,15 @@ export class ProfileListValidator extends BaseValidator<ProfileList> {
  * Validator for ProfileUpdate
  */
 export class ProfileUpdateValidator extends BaseValidator<ProfileUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "avatar_color": {
       "anyOf": [
@@ -862,34 +887,37 @@ export class ProfileUpdateValidator extends BaseValidator<ProfileUpdate> {
   "title": "ProfileUpdate",
   "type": "object",
   "x-model-name": "ProfileUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ProfileUpdate {
@@ -953,11 +981,15 @@ export class ProfileUpdateValidator extends BaseValidator<ProfileUpdate> {
  * Validator for ProfileQuery
  */
 export class ProfileQueryValidator extends BaseValidator<ProfileQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -1026,34 +1058,37 @@ export class ProfileQueryValidator extends BaseValidator<ProfileQuery> {
   "title": "ProfileQuery",
   "type": "object",
   "x-model-name": "ProfileQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ProfileQuery {
@@ -1112,11 +1147,15 @@ export class ProfileQueryValidator extends BaseValidator<ProfileQuery> {
  * Validator for CourseMemberGitLabConfig
  */
 export class CourseMemberGitLabConfigValidator extends BaseValidator<CourseMemberGitLabConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "settings": {
       "anyOf": [
@@ -1290,34 +1329,37 @@ export class CourseMemberGitLabConfigValidator extends BaseValidator<CourseMembe
   "title": "CourseMemberGitLabConfig",
   "type": "object",
   "x-model-name": "CourseMemberGitLabConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberGitLabConfig {
@@ -1421,11 +1463,15 @@ export class CourseMemberGitLabConfigValidator extends BaseValidator<CourseMembe
  * Validator for Repository
  */
 export class RepositoryValidator extends BaseValidator<Repository> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "url": {
       "title": "Url",
@@ -1498,34 +1544,37 @@ export class RepositoryValidator extends BaseValidator<Repository> {
   "title": "Repository",
   "type": "object",
   "x-model-name": "Repository"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): Repository {
@@ -1593,11 +1642,15 @@ export class RepositoryValidator extends BaseValidator<Repository> {
  * Validator for StudentProfileCreate
  */
 export class StudentProfileCreateValidator extends BaseValidator<StudentProfileCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "anyOf": [
@@ -1651,34 +1704,37 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
   "title": "StudentProfileCreate",
   "type": "object",
   "x-model-name": "StudentProfileCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentProfileCreate {
@@ -1732,11 +1788,15 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
  * Validator for StudentProfileGet
  */
 export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -1830,34 +1890,37 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
   "title": "StudentProfileGet",
   "type": "object",
   "x-model-name": "StudentProfileGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentProfileGet {
@@ -1939,11 +2002,15 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
  * Validator for StudentProfileList
  */
 export class StudentProfileListValidator extends BaseValidator<StudentProfileList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -1985,34 +2052,37 @@ export class StudentProfileListValidator extends BaseValidator<StudentProfileLis
   "title": "StudentProfileList",
   "type": "object",
   "x-model-name": "StudentProfileList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentProfileList {
@@ -2074,11 +2144,15 @@ export class StudentProfileListValidator extends BaseValidator<StudentProfileLis
  * Validator for StudentProfileUpdate
  */
 export class StudentProfileUpdateValidator extends BaseValidator<StudentProfileUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "student_id": {
       "anyOf": [
@@ -2121,34 +2195,37 @@ export class StudentProfileUpdateValidator extends BaseValidator<StudentProfileU
   "title": "StudentProfileUpdate",
   "type": "object",
   "x-model-name": "StudentProfileUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentProfileUpdate {
@@ -2197,11 +2274,15 @@ export class StudentProfileUpdateValidator extends BaseValidator<StudentProfileU
  * Validator for StudentProfileQuery
  */
 export class StudentProfileQueryValidator extends BaseValidator<StudentProfileQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -2292,34 +2373,37 @@ export class StudentProfileQueryValidator extends BaseValidator<StudentProfileQu
   "title": "StudentProfileQuery",
   "type": "object",
   "x-model-name": "StudentProfileQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentProfileQuery {
@@ -2388,11 +2472,15 @@ export class StudentProfileQueryValidator extends BaseValidator<StudentProfileQu
  * Payload describing a manual submission request.
  */
 export class SubmissionCreateValidator extends BaseValidator<SubmissionCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Payload describing a manual submission request.",
   "properties": {
     "submission_group_id": {
@@ -2423,34 +2511,37 @@ export class SubmissionCreateValidator extends BaseValidator<SubmissionCreate> {
   "title": "SubmissionCreate",
   "type": "object",
   "x-model-name": "SubmissionCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionCreate {
@@ -2505,11 +2596,15 @@ export class SubmissionCreateValidator extends BaseValidator<SubmissionCreate> {
  * Metadata about a file extracted from a submission archive.
  */
 export class SubmissionUploadedFileValidator extends BaseValidator<SubmissionUploadedFile> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Metadata about a file extracted from a submission archive.",
   "properties": {
     "object_key": {
@@ -2538,34 +2633,37 @@ export class SubmissionUploadedFileValidator extends BaseValidator<SubmissionUpl
   "title": "SubmissionUploadedFile",
   "type": "object",
   "x-model-name": "SubmissionUploadedFile"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionUploadedFile {
@@ -2635,11 +2733,15 @@ export class SubmissionUploadedFileValidator extends BaseValidator<SubmissionUpl
  * Response returned after processing a manual submission.
  */
 export class SubmissionUploadResponseModelValidator extends BaseValidator<SubmissionUploadResponseModel> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response returned after processing a manual submission.",
   "properties": {
     "artifacts": {
@@ -2687,34 +2789,37 @@ export class SubmissionUploadResponseModelValidator extends BaseValidator<Submis
   "title": "SubmissionUploadResponseModel",
   "type": "object",
   "x-model-name": "SubmissionUploadResponseModel"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionUploadResponseModel {
@@ -2811,11 +2916,15 @@ export class SubmissionUploadResponseModelValidator extends BaseValidator<Submis
  * List item representation for manual submissions stored as results.
  */
 export class SubmissionListItemValidator extends BaseValidator<SubmissionListItem> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -2975,34 +3084,37 @@ export class SubmissionListItemValidator extends BaseValidator<SubmissionListIte
   "title": "SubmissionListItem",
   "type": "object",
   "x-model-name": "SubmissionListItem"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionListItem {
@@ -3140,11 +3252,15 @@ export class SubmissionListItemValidator extends BaseValidator<SubmissionListIte
  * Query parameters for listing manual submissions.
  */
 export class SubmissionQueryValidator extends BaseValidator<SubmissionQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -3309,34 +3425,37 @@ export class SubmissionQueryValidator extends BaseValidator<SubmissionQuery> {
   "title": "SubmissionQuery",
   "type": "object",
   "x-model-name": "SubmissionQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionQuery {
@@ -3430,11 +3549,15 @@ export class SubmissionQueryValidator extends BaseValidator<SubmissionQuery> {
  * Metadata stored with deployments.
  */
 export class DeploymentMetadataValidator extends BaseValidator<DeploymentMetadata> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "additionalProperties": true,
   "description": "Metadata stored with deployments.",
   "properties": {
@@ -3512,34 +3635,37 @@ export class DeploymentMetadataValidator extends BaseValidator<DeploymentMetadat
   "title": "DeploymentMetadata",
   "type": "object",
   "x-model-name": "DeploymentMetadata"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): DeploymentMetadata {
@@ -3598,11 +3724,15 @@ export class DeploymentMetadataValidator extends BaseValidator<DeploymentMetadat
  * Create a new deployment (typically done automatically).
  */
 export class CourseContentDeploymentCreateValidator extends BaseValidator<CourseContentDeploymentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "DeploymentMetadata": {
       "additionalProperties": true,
@@ -3741,34 +3871,37 @@ export class CourseContentDeploymentCreateValidator extends BaseValidator<Course
   "title": "CourseContentDeploymentCreate",
   "type": "object",
   "x-model-name": "CourseContentDeploymentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentDeploymentCreate {
@@ -3837,11 +3970,15 @@ export class CourseContentDeploymentCreateValidator extends BaseValidator<Course
  * Update deployment status.
  */
 export class CourseContentDeploymentUpdateValidator extends BaseValidator<CourseContentDeploymentUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "DeploymentMetadata": {
       "additionalProperties": true,
@@ -4032,34 +4169,37 @@ export class CourseContentDeploymentUpdateValidator extends BaseValidator<Course
   "title": "CourseContentDeploymentUpdate",
   "type": "object",
   "x-model-name": "CourseContentDeploymentUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentDeploymentUpdate {
@@ -4133,11 +4273,15 @@ export class CourseContentDeploymentUpdateValidator extends BaseValidator<Course
  * List view of deployments.
  */
 export class CourseContentDeploymentListValidator extends BaseValidator<CourseContentDeploymentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ExampleVersionList": {
       "description": "List view of example versions.",
@@ -4271,34 +4415,37 @@ export class CourseContentDeploymentListValidator extends BaseValidator<CourseCo
   "title": "CourseContentDeploymentList",
   "type": "object",
   "x-model-name": "CourseContentDeploymentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentDeploymentList {
@@ -4404,11 +4551,15 @@ export class CourseContentDeploymentListValidator extends BaseValidator<CourseCo
  * Query parameters for deployments.
  */
 export class CourseContentDeploymentQueryValidator extends BaseValidator<CourseContentDeploymentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for deployments.",
   "properties": {
     "skip": {
@@ -4499,34 +4650,37 @@ export class CourseContentDeploymentQueryValidator extends BaseValidator<CourseC
   "title": "CourseContentDeploymentQuery",
   "type": "object",
   "x-model-name": "CourseContentDeploymentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentDeploymentQuery {
@@ -4595,11 +4749,15 @@ export class CourseContentDeploymentQueryValidator extends BaseValidator<CourseC
  * Create a deployment history entry.
  */
 export class DeploymentHistoryCreateValidator extends BaseValidator<DeploymentHistoryCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Create a deployment history entry.",
   "properties": {
     "deployment_id": {
@@ -4688,34 +4846,37 @@ export class DeploymentHistoryCreateValidator extends BaseValidator<DeploymentHi
   "title": "DeploymentHistoryCreate",
   "type": "object",
   "x-model-name": "DeploymentHistoryCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): DeploymentHistoryCreate {
@@ -4792,11 +4953,15 @@ export class DeploymentHistoryCreateValidator extends BaseValidator<DeploymentHi
  * List view of deployment history.
  */
 export class DeploymentHistoryListValidator extends BaseValidator<DeploymentHistoryList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "List view of deployment history.",
   "properties": {
     "id": {
@@ -4838,34 +5003,37 @@ export class DeploymentHistoryListValidator extends BaseValidator<DeploymentHist
   "title": "DeploymentHistoryList",
   "type": "object",
   "x-model-name": "DeploymentHistoryList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): DeploymentHistoryList {
@@ -4942,11 +5110,15 @@ export class DeploymentHistoryListValidator extends BaseValidator<DeploymentHist
  * Summary of deployments for a course.
  */
 export class DeploymentSummaryValidator extends BaseValidator<DeploymentSummary> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Summary of deployments for a course.",
   "properties": {
     "course_id": {
@@ -5010,34 +5182,37 @@ export class DeploymentSummaryValidator extends BaseValidator<DeploymentSummary>
   "title": "DeploymentSummary",
   "type": "object",
   "x-model-name": "DeploymentSummary"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): DeploymentSummary {
@@ -5139,11 +5314,15 @@ export class DeploymentSummaryValidator extends BaseValidator<DeploymentSummary>
  * Validator for ExecutionBackendCreate
  */
 export class ExecutionBackendCreateValidator extends BaseValidator<ExecutionBackendCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "type": {
       "title": "Type",
@@ -5174,34 +5353,37 @@ export class ExecutionBackendCreateValidator extends BaseValidator<ExecutionBack
   "title": "ExecutionBackendCreate",
   "type": "object",
   "x-model-name": "ExecutionBackendCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendCreate {
@@ -5258,11 +5440,15 @@ export class ExecutionBackendCreateValidator extends BaseValidator<ExecutionBack
  * Validator for ExecutionBackendGet
  */
 export class ExecutionBackendGetValidator extends BaseValidator<ExecutionBackendGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "type": {
       "title": "Type",
@@ -5350,34 +5536,37 @@ export class ExecutionBackendGetValidator extends BaseValidator<ExecutionBackend
   "title": "ExecutionBackendGet",
   "type": "object",
   "x-model-name": "ExecutionBackendGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendGet {
@@ -5463,11 +5652,15 @@ export class ExecutionBackendGetValidator extends BaseValidator<ExecutionBackend
  * Validator for ExecutionBackendList
  */
 export class ExecutionBackendListValidator extends BaseValidator<ExecutionBackendList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "type": {
       "title": "Type",
@@ -5555,34 +5748,37 @@ export class ExecutionBackendListValidator extends BaseValidator<ExecutionBacken
   "title": "ExecutionBackendList",
   "type": "object",
   "x-model-name": "ExecutionBackendList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendList {
@@ -5668,11 +5864,15 @@ export class ExecutionBackendListValidator extends BaseValidator<ExecutionBacken
  * Validator for ExecutionBackendUpdate
  */
 export class ExecutionBackendUpdateValidator extends BaseValidator<ExecutionBackendUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "type": {
       "anyOf": [
@@ -5715,34 +5915,37 @@ export class ExecutionBackendUpdateValidator extends BaseValidator<ExecutionBack
   "title": "ExecutionBackendUpdate",
   "type": "object",
   "x-model-name": "ExecutionBackendUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendUpdate {
@@ -5791,11 +5994,15 @@ export class ExecutionBackendUpdateValidator extends BaseValidator<ExecutionBack
  * Validator for ExecutionBackendQuery
  */
 export class ExecutionBackendQueryValidator extends BaseValidator<ExecutionBackendQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -5873,34 +6080,37 @@ export class ExecutionBackendQueryValidator extends BaseValidator<ExecutionBacke
   "title": "ExecutionBackendQuery",
   "type": "object",
   "x-model-name": "ExecutionBackendQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendQuery {
@@ -5964,11 +6174,15 @@ export class ExecutionBackendQueryValidator extends BaseValidator<ExecutionBacke
  * Validator for Claims
  */
 export class ClaimsValidator extends BaseValidator<Claims> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "general": {
       "additionalProperties": true,
@@ -5986,34 +6200,37 @@ export class ClaimsValidator extends BaseValidator<Claims> {
   "title": "Claims",
   "type": "object",
   "x-model-name": "Claims"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): Claims {
@@ -6061,11 +6278,15 @@ export class ClaimsValidator extends BaseValidator<Claims> {
  * Validator for Principal
  */
 export class PrincipalValidator extends BaseValidator<Principal> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "Claims": {
       "properties": {
@@ -6123,34 +6344,37 @@ export class PrincipalValidator extends BaseValidator<Principal> {
   "title": "Principal",
   "type": "object",
   "x-model-name": "Principal"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): Principal {
@@ -6211,11 +6435,15 @@ export class PrincipalValidator extends BaseValidator<Principal> {
  * Form metadata submitted when publishing a new extension version.
  */
 export class ExtensionPublishRequestValidator extends BaseValidator<ExtensionPublishRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Form metadata submitted when publishing a new extension version.",
   "properties": {
     "version": {
@@ -6274,34 +6502,37 @@ export class ExtensionPublishRequestValidator extends BaseValidator<ExtensionPub
   "title": "ExtensionPublishRequest",
   "type": "object",
   "x-model-name": "ExtensionPublishRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionPublishRequest {
@@ -6355,11 +6586,15 @@ export class ExtensionPublishRequestValidator extends BaseValidator<ExtensionPub
  * Common fields describing an extension version.
  */
 export class ExtensionVersionBaseValidator extends BaseValidator<ExtensionVersionBase> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Common fields describing an extension version.",
   "properties": {
     "version": {
@@ -6431,34 +6666,37 @@ export class ExtensionVersionBaseValidator extends BaseValidator<ExtensionVersio
   "title": "ExtensionVersionBase",
   "type": "object",
   "x-model-name": "ExtensionVersionBase"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionVersionBase {
@@ -6567,11 +6805,15 @@ export class ExtensionVersionBaseValidator extends BaseValidator<ExtensionVersio
  * List view of extension versions.
  */
 export class ExtensionVersionListItemValidator extends BaseValidator<ExtensionVersionListItem> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "List view of extension versions.",
   "properties": {
     "version": {
@@ -6643,34 +6885,37 @@ export class ExtensionVersionListItemValidator extends BaseValidator<ExtensionVe
   "title": "ExtensionVersionListItem",
   "type": "object",
   "x-model-name": "ExtensionVersionListItem"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionVersionListItem {
@@ -6779,11 +7024,15 @@ export class ExtensionVersionListItemValidator extends BaseValidator<ExtensionVe
  * Detailed view of an extension version.
  */
 export class ExtensionVersionDetailValidator extends BaseValidator<ExtensionVersionDetail> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Detailed view of an extension version.",
   "properties": {
     "version": {
@@ -6861,34 +7110,37 @@ export class ExtensionVersionDetailValidator extends BaseValidator<ExtensionVers
   "title": "ExtensionVersionDetail",
   "type": "object",
   "x-model-name": "ExtensionVersionDetail"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionVersionDetail {
@@ -7006,11 +7258,15 @@ export class ExtensionVersionDetailValidator extends BaseValidator<ExtensionVers
  * Response payload for version listing.
  */
 export class ExtensionVersionListResponseValidator extends BaseValidator<ExtensionVersionListResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ExtensionVersionListItem": {
       "description": "List view of extension versions.",
@@ -7111,34 +7367,37 @@ export class ExtensionVersionListResponseValidator extends BaseValidator<Extensi
   "title": "ExtensionVersionListResponse",
   "type": "object",
   "x-model-name": "ExtensionVersionListResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionVersionListResponse {
@@ -7184,11 +7443,15 @@ export class ExtensionVersionListResponseValidator extends BaseValidator<Extensi
  * Extension-level metadata including latest version information.
  */
 export class ExtensionMetadataValidator extends BaseValidator<ExtensionMetadata> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ExtensionVersionListItem": {
       "description": "List view of extension versions.",
@@ -7347,34 +7610,37 @@ export class ExtensionMetadataValidator extends BaseValidator<ExtensionMetadata>
   "title": "ExtensionMetadata",
   "type": "object",
   "x-model-name": "ExtensionMetadata"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionMetadata {
@@ -7477,11 +7743,15 @@ export class ExtensionMetadataValidator extends BaseValidator<ExtensionMetadata>
  * Request payload to (un)yank a specific version.
  */
 export class ExtensionVersionYankRequestValidator extends BaseValidator<ExtensionVersionYankRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request payload to (un)yank a specific version.",
   "properties": {
     "yanked": {
@@ -7496,34 +7766,37 @@ export class ExtensionVersionYankRequestValidator extends BaseValidator<Extensio
   "title": "ExtensionVersionYankRequest",
   "type": "object",
   "x-model-name": "ExtensionVersionYankRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionVersionYankRequest {
@@ -7566,11 +7839,15 @@ export class ExtensionVersionYankRequestValidator extends BaseValidator<Extensio
  * Response payload returned after publishing a version.
  */
 export class ExtensionPublishResponseValidator extends BaseValidator<ExtensionPublishResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response payload returned after publishing a version.",
   "properties": {
     "version": {
@@ -7660,34 +7937,37 @@ export class ExtensionPublishResponseValidator extends BaseValidator<ExtensionPu
   "title": "ExtensionPublishResponse",
   "type": "object",
   "x-model-name": "ExtensionPublishResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionPublishResponse {
@@ -7823,11 +8103,15 @@ export class ExtensionPublishResponseValidator extends BaseValidator<ExtensionPu
  * Validator for GroupCreate
  */
 export class GroupCreateValidator extends BaseValidator<GroupCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GroupType": {
       "enum": [
@@ -7886,34 +8170,37 @@ export class GroupCreateValidator extends BaseValidator<GroupCreate> {
   "title": "GroupCreate",
   "type": "object",
   "x-model-name": "GroupCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupCreate {
@@ -7976,11 +8263,15 @@ export class GroupCreateValidator extends BaseValidator<GroupCreate> {
  * Validator for GroupGet
  */
 export class GroupGetValidator extends BaseValidator<GroupGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GroupType": {
       "enum": [
@@ -8094,34 +8385,37 @@ export class GroupGetValidator extends BaseValidator<GroupGet> {
   "title": "GroupGet",
   "type": "object",
   "x-model-name": "GroupGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupGet {
@@ -8213,11 +8507,15 @@ export class GroupGetValidator extends BaseValidator<GroupGet> {
  * Validator for GroupList
  */
 export class GroupListValidator extends BaseValidator<GroupList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GroupType": {
       "enum": [
@@ -8293,34 +8591,37 @@ export class GroupListValidator extends BaseValidator<GroupList> {
   "title": "GroupList",
   "type": "object",
   "x-model-name": "GroupList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupList {
@@ -8397,11 +8698,15 @@ export class GroupListValidator extends BaseValidator<GroupList> {
  * Validator for GroupUpdate
  */
 export class GroupUpdateValidator extends BaseValidator<GroupUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GroupType": {
       "enum": [
@@ -8472,34 +8777,37 @@ export class GroupUpdateValidator extends BaseValidator<GroupUpdate> {
   "title": "GroupUpdate",
   "type": "object",
   "x-model-name": "GroupUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupUpdate {
@@ -8553,11 +8861,15 @@ export class GroupUpdateValidator extends BaseValidator<GroupUpdate> {
  * Validator for GroupQuery
  */
 export class GroupQueryValidator extends BaseValidator<GroupQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GroupType": {
       "enum": [
@@ -8648,34 +8960,37 @@ export class GroupQueryValidator extends BaseValidator<GroupQuery> {
   "title": "GroupQuery",
   "type": "object",
   "x-model-name": "GroupQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupQuery {
@@ -8742,11 +9057,15 @@ export class GroupQueryValidator extends BaseValidator<GroupQuery> {
     The endpoint will automatically find the latest artifact for the submission group.
  */
 export class TutorGradeCreateValidator extends BaseValidator<TutorGradeCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -8818,34 +9137,37 @@ export class TutorGradeCreateValidator extends BaseValidator<TutorGradeCreate> {
   "title": "TutorGradeCreate",
   "type": "object",
   "x-model-name": "TutorGradeCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TutorGradeCreate {
@@ -8902,11 +9224,15 @@ export class TutorGradeCreateValidator extends BaseValidator<TutorGradeCreate> {
     We extend CourseContentStudentList to maintain backward compatibility.
  */
 export class TutorGradeResponseValidator extends BaseValidator<TutorGradeResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindList": {
       "properties": {
@@ -9510,34 +9836,37 @@ export class TutorGradeResponseValidator extends BaseValidator<TutorGradeRespons
   "title": "TutorGradeResponse",
   "type": "object",
   "x-model-name": "TutorGradeResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TutorGradeResponse {
@@ -9714,11 +10043,15 @@ export class TutorGradeResponseValidator extends BaseValidator<TutorGradeRespons
  * Validator for ListQuery
  */
 export class ListQueryValidator extends BaseValidator<ListQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -9748,34 +10081,37 @@ export class ListQueryValidator extends BaseValidator<ListQuery> {
   "title": "ListQuery",
   "type": "object",
   "x-model-name": "ListQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ListQuery {
@@ -9819,11 +10155,15 @@ export class ListQueryValidator extends BaseValidator<ListQuery> {
  * Validator for BaseEntityList
  */
 export class BaseEntityListValidator extends BaseValidator<BaseEntityList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -9857,34 +10197,37 @@ export class BaseEntityListValidator extends BaseValidator<BaseEntityList> {
   "title": "BaseEntityList",
   "type": "object",
   "x-model-name": "BaseEntityList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BaseEntityList {
@@ -9928,11 +10271,15 @@ export class BaseEntityListValidator extends BaseValidator<BaseEntityList> {
  * Validator for BaseEntityGet
  */
 export class BaseEntityGetValidator extends BaseValidator<BaseEntityGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -9990,34 +10337,37 @@ export class BaseEntityGetValidator extends BaseValidator<BaseEntityGet> {
   "title": "BaseEntityGet",
   "type": "object",
   "x-model-name": "BaseEntityGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BaseEntityGet {
@@ -10071,11 +10421,15 @@ export class BaseEntityGetValidator extends BaseValidator<BaseEntityGet> {
  * Validator for StudentTemplateSettings
  */
 export class StudentTemplateSettingsValidator extends BaseValidator<StudentTemplateSettings> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "MergeMethod": {
       "enum": [
@@ -10111,34 +10465,37 @@ export class StudentTemplateSettingsValidator extends BaseValidator<StudentTempl
   "title": "StudentTemplateSettings",
   "type": "object",
   "x-model-name": "StudentTemplateSettings"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentTemplateSettings {
@@ -10201,43 +10558,50 @@ export class StudentTemplateSettingsValidator extends BaseValidator<StudentTempl
  * Validator for FilterBase
  */
 export class FilterBaseValidator extends BaseValidator<FilterBase> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {},
   "title": "FilterBase",
   "type": "object",
   "x-model-name": "FilterBase"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): FilterBase {
@@ -10271,11 +10635,15 @@ export class FilterBaseValidator extends BaseValidator<FilterBase> {
  * Validator for EqualsFilter
  */
 export class EqualsFilterValidator extends BaseValidator<EqualsFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "eq": {
       "title": "Eq"
@@ -10287,34 +10655,37 @@ export class EqualsFilterValidator extends BaseValidator<EqualsFilter> {
   "title": "EqualsFilter",
   "type": "object",
   "x-model-name": "EqualsFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): EqualsFilter {
@@ -10355,11 +10726,15 @@ export class EqualsFilterValidator extends BaseValidator<EqualsFilter> {
  * Validator for GreaterFilter
  */
 export class GreaterFilterValidator extends BaseValidator<GreaterFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "gt": {
       "title": "Gt"
@@ -10371,34 +10746,37 @@ export class GreaterFilterValidator extends BaseValidator<GreaterFilter> {
   "title": "GreaterFilter",
   "type": "object",
   "x-model-name": "GreaterFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GreaterFilter {
@@ -10439,11 +10817,15 @@ export class GreaterFilterValidator extends BaseValidator<GreaterFilter> {
  * Validator for LowerFilter
  */
 export class LowerFilterValidator extends BaseValidator<LowerFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "lt": {
       "title": "Lt"
@@ -10455,34 +10837,37 @@ export class LowerFilterValidator extends BaseValidator<LowerFilter> {
   "title": "LowerFilter",
   "type": "object",
   "x-model-name": "LowerFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LowerFilter {
@@ -10523,11 +10908,15 @@ export class LowerFilterValidator extends BaseValidator<LowerFilter> {
  * Validator for NotEqualsFilter
  */
 export class NotEqualsFilterValidator extends BaseValidator<NotEqualsFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "ne": {
       "title": "Ne"
@@ -10539,34 +10928,37 @@ export class NotEqualsFilterValidator extends BaseValidator<NotEqualsFilter> {
   "title": "NotEqualsFilter",
   "type": "object",
   "x-model-name": "NotEqualsFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): NotEqualsFilter {
@@ -10607,11 +10999,15 @@ export class NotEqualsFilterValidator extends BaseValidator<NotEqualsFilter> {
  * Validator for InFilter
  */
 export class InFilterValidator extends BaseValidator<InFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "in": {
       "items": {},
@@ -10625,34 +11021,37 @@ export class InFilterValidator extends BaseValidator<InFilter> {
   "title": "InFilter",
   "type": "object",
   "x-model-name": "InFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): InFilter {
@@ -10695,11 +11094,15 @@ export class InFilterValidator extends BaseValidator<InFilter> {
  * Validator for NotInFilter
  */
 export class NotInFilterValidator extends BaseValidator<NotInFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "not_in": {
       "items": {},
@@ -10713,34 +11116,37 @@ export class NotInFilterValidator extends BaseValidator<NotInFilter> {
   "title": "NotInFilter",
   "type": "object",
   "x-model-name": "NotInFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): NotInFilter {
@@ -10783,11 +11189,15 @@ export class NotInFilterValidator extends BaseValidator<NotInFilter> {
  * Validator for LikeFilter
  */
 export class LikeFilterValidator extends BaseValidator<LikeFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "like": {
       "title": "Like",
@@ -10800,34 +11210,37 @@ export class LikeFilterValidator extends BaseValidator<LikeFilter> {
   "title": "LikeFilter",
   "type": "object",
   "x-model-name": "LikeFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LikeFilter {
@@ -10870,11 +11283,15 @@ export class LikeFilterValidator extends BaseValidator<LikeFilter> {
  * Validator for ILikeFilter
  */
 export class ILikeFilterValidator extends BaseValidator<ILikeFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "ilike": {
       "title": "Ilike",
@@ -10887,34 +11304,37 @@ export class ILikeFilterValidator extends BaseValidator<ILikeFilter> {
   "title": "ILikeFilter",
   "type": "object",
   "x-model-name": "ILikeFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ILikeFilter {
@@ -10957,11 +11377,15 @@ export class ILikeFilterValidator extends BaseValidator<ILikeFilter> {
  * Validator for BetweenFilter
  */
 export class BetweenFilterValidator extends BaseValidator<BetweenFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "between": {
       "items": {},
@@ -10975,34 +11399,37 @@ export class BetweenFilterValidator extends BaseValidator<BetweenFilter> {
   "title": "BetweenFilter",
   "type": "object",
   "x-model-name": "BetweenFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BetweenFilter {
@@ -11045,11 +11472,15 @@ export class BetweenFilterValidator extends BaseValidator<BetweenFilter> {
  * Validator for IsNullFilter
  */
 export class IsNullFilterValidator extends BaseValidator<IsNullFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "is_null": {
       "title": "Is Null",
@@ -11062,34 +11493,37 @@ export class IsNullFilterValidator extends BaseValidator<IsNullFilter> {
   "title": "IsNullFilter",
   "type": "object",
   "x-model-name": "IsNullFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): IsNullFilter {
@@ -11132,11 +11566,15 @@ export class IsNullFilterValidator extends BaseValidator<IsNullFilter> {
  * Validator for NotNullFilter
  */
 export class NotNullFilterValidator extends BaseValidator<NotNullFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "not_null": {
       "title": "Not Null",
@@ -11149,34 +11587,37 @@ export class NotNullFilterValidator extends BaseValidator<NotNullFilter> {
   "title": "NotNullFilter",
   "type": "object",
   "x-model-name": "NotNullFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): NotNullFilter {
@@ -11219,11 +11660,15 @@ export class NotNullFilterValidator extends BaseValidator<NotNullFilter> {
  * Validator for StartswithFilter
  */
 export class StartswithFilterValidator extends BaseValidator<StartswithFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "startswith": {
       "title": "Startswith",
@@ -11236,34 +11681,37 @@ export class StartswithFilterValidator extends BaseValidator<StartswithFilter> {
   "title": "StartswithFilter",
   "type": "object",
   "x-model-name": "StartswithFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StartswithFilter {
@@ -11306,11 +11754,15 @@ export class StartswithFilterValidator extends BaseValidator<StartswithFilter> {
  * Validator for EndswithFilter
  */
 export class EndswithFilterValidator extends BaseValidator<EndswithFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "endswith": {
       "title": "Endswith",
@@ -11323,34 +11775,37 @@ export class EndswithFilterValidator extends BaseValidator<EndswithFilter> {
   "title": "EndswithFilter",
   "type": "object",
   "x-model-name": "EndswithFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): EndswithFilter {
@@ -11393,11 +11848,15 @@ export class EndswithFilterValidator extends BaseValidator<EndswithFilter> {
  * Validator for ContainsFilter
  */
 export class ContainsFilterValidator extends BaseValidator<ContainsFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "contains": {
       "title": "Contains",
@@ -11410,34 +11869,37 @@ export class ContainsFilterValidator extends BaseValidator<ContainsFilter> {
   "title": "ContainsFilter",
   "type": "object",
   "x-model-name": "ContainsFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ContainsFilter {
@@ -11480,11 +11942,15 @@ export class ContainsFilterValidator extends BaseValidator<ContainsFilter> {
  * Validator for AndFilter
  */
 export class AndFilterValidator extends BaseValidator<AndFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "BetweenFilter": {
       "properties": {
@@ -11868,34 +12334,37 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
   },
   "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__2",
   "x-model-name": "AndFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): AndFilter {
@@ -11929,11 +12398,15 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
  * Validator for OrFilter
  */
 export class OrFilterValidator extends BaseValidator<OrFilter> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "AndFilter": {
       "properties": {
@@ -12317,34 +12790,37 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
   },
   "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__2",
   "x-model-name": "OrFilter"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrFilter {
@@ -12378,11 +12854,15 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
  * Validator for ResultCreate
  */
 export class ResultCreateValidator extends BaseValidator<ResultCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -12520,34 +13000,37 @@ export class ResultCreateValidator extends BaseValidator<ResultCreate> {
   "title": "ResultCreate",
   "type": "object",
   "x-model-name": "ResultCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultCreate {
@@ -12669,11 +13152,15 @@ export class ResultCreateValidator extends BaseValidator<ResultCreate> {
  * Validator for ResultGet
  */
 export class ResultGetValidator extends BaseValidator<ResultGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -12895,34 +13382,37 @@ export class ResultGetValidator extends BaseValidator<ResultGet> {
   "title": "ResultGet",
   "type": "object",
   "x-model-name": "ResultGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultGet {
@@ -13085,11 +13575,15 @@ export class ResultGetValidator extends BaseValidator<ResultGet> {
  * Validator for ResultList
  */
 export class ResultListValidator extends BaseValidator<ResultList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -13246,34 +13740,37 @@ export class ResultListValidator extends BaseValidator<ResultList> {
   "title": "ResultList",
   "type": "object",
   "x-model-name": "ResultList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultList {
@@ -13411,11 +13908,15 @@ export class ResultListValidator extends BaseValidator<ResultList> {
  * Validator for ResultUpdate
  */
 export class ResultUpdateValidator extends BaseValidator<ResultUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -13509,34 +14010,37 @@ export class ResultUpdateValidator extends BaseValidator<ResultUpdate> {
   "title": "ResultUpdate",
   "type": "object",
   "x-model-name": "ResultUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultUpdate {
@@ -13600,11 +14104,15 @@ export class ResultUpdateValidator extends BaseValidator<ResultUpdate> {
  * Validator for ResultQuery
  */
 export class ResultQueryValidator extends BaseValidator<ResultQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -13828,34 +14336,37 @@ export class ResultQueryValidator extends BaseValidator<ResultQuery> {
   "title": "ResultQuery",
   "type": "object",
   "x-model-name": "ResultQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultQuery {
@@ -13974,11 +14485,15 @@ export class ResultQueryValidator extends BaseValidator<ResultQuery> {
  * Result with associated grading information.
  */
 export class ResultWithGradingValidator extends BaseValidator<ResultWithGrading> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -14219,34 +14734,37 @@ export class ResultWithGradingValidator extends BaseValidator<ResultWithGrading>
   "title": "ResultWithGrading",
   "type": "object",
   "x-model-name": "ResultWithGrading"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultWithGrading {
@@ -14421,11 +14939,15 @@ export class ResultWithGradingValidator extends BaseValidator<ResultWithGrading>
  * Create a new grading for a submission group.
  */
 export class SubmissionGroupGradingCreateValidator extends BaseValidator<SubmissionGroupGradingCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradedByCourseMember": {
       "properties": {
@@ -14575,34 +15097,37 @@ export class SubmissionGroupGradingCreateValidator extends BaseValidator<Submiss
   "title": "SubmissionGroupGradingCreate",
   "type": "object",
   "x-model-name": "SubmissionGroupGradingCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGradingCreate {
@@ -14686,11 +15211,15 @@ export class SubmissionGroupGradingCreateValidator extends BaseValidator<Submiss
  * Full grading information.
  */
 export class SubmissionGroupGradingGetValidator extends BaseValidator<SubmissionGroupGradingGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradedByCourseMember": {
       "properties": {
@@ -14879,34 +15408,37 @@ export class SubmissionGroupGradingGetValidator extends BaseValidator<Submission
   "title": "SubmissionGroupGradingGet",
   "type": "object",
   "x-model-name": "SubmissionGroupGradingGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGradingGet {
@@ -15029,11 +15561,15 @@ export class SubmissionGroupGradingGetValidator extends BaseValidator<Submission
  * List view of grading.
  */
 export class SubmissionGroupGradingListValidator extends BaseValidator<SubmissionGroupGradingList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradedByCourseMember": {
       "properties": {
@@ -15192,34 +15728,37 @@ export class SubmissionGroupGradingListValidator extends BaseValidator<Submissio
   "title": "SubmissionGroupGradingList",
   "type": "object",
   "x-model-name": "SubmissionGroupGradingList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGradingList {
@@ -15323,11 +15862,15 @@ export class SubmissionGroupGradingListValidator extends BaseValidator<Submissio
  * Update grading information.
  */
 export class SubmissionGroupGradingUpdateValidator extends BaseValidator<SubmissionGroupGradingUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -15396,34 +15939,37 @@ export class SubmissionGroupGradingUpdateValidator extends BaseValidator<Submiss
   "title": "SubmissionGroupGradingUpdate",
   "type": "object",
   "x-model-name": "SubmissionGroupGradingUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGradingUpdate {
@@ -15477,11 +16023,15 @@ export class SubmissionGroupGradingUpdateValidator extends BaseValidator<Submiss
  * Query parameters for searching gradings.
  */
 export class SubmissionGroupGradingQueryValidator extends BaseValidator<SubmissionGroupGradingQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -15624,34 +16174,37 @@ export class SubmissionGroupGradingQueryValidator extends BaseValidator<Submissi
   "title": "SubmissionGroupGradingQuery",
   "type": "object",
   "x-model-name": "SubmissionGroupGradingQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGradingQuery {
@@ -15735,11 +16288,15 @@ export class SubmissionGroupGradingQueryValidator extends BaseValidator<Submissi
  * Simplified grading view for students.
  */
 export class GradingStudentViewValidator extends BaseValidator<GradingStudentView> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -15805,34 +16362,37 @@ export class GradingStudentViewValidator extends BaseValidator<GradingStudentVie
   "title": "GradingStudentView",
   "type": "object",
   "x-model-name": "GradingStudentView"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GradingStudentView {
@@ -15913,11 +16473,15 @@ export class GradingStudentViewValidator extends BaseValidator<GradingStudentVie
  * Summary of gradings for a course content.
  */
 export class GradingSummaryValidator extends BaseValidator<GradingSummary> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Summary of gradings for a course content.",
   "properties": {
     "course_content_id": {
@@ -15973,34 +16537,37 @@ export class GradingSummaryValidator extends BaseValidator<GradingSummary> {
   "title": "GradingSummary",
   "type": "object",
   "x-model-name": "GradingSummary"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GradingSummary {
@@ -16102,11 +16669,15 @@ export class GradingSummaryValidator extends BaseValidator<GradingSummary> {
  * Validator for TestCreate
  */
 export class TestCreateValidator extends BaseValidator<TestCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "artifact_id": {
       "anyOf": [
@@ -16232,34 +16803,37 @@ export class TestCreateValidator extends BaseValidator<TestCreate> {
   "title": "TestCreate",
   "type": "object",
   "x-model-name": "TestCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TestCreate {
@@ -16343,11 +16917,15 @@ export class TestCreateValidator extends BaseValidator<TestCreate> {
  * Repository information for a submission group
  */
 export class SubmissionGroupRepositoryValidator extends BaseValidator<SubmissionGroupRepository> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Repository information for a submission group",
   "properties": {
     "provider": {
@@ -16395,34 +16973,37 @@ export class SubmissionGroupRepositoryValidator extends BaseValidator<Submission
   "title": "SubmissionGroupRepository",
   "type": "object",
   "x-model-name": "SubmissionGroupRepository"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupRepository {
@@ -16491,11 +17072,15 @@ export class SubmissionGroupRepositoryValidator extends BaseValidator<Submission
  * Basic member information
  */
 export class SubmissionGroupMemberBasicValidator extends BaseValidator<SubmissionGroupMemberBasic> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Basic member information",
   "properties": {
     "id": {
@@ -16543,34 +17128,37 @@ export class SubmissionGroupMemberBasicValidator extends BaseValidator<Submissio
   "title": "SubmissionGroupMemberBasic",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberBasic"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberBasic {
@@ -16641,11 +17229,15 @@ export class SubmissionGroupMemberBasicValidator extends BaseValidator<Submissio
  * Submission group data for course contents (list view).
  */
 export class SubmissionGroupStudentListValidator extends BaseValidator<SubmissionGroupStudentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "SubmissionGroupMemberBasic": {
       "description": "Basic member information",
@@ -16880,34 +17472,37 @@ export class SubmissionGroupStudentListValidator extends BaseValidator<Submissio
   "title": "SubmissionGroupStudentList",
   "type": "object",
   "x-model-name": "SubmissionGroupStudentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupStudentList {
@@ -17014,11 +17609,15 @@ export class SubmissionGroupStudentListValidator extends BaseValidator<Submissio
  * Detailed submission group view including grading history.
  */
 export class SubmissionGroupStudentGetValidator extends BaseValidator<SubmissionGroupStudentGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradedByCourseMember": {
       "properties": {
@@ -17417,34 +18016,37 @@ export class SubmissionGroupStudentGetValidator extends BaseValidator<Submission
   "title": "SubmissionGroupStudentGet",
   "type": "object",
   "x-model-name": "SubmissionGroupStudentGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupStudentGet {
@@ -17558,11 +18160,15 @@ export class SubmissionGroupStudentGetValidator extends BaseValidator<Submission
  * Validator for ResultStudentList
  */
 export class ResultStudentListValidator extends BaseValidator<ResultStudentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "TaskStatus": {
       "description": "Task execution status enumeration.",
@@ -17667,34 +18273,37 @@ export class ResultStudentListValidator extends BaseValidator<ResultStudentList>
   "title": "ResultStudentList",
   "type": "object",
   "x-model-name": "ResultStudentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultStudentList {
@@ -17763,11 +18372,15 @@ export class ResultStudentListValidator extends BaseValidator<ResultStudentList>
  * Request model for logout.
  */
 export class LogoutRequestValidator extends BaseValidator<LogoutRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request model for logout.",
   "properties": {
     "provider": {
@@ -17787,34 +18400,37 @@ export class LogoutRequestValidator extends BaseValidator<LogoutRequest> {
   "title": "LogoutRequest",
   "type": "object",
   "x-model-name": "LogoutRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LogoutRequest {
@@ -17853,11 +18469,15 @@ export class LogoutRequestValidator extends BaseValidator<LogoutRequest> {
  * Response model after successful logout.
  */
 export class LogoutResponseValidator extends BaseValidator<LogoutResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response model after successful logout.",
   "properties": {
     "message": {
@@ -17885,34 +18505,37 @@ export class LogoutResponseValidator extends BaseValidator<LogoutResponse> {
   "title": "LogoutResponse",
   "type": "object",
   "x-model-name": "LogoutResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LogoutResponse {
@@ -17960,11 +18583,15 @@ export class LogoutResponseValidator extends BaseValidator<LogoutResponse> {
  * Validator for SessionCreate
  */
 export class SessionCreateValidator extends BaseValidator<SessionCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "user_id": {
       "description": "Associated user ID",
@@ -18006,34 +18633,37 @@ export class SessionCreateValidator extends BaseValidator<SessionCreate> {
   "title": "SessionCreate",
   "type": "object",
   "x-model-name": "SessionCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SessionCreate {
@@ -18099,11 +18729,15 @@ export class SessionCreateValidator extends BaseValidator<SessionCreate> {
  * Validator for SessionGet
  */
 export class SessionGetValidator extends BaseValidator<SessionGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -18215,34 +18849,37 @@ export class SessionGetValidator extends BaseValidator<SessionGet> {
   "title": "SessionGet",
   "type": "object",
   "x-model-name": "SessionGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SessionGet {
@@ -18342,11 +18979,15 @@ export class SessionGetValidator extends BaseValidator<SessionGet> {
  * Validator for SessionList
  */
 export class SessionListValidator extends BaseValidator<SessionList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -18420,34 +19061,37 @@ export class SessionListValidator extends BaseValidator<SessionList> {
   "title": "SessionList",
   "type": "object",
   "x-model-name": "SessionList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SessionList {
@@ -18532,11 +19176,15 @@ export class SessionListValidator extends BaseValidator<SessionList> {
  * Validator for SessionUpdate
  */
 export class SessionUpdateValidator extends BaseValidator<SessionUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "logout_time": {
       "anyOf": [
@@ -18570,34 +19218,37 @@ export class SessionUpdateValidator extends BaseValidator<SessionUpdate> {
   "title": "SessionUpdate",
   "type": "object",
   "x-model-name": "SessionUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SessionUpdate {
@@ -18641,11 +19292,15 @@ export class SessionUpdateValidator extends BaseValidator<SessionUpdate> {
  * Validator for SessionQuery
  */
 export class SessionQueryValidator extends BaseValidator<SessionQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -18740,34 +19395,37 @@ export class SessionQueryValidator extends BaseValidator<SessionQuery> {
   "title": "SessionQuery",
   "type": "object",
   "x-model-name": "SessionQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SessionQuery {
@@ -18836,11 +19494,15 @@ export class SessionQueryValidator extends BaseValidator<SessionQuery> {
  * Validator for GroupClaimCreate
  */
 export class GroupClaimCreateValidator extends BaseValidator<GroupClaimCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "group_id": {
       "description": "Group ID this claim belongs to",
@@ -18884,34 +19546,37 @@ export class GroupClaimCreateValidator extends BaseValidator<GroupClaimCreate> {
   "title": "GroupClaimCreate",
   "type": "object",
   "x-model-name": "GroupClaimCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupClaimCreate {
@@ -18977,11 +19642,15 @@ export class GroupClaimCreateValidator extends BaseValidator<GroupClaimCreate> {
  * Validator for GroupClaimGet
  */
 export class GroupClaimGetValidator extends BaseValidator<GroupClaimGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -19073,34 +19742,37 @@ export class GroupClaimGetValidator extends BaseValidator<GroupClaimGet> {
   "title": "GroupClaimGet",
   "type": "object",
   "x-model-name": "GroupClaimGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupClaimGet {
@@ -19186,11 +19858,15 @@ export class GroupClaimGetValidator extends BaseValidator<GroupClaimGet> {
  * Validator for GroupClaimList
  */
 export class GroupClaimListValidator extends BaseValidator<GroupClaimList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -19244,34 +19920,37 @@ export class GroupClaimListValidator extends BaseValidator<GroupClaimList> {
   "title": "GroupClaimList",
   "type": "object",
   "x-model-name": "GroupClaimList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupClaimList {
@@ -19342,11 +20021,15 @@ export class GroupClaimListValidator extends BaseValidator<GroupClaimList> {
  * Validator for GroupClaimUpdate
  */
 export class GroupClaimUpdateValidator extends BaseValidator<GroupClaimUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "properties": {
       "anyOf": [
@@ -19366,34 +20049,37 @@ export class GroupClaimUpdateValidator extends BaseValidator<GroupClaimUpdate> {
   "title": "GroupClaimUpdate",
   "type": "object",
   "x-model-name": "GroupClaimUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupClaimUpdate {
@@ -19432,11 +20118,15 @@ export class GroupClaimUpdateValidator extends BaseValidator<GroupClaimUpdate> {
  * Validator for GroupClaimQuery
  */
 export class GroupClaimQueryValidator extends BaseValidator<GroupClaimQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -19505,34 +20195,37 @@ export class GroupClaimQueryValidator extends BaseValidator<GroupClaimQuery> {
   "title": "GroupClaimQuery",
   "type": "object",
   "x-model-name": "GroupClaimQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GroupClaimQuery {
@@ -19591,11 +20284,15 @@ export class GroupClaimQueryValidator extends BaseValidator<GroupClaimQuery> {
  * DTO for creating a student.
  */
 export class StudentCreateValidator extends BaseValidator<StudentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "StudentProfileGet": {
       "properties": {
@@ -19945,34 +20642,37 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
   "title": "StudentCreate",
   "type": "object",
   "x-model-name": "StudentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StudentCreate {
@@ -20031,11 +20731,15 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
  * DTO for releasing multiple students.
  */
 export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudentsCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "StudentCreate": {
       "description": "DTO for creating a student.",
@@ -20407,34 +21111,37 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
   "title": "ReleaseStudentsCreate",
   "type": "object",
   "x-model-name": "ReleaseStudentsCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ReleaseStudentsCreate {
@@ -20484,11 +21191,15 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
  * DTO for TUG student export data.
  */
 export class TUGStudentExportValidator extends BaseValidator<TUGStudentExport> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for TUG student export data.",
   "properties": {
     "course_group_title": {
@@ -20522,34 +21233,37 @@ export class TUGStudentExportValidator extends BaseValidator<TUGStudentExport> {
   "title": "TUGStudentExport",
   "type": "object",
   "x-model-name": "TUGStudentExport"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TUGStudentExport {
@@ -20628,11 +21342,15 @@ export class TUGStudentExportValidator extends BaseValidator<TUGStudentExport> {
  * DTO for status query parameters.
  */
 export class StatusQueryValidator extends BaseValidator<StatusQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for status query parameters.",
   "properties": {
     "course_id": {
@@ -20651,34 +21369,37 @@ export class StatusQueryValidator extends BaseValidator<StatusQuery> {
   "title": "StatusQuery",
   "type": "object",
   "x-model-name": "StatusQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StatusQuery {
@@ -20717,11 +21438,15 @@ export class StatusQueryValidator extends BaseValidator<StatusQuery> {
  * GitLab connection credentials.
  */
 export class GitLabCredentialsValidator extends BaseValidator<GitLabCredentials> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "GitLab connection credentials.",
   "properties": {
     "gitlab_url": {
@@ -20740,34 +21465,37 @@ export class GitLabCredentialsValidator extends BaseValidator<GitLabCredentials>
   "title": "GitLabCredentials",
   "type": "object",
   "x-model-name": "GitLabCredentials"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitLabCredentials {
@@ -20819,11 +21547,15 @@ export class GitLabCredentialsValidator extends BaseValidator<GitLabCredentials>
  * Represents a pending change for template generation.
  */
 export class PendingChangeValidator extends BaseValidator<PendingChange> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Represents a pending change for template generation.",
   "properties": {
     "type": {
@@ -20853,34 +21585,37 @@ export class PendingChangeValidator extends BaseValidator<PendingChange> {
   "title": "PendingChange",
   "type": "object",
   "x-model-name": "PendingChange"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): PendingChange {
@@ -20950,11 +21685,15 @@ export class PendingChangeValidator extends BaseValidator<PendingChange> {
  * Response for pending changes check.
  */
 export class PendingChangesResponseValidator extends BaseValidator<PendingChangesResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "PendingChange": {
       "description": "Represents a pending change for template generation.",
@@ -21021,34 +21760,37 @@ export class PendingChangesResponseValidator extends BaseValidator<PendingChange
   "title": "PendingChangesResponse",
   "type": "object",
   "x-model-name": "PendingChangesResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): PendingChangesResponse {
@@ -21105,11 +21847,15 @@ export class PendingChangesResponseValidator extends BaseValidator<PendingChange
  * Per-item override for release commit selection.
  */
 export class ReleaseOverrideValidator extends BaseValidator<ReleaseOverride> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Per-item override for release commit selection.",
   "properties": {
     "course_content_id": {
@@ -21129,34 +21875,37 @@ export class ReleaseOverrideValidator extends BaseValidator<ReleaseOverride> {
   "title": "ReleaseOverride",
   "type": "object",
   "x-model-name": "ReleaseOverride"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ReleaseOverride {
@@ -21208,11 +21957,15 @@ export class ReleaseOverrideValidator extends BaseValidator<ReleaseOverride> {
  * Selection of contents and commits for a release.
  */
 export class ReleaseSelectionValidator extends BaseValidator<ReleaseSelection> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ReleaseOverride": {
       "description": "Per-item override for release commit selection.",
@@ -21311,34 +22064,37 @@ export class ReleaseSelectionValidator extends BaseValidator<ReleaseSelection> {
   "title": "ReleaseSelection",
   "type": "object",
   "x-model-name": "ReleaseSelection"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ReleaseSelection {
@@ -21406,11 +22162,15 @@ export class ReleaseSelectionValidator extends BaseValidator<ReleaseSelection> {
  * Request to generate student template.
  */
 export class GenerateTemplateRequestValidator extends BaseValidator<GenerateTemplateRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ReleaseOverride": {
       "description": "Per-item override for release commit selection.",
@@ -21547,34 +22307,37 @@ export class GenerateTemplateRequestValidator extends BaseValidator<GenerateTemp
   "title": "GenerateTemplateRequest",
   "type": "object",
   "x-model-name": "GenerateTemplateRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GenerateTemplateRequest {
@@ -21625,11 +22388,15 @@ export class GenerateTemplateRequestValidator extends BaseValidator<GenerateTemp
  * Response for template generation request.
  */
 export class GenerateTemplateResponseValidator extends BaseValidator<GenerateTemplateResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response for template generation request.",
   "properties": {
     "workflow_id": {
@@ -21653,34 +22420,37 @@ export class GenerateTemplateResponseValidator extends BaseValidator<GenerateTem
   "title": "GenerateTemplateResponse",
   "type": "object",
   "x-model-name": "GenerateTemplateResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GenerateTemplateResponse {
@@ -21739,11 +22509,15 @@ export class GenerateTemplateResponseValidator extends BaseValidator<GenerateTem
  * Request to generate the assignments repository from Example Library.
  */
 export class GenerateAssignmentsRequestValidator extends BaseValidator<GenerateAssignmentsRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request to generate the assignments repository from Example Library.",
   "properties": {
     "assignments_url": {
@@ -21817,34 +22591,37 @@ export class GenerateAssignmentsRequestValidator extends BaseValidator<GenerateA
   "title": "GenerateAssignmentsRequest",
   "type": "object",
   "x-model-name": "GenerateAssignmentsRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GenerateAssignmentsRequest {
@@ -21919,11 +22696,15 @@ export class GenerateAssignmentsRequestValidator extends BaseValidator<GenerateA
  * Validator for GenerateAssignmentsResponse
  */
 export class GenerateAssignmentsResponseValidator extends BaseValidator<GenerateAssignmentsResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "workflow_id": {
       "title": "Workflow Id",
@@ -21946,34 +22727,37 @@ export class GenerateAssignmentsResponseValidator extends BaseValidator<Generate
   "title": "GenerateAssignmentsResponse",
   "type": "object",
   "x-model-name": "GenerateAssignmentsResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GenerateAssignmentsResponse {
@@ -22032,11 +22816,15 @@ export class GenerateAssignmentsResponseValidator extends BaseValidator<Generate
  * Validator for GitCommit
  */
 export class GitCommitValidator extends BaseValidator<GitCommit> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "hash": {
       "title": "Hash",
@@ -22064,34 +22852,37 @@ export class GitCommitValidator extends BaseValidator<GitCommit> {
   "title": "GitCommit",
   "type": "object",
   "x-model-name": "GitCommit"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitCommit {
@@ -22161,11 +22952,15 @@ export class GitCommitValidator extends BaseValidator<GitCommit> {
  * Represents a test dependency with slug and version constraint.
  */
 export class TestDependencyValidator extends BaseValidator<TestDependency> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Represents a test dependency with slug and version constraint.",
   "properties": {
     "slug": {
@@ -22193,34 +22988,37 @@ export class TestDependencyValidator extends BaseValidator<TestDependency> {
   "title": "TestDependency",
   "type": "object",
   "x-model-name": "TestDependency"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TestDependency {
@@ -22268,44 +23066,51 @@ export class TestDependencyValidator extends BaseValidator<TestDependency> {
  * Base class for all CodeAbility meta models.
  */
 export class CodeAbilityBaseValidator extends BaseValidator<CodeAbilityBase> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Base class for all CodeAbility meta models.",
   "properties": {},
   "title": "CodeAbilityBase",
   "type": "object",
   "x-model-name": "CodeAbilityBase"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityBase {
@@ -22339,11 +23144,15 @@ export class CodeAbilityBaseValidator extends BaseValidator<CodeAbilityBase> {
  * Link to external resources.
  */
 export class CodeAbilityLinkValidator extends BaseValidator<CodeAbilityLink> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Link to external resources.",
   "properties": {
     "description": {
@@ -22366,34 +23175,37 @@ export class CodeAbilityLinkValidator extends BaseValidator<CodeAbilityLink> {
   "title": "CodeAbilityLink",
   "type": "object",
   "x-model-name": "CodeAbilityLink"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityLink {
@@ -22445,11 +23257,15 @@ export class CodeAbilityLinkValidator extends BaseValidator<CodeAbilityLink> {
  * Person information for authors/maintainers.
  */
 export class CodeAbilityPersonValidator extends BaseValidator<CodeAbilityPerson> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Person information for authors/maintainers.",
   "properties": {
     "name": {
@@ -22498,34 +23314,37 @@ export class CodeAbilityPersonValidator extends BaseValidator<CodeAbilityPerson>
   "title": "CodeAbilityPerson",
   "type": "object",
   "x-model-name": "CodeAbilityPerson"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityPerson {
@@ -22574,11 +23393,15 @@ export class CodeAbilityPersonValidator extends BaseValidator<CodeAbilityPerson>
  * Properties specific to assignment-level meta.
  */
 export class CodeAbilityMetaPropertiesValidator extends BaseValidator<CodeAbilityMetaProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseExecutionBackendConfig": {
       "description": "Configuration for course execution backend.",
@@ -22744,34 +23567,37 @@ export class CodeAbilityMetaPropertiesValidator extends BaseValidator<CodeAbilit
   "title": "CodeAbilityMetaProperties",
   "type": "object",
   "x-model-name": "CodeAbilityMetaProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityMetaProperties {
@@ -22835,11 +23661,15 @@ export class CodeAbilityMetaPropertiesValidator extends BaseValidator<CodeAbilit
  * Meta information for assignments/examples.
  */
 export class CodeAbilityMetaValidator extends BaseValidator<CodeAbilityMeta> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityLink": {
       "description": "Link to external resources.",
@@ -23251,34 +24081,37 @@ export class CodeAbilityMetaValidator extends BaseValidator<CodeAbilityMeta> {
   "title": "CodeAbilityMeta",
   "type": "object",
   "x-model-name": "CodeAbilityMeta"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityMeta {
@@ -23372,11 +24205,15 @@ export class CodeAbilityMetaValidator extends BaseValidator<CodeAbilityMeta> {
  * Validator for SubmissionGroupProperties
  */
 export class SubmissionGroupPropertiesValidator extends BaseValidator<SubmissionGroupProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -23570,34 +24407,37 @@ export class SubmissionGroupPropertiesValidator extends BaseValidator<Submission
   "title": "SubmissionGroupProperties",
   "type": "object",
   "x-model-name": "SubmissionGroupProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupProperties {
@@ -23636,11 +24476,15 @@ export class SubmissionGroupPropertiesValidator extends BaseValidator<Submission
  * Validator for SubmissionGroupCreate
  */
 export class SubmissionGroupCreateValidator extends BaseValidator<SubmissionGroupCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -23887,34 +24731,37 @@ export class SubmissionGroupCreateValidator extends BaseValidator<SubmissionGrou
   "title": "SubmissionGroupCreate",
   "type": "object",
   "x-model-name": "SubmissionGroupCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupCreate {
@@ -23979,11 +24826,15 @@ export class SubmissionGroupCreateValidator extends BaseValidator<SubmissionGrou
  * Validator for SubmissionGroupGet
  */
 export class SubmissionGroupGetValidator extends BaseValidator<SubmissionGroupGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -24304,34 +25155,37 @@ export class SubmissionGroupGetValidator extends BaseValidator<SubmissionGroupGe
   "title": "SubmissionGroupGet",
   "type": "object",
   "x-model-name": "SubmissionGroupGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupGet {
@@ -24439,11 +25293,15 @@ export class SubmissionGroupGetValidator extends BaseValidator<SubmissionGroupGe
  * Validator for SubmissionGroupList
  */
 export class SubmissionGroupListValidator extends BaseValidator<SubmissionGroupList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -24712,34 +25570,37 @@ export class SubmissionGroupListValidator extends BaseValidator<SubmissionGroupL
   "title": "SubmissionGroupList",
   "type": "object",
   "x-model-name": "SubmissionGroupList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupList {
@@ -24829,11 +25690,15 @@ export class SubmissionGroupListValidator extends BaseValidator<SubmissionGroupL
  * Validator for SubmissionGroupUpdate
  */
 export class SubmissionGroupUpdateValidator extends BaseValidator<SubmissionGroupUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -25080,34 +25945,37 @@ export class SubmissionGroupUpdateValidator extends BaseValidator<SubmissionGrou
   "title": "SubmissionGroupUpdate",
   "type": "object",
   "x-model-name": "SubmissionGroupUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupUpdate {
@@ -25161,11 +26029,15 @@ export class SubmissionGroupUpdateValidator extends BaseValidator<SubmissionGrou
  * Validator for SubmissionGroupQuery
  */
 export class SubmissionGroupQueryValidator extends BaseValidator<SubmissionGroupQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -25472,34 +26344,37 @@ export class SubmissionGroupQueryValidator extends BaseValidator<SubmissionGroup
   "title": "SubmissionGroupQuery",
   "type": "object",
   "x-model-name": "SubmissionGroupQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupQuery {
@@ -25578,11 +26453,15 @@ export class SubmissionGroupQueryValidator extends BaseValidator<SubmissionGroup
  * Query parameters for student submission groups
  */
 export class SubmissionGroupStudentQueryValidator extends BaseValidator<SubmissionGroupStudentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for student submission groups",
   "properties": {
     "course_id": {
@@ -25637,34 +26516,37 @@ export class SubmissionGroupStudentQueryValidator extends BaseValidator<Submissi
   "title": "SubmissionGroupStudentQuery",
   "type": "object",
   "x-model-name": "SubmissionGroupStudentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupStudentQuery {
@@ -25718,11 +26600,15 @@ export class SubmissionGroupStudentQueryValidator extends BaseValidator<Submissi
  * Submission group with latest grading information.
  */
 export class SubmissionGroupWithGradingValidator extends BaseValidator<SubmissionGroupWithGrading> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -26075,34 +26961,37 @@ export class SubmissionGroupWithGradingValidator extends BaseValidator<Submissio
   "title": "SubmissionGroupWithGrading",
   "type": "object",
   "x-model-name": "SubmissionGroupWithGrading"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupWithGrading {
@@ -26227,11 +27116,15 @@ export class SubmissionGroupWithGradingValidator extends BaseValidator<Submissio
  * Detailed submission group information including members and gradings.
  */
 export class SubmissionGroupDetailedValidator extends BaseValidator<SubmissionGroupDetailed> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -26581,34 +27474,37 @@ export class SubmissionGroupDetailedValidator extends BaseValidator<SubmissionGr
   "title": "SubmissionGroupDetailed",
   "type": "object",
   "x-model-name": "SubmissionGroupDetailed"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupDetailed {
@@ -26761,11 +27657,15 @@ export class SubmissionGroupDetailedValidator extends BaseValidator<SubmissionGr
  * Validator for SubmissionGroupMemberProperties
  */
 export class SubmissionGroupMemberPropertiesValidator extends BaseValidator<SubmissionGroupMemberProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -26959,34 +27859,37 @@ export class SubmissionGroupMemberPropertiesValidator extends BaseValidator<Subm
   "title": "SubmissionGroupMemberProperties",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberProperties {
@@ -27025,11 +27928,15 @@ export class SubmissionGroupMemberPropertiesValidator extends BaseValidator<Subm
  * Validator for SubmissionGroupMemberCreate
  */
 export class SubmissionGroupMemberCreateValidator extends BaseValidator<SubmissionGroupMemberCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -27264,34 +28171,37 @@ export class SubmissionGroupMemberCreateValidator extends BaseValidator<Submissi
   "title": "SubmissionGroupMemberCreate",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberCreate {
@@ -27353,11 +28263,15 @@ export class SubmissionGroupMemberCreateValidator extends BaseValidator<Submissi
  * Validator for SubmissionGroupMemberGet
  */
 export class SubmissionGroupMemberGetValidator extends BaseValidator<SubmissionGroupMemberGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -27671,34 +28585,37 @@ export class SubmissionGroupMemberGetValidator extends BaseValidator<SubmissionG
   "title": "SubmissionGroupMemberGet",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberGet {
@@ -27812,11 +28729,15 @@ export class SubmissionGroupMemberGetValidator extends BaseValidator<SubmissionG
  * Validator for SubmissionGroupMemberList
  */
 export class SubmissionGroupMemberListValidator extends BaseValidator<SubmissionGroupMemberList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -27873,34 +28794,37 @@ export class SubmissionGroupMemberListValidator extends BaseValidator<Submission
   "title": "SubmissionGroupMemberList",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberList {
@@ -27989,11 +28913,15 @@ export class SubmissionGroupMemberListValidator extends BaseValidator<Submission
  * Validator for SubmissionGroupMemberUpdate
  */
 export class SubmissionGroupMemberUpdateValidator extends BaseValidator<SubmissionGroupMemberUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -28240,34 +29168,37 @@ export class SubmissionGroupMemberUpdateValidator extends BaseValidator<Submissi
   "title": "SubmissionGroupMemberUpdate",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberUpdate {
@@ -28321,11 +29252,15 @@ export class SubmissionGroupMemberUpdateValidator extends BaseValidator<Submissi
  * Validator for SubmissionGroupMemberQuery
  */
 export class SubmissionGroupMemberQueryValidator extends BaseValidator<SubmissionGroupMemberQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -28644,34 +29579,37 @@ export class SubmissionGroupMemberQueryValidator extends BaseValidator<Submissio
   "title": "SubmissionGroupMemberQuery",
   "type": "object",
   "x-model-name": "SubmissionGroupMemberQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGroupMemberQuery {
@@ -28760,11 +29698,15 @@ export class SubmissionGroupMemberQueryValidator extends BaseValidator<Submissio
     - version_identifier (optional)
  */
 export class SubmissionArtifactCreateValidator extends BaseValidator<SubmissionArtifactCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for creating submission artifacts.\\n\\n    This is used internally when processing submission uploads.\\n    The upload endpoint accepts SubmissionCreate which only has:\\n    - submission_group_id\\n    - version_identifier (optional)",
   "properties": {
     "submission_group_id": {
@@ -28790,34 +29732,37 @@ export class SubmissionArtifactCreateValidator extends BaseValidator<SubmissionA
   "title": "SubmissionArtifactCreate",
   "type": "object",
   "x-model-name": "SubmissionArtifactCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionArtifactCreate {
@@ -28865,11 +29810,15 @@ export class SubmissionArtifactCreateValidator extends BaseValidator<SubmissionA
  * DTO for updating submission artifacts.
  */
 export class SubmissionArtifactUpdateValidator extends BaseValidator<SubmissionArtifactUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for updating submission artifacts.",
   "properties": {
     "submit": {
@@ -28901,34 +29850,37 @@ export class SubmissionArtifactUpdateValidator extends BaseValidator<SubmissionA
   "title": "SubmissionArtifactUpdate",
   "type": "object",
   "x-model-name": "SubmissionArtifactUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionArtifactUpdate {
@@ -28975,11 +29927,15 @@ export class SubmissionArtifactUpdateValidator extends BaseValidator<SubmissionA
     Properties field is kept for legacy compatibility and future extensibility.
  */
 export class SubmissionArtifactListValidator extends BaseValidator<SubmissionArtifactList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "List item representation for submission artifacts.\\n\\n    Essential metadata is stored in proper database columns.\\n    Properties field is kept for legacy compatibility and future extensibility.",
   "properties": {
     "created_at": {
@@ -29096,34 +30052,37 @@ export class SubmissionArtifactListValidator extends BaseValidator<SubmissionArt
   "title": "SubmissionArtifactList",
   "type": "object",
   "x-model-name": "SubmissionArtifactList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionArtifactList {
@@ -29241,11 +30200,15 @@ export class SubmissionArtifactListValidator extends BaseValidator<SubmissionArt
  * Detailed view of submission artifact with related data.
  */
 export class SubmissionArtifactGetValidator extends BaseValidator<SubmissionArtifactGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ResultList": {
       "properties": {
@@ -29578,34 +30541,37 @@ export class SubmissionArtifactGetValidator extends BaseValidator<SubmissionArti
   "title": "SubmissionArtifactGet",
   "type": "object",
   "x-model-name": "SubmissionArtifactGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionArtifactGet {
@@ -29748,11 +30714,15 @@ export class SubmissionArtifactGetValidator extends BaseValidator<SubmissionArti
  * Query parameters for listing submission artifacts.
  */
 export class SubmissionArtifactQueryValidator extends BaseValidator<SubmissionArtifactQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for listing submission artifacts.",
   "properties": {
     "skip": {
@@ -29831,34 +30801,37 @@ export class SubmissionArtifactQueryValidator extends BaseValidator<SubmissionAr
   "title": "SubmissionArtifactQuery",
   "type": "object",
   "x-model-name": "SubmissionArtifactQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionArtifactQuery {
@@ -29922,11 +30895,15 @@ export class SubmissionArtifactQueryValidator extends BaseValidator<SubmissionAr
  * DTO for creating submission grades.
  */
 export class SubmissionGradeCreateValidator extends BaseValidator<SubmissionGradeCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -29979,34 +30956,37 @@ export class SubmissionGradeCreateValidator extends BaseValidator<SubmissionGrad
   "title": "SubmissionGradeCreate",
   "type": "object",
   "x-model-name": "SubmissionGradeCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGradeCreate {
@@ -30080,11 +31060,15 @@ export class SubmissionGradeCreateValidator extends BaseValidator<SubmissionGrad
  * DTO for updating submission grades.
  */
 export class SubmissionGradeUpdateValidator extends BaseValidator<SubmissionGradeUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -30139,34 +31123,37 @@ export class SubmissionGradeUpdateValidator extends BaseValidator<SubmissionGrad
   "title": "SubmissionGradeUpdate",
   "type": "object",
   "x-model-name": "SubmissionGradeUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGradeUpdate {
@@ -30215,11 +31202,15 @@ export class SubmissionGradeUpdateValidator extends BaseValidator<SubmissionGrad
  * List item representation for submission grades.
  */
 export class SubmissionGradeListItemValidator extends BaseValidator<SubmissionGradeListItem> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -30311,34 +31302,37 @@ export class SubmissionGradeListItemValidator extends BaseValidator<SubmissionGr
   "title": "SubmissionGradeListItem",
   "type": "object",
   "x-model-name": "SubmissionGradeListItem"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGradeListItem {
@@ -30442,11 +31436,15 @@ export class SubmissionGradeListItemValidator extends BaseValidator<SubmissionGr
  * Detailed view of submission grade.
  */
 export class SubmissionGradeDetailValidator extends BaseValidator<SubmissionGradeDetail> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -30538,34 +31536,37 @@ export class SubmissionGradeDetailValidator extends BaseValidator<SubmissionGrad
   "title": "SubmissionGradeDetail",
   "type": "object",
   "x-model-name": "SubmissionGradeDetail"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGradeDetail {
@@ -30669,11 +31670,15 @@ export class SubmissionGradeDetailValidator extends BaseValidator<SubmissionGrad
  * Query parameters for listing submission grades.
  */
 export class SubmissionGradeQueryValidator extends BaseValidator<SubmissionGradeQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingStatus": {
       "description": "Enumeration for grading status values.",
@@ -30764,34 +31769,37 @@ export class SubmissionGradeQueryValidator extends BaseValidator<SubmissionGrade
   "title": "SubmissionGradeQuery",
   "type": "object",
   "x-model-name": "SubmissionGradeQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionGradeQuery {
@@ -30855,11 +31863,15 @@ export class SubmissionGradeQueryValidator extends BaseValidator<SubmissionGrade
  * DTO for creating submission reviews.
  */
 export class SubmissionReviewCreateValidator extends BaseValidator<SubmissionReviewCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for creating submission reviews.",
   "properties": {
     "artifact_id": {
@@ -30895,34 +31907,37 @@ export class SubmissionReviewCreateValidator extends BaseValidator<SubmissionRev
   "title": "SubmissionReviewCreate",
   "type": "object",
   "x-model-name": "SubmissionReviewCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionReviewCreate {
@@ -30988,11 +32003,15 @@ export class SubmissionReviewCreateValidator extends BaseValidator<SubmissionRev
  * DTO for updating submission reviews.
  */
 export class SubmissionReviewUpdateValidator extends BaseValidator<SubmissionReviewUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for updating submission reviews.",
   "properties": {
     "body": {
@@ -31023,34 +32042,37 @@ export class SubmissionReviewUpdateValidator extends BaseValidator<SubmissionRev
   "title": "SubmissionReviewUpdate",
   "type": "object",
   "x-model-name": "SubmissionReviewUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionReviewUpdate {
@@ -31094,11 +32116,15 @@ export class SubmissionReviewUpdateValidator extends BaseValidator<SubmissionRev
  * List item representation for submission reviews.
  */
 export class SubmissionReviewListItemValidator extends BaseValidator<SubmissionReviewListItem> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "List item representation for submission reviews.",
   "properties": {
     "created_at": {
@@ -31159,34 +32185,37 @@ export class SubmissionReviewListItemValidator extends BaseValidator<SubmissionR
   "title": "SubmissionReviewListItem",
   "type": "object",
   "x-model-name": "SubmissionReviewListItem"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionReviewListItem {
@@ -31275,11 +32304,15 @@ export class SubmissionReviewListItemValidator extends BaseValidator<SubmissionR
  * Detailed view of submission review.
  */
 export class SubmissionReviewDetailValidator extends BaseValidator<SubmissionReviewDetail> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Detailed view of submission review.",
   "properties": {
     "created_at": {
@@ -31340,34 +32373,37 @@ export class SubmissionReviewDetailValidator extends BaseValidator<SubmissionRev
   "title": "SubmissionReviewDetail",
   "type": "object",
   "x-model-name": "SubmissionReviewDetail"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionReviewDetail {
@@ -31456,11 +32492,15 @@ export class SubmissionReviewDetailValidator extends BaseValidator<SubmissionRev
  * Query parameters for listing submission reviews.
  */
 export class SubmissionReviewQueryValidator extends BaseValidator<SubmissionReviewQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for listing submission reviews.",
   "properties": {
     "skip": {
@@ -31539,34 +32579,37 @@ export class SubmissionReviewQueryValidator extends BaseValidator<SubmissionRevi
   "title": "SubmissionReviewQuery",
   "type": "object",
   "x-model-name": "SubmissionReviewQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmissionReviewQuery {
@@ -31630,11 +32673,15 @@ export class SubmissionReviewQueryValidator extends BaseValidator<SubmissionRevi
  * DTO for creating result artifacts.
  */
 export class ResultArtifactCreateValidator extends BaseValidator<ResultArtifactCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for creating result artifacts.",
   "properties": {
     "result_id": {
@@ -31688,34 +32735,37 @@ export class ResultArtifactCreateValidator extends BaseValidator<ResultArtifactC
   "title": "ResultArtifactCreate",
   "type": "object",
   "x-model-name": "ResultArtifactCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultArtifactCreate {
@@ -31795,11 +32845,15 @@ export class ResultArtifactCreateValidator extends BaseValidator<ResultArtifactC
  * List item representation for result artifacts.
  */
 export class ResultArtifactListItemValidator extends BaseValidator<ResultArtifactListItem> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "List item representation for result artifacts.",
   "properties": {
     "created_at": {
@@ -31878,34 +32932,37 @@ export class ResultArtifactListItemValidator extends BaseValidator<ResultArtifac
   "title": "ResultArtifactListItem",
   "type": "object",
   "x-model-name": "ResultArtifactListItem"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultArtifactListItem {
@@ -32008,11 +33065,15 @@ export class ResultArtifactListItemValidator extends BaseValidator<ResultArtifac
  * Query parameters for listing result artifacts.
  */
 export class ResultArtifactQueryValidator extends BaseValidator<ResultArtifactQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for listing result artifacts.",
   "properties": {
     "skip": {
@@ -32079,34 +33140,37 @@ export class ResultArtifactQueryValidator extends BaseValidator<ResultArtifactQu
   "title": "ResultArtifactQuery",
   "type": "object",
   "x-model-name": "ResultArtifactQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ResultArtifactQuery {
@@ -32165,11 +33229,15 @@ export class ResultArtifactQueryValidator extends BaseValidator<ResultArtifactQu
  * Metadata for storage objects
  */
 export class StorageObjectMetadataValidator extends BaseValidator<StorageObjectMetadata> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Metadata for storage objects",
   "properties": {
     "content_type": {
@@ -32219,34 +33287,37 @@ export class StorageObjectMetadataValidator extends BaseValidator<StorageObjectM
   "title": "StorageObjectMetadata",
   "type": "object",
   "x-model-name": "StorageObjectMetadata"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectMetadata {
@@ -32321,11 +33392,15 @@ export class StorageObjectMetadataValidator extends BaseValidator<StorageObjectM
  * DTO for creating/uploading a storage object
  */
 export class StorageObjectCreateValidator extends BaseValidator<StorageObjectCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for creating/uploading a storage object",
   "properties": {
     "object_key": {
@@ -32382,34 +33457,37 @@ export class StorageObjectCreateValidator extends BaseValidator<StorageObjectCre
   "title": "StorageObjectCreate",
   "type": "object",
   "x-model-name": "StorageObjectCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectCreate {
@@ -32467,11 +33545,15 @@ export class StorageObjectCreateValidator extends BaseValidator<StorageObjectCre
  * DTO for retrieving a storage object
  */
 export class StorageObjectGetValidator extends BaseValidator<StorageObjectGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for retrieving a storage object",
   "properties": {
     "content_type": {
@@ -32604,34 +33686,37 @@ export class StorageObjectGetValidator extends BaseValidator<StorageObjectGet> {
   "title": "StorageObjectGet",
   "type": "object",
   "x-model-name": "StorageObjectGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectGet {
@@ -32758,11 +33843,15 @@ export class StorageObjectGetValidator extends BaseValidator<StorageObjectGet> {
  * DTO for listing storage objects
  */
 export class StorageObjectListValidator extends BaseValidator<StorageObjectList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for listing storage objects",
   "properties": {
     "created_at": {
@@ -32836,34 +33925,37 @@ export class StorageObjectListValidator extends BaseValidator<StorageObjectList>
   "title": "StorageObjectList",
   "type": "object",
   "x-model-name": "StorageObjectList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectList {
@@ -32961,11 +34053,15 @@ export class StorageObjectListValidator extends BaseValidator<StorageObjectList>
  * DTO for updating storage object metadata
  */
 export class StorageObjectUpdateValidator extends BaseValidator<StorageObjectUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for updating storage object metadata",
   "properties": {
     "metadata": {
@@ -33001,34 +34097,37 @@ export class StorageObjectUpdateValidator extends BaseValidator<StorageObjectUpd
   "title": "StorageObjectUpdate",
   "type": "object",
   "x-model-name": "StorageObjectUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectUpdate {
@@ -33072,11 +34171,15 @@ export class StorageObjectUpdateValidator extends BaseValidator<StorageObjectUpd
  * Query parameters for filtering storage objects
  */
 export class StorageObjectQueryValidator extends BaseValidator<StorageObjectQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for filtering storage objects",
   "properties": {
     "skip": {
@@ -33172,34 +34275,37 @@ export class StorageObjectQueryValidator extends BaseValidator<StorageObjectQuer
   "title": "StorageObjectQuery",
   "type": "object",
   "x-model-name": "StorageObjectQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageObjectQuery {
@@ -33268,11 +34374,15 @@ export class StorageObjectQueryValidator extends BaseValidator<StorageObjectQuer
  * DTO for creating a storage bucket
  */
 export class BucketCreateValidator extends BaseValidator<BucketCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for creating a storage bucket",
   "properties": {
     "bucket_name": {
@@ -33300,34 +34410,37 @@ export class BucketCreateValidator extends BaseValidator<BucketCreate> {
   "title": "BucketCreate",
   "type": "object",
   "x-model-name": "BucketCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BucketCreate {
@@ -33375,11 +34488,15 @@ export class BucketCreateValidator extends BaseValidator<BucketCreate> {
  * DTO for bucket information
  */
 export class BucketInfoValidator extends BaseValidator<BucketInfo> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for bucket information",
   "properties": {
     "bucket_name": {
@@ -33421,34 +34538,37 @@ export class BucketInfoValidator extends BaseValidator<BucketInfo> {
   "title": "BucketInfo",
   "type": "object",
   "x-model-name": "BucketInfo"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BucketInfo {
@@ -33501,11 +34621,15 @@ export class BucketInfoValidator extends BaseValidator<BucketInfo> {
  * DTO for listing buckets
  */
 export class BucketListValidator extends BaseValidator<BucketList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "BucketInfo": {
       "description": "DTO for bucket information",
@@ -33567,34 +34691,37 @@ export class BucketListValidator extends BaseValidator<BucketList> {
   "title": "BucketList",
   "type": "object",
   "x-model-name": "BucketList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BucketList {
@@ -33637,11 +34764,15 @@ export class BucketListValidator extends BaseValidator<BucketList> {
  * DTO for generating presigned URLs
  */
 export class PresignedUrlRequestValidator extends BaseValidator<PresignedUrlRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for generating presigned URLs",
   "properties": {
     "object_key": {
@@ -33697,34 +34828,37 @@ export class PresignedUrlRequestValidator extends BaseValidator<PresignedUrlRequ
   "title": "PresignedUrlRequest",
   "type": "object",
   "x-model-name": "PresignedUrlRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): PresignedUrlRequest {
@@ -33782,11 +34916,15 @@ export class PresignedUrlRequestValidator extends BaseValidator<PresignedUrlRequ
  * DTO for presigned URL response
  */
 export class PresignedUrlResponseValidator extends BaseValidator<PresignedUrlResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for presigned URL response",
   "properties": {
     "url": {
@@ -33814,34 +34952,37 @@ export class PresignedUrlResponseValidator extends BaseValidator<PresignedUrlRes
   "title": "PresignedUrlResponse",
   "type": "object",
   "x-model-name": "PresignedUrlResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): PresignedUrlResponse {
@@ -33902,11 +35043,15 @@ export class PresignedUrlResponseValidator extends BaseValidator<PresignedUrlRes
  * DTO for storage usage statistics
  */
 export class StorageUsageStatsValidator extends BaseValidator<StorageUsageStats> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "DTO for storage usage statistics",
   "properties": {
     "bucket_name": {
@@ -33940,34 +35085,37 @@ export class StorageUsageStatsValidator extends BaseValidator<StorageUsageStats>
   "title": "StorageUsageStats",
   "type": "object",
   "x-model-name": "StorageUsageStats"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): StorageUsageStats {
@@ -34037,44 +35185,51 @@ export class StorageUsageStatsValidator extends BaseValidator<StorageUsageStats>
  * Base class for all deployment configurations.
  */
 export class BaseDeploymentValidator extends BaseValidator<BaseDeployment> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Base class for all deployment configurations.",
   "properties": {},
   "title": "BaseDeployment",
   "type": "object",
   "x-model-name": "BaseDeployment"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BaseDeployment {
@@ -34108,11 +35263,15 @@ export class BaseDeploymentValidator extends BaseValidator<BaseDeployment> {
  * User deployment configuration for creating users in the system.
  */
 export class UserDeploymentValidator extends BaseValidator<UserDeployment> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "User deployment configuration for creating users in the system.",
   "properties": {
     "given_name": {
@@ -34258,34 +35417,37 @@ export class UserDeploymentValidator extends BaseValidator<UserDeployment> {
   "title": "UserDeployment",
   "type": "object",
   "x-model-name": "UserDeployment"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): UserDeployment {
@@ -34376,11 +35538,15 @@ export class UserDeploymentValidator extends BaseValidator<UserDeployment> {
  * Account deployment configuration for external service accounts (e.g., GitLab).
  */
 export class AccountDeploymentValidator extends BaseValidator<AccountDeployment> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Account deployment configuration for external service accounts (e.g., GitLab).",
   "properties": {
     "provider": {
@@ -34511,34 +35677,37 @@ export class AccountDeploymentValidator extends BaseValidator<AccountDeployment>
   "title": "AccountDeployment",
   "type": "object",
   "x-model-name": "AccountDeployment"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): AccountDeployment {
@@ -34639,11 +35808,15 @@ export class AccountDeploymentValidator extends BaseValidator<AccountDeployment>
  * Course member deployment configuration for assigning users to courses.
  */
 export class CourseMemberDeploymentValidator extends BaseValidator<CourseMemberDeployment> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Course member deployment configuration for assigning users to courses.",
   "properties": {
     "id": {
@@ -34721,34 +35894,37 @@ export class CourseMemberDeploymentValidator extends BaseValidator<CourseMemberD
   "title": "CourseMemberDeployment",
   "type": "object",
   "x-model-name": "CourseMemberDeployment"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberDeployment {
@@ -34814,11 +35990,15 @@ export class CourseMemberDeploymentValidator extends BaseValidator<CourseMemberD
  * Combined user and account deployment configuration.
  */
 export class UserAccountDeploymentValidator extends BaseValidator<UserAccountDeployment> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "AccountDeployment": {
       "description": "Account deployment configuration for external service accounts (e.g., GitLab).",
@@ -35205,34 +36385,37 @@ export class UserAccountDeploymentValidator extends BaseValidator<UserAccountDep
   "title": "UserAccountDeployment",
   "type": "object",
   "x-model-name": "UserAccountDeployment"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): UserAccountDeployment {
@@ -35290,11 +36473,15 @@ export class UserAccountDeploymentValidator extends BaseValidator<UserAccountDep
  * Configuration for deploying multiple users and their accounts.
  */
 export class UsersDeploymentConfigValidator extends BaseValidator<UsersDeploymentConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "AccountDeployment": {
       "description": "Account deployment configuration for external service accounts (e.g., GitLab).",
@@ -35699,34 +36886,37 @@ export class UsersDeploymentConfigValidator extends BaseValidator<UsersDeploymen
   "title": "UsersDeploymentConfig",
   "type": "object",
   "x-model-name": "UsersDeploymentConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): UsersDeploymentConfig {
@@ -35769,11 +36959,15 @@ export class UsersDeploymentConfigValidator extends BaseValidator<UsersDeploymen
  * GitLab repository configuration.
  */
 export class GitLabConfigValidator extends BaseValidator<GitLabConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "GitLab repository configuration.",
   "properties": {
     "url": {
@@ -35923,34 +37117,37 @@ export class GitLabConfigValidator extends BaseValidator<GitLabConfig> {
   "title": "GitLabConfig",
   "type": "object",
   "x-model-name": "GitLabConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitLabConfig {
@@ -36039,11 +37236,15 @@ export class GitLabConfigValidator extends BaseValidator<GitLabConfig> {
  * GitHub repository configuration (future support).
  */
 export class GitHubConfigValidator extends BaseValidator<GitHubConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "GitHub repository configuration (future support).",
   "properties": {
     "url": {
@@ -36089,34 +37290,37 @@ export class GitHubConfigValidator extends BaseValidator<GitHubConfig> {
   "title": "GitHubConfig",
   "type": "object",
   "x-model-name": "GitHubConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitHubConfig {
@@ -36165,11 +37369,15 @@ export class GitHubConfigValidator extends BaseValidator<GitHubConfig> {
  * Full execution backend configuration for defining backends at root level.
  */
 export class ExecutionBackendConfigValidator extends BaseValidator<ExecutionBackendConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Full execution backend configuration for defining backends at root level.",
   "properties": {
     "slug": {
@@ -36203,34 +37411,37 @@ export class ExecutionBackendConfigValidator extends BaseValidator<ExecutionBack
   "title": "ExecutionBackendConfig",
   "type": "object",
   "x-model-name": "ExecutionBackendConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendConfig {
@@ -36287,11 +37498,15 @@ export class ExecutionBackendConfigValidator extends BaseValidator<ExecutionBack
  * Reference to an execution backend by slug for linking to courses.
  */
 export class ExecutionBackendReferenceValidator extends BaseValidator<ExecutionBackendReference> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Reference to an execution backend by slug for linking to courses.",
   "properties": {
     "slug": {
@@ -36319,34 +37534,37 @@ export class ExecutionBackendReferenceValidator extends BaseValidator<ExecutionB
   "title": "ExecutionBackendReference",
   "type": "object",
   "x-model-name": "ExecutionBackendReference"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExecutionBackendReference {
@@ -36396,11 +37614,15 @@ export class ExecutionBackendReferenceValidator extends BaseValidator<ExecutionB
     Supports deploying multiple organizations, each with multiple course families and courses.
  */
 export class ComputorDeploymentConfigValidator extends BaseValidator<ComputorDeploymentConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "AccountDeployment": {
       "description": "Account deployment configuration for external service accounts (e.g., GitLab).",
@@ -37781,34 +39003,37 @@ export class ComputorDeploymentConfigValidator extends BaseValidator<ComputorDep
   "title": "ComputorDeploymentConfig",
   "type": "object",
   "x-model-name": "ComputorDeploymentConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ComputorDeploymentConfig {
@@ -37876,11 +39101,15 @@ export class ComputorDeploymentConfigValidator extends BaseValidator<ComputorDep
  * Validator for ExtensionUploadConfig
  */
 export class ExtensionUploadConfigValidator extends BaseValidator<ExtensionUploadConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "path": {
       "description": "Relative path to the .vsix package to upload",
@@ -37959,34 +39188,37 @@ export class ExtensionUploadConfigValidator extends BaseValidator<ExtensionUploa
   "title": "ExtensionUploadConfig",
   "type": "object",
   "x-model-name": "ExtensionUploadConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ExtensionUploadConfig {
@@ -38054,11 +39286,15 @@ export class ExtensionUploadConfigValidator extends BaseValidator<ExtensionUploa
  * Validator for GitlabGroupProjectConfig
  */
 export class GitlabGroupProjectConfigValidator extends BaseValidator<GitlabGroupProjectConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "name": {
       "anyOf": [
@@ -38083,34 +39319,37 @@ export class GitlabGroupProjectConfigValidator extends BaseValidator<GitlabGroup
   "title": "GitlabGroupProjectConfig",
   "type": "object",
   "x-model-name": "GitlabGroupProjectConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitlabGroupProjectConfig {
@@ -38158,11 +39397,15 @@ export class GitlabGroupProjectConfigValidator extends BaseValidator<GitlabGroup
  * Validator for ApiConfig
  */
 export class ApiConfigValidator extends BaseValidator<ApiConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "user": {
       "title": "User",
@@ -38185,34 +39428,37 @@ export class ApiConfigValidator extends BaseValidator<ApiConfig> {
   "title": "ApiConfig",
   "type": "object",
   "x-model-name": "ApiConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ApiConfig {
@@ -38273,11 +39519,15 @@ export class ApiConfigValidator extends BaseValidator<ApiConfig> {
  * Validator for RepositoryConfig
  */
 export class RepositoryConfigValidator extends BaseValidator<RepositoryConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "settings": {
       "anyOf": [
@@ -38295,34 +39545,37 @@ export class RepositoryConfigValidator extends BaseValidator<RepositoryConfig> {
   "title": "RepositoryConfig",
   "type": "object",
   "x-model-name": "RepositoryConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RepositoryConfig {
@@ -38361,11 +39614,15 @@ export class RepositoryConfigValidator extends BaseValidator<RepositoryConfig> {
  * Validator for GitLabConfigGet
  */
 export class GitLabConfigGetValidator extends BaseValidator<GitLabConfigGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "settings": {
       "anyOf": [
@@ -38527,34 +39784,37 @@ export class GitLabConfigGetValidator extends BaseValidator<GitLabConfigGet> {
   "title": "GitLabConfigGet",
   "type": "object",
   "x-model-name": "GitLabConfigGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitLabConfigGet {
@@ -38653,11 +39913,15 @@ export class GitLabConfigGetValidator extends BaseValidator<GitLabConfigGet> {
  * Validator for TypeConfig
  */
 export class TypeConfigValidator extends BaseValidator<TypeConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "kind": {
       "title": "Kind",
@@ -38710,34 +39974,37 @@ export class TypeConfigValidator extends BaseValidator<TypeConfig> {
   "title": "TypeConfig",
   "type": "object",
   "x-model-name": "TypeConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TypeConfig {
@@ -38815,11 +40082,15 @@ export class TypeConfigValidator extends BaseValidator<TypeConfig> {
  * Validator for FileSourceConfig
  */
 export class FileSourceConfigValidator extends BaseValidator<FileSourceConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "url": {
       "title": "Url",
@@ -38844,34 +40115,37 @@ export class FileSourceConfigValidator extends BaseValidator<FileSourceConfig> {
   "title": "FileSourceConfig",
   "type": "object",
   "x-model-name": "FileSourceConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): FileSourceConfig {
@@ -38919,11 +40193,15 @@ export class FileSourceConfigValidator extends BaseValidator<FileSourceConfig> {
  * Validator for CodeAbilityTestCommon
  */
 export class CodeAbilityTestCommonValidator extends BaseValidator<CodeAbilityTestCommon> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "QualificationEnum": {
       "enum": [
@@ -39051,34 +40329,37 @@ export class CodeAbilityTestCommonValidator extends BaseValidator<CodeAbilityTes
   "title": "CodeAbilityTestCommon",
   "type": "object",
   "x-model-name": "CodeAbilityTestCommon"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTestCommon {
@@ -39152,11 +40433,15 @@ export class CodeAbilityTestCommonValidator extends BaseValidator<CodeAbilityTes
  * Validator for CodeAbilityTestCollectionCommon
  */
 export class CodeAbilityTestCollectionCommonValidator extends BaseValidator<CodeAbilityTestCollectionCommon> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "QualificationEnum": {
       "enum": [
@@ -39322,34 +40607,37 @@ export class CodeAbilityTestCollectionCommonValidator extends BaseValidator<Code
   "title": "CodeAbilityTestCollectionCommon",
   "type": "object",
   "x-model-name": "CodeAbilityTestCollectionCommon"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTestCollectionCommon {
@@ -39438,11 +40726,15 @@ export class CodeAbilityTestCollectionCommonValidator extends BaseValidator<Code
  * Validator for CodeAbilityTest
  */
 export class CodeAbilityTestValidator extends BaseValidator<CodeAbilityTest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "QualificationEnum": {
       "enum": [
@@ -39627,34 +40919,37 @@ export class CodeAbilityTestValidator extends BaseValidator<CodeAbilityTest> {
   "title": "CodeAbilityTest",
   "type": "object",
   "x-model-name": "CodeAbilityTest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTest {
@@ -39757,11 +41052,15 @@ export class CodeAbilityTestValidator extends BaseValidator<CodeAbilityTest> {
  * Validator for CodeAbilityTestCollection
  */
 export class CodeAbilityTestCollectionValidator extends BaseValidator<CodeAbilityTestCollection> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityTest": {
       "properties": {
@@ -40285,34 +41584,37 @@ export class CodeAbilityTestCollectionValidator extends BaseValidator<CodeAbilit
   "title": "CodeAbilityTestCollection",
   "type": "object",
   "x-model-name": "CodeAbilityTestCollection"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTestCollection {
@@ -40469,11 +41771,15 @@ export class CodeAbilityTestCollectionValidator extends BaseValidator<CodeAbilit
  * Validator for CodeAbilityTestProperty
  */
 export class CodeAbilityTestPropertyValidator extends BaseValidator<CodeAbilityTestProperty> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityTest": {
       "properties": {
@@ -41159,34 +42465,37 @@ export class CodeAbilityTestPropertyValidator extends BaseValidator<CodeAbilityT
   "title": "CodeAbilityTestProperty",
   "type": "object",
   "x-model-name": "CodeAbilityTestProperty"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTestProperty {
@@ -41282,11 +42591,15 @@ export class CodeAbilityTestPropertyValidator extends BaseValidator<CodeAbilityT
  * Validator for CodeAbilityTestSuite
  */
 export class CodeAbilityTestSuiteValidator extends BaseValidator<CodeAbilityTestSuite> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityTest": {
       "properties": {
@@ -42049,34 +43362,37 @@ export class CodeAbilityTestSuiteValidator extends BaseValidator<CodeAbilityTest
   "title": "CodeAbilityTestSuite",
   "type": "object",
   "x-model-name": "CodeAbilityTestSuite"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityTestSuite {
@@ -42138,11 +43454,15 @@ export class CodeAbilityTestSuiteValidator extends BaseValidator<CodeAbilityTest
  * Validator for CodeAbilitySpecification
  */
 export class CodeAbilitySpecificationValidator extends BaseValidator<CodeAbilitySpecification> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "executionDirectory": {
       "anyOf": [
@@ -42289,34 +43609,37 @@ export class CodeAbilitySpecificationValidator extends BaseValidator<CodeAbility
   "title": "CodeAbilitySpecification",
   "type": "object",
   "x-model-name": "CodeAbilitySpecification"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilitySpecification {
@@ -42405,11 +43728,15 @@ export class CodeAbilitySpecificationValidator extends BaseValidator<CodeAbility
  * Validator for CodeAbilityMetaProperty
  */
 export class CodeAbilityMetaPropertyValidator extends BaseValidator<CodeAbilityMetaProperty> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseExecutionBackendConfig": {
       "properties": {
@@ -42550,34 +43877,37 @@ export class CodeAbilityMetaPropertyValidator extends BaseValidator<CodeAbilityM
   "title": "CodeAbilityMetaProperty",
   "type": "object",
   "x-model-name": "CodeAbilityMetaProperty"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityMetaProperty {
@@ -42651,11 +43981,15 @@ export class CodeAbilityMetaPropertyValidator extends BaseValidator<CodeAbilityM
  * Validator for CodeAbilityReportSummary
  */
 export class CodeAbilityReportSummaryValidator extends BaseValidator<CodeAbilityReportSummary> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "total": {
       "default": 0,
@@ -42685,34 +44019,37 @@ export class CodeAbilityReportSummaryValidator extends BaseValidator<CodeAbility
   "title": "CodeAbilityReportSummary",
   "type": "object",
   "x-model-name": "CodeAbilityReportSummary"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReportSummary {
@@ -42774,11 +44111,15 @@ export class CodeAbilityReportSummaryValidator extends BaseValidator<CodeAbility
  * Validator for CodeAbilityReleaseMeta
  */
 export class CodeAbilityReleaseMetaValidator extends BaseValidator<CodeAbilityReleaseMeta> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityLink": {
       "properties": {
@@ -43175,34 +44516,37 @@ export class CodeAbilityReleaseMetaValidator extends BaseValidator<CodeAbilityRe
   "title": "CodeAbilityReleaseMeta",
   "type": "object",
   "x-model-name": "CodeAbilityReleaseMeta"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReleaseMeta {
@@ -43296,11 +44640,15 @@ export class CodeAbilityReleaseMetaValidator extends BaseValidator<CodeAbilityRe
  * Validator for CodeAbilityUnitMeta
  */
 export class CodeAbilityUnitMetaValidator extends BaseValidator<CodeAbilityUnitMeta> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityLink": {
       "properties": {
@@ -43704,34 +45052,37 @@ export class CodeAbilityUnitMetaValidator extends BaseValidator<CodeAbilityUnitM
   "title": "CodeAbilityUnitMeta",
   "type": "object",
   "x-model-name": "CodeAbilityUnitMeta"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityUnitMeta {
@@ -43834,11 +45185,15 @@ export class CodeAbilityUnitMetaValidator extends BaseValidator<CodeAbilityUnitM
  * Validator for CodeAbilityReportProperties
  */
 export class CodeAbilityReportPropertiesValidator extends BaseValidator<CodeAbilityReportProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityReportSummary": {
       "properties": {
@@ -44114,34 +45469,37 @@ export class CodeAbilityReportPropertiesValidator extends BaseValidator<CodeAbil
   "title": "CodeAbilityReportProperties",
   "type": "object",
   "x-model-name": "CodeAbilityReportProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReportProperties {
@@ -44265,11 +45623,15 @@ export class CodeAbilityReportPropertiesValidator extends BaseValidator<CodeAbil
  * Validator for CodeAbilityReportSub
  */
 export class CodeAbilityReportSubValidator extends BaseValidator<CodeAbilityReportSub> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityReportSummary": {
       "properties": {
@@ -44545,34 +45907,37 @@ export class CodeAbilityReportSubValidator extends BaseValidator<CodeAbilityRepo
   "title": "CodeAbilityReportSub",
   "type": "object",
   "x-model-name": "CodeAbilityReportSub"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReportSub {
@@ -44696,11 +46061,15 @@ export class CodeAbilityReportSubValidator extends BaseValidator<CodeAbilityRepo
  * Validator for CodeAbilityReportMain
  */
 export class CodeAbilityReportMainValidator extends BaseValidator<CodeAbilityReportMain> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityReportSub": {
       "properties": {
@@ -45213,34 +46582,37 @@ export class CodeAbilityReportMainValidator extends BaseValidator<CodeAbilityRep
   "title": "CodeAbilityReportMain",
   "type": "object",
   "x-model-name": "CodeAbilityReportMain"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReportMain {
@@ -45369,11 +46741,15 @@ export class CodeAbilityReportMainValidator extends BaseValidator<CodeAbilityRep
  * Validator for CodeAbilityReport
  */
 export class CodeAbilityReportValidator extends BaseValidator<CodeAbilityReport> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityReportMain": {
       "properties": {
@@ -46123,34 +47499,37 @@ export class CodeAbilityReportValidator extends BaseValidator<CodeAbilityReport>
   "title": "CodeAbilityReport",
   "type": "object",
   "x-model-name": "CodeAbilityReport"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityReport {
@@ -46279,11 +47658,15 @@ export class CodeAbilityReportValidator extends BaseValidator<CodeAbilityReport>
  * OAuth callback parameters.
  */
 export class CallbackRequestValidator extends BaseValidator<CallbackRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "OAuth callback parameters.",
   "properties": {
     "code": {
@@ -46311,34 +47694,37 @@ export class CallbackRequestValidator extends BaseValidator<CallbackRequest> {
   "title": "CallbackRequest",
   "type": "object",
   "x-model-name": "CallbackRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CallbackRequest {
@@ -46386,11 +47772,15 @@ export class CallbackRequestValidator extends BaseValidator<CallbackRequest> {
  * Validator for GitlabSignup
  */
 export class GitlabSignupValidator extends BaseValidator<GitlabSignup> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "provider": {
       "title": "Provider",
@@ -46408,34 +47798,37 @@ export class GitlabSignupValidator extends BaseValidator<GitlabSignup> {
   "title": "GitlabSignup",
   "type": "object",
   "x-model-name": "GitlabSignup"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitlabSignup {
@@ -46487,11 +47880,15 @@ export class GitlabSignupValidator extends BaseValidator<GitlabSignup> {
  * Validator for GitlabSignupResponse
  */
 export class GitlabSignupResponseValidator extends BaseValidator<GitlabSignupResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseSignupResponse": {
       "properties": {
@@ -46535,34 +47932,37 @@ export class GitlabSignupResponseValidator extends BaseValidator<GitlabSignupRes
   "title": "GitlabSignupResponse",
   "type": "object",
   "x-model-name": "GitlabSignupResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GitlabSignupResponse {
@@ -46603,11 +48003,15 @@ export class GitlabSignupResponseValidator extends BaseValidator<GitlabSignupRes
  * Request model for creating a merge request submission.
  */
 export class SubmitRequestValidator extends BaseValidator<SubmitRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request model for creating a merge request submission.",
   "properties": {
     "branch_name": {
@@ -46654,34 +48058,37 @@ export class SubmitRequestValidator extends BaseValidator<SubmitRequest> {
   "title": "SubmitRequest",
   "type": "object",
   "x-model-name": "SubmitRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmitRequest {
@@ -46743,11 +48150,15 @@ export class SubmitRequestValidator extends BaseValidator<SubmitRequest> {
  * Response model for merge request submission.
  */
 export class SubmitResponseValidator extends BaseValidator<SubmitResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response model for merge request submission.",
   "properties": {
     "merge_request_id": {
@@ -46798,34 +48209,37 @@ export class SubmitResponseValidator extends BaseValidator<SubmitResponse> {
   "title": "SubmitResponse",
   "type": "object",
   "x-model-name": "SubmitResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SubmitResponse {
@@ -46922,11 +48336,15 @@ export class SubmitResponseValidator extends BaseValidator<SubmitResponse> {
  * Validator for CommentCreate
  */
 export class CommentCreateValidator extends BaseValidator<CommentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "course_member_id": {
       "anyOf": [
@@ -46952,34 +48370,37 @@ export class CommentCreateValidator extends BaseValidator<CommentCreate> {
   "title": "CommentCreate",
   "type": "object",
   "x-model-name": "CommentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CommentCreate {
@@ -47029,11 +48450,15 @@ export class CommentCreateValidator extends BaseValidator<CommentCreate> {
  * Validator for CommentUpdate
  */
 export class CommentUpdateValidator extends BaseValidator<CommentUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "message": {
       "title": "Message",
@@ -47046,34 +48471,37 @@ export class CommentUpdateValidator extends BaseValidator<CommentUpdate> {
   "title": "CommentUpdate",
   "type": "object",
   "x-model-name": "CommentUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CommentUpdate {

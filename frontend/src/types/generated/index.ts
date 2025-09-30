@@ -9,6 +9,5 @@ export * from './examples';
 export * from './messages';
 export * from './organizations';
 export * from './roles';
-export * from './sso';
 export * from './tasks';
 export * from './users';

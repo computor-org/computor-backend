@@ -10,11 +10,15 @@ import { BaseValidator, ValidationError } from './BaseValidator';
  * Validator for RoleGet
  */
 export class RoleGetValidator extends BaseValidator<RoleGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "description": "Role unique identifier",
@@ -60,34 +64,37 @@ export class RoleGetValidator extends BaseValidator<RoleGet> {
   "title": "RoleGet",
   "type": "object",
   "x-model-name": "RoleGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleGet {
@@ -149,11 +156,15 @@ export class RoleGetValidator extends BaseValidator<RoleGet> {
  * Validator for RoleList
  */
 export class RoleListValidator extends BaseValidator<RoleList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "description": "Role unique identifier",
@@ -186,34 +197,37 @@ export class RoleListValidator extends BaseValidator<RoleList> {
   "title": "RoleList",
   "type": "object",
   "x-model-name": "RoleList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleList {
@@ -270,11 +284,15 @@ export class RoleListValidator extends BaseValidator<RoleList> {
  * Validator for RoleQuery
  */
 export class RoleQueryValidator extends BaseValidator<RoleQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -356,34 +374,37 @@ export class RoleQueryValidator extends BaseValidator<RoleQuery> {
   "title": "RoleQuery",
   "type": "object",
   "x-model-name": "RoleQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleQuery {
@@ -447,11 +468,15 @@ export class RoleQueryValidator extends BaseValidator<RoleQuery> {
  * Validator for RoleClaimGet
  */
 export class RoleClaimGetValidator extends BaseValidator<RoleClaimGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "role_id": {
       "title": "Role Id",
@@ -487,34 +512,37 @@ export class RoleClaimGetValidator extends BaseValidator<RoleClaimGet> {
   "title": "RoleClaimGet",
   "type": "object",
   "x-model-name": "RoleClaimGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleClaimGet {
@@ -580,11 +608,15 @@ export class RoleClaimGetValidator extends BaseValidator<RoleClaimGet> {
  * Validator for RoleClaimList
  */
 export class RoleClaimListValidator extends BaseValidator<RoleClaimList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "role_id": {
       "title": "Role Id",
@@ -607,34 +639,37 @@ export class RoleClaimListValidator extends BaseValidator<RoleClaimList> {
   "title": "RoleClaimList",
   "type": "object",
   "x-model-name": "RoleClaimList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleClaimList {
@@ -695,11 +730,15 @@ export class RoleClaimListValidator extends BaseValidator<RoleClaimList> {
  * Validator for RoleClaimQuery
  */
 export class RoleClaimQueryValidator extends BaseValidator<RoleClaimQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -765,34 +804,37 @@ export class RoleClaimQueryValidator extends BaseValidator<RoleClaimQuery> {
   "title": "RoleClaimQuery",
   "type": "object",
   "x-model-name": "RoleClaimQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): RoleClaimQuery {

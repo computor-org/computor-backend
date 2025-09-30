@@ -167,18 +167,27 @@ class ValidationClassGenerator:
         class_name = f"{model_name}Validator"
         lines.append(f"export class {class_name} extends BaseValidator<{model_name}> {{")
 
-        # Static schema property
+        # Private static schema storage (cached)
+        lines.append("  private static _schema: any = null;")
+        lines.append("")
+
+        # Static schema getter (lazy-loaded)
         lines.append("  /**")
-        lines.append("   * JSON Schema for this model")
+        lines.append("   * Get JSON Schema for this model")
         lines.append("   * Useful for form generation, validation, and documentation")
         lines.append("   */")
+        lines.append("  static getSchema(): any {")
+        lines.append("    if (!this._schema) {")
 
         # Serialize schema to JSON string (escape special characters)
         schema_json = json.dumps(model_schema, indent=2)
         # Escape backticks and ${} for template literals
         schema_json = schema_json.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
 
-        lines.append(f"  static readonly schema = JSON.parse(`{schema_json}`) as const;")
+        lines.append(f"      this._schema = JSON.parse(`{schema_json}`);")
+        lines.append("    }")
+        lines.append("    return this._schema;")
+        lines.append("  }")
         lines.append("")
 
         # Static helper methods
@@ -186,7 +195,7 @@ class ValidationClassGenerator:
         lines.append("   * Get schema for a specific field")
         lines.append("   */")
         lines.append("  static getFieldSchema(fieldName: string): any {")
-        lines.append("    return this.schema.properties?.[fieldName];")
+        lines.append("    return this.getSchema().properties?.[fieldName];")
         lines.append("  }")
         lines.append("")
 
@@ -194,7 +203,7 @@ class ValidationClassGenerator:
         lines.append("   * Check if a field is required")
         lines.append("   */")
         lines.append("  static isFieldRequired(fieldName: string): boolean {")
-        lines.append("    return this.schema.required?.includes(fieldName) ?? false;")
+        lines.append("    return this.getSchema().required?.includes(fieldName) ?? false;")
         lines.append("  }")
         lines.append("")
 
@@ -202,7 +211,7 @@ class ValidationClassGenerator:
         lines.append("   * Get all required field names")
         lines.append("   */")
         lines.append("  static getRequiredFields(): string[] {")
-        lines.append("    return this.schema.required ?? [];")
+        lines.append("    return this.getSchema().required ?? [];")
         lines.append("  }")
         lines.append("")
 
@@ -210,7 +219,7 @@ class ValidationClassGenerator:
         lines.append("   * Get all field names")
         lines.append("   */")
         lines.append("  static getFields(): string[] {")
-        lines.append("    return Object.keys(this.schema.properties ?? {});")
+        lines.append("    return Object.keys(this.getSchema().properties ?? {});")
         lines.append("  }")
         lines.append("")
 

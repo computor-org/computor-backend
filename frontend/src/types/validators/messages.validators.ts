@@ -10,11 +10,15 @@ import { BaseValidator, ValidationError } from './BaseValidator';
  * Validator for MessageCreate
  */
 export class MessageCreateValidator extends BaseValidator<MessageCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "parent_id": {
       "anyOf": [
@@ -121,34 +125,37 @@ export class MessageCreateValidator extends BaseValidator<MessageCreate> {
   "title": "MessageCreate",
   "type": "object",
   "x-model-name": "MessageCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageCreate {
@@ -242,11 +249,15 @@ export class MessageCreateValidator extends BaseValidator<MessageCreate> {
  * Validator for MessageUpdate
  */
 export class MessageUpdateValidator extends BaseValidator<MessageUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -276,34 +287,37 @@ export class MessageUpdateValidator extends BaseValidator<MessageUpdate> {
   "title": "MessageUpdate",
   "type": "object",
   "x-model-name": "MessageUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageUpdate {
@@ -347,11 +361,15 @@ export class MessageUpdateValidator extends BaseValidator<MessageUpdate> {
  * Validator for MessageGet
  */
 export class MessageGetValidator extends BaseValidator<MessageGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "MessageAuthor": {
       "properties": {
@@ -575,34 +593,37 @@ export class MessageGetValidator extends BaseValidator<MessageGet> {
   "title": "MessageGet",
   "type": "object",
   "x-model-name": "MessageGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageGet {
@@ -748,11 +769,15 @@ export class MessageGetValidator extends BaseValidator<MessageGet> {
  * Validator for MessageList
  */
 export class MessageListValidator extends BaseValidator<MessageList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "MessageAuthor": {
       "properties": {
@@ -952,34 +977,37 @@ export class MessageListValidator extends BaseValidator<MessageList> {
   "title": "MessageList",
   "type": "object",
   "x-model-name": "MessageList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageList {
@@ -1115,11 +1143,15 @@ export class MessageListValidator extends BaseValidator<MessageList> {
  * Validator for MessageQuery
  */
 export class MessageQueryValidator extends BaseValidator<MessageQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -1257,34 +1289,37 @@ export class MessageQueryValidator extends BaseValidator<MessageQuery> {
   "title": "MessageQuery",
   "type": "object",
   "x-model-name": "MessageQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageQuery {

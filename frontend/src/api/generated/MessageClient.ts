@@ -36,4 +36,18 @@ export class MessageClient extends BaseEndpointClient {
   async archive(id: string | number): Promise<void> {
     await this.client.patch<void>(this.buildPath(id, 'archive'));
   }
+
+  /**
+   * Mark Message Read
+   */
+  async markMessageReadMessagesIdReadsPost({ id }: { id: string | string }): Promise<void> {
+    return this.client.post<void>(this.buildPath(id, 'reads'));
+  }
+
+  /**
+   * Mark Message Unread
+   */
+  async markMessageUnreadMessagesIdReadsDelete({ id }: { id: string | string }): Promise<void> {
+    return this.client.delete<void>(this.buildPath(id, 'reads'));
+  }
 }

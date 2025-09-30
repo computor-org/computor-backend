@@ -284,42 +284,6 @@ export interface UserPassword {
   password_old?: string | null;
 }
 
-/**
- * User registration request.
- */
-export interface UserRegistrationRequest {
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Password */
-  password: string;
-  /** First name */
-  given_name: string;
-  /** Last name */
-  family_name: string;
-  /** Authentication provider to register with */
-  provider?: string;
-  /** Send email verification */
-  send_verification_email?: boolean;
-}
-
-/**
- * Response after successful user registration.
- */
-export interface UserRegistrationResponse {
-  /** User ID in Computor */
-  user_id: string;
-  /** User ID in authentication provider */
-  provider_user_id: string;
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Success message */
-  message: string;
-}
-
 
 
 export type UserTypeEnum = "user" | "token";

@@ -99,6 +99,12 @@ class ProfilePermissionHandler(PermissionHandler):
         if self.check_general_permission(principal, action):
             return True
 
+        # Users can create their own profile
+        if action == "create":
+            if context and context.get("user_id") == principal.user_id:
+                return True
+            return False
+
         # Users can view and update their own profile
         if action in ["list", "get", "update"]:
             return True
@@ -127,6 +133,12 @@ class StudentProfilePermissionHandler(PermissionHandler):
 
         if self.check_general_permission(principal, action):
             return True
+
+        # Users can create their own student profile
+        if action == "create":
+            if context and context.get("user_id") == principal.user_id:
+                return True
+            return False
 
         # Users can view and update their own student profile
         if action in ["list", "get", "update"]:

@@ -10,11 +10,15 @@ import { BaseValidator, ValidationError } from './BaseValidator';
  * Validator for MessageAuthor
  */
 export class MessageAuthorValidator extends BaseValidator<MessageAuthor> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "given_name": {
       "anyOf": [
@@ -50,34 +54,37 @@ export class MessageAuthorValidator extends BaseValidator<MessageAuthor> {
   "title": "MessageAuthor",
   "type": "object",
   "x-model-name": "MessageAuthor"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): MessageAuthor {
@@ -121,11 +128,15 @@ export class MessageAuthorValidator extends BaseValidator<MessageAuthor> {
  * Validator for GradingAuthor
  */
 export class GradingAuthorValidator extends BaseValidator<GradingAuthor> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "given_name": {
       "anyOf": [
@@ -161,34 +172,37 @@ export class GradingAuthorValidator extends BaseValidator<GradingAuthor> {
   "title": "GradingAuthor",
   "type": "object",
   "x-model-name": "GradingAuthor"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GradingAuthor {
@@ -232,43 +246,50 @@ export class GradingAuthorValidator extends BaseValidator<GradingAuthor> {
  * Validator for AuthConfig
  */
 export class AuthConfigValidator extends BaseValidator<AuthConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {},
   "title": "AuthConfig",
   "type": "object",
   "x-model-name": "AuthConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): AuthConfig {
@@ -302,11 +323,15 @@ export class AuthConfigValidator extends BaseValidator<AuthConfig> {
  * Validator for GLPAuthConfig
  */
 export class GLPAuthConfigValidator extends BaseValidator<GLPAuthConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "url": {
       "title": "Url",
@@ -324,34 +349,37 @@ export class GLPAuthConfigValidator extends BaseValidator<GLPAuthConfig> {
   "title": "GLPAuthConfig",
   "type": "object",
   "x-model-name": "GLPAuthConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GLPAuthConfig {
@@ -403,11 +431,15 @@ export class GLPAuthConfigValidator extends BaseValidator<GLPAuthConfig> {
  * Validator for BasicAuthConfig
  */
 export class BasicAuthConfigValidator extends BaseValidator<BasicAuthConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "username": {
       "title": "Username",
@@ -425,34 +457,37 @@ export class BasicAuthConfigValidator extends BaseValidator<BasicAuthConfig> {
   "title": "BasicAuthConfig",
   "type": "object",
   "x-model-name": "BasicAuthConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): BasicAuthConfig {
@@ -504,11 +539,15 @@ export class BasicAuthConfigValidator extends BaseValidator<BasicAuthConfig> {
  * Request model for local username/password login.
  */
 export class LocalLoginRequestValidator extends BaseValidator<LocalLoginRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request model for local username/password login.",
   "properties": {
     "username": {
@@ -531,34 +570,37 @@ export class LocalLoginRequestValidator extends BaseValidator<LocalLoginRequest>
   "title": "LocalLoginRequest",
   "type": "object",
   "x-model-name": "LocalLoginRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LocalLoginRequest {
@@ -610,11 +652,15 @@ export class LocalLoginRequestValidator extends BaseValidator<LocalLoginRequest>
  * Response model after successful local login.
  */
 export class LocalLoginResponseValidator extends BaseValidator<LocalLoginResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response model after successful local login.",
   "properties": {
     "access_token": {
@@ -653,34 +699,37 @@ export class LocalLoginResponseValidator extends BaseValidator<LocalLoginRespons
   "title": "LocalLoginResponse",
   "type": "object",
   "x-model-name": "LocalLoginResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LocalLoginResponse {
@@ -757,11 +806,15 @@ export class LocalLoginResponseValidator extends BaseValidator<LocalLoginRespons
  * Request model for refreshing local session token.
  */
 export class LocalTokenRefreshRequestValidator extends BaseValidator<LocalTokenRefreshRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Request model for refreshing local session token.",
   "properties": {
     "refresh_token": {
@@ -776,34 +829,37 @@ export class LocalTokenRefreshRequestValidator extends BaseValidator<LocalTokenR
   "title": "LocalTokenRefreshRequest",
   "type": "object",
   "x-model-name": "LocalTokenRefreshRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LocalTokenRefreshRequest {
@@ -846,11 +902,15 @@ export class LocalTokenRefreshRequestValidator extends BaseValidator<LocalTokenR
  * Response model after successful token refresh.
  */
 export class LocalTokenRefreshResponseValidator extends BaseValidator<LocalTokenRefreshResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response model after successful token refresh.",
   "properties": {
     "access_token": {
@@ -890,34 +950,37 @@ export class LocalTokenRefreshResponseValidator extends BaseValidator<LocalToken
   "title": "LocalTokenRefreshResponse",
   "type": "object",
   "x-model-name": "LocalTokenRefreshResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LocalTokenRefreshResponse {
@@ -981,11 +1044,15 @@ export class LocalTokenRefreshResponseValidator extends BaseValidator<LocalToken
  * Validator for OrganizationUpdateTokenQuery
  */
 export class OrganizationUpdateTokenQueryValidator extends BaseValidator<OrganizationUpdateTokenQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "type": {
       "title": "Type",
@@ -998,34 +1065,37 @@ export class OrganizationUpdateTokenQueryValidator extends BaseValidator<Organiz
   "title": "OrganizationUpdateTokenQuery",
   "type": "object",
   "x-model-name": "OrganizationUpdateTokenQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationUpdateTokenQuery {
@@ -1068,11 +1138,15 @@ export class OrganizationUpdateTokenQueryValidator extends BaseValidator<Organiz
  * Validator for OrganizationUpdateTokenUpdate
  */
 export class OrganizationUpdateTokenUpdateValidator extends BaseValidator<OrganizationUpdateTokenUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "token": {
       "title": "Token",
@@ -1085,34 +1159,37 @@ export class OrganizationUpdateTokenUpdateValidator extends BaseValidator<Organi
   "title": "OrganizationUpdateTokenUpdate",
   "type": "object",
   "x-model-name": "OrganizationUpdateTokenUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationUpdateTokenUpdate {
@@ -1155,11 +1232,15 @@ export class OrganizationUpdateTokenUpdateValidator extends BaseValidator<Organi
  * Login request for SSO.
  */
 export class LoginRequestValidator extends BaseValidator<LoginRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Login request for SSO.",
   "properties": {
     "provider": {
@@ -1187,34 +1268,37 @@ export class LoginRequestValidator extends BaseValidator<LoginRequest> {
   "title": "LoginRequest",
   "type": "object",
   "x-model-name": "LoginRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): LoginRequest {
@@ -1262,11 +1346,15 @@ export class LoginRequestValidator extends BaseValidator<LoginRequest> {
  * Response after successful SSO authentication.
  */
 export class SSOAuthResponseValidator extends BaseValidator<SSOAuthResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response after successful SSO authentication.",
   "properties": {
     "user_id": {
@@ -1306,34 +1394,37 @@ export class SSOAuthResponseValidator extends BaseValidator<SSOAuthResponse> {
   "title": "SSOAuthResponse",
   "type": "object",
   "x-model-name": "SSOAuthResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): SSOAuthResponse {
@@ -1399,11 +1490,15 @@ export class SSOAuthResponseValidator extends BaseValidator<SSOAuthResponse> {
  * Token refresh request.
  */
 export class TokenRefreshRequestValidator extends BaseValidator<TokenRefreshRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Token refresh request.",
   "properties": {
     "refresh_token": {
@@ -1424,34 +1519,37 @@ export class TokenRefreshRequestValidator extends BaseValidator<TokenRefreshRequ
   "title": "TokenRefreshRequest",
   "type": "object",
   "x-model-name": "TokenRefreshRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TokenRefreshRequest {
@@ -1501,11 +1599,15 @@ export class TokenRefreshRequestValidator extends BaseValidator<TokenRefreshRequ
  * Response after successful token refresh.
  */
 export class TokenRefreshResponseValidator extends BaseValidator<TokenRefreshResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Response after successful token refresh.",
   "properties": {
     "access_token": {
@@ -1546,34 +1648,37 @@ export class TokenRefreshResponseValidator extends BaseValidator<TokenRefreshRes
   "title": "TokenRefreshResponse",
   "type": "object",
   "x-model-name": "TokenRefreshResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TokenRefreshResponse {

@@ -16,15 +16,12 @@ from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
 from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.api.auth import auth_router
-from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig
+from ctutor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.deployments import DeploymentFactory
 from ctutor_backend.interface.accounts import AccountInterface
-from ctutor_backend.interface.deployments import ExecutionBackendConfig
 from ctutor_backend.interface.execution_backends import ExecutionBackendInterface
 from ctutor_backend.interface.groups import GroupInterface
-from ctutor_backend.interface.profiles import ProfileInterface
 from ctutor_backend.interface.sessions import SessionInterface
 from ctutor_backend.interface.submission_group_members import SubmissionGroupMemberInterface
 from ctutor_backend.interface.submission_groups import SubmissionGroupInterface
@@ -40,6 +37,7 @@ from ctutor_backend.api.system import system_router
 from ctutor_backend.api.course_contents import course_content_router
 from ctutor_backend.settings import settings 
 from ctutor_backend.api.students import student_router
+from ctutor_backend.api.profiles import profile_router
 from ctutor_backend.api.student_profiles import student_profile_router
 from ctutor_backend.api.results import result_router
 from ctutor_backend.api.tutor import tutor_router
@@ -47,11 +45,9 @@ from ctutor_backend.api.lecturer import lecturer_router
 from ctutor_backend.api.signup import signup_router
 from ctutor_backend.api.organizations import organization_router
 from ctutor_backend.api.course_members import course_member_router
-# from ctutor_backend.api.services import services_router
 from ctutor_backend.api.user_roles import user_roles_router
 from ctutor_backend.api.role_claims import role_claim_router
 from ctutor_backend.api.user import user_router
-# from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.submissions import submissions_router
@@ -59,7 +55,7 @@ from ctutor_backend.api.examples import examples_router
 from ctutor_backend.api.extensions import extensions_router
 from ctutor_backend.api.course_member_comments import router as course_member_comments_router
 from ctutor_backend.api.messages import messages_router
-from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
+from ctutor_backend.interface.example import ExampleRepositoryInterface
 import json
 import tempfile
 from pathlib import Path
@@ -194,7 +190,7 @@ app.add_middleware(
 CrudRouter(UserInterface).register_routes(app)
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
-CrudRouter(ProfileInterface).register_routes(app)
+# ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
 CrudRouter(SessionInterface).register_routes(app)
 course_router.register_routes(app)
 organization_router.register_routes(app)
@@ -220,6 +216,10 @@ app.include_router(
 CrudRouter(CourseContentKindInterface).register_routes(app)
 CrudRouter(CourseContentTypeInterface).register_routes(app)
 
+# ProfileInterface and StudentProfileInterface use custom routers (see below)
+# CrudRouter(StudentProfileInterface).register_routes(app)
+# CrudRouter(ProfileInterface).register_routes(app)
+
 course_content_router.register_routes(app)
 
 app.include_router(result_router)
@@ -243,6 +243,13 @@ app.include_router(
     prefix="/students",
     tags=["students"],
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
+)
+
+app.include_router(
+    profile_router,
+    prefix="/profiles",
+    tags=["profiles"],
+    dependencies=[Depends(get_current_principal)]
 )
 
 app.include_router(

@@ -19,11 +19,15 @@ export function validateOrganizationType(value: any): OrganizationType {
  * Validator for OrganizationProperties
  */
 export class OrganizationPropertiesValidator extends BaseValidator<OrganizationProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -217,34 +221,37 @@ export class OrganizationPropertiesValidator extends BaseValidator<OrganizationP
   "title": "OrganizationProperties",
   "type": "object",
   "x-model-name": "OrganizationProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationProperties {
@@ -283,11 +290,15 @@ export class OrganizationPropertiesValidator extends BaseValidator<OrganizationP
  * Validator for OrganizationPropertiesGet
  */
 export class OrganizationPropertiesGetValidator extends BaseValidator<OrganizationPropertiesGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -469,34 +480,37 @@ export class OrganizationPropertiesGetValidator extends BaseValidator<Organizati
   "title": "OrganizationPropertiesGet",
   "type": "object",
   "x-model-name": "OrganizationPropertiesGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationPropertiesGet {
@@ -535,11 +549,15 @@ export class OrganizationPropertiesGetValidator extends BaseValidator<Organizati
  * Validator for OrganizationCreate
  */
 export class OrganizationCreateValidator extends BaseValidator<OrganizationCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -956,34 +974,37 @@ export class OrganizationCreateValidator extends BaseValidator<OrganizationCreat
   "title": "OrganizationCreate",
   "type": "object",
   "x-model-name": "OrganizationCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationCreate {
@@ -1106,11 +1127,15 @@ export class OrganizationCreateValidator extends BaseValidator<OrganizationCreat
  * Validator for OrganizationGet
  */
 export class OrganizationGetValidator extends BaseValidator<OrganizationGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -1560,34 +1585,37 @@ export class OrganizationGetValidator extends BaseValidator<OrganizationGet> {
   "title": "OrganizationGet",
   "type": "object",
   "x-model-name": "OrganizationGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationGet {
@@ -1739,11 +1767,15 @@ export class OrganizationGetValidator extends BaseValidator<OrganizationGet> {
  * Validator for OrganizationList
  */
 export class OrganizationListValidator extends BaseValidator<OrganizationList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "OrganizationType": {
       "enum": [
@@ -1847,34 +1879,37 @@ export class OrganizationListValidator extends BaseValidator<OrganizationList> {
   "title": "OrganizationList",
   "type": "object",
   "x-model-name": "OrganizationList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationList {
@@ -1961,11 +1996,15 @@ export class OrganizationListValidator extends BaseValidator<OrganizationList> {
  * Validator for OrganizationUpdate
  */
 export class OrganizationUpdateValidator extends BaseValidator<OrganizationUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -2364,34 +2403,37 @@ export class OrganizationUpdateValidator extends BaseValidator<OrganizationUpdat
   "title": "OrganizationUpdate",
   "type": "object",
   "x-model-name": "OrganizationUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationUpdate {
@@ -2505,11 +2547,15 @@ export class OrganizationUpdateValidator extends BaseValidator<OrganizationUpdat
  * Validator for OrganizationQuery
  */
 export class OrganizationQueryValidator extends BaseValidator<OrganizationQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -2944,34 +2990,37 @@ export class OrganizationQueryValidator extends BaseValidator<OrganizationQuery>
   "title": "OrganizationQuery",
   "type": "object",
   "x-model-name": "OrganizationQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationQuery {
@@ -3100,11 +3149,15 @@ export class OrganizationQueryValidator extends BaseValidator<OrganizationQuery>
  * Request to create an organization via Temporal workflow.
  */
 export class OrganizationTaskRequestValidator extends BaseValidator<OrganizationTaskRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabCredentials": {
       "description": "GitLab connection credentials.",
@@ -3149,34 +3202,37 @@ export class OrganizationTaskRequestValidator extends BaseValidator<Organization
   "title": "OrganizationTaskRequest",
   "type": "object",
   "x-model-name": "OrganizationTaskRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationTaskRequest {
@@ -3238,11 +3294,15 @@ export class OrganizationTaskRequestValidator extends BaseValidator<Organization
  * Organization configuration.
  */
 export class OrganizationConfigValidator extends BaseValidator<OrganizationConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitHubConfig": {
       "description": "GitHub repository configuration (future support).",
@@ -3511,34 +3571,37 @@ export class OrganizationConfigValidator extends BaseValidator<OrganizationConfi
   "title": "OrganizationConfig",
   "type": "object",
   "x-model-name": "OrganizationConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): OrganizationConfig {
@@ -3610,11 +3673,15 @@ export class OrganizationConfigValidator extends BaseValidator<OrganizationConfi
  * Organization configuration with nested course families.
  */
 export class HierarchicalOrganizationConfigValidator extends BaseValidator<HierarchicalOrganizationConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentConfig": {
       "description": "Configuration for course content (assignments, units, etc.).",
@@ -4397,34 +4464,37 @@ export class HierarchicalOrganizationConfigValidator extends BaseValidator<Hiera
   "title": "HierarchicalOrganizationConfig",
   "type": "object",
   "x-model-name": "HierarchicalOrganizationConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): HierarchicalOrganizationConfig {

@@ -10,11 +10,15 @@ import { BaseValidator, ValidationError } from './BaseValidator';
  * Validator for TutorCourseMemberCourseContent
  */
 export class TutorCourseMemberCourseContentValidator extends BaseValidator<TutorCourseMemberCourseContent> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -32,34 +36,37 @@ export class TutorCourseMemberCourseContentValidator extends BaseValidator<Tutor
   "title": "TutorCourseMemberCourseContent",
   "type": "object",
   "x-model-name": "TutorCourseMemberCourseContent"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TutorCourseMemberCourseContent {
@@ -111,11 +118,15 @@ export class TutorCourseMemberCourseContentValidator extends BaseValidator<Tutor
  * Validator for TutorCourseMemberGet
  */
 export class TutorCourseMemberGetValidator extends BaseValidator<TutorCourseMemberGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -518,34 +529,37 @@ export class TutorCourseMemberGetValidator extends BaseValidator<TutorCourseMemb
   "title": "TutorCourseMemberGet",
   "type": "object",
   "x-model-name": "TutorCourseMemberGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TutorCourseMemberGet {
@@ -642,11 +656,15 @@ export class TutorCourseMemberGetValidator extends BaseValidator<TutorCourseMemb
  * Validator for TutorCourseMemberList
  */
 export class TutorCourseMemberListValidator extends BaseValidator<TutorCourseMemberList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "UserList": {
       "properties": {
@@ -832,34 +850,37 @@ export class TutorCourseMemberListValidator extends BaseValidator<TutorCourseMem
   "title": "TutorCourseMemberList",
   "type": "object",
   "x-model-name": "TutorCourseMemberList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): TutorCourseMemberList {
@@ -949,11 +970,15 @@ export class TutorCourseMemberListValidator extends BaseValidator<TutorCourseMem
  * Readiness state for a course member to start working on provider-backed tasks.
  */
 export class CourseMemberReadinessStatusValidator extends BaseValidator<CourseMemberReadinessStatus> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Readiness state for a course member to start working on provider-backed tasks.",
   "properties": {
     "course_member_id": {
@@ -1045,34 +1070,37 @@ export class CourseMemberReadinessStatusValidator extends BaseValidator<CourseMe
   "title": "CourseMemberReadinessStatus",
   "type": "object",
   "x-model-name": "CourseMemberReadinessStatus"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberReadinessStatus {
@@ -1189,11 +1217,15 @@ export class CourseMemberReadinessStatusValidator extends BaseValidator<CourseMe
  * Validation parameters supplied when checking provider readiness.
  */
 export class CourseMemberValidationRequestValidator extends BaseValidator<CourseMemberValidationRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Validation parameters supplied when checking provider readiness.",
   "properties": {
     "provider_access_token": {
@@ -1213,34 +1245,37 @@ export class CourseMemberValidationRequestValidator extends BaseValidator<Course
   "title": "CourseMemberValidationRequest",
   "type": "object",
   "x-model-name": "CourseMemberValidationRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberValidationRequest {
@@ -1279,11 +1314,15 @@ export class CourseMemberValidationRequestValidator extends BaseValidator<Course
  * Validator for CourseProperties
  */
 export class CoursePropertiesValidator extends BaseValidator<CourseProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -1477,34 +1516,37 @@ export class CoursePropertiesValidator extends BaseValidator<CourseProperties> {
   "title": "CourseProperties",
   "type": "object",
   "x-model-name": "CourseProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseProperties {
@@ -1543,11 +1585,15 @@ export class CoursePropertiesValidator extends BaseValidator<CourseProperties> {
  * Validator for CoursePropertiesGet
  */
 export class CoursePropertiesGetValidator extends BaseValidator<CoursePropertiesGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -1729,34 +1775,37 @@ export class CoursePropertiesGetValidator extends BaseValidator<CourseProperties
   "title": "CoursePropertiesGet",
   "type": "object",
   "x-model-name": "CoursePropertiesGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CoursePropertiesGet {
@@ -1795,11 +1844,15 @@ export class CoursePropertiesGetValidator extends BaseValidator<CourseProperties
  * Validator for CourseCreate
  */
 export class CourseCreateValidator extends BaseValidator<CourseCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseProperties": {
       "additionalProperties": true,
@@ -2058,34 +2111,37 @@ export class CourseCreateValidator extends BaseValidator<CourseCreate> {
   "title": "CourseCreate",
   "type": "object",
   "x-model-name": "CourseCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseCreate {
@@ -2157,11 +2213,15 @@ export class CourseCreateValidator extends BaseValidator<CourseCreate> {
  * Validator for CourseGet
  */
 export class CourseGetValidator extends BaseValidator<CourseGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseFamilyGet": {
       "properties": {
@@ -2894,34 +2954,37 @@ export class CourseGetValidator extends BaseValidator<CourseGet> {
   "title": "CourseGet",
   "type": "object",
   "x-model-name": "CourseGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGet {
@@ -3031,11 +3094,15 @@ export class CourseGetValidator extends BaseValidator<CourseGet> {
  * Validator for CourseList
  */
 export class CourseListValidator extends BaseValidator<CourseList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CoursePropertiesGet": {
       "additionalProperties": true,
@@ -3282,34 +3349,37 @@ export class CourseListValidator extends BaseValidator<CourseList> {
   "title": "CourseList",
   "type": "object",
   "x-model-name": "CourseList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseList {
@@ -3381,11 +3451,15 @@ export class CourseListValidator extends BaseValidator<CourseList> {
  * Validator for CourseUpdate
  */
 export class CourseUpdateValidator extends BaseValidator<CourseUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseProperties": {
       "additionalProperties": true,
@@ -3620,34 +3694,37 @@ export class CourseUpdateValidator extends BaseValidator<CourseUpdate> {
   "title": "CourseUpdate",
   "type": "object",
   "x-model-name": "CourseUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseUpdate {
@@ -3696,11 +3773,15 @@ export class CourseUpdateValidator extends BaseValidator<CourseUpdate> {
  * Validator for CourseQuery
  */
 export class CourseQueryValidator extends BaseValidator<CourseQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -3826,34 +3907,37 @@ export class CourseQueryValidator extends BaseValidator<CourseQuery> {
   "title": "CourseQuery",
   "type": "object",
   "x-model-name": "CourseQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseQuery {
@@ -3937,11 +4021,15 @@ export class CourseQueryValidator extends BaseValidator<CourseQuery> {
  * Validator for CourseMemberProperties
  */
 export class CourseMemberPropertiesValidator extends BaseValidator<CourseMemberProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -4135,34 +4223,37 @@ export class CourseMemberPropertiesValidator extends BaseValidator<CourseMemberP
   "title": "CourseMemberProperties",
   "type": "object",
   "x-model-name": "CourseMemberProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberProperties {
@@ -4201,11 +4292,15 @@ export class CourseMemberPropertiesValidator extends BaseValidator<CourseMemberP
  * Validator for CourseMemberCreate
  */
 export class CourseMemberCreateValidator extends BaseValidator<CourseMemberCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -4457,34 +4552,37 @@ export class CourseMemberCreateValidator extends BaseValidator<CourseMemberCreat
   "title": "CourseMemberCreate",
   "type": "object",
   "x-model-name": "CourseMemberCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCreate {
@@ -4560,11 +4658,15 @@ export class CourseMemberCreateValidator extends BaseValidator<CourseMemberCreat
  * Validator for CourseMemberGet
  */
 export class CourseMemberGetValidator extends BaseValidator<CourseMemberGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -5000,34 +5102,37 @@ export class CourseMemberGetValidator extends BaseValidator<CourseMemberGet> {
   "title": "CourseMemberGet",
   "type": "object",
   "x-model-name": "CourseMemberGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberGet {
@@ -5132,11 +5237,15 @@ export class CourseMemberGetValidator extends BaseValidator<CourseMemberGet> {
  * Validator for CourseMemberList
  */
 export class CourseMemberListValidator extends BaseValidator<CourseMemberList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "UserList": {
       "properties": {
@@ -5310,34 +5419,37 @@ export class CourseMemberListValidator extends BaseValidator<CourseMemberList> {
   "title": "CourseMemberList",
   "type": "object",
   "x-model-name": "CourseMemberList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberList {
@@ -5422,11 +5534,15 @@ export class CourseMemberListValidator extends BaseValidator<CourseMemberList> {
  * Validator for CourseMemberUpdate
  */
 export class CourseMemberUpdateValidator extends BaseValidator<CourseMemberUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -5661,34 +5777,37 @@ export class CourseMemberUpdateValidator extends BaseValidator<CourseMemberUpdat
   "title": "CourseMemberUpdate",
   "type": "object",
   "x-model-name": "CourseMemberUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberUpdate {
@@ -5737,11 +5856,15 @@ export class CourseMemberUpdateValidator extends BaseValidator<CourseMemberUpdat
  * Validator for CourseMemberQuery
  */
 export class CourseMemberQueryValidator extends BaseValidator<CourseMemberQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGitLabConfig": {
       "properties": {
@@ -6060,34 +6183,37 @@ export class CourseMemberQueryValidator extends BaseValidator<CourseMemberQuery>
   "title": "CourseMemberQuery",
   "type": "object",
   "x-model-name": "CourseMemberQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberQuery {
@@ -6171,11 +6297,15 @@ export class CourseMemberQueryValidator extends BaseValidator<CourseMemberQuery>
  * Validator for CourseExecutionBackendCreate
  */
 export class CourseExecutionBackendCreateValidator extends BaseValidator<CourseExecutionBackendCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "execution_backend_id": {
       "title": "Execution Backend Id",
@@ -6206,34 +6336,37 @@ export class CourseExecutionBackendCreateValidator extends BaseValidator<CourseE
   "title": "CourseExecutionBackendCreate",
   "type": "object",
   "x-model-name": "CourseExecutionBackendCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendCreate {
@@ -6290,11 +6423,15 @@ export class CourseExecutionBackendCreateValidator extends BaseValidator<CourseE
  * Validator for CourseExecutionBackendGet
  */
 export class CourseExecutionBackendGetValidator extends BaseValidator<CourseExecutionBackendGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "created_at": {
       "anyOf": [
@@ -6377,34 +6514,37 @@ export class CourseExecutionBackendGetValidator extends BaseValidator<CourseExec
   "title": "CourseExecutionBackendGet",
   "type": "object",
   "x-model-name": "CourseExecutionBackendGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendGet {
@@ -6481,11 +6621,15 @@ export class CourseExecutionBackendGetValidator extends BaseValidator<CourseExec
  * Validator for CourseExecutionBackendList
  */
 export class CourseExecutionBackendListValidator extends BaseValidator<CourseExecutionBackendList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "execution_backend_id": {
       "title": "Execution Backend Id",
@@ -6503,34 +6647,37 @@ export class CourseExecutionBackendListValidator extends BaseValidator<CourseExe
   "title": "CourseExecutionBackendList",
   "type": "object",
   "x-model-name": "CourseExecutionBackendList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendList {
@@ -6582,11 +6729,15 @@ export class CourseExecutionBackendListValidator extends BaseValidator<CourseExe
  * Validator for CourseExecutionBackendUpdate
  */
 export class CourseExecutionBackendUpdateValidator extends BaseValidator<CourseExecutionBackendUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "properties": {
       "anyOf": [
@@ -6605,34 +6756,37 @@ export class CourseExecutionBackendUpdateValidator extends BaseValidator<CourseE
   "title": "CourseExecutionBackendUpdate",
   "type": "object",
   "x-model-name": "CourseExecutionBackendUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendUpdate {
@@ -6671,11 +6825,15 @@ export class CourseExecutionBackendUpdateValidator extends BaseValidator<CourseE
  * Validator for CourseExecutionBackendQuery
  */
 export class CourseExecutionBackendQueryValidator extends BaseValidator<CourseExecutionBackendQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -6741,34 +6899,37 @@ export class CourseExecutionBackendQueryValidator extends BaseValidator<CourseEx
   "title": "CourseExecutionBackendQuery",
   "type": "object",
   "x-model-name": "CourseExecutionBackendQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendQuery {
@@ -6827,11 +6988,15 @@ export class CourseExecutionBackendQueryValidator extends BaseValidator<CourseEx
  * Validator for CourseRoleGet
  */
 export class CourseRoleGetValidator extends BaseValidator<CourseRoleGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -6868,34 +7033,37 @@ export class CourseRoleGetValidator extends BaseValidator<CourseRoleGet> {
   "title": "CourseRoleGet",
   "type": "object",
   "x-model-name": "CourseRoleGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseRoleGet {
@@ -6948,11 +7116,15 @@ export class CourseRoleGetValidator extends BaseValidator<CourseRoleGet> {
  * Validator for CourseRoleList
  */
 export class CourseRoleListValidator extends BaseValidator<CourseRoleList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -6989,34 +7161,37 @@ export class CourseRoleListValidator extends BaseValidator<CourseRoleList> {
   "title": "CourseRoleList",
   "type": "object",
   "x-model-name": "CourseRoleList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseRoleList {
@@ -7069,11 +7244,15 @@ export class CourseRoleListValidator extends BaseValidator<CourseRoleList> {
  * Validator for CourseRoleQuery
  */
 export class CourseRoleQueryValidator extends BaseValidator<CourseRoleQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -7139,34 +7318,37 @@ export class CourseRoleQueryValidator extends BaseValidator<CourseRoleQuery> {
   "title": "CourseRoleQuery",
   "type": "object",
   "x-model-name": "CourseRoleQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseRoleQuery {
@@ -7225,11 +7407,15 @@ export class CourseRoleQueryValidator extends BaseValidator<CourseRoleQuery> {
  * Validator for CourseContentTypeCreate
  */
 export class CourseContentTypeCreateValidator extends BaseValidator<CourseContentTypeCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "slug": {
       "title": "Slug",
@@ -7301,34 +7487,37 @@ export class CourseContentTypeCreateValidator extends BaseValidator<CourseConten
   "title": "CourseContentTypeCreate",
   "type": "object",
   "x-model-name": "CourseContentTypeCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeCreate {
@@ -7409,11 +7598,15 @@ export class CourseContentTypeCreateValidator extends BaseValidator<CourseConten
  * Validator for CourseContentTypeGet
  */
 export class CourseContentTypeGetValidator extends BaseValidator<CourseContentTypeGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindGet": {
       "properties": {
@@ -7652,34 +7845,37 @@ export class CourseContentTypeGetValidator extends BaseValidator<CourseContentTy
   "title": "CourseContentTypeGet",
   "type": "object",
   "x-model-name": "CourseContentTypeGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeGet {
@@ -7798,11 +7994,15 @@ export class CourseContentTypeGetValidator extends BaseValidator<CourseContentTy
  * Validator for CourseContentTypeList
  */
 export class CourseContentTypeListValidator extends BaseValidator<CourseContentTypeList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindList": {
       "properties": {
@@ -7900,34 +8100,37 @@ export class CourseContentTypeListValidator extends BaseValidator<CourseContentT
   "title": "CourseContentTypeList",
   "type": "object",
   "x-model-name": "CourseContentTypeList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeList {
@@ -8016,11 +8219,15 @@ export class CourseContentTypeListValidator extends BaseValidator<CourseContentT
  * Validator for CourseContentTypeUpdate
  */
 export class CourseContentTypeUpdateValidator extends BaseValidator<CourseContentTypeUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "slug": {
       "anyOf": [
@@ -8087,34 +8294,37 @@ export class CourseContentTypeUpdateValidator extends BaseValidator<CourseConten
   "title": "CourseContentTypeUpdate",
   "type": "object",
   "x-model-name": "CourseContentTypeUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeUpdate {
@@ -8173,11 +8383,15 @@ export class CourseContentTypeUpdateValidator extends BaseValidator<CourseConten
  * Validator for CourseContentTypeQuery
  */
 export class CourseContentTypeQueryValidator extends BaseValidator<CourseContentTypeQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -8303,34 +8517,37 @@ export class CourseContentTypeQueryValidator extends BaseValidator<CourseContent
   "title": "CourseContentTypeQuery",
   "type": "object",
   "x-model-name": "CourseContentTypeQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeQuery {
@@ -8414,11 +8631,15 @@ export class CourseContentTypeQueryValidator extends BaseValidator<CourseContent
  * Validator for CourseGroupCreate
  */
 export class CourseGroupCreateValidator extends BaseValidator<CourseGroupCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -8468,34 +8689,37 @@ export class CourseGroupCreateValidator extends BaseValidator<CourseGroupCreate>
   "title": "CourseGroupCreate",
   "type": "object",
   "x-model-name": "CourseGroupCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupCreate {
@@ -8553,11 +8777,15 @@ export class CourseGroupCreateValidator extends BaseValidator<CourseGroupCreate>
  * Validator for CourseGroupGet
  */
 export class CourseGroupGetValidator extends BaseValidator<CourseGroupGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -8664,34 +8892,37 @@ export class CourseGroupGetValidator extends BaseValidator<CourseGroupGet> {
   "title": "CourseGroupGet",
   "type": "object",
   "x-model-name": "CourseGroupGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupGet {
@@ -8778,11 +9009,15 @@ export class CourseGroupGetValidator extends BaseValidator<CourseGroupGet> {
  * Validator for CourseGroupList
  */
 export class CourseGroupListValidator extends BaseValidator<CourseGroupList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -8812,34 +9047,37 @@ export class CourseGroupListValidator extends BaseValidator<CourseGroupList> {
   "title": "CourseGroupList",
   "type": "object",
   "x-model-name": "CourseGroupList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupList {
@@ -8896,11 +9134,15 @@ export class CourseGroupListValidator extends BaseValidator<CourseGroupList> {
  * Validator for CourseGroupUpdate
  */
 export class CourseGroupUpdateValidator extends BaseValidator<CourseGroupUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -8955,34 +9197,37 @@ export class CourseGroupUpdateValidator extends BaseValidator<CourseGroupUpdate>
   "title": "CourseGroupUpdate",
   "type": "object",
   "x-model-name": "CourseGroupUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupUpdate {
@@ -9036,11 +9281,15 @@ export class CourseGroupUpdateValidator extends BaseValidator<CourseGroupUpdate>
  * Validator for CourseGroupQuery
  */
 export class CourseGroupQueryValidator extends BaseValidator<CourseGroupQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -9118,34 +9367,37 @@ export class CourseGroupQueryValidator extends BaseValidator<CourseGroupQuery> {
   "title": "CourseGroupQuery",
   "type": "object",
   "x-model-name": "CourseGroupQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupQuery {
@@ -9209,11 +9461,15 @@ export class CourseGroupQueryValidator extends BaseValidator<CourseGroupQuery> {
  * Repository information for course content in lecturer view.
  */
 export class CourseContentRepositoryLecturerGetValidator extends BaseValidator<CourseContentRepositoryLecturerGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Repository information for course content in lecturer view.",
   "properties": {
     "url": {
@@ -9244,34 +9500,37 @@ export class CourseContentRepositoryLecturerGetValidator extends BaseValidator<C
   "title": "CourseContentRepositoryLecturerGet",
   "type": "object",
   "x-model-name": "CourseContentRepositoryLecturerGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentRepositoryLecturerGet {
@@ -9315,11 +9574,15 @@ export class CourseContentRepositoryLecturerGetValidator extends BaseValidator<C
  * DTO for lecturer GET of course content with course repository info.
  */
 export class CourseContentLecturerGetValidator extends BaseValidator<CourseContentLecturerGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindGet": {
       "properties": {
@@ -9757,34 +10020,37 @@ export class CourseContentLecturerGetValidator extends BaseValidator<CourseConte
   "title": "CourseContentLecturerGet",
   "type": "object",
   "x-model-name": "CourseContentLecturerGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentLecturerGet {
@@ -9939,11 +10205,15 @@ export class CourseContentLecturerGetValidator extends BaseValidator<CourseConte
  * DTO for lecturer list of course content with course repository info.
  */
 export class CourseContentLecturerListValidator extends BaseValidator<CourseContentLecturerList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindList": {
       "properties": {
@@ -10215,34 +10485,37 @@ export class CourseContentLecturerListValidator extends BaseValidator<CourseCont
   "title": "CourseContentLecturerList",
   "type": "object",
   "x-model-name": "CourseContentLecturerList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentLecturerList {
@@ -10387,11 +10660,15 @@ export class CourseContentLecturerListValidator extends BaseValidator<CourseCont
  * Query parameters for lecturer course content.
  */
 export class CourseContentLecturerQueryValidator extends BaseValidator<CourseContentLecturerQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Query parameters for lecturer course content.",
   "properties": {
     "skip": {
@@ -10567,34 +10844,37 @@ export class CourseContentLecturerQueryValidator extends BaseValidator<CourseCon
   "title": "CourseContentLecturerQuery",
   "type": "object",
   "x-model-name": "CourseContentLecturerQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentLecturerQuery {
@@ -10698,11 +10978,15 @@ export class CourseContentLecturerQueryValidator extends BaseValidator<CourseCon
  * Validator for GradedByCourseMember
  */
 export class GradedByCourseMemberValidator extends BaseValidator<GradedByCourseMember> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GradingAuthor": {
       "properties": {
@@ -10776,34 +11060,37 @@ export class GradedByCourseMemberValidator extends BaseValidator<GradedByCourseM
   "title": "GradedByCourseMember",
   "type": "object",
   "x-model-name": "GradedByCourseMember"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): GradedByCourseMember {
@@ -10856,11 +11143,15 @@ export class GradedByCourseMemberValidator extends BaseValidator<GradedByCourseM
  * Validator for CourseContentStudentProperties
  */
 export class CourseContentStudentPropertiesValidator extends BaseValidator<CourseContentStudentProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -11042,34 +11333,37 @@ export class CourseContentStudentPropertiesValidator extends BaseValidator<Cours
   "title": "CourseContentStudentProperties",
   "type": "object",
   "x-model-name": "CourseContentStudentProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentStudentProperties {
@@ -11108,11 +11402,15 @@ export class CourseContentStudentPropertiesValidator extends BaseValidator<Cours
  * Validator for CourseContentStudentGet
  */
 export class CourseContentStudentGetValidator extends BaseValidator<CourseContentStudentGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindGet": {
       "properties": {
@@ -12072,34 +12370,37 @@ export class CourseContentStudentGetValidator extends BaseValidator<CourseConten
   "title": "CourseContentStudentGet",
   "type": "object",
   "x-model-name": "CourseContentStudentGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentStudentGet {
@@ -12296,11 +12597,15 @@ export class CourseContentStudentGetValidator extends BaseValidator<CourseConten
  * Validator for CourseContentStudentList
  */
 export class CourseContentStudentListValidator extends BaseValidator<CourseContentStudentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindList": {
       "properties": {
@@ -12878,34 +13183,37 @@ export class CourseContentStudentListValidator extends BaseValidator<CourseConte
   "title": "CourseContentStudentList",
   "type": "object",
   "x-model-name": "CourseContentStudentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentStudentList {
@@ -13072,11 +13380,15 @@ export class CourseContentStudentListValidator extends BaseValidator<CourseConte
  * Validator for CourseContentStudentUpdate
  */
 export class CourseContentStudentUpdateValidator extends BaseValidator<CourseContentStudentUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "status": {
       "anyOf": [
@@ -13124,34 +13436,37 @@ export class CourseContentStudentUpdateValidator extends BaseValidator<CourseCon
   "title": "CourseContentStudentUpdate",
   "type": "object",
   "x-model-name": "CourseContentStudentUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentStudentUpdate {
@@ -13200,11 +13515,15 @@ export class CourseContentStudentUpdateValidator extends BaseValidator<CourseCon
  * Validator for CourseContentStudentQuery
  */
 export class CourseContentStudentQueryValidator extends BaseValidator<CourseContentStudentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -13366,34 +13685,37 @@ export class CourseContentStudentQueryValidator extends BaseValidator<CourseCont
   "title": "CourseContentStudentQuery",
   "type": "object",
   "x-model-name": "CourseContentStudentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentStudentQuery {
@@ -13492,11 +13814,15 @@ export class CourseContentStudentQueryValidator extends BaseValidator<CourseCont
  * Validator for CourseStudentRepository
  */
 export class CourseStudentRepositoryValidator extends BaseValidator<CourseStudentRepository> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "provider_url": {
       "anyOf": [
@@ -13526,34 +13852,37 @@ export class CourseStudentRepositoryValidator extends BaseValidator<CourseStuden
   "title": "CourseStudentRepository",
   "type": "object",
   "x-model-name": "CourseStudentRepository"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseStudentRepository {
@@ -13597,11 +13926,15 @@ export class CourseStudentRepositoryValidator extends BaseValidator<CourseStuden
  * Validator for CourseStudentGet
  */
 export class CourseStudentGetValidator extends BaseValidator<CourseStudentGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentKindGet": {
       "properties": {
@@ -13936,34 +14269,37 @@ export class CourseStudentGetValidator extends BaseValidator<CourseStudentGet> {
   "title": "CourseStudentGet",
   "type": "object",
   "x-model-name": "CourseStudentGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseStudentGet {
@@ -14049,11 +14385,15 @@ export class CourseStudentGetValidator extends BaseValidator<CourseStudentGet> {
  * Validator for CourseStudentList
  */
 export class CourseStudentListValidator extends BaseValidator<CourseStudentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseStudentRepository": {
       "properties": {
@@ -14143,34 +14483,37 @@ export class CourseStudentListValidator extends BaseValidator<CourseStudentList>
   "title": "CourseStudentList",
   "type": "object",
   "x-model-name": "CourseStudentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseStudentList {
@@ -14247,11 +14590,15 @@ export class CourseStudentListValidator extends BaseValidator<CourseStudentList>
  * Validator for CourseStudentQuery
  */
 export class CourseStudentQueryValidator extends BaseValidator<CourseStudentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -14389,34 +14736,37 @@ export class CourseStudentQueryValidator extends BaseValidator<CourseStudentQuer
   "title": "CourseStudentQuery",
   "type": "object",
   "x-model-name": "CourseStudentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseStudentQuery {
@@ -14505,11 +14855,15 @@ export class CourseStudentQueryValidator extends BaseValidator<CourseStudentQuer
  * Validator for CourseContentKindCreate
  */
 export class CourseContentKindCreateValidator extends BaseValidator<CourseContentKindCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -14556,34 +14910,37 @@ export class CourseContentKindCreateValidator extends BaseValidator<CourseConten
   "title": "CourseContentKindCreate",
   "type": "object",
   "x-model-name": "CourseContentKindCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentKindCreate {
@@ -14654,11 +15011,15 @@ export class CourseContentKindCreateValidator extends BaseValidator<CourseConten
  * Validator for CourseContentKindGet
  */
 export class CourseContentKindGetValidator extends BaseValidator<CourseContentKindGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -14762,34 +15123,37 @@ export class CourseContentKindGetValidator extends BaseValidator<CourseContentKi
   "title": "CourseContentKindGet",
   "type": "object",
   "x-model-name": "CourseContentKindGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentKindGet {
@@ -14889,11 +15253,15 @@ export class CourseContentKindGetValidator extends BaseValidator<CourseContentKi
  * Validator for CourseContentKindList
  */
 export class CourseContentKindListValidator extends BaseValidator<CourseContentKindList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -14933,34 +15301,37 @@ export class CourseContentKindListValidator extends BaseValidator<CourseContentK
   "title": "CourseContentKindList",
   "type": "object",
   "x-model-name": "CourseContentKindList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentKindList {
@@ -15035,11 +15406,15 @@ export class CourseContentKindListValidator extends BaseValidator<CourseContentK
  * Validator for CourseContentKindUpdate
  */
 export class CourseContentKindUpdateValidator extends BaseValidator<CourseContentKindUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "title": {
       "anyOf": [
@@ -15069,34 +15444,37 @@ export class CourseContentKindUpdateValidator extends BaseValidator<CourseConten
   "title": "CourseContentKindUpdate",
   "type": "object",
   "x-model-name": "CourseContentKindUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentKindUpdate {
@@ -15140,11 +15518,15 @@ export class CourseContentKindUpdateValidator extends BaseValidator<CourseConten
  * Validator for CourseContentKindQuery
  */
 export class CourseContentKindQueryValidator extends BaseValidator<CourseContentKindQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -15246,34 +15628,37 @@ export class CourseContentKindQueryValidator extends BaseValidator<CourseContent
   "title": "CourseContentKindQuery",
   "type": "object",
   "x-model-name": "CourseContentKindQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentKindQuery {
@@ -15347,11 +15732,15 @@ export class CourseContentKindQueryValidator extends BaseValidator<CourseContent
  * DTO for releasing a course.
  */
 export class ReleaseCourseCreateValidator extends BaseValidator<ReleaseCourseCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ComputorDeploymentConfig": {
       "properties": {
@@ -15836,34 +16225,37 @@ export class ReleaseCourseCreateValidator extends BaseValidator<ReleaseCourseCre
   "title": "ReleaseCourseCreate",
   "type": "object",
   "x-model-name": "ReleaseCourseCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ReleaseCourseCreate {
@@ -15917,11 +16309,15 @@ export class ReleaseCourseCreateValidator extends BaseValidator<ReleaseCourseCre
  * DTO for releasing course content.
  */
 export class ReleaseCourseContentCreateValidator extends BaseValidator<ReleaseCourseContentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "ComputorDeploymentConfig": {
       "properties": {
@@ -16416,34 +16812,37 @@ export class ReleaseCourseContentCreateValidator extends BaseValidator<ReleaseCo
   "title": "ReleaseCourseContentCreate",
   "type": "object",
   "x-model-name": "ReleaseCourseContentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): ReleaseCourseContentCreate {
@@ -16511,11 +16910,15 @@ export class ReleaseCourseContentCreateValidator extends BaseValidator<ReleaseCo
  * DTO for updating course release.
  */
 export class CourseReleaseUpdateValidator extends BaseValidator<CourseReleaseUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentTypeCreate": {
       "properties": {
@@ -16850,34 +17253,37 @@ export class CourseReleaseUpdateValidator extends BaseValidator<CourseReleaseUpd
   "title": "CourseReleaseUpdate",
   "type": "object",
   "x-model-name": "CourseReleaseUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseReleaseUpdate {
@@ -16925,11 +17331,15 @@ export class CourseReleaseUpdateValidator extends BaseValidator<CourseReleaseUpd
  * Request to create a course family via Temporal workflow.
  */
 export class CourseFamilyTaskRequestValidator extends BaseValidator<CourseFamilyTaskRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabCredentials": {
       "description": "GitLab connection credentials.",
@@ -16981,34 +17391,37 @@ export class CourseFamilyTaskRequestValidator extends BaseValidator<CourseFamily
   "title": "CourseFamilyTaskRequest",
   "type": "object",
   "x-model-name": "CourseFamilyTaskRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyTaskRequest {
@@ -17065,11 +17478,15 @@ export class CourseFamilyTaskRequestValidator extends BaseValidator<CourseFamily
  * Request to create a course via Temporal workflow.
  */
 export class CourseTaskRequestValidator extends BaseValidator<CourseTaskRequest> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabCredentials": {
       "description": "GitLab connection credentials.",
@@ -17121,34 +17538,37 @@ export class CourseTaskRequestValidator extends BaseValidator<CourseTaskRequest>
   "title": "CourseTaskRequest",
   "type": "object",
   "x-model-name": "CourseTaskRequest"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseTaskRequest {
@@ -17205,11 +17625,15 @@ export class CourseTaskRequestValidator extends BaseValidator<CourseTaskRequest>
  * Configuration for course execution backend.
  */
 export class CourseExecutionBackendConfigValidator extends BaseValidator<CourseExecutionBackendConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Configuration for course execution backend.",
   "properties": {
     "slug": {
@@ -17244,34 +17668,37 @@ export class CourseExecutionBackendConfigValidator extends BaseValidator<CourseE
   "title": "CourseExecutionBackendConfig",
   "type": "object",
   "x-model-name": "CourseExecutionBackendConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseExecutionBackendConfig {
@@ -17328,11 +17755,15 @@ export class CourseExecutionBackendConfigValidator extends BaseValidator<CourseE
  * Validator for CourseFamilyProperties
  */
 export class CourseFamilyPropertiesValidator extends BaseValidator<CourseFamilyProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -17526,34 +17957,37 @@ export class CourseFamilyPropertiesValidator extends BaseValidator<CourseFamilyP
   "title": "CourseFamilyProperties",
   "type": "object",
   "x-model-name": "CourseFamilyProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyProperties {
@@ -17592,11 +18026,15 @@ export class CourseFamilyPropertiesValidator extends BaseValidator<CourseFamilyP
  * Validator for CourseFamilyPropertiesGet
  */
 export class CourseFamilyPropertiesGetValidator extends BaseValidator<CourseFamilyPropertiesGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -17778,34 +18216,37 @@ export class CourseFamilyPropertiesGetValidator extends BaseValidator<CourseFami
   "title": "CourseFamilyPropertiesGet",
   "type": "object",
   "x-model-name": "CourseFamilyPropertiesGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyPropertiesGet {
@@ -17844,11 +18285,15 @@ export class CourseFamilyPropertiesGetValidator extends BaseValidator<CourseFami
  * Validator for CourseFamilyCreate
  */
 export class CourseFamilyCreateValidator extends BaseValidator<CourseFamilyCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseFamilyProperties": {
       "additionalProperties": true,
@@ -18095,34 +18540,37 @@ export class CourseFamilyCreateValidator extends BaseValidator<CourseFamilyCreat
   "title": "CourseFamilyCreate",
   "type": "object",
   "x-model-name": "CourseFamilyCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyCreate {
@@ -18189,11 +18637,15 @@ export class CourseFamilyCreateValidator extends BaseValidator<CourseFamilyCreat
  * Validator for CourseFamilyGet
  */
 export class CourseFamilyGetValidator extends BaseValidator<CourseFamilyGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseFamilyPropertiesGet": {
       "additionalProperties": true,
@@ -18782,34 +19234,37 @@ export class CourseFamilyGetValidator extends BaseValidator<CourseFamilyGet> {
   "title": "CourseFamilyGet",
   "type": "object",
   "x-model-name": "CourseFamilyGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyGet {
@@ -18910,11 +19365,15 @@ export class CourseFamilyGetValidator extends BaseValidator<CourseFamilyGet> {
  * Validator for CourseFamilyList
  */
 export class CourseFamilyListValidator extends BaseValidator<CourseFamilyList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "title": "Id",
@@ -18949,34 +19408,37 @@ export class CourseFamilyListValidator extends BaseValidator<CourseFamilyList> {
   "title": "CourseFamilyList",
   "type": "object",
   "x-model-name": "CourseFamilyList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyList {
@@ -19042,11 +19504,15 @@ export class CourseFamilyListValidator extends BaseValidator<CourseFamilyList> {
  * Validator for CourseFamilyUpdate
  */
 export class CourseFamilyUpdateValidator extends BaseValidator<CourseFamilyUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseFamilyProperties": {
       "additionalProperties": true,
@@ -19305,34 +19771,37 @@ export class CourseFamilyUpdateValidator extends BaseValidator<CourseFamilyUpdat
   "title": "CourseFamilyUpdate",
   "type": "object",
   "x-model-name": "CourseFamilyUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyUpdate {
@@ -19391,11 +19860,15 @@ export class CourseFamilyUpdateValidator extends BaseValidator<CourseFamilyUpdat
  * Validator for CourseFamilyQuery
  */
 export class CourseFamilyQueryValidator extends BaseValidator<CourseFamilyQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -19497,34 +19970,37 @@ export class CourseFamilyQueryValidator extends BaseValidator<CourseFamilyQuery>
   "title": "CourseFamilyQuery",
   "type": "object",
   "x-model-name": "CourseFamilyQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyQuery {
@@ -19598,11 +20074,15 @@ export class CourseFamilyQueryValidator extends BaseValidator<CourseFamilyQuery>
  * Properties for course content (stored in JSONB).
  */
 export class CourseContentPropertiesValidator extends BaseValidator<CourseContentProperties> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfig": {
       "properties": {
@@ -19797,34 +20277,37 @@ export class CourseContentPropertiesValidator extends BaseValidator<CourseConten
   "title": "CourseContentProperties",
   "type": "object",
   "x-model-name": "CourseContentProperties"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentProperties {
@@ -19863,11 +20346,15 @@ export class CourseContentPropertiesValidator extends BaseValidator<CourseConten
  * Properties for course content GET responses.
  */
 export class CourseContentPropertiesGetValidator extends BaseValidator<CourseContentPropertiesGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitLabConfigGet": {
       "properties": {
@@ -20050,34 +20537,37 @@ export class CourseContentPropertiesGetValidator extends BaseValidator<CourseCon
   "title": "CourseContentPropertiesGet",
   "type": "object",
   "x-model-name": "CourseContentPropertiesGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentPropertiesGet {
@@ -20116,11 +20606,15 @@ export class CourseContentPropertiesGetValidator extends BaseValidator<CourseCon
  * DTO for creating course content.
  */
 export class CourseContentCreateValidator extends BaseValidator<CourseContentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentProperties": {
       "additionalProperties": true,
@@ -20427,34 +20921,37 @@ export class CourseContentCreateValidator extends BaseValidator<CourseContentCre
   "title": "CourseContentCreate",
   "type": "object",
   "x-model-name": "CourseContentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentCreate {
@@ -20557,11 +21054,15 @@ export class CourseContentCreateValidator extends BaseValidator<CourseContentCre
  * DTO for course content GET responses.
  */
 export class CourseContentGetValidator extends BaseValidator<CourseContentGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentDeploymentGet": {
       "description": "Get deployment details.",
@@ -21545,34 +22046,37 @@ export class CourseContentGetValidator extends BaseValidator<CourseContentGet> {
   "title": "CourseContentGet",
   "type": "object",
   "x-model-name": "CourseContentGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentGet {
@@ -21752,11 +22256,15 @@ export class CourseContentGetValidator extends BaseValidator<CourseContentGet> {
  * DTO for course content list responses.
  */
 export class CourseContentListValidator extends BaseValidator<CourseContentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentDeploymentList": {
       "description": "List view of deployments.",
@@ -22139,34 +22647,37 @@ export class CourseContentListValidator extends BaseValidator<CourseContentList>
   "title": "CourseContentList",
   "type": "object",
   "x-model-name": "CourseContentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentList {
@@ -22306,11 +22817,15 @@ export class CourseContentListValidator extends BaseValidator<CourseContentList>
  * DTO for updating course content.
  */
 export class CourseContentUpdateValidator extends BaseValidator<CourseContentUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentProperties": {
       "additionalProperties": true,
@@ -22631,34 +23146,37 @@ export class CourseContentUpdateValidator extends BaseValidator<CourseContentUpd
   "title": "CourseContentUpdate",
   "type": "object",
   "x-model-name": "CourseContentUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentUpdate {
@@ -22742,11 +23260,15 @@ export class CourseContentUpdateValidator extends BaseValidator<CourseContentUpd
  * Query parameters for course content.
  */
 export class CourseContentQueryValidator extends BaseValidator<CourseContentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentProperties": {
       "additionalProperties": true,
@@ -23128,34 +23650,37 @@ export class CourseContentQueryValidator extends BaseValidator<CourseContentQuer
   "title": "CourseContentQuery",
   "type": "object",
   "x-model-name": "CourseContentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentQuery {
@@ -23264,11 +23789,15 @@ export class CourseContentQueryValidator extends BaseValidator<CourseContentQuer
  * Validator for CourseMemberCommentCreate
  */
 export class CourseMemberCommentCreateValidator extends BaseValidator<CourseMemberCommentCreate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "id": {
       "anyOf": [
@@ -23303,34 +23832,37 @@ export class CourseMemberCommentCreateValidator extends BaseValidator<CourseMemb
   "title": "CourseMemberCommentCreate",
   "type": "object",
   "x-model-name": "CourseMemberCommentCreate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCommentCreate {
@@ -23394,11 +23926,15 @@ export class CourseMemberCommentCreateValidator extends BaseValidator<CourseMemb
  * Validator for CourseMemberCommentGet
  */
 export class CourseMemberCommentGetValidator extends BaseValidator<CourseMemberCommentGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberGet": {
       "properties": {
@@ -23918,34 +24454,37 @@ export class CourseMemberCommentGetValidator extends BaseValidator<CourseMemberC
   "title": "CourseMemberCommentGet",
   "type": "object",
   "x-model-name": "CourseMemberCommentGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCommentGet {
@@ -24043,11 +24582,15 @@ export class CourseMemberCommentGetValidator extends BaseValidator<CourseMemberC
  * Validator for CourseMemberCommentList
  */
 export class CourseMemberCommentListValidator extends BaseValidator<CourseMemberCommentList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseMemberList": {
       "properties": {
@@ -24305,34 +24848,37 @@ export class CourseMemberCommentListValidator extends BaseValidator<CourseMember
   "title": "CourseMemberCommentList",
   "type": "object",
   "x-model-name": "CourseMemberCommentList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCommentList {
@@ -24430,11 +24976,15 @@ export class CourseMemberCommentListValidator extends BaseValidator<CourseMember
  * Validator for CourseMemberCommentUpdate
  */
 export class CourseMemberCommentUpdateValidator extends BaseValidator<CourseMemberCommentUpdate> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "message": {
       "anyOf": [
@@ -24452,34 +25002,37 @@ export class CourseMemberCommentUpdateValidator extends BaseValidator<CourseMemb
   "title": "CourseMemberCommentUpdate",
   "type": "object",
   "x-model-name": "CourseMemberCommentUpdate"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCommentUpdate {
@@ -24518,11 +25071,15 @@ export class CourseMemberCommentUpdateValidator extends BaseValidator<CourseMemb
  * Validator for CourseMemberCommentQuery
  */
 export class CourseMemberCommentQueryValidator extends BaseValidator<CourseMemberCommentQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -24588,34 +25145,37 @@ export class CourseMemberCommentQueryValidator extends BaseValidator<CourseMembe
   "title": "CourseMemberCommentQuery",
   "type": "object",
   "x-model-name": "CourseMemberCommentQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseMemberCommentQuery {
@@ -24674,11 +25234,15 @@ export class CourseMemberCommentQueryValidator extends BaseValidator<CourseMembe
  * Validator for CourseTutorRepository
  */
 export class CourseTutorRepositoryValidator extends BaseValidator<CourseTutorRepository> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "provider_url": {
       "anyOf": [
@@ -24708,34 +25272,37 @@ export class CourseTutorRepositoryValidator extends BaseValidator<CourseTutorRep
   "title": "CourseTutorRepository",
   "type": "object",
   "x-model-name": "CourseTutorRepository"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseTutorRepository {
@@ -24779,11 +25346,15 @@ export class CourseTutorRepositoryValidator extends BaseValidator<CourseTutorRep
  * Validator for CourseTutorGet
  */
 export class CourseTutorGetValidator extends BaseValidator<CourseTutorGet> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseTutorRepository": {
       "properties": {
@@ -24873,34 +25444,37 @@ export class CourseTutorGetValidator extends BaseValidator<CourseTutorGet> {
   "title": "CourseTutorGet",
   "type": "object",
   "x-model-name": "CourseTutorGet"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseTutorGet {
@@ -24977,11 +25551,15 @@ export class CourseTutorGetValidator extends BaseValidator<CourseTutorGet> {
  * Validator for CourseTutorList
  */
 export class CourseTutorListValidator extends BaseValidator<CourseTutorList> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseTutorRepository": {
       "properties": {
@@ -25071,34 +25649,37 @@ export class CourseTutorListValidator extends BaseValidator<CourseTutorList> {
   "title": "CourseTutorList",
   "type": "object",
   "x-model-name": "CourseTutorList"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseTutorList {
@@ -25175,11 +25756,15 @@ export class CourseTutorListValidator extends BaseValidator<CourseTutorList> {
  * Validator for CourseTutorQuery
  */
 export class CourseTutorQueryValidator extends BaseValidator<CourseTutorQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "skip": {
       "anyOf": [
@@ -25281,34 +25866,37 @@ export class CourseTutorQueryValidator extends BaseValidator<CourseTutorQuery> {
   "title": "CourseTutorQuery",
   "type": "object",
   "x-model-name": "CourseTutorQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseTutorQuery {
@@ -25382,11 +25970,15 @@ export class CourseTutorQueryValidator extends BaseValidator<CourseTutorQuery> {
  * Course content type configuration for deployment.
  */
 export class CourseContentTypeConfigValidator extends BaseValidator<CourseContentTypeConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Course content type configuration for deployment.",
   "properties": {
     "slug": {
@@ -25459,34 +26051,37 @@ export class CourseContentTypeConfigValidator extends BaseValidator<CourseConten
   "title": "CourseContentTypeConfig",
   "type": "object",
   "x-model-name": "CourseContentTypeConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentTypeConfig {
@@ -25558,11 +26153,15 @@ export class CourseContentTypeConfigValidator extends BaseValidator<CourseConten
  * Configuration for course-related GitLab projects.
  */
 export class CourseProjectsValidator extends BaseValidator<CourseProjects> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Configuration for course-related GitLab projects.",
   "properties": {
     "tests": {
@@ -25634,34 +26233,37 @@ export class CourseProjectsValidator extends BaseValidator<CourseProjects> {
   "title": "CourseProjects",
   "type": "object",
   "x-model-name": "CourseProjects"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseProjects {
@@ -25720,11 +26322,15 @@ export class CourseProjectsValidator extends BaseValidator<CourseProjects> {
  * Course family configuration.
  */
 export class CourseFamilyConfigValidator extends BaseValidator<CourseFamilyConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "description": "Course family configuration.",
   "properties": {
     "name": {
@@ -25771,34 +26377,37 @@ export class CourseFamilyConfigValidator extends BaseValidator<CourseFamilyConfi
   "title": "CourseFamilyConfig",
   "type": "object",
   "x-model-name": "CourseFamilyConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseFamilyConfig {
@@ -25860,11 +26469,15 @@ export class CourseFamilyConfigValidator extends BaseValidator<CourseFamilyConfi
  * Configuration for course content (assignments, units, etc.).
  */
 export class CourseContentConfigValidator extends BaseValidator<CourseContentConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentConfig": {
       "description": "Configuration for course content (assignments, units, etc.).",
@@ -26043,34 +26656,37 @@ export class CourseContentConfigValidator extends BaseValidator<CourseContentCon
   "$ref": "#/$defs/CourseContentConfig",
   "x-model-name": "CourseContentConfig",
   "description": "Configuration for course content (assignments, units, etc.)."
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentConfig {
@@ -26104,11 +26720,15 @@ export class CourseContentConfigValidator extends BaseValidator<CourseContentCon
  * Course configuration.
  */
 export class CourseConfigValidator extends BaseValidator<CourseConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentConfig": {
       "description": "Configuration for course content (assignments, units, etc.).",
@@ -26561,34 +27181,37 @@ export class CourseConfigValidator extends BaseValidator<CourseConfig> {
   "title": "CourseConfig",
   "type": "object",
   "x-model-name": "CourseConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseConfig {
@@ -26670,11 +27293,15 @@ export class CourseConfigValidator extends BaseValidator<CourseConfig> {
  * Course configuration for hierarchical deployment.
  */
 export class HierarchicalCourseConfigValidator extends BaseValidator<HierarchicalCourseConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentConfig": {
       "description": "Configuration for course content (assignments, units, etc.).",
@@ -27127,34 +27754,37 @@ export class HierarchicalCourseConfigValidator extends BaseValidator<Hierarchica
   "title": "HierarchicalCourseConfig",
   "type": "object",
   "x-model-name": "HierarchicalCourseConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): HierarchicalCourseConfig {
@@ -27236,11 +27866,15 @@ export class HierarchicalCourseConfigValidator extends BaseValidator<Hierarchica
  * Course family configuration with nested courses.
  */
 export class HierarchicalCourseFamilyConfigValidator extends BaseValidator<HierarchicalCourseFamilyConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CourseContentConfig": {
       "description": "Configuration for course content (assignments, units, etc.).",
@@ -27748,34 +28382,37 @@ export class HierarchicalCourseFamilyConfigValidator extends BaseValidator<Hiera
   "title": "HierarchicalCourseFamilyConfig",
   "type": "object",
   "x-model-name": "HierarchicalCourseFamilyConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): HierarchicalCourseFamilyConfig {
@@ -27844,11 +28481,15 @@ export class HierarchicalCourseFamilyConfigValidator extends BaseValidator<Hiera
  * Validator for CourseProjectsConfig
  */
 export class CourseProjectsConfigValidator extends BaseValidator<CourseProjectsConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "GitlabGroupProjectConfig": {
       "properties": {
@@ -27903,34 +28544,37 @@ export class CourseProjectsConfigValidator extends BaseValidator<CourseProjectsC
   "title": "CourseProjectsConfig",
   "type": "object",
   "x-model-name": "CourseProjectsConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseProjectsConfig {
@@ -28014,11 +28658,15 @@ export class CourseProjectsConfigValidator extends BaseValidator<CourseProjectsC
  * Validator for CourseGroupConfig
  */
 export class CourseGroupConfigValidator extends BaseValidator<CourseGroupConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "name": {
       "title": "Name",
@@ -28031,34 +28679,37 @@ export class CourseGroupConfigValidator extends BaseValidator<CourseGroupConfig>
   "title": "CourseGroupConfig",
   "type": "object",
   "x-model-name": "CourseGroupConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseGroupConfig {
@@ -28101,11 +28752,15 @@ export class CourseGroupConfigValidator extends BaseValidator<CourseGroupConfig>
  * Validator for CourseSettingsConfig
  */
 export class CourseSettingsConfigValidator extends BaseValidator<CourseSettingsConfig> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "FileSourceConfig": {
       "properties": {
@@ -28150,34 +28805,37 @@ export class CourseSettingsConfigValidator extends BaseValidator<CourseSettingsC
   "title": "CourseSettingsConfig",
   "type": "object",
   "x-model-name": "CourseSettingsConfig"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseSettingsConfig {
@@ -28216,11 +28874,15 @@ export class CourseSettingsConfigValidator extends BaseValidator<CourseSettingsC
  * Validator for CodeAbilityCourseMeta
  */
 export class CodeAbilityCourseMetaValidator extends BaseValidator<CodeAbilityCourseMeta> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "$defs": {
     "CodeAbilityLink": {
       "properties": {
@@ -28700,34 +29362,37 @@ export class CodeAbilityCourseMetaValidator extends BaseValidator<CodeAbilityCou
   "title": "CodeAbilityCourseMeta",
   "type": "object",
   "x-model-name": "CodeAbilityCourseMeta"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CodeAbilityCourseMeta {
@@ -28831,11 +29496,15 @@ export class CodeAbilityCourseMetaValidator extends BaseValidator<CodeAbilityCou
  * Validator for CourseSignupResponse
  */
 export class CourseSignupResponseValidator extends BaseValidator<CourseSignupResponse> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "course_id": {
       "title": "Course Id",
@@ -28863,34 +29532,37 @@ export class CourseSignupResponseValidator extends BaseValidator<CourseSignupRes
   "title": "CourseSignupResponse",
   "type": "object",
   "x-model-name": "CourseSignupResponse"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseSignupResponse {
@@ -28960,11 +29632,15 @@ export class CourseSignupResponseValidator extends BaseValidator<CourseSignupRes
  * Validator for CourseContentFileQuery
  */
 export class CourseContentFileQueryValidator extends BaseValidator<CourseContentFileQuery> {
+  private static _schema: any = null;
+
   /**
-   * JSON Schema for this model
+   * Get JSON Schema for this model
    * Useful for form generation, validation, and documentation
    */
-  static readonly schema = JSON.parse(`{
+  static getSchema(): any {
+    if (!this._schema) {
+      this._schema = JSON.parse(`{
   "properties": {
     "filename": {
       "anyOf": [
@@ -28982,34 +29658,37 @@ export class CourseContentFileQueryValidator extends BaseValidator<CourseContent
   "title": "CourseContentFileQuery",
   "type": "object",
   "x-model-name": "CourseContentFileQuery"
-}`) as const;
+}`);
+    }
+    return this._schema;
+  }
 
   /**
    * Get schema for a specific field
    */
   static getFieldSchema(fieldName: string): any {
-    return this.schema.properties?.[fieldName];
+    return this.getSchema().properties?.[fieldName];
   }
 
   /**
    * Check if a field is required
    */
   static isFieldRequired(fieldName: string): boolean {
-    return this.schema.required?.includes(fieldName) ?? false;
+    return this.getSchema().required?.includes(fieldName) ?? false;
   }
 
   /**
    * Get all required field names
    */
   static getRequiredFields(): string[] {
-    return this.schema.required ?? [];
+    return this.getSchema().required ?? [];
   }
 
   /**
    * Get all field names
    */
   static getFields(): string[] {
-    return Object.keys(this.schema.properties ?? {});
+    return Object.keys(this.getSchema().properties ?? {});
   }
 
   validate(data: any): CourseContentFileQuery {

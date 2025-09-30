@@ -136,9 +136,9 @@ export function extractFieldMetadata(
  * Generate field metadata for all fields in a schema
  */
 export function generateFormFields(
-  validatorClass: { schema: any }
+  validatorClass: { getSchema(): any }
 ): FieldMetadata[] {
-  const schema = validatorClass.schema;
+  const schema = validatorClass.getSchema();
   const properties = schema.properties || {};
   const requiredFields = new Set(schema.required || []);
 
@@ -193,9 +193,9 @@ export function getHtmlValidationAttributes(field: FieldMetadata): Record<string
  * Generate default form values from schema
  */
 export function generateDefaultValues(
-  validatorClass: { schema: any }
+  validatorClass: { getSchema(): any }
 ): Record<string, any> {
-  const schema = validatorClass.schema;
+  const schema = validatorClass.getSchema();
   const properties = schema.properties || {};
   const defaults: Record<string, any> = {};
 
@@ -277,7 +277,7 @@ export function generateReactHookFormRules(field: FieldMetadata) {
  * Generate Yup validation schema from JSON Schema
  * Note: Requires yup to be installed
  */
-export function generateYupSchema(validatorClass: { schema: any }): string {
+export function generateYupSchema(validatorClass: { getSchema(): any }): string {
   const fields = generateFormFields(validatorClass);
 
   const yupFields = fields.map(field => {
@@ -348,8 +348,8 @@ export function generateYupSchema(validatorClass: { schema: any }): string {
 /**
  * Format schema for display (useful for debugging/documentation)
  */
-export function formatSchemaForDisplay(validatorClass: { schema: any }): string {
-  const schema = validatorClass.schema;
+export function formatSchemaForDisplay(validatorClass: { getSchema(): any }): string {
+  const schema = validatorClass.getSchema();
   const fields = generateFormFields(validatorClass);
 
   return fields.map(field => {

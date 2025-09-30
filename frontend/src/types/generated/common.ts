@@ -1694,7 +1694,7 @@ export interface SubmissionArtifactGet {
   test_results_count?: number | null;
   grades_count?: number | null;
   reviews_count?: number | null;
-  latest_result?: any | null;
+  latest_result?: ResultList | null;
   average_grade?: number | null;
 }
 
