@@ -38,6 +38,7 @@ from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.artifacts import (
     SubmissionArtifactList,
     SubmissionArtifactGet,
+    SubmissionArtifactUpdate,
     SubmissionGradeCreate,
     SubmissionGradeUpdate,
     SubmissionGradeListItem,
@@ -255,6 +256,7 @@ async def upload_submission(
         bucket_name=bucket_name,
         object_key=object_key,
         version_identifier=manual_version_identifier,
+        submit=submission_data.submit,  # True = official submission, False = test/practice run
         properties={}  # Keep empty for future extensibility and legacy compatibility
     )
 
@@ -395,6 +397,71 @@ async def get_submission_artifact(
     artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
 
     # Calculate average grade if there are grades
+    if hasattr(artifact, 'grades') and artifact.grades:
+        grades = [g.grade for g in artifact.grades if g.grade is not None]
+        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
+
+    return artifact_get
+
+
+@submissions_router.patch("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
+async def update_submission_artifact(
+    artifact_id: str,
+    update_data: SubmissionArtifactUpdate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    """Update a submission artifact (e.g., change submit status)."""
+
+    artifact = db.query(SubmissionArtifact).options(
+        joinedload(SubmissionArtifact.submission_group)
+    ).filter(
+        SubmissionArtifact.id == artifact_id
+    ).first()
+
+    if not artifact:
+        raise NotFoundException(detail="Submission artifact not found")
+
+    # Check permissions - only group members or tutors/instructors can update
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
+        ).filter(
+            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_group_member:
+            # Check for tutor/instructor permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == artifact.submission_group.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You don't have permission to update this artifact")
+
+    # Apply updates
+    if update_data.submit is not None:
+        artifact.submit = update_data.submit
+
+    if update_data.properties is not None:
+        artifact.properties = update_data.properties
+
+    db.commit()
+    db.refresh(artifact)
+
+    logger.info("Updated submission artifact %s", artifact_id)
+
+    # Return updated artifact with computed fields
+    artifact_get = SubmissionArtifactGet.model_validate(artifact)
+    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
+    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
+    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
+
     if hasattr(artifact, 'grades') and artifact.grades:
         grades = [g.grade for g in artifact.grades if g.grade is not None]
         artifact_get.average_grade = sum(grades) / len(grades) if grades else None

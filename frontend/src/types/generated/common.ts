@@ -178,6 +178,7 @@ export interface StudentProfileQuery {
 export interface SubmissionCreate {
   submission_group_id: string;
   version_identifier?: string | null;
+  submit?: boolean;
 }
 
 /**
@@ -1645,6 +1646,7 @@ export interface SubmissionArtifactCreate {
  * DTO for updating submission artifacts.
  */
 export interface SubmissionArtifactUpdate {
+  submit?: boolean | null;
   properties?: Record<string, any> | null;
 }
 

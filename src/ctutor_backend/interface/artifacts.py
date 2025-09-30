@@ -34,6 +34,7 @@ class SubmissionArtifactCreate(BaseModel):
 
 class SubmissionArtifactUpdate(BaseModel):
     """DTO for updating submission artifacts."""
+    submit: Optional[bool] = None  # True = official submission, False = test/practice run
     properties: Optional[dict[str, Any]] = None
 
 

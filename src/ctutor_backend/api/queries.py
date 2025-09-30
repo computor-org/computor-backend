@@ -42,14 +42,41 @@ def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | 
 
     return query.group_by(Result.course_content_id).subquery()
 
-def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
+def submission_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
+    """
+    Count SubmissionArtifacts with submit=True per course content.
+    This counts actual submissions, not test results.
+    """
+    query = db.query(
+        SubmissionGroup.course_content_id.label("course_content_id"),
+        func.count(SubmissionArtifact.id).label("submission_count")
+    ).select_from(SubmissionArtifact) \
+        .join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id) \
+        .filter(SubmissionArtifact.submit == True)
 
-    # Join with SubmissionArtifact to access submit field
+    if user_id != None:
+        query = query.join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
+            .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
+            .filter(CourseMember.user_id == user_id)
+    elif course_member_id != None:
+        query = query.join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
+            .filter(SubmissionGroupMember.course_member_id == course_member_id)
+
+    if course_content_id != None:
+        query = query.filter(SubmissionGroup.course_content_id == course_content_id)
+
+    return query.group_by(SubmissionGroup.course_content_id).subquery()
+
+
+def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
+    """
+    Count test results (Results with test_system_id) per course content.
+    This counts all test runs, regardless of whether they were official submissions.
+    """
     query = db.query(
                 Result.course_content_id,
                 func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
-                func.count(case((SubmissionArtifact.submit == True, 1))).label("submission_count"),
-            ).outerjoin(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
+            ).join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
 
     if user_id != None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
@@ -142,6 +169,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
 
     latest_result_sub = latest_result_subquery(user_id,None,course_content_id,db)
     results_count_sub = results_count_subquery(user_id,None,course_content_id,db)
+    submission_count_sub = submission_count_subquery(user_id,None,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
@@ -177,7 +205,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         results_count_sub.c.total_results_count,
         Result,
         SubmissionGroup,
-        results_count_sub.c.submission_count,
+        submission_count_sub.c.submission_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
         content_unread_column,
@@ -191,10 +219,10 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         .join(Course, Course.id == CourseMember.course_id) \
         .join(CourseContent, (CourseContent.course_id == Course.id) & (CourseContent.id == course_content_id)) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
-        .outerjoin(SubmissionGroup, 
+        .outerjoin(SubmissionGroup,
                    (SubmissionGroup.course_content_id == CourseContent.id) &
                    (SubmissionGroup.id.in_(select(user_submission_groups.c.id)))) \
-        .outerjoin(SubmissionGroupMember, 
+        .outerjoin(SubmissionGroupMember,
                    (SubmissionGroupMember.submission_group_id == SubmissionGroup.id) &
                    (SubmissionGroupMember.course_member_id == CourseMember.id)) \
         .outerjoin(
@@ -208,6 +236,9 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         .outerjoin(
             results_count_sub,
             CourseContent.id == results_count_sub.c.course_content_id
+        ).outerjoin(
+            submission_count_sub,
+            CourseContent.id == submission_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
@@ -253,6 +284,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
 
     latest_result_sub = latest_result_subquery(user_id,None,None,db)
     results_count_sub = results_count_subquery(user_id,None,None,db)
+    submission_count_sub = submission_count_subquery(user_id,None,None,db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
@@ -288,7 +320,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         results_count_sub.c.total_results_count,
         Result,
         SubmissionGroup,
-        results_count_sub.c.submission_count,
+        submission_count_sub.c.submission_count,
         latest_grading_sub.c.status,
         latest_grading_sub.c.grading,
         content_unread_column,
@@ -302,10 +334,10 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         .join(Course, Course.id == CourseMember.course_id) \
         .join(CourseContent, CourseContent.course_id == Course.id) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
-        .outerjoin(SubmissionGroup, 
+        .outerjoin(SubmissionGroup,
                    (SubmissionGroup.course_content_id == CourseContent.id) &
                    (SubmissionGroup.id.in_(select(user_submission_groups.c.id)))) \
-        .outerjoin(SubmissionGroupMember, 
+        .outerjoin(SubmissionGroupMember,
                    (SubmissionGroupMember.submission_group_id == SubmissionGroup.id) &
                    (SubmissionGroupMember.course_member_id == CourseMember.id)) \
         .outerjoin(
@@ -319,6 +351,9 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         .outerjoin(
             results_count_sub,
             CourseContent.id == results_count_sub.c.course_content_id
+        ).outerjoin(
+            submission_count_sub,
+            CourseContent.id == submission_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
@@ -361,6 +396,7 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
 
     latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
     results_count_sub = results_count_subquery(None,course_member_id,course_content_id,db)
+    submission_count_sub = submission_count_subquery(None,course_member_id,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
@@ -381,7 +417,7 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             results_count_sub.c.total_results_count,
             Result,
             SubmissionGroup,
-            results_count_sub.c.submission_count,
+            submission_count_sub.c.submission_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
             content_unread_column,
@@ -404,6 +440,9 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
         .outerjoin(
             results_count_sub,
             CourseContent.id == results_count_sub.c.course_content_id
+        ).outerjoin(
+            submission_count_sub,
+            CourseContent.id == submission_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
@@ -449,6 +488,7 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
 
     latest_result_sub = latest_result_subquery(None,course_member_id,None,db,True)
     results_count_sub = results_count_subquery(None,course_member_id,None,db)
+    submission_count_sub = submission_count_subquery(None,course_member_id,None,db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
@@ -480,7 +520,7 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             results_count_sub.c.total_results_count,
             Result,
             SubmissionGroup,
-            results_count_sub.c.submission_count,
+            submission_count_sub.c.submission_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading,
             content_unread_column,
@@ -505,6 +545,9 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         .outerjoin(
             results_count_sub,
             CourseContent.id == results_count_sub.c.course_content_id
+        ).outerjoin(
+            submission_count_sub,
+            CourseContent.id == submission_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
@@ -542,7 +585,10 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
     return query
 
 def course_course_member_list_query(db: Session):
-
+    """
+    Query to get course members with their latest submission result dates.
+    Used for lecturer/tutor views to see student progress.
+    """
     latest_result_subquery =  db.query(
                     Result.course_content_id,
                     CourseMember.id.label("course_member_id"),
@@ -553,8 +599,9 @@ def course_course_member_list_query(db: Session):
         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
         .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
         .filter(
-                Result.status == 0,
-                SubmissionArtifact.submit == True
+                Result.status == 0,  # FINISHED status
+                SubmissionArtifact.submit == True,  # Only official submissions
+                Result.test_system_id.isnot(None)  # Only completed tests
         ) \
         .group_by(Result.course_content_id, CourseMember.id).subquery()
 

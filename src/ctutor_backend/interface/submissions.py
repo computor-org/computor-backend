@@ -20,6 +20,7 @@ class SubmissionCreate(BaseModel):
 
     submission_group_id: str
     version_identifier: Optional[str] = None
+    submit: bool = False  # True = official submission, False = test/practice run
 
 
 class SubmissionUploadedFile(BaseModel):
