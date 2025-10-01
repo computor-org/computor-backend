@@ -1779,6 +1779,454 @@ export class UserGetValidator extends BaseValidator<UserGet> {
     if (!this._schema) {
       this._schema = JSON.parse(`{
   "$defs": {
+    "GitLabConfigGet": {
+      "properties": {
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Settings"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "full_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Path"
+        },
+        "directory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directory"
+        },
+        "registry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registry"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "namespace_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Id"
+        },
+        "namespace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Path"
+        },
+        "web_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Web Url"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visibility"
+        },
+        "last_synced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Synced At"
+        }
+      },
+      "title": "GitLabConfigGet",
+      "type": "object"
+    },
+    "OrganizationGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationPropertiesGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationGet",
+      "type": "object"
+    },
+    "OrganizationPropertiesGet": {
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfigGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationPropertiesGet",
+      "type": "object"
+    },
+    "OrganizationType": {
+      "enum": [
+        "user",
+        "community",
+        "organization"
+      ],
+      "title": "OrganizationType",
+      "type": "string"
+    },
     "ProfileGet": {
       "properties": {
         "created_at": {
@@ -1945,10 +2393,6 @@ export class UserGetValidator extends BaseValidator<UserGet> {
     },
     "StudentProfileGet": {
       "properties": {
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
         "student_id": {
           "anyOf": [
             {
@@ -1975,6 +2419,10 @@ export class UserGetValidator extends BaseValidator<UserGet> {
         },
         "user_id": {
           "title": "User Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "title": "Organization Id",
           "type": "string"
         },
         "created_at": {
@@ -2028,11 +2476,27 @@ export class UserGetValidator extends BaseValidator<UserGet> {
           ],
           "default": null,
           "title": "Updated By"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
-        "id",
-        "user_id"
+        "user_id",
+        "organization_id",
+        "id"
       ],
       "title": "StudentProfileGet",
       "type": "object"

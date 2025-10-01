@@ -1726,18 +1726,6 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
     if (!this._schema) {
       this._schema = JSON.parse(`{
   "properties": {
-    "id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Id"
-    },
     "student_id": {
       "anyOf": [
         {
@@ -1773,8 +1761,15 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
       ],
       "default": null,
       "title": "User Id"
+    },
+    "organization_id": {
+      "title": "Organization Id",
+      "type": "string"
     }
   },
+  "required": [
+    "organization_id"
+  ],
   "title": "StudentProfileCreate",
   "type": "object",
   "x-model-name": "StudentProfileCreate"
@@ -1818,11 +1813,6 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
       throw new ValidationError('StudentProfileCreate', 'Expected an object');
     }
 
-    // Optional field: id
-    if ('id' in data && data.id !== undefined && data.id !== null) {
-      // Union type - skipping detailed validation
-    }
-
     // Optional field: student_id
     if ('student_id' in data && data.student_id !== undefined && data.student_id !== null) {
       // Union type - skipping detailed validation
@@ -1836,6 +1826,15 @@ export class StudentProfileCreateValidator extends BaseValidator<StudentProfileC
     // Optional field: user_id
     if ('user_id' in data && data.user_id !== undefined && data.user_id !== null) {
       // Union type - skipping detailed validation
+    }
+
+    // Required field: organization_id
+    if (!('organization_id' in data)) {
+      errors.push('Missing required field: organization_id');
+    } else {
+      if (typeof data.organization_id !== 'string') {
+        errors.push('Field organization_id must be a string');
+      }
     }
 
     if (errors.length > 0) {
@@ -1871,11 +1870,457 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
   static getSchema(): any {
     if (!this._schema) {
       this._schema = JSON.parse(`{
-  "properties": {
-    "id": {
-      "title": "Id",
-      "type": "string"
+  "$defs": {
+    "GitLabConfigGet": {
+      "properties": {
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Settings"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "full_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Path"
+        },
+        "directory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directory"
+        },
+        "registry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registry"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "namespace_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Id"
+        },
+        "namespace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Path"
+        },
+        "web_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Web Url"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visibility"
+        },
+        "last_synced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Synced At"
+        }
+      },
+      "title": "GitLabConfigGet",
+      "type": "object"
     },
+    "OrganizationGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationPropertiesGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationGet",
+      "type": "object"
+    },
+    "OrganizationPropertiesGet": {
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfigGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationPropertiesGet",
+      "type": "object"
+    },
+    "OrganizationType": {
+      "enum": [
+        "user",
+        "community",
+        "organization"
+      ],
+      "title": "OrganizationType",
+      "type": "string"
+    }
+  },
+  "properties": {
     "student_id": {
       "anyOf": [
         {
@@ -1902,6 +2347,10 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
     },
     "user_id": {
       "title": "User Id",
+      "type": "string"
+    },
+    "organization_id": {
+      "title": "Organization Id",
       "type": "string"
     },
     "created_at": {
@@ -1955,11 +2404,27 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
       ],
       "default": null,
       "title": "Updated By"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "organization": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OrganizationGet"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
-    "id",
-    "user_id"
+    "user_id",
+    "organization_id",
+    "id"
   ],
   "title": "StudentProfileGet",
   "type": "object",
@@ -2004,15 +2469,6 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
       throw new ValidationError('StudentProfileGet', 'Expected an object');
     }
 
-    // Required field: id
-    if (!('id' in data)) {
-      errors.push('Missing required field: id');
-    } else {
-      if (typeof data.id !== 'string') {
-        errors.push('Field id must be a string');
-      }
-    }
-
     // Optional field: student_id
     if ('student_id' in data && data.student_id !== undefined && data.student_id !== null) {
       // Union type - skipping detailed validation
@@ -2029,6 +2485,15 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
     } else {
       if (typeof data.user_id !== 'string') {
         errors.push('Field user_id must be a string');
+      }
+    }
+
+    // Required field: organization_id
+    if (!('organization_id' in data)) {
+      errors.push('Missing required field: organization_id');
+    } else {
+      if (typeof data.organization_id !== 'string') {
+        errors.push('Field organization_id must be a string');
       }
     }
 
@@ -2049,6 +2514,20 @@ export class StudentProfileGetValidator extends BaseValidator<StudentProfileGet>
 
     // Optional field: updated_by
     if ('updated_by' in data && data.updated_by !== undefined && data.updated_by !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Required field: id
+    if (!('id' in data)) {
+      errors.push('Missing required field: id');
+    } else {
+      if (typeof data.id !== 'string') {
+        errors.push('Field id must be a string');
+      }
+    }
+
+    // Optional field: organization
+    if ('organization' in data && data.organization !== undefined && data.organization !== null) {
       // Union type - skipping detailed validation
     }
 
@@ -2117,11 +2596,16 @@ export class StudentProfileListValidator extends BaseValidator<StudentProfileLis
     "user_id": {
       "title": "User Id",
       "type": "string"
+    },
+    "organization_id": {
+      "title": "Organization Id",
+      "type": "string"
     }
   },
   "required": [
     "id",
-    "user_id"
+    "user_id",
+    "organization_id"
   ],
   "title": "StudentProfileList",
   "type": "object",
@@ -2191,6 +2675,15 @@ export class StudentProfileListValidator extends BaseValidator<StudentProfileLis
     } else {
       if (typeof data.user_id !== 'string') {
         errors.push('Field user_id must be a string');
+      }
+    }
+
+    // Required field: organization_id
+    if (!('organization_id' in data)) {
+      errors.push('Missing required field: organization_id');
+    } else {
+      if (typeof data.organization_id !== 'string') {
+        errors.push('Field organization_id must be a string');
       }
     }
 
@@ -2264,6 +2757,18 @@ export class StudentProfileUpdateValidator extends BaseValidator<StudentProfileU
       ],
       "default": null,
       "title": "Properties"
+    },
+    "organization_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Organization Id"
     }
   },
   "title": "StudentProfileUpdate",
@@ -2321,6 +2826,11 @@ export class StudentProfileUpdateValidator extends BaseValidator<StudentProfileU
 
     // Optional field: properties
     if ('properties' in data && data.properties !== undefined && data.properties !== null) {
+      // Union type - skipping detailed validation
+    }
+
+    // Optional field: organization_id
+    if ('organization_id' in data && data.organization_id !== undefined && data.organization_id !== null) {
       // Union type - skipping detailed validation
     }
 
@@ -2430,18 +2940,17 @@ export class StudentProfileQueryValidator extends BaseValidator<StudentProfileQu
       "default": null,
       "title": "User Id"
     },
-    "properties": {
+    "organization_id": {
       "anyOf": [
         {
-          "additionalProperties": true,
-          "type": "object"
+          "type": "string"
         },
         {
           "type": "null"
         }
       ],
       "default": null,
-      "title": "Properties"
+      "title": "Organization Id"
     }
   },
   "title": "StudentProfileQuery",
@@ -2517,8 +3026,8 @@ export class StudentProfileQueryValidator extends BaseValidator<StudentProfileQu
       // Union type - skipping detailed validation
     }
 
-    // Optional field: properties
-    if ('properties' in data && data.properties !== undefined && data.properties !== null) {
+    // Optional field: organization_id
+    if ('organization_id' in data && data.organization_id !== undefined && data.organization_id !== null) {
       // Union type - skipping detailed validation
     }
 
@@ -20368,6 +20877,454 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
     if (!this._schema) {
       this._schema = JSON.parse(`{
   "$defs": {
+    "GitLabConfigGet": {
+      "properties": {
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Settings"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "full_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Path"
+        },
+        "directory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directory"
+        },
+        "registry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registry"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "namespace_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Id"
+        },
+        "namespace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Path"
+        },
+        "web_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Web Url"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visibility"
+        },
+        "last_synced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Synced At"
+        }
+      },
+      "title": "GitLabConfigGet",
+      "type": "object"
+    },
+    "OrganizationGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationPropertiesGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationGet",
+      "type": "object"
+    },
+    "OrganizationPropertiesGet": {
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfigGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationPropertiesGet",
+      "type": "object"
+    },
+    "OrganizationType": {
+      "enum": [
+        "user",
+        "community",
+        "organization"
+      ],
+      "title": "OrganizationType",
+      "type": "string"
+    },
     "ProfileGet": {
       "properties": {
         "created_at": {
@@ -20534,10 +21491,6 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
     },
     "StudentProfileGet": {
       "properties": {
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
         "student_id": {
           "anyOf": [
             {
@@ -20564,6 +21517,10 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
         },
         "user_id": {
           "title": "User Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "title": "Organization Id",
           "type": "string"
         },
         "created_at": {
@@ -20617,11 +21574,27 @@ export class StudentCreateValidator extends BaseValidator<StudentCreate> {
           ],
           "default": null,
           "title": "Updated By"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
-        "id",
-        "user_id"
+        "user_id",
+        "organization_id",
+        "id"
       ],
       "title": "StudentProfileGet",
       "type": "object"
@@ -20991,6 +21964,454 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
     if (!this._schema) {
       this._schema = JSON.parse(`{
   "$defs": {
+    "GitLabConfigGet": {
+      "properties": {
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Settings"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "full_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Path"
+        },
+        "directory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Directory"
+        },
+        "registry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registry"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "namespace_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Id"
+        },
+        "namespace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace Path"
+        },
+        "web_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Web Url"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visibility"
+        },
+        "last_synced_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Synced At"
+        }
+      },
+      "title": "GitLabConfigGet",
+      "type": "object"
+    },
+    "OrganizationGet": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Update timestamp",
+          "title": "Updated At"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created By"
+        },
+        "updated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated By"
+        },
+        "id": {
+          "description": "Organization unique identifier",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Hierarchical path",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization title",
+          "title": "Title"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization description",
+          "title": "Description"
+        },
+        "organization_type": {
+          "$ref": "#/$defs/OrganizationType",
+          "description": "Type of organization"
+        },
+        "user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Associated user ID",
+          "title": "User Id"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationPropertiesGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional properties"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization number",
+          "title": "Number"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "format": "email",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contact email",
+          "title": "Email"
+        },
+        "telephone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phone number",
+          "title": "Telephone"
+        },
+        "fax_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fax number",
+          "title": "Fax Number"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Website URL",
+          "title": "Url"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Postal code",
+          "title": "Postal Code"
+        },
+        "street_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Street address",
+          "title": "Street Address"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "City/locality",
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State/region",
+          "title": "Region"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Country",
+          "title": "Country"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "organization_type"
+      ],
+      "title": "OrganizationGet",
+      "type": "object"
+    },
+    "OrganizationPropertiesGet": {
+      "additionalProperties": true,
+      "properties": {
+        "gitlab": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitLabConfigGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "OrganizationPropertiesGet",
+      "type": "object"
+    },
+    "OrganizationType": {
+      "enum": [
+        "user",
+        "community",
+        "organization"
+      ],
+      "title": "OrganizationType",
+      "type": "string"
+    },
     "ProfileGet": {
       "properties": {
         "created_at": {
@@ -21223,10 +22644,6 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
     },
     "StudentProfileGet": {
       "properties": {
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
         "student_id": {
           "anyOf": [
             {
@@ -21253,6 +22670,10 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
         },
         "user_id": {
           "title": "User Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "title": "Organization Id",
           "type": "string"
         },
         "created_at": {
@@ -21306,11 +22727,27 @@ export class ReleaseStudentsCreateValidator extends BaseValidator<ReleaseStudent
           ],
           "default": null,
           "title": "Updated By"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationGet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
-        "id",
-        "user_id"
+        "user_id",
+        "organization_id",
+        "id"
       ],
       "title": "StudentProfileGet",
       "type": "object"

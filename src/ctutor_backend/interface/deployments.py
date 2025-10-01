@@ -2,9 +2,11 @@ import yaml
 from abc import ABC
 from enum import Enum
 from pydantic_yaml import to_yaml_str
-from typing import Any, List, Optional
-from ctutor_backend.interface.users import UserGet
+from typing import Any, List, Optional, TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+if TYPE_CHECKING:
+    from ctutor_backend.interface.users import UserGet
 
 class DeploymentFactory:
 
@@ -48,7 +50,7 @@ class CodeabilityReleaseBuilder(ABC):
   def create_release(self, release_dir: str) -> list[str]:
     pass
 
-  async def create_student_project(self, user: UserGet):
+  async def create_student_project(self, user: 'UserGet'):
     pass
 
 

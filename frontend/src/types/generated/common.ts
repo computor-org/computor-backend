@@ -12,6 +12,8 @@ import type { CourseContentTypeList, CourseExecutionBackendConfig, CourseSignupR
 
 import type { ExampleVersionList } from './examples';
 
+import type { OrganizationGet } from './organizations';
+
 import type { TaskStatus } from './tasks';
 
 import type { UserGet } from './users';
@@ -138,23 +140,25 @@ export interface Repository {
 }
 
 export interface StudentProfileCreate {
-  id?: string | null;
   student_id?: string | null;
   student_email?: string | null;
   user_id?: string | null;
+  organization_id: string;
 }
 
 export interface StudentProfileGet {
-  id: string;
   student_id?: string | null;
   student_email?: string | null;
   user_id: string;
+  organization_id: string;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
   updated_at?: string | null;
   created_by?: string | null;
   updated_by?: string | null;
+  id: string;
+  organization?: OrganizationGet | null;
 }
 
 export interface StudentProfileList {
@@ -162,12 +166,14 @@ export interface StudentProfileList {
   student_id?: string | null;
   student_email?: string | null;
   user_id: string;
+  organization_id: string;
 }
 
 export interface StudentProfileUpdate {
   student_id?: string | null;
   student_email?: string | null;
   properties?: any | null;
+  organization_id?: string | null;
 }
 
 export interface StudentProfileQuery {
@@ -177,7 +183,7 @@ export interface StudentProfileQuery {
   student_id?: string | null;
   student_email?: string | null;
   user_id?: string | null;
-  properties?: any | null;
+  organization_id?: string | null;
 }
 
 /**

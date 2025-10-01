@@ -1,13 +1,15 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
-from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.model.organization import Organization
 from ..custom_types import Ltree
 import re
+
+if TYPE_CHECKING:
+    from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 
 class OrganizationType(str,Enum):
     user = "user"
@@ -15,15 +17,15 @@ class OrganizationType(str,Enum):
     organization = "organization"
 
 class OrganizationProperties(BaseModel):
-    gitlab: Optional[GitLabConfig] = None
-    
+    gitlab: Optional['GitLabConfig'] = None
+
     model_config = ConfigDict(
         extra='allow',
     )
 
 class OrganizationPropertiesGet(BaseModel):
-    gitlab: Optional[GitLabConfigGet] = None
-    
+    gitlab: Optional['GitLabConfigGet'] = None
+
     model_config = ConfigDict(
         extra='allow',
     )
@@ -241,3 +243,9 @@ class OrganizationInterface(EntityInterface):
     endpoint = "organizations"
     model = Organization
     cache_ttl = 600  # 10 minutes cache for organization data (changes less frequently)
+
+# Import GitLabConfig after OrganizationProperties is defined to avoid circular import
+from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
+# Rebuild the models to resolve forward references
+OrganizationProperties.model_rebuild()
+OrganizationPropertiesGet.model_rebuild()
