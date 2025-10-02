@@ -8,7 +8,7 @@ from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.api.queries import user_course_content_list_query, user_course_content_query
+from ctutor_backend.repositories.course_content import user_course_content_list_query, user_course_content_query
 from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentInterface,

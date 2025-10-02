@@ -13,7 +13,7 @@ from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
-# from ctutor_backend.api.queries import latest_result_subquery, results_count_subquery
+# from ctutor_backend.repositories.course_content import latest_result_subquery, results_count_subquery
 from ctutor_backend.database import get_db
 # from ctutor_backend.generator.git_helper import clone_or_pull_and_checkout
 # from ctutor_backend.interface.course_member_comments import CourseMemberCommentList

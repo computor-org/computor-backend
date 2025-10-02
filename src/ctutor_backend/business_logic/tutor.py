@@ -20,7 +20,7 @@ from ctutor_backend.model.course import (
 )
 from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
-from ctutor_backend.api.queries import (
+from ctutor_backend.repositories.course_content import (
     course_course_member_list_query,
     course_member_course_content_list_query,
     course_member_course_content_query,
