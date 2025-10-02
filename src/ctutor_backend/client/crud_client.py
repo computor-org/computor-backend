@@ -142,48 +142,6 @@ class CrudClient(BaseClient):
             raise e
             
         return response
-
-    # def filter(self, params: ListQuery | dict | None = None, filters: FilterSchema | dict | None = None):
-
-    #     try:
-    #         if params != None:
-    #             if isinstance(params,ListQuery):
-    #                 params = params.model_dump(exclude_unset=True)
-
-    #     except Exception as e:
-    #         raise e
-
-    #     try:
-    #         if filters != None:
-    #             if isinstance(filters,FilterSchema):
-    #                 filters = filters.model_dump(exclude_unset=True)
-
-    #     except Exception as e:
-    #         raise e
-        
-    #     try:
-    #         response = self.client.request("GET", f"{self.url}-filtered", params=params, json=filters)
-        
-    #         raise_if_response_is_error(response)
-        
-    #     except HTTPStatusError as e:
-    #         raise e
-
-    #     except Exception as e:
-    #         raise e
-
-    #     try:
-    #         json_response = response.json()
-            
-    #         entities: list = []
-
-    #         for entity_response in json_response:
-    #             entity = self.entity_interface.list(**entity_response)
-    #             entities.append(entity)
-            
-    #         return entities
-    #     except Exception as e:
-    #         raise Exception(response)
     
 class CustomClient(BaseClient):
 
