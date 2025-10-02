@@ -43,7 +43,6 @@ from ctutor_backend.api.student_profiles import student_profile_router
 from ctutor_backend.api.results import result_router
 from ctutor_backend.api.tutor import tutor_router
 from ctutor_backend.api.lecturer import lecturer_router
-from ctutor_backend.api.signup import signup_router
 from ctutor_backend.api.organizations import organization_router
 from ctutor_backend.api.course_members import course_member_router
 from ctutor_backend.api.user_roles import user_roles_router
@@ -275,12 +274,6 @@ app.include_router(
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
-app.include_router(
-    signup_router,
-    prefix="/signup",
-    tags=["signup","gitlab"]
-)
-
 # app.include_router(
 #     services_router,
 #     prefix="/services",
@@ -367,6 +360,6 @@ def get_status_head():
 
 
 @app.get("/health", status_code=204, include_in_schema=False)
-async def health_check() -> Response:
+async def health_check():
     """Simple health probe endpoint."""
-    return Response(status_code=204)
+    return None  # FastAPI will return 204 automatically
