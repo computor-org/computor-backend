@@ -357,9 +357,3 @@ app.include_router(
 @app.head("/", status_code=204)
 def get_status_head():
     return
-
-
-@app.get("/health", status_code=204, include_in_schema=False)
-async def health_check():
-    """Simple health probe endpoint."""
-    return None  # FastAPI will return 204 automatically
