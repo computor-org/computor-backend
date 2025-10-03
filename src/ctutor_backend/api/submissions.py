@@ -65,6 +65,7 @@ import mimetypes
 from ctutor_backend.cache import Cache
 from ctutor_backend.redis_cache import get_cache
 from ctutor_backend.repositories.submission_artifact import SubmissionArtifactRepository
+from ctutor_backend.repositories.result import ResultRepository
 from ctutor_backend.business_logic.submissions import (
     upload_submission_artifact,
     check_artifact_access,
@@ -793,8 +794,12 @@ async def update_test_result(
     update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
+
+    # Initialize repository with cache for automatic invalidation
+    result_repo = ResultRepository(db, cache)
 
     result = db.query(Result).filter(Result.id == test_id).first()
 
@@ -814,22 +819,26 @@ async def update_test_result(
         if not course_member or str(course_member.user_id) != str(user_id):
             raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
-    # Update fields
+    # Build updates dict
+    updates = {}
     if update_data.status is not None:
         from ctutor_backend.interface.tasks import map_task_status_to_int
-        result.status = map_task_status_to_int(update_data.status)
+        updates['status'] = map_task_status_to_int(update_data.status)
     if update_data.grade is not None:
-        result.grade = update_data.grade
+        updates['grade'] = update_data.grade
     if update_data.result_json is not None:
-        result.result_json = update_data.result_json
+        updates['result_json'] = update_data.result_json
     if update_data.properties is not None:
-        result.properties = update_data.properties
+        updates['properties'] = update_data.properties
     if update_data.log_text is not None:
-        result.log_text = update_data.log_text
+        updates['log_text'] = update_data.log_text
     if update_data.finished_at is not None:
-        result.finished_at = update_data.finished_at
+        updates['finished_at'] = update_data.finished_at
 
-    db.commit()
-    db.refresh(result)
+    # CRITICAL: Use repository.update() for automatic cache invalidation
+    if updates:
+        result = result_repo.update(str(test_id), updates)
+
+    logger.info("Updated test result %s (cache invalidated)", test_id)
 
     return ResultList.model_validate(result)

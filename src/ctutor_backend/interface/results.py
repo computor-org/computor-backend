@@ -207,6 +207,24 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
 
     return query
 
+def post_update_result(updated_entity: Result, old_entity, db: Session):
+    """
+    Post-update hook to invalidate view caches when results change.
+
+    This is called by the CRUD update_db() function after a Result is updated.
+    """
+    from ctutor_backend.redis_cache import get_cache
+    from ctutor_backend.repositories.result import ResultRepository
+
+    cache = get_cache()
+    result_repo = ResultRepository(db, cache)
+
+    # Invalidate caches using repository tags
+    tags = result_repo.get_entity_tags(updated_entity)
+    if tags:
+        cache.invalidate_tags(*tags)
+
+
 class ResultInterface(EntityInterface):
     create = ResultCreate
     get = ResultGet
@@ -217,6 +235,7 @@ class ResultInterface(EntityInterface):
     endpoint = "results"
     model = Result
     cache_ttl = 60  # 1 minute - results change frequently as students submit work
+    post_update = staticmethod(post_update_result)  # Cache invalidation hook
 
 
 # Extended Result DTOs
