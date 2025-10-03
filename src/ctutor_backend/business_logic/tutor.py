@@ -1,54 +1,35 @@
 """Business logic for tutor-specific operations."""
 import logging
 from uuid import UUID
-from typing import List, Tuple, Optional
-from aiocache import SimpleMemoryCache
+from typing import List, Optional
 
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from ctutor_backend.api.exceptions import ForbiddenException, NotFoundException
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal, allowed_course_role_ids
-from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import (
-    Course,
-    CourseContent,
-    CourseMember,
-    SubmissionGroup,
-    SubmissionGroupMember,
-)
-from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
-from ctutor_backend.api.mappers import course_member_course_content_result_mapper
+from ctutor_backend.cache import Cache
+from ctutor_backend.repositories.tutor_view import TutorViewRepository
+from ctutor_backend.repositories.course_member import CourseMemberRepository
+from ctutor_backend.repositories.submission_group import SubmissionGroupRepository
+from ctutor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from ctutor_backend.repositories.course_content import (
     course_course_member_list_query,
     course_member_course_content_list_query,
     course_member_course_content_query,
 )
-from ctutor_backend.interface.student_courses import CourseStudentInterface, CourseStudentQuery
-from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentQuery
+from ctutor_backend.api.mappers import course_member_course_content_result_mapper
+from ctutor_backend.model.auth import User
+from ctutor_backend.model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
+from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
+from ctutor_backend.interface.student_courses import CourseStudentQuery
+from ctutor_backend.interface.student_course_contents import CourseContentStudentQuery
 from ctutor_backend.interface.course_members import CourseMemberInterface, CourseMemberQuery
-from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
+from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.grading import GradingStatus
 
 logger = logging.getLogger(__name__)
-
-_tutor_cache = SimpleMemoryCache()
-_expiry_time_tutors = 3600  # in seconds
-
-
-async def get_cached_data(course_id: str):
-    """Get cached tutor data for a course."""
-    cached = await _tutor_cache.get(f"{course_id}")
-    if cached is not None:
-        return cached
-    return None
-
-
-async def set_cached_data(course_id: str, data: dict):
-    """Set cached tutor data for a course."""
-    await _tutor_cache.set(f"{course_id}", data, _expiry_time_tutors)
 
 
 def get_tutor_course_content(
@@ -56,20 +37,11 @@ def get_tutor_course_content(
     course_content_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ):
-    """Get course content for a course member as a tutor."""
-
-    if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
-        CourseMember.id == course_member_id
-    ).first() is None:
-        raise ForbiddenException()
-
-    reader_user_id = permissions.get_user_id_or_throw()
-    course_contents_result = course_member_course_content_query(
-        course_member_id, course_content_id, db, reader_user_id=reader_user_id
-    )
-
-    return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
+    """Get course content for a course member as a tutor with caching via repository."""
+    repo = TutorViewRepository(db, cache)
+    return repo.get_course_content(course_member_id, course_content_id, permissions)
 
 
 def list_tutor_course_contents(
@@ -77,24 +49,11 @@ def list_tutor_course_contents(
     permissions: Principal,
     params: CourseContentStudentQuery,
     db: Session,
+    cache: Optional[Cache] = None,
 ):
-    """List course contents for a course member as a tutor."""
-
-    if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
-        CourseMember.id == course_member_id
-    ).first() is None:
-        raise ForbiddenException()
-
-    reader_user_id = permissions.get_user_id_or_throw()
-    query = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id)
-
-    course_contents_results = CourseContentStudentInterface.search(db, query, params).all()
-
-    response_list = []
-    for course_contents_result in course_contents_results:
-        response_list.append(course_member_course_content_result_mapper(course_contents_result, db))
-
-    return response_list
+    """List course contents for a course member as a tutor with caching via repository."""
+    repo = TutorViewRepository(db, cache)
+    return repo.list_course_contents(course_member_id, permissions, params)
 
 
 def update_tutor_course_content_grade(
@@ -106,6 +65,7 @@ def update_tutor_course_content_grade(
     artifact_id: Optional[UUID | str],
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ):
     """Update grade for a course content as a tutor."""
 
@@ -114,35 +74,35 @@ def update_tutor_course_content_grade(
     ).first() is None:
         raise ForbiddenException()
 
+    # Initialize repositories with cache
+    course_member_repo = CourseMemberRepository(db, cache)
+    submission_group_repo = SubmissionGroupRepository(db, cache)
+    submission_artifact_repo = SubmissionArtifactRepository(db, cache)
+
     # 1) Resolve the student's course member and related submission group for this content
-    student_cm = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
+    student_cm = course_member_repo.get_by_id_optional(course_member_id)
     if student_cm is None:
         raise NotFoundException()
 
-    submission_group = (
-        db.query(SubmissionGroup)
-        .join(
-            SubmissionGroupMember,
-            SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
-        )
-        .filter(
-            SubmissionGroupMember.course_member_id == course_member_id,
-            SubmissionGroup.course_content_id == course_content_id,
-        )
-        .first()
-    )
+    # Find submission group for this course member and content
+    submission_groups = submission_group_repo.find_by_course_content(course_content_id)
+    submission_group = None
+    for sg in submission_groups:
+        # Check if this submission group has the course member
+        for member in sg.members:
+            if str(member.course_member_id) == str(course_member_id):
+                submission_group = sg
+                break
+        if submission_group:
+            break
 
     if submission_group is None:
         raise NotFoundException()
 
     # 2) Resolve the grader's course member (the current user in the same course)
-    grader_cm = (
-        db.query(CourseMember)
-        .filter(
-            CourseMember.user_id == permissions.get_user_id_or_throw(),
-            CourseMember.course_id == student_cm.course_id,
-        )
-        .first()
+    grader_cm = course_member_repo.find_by_user_and_course(
+        user_id=permissions.get_user_id_or_throw(),
+        course_id=student_cm.course_id
     )
     if grader_cm is None:
         raise ForbiddenException()
@@ -150,26 +110,15 @@ def update_tutor_course_content_grade(
     # 3) Determine which artifact to grade
     if artifact_id:
         # Specific artifact requested - verify it belongs to this submission group
-        artifact_to_grade = (
-            db.query(SubmissionArtifact)
-            .filter(
-                SubmissionArtifact.id == artifact_id,
-                SubmissionArtifact.submission_group_id == submission_group.id
-            )
-            .first()
-        )
-        if artifact_to_grade is None:
+        artifact_to_grade = submission_artifact_repo.get_by_id_optional(artifact_id)
+        if artifact_to_grade is None or str(artifact_to_grade.submission_group_id) != str(submission_group.id):
             raise NotFoundException(detail="Specified artifact not found or doesn't belong to this submission group")
     else:
         # Get the latest submission artifact for this submission group
-        artifact_to_grade = (
-            db.query(SubmissionArtifact)
-            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
-            .order_by(SubmissionArtifact.created_at.desc())
-            .first()
-        )
-        if artifact_to_grade is None:
+        artifacts = submission_artifact_repo.find_by_submission_group(submission_group.id)
+        if not artifacts:
             raise NotFoundException(detail="No submission artifact found for this submission group. Student must submit first.")
+        artifact_to_grade = max(artifacts, key=lambda a: a.created_at)
 
     # 4) Get grading status
     status = grading_status if grading_status is not None else GradingStatus.NOT_REVIEWED
@@ -189,6 +138,17 @@ def update_tutor_course_content_grade(
         db.commit()
 
         logger.info(f"Created grade for artifact {artifact_to_grade.id} by grader {grader_cm.id}")
+
+        # Invalidate cached views after grading
+        if cache:
+            cache.invalidate_user_views(
+                entity_type="course_member_id",
+                entity_id=str(course_member_id)
+            )
+            cache.invalidate_user_views(
+                entity_type="course_content_id",
+                entity_id=str(course_content_id)
+            )
 
     # 6) Return fresh data
     reader_user_id = permissions.get_user_id_or_throw()
@@ -214,60 +174,29 @@ def get_tutor_course(
     course_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> CourseTutorGet:
-    """Get a course for tutors."""
-
-    course = check_course_permissions(permissions, Course, "_tutor", db).filter(
-        Course.id == course_id
-    ).first()
-
-    if course is None:
-        raise NotFoundException()
-
-    return CourseTutorGet(
-        id=str(course.id),
-        title=course.title,
-        course_family_id=str(course.course_family_id) if course.course_family_id else None,
-        organization_id=str(course.organization_id) if course.organization_id else None,
-        path=course.path,
-        repository=CourseTutorRepository(
-            provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-            full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
-        ) if course.properties and course.properties.get("gitlab") else None
-    )
+    """Get a course for tutors with caching via repository."""
+    repo = TutorViewRepository(db, cache)
+    return repo.get_course(course_id, permissions)
 
 
 def list_tutor_courses(
     permissions: Principal,
     params: CourseStudentQuery,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> List[CourseTutorList]:
-    """List courses for tutors."""
-
-    query = check_course_permissions(permissions, Course, "_tutor", db)
-    courses = CourseStudentInterface.search(db, query, params).all()
-
-    response_list = []
-    for course in courses:
-        response_list.append(CourseTutorList(
-            id=str(course.id),
-            title=course.title,
-            course_family_id=str(course.course_family_id) if course.course_family_id else None,
-            organization_id=str(course.organization_id) if course.organization_id else None,
-            path=course.path,
-            repository=CourseTutorRepository(
-                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
-            ) if course.properties and course.properties.get("gitlab") else None
-        ))
-
-    return response_list
+    """List courses for tutors with caching via repository."""
+    repo = TutorViewRepository(db, cache)
+    return repo.list_courses(permissions, params)
 
 
 def get_tutor_course_member(
     course_member_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> TutorCourseMemberGet:
     """Get a course member with unreviewed course contents."""
 
@@ -306,6 +235,7 @@ def list_tutor_course_members(
     permissions: Principal,
     params: CourseMemberQuery,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> List[TutorCourseMemberList]:
     """List course members for tutors."""
 
