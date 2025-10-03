@@ -43,10 +43,11 @@ from ..api.exceptions import (
     BadRequestException,
     NotImplementedException,
 )
-from ..redis_cache import get_redis_client
+from ..redis_cache import get_redis_client, get_cache
 from ..services.storage_service import get_storage_service
 from ..services.version_resolver import VersionResolver
 from ..services.dependency_sync import DependencySyncService
+from ..repositories import ExampleVersionRepository, ExampleDependencyRepository
 
 logger = logging.getLogger(__name__)
 
@@ -290,31 +291,28 @@ async def create_version(
     # Check permissions
     if not permissions.permitted("example", "create"):
         raise ForbiddenException("You don't have permission to create versions")
-    
+
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
         raise NotFoundException(f"Example {example_id} not found")
-    
+
     # Ensure example_id matches
     if version.example_id != example_id:
         raise BadRequestException("Example ID mismatch")
-    
+
     # Create version
     db_version = ExampleVersion(
         **version.model_dump(),
         created_by=permissions.user_id,
     )
-    
-    db.add(db_version)
-    db.commit()
-    db.refresh(db_version)
-    
-    # Invalidate cache
-    redis_client = await get_redis_client()
-    await redis_client.delete(f"example:{example_id}")
-    await redis_client.delete(f"example_versions:{example_id}")
-    
+
+    # Create via repository (cache invalidation automatic)
+    db_version = version_repo.create(db_version)
+
     return db_version
 
 
@@ -333,25 +331,22 @@ async def list_versions(
     # Check permissions
     if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view versions")
-    
-    # Try cache first
-    cache_key = f"example_versions:{example_id}"
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
-        return [ExampleVersionList.model_validate(v) for v in json.loads(cached_result)]
-    
-    # Get versions
-    query = db.query(ExampleVersion).filter(ExampleVersion.example_id == example_id)
+
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
+    # Get versions via repository
     if params and params.version_tag:
-        query = query.filter(ExampleVersion.version_tag == params.version_tag)
-    versions = query.order_by(ExampleVersion.version_number.desc()).all()
-    
-    # Cache result
+        # Filter by version_tag
+        version = version_repo.find_by_version_tag(example_id, params.version_tag)
+        versions = [version] if version else []
+    else:
+        # Get all versions for example
+        versions = version_repo.find_by_example(example_id)
+
+    # Convert to response model
     result = [ExampleVersionList.model_validate(v) for v in versions]
-    # Use model_dump with mode='json' to handle UUID serialization
-    serializable_data = [r.model_dump(mode='json') for r in result]
-    await redis_client.set(cache_key, json.dumps(serializable_data), ex=CACHE_TTL_LIST)
-    
+
     return result
 
 
@@ -366,27 +361,18 @@ async def get_version(
     # Check permissions
     if not permissions.permitted("example", "get"):
         raise ForbiddenException("You don't have permission to view versions")
-    
-    # Try cache first
-    cache_key = f"example_version:{version_id}"
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
-        return ExampleVersionGet.model_validate(json.loads(cached_result))
-    
-    # Get version
-    version = db.query(ExampleVersion).filter(
-        ExampleVersion.id == version_id
-    ).first()
-    
+
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
+    # Get version via repository (caching automatic)
+    version = version_repo.get_by_id(version_id)
+
     if not version:
         raise NotFoundException(f"Version {version_id} not found")
-    
-    # Cache result
-    result = ExampleVersionGet.model_validate(version)
-    # Use model_dump with mode='json' to handle UUID serialization
-    await redis_client.set(cache_key, json.dumps(result.model_dump(mode='json')), ex=CACHE_TTL_GET)
-    
-    return result
+
+    # Convert to response model
+    return ExampleVersionGet.model_validate(version)
 
 
 # ==============================================================================
@@ -404,36 +390,36 @@ async def add_dependency(
     # Check permissions
     if not permissions.permitted("example", "update"):
         raise ForbiddenException("You don't have permission to modify dependencies")
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
         raise NotFoundException(f"Example {example_id} not found")
-    
+
     # Verify dependency exists
     depends_on = db.query(Example).filter(Example.id == dependency.depends_id).first()
     if not depends_on:
         raise NotFoundException(f"Dependency example {dependency.depends_id} not found")
-    
+
     # Ensure example_id matches
     if dependency.example_id != example_id:
         raise BadRequestException("Example ID mismatch")
-    
+
     # Check for circular dependencies
     if dependency.depends_id == example_id:
         raise BadRequestException("An example cannot depend on itself")
-    
-    # Create dependency
+
+    # Check for circular dependencies (advanced)
+    if dependency_repo.has_circular_dependency(example_id, dependency.depends_id):
+        raise BadRequestException("Adding this dependency would create a circular dependency")
+
+    # Create dependency via repository (cache invalidation automatic)
     db_dependency = ExampleDependency(**dependency.model_dump())
-    
-    db.add(db_dependency)
-    db.commit()
-    db.refresh(db_dependency)
-    
-    # Invalidate cache
-    redis_client = await get_redis_client()
-    await redis_client.delete(f"example:{example_id}")
-    
+    db_dependency = dependency_repo.create(db_dependency)
+
     return db_dependency
 
 
@@ -447,12 +433,13 @@ async def list_dependencies(
     # Check permissions
     if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view dependencies")
-    
-    # Get dependencies
-    dependencies = db.query(ExampleDependency).filter(
-        ExampleDependency.example_id == example_id
-    ).all()
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
+    # Get dependencies via repository
+    dependencies = dependency_repo.find_dependencies_of(example_id)
+
     return [ExampleDependencyGet.model_validate(d) for d in dependencies]
 
 
@@ -466,25 +453,19 @@ async def remove_dependency(
     # Check permissions
     if not permissions.permitted("example", "update"):
         raise ForbiddenException("You don't have permission to modify dependencies")
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
     # Get dependency
-    dependency = db.query(ExampleDependency).filter(
-        ExampleDependency.id == dependency_id
-    ).first()
-    
+    dependency = dependency_repo.get_by_id(dependency_id)
+
     if not dependency:
         raise NotFoundException(f"Dependency {dependency_id} not found")
-    
-    example_id = dependency.example_id
-    
-    # Delete dependency
-    db.delete(dependency)
-    db.commit()
-    
-    # Invalidate cache
-    redis_client = await get_redis_client()
-    await redis_client.delete(f"example:{example_id}")
-    
+
+    # Delete dependency via repository (cache invalidation automatic)
+    dependency_repo.delete(dependency)
+
     return {"message": "Dependency removed successfully"}
 
 
@@ -622,11 +603,11 @@ async def upload_example(
         example.tags = tags
         example.updated_by = permissions.user_id
     
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
     # Check if this version already exists
-    existing_version = db.query(ExampleVersion).filter(
-        ExampleVersion.example_id == example.id,
-        ExampleVersion.version_tag == version_tag
-    ).first()
+    existing_version = version_repo.find_by_version_tag(example.id, version_tag)
     
     # Check if meta.yaml indicates this should update an existing version
     should_update = meta_data.get('update_existing', False) or meta_data.get('overwrite', False)
@@ -643,12 +624,8 @@ async def upload_example(
         version_number = existing_version.version_number
         storage_path = existing_version.storage_path
     else:
-        # Creating new version
-        last_version = db.query(ExampleVersion).filter(
-            ExampleVersion.example_id == example.id
-        ).order_by(ExampleVersion.version_number.desc()).first()
-        
-        version_number = (last_version.version_number + 1) if last_version else 1
+        # Creating new version - use repository method
+        version_number = version_repo.get_next_version_number(example.id)
         storage_path = f"examples/{repository.id}/{example.directory}/v{version_number}"
     
     # Upload files to MinIO
@@ -688,7 +665,7 @@ async def upload_example(
         existing_version.meta_yaml = meta_str
         existing_version.test_yaml = test_yaml_content
         existing_version.updated_at = func.now()
-        version = existing_version
+        version = version_repo.update(existing_version)
     else:
         # Create new version
         version = ExampleVersion(
@@ -700,10 +677,7 @@ async def upload_example(
             test_yaml=test_yaml_content,
             created_by=permissions.user_id,
         )
-        db.add(version)
-    
-    db.commit()
-    db.refresh(version)
+        version = version_repo.create(version)
     
     # Process testDependencies from meta.yaml (check both root and properties)
     test_dependencies = meta_data.get('testDependencies', [])
@@ -722,13 +696,9 @@ async def upload_example(
         test_dependencies=test_dependencies,
         repository_id=repository.id
     )
-    
-    # Invalidate cache
-    redis_client = await get_redis_client()
-    await redis_client.delete(f"example:{example.id}")
-    await redis_client.delete(f"example_versions:{example.id}")
-    await redis_client.delete("examples:list")  # Clear examples list cache
-    
+
+    # Cache invalidation is automatic via repository
+
     return version
 
 
@@ -750,10 +720,11 @@ async def download_example_latest(
     if not example:
         raise NotFoundException(f"Example {example_id} not found")
     
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
     # Get the latest version
-    latest_version = db.query(ExampleVersion).filter(
-        ExampleVersion.example_id == example_id
-    ).order_by(ExampleVersion.version_number.desc()).first()
+    latest_version = version_repo.find_latest_version(example_id)
     
     if not latest_version:
         # If no version exists, return minimal response with just the example directory structure
@@ -806,10 +777,11 @@ async def download_example_version(
     if not permissions.permitted("example", "download"):
         raise ForbiddenException("You don't have permission to download examples")
     
+    # Initialize repository
+    version_repo = ExampleVersionRepository(db, get_cache())
+
     # Get version
-    version = db.query(ExampleVersion).filter(
-        ExampleVersion.id == version_id
-    ).first()
+    version = version_repo.get_by_id(version_id)
     
     if not version:
         raise NotFoundException(f"Version {version_id} not found")
@@ -818,21 +790,22 @@ async def download_example_version(
     example = version.example
     repository = example.repository
     
+    # Initialize dependency repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
     # Helper function to get all dependencies with version constraints recursively
     def get_all_dependencies_with_constraints(example_id: str, visited: set = None) -> List[tuple]:
         if visited is None:
             visited = set()
-        
+
         if example_id in visited:
             return []  # Avoid circular dependencies
-        
+
         visited.add(example_id)
         all_deps = []
-        
-        # Get direct dependencies with version constraints
-        dependencies = db.query(ExampleDependency).filter(
-            ExampleDependency.example_id == example_id
-        ).all()
+
+        # Get direct dependencies with version constraints via repository
+        dependencies = dependency_repo.find_dependencies_of(example_id)
         
         for dep in dependencies:
             if dep.depends_id not in visited:
@@ -954,17 +927,18 @@ async def get_example_dependencies(
     # Check permissions
     if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to read example dependencies")
-    
+
     # Check if example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
         raise NotFoundException(f"Example {example_id} not found")
-    
-    # Get dependencies
-    dependencies = db.query(ExampleDependency).filter(
-        ExampleDependency.example_id == example_id
-    ).all()
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
+    # Get dependencies via repository
+    dependencies = dependency_repo.find_dependencies_of(example_id)
+
     return dependencies
 
 
@@ -979,37 +953,39 @@ async def create_example_dependency(
     # Check permissions
     if not permissions.permitted("example", "create"):
         raise ForbiddenException("You don't have permission to create example dependencies")
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
     # Validate example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
         raise NotFoundException(f"Example {example_id} not found")
-    
+
     # Validate dependency example exists
     dependency_example = db.query(Example).filter(Example.id == dependency_data.depends_id).first()
     if not dependency_example:
         raise NotFoundException(f"Dependency example {dependency_data.depends_id} not found")
-    
+
     # Check if dependency already exists
-    existing = db.query(ExampleDependency).filter(
-        ExampleDependency.example_id == example_id,
-        ExampleDependency.depends_id == dependency_data.depends_id
-    ).first()
-    
+    existing = dependency_repo.find_dependency_between(example_id, dependency_data.depends_id)
+
     if existing:
         raise BadRequestException(f"Dependency already exists between {example_id} and {dependency_data.depends_id}")
-    
-    # Create dependency
+
+    # Check for circular dependencies
+    if dependency_repo.has_circular_dependency(example_id, dependency_data.depends_id):
+        raise BadRequestException("Adding this dependency would create a circular dependency")
+
+    # Create dependency via repository (cache invalidation automatic)
     dependency = ExampleDependency(
         example_id=example_id,
         depends_id=dependency_data.depends_id,
         version_constraint=dependency_data.version_constraint
     )
-    
-    db.add(dependency)
-    db.commit()
-    db.refresh(dependency)
-    
+
+    dependency = dependency_repo.create(dependency)
+
     return dependency
 
 
@@ -1024,18 +1000,17 @@ async def delete_example_dependency(
     # Check permissions
     if not permissions.permitted("example", "delete"):
         raise ForbiddenException("You don't have permission to delete example dependencies")
-    
+
+    # Initialize repository
+    dependency_repo = ExampleDependencyRepository(db, get_cache())
+
     # Find dependency
-    dependency = db.query(ExampleDependency).filter(
-        ExampleDependency.id == dependency_id,
-        ExampleDependency.example_id == example_id
-    ).first()
-    
-    if not dependency:
+    dependency = dependency_repo.get_by_id(dependency_id)
+
+    if not dependency or dependency.example_id != example_id:
         raise NotFoundException(f"Dependency {dependency_id} not found for example {example_id}")
-    
-    # Delete dependency
-    db.delete(dependency)
-    db.commit()
-    
+
+    # Delete dependency via repository (cache invalidation automatic)
+    dependency_repo.delete(dependency)
+
     return {"message": "Dependency deleted successfully"}

@@ -39,7 +39,12 @@ from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
 from ctutor_backend.model.example import Example, ExampleVersion
 from ctutor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
-from ctutor_backend.redis_cache import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client, get_cache
+from ctutor_backend.repositories import (
+    CourseContentRepository,
+    CourseContentDeploymentRepository,
+    ExampleVersionRepository,
+)
 from aiocache import BaseCache
 
 # Create the router
@@ -51,6 +56,7 @@ def _build_deployment_with_history(
     db: Session,
 ) -> DeploymentWithHistory:
     """Serialize a deployment and its history for API responses."""
+    # Query DeploymentHistory directly (no repository needed for history queries)
     history = (
         db.query(DeploymentHistory)
         .filter(DeploymentHistory.deployment_id == deployment.id)
@@ -108,49 +114,49 @@ def _build_deployment_with_history(
     )
 
 
-# File operations (unchanged)
-class CourseContentFileQuery(BaseModel):
-    filename: Optional[str] = None
+# # File operations (unchanged)
+# class CourseContentFileQuery(BaseModel):
+#     filename: Optional[str] = None
 
 
-@course_content_router.router.get("/files/{course_content_id}", response_model=dict)
-async def get_course_content_meta(
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    course_content_id: UUID | str,
-    file_query: CourseContentFileQuery = Depends(),
-    db: Session = Depends(get_db)
-):
-    """Get file content from course content directory."""
-    if check_course_permissions(permissions, CourseContent, "_tutor", db).filter(
-        CourseContent.id == course_content_id
-    ).first() is None:
-        raise NotFoundException()
+# @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
+# async def get_course_content_meta(
+#     permissions: Annotated[Principal, Depends(get_current_principal)],
+#     course_content_id: UUID | str,
+#     file_query: CourseContentFileQuery = Depends(),
+#     db: Session = Depends(get_db)
+# ):
+#     """Get file content from course content directory."""
+#     if check_course_permissions(permissions, CourseContent, "_tutor", db).filter(
+#         CourseContent.id == course_content_id
+#     ).first() is None:
+#         raise NotFoundException()
 
-    course_content_dir = await get_path_course_content(course_content_id, db)
+#     course_content_dir = await get_path_course_content(course_content_id, db)
 
-    if file_query.filename is None:
-        raise BadRequestException()
+#     if file_query.filename is None:
+#         raise BadRequestException()
 
-    with open(os.path.join(course_content_dir, file_query.filename), 'r') as file:
-        content = file.read()
+#     with open(os.path.join(course_content_dir, file_query.filename), 'r') as file:
+#         content = file.read()
 
-        if file_query.filename.endswith(".yaml") or file_query.filename.endswith(".yml"):
-            try:
-                data = yaml.safe_load(content)
-                if isinstance(data, dict):
-                    return data
-            except Exception:
-                raise BadRequestException()
+#         if file_query.filename.endswith(".yaml") or file_query.filename.endswith(".yml"):
+#             try:
+#                 data = yaml.safe_load(content)
+#                 if isinstance(data, dict):
+#                     return data
+#             except Exception:
+#                 raise BadRequestException()
 
-        elif file_query.filename.endswith(".json"):
-            try:
-                data = json.loads(content)
-                if isinstance(data, dict):
-                    return data
-            except Exception:
-                raise BadRequestException()
-        else:
-            return {"content": content}
+#         elif file_query.filename.endswith(".json"):
+#             try:
+#                 data = json.loads(content)
+#                 if isinstance(data, dict):
+#                     return data
+#             except Exception:
+#                 raise BadRequestException()
+#         else:
+#             return {"content": content}
 
 
 # Event handlers for filesystem mirroring
@@ -180,12 +186,17 @@ async def assign_example_to_content(
 ):
     """
     Assign an example version to course content.
-    
+
     This creates or updates a deployment record, linking the example to the content.
     Only submittable content (assignments) can have examples assigned.
     """
+    # Initialize repositories with cache
+    content_repo = CourseContentRepository(db, get_cache())
+    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
+    example_version_repo = ExampleVersionRepository(db, get_cache())
+
     # Get course content
-    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    content = content_repo.get_by_id(str(content_id))
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -228,9 +239,7 @@ async def assign_example_to_content(
     src_version_tag: Optional[str] = None
 
     if request.example_version_id is not None:
-        example_version = db.query(ExampleVersion).options(
-            joinedload(ExampleVersion.example)
-        ).filter(ExampleVersion.id == request.example_version_id).first()
+        example_version = example_version_repo.get_by_id(request.example_version_id)
         if not example_version:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -254,12 +263,7 @@ async def assign_example_to_content(
         if example_row:
             # Determine concrete tag: resolve 'latest' or missing to newest version
             if not requested_tag or requested_tag.lower() == 'latest':
-                latest_ev = (
-                    db.query(ExampleVersion)
-                    .filter(ExampleVersion.example_id == example_row.id)
-                    .order_by(ExampleVersion.version_number.desc())
-                    .first()
-                )
+                latest_ev = example_version_repo.find_latest_version(example_row.id)
                 if not latest_ev:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -268,14 +272,7 @@ async def assign_example_to_content(
                 example_version = latest_ev
                 src_version_tag = latest_ev.version_tag
             else:
-                ev = (
-                    db.query(ExampleVersion)
-                    .filter(
-                        ExampleVersion.example_id == example_row.id,
-                        ExampleVersion.version_tag == requested_tag
-                    )
-                    .first()
-                )
+                ev = example_version_repo.find_by_version_tag(example_row.id, requested_tag)
                 if not ev:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -293,9 +290,7 @@ async def assign_example_to_content(
             src_version_tag = requested_tag
     
     # Get or create deployment record
-    deployment = db.query(CourseContentDeployment).filter(
-        CourseContentDeployment.course_content_id == str(content_id)
-    ).first()
+    deployment = deployment_repo.find_by_content(str(content_id))
     
     if deployment:
         # Update existing deployment (reassignment)
@@ -331,6 +326,9 @@ async def assign_example_to_content(
         deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
         deployment.updated_at = datetime.utcnow()
 
+        # Update via repository
+        deployment = deployment_repo.update(deployment)
+
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="reassigned" if previous_version_id else "assigned",
@@ -341,6 +339,7 @@ async def assign_example_to_content(
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
         db.add(history_entry)
+        db.commit()
 
     else:
         # Create new deployment
@@ -354,9 +353,9 @@ async def assign_example_to_content(
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None,
             updated_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
-        db.add(deployment)
-        db.flush()  # Get the ID
-        
+        # Create via repository
+        deployment = deployment_repo.create(deployment)
+
         # Add initial history entry
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
@@ -367,9 +366,7 @@ async def assign_example_to_content(
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
         db.add(history_entry)
-
-    db.commit()
-    db.refresh(deployment)
+        db.commit()
     
     # Clear cache
     if cache:
@@ -390,18 +387,22 @@ async def unassign_example_from_content(
 ):
     """
     Remove example assignment from course content.
-    
+
     This updates the deployment record to unassigned status.
     The actual removal from student-template happens during next generation.
     """
+    # Initialize repositories
+    content_repo = CourseContentRepository(db, get_cache())
+    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
+
     # Get course content
-    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    content = content_repo.get_by_id(str(content_id))
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"CourseContent {content_id} not found"
         )
-    
+
     # Check permissions
     if check_course_permissions(permissions, Course, "_maintainer", db).filter(
         Course.id == content.course_id
@@ -410,11 +411,9 @@ async def unassign_example_from_content(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this course content"
         )
-    
+
     # Get deployment record
-    deployment = db.query(CourseContentDeployment).filter(
-        CourseContentDeployment.course_content_id == str(content_id)
-    ).first()
+    deployment = deployment_repo.find_by_content(str(content_id))
     
     if not deployment:
         raise HTTPException(
@@ -428,7 +427,10 @@ async def unassign_example_from_content(
     deployment.deployment_status = "unassigned"
     deployment.deployment_message = "Example unassigned"
     deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
-    
+
+    # Update via repository
+    deployment = deployment_repo.update(deployment)
+
     # Add history entry
     history_entry = DeploymentHistory(
         deployment_id=deployment.id,
@@ -437,7 +439,7 @@ async def unassign_example_from_content(
         created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
     )
     db.add(history_entry)
-    
+
     db.commit()
     
     # Clear cache
@@ -458,11 +460,15 @@ async def get_deployment_status_with_workflow(
 ):
     """
     Get detailed deployment status including Temporal workflow information.
-    
+
     Returns deployment data and checks the Temporal workflow status if one is running.
     """
+    # Initialize repositories
+    content_repo = CourseContentRepository(db, get_cache())
+    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
+
     # Check content exists
-    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    content = content_repo.get_by_id(str(content_id))
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -479,11 +485,7 @@ async def get_deployment_status_with_workflow(
         )
     
     # Get deployment with relationships
-    deployment = db.query(CourseContentDeployment).options(
-        joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example)
-    ).filter(
-        CourseContentDeployment.course_content_id == str(content_id)
-    ).first()
+    deployment = deployment_repo.find_by_content(str(content_id))
     
     if not deployment:
         return {
@@ -624,9 +626,13 @@ async def get_course_deployment_summary(
 ):
     """
     Get deployment summary for a course.
-    
+
     Shows statistics about example deployments in the course.
     """
+    # Initialize repositories
+    content_repo = CourseContentRepository(db, get_cache())
+    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
+
     # Check permissions
     if check_course_permissions(permissions, Course, "_tutor", db).filter(
         Course.id == course_id
@@ -635,33 +641,23 @@ async def get_course_deployment_summary(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this course"
         )
-    
+
     # Try cache first
     cache_key = f"course:{course_id}:deployment-summary"
     if cache:
         cached = await cache.get(cache_key)
         if cached:
             return cached
-    
+
     # Get total course content count
-    total_content = db.query(CourseContent).filter(
-        CourseContent.course_id == course_id,
-        CourseContent.archived_at.is_(None)
-    ).count()
+    total_content_list = content_repo.find_by_course(course_id)
+    total_content = len([c for c in total_content_list if c.archived_at is None])
     
     # Get submittable content count
-    submittable_query = db.query(CourseContent).join(
-        CourseContentType
-    ).join(
-        CourseContentKind
-    ).filter(
-        CourseContent.course_id == course_id,
-        CourseContent.archived_at.is_(None),
-        CourseContentKind.submittable == True
-    )
-    submittable_content = submittable_query.count()
-    
-    # Get deployment statistics
+    submittable_list = content_repo.find_submittable_by_course(course_id)
+    submittable_content = len([c for c in submittable_list if c.archived_at is None])
+
+    # Get deployment statistics - need direct query for join
     deployments = db.query(CourseContentDeployment).join(
         CourseContent
     ).filter(
@@ -708,11 +704,15 @@ async def get_content_deployment(
 ):
     """
     Get deployment information for specific course content.
-    
+
     Returns deployment record with full history if exists.
     """
+    # Initialize repositories
+    content_repo = CourseContentRepository(db, get_cache())
+    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
+
     # Get course content to check permissions
-    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    content = content_repo.get_by_id(str(content_id))
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -729,11 +729,7 @@ async def get_content_deployment(
         )
     
     # Get deployment
-    deployment = db.query(CourseContentDeployment).options(
-        joinedload(CourseContentDeployment.example_version)
-    ).filter(
-        CourseContentDeployment.course_content_id == str(content_id)
-    ).first()
+    deployment = deployment_repo.find_by_content(str(content_id))
     
     if not deployment:
         return None
