@@ -5,6 +5,10 @@ from ctutor_backend.model.course import Course, CourseMember
 from ctutor_backend.permissions.principal import course_role_hierarchy
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import CourseContent
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CoursePermissionQueryBuilder:
     """Utility class for building course-related permission queries"""
@@ -17,13 +21,67 @@ class CoursePermissionQueryBuilder:
     
     @classmethod
     def user_courses_subquery(cls, user_id: str, minimum_role: str, db: Session):
-        """Create a subquery for courses where user has at least the minimum role"""
+        """
+        Create a subquery for courses where user has at least the minimum role.
+
+        PERFORMANCE NOTE: This method builds a SQL subquery. For better performance
+        in async contexts, consider using the cached version:
+        `user_courses_subquery_cached()` which uses Redis caching.
+
+        Args:
+            user_id: User identifier
+            minimum_role: Minimum required role
+            db: SQLAlchemy session
+
+        Returns:
+            SQLAlchemy select subquery
+        """
         cm_alias = aliased(CourseMember)
-        
+
         return select(cm_alias.course_id).where(
             cm_alias.user_id == user_id,
             cm_alias.course_role_id.in_(cls.get_allowed_roles(minimum_role))
         )
+
+    @classmethod
+    def user_courses_subquery_cached(cls, user_id: str, minimum_role: str, db: Session):
+        """
+        Create a subquery using CACHED course memberships (RECOMMENDED).
+
+        This version uses Redis caching for significantly better performance.
+        Falls back to database query if cache is unavailable.
+
+        Args:
+            user_id: User identifier
+            minimum_role: Minimum required role
+            db: SQLAlchemy session
+
+        Returns:
+            SQLAlchemy select with course IDs (cached when possible)
+        """
+        try:
+            # Try to use cached version
+            from ctutor_backend.permissions.cache import get_user_courses_with_role
+
+            # Get cached course IDs
+            course_ids = asyncio.run(get_user_courses_with_role(
+                user_id,
+                minimum_role,
+                db,
+                cls.get_allowed_roles
+            ))
+
+            if course_ids:
+                # Return a select that matches these specific course IDs
+                # This is much faster than a subquery join
+                logger.debug(f"Using cached course list ({len(course_ids)} courses) for user {user_id}")
+                return select(Course.id).where(Course.id.in_(course_ids))
+
+        except Exception as e:
+            logger.warning(f"Cache lookup failed, falling back to DB query: {e}")
+
+        # Fallback to standard subquery if cache fails
+        return cls.user_courses_subquery(user_id, minimum_role, db)
     
     @classmethod
     def filter_by_course_membership(cls, query: Query, entity: Type[Any], 

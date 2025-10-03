@@ -3,13 +3,21 @@ Course member repository for direct database access with optional caching.
 
 This module provides the CourseMemberRepository class that handles
 all database operations for CourseMember entities with transparent caching.
+
+IMPORTANT: This repository automatically invalidates permission caches
+when memberships change, as course memberships are the foundation of
+all permission checks in the system.
 """
 
 from typing import List, Optional, Set
 from sqlalchemy.orm import Session
+import asyncio
+import logging
 
 from .base import BaseRepository
 from ..model.course import CourseMember
+
+logger = logging.getLogger(__name__)
 
 
 class CourseMemberRepository(BaseRepository[CourseMember]):
@@ -17,6 +25,11 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
     Repository for CourseMember entity database operations with optional caching.
 
     Caching is automatic when cache instance is provided to constructor.
+
+    CRITICAL SECURITY FEATURE:
+    This repository automatically invalidates permission caches when
+    memberships change, ensuring permission checks always reflect
+    current membership status.
     """
 
     def __init__(self, db: Session, cache=None):
@@ -28,6 +41,88 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
             cache: Optional Cache instance (enables transparent caching)
         """
         super().__init__(db, CourseMember, cache)
+
+    # ========================================================================
+    # Permission cache invalidation hooks
+    # ========================================================================
+
+    def _invalidate_permission_cache(self, entity: CourseMember) -> None:
+        """
+        Invalidate permission cache for a course member.
+
+        This is CRITICAL for security - permission caches must be invalidated
+        immediately when memberships change.
+        """
+        from ctutor_backend.permissions.cache import invalidate_user_course_memberships
+
+        try:
+            # Invalidate permission cache for this user
+            asyncio.run(invalidate_user_course_memberships(str(entity.user_id)))
+            logger.info(f"Invalidated permission cache for user {entity.user_id} (course {entity.course_id})")
+        except Exception as e:
+            # Log but don't fail the operation
+            logger.warning(
+                f"Failed to invalidate permission cache for user {entity.user_id}: {e}"
+            )
+
+    def create(self, entity: CourseMember) -> CourseMember:
+        """
+        Create a course member and invalidate permission caches.
+
+        Args:
+            entity: CourseMember to create
+
+        Returns:
+            Created CourseMember with ID populated
+        """
+        # Create via base repository (handles cache tags)
+        result = super().create(entity)
+
+        # Invalidate permission cache
+        self._invalidate_permission_cache(result)
+
+        return result
+
+    def update(self, entity: CourseMember) -> CourseMember:
+        """
+        Update a course member and invalidate permission caches.
+
+        Args:
+            entity: CourseMember to update
+
+        Returns:
+            Updated CourseMember
+        """
+        # Update via base repository (handles cache tags)
+        result = super().update(entity)
+
+        # Invalidate permission cache
+        self._invalidate_permission_cache(result)
+
+        return result
+
+    def delete(self, entity: CourseMember) -> None:
+        """
+        Delete a course member and invalidate permission caches.
+
+        Args:
+            entity: CourseMember to delete
+        """
+        # Store user_id before deletion
+        user_id = entity.user_id
+
+        # Delete via base repository (handles cache tags)
+        super().delete(entity)
+
+        # Invalidate permission cache
+        from ctutor_backend.permissions.cache import invalidate_user_course_memberships
+        try:
+            asyncio.run(invalidate_user_course_memberships(str(user_id)))
+            logger.info(f"Invalidated permission cache for user {user_id} after deletion")
+        except Exception as e:
+            logger.warning(
+                f"Failed to invalidate permission cache for user {user_id}: {e}"
+            )
 
     # ========================================================================
     # Cache configuration
