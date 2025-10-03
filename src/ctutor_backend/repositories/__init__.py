@@ -42,6 +42,12 @@ from .submission_artifact import SubmissionArtifactRepository
 from .result import ResultRepository
 from .message import MessageRepository
 from .example import ExampleRepository
+from .course_content_repo import CourseContentRepository
+from .example_version_repo import ExampleVersionRepository
+from .submission_grade_repo import SubmissionGradeRepository
+from .submission_group_member_repo import SubmissionGroupMemberRepository
+from .course_content_deployment_repo import CourseContentDeploymentRepository
+from .example_dependency_repo import ExampleDependencyRepository
 from .student_view import StudentViewRepository
 from .tutor_view import TutorViewRepository
 from .lecturer_view import LecturerViewRepository
@@ -64,6 +70,12 @@ __all__ = [
     "ResultRepository",
     "MessageRepository",
     "ExampleRepository",
+    "CourseContentRepository",
+    "ExampleVersionRepository",
+    "SubmissionGradeRepository",
+    "SubmissionGroupMemberRepository",
+    "CourseContentDeploymentRepository",
+    "ExampleDependencyRepository",
     # View repositories
     "StudentViewRepository",
     "TutorViewRepository",
