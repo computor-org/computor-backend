@@ -75,7 +75,7 @@ async def login_with_local_credentials(
     await redis_client.set(
         f"sso_session:{access_token}",
         json.dumps(access_session_data),
-        ttl=ACCESS_TOKEN_TTL,
+        ex=ACCESS_TOKEN_TTL,
     )
 
     # Store refresh token session
@@ -90,7 +90,7 @@ async def login_with_local_credentials(
     await redis_client.set(
         f"refresh_token:{refresh_token}",
         json.dumps(refresh_session_data),
-        ttl=REFRESH_TOKEN_TTL,
+        ex=REFRESH_TOKEN_TTL,
     )
 
     logger.info(f"Local login successful for user {auth_result.user_id}")
@@ -158,7 +158,7 @@ async def refresh_local_token(
         await redis_client.set(
             f"sso_session:{new_access_token}",
             json.dumps(access_session_data),
-            ttl=ACCESS_TOKEN_TTL,
+            ex=ACCESS_TOKEN_TTL,
         )
 
         # Update the old access token reference in refresh token if it exists
@@ -172,7 +172,7 @@ async def refresh_local_token(
         refresh_data["refreshed_at"] = str(datetime.now(timezone.utc))
 
         await redis_client.set(
-            refresh_key, json.dumps(refresh_data), ttl=REFRESH_TOKEN_TTL
+            refresh_key, json.dumps(refresh_data), ex=REFRESH_TOKEN_TTL
         )
 
         logger.info(f"Token refreshed for user {user_id}")
@@ -381,7 +381,7 @@ async def handle_sso_callback(
 
     # Store session in Redis with TTL
     session_key = f"sso_session:{api_session_token}"
-    await redis_client.set(session_key, json.dumps(session_data), ttl=86400)  # 24 hours
+    await redis_client.set(session_key, json.dumps(session_data), ex=86400)  # 24 hours
 
     # Store tokens in Redis if available
     if auth_result.access_token:
@@ -402,7 +402,7 @@ async def handle_sso_callback(
             delta = auth_result.expires_at - now
             expiration = max(int(delta.total_seconds()), 60)  # At least 1 minute
 
-        await redis_client.set(token_key, json.dumps(token_data), ttl=expiration)
+        await redis_client.set(token_key, json.dumps(token_data), ex=expiration)
 
     return {
         "user_id": str(user.id),
@@ -602,7 +602,7 @@ async def refresh_sso_token(
 
         # Store new session in Redis
         session_key = f"sso_session:{new_session_token}"
-        await redis_client.set(session_key, json.dumps(session_data), ttl=86400)
+        await redis_client.set(session_key, json.dumps(session_data), ex=86400)
 
         # Update stored provider tokens if available
         if auth_result.access_token:
@@ -622,7 +622,7 @@ async def refresh_sso_token(
                 delta = auth_result.expires_at - now
                 expiration = max(int(delta.total_seconds()), 60)
 
-            await redis_client.set(token_key, json.dumps(token_data), ttl=expiration)
+            await redis_client.set(token_key, json.dumps(token_data), ex=expiration)
 
         return {
             "access_token": new_session_token,

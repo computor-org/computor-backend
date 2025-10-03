@@ -7,6 +7,7 @@ for use in dependency injection throughout the application.
 
 import os
 import redis
+import redis.asyncio as aioredis
 
 from ctutor_backend.cache import Cache
 
@@ -16,8 +17,20 @@ REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 REDIS_DB = int(os.environ.get('REDIS_DB', '0'))
 
-# Initialize Redis client
-_redis_client = redis.Redis(
+# Initialize async Redis client for async operations
+_async_redis_client = aioredis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=REDIS_PASSWORD if REDIS_PASSWORD else None,
+    db=REDIS_DB,
+    decode_responses=True,  # Auto decode to strings for easier async use
+    socket_connect_timeout=5,
+    socket_timeout=5,
+    retry_on_timeout=True,
+)
+
+# Initialize sync Redis client for Cache (which is sync)
+_sync_redis_client = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
     password=REDIS_PASSWORD if REDIS_PASSWORD else None,
@@ -29,24 +42,30 @@ _redis_client = redis.Redis(
     health_check_interval=30,
 )
 
-# Initialize write-through cache
+# Initialize write-through cache with sync client
 _cache = Cache(
-    client=_redis_client,
+    client=_sync_redis_client,
     prefix="computor",
     default_ttl=600  # 10 minutes default
 )
 
 
-def get_redis_client() -> redis.Redis:
+async def get_redis_client() -> aioredis.Redis:
     """
-    Get raw Redis client for direct access.
+    Get async Redis client for direct access.
 
     Use this for operations not covered by the Cache abstraction.
+    This is an async function that returns an async Redis client.
 
     Returns:
-        Redis client instance
+        Async Redis client instance
+
+    Example:
+        >>> redis = await get_redis_client()
+        >>> await redis.set("key", "value", ex=3600)
+        >>> value = await redis.get("key")
     """
-    return _redis_client
+    return _async_redis_client
 
 
 def get_cache() -> Cache:

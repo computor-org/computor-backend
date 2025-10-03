@@ -9,6 +9,7 @@ This module provides:
 
 import json
 import logging
+import secrets
 from typing import List, Optional
 from urllib.parse import urlencode
 
@@ -173,8 +174,9 @@ async def initiate_login(
     
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
-    
+
     # Store state in Redis with 10 minute expiration
+    from ctutor_backend.redis_cache import get_redis_client
     redis_client = await get_redis_client()
     state_data = {
         "provider": provider,
@@ -184,7 +186,7 @@ async def initiate_login(
     await redis_client.set(
         f"sso_state:{state}",
         json.dumps(state_data),
-        ttl=600  # 10 minutes
+        ex=600  # 10 minutes
     )
     
     # Get callback URL
@@ -219,6 +221,7 @@ async def handle_callback(
     Exchanges the authorization code for tokens and creates/updates user account.
     """
     from ctutor_backend.business_logic.auth import handle_sso_callback
+    from ctutor_backend.redis_cache import get_redis_client
 
     redis_client = await get_redis_client()
 
