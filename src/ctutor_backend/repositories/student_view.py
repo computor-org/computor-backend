@@ -77,10 +77,12 @@ class StudentViewRepository(ViewRepository):
 
         # Cache result
         if result:
-            # Extract related IDs for tag generation
-            related_ids = {}
+            # CRITICAL: Tag with student_view for invalidation when results/submissions change
+            related_ids = {
+                'course_content_id': str(course_content_id)
+            }
             if hasattr(result, 'course_id') and result.course_id:
-                related_ids['course_id'] = str(result.course_id)
+                related_ids['student_view'] = str(result.course_id)  # ← CRITICAL for invalidation
             if hasattr(result, 'course_family_id') and result.course_family_id:
                 related_ids['course_family_id'] = str(result.course_family_id)
 
@@ -128,12 +130,19 @@ class StudentViewRepository(ViewRepository):
             response_list.append(course_member_course_content_result_mapper(course_contents_result, self.db))
 
         # Cache result with query-aware key
+        # CRITICAL: Extract course_id for proper invalidation
+        course_ids = {}
+        if params.course_id:
+            # Single course filter - tag with that course_id
+            course_ids = {'student_view': str(params.course_id)}
+
         self._set_cached_query_view(
             user_id=str(user_id),
             view_type="course_contents",
             params=params,
             data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl()
+            ttl=self.get_default_ttl(),
+            related_ids=course_ids if course_ids else None
         )
 
         return response_list

@@ -9,15 +9,43 @@ invalidation strategies.
 import hashlib
 import logging
 from typing import Any, Iterable, Optional, Callable, Dict
+from datetime import datetime, date
+import json
 
 try:
     import orjson
-    _dumps = lambda o: orjson.dumps(o)
+
+    def _dumps(o: Any) -> bytes:
+        """Serialize object with datetime support using orjson."""
+        try:
+            # orjson handles datetime natively with OPT_PASSTHROUGH_DATETIME or default handler
+            return orjson.dumps(o, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_DATETIME)
+        except TypeError:
+            # Fallback: convert datetime objects manually
+            return orjson.dumps(_convert_datetime(o))
+
     _loads = lambda b: orjson.loads(b) if b else None
 except ImportError:
-    import json
-    _dumps = lambda o: json.dumps(o).encode()
+    def _dumps(o: Any) -> bytes:
+        """Serialize object with datetime support using standard json."""
+        return json.dumps(_convert_datetime(o)).encode()
+
     _loads = lambda b: json.loads(b) if b else None
+
+
+def _convert_datetime(obj: Any) -> Any:
+    """
+    Recursively convert datetime objects to ISO format strings.
+
+    This ensures datetime objects can be serialized to JSON.
+    """
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: _convert_datetime(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_convert_datetime(item) for item in obj]
+    return obj
 
 import redis
 

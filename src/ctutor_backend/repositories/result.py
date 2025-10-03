@@ -3,6 +3,9 @@ Result repository for direct database access with optional caching.
 
 This module provides the ResultRepository class that handles
 all database operations for Result entities with transparent caching.
+
+CRITICAL: This repository invalidates tutor/lecturer/student view caches
+when results change, ensuring views reflect current test results.
 """
 
 from typing import List, Optional, Set
@@ -10,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from .base import BaseRepository
 from ..model.result import Result
+from ..model.course import CourseContent
 
 
 class ResultRepository(BaseRepository[Result]):
@@ -42,6 +46,22 @@ class ResultRepository(BaseRepository[Result]):
         """Results are frequently created during testing - use 5 minute TTL."""
         return 300  # 5 minutes
 
+    def _get_course_id_from_result(self, entity: Result) -> Optional[str]:
+        """
+        Get the course_id for a result by querying course_content.
+
+        This is needed to invalidate tutor/lecturer/student view caches.
+        """
+        if not entity.course_content_id:
+            return None
+
+        # Query course_content to get course_id
+        course_content = self.db.query(CourseContent).filter(
+            CourseContent.id == entity.course_content_id
+        ).first()
+
+        return str(course_content.course_id) if course_content else None
+
     def get_entity_tags(self, entity: Result) -> Set[str]:
         """
         Get cache tags for a result.
@@ -56,6 +76,9 @@ class ResultRepository(BaseRepository[Result]):
         - course_content:{content_id} - All results for this content
         - result:content:{content_id} - Content-specific results
         - result:status:{status} - Results with specific status
+        - tutor_view:{course_id} - Tutor views for this course (CRITICAL)
+        - lecturer_view:{course_id} - Lecturer views for this course (CRITICAL)
+        - student_view:{course_id} - Student views for this course
         """
         tags = {
             f"result:{entity.id}",
@@ -73,6 +96,14 @@ class ResultRepository(BaseRepository[Result]):
         if entity.course_content_id:
             tags.add(f"course_content:{entity.course_content_id}")
             tags.add(f"result:content:{entity.course_content_id}")
+
+            # CRITICAL: Invalidate tutor/lecturer/student views when result changes
+            # Get course_id to invalidate view caches
+            course_id = self._get_course_id_from_result(entity)
+            if course_id:
+                tags.add(f"tutor_view:{course_id}")      # Tutors see results
+                tags.add(f"lecturer_view:{course_id}")   # Lecturers see results
+                tags.add(f"student_view:{course_id}")    # Students see their own results
 
         if entity.status is not None:
             tags.add(f"result:status:{entity.status}")

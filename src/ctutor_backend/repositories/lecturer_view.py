@@ -174,13 +174,17 @@ class LecturerViewRepository(ViewRepository):
         result = CourseContentLecturerGet.model_validate(response_dict)
 
         # Cache result
+        # CRITICAL: Tag with lecturer_view for invalidation when results/submissions change
         self._set_cached_view(
             user_id=str(user_id),
             view_type="lecturer:course_content",
             view_id=str(course_content_id),
             data=self._serialize_dto(result),
             ttl=self.get_default_ttl(),
-            related_ids={'course_content_id': str(course_content_id), 'course_id': str(course_content.course_id)}
+            related_ids={
+                'course_content_id': str(course_content_id),
+                'lecturer_view': str(course_content.course_id)  # ← CRITICAL for invalidation
+            }
         )
 
         return result
@@ -254,12 +258,19 @@ class LecturerViewRepository(ViewRepository):
             result.append(CourseContentLecturerList.model_validate(response_dict))
 
         # Cache result with query-aware key
+        # CRITICAL: Extract course_ids for proper invalidation
+        course_ids = {}
+        if params.course_id:
+            # Single course filter - tag with that course_id
+            course_ids = {'lecturer_view': str(params.course_id)}
+
         self._set_cached_query_view(
             user_id=str(user_id),
             view_type="lecturer:course_contents",
             params=params,
             data=self._serialize_dto_list(result),
-            ttl=self.get_default_ttl()
+            ttl=self.get_default_ttl(),
+            related_ids=course_ids if course_ids else None
         )
 
         return result

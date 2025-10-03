@@ -56,9 +56,11 @@ class TutorViewRepository(ViewRepository):
             Course content with submission/grading data
         """
         # Permission check
-        if check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
             CourseMember.id == course_member_id
-        ).first() is None:
+        ).first()
+
+        if course_member is None:
             raise ForbiddenException()
 
         reader_user_id = permissions.get_user_id_or_throw()
@@ -81,9 +83,11 @@ class TutorViewRepository(ViewRepository):
 
         # Cache result
         if result:
+            # CRITICAL: Include course_id for proper invalidation when submissions/results change
             related_ids = {
                 'course_member_id': str(course_member_id),
-                'course_content_id': str(course_content_id)
+                'course_content_id': str(course_content_id),
+                'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id
             }
             self._set_cached_view(
                 user_id=str(reader_user_id),
@@ -113,9 +117,11 @@ class TutorViewRepository(ViewRepository):
             List of course contents with submission data
         """
         # Permission check
-        if check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
             CourseMember.id == course_member_id
-        ).first() is None:
+        ).first()
+
+        if course_member is None:
             raise ForbiddenException()
 
         reader_user_id = permissions.get_user_id_or_throw()
@@ -138,13 +144,17 @@ class TutorViewRepository(ViewRepository):
             response_list.append(course_member_course_content_result_mapper(course_contents_result, self.db))
 
         # Cache result with query-aware key
+        # CRITICAL: Include course_id for proper invalidation when submissions/results change
         self._set_cached_query_view(
             user_id=str(reader_user_id),
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params,
             data=self._serialize_dto_list(response_list),
             ttl=self.get_default_ttl(),
-            related_ids={'course_member_id': str(course_member_id)}
+            related_ids={
+                'course_member_id': str(course_member_id),
+                'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id for invalidation
+            }
         )
 
         return response_list

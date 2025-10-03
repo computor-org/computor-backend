@@ -28,6 +28,8 @@ from ctutor_backend.model.course import (
     SubmissionGroupMember,
 )
 from ctutor_backend.permissions.core import check_course_permissions
+from ctutor_backend.cache import Cache
+from ctutor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.services.storage_service import StorageService
 from ctutor_backend.storage_security import perform_full_file_validation, sanitize_filename
@@ -87,6 +89,7 @@ async def upload_submission_artifact(
     permissions: Principal,
     db: Session,
     storage_service: StorageService,
+    cache: Optional[Cache] = None,
 ) -> SubmissionUploadResponseModel:
     """Upload a submission file and create artifact record."""
 
@@ -227,12 +230,12 @@ async def upload_submission_artifact(
         properties={}  # Keep empty for future extensibility and legacy compatibility
     )
 
-    db.add(artifact)
-    db.commit()
-    db.refresh(artifact)
+    # CRITICAL: Use repository for automatic cache invalidation
+    artifact_repo = SubmissionArtifactRepository(db, cache)
+    artifact = artifact_repo.create(artifact)
 
     logger.info(
-        "Created submission artifact %s for group %s", artifact.id, submission_group.id
+        "Created submission artifact %s for group %s (cache invalidated)", artifact.id, submission_group.id
     )
 
     return SubmissionUploadResponseModel(

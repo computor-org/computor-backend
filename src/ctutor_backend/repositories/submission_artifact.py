@@ -3,6 +3,9 @@ Submission artifact repository for direct database access with optional caching.
 
 This module provides the SubmissionArtifactRepository class that handles
 all database operations for SubmissionArtifact entities with transparent caching.
+
+CRITICAL: This repository invalidates tutor/lecturer/student view caches
+when artifacts change, ensuring views reflect current submission status.
 """
 
 from typing import List, Optional, Set
@@ -10,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from .base import BaseRepository
 from ..model.artifact import SubmissionArtifact
+from ..model.course import SubmissionGroup, CourseContent
 
 
 class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
@@ -42,6 +46,30 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
         """Artifacts are frequently created during active work - use 5 minute TTL."""
         return 300  # 5 minutes
 
+    def _get_course_id_from_artifact(self, entity: SubmissionArtifact) -> Optional[str]:
+        """
+        Get the course_id for an artifact by querying submission_group and course_content.
+
+        This is needed to invalidate tutor/lecturer/student view caches.
+        """
+        if not entity.submission_group_id:
+            return None
+
+        # Query submission_group to get course_content_id
+        submission_group = self.db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == entity.submission_group_id
+        ).first()
+
+        if not submission_group or not submission_group.course_content_id:
+            return None
+
+        # Query course_content to get course_id
+        course_content = self.db.query(CourseContent).filter(
+            CourseContent.id == submission_group.course_content_id
+        ).first()
+
+        return str(course_content.course_id) if course_content else None
+
     def get_entity_tags(self, entity: SubmissionArtifact) -> Set[str]:
         """
         Get cache tags for a submission artifact.
@@ -54,6 +82,9 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
         - course_member:{member_id} - All artifacts by this member
         - submission_artifact:member:{member_id} - Member-specific artifacts
         - submission_artifact:submit:{submit} - Filter by official submission status
+        - tutor_view:{course_id} - Tutor views for this course (CRITICAL)
+        - lecturer_view:{course_id} - Lecturer views for this course (CRITICAL)
+        - student_view:{course_id} - Student views for this course
         """
         tags = {
             f"submission_artifact:{entity.id}",
@@ -64,9 +95,17 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
             tags.add(f"submission_group:{entity.submission_group_id}")
             tags.add(f"submission_artifact:group:{entity.submission_group_id}")
 
-        if entity.submitting_member_id:
-            tags.add(f"course_member:{entity.submitting_member_id}")
-            tags.add(f"submission_artifact:member:{entity.submitting_member_id}")
+            # CRITICAL: Invalidate tutor/lecturer/student views when artifact changes
+            # Get course_id to invalidate view caches
+            course_id = self._get_course_id_from_artifact(entity)
+            if course_id:
+                tags.add(f"tutor_view:{course_id}")      # Tutors see submissions
+                tags.add(f"lecturer_view:{course_id}")   # Lecturers see submissions
+                tags.add(f"student_view:{course_id}")    # Students see their own submissions
+
+        if entity.uploaded_by_course_member_id:
+            tags.add(f"course_member:{entity.uploaded_by_course_member_id}")
+            tags.add(f"submission_artifact:member:{entity.uploaded_by_course_member_id}")
 
         if entity.submit is not None:
             tags.add(f"submission_artifact:submit:{entity.submit}")

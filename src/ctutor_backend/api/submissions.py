@@ -62,6 +62,9 @@ import re
 import mimetypes
 
 # Import business logic functions
+from ctutor_backend.cache import Cache
+from ctutor_backend.redis_cache import get_cache
+from ctutor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from ctutor_backend.business_logic.submissions import (
     upload_submission_artifact,
     check_artifact_access,
@@ -130,6 +133,7 @@ async def upload_submission(
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
+    cache: Cache = Depends(get_cache),
 ):
     """Upload a submission file to MinIO and create matching SubmissionArtifact records."""
 
@@ -152,6 +156,7 @@ async def upload_submission(
         permissions=permissions,
         db=db,
         storage_service=storage_service,
+        cache=cache,
     )
 
 
@@ -243,8 +248,12 @@ async def update_submission_artifact(
     update_data: SubmissionArtifactUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Update a submission artifact (e.g., change submit status)."""
+
+    # Initialize repository with cache for automatic invalidation
+    artifact_repo = SubmissionArtifactRepository(db, cache)
 
     artifact = db.query(SubmissionArtifact).options(
         joinedload(SubmissionArtifact.submission_group)
@@ -277,17 +286,18 @@ async def update_submission_artifact(
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to update this artifact")
 
-    # Apply updates
+    # Build updates dict
+    updates = {}
     if update_data.submit is not None:
-        artifact.submit = update_data.submit
-
+        updates['submit'] = update_data.submit
     if update_data.properties is not None:
-        artifact.properties = update_data.properties
+        updates['properties'] = update_data.properties
 
-    db.commit()
-    db.refresh(artifact)
+    # CRITICAL: Use repository.update() for automatic cache invalidation
+    if updates:
+        artifact = artifact_repo.update(str(artifact_id), updates)
 
-    logger.info("Updated submission artifact %s", artifact_id)
+    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
 
     # Return updated artifact with computed fields
     artifact_get = SubmissionArtifactGet.model_validate(artifact)
