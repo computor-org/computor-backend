@@ -488,9 +488,9 @@ class Cache:
             >>> cache.get_user_view("user123", "course_content", "content456")
         """
         if view_id:
-            key = self.key("user_view", user_id, view_type, view_id)
+            key = self.k("user_view", user_id, view_type, view_id)
         else:
-            key = self.key("user_view", user_id, view_type)
+            key = self.k("user_view", user_id, view_type)
 
         return self.get_by_key(key)
 
@@ -534,9 +534,9 @@ class Cache:
             ... )
         """
         if view_id:
-            key = self.key("user_view", user_id, view_type, view_id)
+            key = self.k("user_view", user_id, view_type, view_id)
         else:
-            key = self.key("user_view", user_id, view_type)
+            key = self.k("user_view", user_id, view_type)
 
         # Build tags for invalidation
         tags = {
