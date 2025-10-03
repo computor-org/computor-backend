@@ -8,20 +8,6 @@
 
 
 
-export interface MessageAuthor {
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
-export interface GradingAuthor {
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
 export interface AuthConfig {
 }
 
@@ -101,6 +87,20 @@ export interface LocalTokenRefreshResponse {
   token_type?: string;
 }
 
+export interface MessageAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
+export interface GradingAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
 export interface OrganizationUpdateTokenQuery {
   type: string;
 }
@@ -133,30 +133,6 @@ export interface LoginRequest {
   provider: string;
   /** Redirect URI after login */
   redirect_uri?: string | null;
-}
-
-/**
- * OAuth callback parameters.
- */
-export interface CallbackRequest {
-  /** Authorization code */
-  code: string;
-  /** State parameter */
-  state?: string | null;
-}
-
-/**
- * Response after successful SSO authentication.
- */
-export interface SSOAuthResponse {
-  /** User ID */
-  user_id: string;
-  /** Account ID */
-  account_id: string;
-  /** Access token if available */
-  access_token?: string | null;
-  /** Whether this is a new user */
-  is_new_user: boolean;
 }
 
 /**

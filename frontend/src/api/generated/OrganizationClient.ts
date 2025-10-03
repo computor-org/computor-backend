@@ -46,6 +46,7 @@ export class OrganizationClient extends BaseEndpointClient {
 
   /**
    * Patch Organizations Token
+   * Update organization provider token.
    */
   async patchOrganizationsTokenOrganizationsOrganizationIdTokenPatch({ organizationId, type, body }: { organizationId: string | string; type: string; body: OrganizationUpdateTokenUpdate }): Promise<void> {
     const queryParams: Record<string, unknown> = {

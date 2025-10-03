@@ -44,7 +44,6 @@ export * from './UserRoleClient';
 export * from './AuthenticationClient';
 export * from './LecturersClient';
 export * from './MiscClient';
-export * from './SignupClient';
 export * from './StudentsClient';
 export * from './SubmissionsClient';
 export * from './SystemClient';

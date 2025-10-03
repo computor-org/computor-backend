@@ -39,6 +39,7 @@ export class MessageClient extends BaseEndpointClient {
 
   /**
    * Mark Message Unread
+   * Mark a message as unread.
    */
   async markMessageUnreadMessagesIdReadsDelete({ id }: { id: string | string }): Promise<void> {
     return this.client.delete<void>(this.buildPath(id, 'reads'));
@@ -46,6 +47,7 @@ export class MessageClient extends BaseEndpointClient {
 
   /**
    * Mark Message Read
+   * Mark a message as read.
    */
   async markMessageReadMessagesIdReadsPost({ id }: { id: string | string }): Promise<void> {
     return this.client.post<void>(this.buildPath(id, 'reads'));

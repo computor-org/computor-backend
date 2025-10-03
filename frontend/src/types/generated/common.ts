@@ -8,7 +8,7 @@
 
 
 
-import type { CourseContentTypeList, CourseExecutionBackendConfig, CourseSignupResponse, GradedByCourseMember, ResultStudentList, SubmissionGroupStudentList } from './courses';
+import type { CourseContentTypeList, CourseExecutionBackendConfig, GradedByCourseMember, ResultStudentList, SubmissionGroupStudentList } from './courses';
 
 import type { ExampleVersionList } from './examples';
 
@@ -19,125 +19,6 @@ import type { TaskStatus } from './tasks';
 import type { UserGet } from './users';
 
 
-
-export interface ProfileCreate {
-  /** Associated user ID */
-  user_id: string;
-  /** Avatar color as RGB integer (0-16777215) */
-  avatar_color?: number | null;
-  /** Avatar image URL */
-  avatar_image?: string | null;
-  /** Unique nickname */
-  nickname?: string | null;
-  /** User biography */
-  bio?: string | null;
-  /** User website URL */
-  url?: string | null;
-  /** ISO 639-1 language code */
-  language_code?: string | null;
-  /** Additional profile properties */
-  properties?: any | null;
-}
-
-export interface ProfileGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Profile unique identifier */
-  id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Avatar color as RGB integer */
-  avatar_color?: number | null;
-  /** Avatar image URL */
-  avatar_image?: string | null;
-  /** Unique nickname */
-  nickname?: string | null;
-  /** User biography */
-  bio?: string | null;
-  /** User website URL */
-  url?: string | null;
-  /** ISO 639-1 language code */
-  language_code?: string | null;
-  /** Additional properties */
-  properties?: any | null;
-}
-
-export interface ProfileList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Profile unique identifier */
-  id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Unique nickname */
-  nickname?: string | null;
-  /** Avatar image URL */
-  avatar_image?: string | null;
-  /** Avatar color */
-  avatar_color?: number | null;
-  /** ISO 639-1 language code */
-  language_code?: string | null;
-}
-
-export interface ProfileUpdate {
-  /** Avatar color as RGB integer */
-  avatar_color?: number | null;
-  /** Avatar image URL */
-  avatar_image?: string | null;
-  /** Unique nickname */
-  nickname?: string | null;
-  /** User biography */
-  bio?: string | null;
-  /** User website URL */
-  url?: string | null;
-  /** ISO 639-1 language code */
-  language_code?: string | null;
-  /** Additional properties */
-  properties?: any | null;
-}
-
-export interface ProfileQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by profile ID */
-  id?: string | null;
-  /** Filter by user ID */
-  user_id?: string | null;
-  /** Filter by nickname */
-  nickname?: string | null;
-}
-
-export interface CourseMemberGitLabConfig {
-  settings?: any | null;
-  url?: string | null;
-  full_path?: string | null;
-  directory?: string | null;
-  registry?: string | null;
-  parent?: number | null;
-  group_id?: number | null;
-  parent_id?: number | null;
-  namespace_id?: number | null;
-  namespace_path?: string | null;
-  web_url?: string | null;
-  visibility?: string | null;
-  last_synced_at?: string | null;
-  full_path_submission?: string | null;
-}
-
-export interface Repository {
-  url: string;
-  user?: string | null;
-  token?: string | null;
-  branch?: string | null;
-  path?: string | null;
-  commit?: string | null;
-}
 
 export interface StudentProfileCreate {
   student_id?: string | null;
@@ -184,496 +65,6 @@ export interface StudentProfileQuery {
   student_email?: string | null;
   user_id?: string | null;
   organization_id?: string | null;
-}
-
-/**
- * Payload describing a manual submission request.
- */
-export interface SubmissionCreate {
-  submission_group_id: string;
-  version_identifier?: string | null;
-  submit?: boolean;
-}
-
-/**
- * Metadata about a file extracted from a submission archive.
- */
-export interface SubmissionUploadedFile {
-  object_key: string;
-  size: number;
-  content_type: string;
-  relative_path: string;
-}
-
-/**
- * Response returned after processing a manual submission.
- */
-export interface SubmissionUploadResponseModel {
-  artifacts: string[];
-  submission_group_id: string;
-  uploaded_by_course_member_id: string;
-  total_size: number;
-  files_count: number;
-  uploaded_at: string;
-  version_identifier: string;
-}
-
-/**
- * List item representation for manual submissions stored as results.
- */
-export interface SubmissionListItem {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  submit: boolean;
-  course_member_id: string;
-  course_content_id: string;
-  submission_group_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  result: number;
-  result_json?: Record<string, any> | null;
-  properties?: Record<string, any> | null;
-}
-
-/**
- * Query parameters for listing manual submissions.
- */
-export interface SubmissionQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  submit?: boolean | null;
-  course_member_id?: string | null;
-  submission_group_id?: string | null;
-  course_content_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  version_identifier?: string | null;
-  reference_version_identifier?: string | null;
-  status?: TaskStatus | null;
-}
-
-/**
- * Metadata stored with deployments.
- */
-export interface DeploymentMetadata {
-  /** Temporal workflow ID */
-  workflow_id?: string | null;
-  /** List of files deployed */
-  files_deployed?: string[] | null;
-  /** Git commit hash */
-  git_commit?: string | null;
-  /** Error details if deployment failed */
-  error_details?: Record<string, any> | null;
-  /** Properties migrated from old schema */
-  migrated_properties?: Record<string, any> | null;
-}
-
-/**
- * Create a new deployment (typically done automatically).
- */
-export interface CourseContentDeploymentCreate {
-  /** Course content to deploy to */
-  course_content_id: string;
-  /** Example version to deploy */
-  example_version_id: string;
-  /** Initial deployment status */
-  deployment_status?: any;
-  /** Optional message */
-  deployment_message?: string | null;
-  /** Additional metadata */
-  deployment_metadata?: DeploymentMetadata | null;
-}
-
-/**
- * Update deployment status.
- */
-export interface CourseContentDeploymentUpdate {
-  deployment_status?: any | null;
-  deployment_message?: string | null;
-  deployed_at?: string | null;
-  last_attempt_at?: string | null;
-  deployment_path?: string | null;
-  deployment_metadata?: DeploymentMetadata | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-}
-
-/**
- * Get deployment details.
- */
-export interface CourseContentDeploymentGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_content_id: string;
-  example_version_id: string | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  deployment_status: string;
-  deployment_message: string | null;
-  assigned_at: string;
-  deployed_at: string | null;
-  last_attempt_at: string | null;
-  deployment_path: string | null;
-  version_identifier: string | null;
-  deployment_metadata: Record<string, any> | null;
-  workflow_id: string | null;
-  example_version?: any | null;
-}
-
-/**
- * List view of deployments.
- */
-export interface CourseContentDeploymentList {
-  id: string;
-  course_content_id: string;
-  example_version_id: string | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  deployment_status: string;
-  assigned_at: string;
-  deployed_at: string | null;
-  version_identifier: string | null;
-  example_version?: ExampleVersionList | null;
-}
-
-/**
- * Query parameters for deployments.
- */
-export interface CourseContentDeploymentQuery {
-  skip?: number | null;
-  limit?: number | null;
-  course_content_id?: string | null;
-  example_version_id?: string | null;
-  deployment_status?: string | null;
-  deployed?: boolean | null;
-  failed?: boolean | null;
-}
-
-/**
- * Create a deployment history entry.
- */
-export interface DeploymentHistoryCreate {
-  deployment_id: string;
-  action: any;
-  example_version_id?: string | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  previous_example_version_id?: string | null;
-  workflow_id?: string | null;
-}
-
-/**
- * Get deployment history entry.
- */
-export interface DeploymentHistoryGet {
-  id: string;
-  deployment_id: string;
-  action: string;
-  example_version_id: string | null;
-  previous_example_version_id: string | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  workflow_id: string | null;
-  created_at: string;
-  created_by: string | null;
-  example_version?: any | null;
-  previous_example_version?: any | null;
-}
-
-/**
- * List view of deployment history.
- */
-export interface DeploymentHistoryList {
-  id: string;
-  deployment_id: string;
-  action: string;
-  created_at: string;
-  workflow_id: string | null;
-}
-
-/**
- * Deployment with its full history.
- */
-export interface DeploymentWithHistory {
-  deployment: CourseContentDeploymentGet;
-  history: DeploymentHistoryGet[];
-}
-
-/**
- * Summary of deployments for a course.
- */
-export interface DeploymentSummary {
-  course_id: string;
-  /** Total course content items */
-  total_content: number;
-  /** Total submittable content (assignments) */
-  submittable_content: number;
-  /** Total deployments */
-  deployments_total: number;
-  /** Deployments pending */
-  deployments_pending: number;
-  /** Successfully deployed */
-  deployments_deployed: number;
-  /** Failed deployments */
-  deployments_failed: number;
-  /** Most recent deployment */
-  last_deployment_at?: string | null;
-}
-
-/**
- * Request to assign an example to course content.
- */
-export interface AssignExampleRequest {
-  /** Example version to assign (optional if providing identifier+version_tag) */
-  example_version_id?: string | null;
-  /** Hierarchical identifier (ltree string) for the example source */
-  example_identifier?: string | null;
-  /** Version tag for the example source */
-  version_tag?: string | null;
-  /** Optional message about this assignment */
-  deployment_message?: string | null;
-}
-
-/**
- * Request to deploy assigned examples.
- */
-export interface DeployExampleRequest {
-  /** Course to deploy examples for */
-  course_id: string;
-  /** Specific content IDs to deploy (all if None) */
-  content_ids?: string[] | null;
-  /** Force re-deployment even if already deployed */
-  force?: boolean;
-}
-
-export interface ExecutionBackendCreate {
-  type: string;
-  slug: string;
-  properties?: any | null;
-}
-
-export interface ExecutionBackendGet {
-  type: string;
-  slug: string;
-  properties?: any | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-}
-
-export interface ExecutionBackendList {
-  type: string;
-  slug: string;
-  properties?: any | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-}
-
-export interface ExecutionBackendUpdate {
-  type?: string | null;
-  slug?: string | null;
-  properties?: any | null;
-}
-
-export interface ExecutionBackendQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  type?: string | null;
-  slug?: string | null;
-  properties?: string | null;
-}
-
-export interface Claims {
-  general?: any;
-  dependent?: any;
-}
-
-export interface Principal {
-  is_admin?: boolean;
-  user_id?: string | null;
-  roles?: string[];
-  claims?: Claims;
-}
-
-/**
- * Form metadata submitted when publishing a new extension version.
- */
-export interface ExtensionPublishRequest {
-  /** Semantic version override (defaults to manifest value) */
-  version?: string | null;
-  /** VS Code engine compatibility override */
-  engine_range?: string | null;
-  /** Friendly display name for the extension */
-  display_name?: string | null;
-  /** Optional extension description */
-  description?: string | null;
-}
-
-/**
- * Common fields describing an extension version.
- */
-export interface ExtensionVersionBase {
-  /** Semantic version identifier */
-  version: string;
-  /** Sequential version number for ordering */
-  version_number: number;
-  /** VS Code engine compatibility constraint */
-  engine_range?: string | null;
-  /** Whether the version is yanked */
-  yanked?: boolean;
-  /** Package size in bytes */
-  size: number;
-  /** SHA256 checksum of the VSIX contents */
-  sha256: string;
-  /** Stored content type of the VSIX */
-  content_type: string;
-  /** Creation timestamp */
-  created_at: string;
-  /** Publish timestamp */
-  published_at: string;
-}
-
-/**
- * List view of extension versions.
- */
-export interface ExtensionVersionListItem {
-  /** Semantic version identifier */
-  version: string;
-  /** Sequential version number for ordering */
-  version_number: number;
-  /** VS Code engine compatibility constraint */
-  engine_range?: string | null;
-  /** Whether the version is yanked */
-  yanked?: boolean;
-  /** Package size in bytes */
-  size: number;
-  /** SHA256 checksum of the VSIX contents */
-  sha256: string;
-  /** Stored content type of the VSIX */
-  content_type: string;
-  /** Creation timestamp */
-  created_at: string;
-  /** Publish timestamp */
-  published_at: string;
-}
-
-/**
- * Detailed view of an extension version.
- */
-export interface ExtensionVersionDetail {
-  /** Semantic version identifier */
-  version: string;
-  /** Sequential version number for ordering */
-  version_number: number;
-  /** VS Code engine compatibility constraint */
-  engine_range?: string | null;
-  /** Whether the version is yanked */
-  yanked?: boolean;
-  /** Package size in bytes */
-  size: number;
-  /** SHA256 checksum of the VSIX contents */
-  sha256: string;
-  /** Stored content type of the VSIX */
-  content_type: string;
-  /** Creation timestamp */
-  created_at: string;
-  /** Publish timestamp */
-  published_at: string;
-  /** Object storage key for the VSIX */
-  object_key: string;
-}
-
-/**
- * Response payload for version listing.
- */
-export interface ExtensionVersionListResponse {
-  items?: ExtensionVersionListItem[];
-  /** Pagination cursor for the next page, if available */
-  next_cursor?: string | null;
-}
-
-/**
- * Extension-level metadata including latest version information.
- */
-export interface ExtensionMetadata {
-  /** Publisher identifier */
-  publisher: string;
-  /** Extension name */
-  name: string;
-  /** Friendly display name for the extension */
-  display_name?: string | null;
-  /** Extension description */
-  description?: string | null;
-  /** Database identifier for the extension */
-  id: string;
-  /** Creation timestamp */
-  created_at: string;
-  /** Last update timestamp */
-  updated_at: string;
-  /** Number of stored versions */
-  version_count: number;
-  /** Metadata for the latest available version */
-  latest_version?: ExtensionVersionListItem | null;
-}
-
-/**
- * Request payload to (un)yank a specific version.
- */
-export interface ExtensionVersionYankRequest {
-  /** Target yank state for the version */
-  yanked: boolean;
-}
-
-/**
- * Response payload returned after publishing a version.
- */
-export interface ExtensionPublishResponse {
-  /** Semantic version identifier */
-  version: string;
-  /** Sequential version number for ordering */
-  version_number: number;
-  /** VS Code engine compatibility constraint */
-  engine_range?: string | null;
-  /** Whether the version is yanked */
-  yanked?: boolean;
-  /** Package size in bytes */
-  size: number;
-  /** SHA256 checksum of the VSIX contents */
-  sha256: string;
-  /** Stored content type of the VSIX */
-  content_type: string;
-  /** Creation timestamp */
-  created_at: string;
-  /** Publish timestamp */
-  published_at: string;
-  /** Object storage key for the VSIX */
-  object_key: string;
-  /** Publisher identifier */
-  publisher: string;
-  /** Extension name */
-  name: string;
 }
 
 export interface GroupCreate {
@@ -745,79 +136,6 @@ export interface GroupQuery {
   archived?: boolean | null;
 }
 
-/**
- * DTO for creating a grade through the tutor endpoint.
- * 
- * This is used when a tutor grades a student's submission for a specific course content.
- * The endpoint will automatically find the latest artifact for the submission group.
- */
-export interface TutorGradeCreate {
-  artifact_id?: string | null;
-  /** Grade between 0.0 and 1.0 */
-  grade?: number | null;
-  /** Grading status */
-  status?: GradingStatus | null;
-  /** Feedback/comment for the student */
-  feedback?: string | null;
-}
-
-/**
- * Response after creating a grade through the tutor endpoint.
- * 
- * Returns the updated course content information with the new grade applied.
- * We extend CourseContentStudentList to maintain backward compatibility.
- */
-export interface TutorGradeResponse {
-  id: string;
-  title?: string | null;
-  path: string;
-  course_id: string;
-  course_content_type_id: string;
-  course_content_kind_id: string;
-  position: number;
-  max_group_size?: number | null;
-  submitted?: boolean | null;
-  course_content_type: CourseContentTypeList;
-  result_count: number;
-  submission_count: number;
-  max_test_runs?: number | null;
-  directory?: string | null;
-  color: string;
-  result?: ResultStudentList | null;
-  submission_group?: SubmissionGroupStudentList | null;
-  unread_message_count?: number;
-  graded_artifact_id?: string | null;
-  graded_artifact_info?: any | null;
-}
-
-export interface ListQuery {
-  skip?: number | null;
-  limit?: number | null;
-}
-
-export interface BaseEntityList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-}
-
-export interface BaseEntityGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-}
-
-export interface StudentTemplateSettings {
-  mr_default_target_self?: boolean;
-  merge_method?: MergeMethod;
-  only_allow_merge_if_pipeline_succeeds?: boolean;
-  only_allow_merge_if_all_discussions_are_resolved?: boolean;
-}
-
 export interface FilterBase {
 }
 
@@ -883,1231 +201,6 @@ export interface AndFilter {
 
 export interface OrFilter {
   or_: EqualsFilter | GreaterFilter | LowerFilter | NotEqualsFilter | InFilter | NotInFilter | LikeFilter | ILikeFilter | BetweenFilter | IsNullFilter | NotNullFilter | StartswithFilter | EndswithFilter | ContainsFilter | AndFilter | OrFilter[];
-}
-
-export interface ResultCreate {
-  course_member_id: string;
-  course_content_id: string;
-  submission_group_id?: string;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  grade?: number | null;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-}
-
-export interface ResultGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_member_id: string;
-  course_content_id: string;
-  course_content_type_id: string;
-  submission_group_id?: string | null;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  grade?: number | null;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  grading_ids?: string[] | null;
-}
-
-export interface ResultList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  course_member_id: string;
-  course_content_id: string;
-  course_content_type_id: string;
-  submission_group_id?: string | null;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  grade?: number | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-}
-
-export interface ResultUpdate {
-  result?: number | null;
-  grade?: number | null;
-  result_json?: any | null;
-  status?: TaskStatus | null;
-  test_system_id?: string | null;
-  properties?: any | null;
-}
-
-export interface ResultQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  submitter_id?: string | null;
-  course_member_id?: string | null;
-  course_content_id?: string | null;
-  course_content_type_id?: string | null;
-  submission_group_id?: string | null;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  version_identifier?: string | null;
-  status?: TaskStatus | null;
-  latest?: boolean | null;
-  result?: number | null;
-  grade?: number | null;
-  result_json?: string | null;
-}
-
-/**
- * Result with associated grading information.
- */
-export interface ResultWithGrading {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_member_id: string;
-  course_content_id: string;
-  course_content_type_id: string;
-  submission_group_id?: string | null;
-  submission_artifact_id?: string | null;
-  execution_backend_id?: string | null;
-  test_system_id?: string | null;
-  result: number;
-  grade?: number | null;
-  result_json?: any | null;
-  properties?: any | null;
-  version_identifier: string;
-  reference_version_identifier?: string | null;
-  status: TaskStatus;
-  grading_ids?: string[] | null;
-  latest_grading?: any | null;
-  grading_count?: number;
-}
-
-/**
- * Create a new grading for a submission group.
- */
-export interface SubmissionGroupGradingCreate {
-  submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status?: GradingStatus;
-  feedback?: string | null;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * Full grading information.
- */
-export interface SubmissionGroupGradingGet {
-  created_at: string;
-  updated_at: string;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status: GradingStatus;
-  feedback?: string | null;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * List view of grading.
- */
-export interface SubmissionGroupGradingList {
-  id: string;
-  submission_group_id: string;
-  graded_by_course_member_id: string;
-  result_id?: string | null;
-  grading: number;
-  status: GradingStatus;
-  feedback?: string | null;
-  created_at: string;
-  graded_by_course_member?: GradedByCourseMember | null;
-}
-
-/**
- * Update grading information.
- */
-export interface SubmissionGroupGradingUpdate {
-  grading?: number | null;
-  status?: GradingStatus | null;
-  feedback?: string | null;
-  result_id?: string | null;
-}
-
-/**
- * Query parameters for searching gradings.
- */
-export interface SubmissionGroupGradingQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  submission_group_id?: string | null;
-  graded_by_course_member_id?: string | null;
-  result_id?: string | null;
-  status?: GradingStatus | null;
-  min_grade?: number | null;
-  max_grade?: number | null;
-  has_feedback?: boolean | null;
-}
-
-/**
- * Simplified grading view for students.
- */
-export interface GradingStudentView {
-  id: string;
-  grading: number;
-  status: GradingStatus;
-  feedback?: string | null;
-  graded_by_name?: string | null;
-  graded_at: string;
-}
-
-/**
- * Summary of gradings for a course content.
- */
-export interface GradingSummary {
-  course_content_id: string;
-  total_submissions: number;
-  graded_count: number;
-  ungraded_count: number;
-  corrected_count: number;
-  correction_necessary_count: number;
-  improvement_possible_count: number;
-  average_grade?: number | null;
-}
-
-export interface TestCreate {
-  artifact_id?: string | null;
-  submission_group_id?: string | null;
-  version_identifier?: string | null;
-  course_member_id?: string | null;
-  course_content_id?: string | null;
-  course_content_path?: string | null;
-  directory?: string | null;
-  project?: string | null;
-  provider_url?: string | null;
-  submit?: boolean | null;
-}
-
-export interface SessionCreate {
-  /** Associated user ID */
-  user_id: string;
-  /** Session identifier/token */
-  session_id: string;
-  /** IP address of the session */
-  ip_address: string;
-  /** Additional session properties */
-  properties?: any | null;
-}
-
-export interface SessionGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Session unique identifier */
-  id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Session identifier/token */
-  session_id: string;
-  /** Logout timestamp */
-  logout_time?: string | null;
-  /** IP address */
-  ip_address: string;
-  /** Additional properties */
-  properties?: any | null;
-}
-
-export interface SessionList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Session unique identifier */
-  id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Session identifier/token */
-  session_id: string;
-  /** Logout timestamp */
-  logout_time?: string | null;
-  /** IP address */
-  ip_address: string;
-}
-
-export interface SessionUpdate {
-  /** Logout timestamp */
-  logout_time?: string | null;
-  /** Additional properties */
-  properties?: any | null;
-}
-
-export interface SessionQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by session ID */
-  id?: string | null;
-  /** Filter by user ID */
-  user_id?: string | null;
-  /** Filter by session identifier */
-  session_id?: string | null;
-  /** Filter for active sessions only */
-  active_only?: boolean | null;
-  /** Filter by IP address */
-  ip_address?: string | null;
-}
-
-export interface GroupClaimCreate {
-  /** Group ID this claim belongs to */
-  group_id: string;
-  /** Type of claim (e.g., 'permission', 'attribute') */
-  claim_type: string;
-  /** Value of the claim */
-  claim_value: string;
-  /** Additional claim properties */
-  properties?: any | null;
-}
-
-export interface GroupClaimGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Group ID */
-  group_id: string;
-  /** Type of claim */
-  claim_type: string;
-  /** Value of the claim */
-  claim_value: string;
-  /** Additional properties */
-  properties?: any | null;
-}
-
-export interface GroupClaimList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Group ID */
-  group_id: string;
-  /** Type of claim */
-  claim_type: string;
-  /** Value of the claim */
-  claim_value: string;
-}
-
-export interface GroupClaimUpdate {
-  /** Additional claim properties */
-  properties?: any | null;
-}
-
-export interface GroupClaimQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by group ID */
-  group_id?: string | null;
-  /** Filter by claim type */
-  claim_type?: string | null;
-  /** Filter by claim value */
-  claim_value?: string | null;
-}
-
-/**
- * DTO for creating a student.
- */
-export interface StudentCreate {
-  user_id?: string | null;
-  user?: UserGet | null;
-  course_group_id?: string | null;
-  course_group_title?: string | null;
-  role?: string | null;
-}
-
-/**
- * DTO for releasing multiple students.
- */
-export interface ReleaseStudentsCreate {
-  students?: StudentCreate[];
-  course_id: string;
-}
-
-/**
- * DTO for TUG student export data.
- */
-export interface TUGStudentExport {
-  course_group_title: string;
-  family_name: string;
-  given_name: string;
-  matriculation_number: string;
-  created_at: string;
-}
-
-/**
- * DTO for status query parameters.
- */
-export interface StatusQuery {
-  course_id?: string | null;
-}
-
-/**
- * GitLab connection credentials.
- */
-export interface GitLabCredentials {
-  gitlab_url: string;
-  gitlab_token: string;
-}
-
-/**
- * Represents a pending change for template generation.
- */
-export interface PendingChange {
-  /** new, update, remove */
-  type: string;
-  content_id: string;
-  path: string;
-  title: string;
-}
-
-/**
- * Response for pending changes check.
- */
-export interface PendingChangesResponse {
-  total_changes: number;
-  changes: PendingChange[];
-  last_release?: Record<string, any> | null;
-}
-
-/**
- * Per-item override for release commit selection.
- */
-export interface ReleaseOverride {
-  course_content_id: string;
-  /** Commit SHA to use for this content */
-  version_identifier: string;
-}
-
-/**
- * Selection of contents and commits for a release.
- */
-export interface ReleaseSelection {
-  /** Explicit list of course content IDs to release */
-  course_content_ids?: string[] | null;
-  /** Parent content ID; combined with include_descendants */
-  parent_id?: string | null;
-  /** Whether to include descendants of parent_id */
-  include_descendants?: boolean;
-  /** Select all contents in the course */
-  all?: boolean;
-  /** Commit SHA to apply to all selected contents (overridden by per-item overrides) */
-  global_commit?: string | null;
-  /** Per-content commit overrides */
-  overrides?: ReleaseOverride[] | null;
-}
-
-/**
- * Request to generate student template.
- */
-export interface GenerateTemplateRequest {
-  /** Custom commit message (optional) */
-  commit_message?: string | null;
-  /** Force redeployment of already deployed content */
-  force_redeploy?: boolean;
-  /** Selection of contents and commits to release */
-  release?: ReleaseSelection | null;
-}
-
-/**
- * Response for template generation request.
- */
-export interface GenerateTemplateResponse {
-  workflow_id: string;
-  status?: string;
-  contents_to_process: number;
-}
-
-/**
- * Request to generate the assignments repository from Example Library.
- */
-export interface GenerateAssignmentsRequest {
-  assignments_url?: string | null;
-  course_content_ids?: string[] | null;
-  parent_id?: string | null;
-  include_descendants?: boolean;
-  all?: boolean;
-  /** skip_if_exists|force_update */
-  overwrite_strategy?: string;
-  commit_message?: string | null;
-}
-
-export interface GenerateAssignmentsResponse {
-  workflow_id: string;
-  status?: string;
-  contents_to_process: number;
-}
-
-export interface GitCommit {
-  hash: string;
-  date: string;
-  message: string;
-  author: string;
-}
-
-/**
- * Represents a test dependency with slug and version constraint.
- */
-export interface TestDependency {
-  /** Hierarchical slug of the dependency example (e.g., 'physics.math.vectors') */
-  slug: string;
-  /** Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version. */
-  version?: string | null;
-}
-
-/**
- * Base class for all CodeAbility meta models.
- */
-export interface CodeAbilityBase {
-}
-
-/**
- * Link to external resources.
- */
-export interface CodeAbilityLink {
-  /** Description of the link */
-  description: string;
-  /** URL of the link */
-  url: string;
-}
-
-/**
- * Person information for authors/maintainers.
- */
-export interface CodeAbilityPerson {
-  /** Full name */
-  name?: string | null;
-  /** Email address */
-  email?: string | null;
-  /** Institutional affiliation */
-  affiliation?: string | null;
-}
-
-/**
- * Properties specific to assignment-level meta.
- */
-export interface CodeAbilityMetaProperties {
-  /** Files that students must submit */
-  studentSubmissionFiles?: string[] | null;
-  /** Additional files provided to students */
-  additionalFiles?: string[] | null;
-  /** Test files for automated grading */
-  testFiles?: string[] | null;
-  /** Template files for student projects */
-  studentTemplates?: string[] | null;
-  /** List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints */
-  testDependencies?: string | TestDependency[] | null;
-  /** Execution backend configuration for this assignment */
-  executionBackend?: CourseExecutionBackendConfig | null;
-}
-
-/**
- * Meta information for assignments/examples.
- */
-export interface CodeAbilityMeta {
-  /** Version of the meta format */
-  version?: string | null;
-  /** Unique identifier for the assignment */
-  slug?: string | null;
-  /** Human-readable title */
-  title?: string | null;
-  /** Detailed description of the content */
-  description?: string | null;
-  /** Primary language of the content (e.g., 'en', 'de', 'fr', etc.) */
-  language?: string | null;
-  /** License information */
-  license?: string | null;
-  /** Content authors */
-  authors?: CodeAbilityPerson[] | null;
-  /** Content maintainers */
-  maintainers?: CodeAbilityPerson[] | null;
-  /** Related links */
-  links?: CodeAbilityLink[] | null;
-  /** Supporting material links */
-  supportingMaterial?: CodeAbilityLink[] | null;
-  /** Keywords for categorization */
-  keywords?: string[] | null;
-  /** Assignment-specific properties */
-  properties?: CodeAbilityMetaProperties | null;
-}
-
-export interface SubmissionGroupProperties {
-  gitlab?: GitLabConfig | null;
-}
-
-export interface SubmissionGroupCreate {
-  properties?: SubmissionGroupProperties | null;
-  max_group_size?: number;
-  max_submissions?: number | null;
-  course_content_id: string;
-  status?: string | null;
-}
-
-export interface SubmissionGroupGet {
-  properties?: SubmissionGroupProperties | null;
-  max_group_size?: number;
-  max_submissions?: number | null;
-  course_content_id: string;
-  status?: string | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_id: string;
-  last_submitted_result_id?: string | null;
-}
-
-export interface SubmissionGroupList {
-  id: string;
-  properties?: SubmissionGroupProperties | null;
-  max_group_size: number;
-  max_submissions?: number | null;
-  course_id: string;
-  course_content_id: string;
-  status?: string | null;
-  last_submitted_result_id?: string | null;
-}
-
-export interface SubmissionGroupUpdate {
-  properties?: SubmissionGroupProperties | null;
-  max_group_size?: number | null;
-  max_submissions?: number | null;
-  status?: string | null;
-}
-
-export interface SubmissionGroupQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  max_group_size?: number | null;
-  max_submissions?: number | null;
-  course_id?: string | null;
-  course_content_id?: string | null;
-  properties?: SubmissionGroupProperties | null;
-  status?: string | null;
-}
-
-/**
- * Query parameters for student submission groups
- */
-export interface SubmissionGroupStudentQuery {
-  course_id?: string | null;
-  course_content_id?: string | null;
-  has_repository?: boolean | null;
-  is_graded?: boolean | null;
-}
-
-/**
- * Submission group with latest grading information.
- */
-export interface SubmissionGroupWithGrading {
-  properties?: SubmissionGroupProperties | null;
-  max_group_size?: number;
-  max_submissions?: number | null;
-  course_content_id: string;
-  status?: string | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_id: string;
-  last_submitted_result_id?: string | null;
-  latest_grading?: any | null;
-  grading_count?: number;
-  last_submitted_at?: string | null;
-}
-
-/**
- * Detailed submission group information including members and gradings.
- */
-export interface SubmissionGroupDetailed {
-  id: string;
-  course_id: string;
-  course_content_id: string;
-  properties?: SubmissionGroupProperties | null;
-  max_group_size: number;
-  max_submissions?: number | null;
-  max_test_runs?: number | null;
-  members?: any[];
-  gradings?: any[];
-  last_submitted_result?: any | null;
-  current_group_size?: number;
-  submission_count?: number;
-  test_run_count?: number;
-  latest_grade?: number | null;
-  latest_grading_status?: GradingStatus | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SubmissionGroupMemberProperties {
-  gitlab?: GitLabConfig | null;
-}
-
-export interface SubmissionGroupMemberCreate {
-  course_member_id: string;
-  submission_group_id: string;
-  grading?: number | null;
-  properties?: SubmissionGroupMemberProperties | null;
-}
-
-export interface SubmissionGroupMemberGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  course_id: string;
-  course_content_id: string;
-  course_member_id: string;
-  submission_group_id: string;
-  grading?: number | null;
-  status?: string | null;
-  properties?: SubmissionGroupMemberProperties | null;
-}
-
-export interface SubmissionGroupMemberList {
-  id: string;
-  course_id: string;
-  course_content_id: string;
-  course_member_id: string;
-  submission_group_id: string;
-  grading?: number | null;
-  status?: string | null;
-}
-
-export interface SubmissionGroupMemberUpdate {
-  course_id?: string | null;
-  grading?: number | null;
-  status?: string | null;
-  properties?: SubmissionGroupMemberProperties | null;
-}
-
-export interface SubmissionGroupMemberQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  course_id?: string | null;
-  course_content_id?: string | null;
-  course_member_id?: string | null;
-  submission_group_id?: string | null;
-  grading?: number | null;
-  status?: string | null;
-  properties?: SubmissionGroupMemberProperties | null;
-}
-
-/**
- * DTO for creating submission artifacts.
- * 
- * This is used internally when processing submission uploads.
- * The upload endpoint accepts SubmissionCreate which only has:
- * - submission_group_id
- * - version_identifier (optional)
- */
-export interface SubmissionArtifactCreate {
-  submission_group_id: string;
-  version_identifier?: string | null;
-}
-
-/**
- * DTO for updating submission artifacts.
- */
-export interface SubmissionArtifactUpdate {
-  submit?: boolean | null;
-  properties?: Record<string, any> | null;
-}
-
-/**
- * List item representation for submission artifacts.
- * 
- * Essential metadata is stored in proper database columns.
- * Properties field is kept for legacy compatibility and future extensibility.
- */
-export interface SubmissionArtifactList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  submission_group_id: string;
-  uploaded_by_course_member_id?: string | null;
-  content_type?: string | null;
-  file_size: number;
-  bucket_name: string;
-  object_key: string;
-  uploaded_at: string;
-  version_identifier?: string | null;
-  properties?: Record<string, any> | null;
-}
-
-/**
- * Detailed view of submission artifact with related data.
- */
-export interface SubmissionArtifactGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  submission_group_id: string;
-  uploaded_by_course_member_id?: string | null;
-  content_type?: string | null;
-  file_size: number;
-  bucket_name: string;
-  object_key: string;
-  uploaded_at: string;
-  version_identifier?: string | null;
-  properties?: Record<string, any> | null;
-  test_results_count?: number | null;
-  grades_count?: number | null;
-  reviews_count?: number | null;
-  latest_result?: ResultList | null;
-  average_grade?: number | null;
-}
-
-/**
- * Query parameters for listing submission artifacts.
- */
-export interface SubmissionArtifactQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  submission_group_id?: string | null;
-  uploaded_by_course_member_id?: string | null;
-  content_type?: string | null;
-}
-
-/**
- * DTO for creating submission grades.
- */
-export interface SubmissionGradeCreate {
-  artifact_id: string;
-  graded_by_course_member_id: string;
-  grade: number;
-  status?: GradingStatus;
-  comment?: string | null;
-}
-
-/**
- * DTO for updating submission grades.
- */
-export interface SubmissionGradeUpdate {
-  grade?: number | null;
-  status?: GradingStatus | null;
-  comment?: string | null;
-}
-
-/**
- * List item representation for submission grades.
- */
-export interface SubmissionGradeListItem {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  artifact_id: string;
-  graded_by_course_member_id: string;
-  grade: number;
-  status: GradingStatus;
-  comment?: string | null;
-  graded_at: string;
-}
-
-/**
- * Detailed view of submission grade.
- */
-export interface SubmissionGradeDetail {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  artifact_id: string;
-  graded_by_course_member_id: string;
-  grade: number;
-  status: GradingStatus;
-  comment?: string | null;
-  graded_at: string;
-}
-
-/**
- * Query parameters for listing submission grades.
- */
-export interface SubmissionGradeQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  artifact_id?: string | null;
-  graded_by_course_member_id?: string | null;
-  status?: GradingStatus | null;
-}
-
-/**
- * DTO for creating submission reviews.
- */
-export interface SubmissionReviewCreate {
-  artifact_id: string;
-  reviewer_course_member_id: string;
-  body: string;
-  review_type?: string | null;
-}
-
-/**
- * DTO for updating submission reviews.
- */
-export interface SubmissionReviewUpdate {
-  body?: string | null;
-  review_type?: string | null;
-}
-
-/**
- * List item representation for submission reviews.
- */
-export interface SubmissionReviewListItem {
-  created_at: string;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  artifact_id: string;
-  reviewer_course_member_id: string;
-  body: string;
-  review_type?: string | null;
-}
-
-/**
- * Detailed view of submission review.
- */
-export interface SubmissionReviewDetail {
-  created_at: string;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  artifact_id: string;
-  reviewer_course_member_id: string;
-  body: string;
-  review_type?: string | null;
-}
-
-/**
- * Query parameters for listing submission reviews.
- */
-export interface SubmissionReviewQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  artifact_id?: string | null;
-  reviewer_course_member_id?: string | null;
-  review_type?: string | null;
-}
-
-/**
- * DTO for creating result artifacts.
- */
-export interface ResultArtifactCreate {
-  result_id: string;
-  content_type?: string | null;
-  file_size: number;
-  bucket_name: string;
-  object_key: string;
-  properties?: Record<string, any> | null;
-}
-
-/**
- * List item representation for result artifacts.
- */
-export interface ResultArtifactListItem {
-  created_at: string;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  result_id: string;
-  content_type?: string | null;
-  file_size: number;
-  bucket_name: string;
-  object_key: string;
-  properties?: Record<string, any> | null;
-}
-
-/**
- * Query parameters for listing result artifacts.
- */
-export interface ResultArtifactQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  result_id?: string | null;
-  content_type?: string | null;
-}
-
-/**
- * Metadata for storage objects
- */
-export interface StorageObjectMetadata {
-  /** MIME type of the object */
-  content_type: string;
-  /** Size of the object in bytes */
-  size: number;
-  /** Entity tag of the object */
-  etag: string;
-  /** Last modification timestamp */
-  last_modified: string;
-  /** Custom metadata */
-  metadata?: Record<string, string> | null;
-}
-
-/**
- * DTO for creating/uploading a storage object
- */
-export interface StorageObjectCreate {
-  /** Key/path for the object in the bucket */
-  object_key: string;
-  /** Target bucket name */
-  bucket_name?: string | null;
-  /** Custom metadata for the object */
-  metadata?: Record<string, string> | null;
-  /** MIME type of the object */
-  content_type?: string | null;
-}
-
-/**
- * DTO for retrieving a storage object
- */
-export interface StorageObjectGet {
-  /** MIME type of the object */
-  content_type: string;
-  /** Size of the object in bytes */
-  size: number;
-  /** Entity tag of the object */
-  etag: string;
-  /** Last modification timestamp */
-  last_modified: string;
-  /** Custom metadata */
-  metadata?: Record<string, string> | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Storage object ID */
-  id: number;
-  /** Object key/path in the bucket */
-  object_key: string;
-  /** Bucket name */
-  bucket_name: string;
-  /** Presigned download URL */
-  download_url?: string | null;
-}
-
-/**
- * DTO for listing storage objects
- */
-export interface StorageObjectList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Storage object ID */
-  id: number;
-  /** Object key/path in the bucket */
-  object_key: string;
-  /** Bucket name */
-  bucket_name: string;
-  /** MIME type of the object */
-  content_type: string;
-  /** Size of the object in bytes */
-  size: number;
-  /** Last modification timestamp */
-  last_modified: string;
-}
-
-/**
- * DTO for updating storage object metadata
- */
-export interface StorageObjectUpdate {
-  /** Updated custom metadata */
-  metadata?: Record<string, string> | null;
-  /** Updated MIME type */
-  content_type?: string | null;
-}
-
-/**
- * Query parameters for filtering storage objects
- */
-export interface StorageObjectQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by bucket name */
-  bucket_name?: string | null;
-  /** Filter by object key prefix */
-  prefix?: string | null;
-  /** Filter by content type */
-  content_type?: string | null;
-  /** Minimum object size in bytes */
-  min_size?: number | null;
-  /** Maximum object size in bytes */
-  max_size?: number | null;
-}
-
-/**
- * DTO for creating a storage bucket
- */
-export interface BucketCreate {
-  /** Name of the bucket to create */
-  bucket_name: string;
-  /** Region for the bucket */
-  region?: string | null;
-}
-
-/**
- * DTO for bucket information
- */
-export interface BucketInfo {
-  /** Name of the bucket */
-  bucket_name: string;
-  /** Bucket creation date */
-  creation_date?: string | null;
-  /** Bucket region */
-  region?: string | null;
-}
-
-/**
- * DTO for listing buckets
- */
-export interface BucketList {
-  /** List of buckets */
-  buckets: BucketInfo[];
-}
-
-/**
- * DTO for generating presigned URLs
- */
-export interface PresignedUrlRequest {
-  /** Object key/path in the bucket */
-  object_key: string;
-  /** Bucket name */
-  bucket_name?: string | null;
-  /** URL expiry time in seconds */
-  expiry_seconds?: number | null;
-  /** HTTP method for the presigned URL */
-  method?: string | null;
-}
-
-/**
- * DTO for presigned URL response
- */
-export interface PresignedUrlResponse {
-  /** The presigned URL */
-  url: string;
-  /** URL expiration timestamp */
-  expires_at: string;
-  /** HTTP method for the URL */
-  method: string;
-}
-
-/**
- * DTO for storage usage statistics
- */
-export interface StorageUsageStats {
-  /** Bucket name */
-  bucket_name: string;
-  /** Number of objects in the bucket */
-  object_count: number;
-  /** Total size of all objects in bytes */
-  total_size: number;
-  /** Last statistics update timestamp */
-  last_updated: string;
-}
-
-export interface LanguageCreate {
-  /** ISO 639-1 language code (2 lowercase letters) */
-  code: string;
-  /** Language name in English */
-  name: string;
-  /** Language name in native script */
-  native_name?: string | null;
-}
-
-export interface LanguageGet {
-  /** ISO 639-1 language code */
-  code: string;
-  /** Language name in English */
-  name: string;
-  /** Language name in native script */
-  native_name?: string | null;
-}
-
-export interface LanguageList {
-  /** ISO 639-1 language code */
-  code: string;
-  /** Language name in English */
-  name: string;
-  /** Language name in native script */
-  native_name?: string | null;
-}
-
-export interface LanguageUpdate {
-  /** Language name in English */
-  name?: string | null;
-  /** Language name in native script */
-  native_name?: string | null;
-}
-
-export interface LanguageQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by language code */
-  code?: string | null;
-  /** Filter by language name */
-  name?: string | null;
 }
 
 /**
@@ -2492,6 +585,291 @@ export interface ExamplesUploadConfig {
   path: string;
 }
 
+export interface SubmissionGroupProperties {
+  gitlab?: GitLabConfig | null;
+}
+
+export interface SubmissionGroupCreate {
+  properties?: SubmissionGroupProperties | null;
+  max_group_size?: number;
+  max_submissions?: number | null;
+  course_content_id: string;
+  status?: string | null;
+}
+
+export interface SubmissionGroupGet {
+  properties?: SubmissionGroupProperties | null;
+  max_group_size?: number;
+  max_submissions?: number | null;
+  course_content_id: string;
+  status?: string | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_id: string;
+  last_submitted_result_id?: string | null;
+}
+
+export interface SubmissionGroupList {
+  id: string;
+  properties?: SubmissionGroupProperties | null;
+  max_group_size: number;
+  max_submissions?: number | null;
+  course_id: string;
+  course_content_id: string;
+  status?: string | null;
+  last_submitted_result_id?: string | null;
+}
+
+export interface SubmissionGroupUpdate {
+  properties?: SubmissionGroupProperties | null;
+  max_group_size?: number | null;
+  max_submissions?: number | null;
+  status?: string | null;
+}
+
+export interface SubmissionGroupQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  max_group_size?: number | null;
+  max_submissions?: number | null;
+  course_id?: string | null;
+  course_content_id?: string | null;
+  properties?: SubmissionGroupProperties | null;
+  status?: string | null;
+}
+
+/**
+ * Query parameters for student submission groups
+ */
+export interface SubmissionGroupStudentQuery {
+  course_id?: string | null;
+  course_content_id?: string | null;
+  has_repository?: boolean | null;
+  is_graded?: boolean | null;
+}
+
+/**
+ * Submission group with latest grading information.
+ */
+export interface SubmissionGroupWithGrading {
+  properties?: SubmissionGroupProperties | null;
+  max_group_size?: number;
+  max_submissions?: number | null;
+  course_content_id: string;
+  status?: string | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_id: string;
+  last_submitted_result_id?: string | null;
+  latest_grading?: any | null;
+  grading_count?: number;
+  last_submitted_at?: string | null;
+}
+
+/**
+ * Detailed submission group information including members and gradings.
+ */
+export interface SubmissionGroupDetailed {
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  properties?: SubmissionGroupProperties | null;
+  max_group_size: number;
+  max_submissions?: number | null;
+  max_test_runs?: number | null;
+  members?: any[];
+  gradings?: any[];
+  last_submitted_result?: any | null;
+  current_group_size?: number;
+  submission_count?: number;
+  test_run_count?: number;
+  latest_grade?: number | null;
+  latest_grading_status?: GradingStatus | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentTemplateSettings {
+  mr_default_target_self?: boolean;
+  merge_method?: MergeMethod;
+  only_allow_merge_if_pipeline_succeeds?: boolean;
+  only_allow_merge_if_all_discussions_are_resolved?: boolean;
+}
+
+/**
+ * Represents a test dependency with slug and version constraint.
+ */
+export interface TestDependency {
+  /** Hierarchical slug of the dependency example (e.g., 'physics.math.vectors') */
+  slug: string;
+  /** Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version. */
+  version?: string | null;
+}
+
+/**
+ * Base class for all CodeAbility meta models.
+ */
+export interface CodeAbilityBase {
+}
+
+/**
+ * Link to external resources.
+ */
+export interface CodeAbilityLink {
+  /** Description of the link */
+  description: string;
+  /** URL of the link */
+  url: string;
+}
+
+/**
+ * Person information for authors/maintainers.
+ */
+export interface CodeAbilityPerson {
+  /** Full name */
+  name?: string | null;
+  /** Email address */
+  email?: string | null;
+  /** Institutional affiliation */
+  affiliation?: string | null;
+}
+
+/**
+ * Properties specific to assignment-level meta.
+ */
+export interface CodeAbilityMetaProperties {
+  /** Files that students must submit */
+  studentSubmissionFiles?: string[] | null;
+  /** Additional files provided to students */
+  additionalFiles?: string[] | null;
+  /** Test files for automated grading */
+  testFiles?: string[] | null;
+  /** Template files for student projects */
+  studentTemplates?: string[] | null;
+  /** List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints */
+  testDependencies?: string | TestDependency[] | null;
+  /** Execution backend configuration for this assignment */
+  executionBackend?: CourseExecutionBackendConfig | null;
+}
+
+/**
+ * Meta information for assignments/examples.
+ */
+export interface CodeAbilityMeta {
+  /** Version of the meta format */
+  version?: string | null;
+  /** Unique identifier for the assignment */
+  slug?: string | null;
+  /** Human-readable title */
+  title?: string | null;
+  /** Detailed description of the content */
+  description?: string | null;
+  /** Primary language of the content (e.g., 'en', 'de', 'fr', etc.) */
+  language?: string | null;
+  /** License information */
+  license?: string | null;
+  /** Content authors */
+  authors?: CodeAbilityPerson[] | null;
+  /** Content maintainers */
+  maintainers?: CodeAbilityPerson[] | null;
+  /** Related links */
+  links?: CodeAbilityLink[] | null;
+  /** Supporting material links */
+  supportingMaterial?: CodeAbilityLink[] | null;
+  /** Keywords for categorization */
+  keywords?: string[] | null;
+  /** Assignment-specific properties */
+  properties?: CodeAbilityMetaProperties | null;
+}
+
+export interface Repository {
+  url: string;
+  user?: string | null;
+  token?: string | null;
+  branch?: string | null;
+  path?: string | null;
+  commit?: string | null;
+}
+
+export interface ExecutionBackendCreate {
+  type: string;
+  slug: string;
+  properties?: any | null;
+}
+
+export interface ExecutionBackendGet {
+  type: string;
+  slug: string;
+  properties?: any | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+}
+
+export interface ExecutionBackendList {
+  type: string;
+  slug: string;
+  properties?: any | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+}
+
+export interface ExecutionBackendUpdate {
+  type?: string | null;
+  slug?: string | null;
+  properties?: any | null;
+}
+
+export interface ExecutionBackendQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  type?: string | null;
+  slug?: string | null;
+  properties?: string | null;
+}
+
+export interface ListQuery {
+  skip?: number | null;
+  limit?: number | null;
+}
+
+export interface BaseEntityList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+}
+
+export interface BaseEntityGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+}
+
 export interface GitlabGroupProjectConfig {
   name?: string | null;
   path: string;
@@ -2809,47 +1187,1626 @@ export interface CodeAbilityReport {
   tests?: CodeAbilityReportMain[] | null;
 }
 
-export interface GitlabSignup {
-  provider: string;
-  token: string;
+export interface Claims {
+  general?: any;
+  dependent?: any;
 }
 
-export interface GitlabSignupResponse {
-  courses?: CourseSignupResponse[];
+export interface Principal {
+  is_admin?: boolean;
+  user_id?: string | null;
+  roles?: string[];
+  claims?: Claims;
 }
 
 /**
- * Request model for creating a merge request submission.
+ * Metadata for storage objects
  */
-export interface SubmitRequest {
-  /** The branch name to create merge request from */
-  branch_name: string;
-  /** GitLab Personal Access Token for authentication */
+export interface StorageObjectMetadata {
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Entity tag of the object */
+  etag: string;
+  /** Last modification timestamp */
+  last_modified: string;
+  /** Custom metadata */
+  metadata?: Record<string, string> | null;
+}
+
+/**
+ * DTO for creating/uploading a storage object
+ */
+export interface StorageObjectCreate {
+  /** Key/path for the object in the bucket */
+  object_key: string;
+  /** Target bucket name */
+  bucket_name?: string | null;
+  /** Custom metadata for the object */
+  metadata?: Record<string, string> | null;
+  /** MIME type of the object */
+  content_type?: string | null;
+}
+
+/**
+ * DTO for retrieving a storage object
+ */
+export interface StorageObjectGet {
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Entity tag of the object */
+  etag: string;
+  /** Last modification timestamp */
+  last_modified: string;
+  /** Custom metadata */
+  metadata?: Record<string, string> | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Storage object ID */
+  id: number;
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name: string;
+  /** Presigned download URL */
+  download_url?: string | null;
+}
+
+/**
+ * DTO for listing storage objects
+ */
+export interface StorageObjectList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Storage object ID */
+  id: number;
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name: string;
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Last modification timestamp */
+  last_modified: string;
+}
+
+/**
+ * DTO for updating storage object metadata
+ */
+export interface StorageObjectUpdate {
+  /** Updated custom metadata */
+  metadata?: Record<string, string> | null;
+  /** Updated MIME type */
+  content_type?: string | null;
+}
+
+/**
+ * Query parameters for filtering storage objects
+ */
+export interface StorageObjectQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by bucket name */
+  bucket_name?: string | null;
+  /** Filter by object key prefix */
+  prefix?: string | null;
+  /** Filter by content type */
+  content_type?: string | null;
+  /** Minimum object size in bytes */
+  min_size?: number | null;
+  /** Maximum object size in bytes */
+  max_size?: number | null;
+}
+
+/**
+ * DTO for creating a storage bucket
+ */
+export interface BucketCreate {
+  /** Name of the bucket to create */
+  bucket_name: string;
+  /** Region for the bucket */
+  region?: string | null;
+}
+
+/**
+ * DTO for bucket information
+ */
+export interface BucketInfo {
+  /** Name of the bucket */
+  bucket_name: string;
+  /** Bucket creation date */
+  creation_date?: string | null;
+  /** Bucket region */
+  region?: string | null;
+}
+
+/**
+ * DTO for listing buckets
+ */
+export interface BucketList {
+  /** List of buckets */
+  buckets: BucketInfo[];
+}
+
+/**
+ * DTO for generating presigned URLs
+ */
+export interface PresignedUrlRequest {
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name?: string | null;
+  /** URL expiry time in seconds */
+  expiry_seconds?: number | null;
+  /** HTTP method for the presigned URL */
+  method?: string | null;
+}
+
+/**
+ * DTO for presigned URL response
+ */
+export interface PresignedUrlResponse {
+  /** The presigned URL */
+  url: string;
+  /** URL expiration timestamp */
+  expires_at: string;
+  /** HTTP method for the URL */
+  method: string;
+}
+
+/**
+ * DTO for storage usage statistics
+ */
+export interface StorageUsageStats {
+  /** Bucket name */
+  bucket_name: string;
+  /** Number of objects in the bucket */
+  object_count: number;
+  /** Total size of all objects in bytes */
+  total_size: number;
+  /** Last statistics update timestamp */
+  last_updated: string;
+}
+
+export interface TestCreate {
+  artifact_id?: string | null;
+  submission_group_id?: string | null;
+  version_identifier?: string | null;
+  course_member_id?: string | null;
+  course_content_id?: string | null;
+  course_content_path?: string | null;
+  directory?: string | null;
+  project?: string | null;
+  provider_url?: string | null;
+  submit?: boolean | null;
+}
+
+/**
+ * Payload describing a manual submission request.
+ */
+export interface SubmissionCreate {
+  submission_group_id: string;
+  version_identifier?: string | null;
+  submit?: boolean;
+}
+
+/**
+ * Metadata about a file extracted from a submission archive.
+ */
+export interface SubmissionUploadedFile {
+  object_key: string;
+  size: number;
+  content_type: string;
+  relative_path: string;
+}
+
+/**
+ * Response returned after processing a manual submission.
+ */
+export interface SubmissionUploadResponseModel {
+  artifacts: string[];
+  submission_group_id: string;
+  uploaded_by_course_member_id: string;
+  total_size: number;
+  files_count: number;
+  uploaded_at: string;
+  version_identifier: string;
+}
+
+/**
+ * List item representation for manual submissions stored as results.
+ */
+export interface SubmissionListItem {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  submit: boolean;
+  course_member_id: string;
+  course_content_id: string;
+  submission_group_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+  result: number;
+  result_json?: Record<string, any> | null;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Query parameters for listing manual submissions.
+ */
+export interface SubmissionQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submit?: boolean | null;
+  course_member_id?: string | null;
+  submission_group_id?: string | null;
+  course_content_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  version_identifier?: string | null;
+  reference_version_identifier?: string | null;
+  status?: TaskStatus | null;
+}
+
+export interface SessionCreate {
+  /** Associated user ID */
+  user_id: string;
+  /** Session identifier/token */
+  session_id: string;
+  /** IP address of the session */
+  ip_address: string;
+  /** Additional session properties */
+  properties?: any | null;
+}
+
+export interface SessionGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Session unique identifier */
+  id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Session identifier/token */
+  session_id: string;
+  /** Logout timestamp */
+  logout_time?: string | null;
+  /** IP address */
+  ip_address: string;
+  /** Additional properties */
+  properties?: any | null;
+}
+
+export interface SessionList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Session unique identifier */
+  id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Session identifier/token */
+  session_id: string;
+  /** Logout timestamp */
+  logout_time?: string | null;
+  /** IP address */
+  ip_address: string;
+}
+
+export interface SessionUpdate {
+  /** Logout timestamp */
+  logout_time?: string | null;
+  /** Additional properties */
+  properties?: any | null;
+}
+
+export interface SessionQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by session ID */
+  id?: string | null;
+  /** Filter by user ID */
+  user_id?: string | null;
+  /** Filter by session identifier */
+  session_id?: string | null;
+  /** Filter for active sessions only */
+  active_only?: boolean | null;
+  /** Filter by IP address */
+  ip_address?: string | null;
+}
+
+export interface GroupClaimCreate {
+  /** Group ID this claim belongs to */
+  group_id: string;
+  /** Type of claim (e.g., 'permission', 'attribute') */
+  claim_type: string;
+  /** Value of the claim */
+  claim_value: string;
+  /** Additional claim properties */
+  properties?: any | null;
+}
+
+export interface GroupClaimGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Group ID */
+  group_id: string;
+  /** Type of claim */
+  claim_type: string;
+  /** Value of the claim */
+  claim_value: string;
+  /** Additional properties */
+  properties?: any | null;
+}
+
+export interface GroupClaimList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Group ID */
+  group_id: string;
+  /** Type of claim */
+  claim_type: string;
+  /** Value of the claim */
+  claim_value: string;
+}
+
+export interface GroupClaimUpdate {
+  /** Additional claim properties */
+  properties?: any | null;
+}
+
+export interface GroupClaimQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by group ID */
+  group_id?: string | null;
+  /** Filter by claim type */
+  claim_type?: string | null;
+  /** Filter by claim value */
+  claim_value?: string | null;
+}
+
+/**
+ * DTO for creating submission artifacts.
+ * 
+ * This is used internally when processing submission uploads.
+ * The upload endpoint accepts SubmissionCreate which only has:
+ * - submission_group_id
+ * - version_identifier (optional)
+ */
+export interface SubmissionArtifactCreate {
+  submission_group_id: string;
+  version_identifier?: string | null;
+}
+
+/**
+ * DTO for updating submission artifacts.
+ */
+export interface SubmissionArtifactUpdate {
+  submit?: boolean | null;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * List item representation for submission artifacts.
+ * 
+ * Essential metadata is stored in proper database columns.
+ * Properties field is kept for legacy compatibility and future extensibility.
+ */
+export interface SubmissionArtifactList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  submission_group_id: string;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  uploaded_at: string;
+  version_identifier?: string | null;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Detailed view of submission artifact with related data.
+ */
+export interface SubmissionArtifactGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  submission_group_id: string;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  uploaded_at: string;
+  version_identifier?: string | null;
+  properties?: Record<string, any> | null;
+  test_results_count?: number | null;
+  grades_count?: number | null;
+  reviews_count?: number | null;
+  latest_result?: ResultList | null;
+  average_grade?: number | null;
+}
+
+/**
+ * Query parameters for listing submission artifacts.
+ */
+export interface SubmissionArtifactQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submission_group_id?: string | null;
+  uploaded_by_course_member_id?: string | null;
+  content_type?: string | null;
+}
+
+/**
+ * DTO for creating submission grades.
+ */
+export interface SubmissionGradeCreate {
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status?: GradingStatus;
+  comment?: string | null;
+}
+
+/**
+ * DTO for updating submission grades.
+ */
+export interface SubmissionGradeUpdate {
+  grade?: number | null;
+  status?: GradingStatus | null;
+  comment?: string | null;
+}
+
+/**
+ * List item representation for submission grades.
+ */
+export interface SubmissionGradeListItem {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status: GradingStatus;
+  comment?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Detailed view of submission grade.
+ */
+export interface SubmissionGradeDetail {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  graded_by_course_member_id: string;
+  grade: number;
+  status: GradingStatus;
+  comment?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Query parameters for listing submission grades.
+ */
+export interface SubmissionGradeQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  artifact_id?: string | null;
+  graded_by_course_member_id?: string | null;
+  status?: GradingStatus | null;
+}
+
+/**
+ * DTO for creating submission reviews.
+ */
+export interface SubmissionReviewCreate {
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * DTO for updating submission reviews.
+ */
+export interface SubmissionReviewUpdate {
+  body?: string | null;
+  review_type?: string | null;
+}
+
+/**
+ * List item representation for submission reviews.
+ */
+export interface SubmissionReviewListItem {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * Detailed view of submission review.
+ */
+export interface SubmissionReviewDetail {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  artifact_id: string;
+  reviewer_course_member_id: string;
+  body: string;
+  review_type?: string | null;
+}
+
+/**
+ * Query parameters for listing submission reviews.
+ */
+export interface SubmissionReviewQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  artifact_id?: string | null;
+  reviewer_course_member_id?: string | null;
+  review_type?: string | null;
+}
+
+/**
+ * DTO for creating result artifacts.
+ */
+export interface ResultArtifactCreate {
+  result_id: string;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * List item representation for result artifacts.
+ */
+export interface ResultArtifactListItem {
+  created_at: string;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  result_id: string;
+  content_type?: string | null;
+  file_size: number;
+  bucket_name: string;
+  object_key: string;
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Query parameters for listing result artifacts.
+ */
+export interface ResultArtifactQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  result_id?: string | null;
+  content_type?: string | null;
+}
+
+export interface CourseMemberGitLabConfig {
+  settings?: any | null;
+  url?: string | null;
+  full_path?: string | null;
+  directory?: string | null;
+  registry?: string | null;
+  parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
+  full_path_submission?: string | null;
+}
+
+export interface LanguageCreate {
+  /** ISO 639-1 language code (2 lowercase letters) */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageGet {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageList {
+  /** ISO 639-1 language code */
+  code: string;
+  /** Language name in English */
+  name: string;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageUpdate {
+  /** Language name in English */
+  name?: string | null;
+  /** Language name in native script */
+  native_name?: string | null;
+}
+
+export interface LanguageQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by language code */
+  code?: string | null;
+  /** Filter by language name */
+  name?: string | null;
+}
+
+/**
+ * Metadata stored with deployments.
+ */
+export interface DeploymentMetadata {
+  /** Temporal workflow ID */
+  workflow_id?: string | null;
+  /** List of files deployed */
+  files_deployed?: string[] | null;
+  /** Git commit hash */
+  git_commit?: string | null;
+  /** Error details if deployment failed */
+  error_details?: Record<string, any> | null;
+  /** Properties migrated from old schema */
+  migrated_properties?: Record<string, any> | null;
+}
+
+/**
+ * Create a new deployment (typically done automatically).
+ */
+export interface CourseContentDeploymentCreate {
+  /** Course content to deploy to */
+  course_content_id: string;
+  /** Example version to deploy */
+  example_version_id: string;
+  /** Initial deployment status */
+  deployment_status?: any;
+  /** Optional message */
+  deployment_message?: string | null;
+  /** Additional metadata */
+  deployment_metadata?: DeploymentMetadata | null;
+}
+
+/**
+ * Update deployment status.
+ */
+export interface CourseContentDeploymentUpdate {
+  deployment_status?: any | null;
+  deployment_message?: string | null;
+  deployed_at?: string | null;
+  last_attempt_at?: string | null;
+  deployment_path?: string | null;
+  deployment_metadata?: DeploymentMetadata | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+}
+
+/**
+ * Get deployment details.
+ */
+export interface CourseContentDeploymentGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_content_id: string;
+  example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+  deployment_status: string;
+  deployment_message: string | null;
+  assigned_at: string;
+  deployed_at: string | null;
+  last_attempt_at: string | null;
+  deployment_path: string | null;
+  version_identifier: string | null;
+  deployment_metadata: Record<string, any> | null;
+  workflow_id: string | null;
+  example_version?: any | null;
+}
+
+/**
+ * List view of deployments.
+ */
+export interface CourseContentDeploymentList {
+  id: string;
+  course_content_id: string;
+  example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+  deployment_status: string;
+  assigned_at: string;
+  deployed_at: string | null;
+  version_identifier: string | null;
+  example_version?: ExampleVersionList | null;
+}
+
+/**
+ * Query parameters for deployments.
+ */
+export interface CourseContentDeploymentQuery {
+  skip?: number | null;
+  limit?: number | null;
+  course_content_id?: string | null;
+  example_version_id?: string | null;
+  deployment_status?: string | null;
+  deployed?: boolean | null;
+  failed?: boolean | null;
+}
+
+/**
+ * Create a deployment history entry.
+ */
+export interface DeploymentHistoryCreate {
+  deployment_id: string;
+  action: any;
+  example_version_id?: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+  previous_example_version_id?: string | null;
+  workflow_id?: string | null;
+}
+
+/**
+ * Get deployment history entry.
+ */
+export interface DeploymentHistoryGet {
+  id: string;
+  deployment_id: string;
+  action: string;
+  example_version_id: string | null;
+  previous_example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+  workflow_id: string | null;
+  created_at: string;
+  created_by: string | null;
+  example_version?: any | null;
+  previous_example_version?: any | null;
+}
+
+/**
+ * List view of deployment history.
+ */
+export interface DeploymentHistoryList {
+  id: string;
+  deployment_id: string;
+  action: string;
+  created_at: string;
+  workflow_id: string | null;
+}
+
+/**
+ * Deployment with its full history.
+ */
+export interface DeploymentWithHistory {
+  deployment: CourseContentDeploymentGet;
+  history: DeploymentHistoryGet[];
+}
+
+/**
+ * Summary of deployments for a course.
+ */
+export interface DeploymentSummary {
+  course_id: string;
+  /** Total course content items */
+  total_content: number;
+  /** Total submittable content (assignments) */
+  submittable_content: number;
+  /** Total deployments */
+  deployments_total: number;
+  /** Deployments pending */
+  deployments_pending: number;
+  /** Successfully deployed */
+  deployments_deployed: number;
+  /** Failed deployments */
+  deployments_failed: number;
+  /** Most recent deployment */
+  last_deployment_at?: string | null;
+}
+
+/**
+ * Request to assign an example to course content.
+ */
+export interface AssignExampleRequest {
+  /** Example version to assign (optional if providing identifier+version_tag) */
+  example_version_id?: string | null;
+  /** Hierarchical identifier (ltree string) for the example source */
+  example_identifier?: string | null;
+  /** Version tag for the example source */
+  version_tag?: string | null;
+  /** Optional message about this assignment */
+  deployment_message?: string | null;
+}
+
+/**
+ * Request to deploy assigned examples.
+ */
+export interface DeployExampleRequest {
+  /** Course to deploy examples for */
+  course_id: string;
+  /** Specific content IDs to deploy (all if None) */
+  content_ids?: string[] | null;
+  /** Force re-deployment even if already deployed */
+  force?: boolean;
+}
+
+/**
+ * DTO for creating a student.
+ */
+export interface StudentCreate {
+  user_id?: string | null;
+  user?: UserGet | null;
+  course_group_id?: string | null;
+  course_group_title?: string | null;
+  role?: string | null;
+}
+
+/**
+ * DTO for releasing multiple students.
+ */
+export interface ReleaseStudentsCreate {
+  students?: StudentCreate[];
+  course_id: string;
+}
+
+/**
+ * DTO for TUG student export data.
+ */
+export interface TUGStudentExport {
+  course_group_title: string;
+  family_name: string;
+  given_name: string;
+  matriculation_number: string;
+  created_at: string;
+}
+
+/**
+ * DTO for status query parameters.
+ */
+export interface StatusQuery {
+  course_id?: string | null;
+}
+
+/**
+ * GitLab connection credentials.
+ */
+export interface GitLabCredentials {
+  gitlab_url: string;
   gitlab_token: string;
-  /** Optional title for the merge request */
+}
+
+/**
+ * Represents a pending change for template generation.
+ */
+export interface PendingChange {
+  /** new, update, remove */
+  type: string;
+  content_id: string;
+  path: string;
+  title: string;
+}
+
+/**
+ * Response for pending changes check.
+ */
+export interface PendingChangesResponse {
+  total_changes: number;
+  changes: PendingChange[];
+  last_release?: Record<string, any> | null;
+}
+
+/**
+ * Per-item override for release commit selection.
+ */
+export interface ReleaseOverride {
+  course_content_id: string;
+  /** Commit SHA to use for this content */
+  version_identifier: string;
+}
+
+/**
+ * Selection of contents and commits for a release.
+ */
+export interface ReleaseSelection {
+  /** Explicit list of course content IDs to release */
+  course_content_ids?: string[] | null;
+  /** Parent content ID; combined with include_descendants */
+  parent_id?: string | null;
+  /** Whether to include descendants of parent_id */
+  include_descendants?: boolean;
+  /** Select all contents in the course */
+  all?: boolean;
+  /** Commit SHA to apply to all selected contents (overridden by per-item overrides) */
+  global_commit?: string | null;
+  /** Per-content commit overrides */
+  overrides?: ReleaseOverride[] | null;
+}
+
+/**
+ * Request to generate student template.
+ */
+export interface GenerateTemplateRequest {
+  /** Custom commit message (optional) */
+  commit_message?: string | null;
+  /** Force redeployment of already deployed content */
+  force_redeploy?: boolean;
+  /** Selection of contents and commits to release */
+  release?: ReleaseSelection | null;
+}
+
+/**
+ * Response for template generation request.
+ */
+export interface GenerateTemplateResponse {
+  workflow_id: string;
+  status?: string;
+  contents_to_process: number;
+}
+
+/**
+ * Request to generate the assignments repository from Example Library.
+ */
+export interface GenerateAssignmentsRequest {
+  assignments_url?: string | null;
+  course_content_ids?: string[] | null;
+  parent_id?: string | null;
+  include_descendants?: boolean;
+  all?: boolean;
+  /** skip_if_exists|force_update */
+  overwrite_strategy?: string;
+  commit_message?: string | null;
+}
+
+export interface GenerateAssignmentsResponse {
+  workflow_id: string;
+  status?: string;
+  contents_to_process: number;
+}
+
+export interface ResultCreate {
+  course_member_id: string;
+  course_content_id: string;
+  submission_group_id?: string;
+  submission_artifact_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  result: number;
+  grade?: number | null;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+}
+
+export interface ResultGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_member_id: string;
+  course_content_id: string;
+  course_content_type_id: string;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  result: number;
+  grade?: number | null;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+  grading_ids?: string[] | null;
+}
+
+export interface ResultList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  course_member_id: string;
+  course_content_id: string;
+  course_content_type_id: string;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  result: number;
+  grade?: number | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+}
+
+export interface ResultUpdate {
+  result?: number | null;
+  grade?: number | null;
+  result_json?: any | null;
+  status?: TaskStatus | null;
+  test_system_id?: string | null;
+  properties?: any | null;
+}
+
+export interface ResultQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submitter_id?: string | null;
+  course_member_id?: string | null;
+  course_content_id?: string | null;
+  course_content_type_id?: string | null;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  version_identifier?: string | null;
+  status?: TaskStatus | null;
+  latest?: boolean | null;
+  result?: number | null;
+  grade?: number | null;
+  result_json?: string | null;
+}
+
+/**
+ * Result with associated grading information.
+ */
+export interface ResultWithGrading {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_member_id: string;
+  course_content_id: string;
+  course_content_type_id: string;
+  submission_group_id?: string | null;
+  submission_artifact_id?: string | null;
+  execution_backend_id?: string | null;
+  test_system_id?: string | null;
+  result: number;
+  grade?: number | null;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+  grading_ids?: string[] | null;
+  latest_grading?: any | null;
+  grading_count?: number;
+}
+
+/**
+ * Create a new grading for a submission group.
+ */
+export interface SubmissionGroupGradingCreate {
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status?: GradingStatus;
+  feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * Full grading information.
+ */
+export interface SubmissionGroupGradingGet {
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: GradingStatus;
+  feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * List view of grading.
+ */
+export interface SubmissionGroupGradingList {
+  id: string;
+  submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: GradingStatus;
+  feedback?: string | null;
+  created_at: string;
+  graded_by_course_member?: GradedByCourseMember | null;
+}
+
+/**
+ * Update grading information.
+ */
+export interface SubmissionGroupGradingUpdate {
+  grading?: number | null;
+  status?: GradingStatus | null;
+  feedback?: string | null;
+  result_id?: string | null;
+}
+
+/**
+ * Query parameters for searching gradings.
+ */
+export interface SubmissionGroupGradingQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  submission_group_id?: string | null;
+  graded_by_course_member_id?: string | null;
+  result_id?: string | null;
+  status?: GradingStatus | null;
+  min_grade?: number | null;
+  max_grade?: number | null;
+  has_feedback?: boolean | null;
+}
+
+/**
+ * Simplified grading view for students.
+ */
+export interface GradingStudentView {
+  id: string;
+  grading: number;
+  status: GradingStatus;
+  feedback?: string | null;
+  graded_by_name?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Summary of gradings for a course content.
+ */
+export interface GradingSummary {
+  course_content_id: string;
+  total_submissions: number;
+  graded_count: number;
+  ungraded_count: number;
+  corrected_count: number;
+  correction_necessary_count: number;
+  improvement_possible_count: number;
+  average_grade?: number | null;
+}
+
+export interface GitCommit {
+  hash: string;
+  date: string;
+  message: string;
+  author: string;
+}
+
+export interface ProfileCreate {
+  /** Associated user ID */
+  user_id: string;
+  /** Avatar color as RGB integer (0-16777215) */
+  avatar_color?: number | null;
+  /** Avatar image URL */
+  avatar_image?: string | null;
+  /** Unique nickname */
+  nickname?: string | null;
+  /** User biography */
+  bio?: string | null;
+  /** User website URL */
+  url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
+  /** Additional profile properties */
+  properties?: any | null;
+}
+
+export interface ProfileGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Profile unique identifier */
+  id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Avatar color as RGB integer */
+  avatar_color?: number | null;
+  /** Avatar image URL */
+  avatar_image?: string | null;
+  /** Unique nickname */
+  nickname?: string | null;
+  /** User biography */
+  bio?: string | null;
+  /** User website URL */
+  url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
+  /** Additional properties */
+  properties?: any | null;
+}
+
+export interface ProfileList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Profile unique identifier */
+  id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Unique nickname */
+  nickname?: string | null;
+  /** Avatar image URL */
+  avatar_image?: string | null;
+  /** Avatar color */
+  avatar_color?: number | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
+}
+
+export interface ProfileUpdate {
+  /** Avatar color as RGB integer */
+  avatar_color?: number | null;
+  /** Avatar image URL */
+  avatar_image?: string | null;
+  /** Unique nickname */
+  nickname?: string | null;
+  /** User biography */
+  bio?: string | null;
+  /** User website URL */
+  url?: string | null;
+  /** ISO 639-1 language code */
+  language_code?: string | null;
+  /** Additional properties */
+  properties?: any | null;
+}
+
+export interface ProfileQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by profile ID */
+  id?: string | null;
+  /** Filter by user ID */
+  user_id?: string | null;
+  /** Filter by nickname */
+  nickname?: string | null;
+}
+
+/**
+ * DTO for creating a grade through the tutor endpoint.
+ * 
+ * This is used when a tutor grades a student's submission for a specific course content.
+ * The endpoint will automatically find the latest artifact for the submission group.
+ */
+export interface TutorGradeCreate {
+  artifact_id?: string | null;
+  /** Grade between 0.0 and 1.0 */
+  grade?: number | null;
+  /** Grading status */
+  status?: GradingStatus | null;
+  /** Feedback/comment for the student */
+  feedback?: string | null;
+}
+
+/**
+ * Response after creating a grade through the tutor endpoint.
+ * 
+ * Returns the updated course content information with the new grade applied.
+ * We extend CourseContentStudentList to maintain backward compatibility.
+ */
+export interface TutorGradeResponse {
+  id: string;
   title?: string | null;
-  /** Optional description for the merge request */
+  path: string;
+  course_id: string;
+  course_content_type_id: string;
+  course_content_kind_id: string;
+  position: number;
+  max_group_size?: number | null;
+  submitted?: boolean | null;
+  course_content_type: CourseContentTypeList;
+  result_count: number;
+  submission_count: number;
+  max_test_runs?: number | null;
+  directory?: string | null;
+  color: string;
+  result?: ResultStudentList | null;
+  submission_group?: SubmissionGroupStudentList | null;
+  unread_message_count?: number;
+  graded_artifact_id?: string | null;
+  graded_artifact_info?: any | null;
+}
+
+/**
+ * Form metadata submitted when publishing a new extension version.
+ */
+export interface ExtensionPublishRequest {
+  /** Semantic version override (defaults to manifest value) */
+  version?: string | null;
+  /** VS Code engine compatibility override */
+  engine_range?: string | null;
+  /** Friendly display name for the extension */
+  display_name?: string | null;
+  /** Optional extension description */
   description?: string | null;
 }
 
 /**
- * Response model for merge request submission.
+ * Common fields describing an extension version.
  */
-export interface SubmitResponse {
-  /** The ID of the created merge request */
-  merge_request_id: number;
-  /** The internal ID of the merge request */
-  merge_request_iid: number;
-  /** The web URL of the merge request */
-  web_url: string;
-  /** The source branch of the merge request */
-  source_branch: string;
-  /** The target branch of the merge request */
-  target_branch: string;
-  /** The title of the merge request */
-  title: string;
-  /** The state of the merge request */
-  state: string;
+export interface ExtensionVersionBase {
+  /** Semantic version identifier */
+  version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+}
+
+/**
+ * List view of extension versions.
+ */
+export interface ExtensionVersionListItem {
+  /** Semantic version identifier */
+  version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+}
+
+/**
+ * Detailed view of an extension version.
+ */
+export interface ExtensionVersionDetail {
+  /** Semantic version identifier */
+  version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+  /** Object storage key for the VSIX */
+  object_key: string;
+}
+
+/**
+ * Response payload for version listing.
+ */
+export interface ExtensionVersionListResponse {
+  items?: ExtensionVersionListItem[];
+  /** Pagination cursor for the next page, if available */
+  next_cursor?: string | null;
+}
+
+/**
+ * Extension-level metadata including latest version information.
+ */
+export interface ExtensionMetadata {
+  /** Publisher identifier */
+  publisher: string;
+  /** Extension name */
+  name: string;
+  /** Friendly display name for the extension */
+  display_name?: string | null;
+  /** Extension description */
+  description?: string | null;
+  /** Database identifier for the extension */
+  id: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
+  /** Number of stored versions */
+  version_count: number;
+  /** Metadata for the latest available version */
+  latest_version?: ExtensionVersionListItem | null;
+}
+
+/**
+ * Request payload to (un)yank a specific version.
+ */
+export interface ExtensionVersionYankRequest {
+  /** Target yank state for the version */
+  yanked: boolean;
+}
+
+/**
+ * Response payload returned after publishing a version.
+ */
+export interface ExtensionPublishResponse {
+  /** Semantic version identifier */
+  version: string;
+  /** Sequential version number for ordering */
+  version_number: number;
+  /** VS Code engine compatibility constraint */
+  engine_range?: string | null;
+  /** Whether the version is yanked */
+  yanked?: boolean;
+  /** Package size in bytes */
+  size: number;
+  /** SHA256 checksum of the VSIX contents */
+  sha256: string;
+  /** Stored content type of the VSIX */
+  content_type: string;
+  /** Creation timestamp */
+  created_at: string;
+  /** Publish timestamp */
+  published_at: string;
+  /** Object storage key for the VSIX */
+  object_key: string;
+  /** Publisher identifier */
+  publisher: string;
+  /** Extension name */
+  name: string;
+}
+
+export interface SubmissionGroupMemberProperties {
+  gitlab?: GitLabConfig | null;
+}
+
+export interface SubmissionGroupMemberCreate {
+  course_member_id: string;
+  submission_group_id: string;
+  grading?: number | null;
+  properties?: SubmissionGroupMemberProperties | null;
+}
+
+export interface SubmissionGroupMemberGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  course_member_id: string;
+  submission_group_id: string;
+  grading?: number | null;
+  status?: string | null;
+  properties?: SubmissionGroupMemberProperties | null;
+}
+
+export interface SubmissionGroupMemberList {
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  course_member_id: string;
+  submission_group_id: string;
+  grading?: number | null;
+  status?: string | null;
+}
+
+export interface SubmissionGroupMemberUpdate {
+  course_id?: string | null;
+  grading?: number | null;
+  status?: string | null;
+  properties?: SubmissionGroupMemberProperties | null;
+}
+
+export interface SubmissionGroupMemberQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  course_id?: string | null;
+  course_content_id?: string | null;
+  course_member_id?: string | null;
+  submission_group_id?: string | null;
+  grading?: number | null;
+  status?: string | null;
+  properties?: SubmissionGroupMemberProperties | null;
 }
 
 
@@ -2857,8 +2814,6 @@ export interface SubmitResponse {
 export type GroupType = "fixed" | "dynamic";
 
 export type MergeMethod = "rebase_merge" | "merge" | "ff";
-
-export type GradingStatus = 0 | 1 | 2 | 3;
 
 export type StatusEnum = "SCHEDULED" | "COMPLETED" | "TIMEDOUT" | "CRASHED" | "CANCELLED" | "SKIPPED" | "FAILED";
 
@@ -2871,3 +2826,5 @@ export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exi
 export type LanguageEnum = "de" | "en";
 
 export type MetaTypeEnum = "course" | "unit" | "assignment";
+
+export type GradingStatus = 0 | 1 | 2 | 3;

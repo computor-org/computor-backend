@@ -13,9 +13,9 @@ export class StudentsClient extends BaseEndpointClient {
   }
 
   /**
-   * Student List Course Contents
+   * Student List Course Contents Endpoint
    */
-  async studentListCourseContentsStudentsCourseContentsGet({ ascendants, courseContentTypeId, courseId, descendants, directory, id, limit, nlevel, path, project, providerUrl, skip, title }: { ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; id?: string | null; limit?: number | null; nlevel?: number | null; path?: string | null; project?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseContentStudentList[]> {
+  async studentListCourseContentsEndpointStudentsCourseContentsGet({ ascendants, courseContentTypeId, courseId, descendants, directory, id, limit, nlevel, path, project, providerUrl, skip, title }: { ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; id?: string | null; limit?: number | null; nlevel?: number | null; path?: string | null; project?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseContentStudentList[]> {
     const queryParams: Record<string, unknown> = {
       ascendants,
       course_content_type_id: courseContentTypeId,
@@ -35,16 +35,16 @@ export class StudentsClient extends BaseEndpointClient {
   }
 
   /**
-   * Student Get Course Content
+   * Student Get Course Content Endpoint
    */
-  async studentGetCourseContentStudentsCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentStudentGet> {
+  async studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentStudentGet> {
     return this.client.get<CourseContentStudentGet>(this.buildPath('course-contents', courseContentId));
   }
 
   /**
-   * Student List Courses
+   * Student List Courses Endpoint
    */
-  async studentListCoursesStudentsCoursesGet({ courseFamilyId, description, fullPath, fullPathStudent, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; fullPathStudent?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
+  async studentListCoursesEndpointStudentsCoursesGet({ courseFamilyId, description, fullPath, fullPathStudent, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; fullPathStudent?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -62,16 +62,9 @@ export class StudentsClient extends BaseEndpointClient {
   }
 
   /**
-   * Student Get Course
+   * Student Get Course Endpoint
    */
-  async studentGetCourseStudentsCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseStudentGet> {
+  async studentGetCourseEndpointStudentsCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseStudentGet> {
     return this.client.get<CourseStudentGet>(this.buildPath('courses', courseId));
-  }
-
-  /**
-   * Get Signup Init Data
-   */
-  async getSignupInitDataStudentsRepositoriesGet(): Promise<string[]> {
-    return this.client.get<string[]>(this.buildPath('repositories'));
   }
 }
