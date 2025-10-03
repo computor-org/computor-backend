@@ -350,7 +350,7 @@ async def list_versions(
     result = [ExampleVersionList.model_validate(v) for v in versions]
     # Use model_dump with mode='json' to handle UUID serialization
     serializable_data = [r.model_dump(mode='json') for r in result]
-    await redis_client.set(cache_key, json.dumps(serializable_data), ttl=CACHE_TTL_LIST)
+    await redis_client.set(cache_key, json.dumps(serializable_data), ex=CACHE_TTL_LIST)
     
     return result
 
@@ -384,7 +384,7 @@ async def get_version(
     # Cache result
     result = ExampleVersionGet.model_validate(version)
     # Use model_dump with mode='json' to handle UUID serialization
-    await redis_client.set(cache_key, json.dumps(result.model_dump(mode='json')), ttl=CACHE_TTL_GET)
+    await redis_client.set(cache_key, json.dumps(result.model_dump(mode='json')), ex=CACHE_TTL_GET)
     
     return result
 

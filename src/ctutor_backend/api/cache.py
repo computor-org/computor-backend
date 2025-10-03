@@ -43,9 +43,9 @@ def cache_route(interface: EntityInterface, ttl: int):
 
             try:
                 if isinstance(response,list):
-                    await cache.set(cache_key, [entity.model_dump_json() for entity in response], ttl=ttl)
+                    await cache.set(cache_key, json.dumps([entity.model_dump_json() for entity in response]), ex=ttl)
                 else:
-                    await cache.set(cache_key, response.model_dump_json(), ttl=ttl)
+                    await cache.set(cache_key, response.model_dump_json(), ex=ttl)
             except Exception as e:
                 raise e
 

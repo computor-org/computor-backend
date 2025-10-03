@@ -692,7 +692,7 @@ async def get_course_deployment_summary(
     
     # Cache the result
     if cache:
-        await cache.set(cache_key, summary.dict(), ttl=300)  # 5 minutes
+        await cache.set(cache_key, json.dumps(summary.dict()), ex=300)  # 5 minutes
     
     return summary
 

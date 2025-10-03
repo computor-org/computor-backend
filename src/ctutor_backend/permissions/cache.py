@@ -100,7 +100,7 @@ class PermissionCache:
         # Update Redis cache
         try:
             cache = await get_redis_client()
-            await cache.set(key, json.dumps(result), ttl=self.ttl_seconds)
+            await cache.set(key, json.dumps(result), ex=self.ttl_seconds)
             logger.debug(f"Cached permission for {key}: {result}")
         except Exception as e:
             logger.warning(f"Failed to cache in Redis: {e}")

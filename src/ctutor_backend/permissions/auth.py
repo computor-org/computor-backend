@@ -225,7 +225,7 @@ class PrincipalBuilder:
         
         # Cache it
         try:
-            await cache.set(cache_key, principal.model_dump_json(), ttl=AUTH_CACHE_TTL)
+            await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
             logger.debug(f"Cached Principal for {cache_key}")
         except Exception as e:
             logger.warning(f"Cache storage error: {e}")
