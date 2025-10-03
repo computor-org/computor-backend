@@ -100,13 +100,11 @@ class LecturerViewRepository(ViewRepository):
         """
         user_id = permissions.get_user_id_or_throw()
 
-        # Build cache key
-        cache_key_suffix = f"params:{hash(str(params.model_dump() if hasattr(params, 'model_dump') else params))}"
-
-        # Try cache
-        cached = self._get_cached_view(
+        # Try cache with query-aware key
+        cached = self._get_cached_query_view(
             user_id=str(user_id),
-            view_type=f"lecturer:courses:{cache_key_suffix}"
+            view_type="lecturer:courses",
+            params=params
         )
         if cached is not None:
             return [CourseList.model_validate(item, from_attributes=True) for item in cached]
@@ -115,10 +113,11 @@ class LecturerViewRepository(ViewRepository):
         query = check_course_permissions(permissions, Course, "_lecturer", self.db)
         result = CourseInterface.search(self.db, query, params)
 
-        # Cache result
-        self._set_cached_view(
+        # Cache result with query-aware key
+        self._set_cached_query_view(
             user_id=str(user_id),
-            view_type=f"lecturer:courses:{cache_key_suffix}",
+            view_type="lecturer:courses",
+            params=params,
             data=[item.model_dump() if hasattr(item, 'model_dump') else {k: v for k, v in item.__dict__.items() if not k.startswith('_')} for item in result],
             ttl=self.get_default_ttl()
         )
@@ -203,13 +202,11 @@ class LecturerViewRepository(ViewRepository):
         """
         user_id = permissions.get_user_id_or_throw()
 
-        # Build cache key
-        cache_key_suffix = f"params:{hash(str(params.model_dump() if hasattr(params, 'model_dump') else params))}"
-
-        # Try cache
-        cached = self._get_cached_view(
+        # Try cache with query-aware key
+        cached = self._get_cached_query_view(
             user_id=str(user_id),
-            view_type=f"lecturer:course_contents:{cache_key_suffix}"
+            view_type="lecturer:course_contents",
+            params=params
         )
         if cached is not None:
             return [CourseContentLecturerList.model_validate(item, from_attributes=True) for item in cached]
@@ -241,10 +238,11 @@ class LecturerViewRepository(ViewRepository):
 
             result.append(CourseContentLecturerList.model_validate(response_dict))
 
-        # Cache result
-        self._set_cached_view(
+        # Cache result with query-aware key
+        self._set_cached_query_view(
             user_id=str(user_id),
-            view_type=f"lecturer:course_contents:{cache_key_suffix}",
+            view_type="lecturer:course_contents",
+            params=params,
             data=self._serialize_dto_list(result),
             ttl=self.get_default_ttl()
         )

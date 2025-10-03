@@ -62,13 +62,13 @@ class LoginRequest(BaseModel):
     redirect_uri: Optional[str] = Field(None, description="Redirect URI after login")
 
 
-class CallbackRequest(BaseModel):
+class CallbackRequest(BaseModel): # is this class used anywhere? if no: deprecated, could be removed
     """OAuth callback parameters."""
     code: str = Field(..., description="Authorization code")
     state: Optional[str] = Field(None, description="State parameter")
 
 
-class SSOAuthResponse(BaseModel):
+class SSOAuthResponse(BaseModel): # is this class used anywhere? if no: deprecated, could be removed
     """Response after successful SSO authentication."""
     user_id: str = Field(..., description="User ID")
     account_id: str = Field(..., description="Account ID")

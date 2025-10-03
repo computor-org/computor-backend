@@ -10,6 +10,8 @@ from abc import ABC
 from typing import Any, Optional, Dict, List
 from sqlalchemy.orm import Session
 import logging
+import json
+import hashlib
 
 from ..cache import Cache
 
@@ -100,6 +102,50 @@ class ViewRepository(ABC):
 
         return cached
 
+    def _get_cached_query_view(
+        self,
+        user_id: str,
+        view_type: str,
+        params: Any
+    ) -> Optional[Any]:
+        """
+        Get cached view data for a query with parameters.
+
+        This method creates a cache key from the query parameters, making
+        cache invalidation more precise and preventing cache pollution.
+
+        Args:
+            user_id: User ID
+            view_type: View type (e.g., "course_contents", "courses")
+            params: Query parameters DTO (e.g., CourseContentQuery)
+
+        Returns:
+            Cached data or None
+
+        Example:
+            params = CourseContentQuery(course_id="123", limit=10)
+            cached = self._get_cached_query_view(user_id, "course_contents", params)
+            # Cache key: "user:user123:course_contents:course_id:123|limit:10"
+        """
+        if not self._use_cache():
+            return None
+
+        # Serialize params into stable cache key component
+        params_key = self._serialize_query_params(params)
+        full_view_type = f"{view_type}:{params_key}"
+
+        cached = self.cache.get_user_view(
+            user_id=str(user_id),
+            view_type=full_view_type
+        )
+
+        if cached is not None:
+            logger.debug(f"Cache HIT: user={user_id}, view={full_view_type}")
+        else:
+            logger.debug(f"Cache MISS: user={user_id}, view={full_view_type}")
+
+        return cached
+
     def _set_cached_view(
         self,
         user_id: str,
@@ -133,6 +179,59 @@ class ViewRepository(ABC):
         )
 
         logger.debug(f"Cache SET: user={user_id}, view={view_type}, id={view_id}, ttl={ttl or self.get_default_ttl()}")
+
+    def _set_cached_query_view(
+        self,
+        user_id: str,
+        view_type: str,
+        params: Any,
+        data: Any,
+        ttl: Optional[int] = None,
+        related_ids: Optional[Dict[str, str]] = None
+    ):
+        """
+        Cache view data for a query with parameters.
+
+        This method creates a cache key from the query parameters, making
+        cache invalidation more precise. Related entity IDs are extracted
+        from params and can be supplemented with additional related_ids.
+
+        Args:
+            user_id: User ID
+            view_type: View type (e.g., "course_contents", "courses")
+            params: Query parameters DTO (e.g., CourseContentQuery)
+            data: Data to cache
+            ttl: Time-to-live in seconds
+            related_ids: Additional related entity IDs for tag generation
+
+        Example:
+            params = CourseContentQuery(course_id="123", limit=10)
+            self._set_cached_query_view(user_id, "course_contents", params, data)
+            # Cache key: "user:user123:course_contents:course_id:123|limit:10"
+            # Tags: ["course_id:123"]
+        """
+        if not self._use_cache():
+            return
+
+        # Serialize params into stable cache key component
+        params_key = self._serialize_query_params(params)
+        full_view_type = f"{view_type}:{params_key}"
+
+        # Extract related IDs from params for tagging
+        auto_related_ids = self._extract_related_ids_from_params(params)
+
+        # Merge auto-extracted IDs with manually provided ones
+        all_related_ids = {**auto_related_ids, **(related_ids or {})}
+
+        self.cache.set_user_view(
+            user_id=str(user_id),
+            view_type=full_view_type,
+            data=data,
+            ttl=ttl or self.get_default_ttl(),
+            related_ids=all_related_ids if all_related_ids else None
+        )
+
+        logger.debug(f"Cache SET: user={user_id}, view={full_view_type}, tags={list(all_related_ids.keys()) if all_related_ids else []}, ttl={ttl or self.get_default_ttl()}")
 
     def _invalidate_user_view(
         self,
@@ -196,3 +295,103 @@ class ViewRepository(ABC):
             List of serialized data
         """
         return [self._serialize_dto(dto) for dto in dtos]
+
+    def _serialize_query_params(self, params: Any, use_hash: bool = True) -> str:
+        """
+        Serialize query parameters into a stable, deterministic cache key component.
+
+        This method converts Query DTOs (like CourseContentQuery, CourseStudentQuery, etc.)
+        into a stable string that can be used as part of a Redis cache key.
+
+        Args:
+            params: Query DTO object (e.g., CourseContentQuery)
+            use_hash: If True, return a SHA256 hash of the params (shorter keys).
+                     If False, return human-readable serialization (for debugging).
+
+        Returns:
+            Stable string representation of query parameters
+
+        Example (use_hash=False):
+            CourseContentQuery(course_id="123", limit=10, skip=0)
+            -> "course_id:123|limit:10|skip:0"
+
+        Example (use_hash=True):
+            CourseContentQuery(course_id="123", limit=10, skip=0)
+            -> "a3f2e8b..." (SHA256 hash of stable JSON)
+        """
+        if params is None:
+            return "default"
+
+        # Get dict representation (exclude None values to make keys shorter)
+        if hasattr(params, 'model_dump'):
+            params_dict = params.model_dump(exclude_none=True, exclude_unset=True)
+        elif isinstance(params, dict):
+            params_dict = {k: v for k, v in params.items() if v is not None}
+        else:
+            # Fallback for non-Pydantic objects
+            return str(params)
+
+        if not params_dict:
+            return "default"
+
+        if use_hash:
+            # Create stable JSON string and hash it
+            # Sort keys for deterministic ordering
+            stable_json = json.dumps(params_dict, sort_keys=True, separators=(',', ':'))
+            # Use SHA256 for uniqueness (take first 16 chars for brevity)
+            hash_digest = hashlib.sha256(stable_json.encode('utf-8')).hexdigest()
+            return hash_digest[:16]  # 16 chars should be sufficient for uniqueness
+        else:
+            # Create human-readable key (good for debugging)
+            # Sort keys for deterministic ordering
+            sorted_items = sorted(params_dict.items())
+            parts = []
+            for key, value in sorted_items:
+                # Convert value to string, handling complex types
+                if isinstance(value, (list, dict)):
+                    # For complex types, use compact JSON
+                    value_str = json.dumps(value, sort_keys=True, separators=(',', ':'))
+                else:
+                    value_str = str(value)
+                parts.append(f"{key}:{value_str}")
+
+            return "|".join(parts)
+
+    def _extract_related_ids_from_params(self, params: Any) -> Dict[str, str]:
+        """
+        Extract entity IDs from query parameters for cache tagging.
+
+        This enables automatic cache invalidation when entities change.
+        For example, if params has course_id="123", this creates a tag
+        so the cache can be invalidated when course 123 changes.
+
+        Args:
+            params: Query parameters DTO
+
+        Returns:
+            Dict of entity_type -> entity_id for tagging
+
+        Example:
+            CourseContentQuery(course_id="123", course_content_type_id="456")
+            -> {"course_id": "123", "course_content_type_id": "456"}
+        """
+        if params is None:
+            return {}
+
+        # Get dict representation
+        if hasattr(params, 'model_dump'):
+            params_dict = params.model_dump(exclude_none=True, exclude_unset=True)
+        elif isinstance(params, dict):
+            params_dict = {k: v for k, v in params.items() if v is not None}
+        else:
+            return {}
+
+        # Extract fields that end with _id (entity references)
+        related_ids = {}
+        for key, value in params_dict.items():
+            # Only extract ID fields (not pagination, filters, etc.)
+            if key.endswith('_id') and value is not None:
+                # Convert to string for consistent tagging
+                related_ids[key] = str(value)
+
+        return related_ids

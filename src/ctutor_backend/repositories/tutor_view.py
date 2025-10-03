@@ -120,13 +120,11 @@ class TutorViewRepository(ViewRepository):
 
         reader_user_id = permissions.get_user_id_or_throw()
 
-        # Build cache key
-        cache_key_suffix = f"member:{course_member_id}:params:{hash(str(params.model_dump() if hasattr(params, 'model_dump') else params))}"
-
-        # Try cache
-        cached = self._get_cached_view(
+        # Try cache with query-aware key (include course_member_id in view_type)
+        cached = self._get_cached_query_view(
             user_id=str(reader_user_id),
-            view_type=f"tutor:course_contents:{cache_key_suffix}"
+            view_type=f"tutor:course_contents:member:{course_member_id}",
+            params=params
         )
         if cached is not None:
             return cached
@@ -139,10 +137,11 @@ class TutorViewRepository(ViewRepository):
         for course_contents_result in course_contents_results:
             response_list.append(course_member_course_content_result_mapper(course_contents_result, self.db))
 
-        # Cache result
-        self._set_cached_view(
+        # Cache result with query-aware key
+        self._set_cached_query_view(
             user_id=str(reader_user_id),
-            view_type=f"tutor:course_contents:{cache_key_suffix}",
+            view_type=f"tutor:course_contents:member:{course_member_id}",
+            params=params,
             data=self._serialize_dto_list(response_list),
             ttl=self.get_default_ttl(),
             related_ids={'course_member_id': str(course_member_id)}
@@ -226,13 +225,11 @@ class TutorViewRepository(ViewRepository):
         """
         user_id = permissions.get_user_id_or_throw()
 
-        # Build cache key
-        cache_key_suffix = f"params:{hash(str(params.model_dump() if hasattr(params, 'model_dump') else params))}"
-
-        # Try cache
-        cached = self._get_cached_view(
+        # Try cache with query-aware key
+        cached = self._get_cached_query_view(
             user_id=str(user_id),
-            view_type=f"tutor:courses:{cache_key_suffix}"
+            view_type="tutor:courses",
+            params=params
         )
         if cached is not None:
             return [CourseTutorList.model_validate(item, from_attributes=True) for item in cached]
@@ -255,10 +252,11 @@ class TutorViewRepository(ViewRepository):
                 ) if course.properties and course.properties.get("gitlab") else None
             ))
 
-        # Cache result
-        self._set_cached_view(
+        # Cache result with query-aware key
+        self._set_cached_query_view(
             user_id=str(user_id),
-            view_type=f"tutor:courses:{cache_key_suffix}",
+            view_type="tutor:courses",
+            params=params,
             data=self._serialize_dto_list(response_list),
             ttl=self.get_default_ttl()
         )
