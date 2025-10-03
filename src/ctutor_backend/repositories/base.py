@@ -133,22 +133,67 @@ class BaseRepository(ABC, Generic[T]):
         for column in entity.__table__.columns:
             value = getattr(entity, column.name)
             # Convert non-JSON-serializable types
-            if hasattr(value, 'isoformat'):  # datetime
+            if value is None:
+                result[column.name] = None
+            elif hasattr(value, 'isoformat'):  # datetime
                 result[column.name] = value.isoformat()
-            elif hasattr(value, '__str__') and not isinstance(value, (str, int, float, bool, type(None))):
-                result[column.name] = str(value)
-            else:
+            elif isinstance(value, (dict, list)):  # JSONB fields - already JSON-serializable
                 result[column.name] = value
+            elif isinstance(value, (str, int, float, bool)):  # Primitives
+                result[column.name] = value
+            else:
+                # For other types (UUID, Enum, etc.), convert to string
+                result[column.name] = str(value)
         return result
 
     def _deserialize_entity(self, data: Dict[str, Any]) -> Optional[T]:
-        """Deserialize dictionary to entity (detached from session)."""
+        """
+        Deserialize dictionary to entity (detached from session).
+
+        Creates a proper SQLAlchemy instance with all internal state initialized.
+        """
         if data is None:
             return None
 
-        instance = self.model.__new__(self.model)
+        try:
+            # Try to create instance with no args (most SQLAlchemy models support this)
+            instance = self.model()
+        except TypeError:
+            # If model requires args, use object.__new__ and manually set __dict__
+            # This bypasses __init__ but still initializes SQLAlchemy state properly
+            from sqlalchemy.orm.state import InstanceState
+            from sqlalchemy import inspect
+
+            instance = object.__new__(self.model)
+            # Initialize SQLAlchemy's instance state
+            InstanceState(instance, inspect(self.model).mapper)
+
+        # Set attributes from cached data
         for key, value in data.items():
-            setattr(instance, key, value)
+            # Skip SQLAlchemy internal attributes
+            if not key.startswith('_sa_'):
+                # Handle legacy cached JSONB that might be stringified
+                # This handles old cached data before the serialization fix
+                if key == 'properties' and isinstance(value, str) and value.startswith('{'):
+                    try:
+                        import json
+                        # Try to parse as JSON first
+                        value = json.loads(value)
+                    except Exception:
+                        # If JSON parsing fails, try Python literal eval
+                        try:
+                            import ast
+                            value = ast.literal_eval(value)
+                        except Exception:
+                            # If all parsing fails, leave as string (will be fixed on next write)
+                            pass
+
+                try:
+                    setattr(instance, key, value)
+                except Exception:
+                    # If setting attribute fails, use __dict__ directly
+                    instance.__dict__[key] = value
+
         return instance
     
     def get_by_id(self, entity_id: Any) -> T:

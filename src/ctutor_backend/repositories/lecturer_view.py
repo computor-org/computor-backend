@@ -228,11 +228,26 @@ class LecturerViewRepository(ViewRepository):
             # Get the course to extract GitLab repository information (cached)
             course = course_repo.get_by_id_optional(course_content.course_id)
 
+            # Safely extract GitLab properties (handle dict or None)
+            gitlab_props = {}
+            if course and course.properties:
+                # Ensure properties is a dict (defensive check for cached data)
+                if isinstance(course.properties, dict):
+                    gitlab_props = course.properties.get("gitlab", {})
+                elif isinstance(course.properties, str):
+                    # Handle legacy stringified properties from old cache
+                    try:
+                        import json
+                        props = json.loads(course.properties)
+                        gitlab_props = props.get("gitlab", {})
+                    except Exception:
+                        gitlab_props = {}
+
             response_dict = {
                 **course_content.__dict__,
                 "repository": {
-                    "url": course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                    "full_path": course.properties.get("gitlab", {}).get("full_path") if course.properties else None
+                    "url": gitlab_props.get("url") if isinstance(gitlab_props, dict) else None,
+                    "full_path": gitlab_props.get("full_path") if isinstance(gitlab_props, dict) else None
                 }
             }
 
