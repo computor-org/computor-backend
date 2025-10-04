@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import func, case, select, and_, literal
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel, ConfigDict
 
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import (
@@ -26,6 +27,37 @@ from ctutor_backend.model.result import Result
 from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.message import Message, MessageRead
+
+
+class CourseMemberCourseContentQueryResult(BaseModel):
+    """
+    Typed result from course_member_course_content_query.
+
+    This replaces the raw tuple unpacking with a proper typed model
+    that provides named field access and type safety.
+
+    Attributes:
+        course_content: The course content entity
+        result_count: Total number of test results for this content
+        result: The latest result (if any)
+        submission_group: The submission group (if any)
+        submission_count: Number of official submissions
+        submission_status_int: Latest grading status as integer
+        submission_grading: Latest grading score
+        content_unread_count: Unread messages at content level
+        submission_group_unread_count: Unread messages at submission group level
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    course_content: CourseContent
+    result_count: Optional[int] = None
+    result: Optional[Result] = None
+    submission_group: Optional[SubmissionGroup] = None
+    submission_count: Optional[int] = None
+    submission_status_int: Optional[int] = None
+    submission_grading: Optional[float] = None
+    content_unread_count: int = 0
+    submission_group_unread_count: int = 0
 
 
 def latest_result_subquery(
@@ -520,7 +552,7 @@ def course_member_course_content_query(
     course_content_id: UUID | str,
     db: Session,
     reader_user_id: UUID | str | None = None
-):
+) -> CourseMemberCourseContentQueryResult:
     """
     Get detailed course content information for a specific course member and course content.
 
@@ -534,7 +566,7 @@ def course_member_course_content_query(
         reader_user_id: Optional user ID for unread message counts
 
     Returns:
-        Query result tuple with CourseContent and related data
+        CourseMemberCourseContentQueryResult with typed fields
 
     Raises:
         NotFoundException: If course content not found or member has no access
@@ -620,12 +652,23 @@ def course_member_course_content_query(
         .joinedload(CourseMember.user),
     )
 
-    course_contents_result = course_contents_query.first()
+    raw_result = course_contents_query.first()
 
-    if course_contents_result is None:
+    if raw_result is None:
         raise NotFoundException()
 
-    return course_contents_result
+    # Convert tuple to typed model
+    return CourseMemberCourseContentQueryResult(
+        course_content=raw_result[0],
+        result_count=raw_result[1],
+        result=raw_result[2],
+        submission_group=raw_result[3],
+        submission_count=raw_result[4] if len(raw_result) > 4 else None,
+        submission_status_int=raw_result[5] if len(raw_result) > 5 else None,
+        submission_grading=raw_result[6] if len(raw_result) > 6 else None,
+        content_unread_count=raw_result[7] if len(raw_result) > 7 else 0,
+        submission_group_unread_count=raw_result[8] if len(raw_result) > 8 else 0,
+    )
 
 
 def course_member_course_content_list_query(

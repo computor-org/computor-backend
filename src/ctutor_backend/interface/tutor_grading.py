@@ -1,5 +1,6 @@
 """Pydantic DTOs for tutor grading operations on submission artifacts."""
-from typing import Optional
+from typing import Optional, Any
+from datetime import datetime
 from pydantic import BaseModel, Field
 from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.interface.student_course_contents import CourseContentStudentList
@@ -21,6 +22,17 @@ class TutorGradeCreate(BaseModel):
     feedback: Optional[str] = Field(None, description="Feedback/comment for the student")
 
 
+class GradedArtifactInfo(BaseModel):
+    """Information about the artifact that was graded.
+
+    This provides context about which specific artifact received the grade,
+    useful for tracking grading history and artifact metadata.
+    """
+    id: str = Field(..., description="The artifact ID that was graded")
+    created_at: Optional[str] = Field(None, description="When the artifact was created (ISO format)")
+    properties: Optional[dict[str, Any]] = Field(None, description="Additional artifact properties (e.g., GitLab info)")
+
+
 class TutorGradeResponse(CourseContentStudentList):
     """Response after creating a grade through the tutor endpoint.
 
@@ -29,4 +41,4 @@ class TutorGradeResponse(CourseContentStudentList):
     """
     # Additional field to indicate which artifact was graded
     graded_artifact_id: Optional[str] = None
-    graded_artifact_info: Optional[dict] = None  # Additional info about the graded artifact
+    graded_artifact_info: Optional[GradedArtifactInfo] = None

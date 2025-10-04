@@ -67,8 +67,7 @@ def tutor_update_course_contents_endpoint(
     cache: Cache = Depends(get_cache)
 ):
     """Update grade for a course content as a tutor."""
-
-    result = update_tutor_course_content_grade(
+    return update_tutor_course_content_grade(
         course_member_id=course_member_id,
         course_content_id=course_content_id,
         grade_value=grade_data.grade,
@@ -79,13 +78,6 @@ def tutor_update_course_contents_endpoint(
         db=db,
         cache=cache,
     )
-
-    # Convert to TutorGradeResponse
-    grade_response = TutorGradeResponse.model_validate(result["response"], from_attributes=True)
-    grade_response.graded_artifact_id = result["graded_artifact_id"]
-    grade_response.graded_artifact_info = result["graded_artifact_info"]
-
-    return grade_response
 
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)

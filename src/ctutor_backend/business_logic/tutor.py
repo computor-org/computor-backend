@@ -28,6 +28,7 @@ from ctutor_backend.interface.course_members import CourseMemberInterface, Cours
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.grading import GradingStatus
+from ctutor_backend.interface.tutor_grading import TutorGradeResponse, GradedArtifactInfo
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,23 @@ def update_tutor_course_content_grade(
     permissions: Principal,
     db: Session,
     cache: Optional[Cache] = None,
-):
-    """Update grade for a course content as a tutor."""
+) -> TutorGradeResponse:
+    """Update grade for a course content as a tutor.
+
+    Args:
+        course_member_id: The course member (student) to grade
+        course_content_id: The course content being graded
+        grade_value: The grade value (0.0 to 1.0)
+        grading_status: The grading status
+        feedback: Optional feedback comment
+        artifact_id: Optional specific artifact to grade (defaults to latest)
+        permissions: Current user permissions
+        db: Database session
+        cache: Optional cache instance
+
+    Returns:
+        TutorGradeResponse with updated course content and graded artifact info
+    """
 
     if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
         CourseMember.id == course_member_id
@@ -158,16 +174,19 @@ def update_tutor_course_content_grade(
 
     response = course_member_course_content_result_mapper(course_contents_result, db)
 
-    # Add artifact info
-    return {
-        "response": response,
-        "graded_artifact_id": artifact_to_grade.id,
-        "graded_artifact_info": {
-            "id": str(artifact_to_grade.id),
-            "created_at": artifact_to_grade.created_at.isoformat() if artifact_to_grade.created_at else None,
-            "properties": artifact_to_grade.properties,
-        }
-    }
+    # Build typed artifact info
+    artifact_info = GradedArtifactInfo(
+        id=str(artifact_to_grade.id),
+        created_at=artifact_to_grade.created_at.isoformat() if artifact_to_grade.created_at else None,
+        properties=artifact_to_grade.properties,
+    )
+
+    # Return typed TutorGradeResponse
+    return TutorGradeResponse(
+        **response.model_dump(),
+        graded_artifact_id=str(artifact_to_grade.id),
+        graded_artifact_info=artifact_info,
+    )
 
 
 def get_tutor_course(

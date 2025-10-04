@@ -14,22 +14,36 @@ from ctutor_backend.interface.grading import GradingStatus, SubmissionGroupGradi
 from ctutor_backend.interface.tasks import map_int_to_task_status
 from ctutor_backend.model.course import CourseMember
 from ctutor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
+from ctutor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
 
 logger = logging.getLogger(__name__)
 
-def course_member_course_content_result_mapper(course_member_course_content_result, db: Session = None, detailed: bool = False):
+def course_member_course_content_result_mapper(
+    course_member_course_content_result: CourseMemberCourseContentQueryResult,
+    db: Session = None,
+    detailed: bool = False
+):
+    """
+    Map CourseMemberCourseContentQueryResult to CourseContentStudent DTOs.
 
-    query = course_member_course_content_result
+    Args:
+        course_member_course_content_result: Typed query result from repository
+        db: Database session (required for fetching grades)
+        detailed: Whether to return detailed (Get) or list (List) DTO
 
-    course_content = query[0]
-    result_count = query[1]
-    result = query[2]
-    submission_group = query[3]
-    submission_count = query[4] if len(query) > 4 else None
-    submission_status_int = query[5] if len(query) > 5 else None
-    submission_grading = query[6] if len(query) > 6 else None
-    content_unread_count = query[7] if len(query) > 7 else 0
-    submission_group_unread_count = query[8] if len(query) > 8 else 0
+    Returns:
+        CourseContentStudentList or CourseContentStudentGet
+    """
+    # Use typed model fields instead of tuple unpacking
+    course_content = course_member_course_content_result.course_content
+    result_count = course_member_course_content_result.result_count
+    result = course_member_course_content_result.result
+    submission_group = course_member_course_content_result.submission_group
+    submission_count = course_member_course_content_result.submission_count
+    submission_status_int = course_member_course_content_result.submission_status_int
+    submission_grading = course_member_course_content_result.submission_grading
+    content_unread_count = course_member_course_content_result.content_unread_count
+    submission_group_unread_count = course_member_course_content_result.submission_group_unread_count
 
     content_unread_count = content_unread_count or 0
     submission_group_unread_count = submission_group_unread_count or 0
