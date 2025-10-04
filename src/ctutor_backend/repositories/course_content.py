@@ -59,6 +59,32 @@ class CourseMemberCourseContentQueryResult(BaseModel):
     content_unread_count: int = 0
     submission_group_unread_count: int = 0
 
+    @classmethod
+    def from_tuple(cls, raw_result: tuple) -> "CourseMemberCourseContentQueryResult":
+        """
+        Convert a raw tuple result into a typed model.
+
+        This is used when query results are fetched via .all() or .first()
+        from the query builder functions.
+
+        Args:
+            raw_result: The raw tuple from SQLAlchemy query
+
+        Returns:
+            Typed CourseMemberCourseContentQueryResult instance
+        """
+        return cls(
+            course_content=raw_result[0],
+            result_count=raw_result[1],
+            result=raw_result[2],
+            submission_group=raw_result[3],
+            submission_count=raw_result[4] if len(raw_result) > 4 else None,
+            submission_status_int=raw_result[5] if len(raw_result) > 5 else None,
+            submission_grading=raw_result[6] if len(raw_result) > 6 else None,
+            content_unread_count=raw_result[7] if len(raw_result) > 7 else 0,
+            submission_group_unread_count=raw_result[8] if len(raw_result) > 8 else 0,
+        )
+
 
 def latest_result_subquery(
     user_id: UUID | str | None,
@@ -289,7 +315,7 @@ def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | Non
     )
 
 
-def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session):
+def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session) -> CourseMemberCourseContentQueryResult:
     """
     Get detailed course content information for a specific user and course content.
 
@@ -301,7 +327,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         db: Database session
 
     Returns:
-        Query result tuple with CourseContent and related data
+        CourseMemberCourseContentQueryResult with typed fields
 
     Raises:
         NotFoundException: If course content not found or user has no access
@@ -423,7 +449,8 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     if course_contents_result is None:
         raise NotFoundException()
 
-    return course_contents_result
+    # Convert tuple to typed model using class method
+    return CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
 
 
 def user_course_content_list_query(user_id: UUID | str, db: Session):
@@ -657,18 +684,8 @@ def course_member_course_content_query(
     if raw_result is None:
         raise NotFoundException()
 
-    # Convert tuple to typed model
-    return CourseMemberCourseContentQueryResult(
-        course_content=raw_result[0],
-        result_count=raw_result[1],
-        result=raw_result[2],
-        submission_group=raw_result[3],
-        submission_count=raw_result[4] if len(raw_result) > 4 else None,
-        submission_status_int=raw_result[5] if len(raw_result) > 5 else None,
-        submission_grading=raw_result[6] if len(raw_result) > 6 else None,
-        content_unread_count=raw_result[7] if len(raw_result) > 7 else 0,
-        submission_group_unread_count=raw_result[8] if len(raw_result) > 8 else 0,
-    )
+    # Convert tuple to typed model using class method
+    return CourseMemberCourseContentQueryResult.from_tuple(raw_result)
 
 
 def course_member_course_content_list_query(

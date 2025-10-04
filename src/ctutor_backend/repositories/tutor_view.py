@@ -14,6 +14,7 @@ from ..api.mappers import course_member_course_content_result_mapper
 from ..repositories.course_content import (
     course_member_course_content_query,
     course_member_course_content_list_query,
+    CourseMemberCourseContentQueryResult,
 )
 from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
@@ -147,7 +148,9 @@ class TutorViewRepository(ViewRepository):
 
         response_list = []
         for course_contents_result in course_contents_results:
-            response_list.append(course_member_course_content_result_mapper(course_contents_result, self.db))
+            # Convert tuple to typed model before mapping
+            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
+            response_list.append(course_member_course_content_result_mapper(typed_result, self.db))
 
         # Cache result with query-aware key
         # CRITICAL: Include course_id for proper invalidation when submissions/results change

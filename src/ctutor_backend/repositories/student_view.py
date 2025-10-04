@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from .view_base import ViewRepository
 from ..api.mappers import course_member_course_content_result_mapper
+from ..repositories.course_content import CourseMemberCourseContentQueryResult
 from ..repositories.course_content import (
     user_course_content_query,
     user_course_content_list_query
@@ -127,7 +128,9 @@ class StudentViewRepository(ViewRepository):
 
         response_list: List[CourseContentStudentList] = []
         for course_contents_result in course_contents_results:
-            response_list.append(course_member_course_content_result_mapper(course_contents_result, self.db))
+            # Convert tuple to typed model before mapping
+            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
+            response_list.append(course_member_course_content_result_mapper(typed_result, self.db))
 
         # Cache result with query-aware key
         # CRITICAL: Extract course_id for proper invalidation
