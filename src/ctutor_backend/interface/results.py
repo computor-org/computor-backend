@@ -207,7 +207,7 @@ def result_search(db: Session, query, params: Optional[ResultQuery]):
 
     return query
 
-def post_update_result(updated_entity: Result, old_entity, db: Session):
+async def post_update_result(updated_entity: Result, old_entity, db: Session):
     """
     Post-update hook to invalidate view caches when results change.
 

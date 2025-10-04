@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from ctutor_backend.api.exceptions import (
     UnauthorizedException,
@@ -54,8 +55,10 @@ async def login_with_local_credentials(
     Raises:
         UnauthorizedException: If credentials are invalid
     """
-    # Authenticate using the AuthenticationService
-    auth_result = AuthenticationService.authenticate_basic(username, password, db)
+    # Authenticate using the AuthenticationService (wrap blocking DB query)
+    auth_result = await run_in_threadpool(
+        lambda: AuthenticationService.authenticate_basic(username, password, db)
+    )
 
     # Generate session tokens
     access_token = secrets.token_urlsafe(32)
@@ -138,8 +141,10 @@ async def refresh_local_token(
         if not user_id:
             raise UnauthorizedException("Invalid refresh token data")
 
-        # Verify user still exists
-        user = db.query(User).filter(User.id == user_id).first()
+        # Verify user still exists (wrap blocking DB query)
+        user = await run_in_threadpool(
+            lambda: db.query(User).filter(User.id == user_id).first()
+        )
         if not user:
             raise NotFoundException("User not found")
 
@@ -302,58 +307,28 @@ async def handle_sso_callback(
     if not user_info:
         raise BadRequestException("No user information received from provider")
 
-    # Find or create user account
-    account = (
-        db.query(Account)
-        .filter(
-            Account.provider == provider,
-            Account.type == registry.get_plugin_metadata(provider).provider_type.value,
-            Account.provider_account_id == user_info.provider_id,
+    # Find or create user account (wrap blocking DB operations)
+    def _find_or_create_account():
+        nonlocal user_info, provider, registry
+
+        account = (
+            db.query(Account)
+            .filter(
+                Account.provider == provider,
+                Account.type == registry.get_plugin_metadata(provider).provider_type.value,
+                Account.provider_account_id == user_info.provider_id,
+            )
+            .first()
         )
-        .first()
-    )
 
-    is_new_user = False
+        is_new_user = False
 
-    if account:
-        # Existing account - get user
-        user = account.user
+        if account:
+            # Existing account - get user
+            user = account.user
 
-        # Update account properties with latest info
-        account.properties = {
-            "email": user_info.email,
-            "username": user_info.username,
-            "picture": user_info.picture,
-            "groups": user_info.groups,
-            "attributes": user_info.attributes,
-            "last_login": (
-                str(auth_result.expires_at) if auth_result.expires_at else None
-            ),
-        }
-
-    else:
-        # New account - create user
-        is_new_user = True
-
-        # Create new user
-        user = User(
-            given_name=user_info.given_name or "",
-            family_name=user_info.family_name or "",
-            username=user_info.username
-            or user_info.email
-            or f"{provider}_{user_info.provider_id}",
-            email=user_info.email,
-        )
-        db.add(user)
-        db.flush()
-
-        # Create account
-        account = Account(
-            provider=provider,
-            type=registry.get_plugin_metadata(provider).provider_type.value,
-            provider_account_id=user_info.provider_id,
-            user_id=user.id,
-            properties={
+            # Update account properties with latest info
+            account.properties = {
                 "email": user_info.email,
                 "username": user_info.username,
                 "picture": user_info.picture,
@@ -362,11 +337,47 @@ async def handle_sso_callback(
                 "last_login": (
                     str(auth_result.expires_at) if auth_result.expires_at else None
                 ),
-            },
-        )
-        db.add(account)
+            }
 
-    db.commit()
+        else:
+            # New account - create user
+            is_new_user = True
+
+            # Create new user
+            user = User(
+                given_name=user_info.given_name or "",
+                family_name=user_info.family_name or "",
+                username=user_info.username
+                or user_info.email
+                or f"{provider}_{user_info.provider_id}",
+                email=user_info.email,
+            )
+            db.add(user)
+            db.flush()
+
+            # Create account
+            account = Account(
+                provider=provider,
+                type=registry.get_plugin_metadata(provider).provider_type.value,
+                provider_account_id=user_info.provider_id,
+                user_id=user.id,
+                properties={
+                    "email": user_info.email,
+                    "username": user_info.username,
+                    "picture": user_info.picture,
+                    "groups": user_info.groups,
+                    "attributes": user_info.attributes,
+                    "last_login": (
+                        str(auth_result.expires_at) if auth_result.expires_at else None
+                    ),
+                },
+            )
+            db.add(account)
+
+        db.commit()
+        return user, account, is_new_user
+
+    user, account, is_new_user = await run_in_threadpool(_find_or_create_account)
 
     # Generate API session token for the user
     api_session_token = secrets.token_urlsafe(32)
@@ -447,9 +458,9 @@ async def register_sso_user(
     if provider not in registry.get_enabled_plugins():
         raise BadRequestException(f"Authentication provider not enabled: {provider}")
 
-    # Check if user already exists in local database
-    existing_user = (
-        db.query(User)
+    # Check if user already exists in local database (wrap blocking query)
+    existing_user = await run_in_threadpool(
+        lambda: db.query(User)
         .filter((User.username == username) | (User.email == email))
         .first()
     )
@@ -491,31 +502,35 @@ async def register_sso_user(
             f"Registration not implemented for provider: {provider}"
         )
 
-    # Create user in local database
-    local_user = User(
-        given_name=given_name,
-        family_name=family_name,
-        username=username,
-        email=email,
-    )
-    db.add(local_user)
-    db.flush()
+    # Create user in local database (wrap blocking DB operations)
+    def _create_local_user():
+        local_user = User(
+            given_name=given_name,
+            family_name=family_name,
+            username=username,
+            email=email,
+        )
+        db.add(local_user)
+        db.flush()
 
-    # Create account linking to provider
-    account = Account(
-        provider=provider,
-        type="oidc",  # Keycloak uses OIDC
-        provider_account_id=provider_user_id,
-        user_id=local_user.id,
-        properties={
-            "email": email,
-            "username": username,
-            "registration_date": str(datetime.now(timezone.utc)),
-        },
-    )
-    db.add(account)
+        # Create account linking to provider
+        account = Account(
+            provider=provider,
+            type="oidc",  # Keycloak uses OIDC
+            provider_account_id=provider_user_id,
+            user_id=local_user.id,
+            properties={
+                "email": email,
+                "username": username,
+                "registration_date": str(datetime.now(timezone.utc)),
+            },
+        )
+        db.add(account)
 
-    db.commit()
+        db.commit()
+        return local_user
+
+    local_user = await run_in_threadpool(_create_local_user)
 
     return {
         "user_id": str(local_user.id),
@@ -573,9 +588,9 @@ async def refresh_sso_token(
         if not user_info:
             raise BadRequestException("No user information received from provider")
 
-        # Find the user account
-        account = (
-            db.query(Account)
+        # Find the user account (wrap blocking query)
+        account = await run_in_threadpool(
+            lambda: db.query(Account)
             .filter(
                 Account.provider == provider,
                 Account.provider_account_id == user_info.provider_id,

@@ -4,7 +4,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
-from ctutor_backend.api.crud import create_db, delete_db, get_id_db, list_db, update_db
+from ctutor_backend.business_logic.crud import (
+    create_entity as create_db,
+    delete_entity as delete_db,
+    get_entity_by_id as get_id_db,
+    list_entities as list_db,
+    update_entity as update_db
+)
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.results import (
     ResultCreate,

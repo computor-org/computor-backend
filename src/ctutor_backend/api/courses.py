@@ -20,7 +20,7 @@ from ctutor_backend.business_logic.courses import (
 course_router = CrudRouter(CourseInterface)
 
 @course_router.router.patch("/{course_id}/execution-backends/{execution_backend_id}", response_model=CourseExecutionBackendGet)
-def patch_course_execution_backend_endpoint(
+async def patch_course_execution_backend_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     course_id: UUID | str,
     execution_backend_id: UUID | str,
@@ -28,7 +28,7 @@ def patch_course_execution_backend_endpoint(
     db: Session = Depends(get_db)
 ):
     """Update course execution backend configuration."""
-    return update_course_execution_backend(
+    return await update_course_execution_backend(
         course_id=course_id,
         execution_backend_id=execution_backend_id,
         entity=entity,

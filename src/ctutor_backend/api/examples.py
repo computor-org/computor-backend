@@ -36,7 +36,10 @@ from ..interface.example import (
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..permissions.auth import get_current_principal
-from ..api.crud import get_id_db, list_db
+from ctutor_backend.business_logic.crud import (
+    get_entity_by_id as get_id_db,
+    list_entities as list_db
+)
 from ..api.exceptions import (
     NotFoundException,
     ForbiddenException,

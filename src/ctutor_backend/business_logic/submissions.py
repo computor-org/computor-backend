@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, joinedload
+from starlette.concurrency import run_in_threadpool
 
 from ctutor_backend.api.exceptions import (
     BadRequestException,

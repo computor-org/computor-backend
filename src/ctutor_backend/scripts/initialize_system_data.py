@@ -254,15 +254,7 @@ def main():
             
         print("=" * 50)
         print("✅ System initialization completed successfully!")
-        print("\n📋 What was initialized:")
-        print("   • System roles: _admin, _user_manager, _organization_manager")
-        print("   • Course roles: _student, _tutor, _lecturer, _maintainer, _owner")
-        print("   • Content kinds: assignment, lecture, exercise, exam, unit")
-        print("   • Execution backends: temporal")
-        print("   • Example repositories: Default Examples (MinIO)")
-        print(f"   • Admin user: username '{os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')}', password '{os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')}'")
         print("\n🎯 You can now start the application!")
-        print("📚 Upload examples to the 'Default Examples' repository via the web UI!")
         
     except Exception as e:
         print(f"❌ Error during initialization: {e}")

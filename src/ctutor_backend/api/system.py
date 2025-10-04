@@ -7,7 +7,7 @@ from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile, HTTPE
 from datetime import datetime, timezone
 import logging
 
-from ctutor_backend.api.crud import get_id_db
+from ctutor_backend.business_logic.crud import get_entity_by_id as get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
 from ctutor_backend.permissions.auth import get_current_principal

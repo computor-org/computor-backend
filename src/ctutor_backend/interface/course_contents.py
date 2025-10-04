@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -232,157 +233,165 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
         
     return query
 
-def post_create(course_content: CourseContent, db: Session):
+async def post_create(course_content: CourseContent, db: Session):
     """Post-create hook for course content.
-    
+
     Creates submission groups for individual assignments.
     Note: Deployment records are created separately via the deployment API.
     """
     import logging
     logger = logging.getLogger(__name__)
-    
+
     logger.info(f"post_create called for CourseContent {course_content.id} in course {course_content.course_id}")
-    
+
     # Only create submission groups for individual assignments (max_group_size == 1)
     # Team assignments (max_group_size > 1) are handled differently
     if course_content.max_group_size != 1 and course_content.max_group_size != None:
         logger.info(f"Skipping submission group creation: max_group_size={course_content.max_group_size} (not individual)")
         return
-    
-    # Check if this course content type is submittable
-    course_content_type = db.query(CourseContentType).filter(
-        CourseContentType.id == course_content.course_content_type_id
-    ).first()
-    
-    if not course_content_type:
-        logger.warning(f"CourseContentType {course_content.course_content_type_id} not found")
-        return
-        
-    course_content_kind = db.query(CourseContentKind).filter(
-        CourseContentKind.id == course_content_type.course_content_kind_id
-    ).first()
-    
-    if not course_content_kind or not course_content_kind.submittable:
-        logger.info(f"Skipping submission group creation: not submittable (kind={course_content_kind})")
-        return
-    
-    # Get all student course members (not tutors, lecturers, etc.)
-    course_members = (
-        db.scalars(db.query(CourseMember.id)
-        .join(User, User.id == CourseMember.user_id)
-        .filter(
-            CourseMember.course_id == course_content.course_id,
-            User.user_type == "user"
-        )).all()
-    )
 
-    logger.info(f"Found {len(course_members)} students in course {course_content.course_id}")
+    # Wrap all database operations in threadpool
+    def _create_submission_groups():
+        # Check if this course content type is submittable
+        course_content_type = db.query(CourseContentType).filter(
+            CourseContentType.id == course_content.course_content_type_id
+        ).first()
 
-    submission_groups_created = 0
-    for course_member_id in course_members:
-        # Get the full course member object to access properties
-        course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
-        if not course_member:
-            logger.warning(f"Could not find CourseMember {course_member_id}")
-            continue
-            
-        submission_group = SubmissionGroup(
-            course_id=course_content.course_id,
-            course_content_id=course_content.id,
-            max_group_size=course_content.max_group_size or 1,
-            max_test_runs=course_content.max_test_runs,
-            max_submissions=course_content.max_submissions
+        if not course_content_type:
+            logger.warning(f"CourseContentType {course_content.course_content_type_id} not found")
+            return
+
+        course_content_kind = db.query(CourseContentKind).filter(
+            CourseContentKind.id == course_content_type.course_content_kind_id
+        ).first()
+
+        if not course_content_kind or not course_content_kind.submittable:
+            logger.info(f"Skipping submission group creation: not submittable (kind={course_content_kind})")
+            return
+
+        # Get all student course members (not tutors, lecturers, etc.)
+        course_members = (
+            db.scalars(db.query(CourseMember.id)
+            .join(User, User.id == CourseMember.user_id)
+            .filter(
+                CourseMember.course_id == course_content.course_id,
+                User.user_type == "user"
+            )).all()
         )
-        
-        # Copy repository info from course member if it exists
-        if course_member.properties:
-            logger.info(f"CourseMember {course_member.id} properties: {course_member.properties}")
-            if 'gitlab' in course_member.properties:
-                # Initialize properties if needed
-                if not submission_group.properties:
-                    submission_group.properties = {}
-                
-                repo_info = course_member.properties
-                
 
-                # Store in the GitLabConfig format expected by SubmissionGroupProperties
-                submission_group.properties['gitlab'] = {
-                    "url": repo_info['gitlab']['url'],
-                    "full_path": repo_info['gitlab']['full_path'],
-                    "directory": str(course_content.path),  # Assignment path
-                    "web_url": repo_info['gitlab']['web_url'],
-                    "group_id": repo_info['gitlab']['group_id'],
-                    "namespace_id": repo_info['gitlab']['namespace_id'],
-                    "namespace_path": repo_info['gitlab']['namespace_path']
-                }
+        logger.info(f"Found {len(course_members)} students in course {course_content.course_id}")
 
-                
-                logger.info(f"Copying gitlab info to submission group for student {course_member.id}")
+        submission_groups_created = 0
+        for course_member_id in course_members:
+            # Get the full course member object to access properties
+            course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
+            if not course_member:
+                logger.warning(f"Could not find CourseMember {course_member_id}")
+                continue
+
+            submission_group = SubmissionGroup(
+                course_id=course_content.course_id,
+                course_content_id=course_content.id,
+                max_group_size=course_content.max_group_size or 1,
+                max_test_runs=course_content.max_test_runs,
+                max_submissions=course_content.max_submissions
+            )
+
+            # Copy repository info from course member if it exists
+            if course_member.properties:
+                logger.info(f"CourseMember {course_member.id} properties: {course_member.properties}")
+                if 'gitlab' in course_member.properties:
+                    # Initialize properties if needed
+                    if not submission_group.properties:
+                        submission_group.properties = {}
+
+                    repo_info = course_member.properties
+
+
+                    # Store in the GitLabConfig format expected by SubmissionGroupProperties
+                    submission_group.properties['gitlab'] = {
+                        "url": repo_info['gitlab']['url'],
+                        "full_path": repo_info['gitlab']['full_path'],
+                        "directory": str(course_content.path),  # Assignment path
+                        "web_url": repo_info['gitlab']['web_url'],
+                        "group_id": repo_info['gitlab']['group_id'],
+                        "namespace_id": repo_info['gitlab']['namespace_id'],
+                        "namespace_path": repo_info['gitlab']['namespace_path']
+                    }
+
+
+                    logger.info(f"Copying gitlab info to submission group for student {course_member.id}")
+                else:
+                    logger.info(f"No gitlab in properties for student {course_member.id}")
             else:
-                logger.info(f"No gitlab in properties for student {course_member.id}")
-        else:
-            logger.info(f"No properties for student {course_member.id}")
-        
-        db.add(submission_group)
-        db.commit()
-        db.refresh(submission_group)
-        
-        submission_group_member = SubmissionGroupMember(
-            submission_group_id = submission_group.id,
-            course_member_id = course_member.id,  # Use the course_member object's id
-            course_id = course_content.course_id  # Add course_id for consistency
-        )
+                logger.info(f"No properties for student {course_member.id}")
 
-        db.add(submission_group_member)
-        db.commit()
-        db.refresh(submission_group_member)
-        
-        submission_groups_created += 1
-        logger.info(f"Created submission group {submission_group.id} and member for student {course_member.id}")
-    
-    logger.info(f"Created {submission_groups_created} submission groups for CourseContent {course_content.id}")
+            db.add(submission_group)
+            db.commit()
+            db.refresh(submission_group)
 
-def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Session):
+            submission_group_member = SubmissionGroupMember(
+                submission_group_id = submission_group.id,
+                course_member_id = course_member.id,  # Use the course_member object's id
+                course_id = course_content.course_id  # Add course_id for consistency
+            )
+
+            db.add(submission_group_member)
+            db.commit()
+            db.refresh(submission_group_member)
+
+            submission_groups_created += 1
+            logger.info(f"Created submission group {submission_group.id} and member for student {course_member.id}")
+
+        logger.info(f"Created {submission_groups_created} submission groups for CourseContent {course_content.id}")
+
+    await run_in_threadpool(_create_submission_groups)
+
+async def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Session):
     """Handle path updates for course content descendants after parent is updated"""
     # Check if path has changed
     if str(old_item.path) != str(updated_item.path):
         old_path = str(old_item.path)
         new_path = str(updated_item.path)
-        
-        try:
-            # Find all descendants using text() to avoid relationship loading issues
-            from sqlalchemy import text
-            descendants = db.query(CourseContent).filter(
-                text("course_content.path::text LIKE :pattern"),
-                CourseContent.course_id == updated_item.course_id
-            ).params(pattern=f'{old_path}.%').all()
-            
-            # Update paths of all descendants using direct SQL update
-            for descendant in descendants:
-                old_descendant_path = str(descendant.path)
-                
-                # Replace the old parent path with the new parent path
-                if old_descendant_path.startswith(old_path + '.'):
-                    # Remove the old parent path and add the new parent path
-                    relative_path = old_descendant_path[len(old_path):]  # includes the leading '.'
-                    new_descendant_path = new_path + relative_path
-                    
-                    # Use direct SQL update to ensure it gets committed
-                    db.execute(
-                        text("UPDATE course_content SET path = :new_path WHERE id = :content_id"),
-                        {"new_path": new_descendant_path, "content_id": descendant.id}
-                    )
-            
-            # Force commit the descendant changes immediately
-            db.commit()
-            
-            # Refresh the updated_item to ensure it's still attached to the session
-            db.refresh(updated_item)
-                
-        except Exception as e:
-            print(f"Error in post_update: {e}")
-            db.rollback()
-            raise
+
+        # Wrap all database operations in threadpool
+        def _update_descendant_paths():
+            try:
+                # Find all descendants using text() to avoid relationship loading issues
+                from sqlalchemy import text
+                descendants = db.query(CourseContent).filter(
+                    text("course_content.path::text LIKE :pattern"),
+                    CourseContent.course_id == updated_item.course_id
+                ).params(pattern=f'{old_path}.%').all()
+
+                # Update paths of all descendants using direct SQL update
+                for descendant in descendants:
+                    old_descendant_path = str(descendant.path)
+
+                    # Replace the old parent path with the new parent path
+                    if old_descendant_path.startswith(old_path + '.'):
+                        # Remove the old parent path and add the new parent path
+                        relative_path = old_descendant_path[len(old_path):]  # includes the leading '.'
+                        new_descendant_path = new_path + relative_path
+
+                        # Use direct SQL update to ensure it gets committed
+                        db.execute(
+                            text("UPDATE course_content SET path = :new_path WHERE id = :content_id"),
+                            {"new_path": new_descendant_path, "content_id": descendant.id}
+                        )
+
+                # Force commit the descendant changes immediately
+                db.commit()
+
+                # Refresh the updated_item to ensure it's still attached to the session
+                db.refresh(updated_item)
+
+            except Exception as e:
+                print(f"Error in post_update: {e}")
+                db.rollback()
+                raise
+
+        await run_in_threadpool(_update_descendant_paths)
 
 
 class CourseContentInterface(EntityInterface):
