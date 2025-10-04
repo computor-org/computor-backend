@@ -83,12 +83,18 @@ class TutorViewRepository(ViewRepository):
 
         # Cache result
         if result:
-            # CRITICAL: Include course_id for proper invalidation when submissions/results change
+            # CRITICAL: Tag with submission_group_id for proper invalidation
+            # When artifacts/results change, they have submission_group_id, so we tag with that
             related_ids = {
                 'course_member_id': str(course_member_id),
                 'course_content_id': str(course_content_id),
-                'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id
+                'tutor_view': str(course_member.course_id)  # Course-level invalidation
             }
+
+            # Extract submission_group_id if available in result
+            if hasattr(result, 'submission_group_id') and result.submission_group_id:
+                related_ids['submission_group'] = str(result.submission_group_id)
+
             self._set_cached_view(
                 user_id=str(reader_user_id),
                 view_type=cache_key,
