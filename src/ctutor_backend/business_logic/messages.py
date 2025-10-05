@@ -3,9 +3,10 @@ from uuid import UUID
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
-from ctutor_backend.api.exceptions import BadRequestException
+from ctutor_backend.api.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.model.message import MessageRead
+from ctutor_backend.model.message import MessageRead, Message
+from ctutor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.interface.messages import MessageCreate, MessageGet
 
 
@@ -15,6 +16,14 @@ def create_message_with_author(
     db: Session,
 ) -> dict:
     """Create a message with enforced author_id and defaults.
+
+    Permission rules per target:
+    - user_id: NOT IMPLEMENTED - throws NotImplementedException
+    - course_member_id: NOT IMPLEMENTED - throws NotImplementedException
+    - submission_group_id: Writeable by submission_group_members and non-_student course roles
+    - course_group_id: Read-only - throws ForbiddenException on create
+    - course_content_id: LECTURER+ ONLY - requires _lecturer, _maintainer, or _owner role
+    - course_id: LECTURER+ ONLY - requires _lecturer, _maintainer, or _owner role
 
     Args:
         payload: Message creation data
@@ -26,6 +35,8 @@ def create_message_with_author(
 
     Raises:
         BadRequestException: If title or content missing
+        NotImplementedException: If user_id or course_member_id target
+        ForbiddenException: If trying to write to read-only target or lacking permissions
     """
     # Enforce author_id from current user
     if not payload.title or not payload.content:
@@ -34,16 +45,158 @@ def create_message_with_author(
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
-    # At least one target is recommended (user_id, course_member_id, submission_group_id, course_group_id)
+    # At least one target is recommended
     if not any(model_dump.get(k) for k in ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']):
         # Allow user-only message by setting user_id to current user if nothing else provided
         model_dump['user_id'] = permissions.user_id
+
+    # Check target-specific write permissions
+    if model_dump.get('user_id'):
+        raise NotImplementedException(detail="Direct user messages (user_id target) are not implemented")
+
+    if model_dump.get('course_member_id'):
+        raise NotImplementedException(detail="Course member messages (course_member_id target) are not implemented")
+
+    if model_dump.get('course_group_id'):
+        raise ForbiddenException(detail="Cannot create messages directly to course_group_id (read-only target)")
+
+    # submission_group_id: Check if user is a member or has elevated role
+    if model_dump.get('submission_group_id'):
+        submission_group_id = model_dump['submission_group_id']
+        _check_submission_group_write_permission(permissions, submission_group_id, db)
+
+    # course_content_id: Check if user has submission group with that content
+    if model_dump.get('course_content_id') and not model_dump.get('submission_group_id'):
+        course_content_id = model_dump['course_content_id']
+        _check_course_content_write_permission(permissions, course_content_id, db)
+
+    # course_id: Check if user is a member
+    if model_dump.get('course_id'):
+        course_id = model_dump['course_id']
+        _check_course_write_permission(permissions, course_id, db)
 
     # Default level
     if 'level' not in model_dump or model_dump['level'] is None:
         model_dump['level'] = 0
 
     return model_dump
+
+
+def _check_submission_group_write_permission(
+    permissions: Principal,
+    submission_group_id: str,
+    db: Session,
+) -> None:
+    """Check if user can write to a submission group.
+
+    Rules:
+    - User must be a submission_group_member OR
+    - User must have a course role other than _student in the submission group's course
+
+    Raises:
+        ForbiddenException: If user lacks permission
+    """
+    # Check if user is a submission group member
+    is_member = db.query(
+        db.query(SubmissionGroupMember.id)
+        .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
+        .filter(
+            SubmissionGroupMember.submission_group_id == submission_group_id,
+            CourseMember.user_id == permissions.user_id
+        )
+        .exists()
+    ).scalar()
+
+    if is_member:
+        return
+
+    # Check if user has non-student role in the course
+    submission_group = db.query(SubmissionGroup).filter(
+        SubmissionGroup.id == submission_group_id
+    ).first()
+
+    if not submission_group:
+        raise ForbiddenException(detail="Submission group not found")
+
+    # Check course membership with elevated role
+    has_elevated_role = db.query(
+        db.query(CourseMember.id)
+        .filter(
+            CourseMember.course_id == submission_group.course_id,
+            CourseMember.user_id == permissions.user_id,
+            CourseMember.course_role_id != "_student"
+        )
+        .exists()
+    ).scalar()
+
+    if not has_elevated_role:
+        raise ForbiddenException(detail="You must be a submission group member or have elevated course role to write messages to this submission group")
+
+
+def _check_course_content_write_permission(
+    permissions: Principal,
+    course_content_id: str,
+    db: Session,
+) -> None:
+    """Check if user can write to a course content.
+
+    Only _lecturer and above can write to course_content_id.
+    Students and tutors cannot write here.
+
+    Raises:
+        ForbiddenException: If user lacks permission
+    """
+    from ctutor_backend.model.course import CourseContent
+
+    # Get the course_content to find the course
+    course_content = db.query(CourseContent).filter(
+        CourseContent.id == course_content_id
+    ).first()
+
+    if not course_content:
+        raise ForbiddenException(detail="Course content not found")
+
+    # Check if user has _lecturer or higher role in the course
+    has_lecturer_role = db.query(
+        db.query(CourseMember.id)
+        .filter(
+            CourseMember.course_id == course_content.course_id,
+            CourseMember.user_id == permissions.user_id,
+            CourseMember.course_role_id.in_(["_lecturer", "_maintainer", "_owner"])
+        )
+        .exists()
+    ).scalar()
+
+    if not has_lecturer_role:
+        raise ForbiddenException(detail="Only lecturers and above can write messages to course_content_id. Students and tutors should use submission_group_id instead.")
+
+
+def _check_course_write_permission(
+    permissions: Principal,
+    course_id: str,
+    db: Session,
+) -> None:
+    """Check if user can write to a course.
+
+    Only _lecturer and above can write to course_id.
+    Students and tutors cannot write here.
+
+    Raises:
+        ForbiddenException: If user lacks permission
+    """
+    # Check if user has _lecturer or higher role in the course
+    has_lecturer_role = db.query(
+        db.query(CourseMember.id)
+        .filter(
+            CourseMember.course_id == course_id,
+            CourseMember.user_id == permissions.user_id,
+            CourseMember.course_role_id.in_(["_lecturer", "_maintainer", "_owner"])
+        )
+        .exists()
+    ).scalar()
+
+    if not has_lecturer_role:
+        raise ForbiddenException(detail="Only lecturers and above can write messages to course_id. Students and tutors should use submission_group_id instead.")
 
 
 def get_message_with_read_status(

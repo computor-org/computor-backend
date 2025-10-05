@@ -1,10 +1,12 @@
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, Literal
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy.orm import Session, selectinload
 
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.course import CourseMember, SubmissionGroup, CourseGroup, CourseContent
+
+MessageScope = Literal["user", "course_member", "submission_group", "course_group", "course_content", "course"]
 
 class MessageAuthor(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
@@ -50,6 +52,25 @@ class MessageGet(BaseEntityGet):
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
 
+    @computed_field
+    @property
+    def scope(self) -> MessageScope:
+        """Determine message scope based on target fields (priority order)"""
+        if self.user_id is not None:
+            return "user"
+        if self.course_member_id is not None:
+            return "course_member"
+        if self.submission_group_id is not None:
+            return "submission_group"
+        if self.course_group_id is not None:
+            return "course_group"
+        if self.course_content_id is not None:
+            return "course_content"
+        if self.course_id is not None:
+            return "course"
+        # Default fallback (shouldn't happen if data is valid)
+        return "course"
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -69,6 +90,25 @@ class MessageList(BaseEntityList):
     course_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
     course_id: Optional[str] = None
+
+    @computed_field
+    @property
+    def scope(self) -> MessageScope:
+        """Determine message scope based on target fields (priority order)"""
+        if self.user_id is not None:
+            return "user"
+        if self.course_member_id is not None:
+            return "course_member"
+        if self.submission_group_id is not None:
+            return "submission_group"
+        if self.course_group_id is not None:
+            return "course_group"
+        if self.course_content_id is not None:
+            return "course_content"
+        if self.course_id is not None:
+            return "course"
+        # Default fallback (shouldn't happen if data is valid)
+        return "course"
 
     model_config = ConfigDict(from_attributes=True)
 
