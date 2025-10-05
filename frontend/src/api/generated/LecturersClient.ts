@@ -13,10 +13,10 @@ export class LecturersClient extends BaseEndpointClient {
   }
 
   /**
-   * Lecturer List Course Contents
+   * Lecturer List Course Contents Endpoint
    * List course contents with course repository information.
    */
-  async lecturerListCourseContentsLecturersCourseContentsGet({ archived, courseContentTypeId, courseId, executionBackendId, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, path, position, skip, title }: { archived?: boolean | null; courseContentTypeId?: string | null; courseId?: string | null; executionBackendId?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; path?: string | null; position?: number | null; skip?: number | null; title?: string | null }): Promise<CourseContentLecturerList[]> {
+  async lecturerListCourseContentsEndpointLecturersCourseContentsGet({ archived, courseContentTypeId, courseId, executionBackendId, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, path, position, skip, title }: { archived?: boolean | null; courseContentTypeId?: string | null; courseId?: string | null; executionBackendId?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; path?: string | null; position?: number | null; skip?: number | null; title?: string | null }): Promise<CourseContentLecturerList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
       course_content_type_id: courseContentTypeId,
@@ -37,17 +37,18 @@ export class LecturersClient extends BaseEndpointClient {
   }
 
   /**
-   * Lecturer Get Course Contents
+   * Lecturer Get Course Contents Endpoint
    * Get a specific course content with course repository information.
    */
-  async lecturerGetCourseContentsLecturersCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentLecturerGet> {
+  async lecturerGetCourseContentsEndpointLecturersCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentLecturerGet> {
     return this.client.get<CourseContentLecturerGet>(this.buildPath('course-contents', courseContentId));
   }
 
   /**
-   * Lecturer List Courses
+   * Lecturer List Courses Endpoint
+   * List courses accessible to lecturers.
    */
-  async lecturerListCoursesLecturersCoursesGet({ courseFamilyId, description, fullPath, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
+  async lecturerListCoursesEndpointLecturersCoursesGet({ courseFamilyId, description, fullPath, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -64,9 +65,10 @@ export class LecturersClient extends BaseEndpointClient {
   }
 
   /**
-   * Lecturer Get Courses
+   * Lecturer Get Courses Endpoint
+   * Get a specific course for lecturers.
    */
-  async lecturerGetCoursesLecturersCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseGet> {
+  async lecturerGetCoursesEndpointLecturersCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseGet> {
     return this.client.get<CourseGet>(this.buildPath('courses', courseId));
   }
 }

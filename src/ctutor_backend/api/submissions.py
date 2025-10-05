@@ -61,6 +61,26 @@ from sqlalchemy import func
 import re
 import mimetypes
 
+# Import business logic functions
+from ctutor_backend.cache import Cache
+from ctutor_backend.redis_cache import get_cache
+from ctutor_backend.repositories.submission_artifact import SubmissionArtifactRepository
+from ctutor_backend.repositories.result import ResultRepository
+from ctutor_backend.business_logic.submissions import (
+    upload_submission_artifact,
+    check_artifact_access,
+    get_artifact_with_details,
+    update_artifact,
+    create_artifact_grade,
+    update_grade,
+    delete_grade,
+    create_artifact_review,
+    update_review,
+    delete_review,
+    create_test_result,
+    update_test_result,
+)
+
 logger = logging.getLogger(__name__)
 
 submissions_router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -114,6 +134,7 @@ async def upload_submission(
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
+    cache: Cache = Depends(get_cache),
 ):
     """Upload a submission file to MinIO and create matching SubmissionArtifact records."""
 
@@ -122,160 +143,21 @@ async def upload_submission(
     except ValidationError as validation_error:
         raise BadRequestException(detail=f"Invalid submission metadata: {validation_error}") from validation_error
 
-    # Resolve submission group with permission check
-    submission_group = (
-        check_course_permissions(permissions, SubmissionGroup, "_student", db)
-        .options(
-            joinedload(SubmissionGroup.course_content),
-            joinedload(SubmissionGroup.members).joinedload(SubmissionGroupMember.course_member),
-        )
-        .filter(SubmissionGroup.id == submission_data.submission_group_id)
-        .first()
-    )
-
-    if not submission_group:
-        raise NotFoundException(detail="Submission group not found or access denied")
-
-    course_content: CourseContent = submission_group.course_content
-
-    if not course_content:
-        raise NotFoundException(detail="Course content not found for submission group")
-
-    if not course_content.is_submittable:
-        raise BadRequestException(detail="This course content does not accept submissions")
-
-    if not course_content.execution_backend_id:
-        raise BadRequestException(detail="Course content is missing an execution backend to link submissions")
-
-    # Determine submitting course member
-    submitting_member: Optional[CourseMember] = None
-    principal_user_id = permissions.get_user_id()
-
-    if not submission_group.members:
-        raise BadRequestException(detail="Submission group does not have any members")
-
-    if principal_user_id:
-        membership = next(
-            (
-                member_assoc
-                for member_assoc in submission_group.members
-                if member_assoc.course_member and str(member_assoc.course_member.user_id) == str(principal_user_id)
-            ),
-            None,
-        )
-        if membership:
-            submitting_member = membership.course_member
-
-    if not submitting_member:
-        if len(submission_group.members) == 1:
-            submitting_member = submission_group.members[0].course_member
-        else:
-            raise ForbiddenException(detail="Unable to resolve submitting course member for this group")
-
-    if not submitting_member:
-        raise NotFoundException(detail="Submitting course member could not be resolved")
-
-    trimmed_version = (submission_data.version_identifier or "").strip() or None
-    if trimmed_version and len(trimmed_version) > 2048:
-        raise BadRequestException(detail="version_identifier exceeds maximum length of 2048 characters")
-
-    manual_version_identifier = trimmed_version or f"manual-{uuid4()}"
-
-    # Check submission quota limits (if configured)
-    if submission_group.max_submissions is not None:
-        submitted_count = (
-            db.query(func.count(SubmissionArtifact.id))
-            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
-            .scalar()
-        )
-        if submitted_count >= submission_group.max_submissions:
-            raise BadRequestException(detail="Submission limit reached for this group")
-
-    # Read file for validation and unzip for storage
+    # Read file content
     file_content = await file.read()
-    file_size = len(file_content)
-    file_data = io.BytesIO(file_content)
 
-    perform_full_file_validation(
+    # Delegate to business logic layer
+    return await upload_submission_artifact(
+        submission_group_id=submission_data.submission_group_id,
+        file_content=file_content,
         filename=file.filename,
         content_type=file.content_type or "application/octet-stream",
-        file_size=file_size,
-        file_data=file_data,
-    )
-
-    archive_suffix = PurePosixPath(file.filename or "").suffix.lower()
-    if archive_suffix != ".zip":
-        raise BadRequestException("Only ZIP archives are supported for submissions")
-
-    # Validate the ZIP file content
-    file_data.seek(0)
-    try:
-        with zipfile.ZipFile(file_data) as archive:
-            members = [info for info in archive.infolist() if not info.is_dir()]
-            if not members:
-                raise BadRequestException("Archive does not contain any files")
-
-            total_unpacked_size = sum(info.file_size for info in members)
-            if total_unpacked_size == 0:
-                raise BadRequestException("Archive contains only empty files")
-            if total_unpacked_size > MAX_UPLOAD_SIZE:
-                raise BadRequestException(
-                    f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
-                )
-    except zipfile.BadZipFile as exc:
-        raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
-
-    # Store the entire ZIP file as a single artifact
-    timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
-    submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
-    bucket_name = str(submission_group.id).lower()
-    object_key = f"{submission_prefix}/{file.filename or 'submission.zip'}"
-
-    # Minimal metadata for MinIO
-    storage_metadata = {
-        "submission_group_id": str(submission_group.id),
-        "version_identifier": manual_version_identifier,
-    }
-
-    # Upload the entire ZIP file to MinIO
-    file_data.seek(0)
-    stored = await storage_service.upload_file(
-        file_data=file_data,
-        object_key=object_key,
-        bucket_name=bucket_name,
-        content_type="application/zip",
-        metadata=storage_metadata,
-    )
-
-    # Create single SubmissionArtifact record for the ZIP file
-    artifact = SubmissionArtifact(
-        submission_group_id=submission_group.id,
-        uploaded_by_course_member_id=submitting_member.id,
-        content_type=stored.content_type,
-        file_size=stored.size,
-        bucket_name=bucket_name,
-        object_key=object_key,
-        version_identifier=manual_version_identifier,
-        submit=submission_data.submit,  # True = official submission, False = test/practice run
-        properties={}  # Keep empty for future extensibility and legacy compatibility
-    )
-
-    db.add(artifact)
-    db.commit()
-    db.refresh(artifact)
-
-    logger.info(
-        "Created submission artifact %s for group %s", artifact.id, submission_group.id
-    )
-
-    return SubmissionUploadResponseModel(
-        artifacts=[artifact.id],
-        submission_group_id=submission_group.id,
-        uploaded_by_course_member_id=submitting_member.id,
-        total_size=stored.size,
-        files_count=1,  # Single ZIP file
-        uploaded_at=datetime.utcnow(),
-        version_identifier=manual_version_identifier,
+        version_identifier=submission_data.version_identifier,
+        submit=submission_data.submit,
+        permissions=permissions,
+        db=db,
+        storage_service=storage_service,
+        cache=cache,
     )
 
 
@@ -357,51 +239,8 @@ async def get_submission_artifact(
 ):
     """Get details of a specific submission artifact."""
 
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
-    ).filter(
-        SubmissionArtifact.id == artifact_id
-    ).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check permissions
-    user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to view this artifact")
-
-    # Create the response with additional computed fields
-    artifact_get = SubmissionArtifactGet.model_validate(artifact)
-
-    # Add computed fields for the detailed view
-    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
-    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
-    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
-
-    # Calculate average grade if there are grades
-    if hasattr(artifact, 'grades') and artifact.grades:
-        grades = [g.grade for g in artifact.grades if g.grade is not None]
-        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
-
-    return artifact_get
+    artifact = check_artifact_access(artifact_id, permissions, db)
+    return get_artifact_with_details(artifact)
 
 
 @submissions_router.patch("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
@@ -410,8 +249,12 @@ async def update_submission_artifact(
     update_data: SubmissionArtifactUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Update a submission artifact (e.g., change submit status)."""
+
+    # Initialize repository with cache for automatic invalidation
+    artifact_repo = SubmissionArtifactRepository(db, cache)
 
     artifact = db.query(SubmissionArtifact).options(
         joinedload(SubmissionArtifact.submission_group)
@@ -444,17 +287,18 @@ async def update_submission_artifact(
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to update this artifact")
 
-    # Apply updates
+    # Build updates dict
+    updates = {}
     if update_data.submit is not None:
-        artifact.submit = update_data.submit
-
+        updates['submit'] = update_data.submit
     if update_data.properties is not None:
-        artifact.properties = update_data.properties
+        updates['properties'] = update_data.properties
 
-    db.commit()
-    db.refresh(artifact)
+    # CRITICAL: Use repository.update() for automatic cache invalidation
+    if updates:
+        artifact = artifact_repo.update(str(artifact_id), updates)
 
-    logger.info("Updated submission artifact %s", artifact_id)
+    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
 
     # Return updated artifact with computed fields
     artifact_get = SubmissionArtifactGet.model_validate(artifact)
@@ -474,7 +318,7 @@ async def update_submission_artifact(
 # ===============================
 
 @submissions_router.post("/artifacts/{artifact_id}/grades", response_model=SubmissionGradeDetail, status_code=status.HTTP_201_CREATED)
-async def create_artifact_grade(
+async def create_artifact_grade_endpoint(
     artifact_id: str,
     grade_data: SubmissionGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -482,46 +326,14 @@ async def create_artifact_grade(
 ):
     """Create a grade for an artifact. Requires instructor/tutor permissions."""
 
-    # Get the artifact and verify permissions
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group).joinedload(SubmissionGroup.course)
-    ).filter(SubmissionArtifact.id == artifact_id).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check if user has grading permissions (must be at least tutor)
-    course = artifact.submission_group.course
-
-    # Query for course member with tutor or higher permission
-    grader_member = check_course_permissions(
-        permissions, CourseMember, "_tutor", db
-    ).filter(
-        CourseMember.course_id == course.id,
-        CourseMember.user_id == permissions.get_user_id()
-    ).first()
-
-    if not grader_member:
-        raise ForbiddenException(detail="You must be a tutor or instructor to grade artifacts")
-
-    # Validate grade
-    if grade_data.grade < 0.0 or grade_data.grade > 1.0:
-        raise BadRequestException(detail="Grade must be between 0.0 and 1.0")
-
-    # Create the grade (use the grader's course member id)
-    grade = SubmissionGrade(
+    grade = create_artifact_grade(
         artifact_id=artifact_id,
-        graded_by_course_member_id=grader_member.id,  # Use the authenticated grader's member ID
         grade=grade_data.grade,
         status=grade_data.status.value if hasattr(grade_data.status, 'value') else grade_data.status,
         comment=grade_data.comment,
+        permissions=permissions,
+        db=db,
     )
-
-    db.add(grade)
-    db.commit()
-    db.refresh(grade)
-
-    logger.info(f"Created grade {grade.id} for artifact {artifact_id}")
 
     return SubmissionGradeDetail.model_validate(grade)
 
@@ -982,8 +794,12 @@ async def update_test_result(
     update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
+
+    # Initialize repository with cache for automatic invalidation
+    result_repo = ResultRepository(db, cache)
 
     result = db.query(Result).filter(Result.id == test_id).first()
 
@@ -1003,22 +819,26 @@ async def update_test_result(
         if not course_member or str(course_member.user_id) != str(user_id):
             raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
-    # Update fields
+    # Build updates dict
+    updates = {}
     if update_data.status is not None:
         from ctutor_backend.interface.tasks import map_task_status_to_int
-        result.status = map_task_status_to_int(update_data.status)
+        updates['status'] = map_task_status_to_int(update_data.status)
     if update_data.grade is not None:
-        result.grade = update_data.grade
+        updates['grade'] = update_data.grade
     if update_data.result_json is not None:
-        result.result_json = update_data.result_json
+        updates['result_json'] = update_data.result_json
     if update_data.properties is not None:
-        result.properties = update_data.properties
+        updates['properties'] = update_data.properties
     if update_data.log_text is not None:
-        result.log_text = update_data.log_text
+        updates['log_text'] = update_data.log_text
     if update_data.finished_at is not None:
-        result.finished_at = update_data.finished_at
+        updates['finished_at'] = update_data.finished_at
 
-    db.commit()
-    db.refresh(result)
+    # CRITICAL: Use repository.update() for automatic cache invalidation
+    if updates:
+        result = result_repo.update(str(test_id), updates)
+
+    logger.info("Updated test result %s (cache invalidated)", test_id)
 
     return ResultList.model_validate(result)

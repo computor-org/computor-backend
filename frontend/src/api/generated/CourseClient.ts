@@ -34,16 +34,18 @@ export class CourseClient extends BaseEndpointClient {
   }
 
   /**
-   * Delete Course Execution Backend
+   * Delete Course Execution Backend Endpoint
+   * Delete course execution backend.
    */
-  async deleteCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdDelete({ courseId, executionBackendId }: { courseId: string | string; executionBackendId: string | string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+  async deleteCourseExecutionBackendEndpointCoursesCourseIdExecutionBackendsExecutionBackendIdDelete({ courseId, executionBackendId }: { courseId: string | string; executionBackendId: string | string }): Promise<Record<string, unknown> & Record<string, unknown>> {
     return this.client.delete<Record<string, unknown> & Record<string, unknown>>(this.buildPath(courseId, 'execution-backends', executionBackendId));
   }
 
   /**
-   * Patch Course Execution Backend
+   * Patch Course Execution Backend Endpoint
+   * Update course execution backend configuration.
    */
-  async patchCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdPatch({ courseId, executionBackendId, body }: { courseId: string | string; executionBackendId: string | string; body: Record<string, unknown> & Record<string, unknown> }): Promise<CourseExecutionBackendGet> {
+  async patchCourseExecutionBackendEndpointCoursesCourseIdExecutionBackendsExecutionBackendIdPatch({ courseId, executionBackendId, body }: { courseId: string | string; executionBackendId: string | string; body: Record<string, unknown> & Record<string, unknown> }): Promise<CourseExecutionBackendGet> {
     return this.client.patch<CourseExecutionBackendGet>(this.buildPath(courseId, 'execution-backends', executionBackendId), body);
   }
 }

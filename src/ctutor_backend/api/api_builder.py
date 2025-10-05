@@ -1,7 +1,15 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from ctutor_backend.api.crud import archive_db, create_db, filter_db, get_id_db, list_db, update_db, delete_db
+from ctutor_backend.business_logic.crud import (
+    archive_entity as archive_db,
+    create_entity as create_db,
+    filter_entities as filter_db,
+    get_entity_by_id as get_id_db,
+    list_entities as list_db,
+    update_entity as update_db,
+    delete_entity as delete_db
+)
 from typing import Annotated, Optional
 from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.database import get_db
@@ -91,7 +99,7 @@ class CrudRouter:
     
     def update(self):
         async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, entity: self.dto.update, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
-            entity_updated = update_db(permissions, db, id, entity, self.dto.model, self.dto.get, None, self.dto.post_update)
+            entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update)
 
             # Clear related cache entries
             await self._clear_entity_cache(cache, self.dto.model.__tablename__)
@@ -117,7 +125,7 @@ class CrudRouter:
                 if entity_deleted:
                     background_tasks.add_task(task, entity_deleted, db, permissions)
 
-            return delete_db(permissions, db, id, self.dto.model)
+            return await delete_db(permissions, db, id, self.dto.model)
 
         return route
     

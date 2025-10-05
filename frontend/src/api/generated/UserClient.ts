@@ -13,15 +13,16 @@ export class UserClient extends BaseEndpointClient {
   }
 
   /**
-   * Get Current User
-   * Get the current authenticated user
+   * Get Current User Endpoint
+   * Get the current authenticated user.
    */
-  async getCurrentUserUserGet(): Promise<UserGet> {
+  async getCurrentUserEndpointUserGet(): Promise<UserGet> {
     return this.client.get<UserGet>(this.basePath);
   }
 
   /**
    * Register Current User Course Account
+   * Register user's provider account for a course.
    */
   async registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost({ courseId, body }: { courseId: string | string; body: CourseMemberProviderAccountUpdate }): Promise<CourseMemberReadinessStatus> {
     return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'register'), body);
@@ -29,15 +30,17 @@ export class UserClient extends BaseEndpointClient {
 
   /**
    * Validate Current User Course
+   * Validate user's course membership and provider account.
    */
   async validateCurrentUserCourseUserCoursesCourseIdValidatePost({ courseId, body }: { courseId: string | string; body: CourseMemberValidationRequest }): Promise<CourseMemberReadinessStatus> {
     return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'validate'), body);
   }
 
   /**
-   * Set User Password
+   * Set User Password Endpoint
+   * Set or update user password.
    */
-  async setUserPasswordUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
+  async setUserPasswordEndpointUserPasswordPost({ body }: { body: UserPassword }): Promise<void> {
     return this.client.post<void>(this.buildPath('password'), body);
   }
 

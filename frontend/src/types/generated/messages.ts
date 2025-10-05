@@ -52,6 +52,8 @@ export interface MessageGet {
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
+  /** Determine message scope based on target fields (priority order) */
+  scope: "user" | "course_member" | "submission_group" | "course_group" | "course_content" | "course";
 }
 
 export interface MessageList {
@@ -74,6 +76,8 @@ export interface MessageList {
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
+  /** Determine message scope based on target fields (priority order) */
+  scope: "user" | "course_member" | "submission_group" | "course_group" | "course_content" | "course";
 }
 
 export interface MessageQuery {
@@ -88,4 +92,6 @@ export interface MessageQuery {
   course_group_id?: string | null;
   course_content_id?: string | null;
   course_id?: string | null;
+  course_id_all_messages?: boolean | null;
+  scope?: "user" | "course_member" | "submission_group" | "course_group" | "course_content" | "course" | null;
 }

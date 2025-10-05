@@ -35,6 +35,7 @@ export class ResultClient extends BaseEndpointClient {
 
   /**
    * Result Status
+   * Get the current status of a test result.
    */
   async resultStatusResultsResultIdStatusGet({ resultId }: { resultId: string | string }): Promise<TaskStatus> {
     return this.client.get<TaskStatus>(this.buildPath(resultId, 'status'));

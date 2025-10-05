@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) 
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
-from typing import get_origin, get_args
+from typing import get_origin, get_args, Literal
 import inspect
 
 
@@ -109,8 +109,26 @@ class TypeScriptGenerator:
                 else:
                     return f"{{ [key: {key_type}]: {value_type} }}"
             return 'Record<string, any>'
-        
-        # Handle literal types
+
+        # Handle Literal types
+        if origin is Literal:
+            args = get_args(py_type)
+            if args:
+                # Convert literal values to TypeScript union
+                ts_values = []
+                for arg in args:
+                    if isinstance(arg, str):
+                        ts_values.append(json.dumps(arg))
+                    elif isinstance(arg, bool):
+                        ts_values.append('true' if arg else 'false')
+                    elif isinstance(arg, (int, float)):
+                        ts_values.append(str(arg))
+                    else:
+                        ts_values.append(json.dumps(str(arg)))
+                return ' | '.join(ts_values)
+            return 'never'
+
+        # Handle class types
         if hasattr(py_type, '__name__'):
             type_name = py_type.__name__
 
@@ -165,24 +183,41 @@ class TypeScriptGenerator:
             lines.append(" */")
         
         lines.append(f"export interface {model_name} {{")
-        
-        # Process fields
+
+        # Process regular fields
         for field_name, field_info in model_class.model_fields.items():
             # Get field type
             field_type = field_info.annotation
             ts_type = self.python_type_to_typescript(field_type)
-            
+
             # Check if field is optional
             is_optional = not field_info.is_required()
-            
+
             # Add JSDoc for field description
             if field_info.description:
                 lines.append(f"  /** {field_info.description} */")
-            
+
             # Add field
             optional_marker = "?" if is_optional else ""
             lines.append(f"  {field_name}{optional_marker}: {ts_type};")
-        
+
+        # Process computed fields (Pydantic v2)
+        if hasattr(model_class, 'model_computed_fields'):
+            for field_name, computed_field_info in model_class.model_computed_fields.items():
+                # Get return type from the computed field
+                field_type = computed_field_info.return_type
+                ts_type = self.python_type_to_typescript(field_type)
+
+                # Computed fields are always present (not optional)
+                # Add JSDoc if available
+                if hasattr(computed_field_info, 'description') and computed_field_info.description:
+                    lines.append(f"  /** {computed_field_info.description} */")
+                elif hasattr(computed_field_info, '__doc__') and computed_field_info.__doc__:
+                    lines.append(f"  /** {computed_field_info.__doc__.strip()} */")
+
+                # Add computed field (not optional)
+                lines.append(f"  {field_name}: {ts_type};")
+
         lines.append("}")
         
         return '\n'.join(lines)

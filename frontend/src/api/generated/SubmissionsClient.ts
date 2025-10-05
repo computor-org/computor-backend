@@ -59,10 +59,10 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Artifact Grade
+   * Create Artifact Grade Endpoint
    * Create a grade for an artifact. Requires instructor/tutor permissions.
    */
-  async createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost({ artifactId, body }: { artifactId: string; body: SubmissionGradeCreate }): Promise<SubmissionGradeDetail> {
+  async createArtifactGradeEndpointSubmissionsArtifactsArtifactIdGradesPost({ artifactId, body }: { artifactId: string; body: SubmissionGradeCreate }): Promise<SubmissionGradeDetail> {
     return this.client.post<SubmissionGradeDetail>(this.buildPath('artifacts', artifactId, 'grades'), body);
   }
 

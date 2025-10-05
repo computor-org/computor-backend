@@ -28,6 +28,7 @@ from ctutor_backend.interface.submission_groups import SubmissionGroupInterface
 from ctutor_backend.interface.users import UserInterface
 from ctutor_backend.interface.course_families import CourseFamilyInterface
 from ctutor_backend.interface.course_groups import CourseGroupInterface
+from ctutor_backend.interface.course_members import CourseMemberInterface
 from ctutor_backend.interface.course_roles import CourseRoleInterface
 from ctutor_backend.interface.course_content_types import CourseContentTypeInterface
 from ctutor_backend.interface.course_content_kind import CourseContentKindInterface
@@ -43,9 +44,7 @@ from ctutor_backend.api.student_profiles import student_profile_router
 from ctutor_backend.api.results import result_router
 from ctutor_backend.api.tutor import tutor_router
 from ctutor_backend.api.lecturer import lecturer_router
-from ctutor_backend.api.signup import signup_router
 from ctutor_backend.api.organizations import organization_router
-from ctutor_backend.api.course_members import course_member_router
 from ctutor_backend.api.user_roles import user_roles_router
 from ctutor_backend.api.role_claims import role_claim_router
 from ctutor_backend.api.user import user_router
@@ -197,7 +196,7 @@ course_router.register_routes(app)
 organization_router.register_routes(app)
 CrudRouter(CourseFamilyInterface).register_routes(app)
 CrudRouter(CourseGroupInterface).register_routes(app)
-course_member_router.register_routes(app)
+CrudRouter(CourseMemberInterface).register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
 LookUpRouter(LanguageInterface).register_routes(app)
@@ -273,12 +272,6 @@ app.include_router(
     prefix="/lecturers",
     tags=["lecturers"],
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
-)
-
-app.include_router(
-    signup_router,
-    prefix="/signup",
-    tags=["signup","gitlab"]
 )
 
 # app.include_router(
@@ -364,9 +357,3 @@ app.include_router(
 @app.head("/", status_code=204)
 def get_status_head():
     return
-
-
-@app.get("/health", status_code=204, include_in_schema=False)
-async def health_check() -> Response:
-    """Simple health probe endpoint."""
-    return Response(status_code=204)

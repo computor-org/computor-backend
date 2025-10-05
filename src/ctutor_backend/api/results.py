@@ -4,8 +4,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
-from ctutor_backend.api.crud import create_db, delete_db, get_id_db, list_db, update_db
-from ctutor_backend.api.exceptions import NotFoundException
+from ctutor_backend.business_logic.crud import (
+    create_entity as create_db,
+    delete_entity as delete_db,
+    get_entity_by_id as get_id_db,
+    list_entities as list_db,
+    update_entity as update_db
+)
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.results import (
     ResultCreate,
@@ -15,27 +20,14 @@ from ctutor_backend.interface.results import (
     ResultUpdate,
     ResultQuery,
 )
-from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
-from ctutor_backend.model.result import Result
+from ctutor_backend.interface.tasks import TaskStatus
 from ctutor_backend.permissions.auth import get_current_principal
-from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.tasks import get_task_executor
 
+# Import business logic
+from ctutor_backend.business_logic.results import get_result_status
 
 result_router = APIRouter(prefix="/results", tags=["results"])
-
-
-async def get_result_status(result: Result) -> TaskStatus:
-    """Fetch the latest task status for a result from the task executor."""
-    if not result.test_system_id:
-        return map_int_to_task_status(result.status)
-    try:
-        task_executor = get_task_executor()
-        task_info = await task_executor.get_task_status(result.test_system_id)
-        return task_info.status
-    except Exception:
-        return TaskStatus.FAILED
 
 
 @result_router.get("", response_model=list[ResultList])
@@ -82,7 +74,7 @@ async def update_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> ResultGet:
-    return update_db(
+    return await update_db(
         permissions,
         db,
         result_id,
@@ -99,7 +91,7 @@ async def delete_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    delete_db(permissions, db, result_id, ResultInterface.model)
+    await delete_db(permissions, db, result_id, ResultInterface.model)
 
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
@@ -108,11 +100,5 @@ async def result_status(
     result_id: UUID | str,
     db: Session = Depends(get_db),
 ):
-    result = (
-        check_permissions(permissions, Result, "get", db)
-        .filter(Result.id == result_id)
-        .first()
-    )
-    if result is None:
-        raise NotFoundException()
-    return await get_result_status(result)
+    """Get the current status of a test result."""
+    return await get_result_status(result_id, permissions, db)

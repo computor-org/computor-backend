@@ -17,32 +17,32 @@ export class AuthenticationClient extends BaseEndpointClient {
    * List all available plugins (admin only).
    * Shows both enabled and disabled plugins with full metadata.
    */
-  async listAllPluginsAuthAdminPluginsGet(): Promise<void> {
-    return this.client.get<void>(this.buildPath('admin', 'plugins'));
+  async listAllPluginsAuthAdminPluginsGet(): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins'));
   }
 
   /**
    * Reload Plugins
    * Reload all plugins (admin only).
    */
-  async reloadPluginsAuthAdminPluginsReloadPost(): Promise<void> {
-    return this.client.post<void>(this.buildPath('admin', 'plugins', 'reload'));
+  async reloadPluginsAuthAdminPluginsReloadPost(): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', 'reload'));
   }
 
   /**
    * Disable Plugin
    * Disable a plugin (admin only).
    */
-  async disablePluginAuthAdminPluginsPluginNameDisablePost({ pluginName }: { pluginName: string }): Promise<void> {
-    return this.client.post<void>(this.buildPath('admin', 'plugins', pluginName, 'disable'));
+  async disablePluginAuthAdminPluginsPluginNameDisablePost({ pluginName }: { pluginName: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', pluginName, 'disable'));
   }
 
   /**
    * Enable Plugin
    * Enable a plugin (admin only).
    */
-  async enablePluginAuthAdminPluginsPluginNameEnablePost({ pluginName }: { pluginName: string }): Promise<void> {
-    return this.client.post<void>(this.buildPath('admin', 'plugins', pluginName, 'enable'));
+  async enablePluginAuthAdminPluginsPluginNameEnablePost({ pluginName }: { pluginName: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', pluginName, 'enable'));
   }
 
   /**

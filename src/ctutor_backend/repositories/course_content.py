@@ -1,51 +1,158 @@
+"""
+Course content repository for complex query operations.
+
+This module provides query builder functions for course content, submissions,
+results, and grading data. These functions construct complex SQLAlchemy queries
+with joins, subqueries, and aggregations for efficient data retrieval.
+"""
+
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from sqlalchemy import func, case, select, and_, literal
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel, ConfigDict
+
 from ctutor_backend.api.exceptions import NotFoundException
-from ctutor_backend.model.course import SubmissionGroupMember
+from ctutor_backend.model.course import (
+    SubmissionGroupMember,
+    Course,
+    CourseContent,
+    CourseContentKind,
+    CourseMember,
+    SubmissionGroup
+)
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, SubmissionGroup
-# SubmissionGroupGrading removed - using SubmissionGrade from artifact module
 from ctutor_backend.model.message import Message, MessageRead
 
-def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session, submission: Optional[bool] = None):
 
+class CourseMemberCourseContentQueryResult(BaseModel):
+    """
+    Typed result from course_member_course_content_query.
+
+    This replaces the raw tuple unpacking with a proper typed model
+    that provides named field access and type safety.
+
+    Attributes:
+        course_content: The course content entity
+        result_count: Total number of test results for this content
+        result: The latest result (if any)
+        submission_group: The submission group (if any)
+        submission_count: Number of official submissions
+        submission_status_int: Latest grading status as integer
+        submission_grading: Latest grading score
+        content_unread_count: Unread messages at content level
+        submission_group_unread_count: Unread messages at submission group level
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    course_content: CourseContent
+    result_count: Optional[int] = None
+    result: Optional[Result] = None
+    submission_group: Optional[SubmissionGroup] = None
+    submission_count: Optional[int] = None
+    submission_status_int: Optional[int] = None
+    submission_grading: Optional[float] = None
+    content_unread_count: int = 0
+    submission_group_unread_count: int = 0
+
+    @classmethod
+    def from_tuple(cls, raw_result: tuple) -> "CourseMemberCourseContentQueryResult":
+        """
+        Convert a raw tuple result into a typed model.
+
+        This is used when query results are fetched via .all() or .first()
+        from the query builder functions.
+
+        Args:
+            raw_result: The raw tuple from SQLAlchemy query
+
+        Returns:
+            Typed CourseMemberCourseContentQueryResult instance
+        """
+        return cls(
+            course_content=raw_result[0],
+            result_count=raw_result[1],
+            result=raw_result[2],
+            submission_group=raw_result[3],
+            submission_count=raw_result[4] if len(raw_result) > 4 else None,
+            submission_status_int=raw_result[5] if len(raw_result) > 5 else None,
+            submission_grading=raw_result[6] if len(raw_result) > 6 else None,
+            content_unread_count=raw_result[7] if len(raw_result) > 7 else 0,
+            submission_group_unread_count=raw_result[8] if len(raw_result) > 8 else 0,
+        )
+
+
+def latest_result_subquery(
+    user_id: UUID | str | None,
+    course_member_id: UUID | str | None,
+    course_content_id: UUID | str | None,
+    db: Session,
+    submission: Optional[bool] = None
+):
+    """
+    Build subquery to get the latest result date per course content.
+
+    Args:
+        user_id: Filter by user ID (mutually exclusive with course_member_id)
+        course_member_id: Filter by course member ID (mutually exclusive with user_id)
+        course_content_id: Filter by specific course content ID
+        db: Database session
+        submission: Filter by submission status (True=official submissions only)
+
+    Returns:
+        Subquery with course_content_id and latest_result_date columns
+    """
     query = db.query(
-                Result.course_content_id,
-                func.max(Result.created_at).label("latest_result_date")
-            )
-    
-    if user_id != None:
+        Result.course_content_id,
+        func.max(Result.created_at).label("latest_result_date")
+    )
+
+    if user_id is not None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
             .filter(CourseMember.user_id == user_id)
-    elif course_member_id != None:
+    elif course_member_id is not None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
-    
+
     query = query.filter(Result.status == 0, Result.test_system_id.isnot(None))
 
-    if course_content_id != None:
+    if course_content_id is not None:
         query = query.filter(Result.course_content_id == course_content_id)
 
-    if submission != None:
+    if submission is not None:
         # Join with SubmissionArtifact to filter by submit field
         query = query.join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
             .filter(SubmissionArtifact.submit == submission)
 
     return query.group_by(Result.course_content_id).subquery()
 
-def submission_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
+
+def submission_count_subquery(
+    user_id: UUID | str | None,
+    course_member_id: UUID | str | None,
+    course_content_id: UUID | str | None,
+    db: Session
+):
     """
     Count SubmissionArtifacts with submit=True per course content.
+
     This counts actual submissions, not test results.
+
+    Args:
+        user_id: Filter by user ID (mutually exclusive with course_member_id)
+        course_member_id: Filter by course member ID (mutually exclusive with user_id)
+        course_content_id: Filter by specific course content ID
+        db: Database session
+
+    Returns:
+        Subquery with course_content_id and submission_count columns
     """
     query = db.query(
         SubmissionGroup.course_content_id.label("course_content_id"),
@@ -54,55 +161,77 @@ def submission_count_subquery(user_id: UUID | str | None, course_member_id: UUID
         .join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id) \
         .filter(SubmissionArtifact.submit == True)
 
-    if user_id != None:
+    if user_id is not None:
         query = query.join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
             .filter(CourseMember.user_id == user_id)
-    elif course_member_id != None:
+    elif course_member_id is not None:
         query = query.join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
 
-    if course_content_id != None:
+    if course_content_id is not None:
         query = query.filter(SubmissionGroup.course_content_id == course_content_id)
 
     return query.group_by(SubmissionGroup.course_content_id).subquery()
 
 
-def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session):
+def results_count_subquery(
+    user_id: UUID | str | None,
+    course_member_id: UUID | str | None,
+    course_content_id: UUID | str | None,
+    db: Session
+):
     """
     Count test results (Results with test_system_id) per course content.
+
     This counts all test runs, regardless of whether they were official submissions.
+
+    Args:
+        user_id: Filter by user ID (mutually exclusive with course_member_id)
+        course_member_id: Filter by course member ID (mutually exclusive with user_id)
+        course_content_id: Filter by specific course content ID
+        db: Database session
+
+    Returns:
+        Subquery with course_content_id and total_results_count columns
     """
     query = db.query(
-                Result.course_content_id,
-                func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
-            ).join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
+        Result.course_content_id,
+        func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
+    ).join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
 
-    if user_id != None:
+    if user_id is not None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
             .filter(CourseMember.user_id == user_id)
-    elif course_member_id != None:
+    elif course_member_id is not None:
         query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
 
     query = query.filter(Result.status == 0)
 
-    if course_content_id != None:
+    if course_content_id is not None:
         query = query.filter(Result.course_content_id == course_content_id)
 
     return query.group_by(Result.course_content_id).subquery()
 
-# TODO: Migrate to new SubmissionGrade artifact-based system
+
 def latest_grading_subquery(db: Session):
     """
     Latest grading per submission group using window function with deterministic ordering.
+
     Returns columns: submission_group_id, status, grading, rn (rn=1 is latest).
 
     NOTE: This needs to be migrated to use SubmissionGrade from artifact module
     which is tied to artifacts, not submission groups directly.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Subquery with grading information (currently returns empty results)
     """
     # Temporarily return an empty subquery to avoid errors
     return db.query(
@@ -116,6 +245,16 @@ def latest_grading_subquery(db: Session):
 
 
 def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
+    """
+    Count unread messages per course content.
+
+    Args:
+        reader_user_id: The user ID to check for unread messages
+        db: Database session
+
+    Returns:
+        Subquery with course_content_id and unread_count columns, or None if no user_id
+    """
     if reader_user_id is None:
         return None
 
@@ -142,6 +281,16 @@ def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Se
 
 
 def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | None, db: Session):
+    """
+    Count unread messages per submission group.
+
+    Args:
+        reader_user_id: The user ID to check for unread messages
+        db: Database session
+
+    Returns:
+        Subquery with submission_group_id and unread_count columns, or None if no user_id
+    """
     if reader_user_id is None:
         return None
 
@@ -165,11 +314,27 @@ def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | Non
         .subquery()
     )
 
-def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session):
 
-    latest_result_sub = latest_result_subquery(user_id,None,course_content_id,db)
-    results_count_sub = results_count_subquery(user_id,None,course_content_id,db)
-    submission_count_sub = submission_count_subquery(user_id,None,course_content_id,db)
+def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session) -> CourseMemberCourseContentQueryResult:
+    """
+    Get detailed course content information for a specific user and course content.
+
+    Includes submission groups, results, grades, and unread message counts.
+
+    Args:
+        user_id: The user ID
+        course_content_id: The course content ID
+        db: Database session
+
+    Returns:
+        CourseMemberCourseContentQueryResult with typed fields
+
+    Raises:
+        NotFoundException: If course content not found or user has no access
+    """
+    latest_result_sub = latest_result_subquery(user_id, None, course_content_id, db)
+    results_count_sub = results_count_subquery(user_id, None, course_content_id, db)
+    submission_count_sub = submission_count_subquery(user_id, None, course_content_id, db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
@@ -186,7 +351,6 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     )
 
     # Subquery to get only the user's submission groups
-    # Use select() explicitly to avoid SQLAlchemy warning
     user_submission_groups = select(SubmissionGroup.id).select_from(
         SubmissionGroup
     ).join(
@@ -281,17 +445,30 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     )
 
     course_contents_result = course_contents_query.distinct().first()
-        
-    if course_contents_result == None:
+
+    if course_contents_result is None:
         raise NotFoundException()
 
-    return course_contents_result
+    # Convert tuple to typed model using class method
+    return CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
+
 
 def user_course_content_list_query(user_id: UUID | str, db: Session):
+    """
+    Get list of all course contents for a specific user across all their courses.
 
-    latest_result_sub = latest_result_subquery(user_id,None,None,db)
-    results_count_sub = results_count_subquery(user_id,None,None,db)
-    submission_count_sub = submission_count_subquery(user_id,None,None,db)
+    Includes submission groups, results, grades, and unread message counts.
+
+    Args:
+        user_id: The user ID
+        db: Database session
+
+    Returns:
+        Query object that can be further filtered or executed
+    """
+    latest_result_sub = latest_result_subquery(user_id, None, None, db)
+    results_count_sub = results_count_subquery(user_id, None, None, db)
+    submission_count_sub = submission_count_subquery(user_id, None, None, db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
@@ -308,7 +485,6 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     )
 
     # Subquery to get only the user's submission groups
-    # Use select() explicitly to avoid SQLAlchemy warning
     user_submission_groups = select(SubmissionGroup.id).select_from(
         SubmissionGroup
     ).join(
@@ -397,11 +573,34 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
 
     return query
 
-def course_member_course_content_query(course_member_id: UUID | str, course_content_id: UUID | str, db: Session, reader_user_id: UUID | str | None = None):
 
-    latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
-    results_count_sub = results_count_subquery(None,course_member_id,course_content_id,db)
-    submission_count_sub = submission_count_subquery(None,course_member_id,course_content_id,db)
+def course_member_course_content_query(
+    course_member_id: UUID | str,
+    course_content_id: UUID | str,
+    db: Session,
+    reader_user_id: UUID | str | None = None
+) -> CourseMemberCourseContentQueryResult:
+    """
+    Get detailed course content information for a specific course member and course content.
+
+    Used for lecturer/tutor views to see student progress. Includes submission groups,
+    results, grades, and unread message counts.
+
+    Args:
+        course_member_id: The course member ID
+        course_content_id: The course content ID
+        db: Database session
+        reader_user_id: Optional user ID for unread message counts
+
+    Returns:
+        CourseMemberCourseContentQueryResult with typed fields
+
+    Raises:
+        NotFoundException: If course content not found or member has no access
+    """
+    latest_result_sub = latest_result_subquery(None, course_member_id, course_content_id, db)
+    results_count_sub = results_count_subquery(None, course_member_id, course_content_id, db)
+    submission_count_sub = submission_count_subquery(None, course_member_id, course_content_id, db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
@@ -418,16 +617,16 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
     )
 
     course_contents_query = db.query(
-            CourseContent,
-            results_count_sub.c.total_results_count,
-            Result,
-            SubmissionGroup,
-            submission_count_sub.c.submission_count,
-            latest_grading_sub.c.status,
-            latest_grading_sub.c.grading,
-            content_unread_column,
-            submission_group_unread_column,
-        ) \
+        CourseContent,
+        results_count_sub.c.total_results_count,
+        Result,
+        SubmissionGroup,
+        submission_count_sub.c.submission_count,
+        latest_grading_sub.c.status,
+        latest_grading_sub.c.grading,
+        content_unread_column,
+        submission_group_unread_column,
+    ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
         .join(SubmissionGroupMember, SubmissionGroupMember.course_member_id == CourseMember.id) \
@@ -480,18 +679,37 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
         .joinedload(CourseMember.user),
     )
 
-    course_contents_result = course_contents_query.first()
-        
-    if course_contents_result == None:
+    raw_result = course_contents_query.first()
+
+    if raw_result is None:
         raise NotFoundException()
 
-    return course_contents_result
+    # Convert tuple to typed model using class method
+    return CourseMemberCourseContentQueryResult.from_tuple(raw_result)
 
-def course_member_course_content_list_query(course_member_id: UUID | str, db: Session, reader_user_id: UUID | str | None = None):
 
-    latest_result_sub = latest_result_subquery(None,course_member_id,None,db,True)
-    results_count_sub = results_count_subquery(None,course_member_id,None,db)
-    submission_count_sub = submission_count_subquery(None,course_member_id,None,db)
+def course_member_course_content_list_query(
+    course_member_id: UUID | str,
+    db: Session,
+    reader_user_id: UUID | str | None = None
+):
+    """
+    Get list of all course contents for a specific course member.
+
+    Used for lecturer/tutor views to see student progress across all content.
+    Includes submission groups, results, grades, and unread message counts.
+
+    Args:
+        course_member_id: The course member ID
+        db: Database session
+        reader_user_id: Optional user ID for unread message counts
+
+    Returns:
+        Query object that can be further filtered or executed
+    """
+    latest_result_sub = latest_result_subquery(None, course_member_id, None, db, True)
+    results_count_sub = results_count_subquery(None, course_member_id, None, db)
+    submission_count_sub = submission_count_subquery(None, course_member_id, None, db)
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
@@ -519,16 +737,16 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
 
     # Query ALL course contents for the course where the user is a member
     query = db.query(
-            CourseContent,
-            results_count_sub.c.total_results_count,
-            Result,
-            SubmissionGroup,
-            submission_count_sub.c.submission_count,
-            latest_grading_sub.c.status,
-            latest_grading_sub.c.grading,
-            content_unread_column,
-            submission_group_unread_column,
-        ) \
+        CourseContent,
+        results_count_sub.c.total_results_count,
+        Result,
+        SubmissionGroup,
+        submission_count_sub.c.submission_count,
+        latest_grading_sub.c.status,
+        latest_grading_sub.c.grading,
+        content_unread_column,
+        submission_group_unread_column,
+    ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
         .join(Course, Course.id == CourseMember.course_id) \
@@ -585,24 +803,33 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
 
     return query
 
+
 def course_course_member_list_query(db: Session):
     """
     Query to get course members with their latest submission result dates.
-    Used for lecturer/tutor views to see student progress.
+
+    Used for lecturer/tutor views to see student progress. Only includes results
+    from official submissions (submit=True).
+
+    Args:
+        db: Database session
+
+    Returns:
+        Query object that returns tuples of (CourseMember, latest_result_date)
     """
-    latest_result_subquery =  db.query(
-                    Result.course_content_id,
-                    CourseMember.id.label("course_member_id"),
-                    func.max(Result.created_at).label("latest_result_date")
-                ) \
+    latest_result_subquery = db.query(
+        Result.course_content_id,
+        CourseMember.id.label("course_member_id"),
+        func.max(Result.created_at).label("latest_result_date")
+    ) \
         .join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
         .join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
         .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
         .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
         .filter(
-                Result.status == 0,  # FINISHED status
-                SubmissionArtifact.submit == True,  # Only official submissions
-                Result.test_system_id.isnot(None)  # Only completed tests
+            Result.status == 0,  # FINISHED status
+            SubmissionArtifact.submit == True,  # Only official submissions
+            Result.test_system_id.isnot(None)  # Only completed tests
         ) \
         .group_by(Result.course_content_id, CourseMember.id).subquery()
 
@@ -614,10 +841,10 @@ def course_course_member_list_query(db: Session):
         .subquery()
 
     course_member_results = db.query(
-            CourseMember,
-            latest_result_per_member.c.latest_result_date
-        ) \
+        CourseMember,
+        latest_result_per_member.c.latest_result_date
+    ) \
         .select_from(CourseMember) \
-        .outerjoin(latest_result_per_member,latest_result_per_member.c.course_member_id == CourseMember.id)
+        .outerjoin(latest_result_per_member, latest_result_per_member.c.course_member_id == CourseMember.id)
 
     return course_member_results

@@ -141,37 +141,38 @@ class AuthenticationService:
     @staticmethod
     async def authenticate_sso(token: str, db: Session) -> AuthenticationResult:
         """Authenticate using SSO token"""
-        
-        cache = await get_redis_client()
+
+        from ctutor_backend.redis_cache import get_redis_client
+        redis_client = await get_redis_client()
         session_key = f"sso_session:{token}"
-        session_data = await cache.get(session_key)
-        
-        if not session_data:
+        session_data_raw = await redis_client.get(session_key)
+
+        if not session_data_raw:
             raise UnauthorizedException("Invalid or expired SSO token")
-        
+
         try:
-            session = json.loads(session_data)
-            user_id = session.get("user_id")
-            provider = session.get("provider", "sso")
-            
+            session_data = json.loads(session_data_raw)
+            user_id = session_data.get("user_id")
+            provider = session_data.get("provider", "sso")
+
             if not user_id:
                 raise UnauthorizedException("Invalid session data")
-            
+
             # Get user roles
             results = (
                 db.query(UserRole.role_id)
                 .filter(UserRole.user_id == user_id)
                 .all()
             )
-            
+
             role_ids = [r[0] for r in results if r[0] is not None]
-            
+
             # Refresh session TTL
-            await cache.set(session_key, session_data, ttl=SSO_SESSION_TTL)
-            
+            await redis_client.set(session_key, session_data_raw, ex=SSO_SESSION_TTL)
+
             logger.info(f"SSO authentication successful for user {user_id} via {provider}")
             return AuthenticationResult(user_id, role_ids, provider)
-            
+
         except json.JSONDecodeError:
             raise UnauthorizedException("Invalid session data format")
         except Exception as e:
@@ -224,7 +225,7 @@ class PrincipalBuilder:
         
         # Cache it
         try:
-            await cache.set(cache_key, principal.model_dump_json(), ttl=AUTH_CACHE_TTL)
+            await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
             logger.debug(f"Cached Principal for {cache_key}")
         except Exception as e:
             logger.warning(f"Cache storage error: {e}")

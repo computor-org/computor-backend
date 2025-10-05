@@ -163,8 +163,9 @@ async def list_objects(
     
     # Check cache
     cache_key = f"storage:list:{query.bucket_name}:{query.prefix}:{query.skip}:{query.limit}"
-    cached_data = await redis_client.get(cache_key)
-    if cached_data:
+    cached_data_raw = await redis_client.get(cache_key)
+    if cached_data_raw:
+        cached_data = json.loads(cached_data_raw)
         return [StorageObjectList(**item) for item in cached_data]
     
     # List objects
@@ -199,7 +200,7 @@ async def list_objects(
     
     # Cache result (convert to dict for JSON serialization)
     cache_data = [obj.model_dump(mode='json') for obj in paginated_result]
-    await redis_client.set(cache_key, cache_data, ttl=StorageInterface.cache_ttl)
+    await redis_client.set(cache_key, json.dumps(cache_data), ex=StorageInterface.cache_ttl)
     
     return paginated_result
 
@@ -264,7 +265,9 @@ async def delete_object(
     
     # Clear cache
     cache_pattern = f"storage:*"
-    await redis_client.clear(cache_pattern)
+    keys = await redis_client.keys(cache_pattern)
+    if keys:
+        await redis_client.delete(*keys)
     
     return {"success": success, "message": f"Object {object_key} deleted successfully"}
 
@@ -395,14 +398,15 @@ async def get_bucket_stats(
     
     # Check cache
     cache_key = f"storage:stats:{bucket_name}"
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
+    cached_result_raw = await redis_client.get(cache_key)
+    if cached_result_raw:
+        cached_result = json.loads(cached_result_raw)
         return StorageUsageStats(**cached_result)
-    
+
     # Get stats
     stats = await storage_service.get_bucket_stats(bucket_name)
-    
+
     # Cache result (convert to dict for JSON serialization)
-    await redis_client.set(cache_key, stats.model_dump(mode='json'), ttl=300)  # Cache for 5 minutes
+    await redis_client.set(cache_key, json.dumps(stats.model_dump(mode='json')), ex=300)  # Cache for 5 minutes
     
     return stats

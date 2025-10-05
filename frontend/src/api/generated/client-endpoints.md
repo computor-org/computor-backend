@@ -115,8 +115,8 @@
 | `list` | GET | `/courses` | `CourseQuery` | `CourseList[]` |
 | `update` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
 | `delete` | DELETE | `/courses/{id}` | — | `void` |
-| `deleteCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdDelete` | DELETE | `/courses/{course_id}/execution-backends/{execution_backend_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `patchCourseExecutionBackendCoursesCourseIdExecutionBackendsExecutionBackendIdPatch` | PATCH | `/courses/{course_id}/execution-backends/{execution_backend_id}` | `Record<string, unknown> & Record<string, unknown>` | `CourseExecutionBackendGet` |
+| `deleteCourseExecutionBackendEndpointCoursesCourseIdExecutionBackendsExecutionBackendIdDelete` | DELETE | `/courses/{course_id}/execution-backends/{execution_backend_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `patchCourseExecutionBackendEndpointCoursesCourseIdExecutionBackendsExecutionBackendIdPatch` | PATCH | `/courses/{course_id}/execution-backends/{execution_backend_id}` | `Record<string, unknown> & Record<string, unknown>` | `CourseExecutionBackendGet` |
 
 ## CourseMemberCommentClient
 - Base path: `/course-member-comments`
@@ -439,8 +439,8 @@
 | `list` | GET | `/user-roles` | `UserRoleQuery` | `UserRoleList[]` |
 | `update` | PATCH | `/user-roles/{id}` | `UserRoleUpdate` | `UserRoleGet` |
 | `delete` | DELETE | `/user-roles/{id}` | — | `void` |
-| `deleteUserRoleUserRolesUsersUserIdRolesRoleIdDelete` | DELETE | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleList[]` |
-| `getUserRoleUserRolesUsersUserIdRolesRoleIdGet` | GET | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleGet` |
+| `deleteUserRoleEndpointUserRolesUsersUserIdRolesRoleIdDelete` | DELETE | `/user-roles/users/{user_id}/roles/{role_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `getUserRoleEndpointUserRolesUsersUserIdRolesRoleIdGet` | GET | `/user-roles/users/{user_id}/roles/{role_id}` | — | `UserRoleGet` |
 
 ## AuthenticationClient
 - Base path: `/auth`
@@ -448,10 +448,10 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `listAllPluginsAuthAdminPluginsGet` | GET | `/auth/admin/plugins` | — | `void` |
-| `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `void` |
-| `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `void` |
-| `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `void` |
+| `listAllPluginsAuthAdminPluginsGet` | GET | `/auth/admin/plugins` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `loginWithCredentialsAuthLoginPost` | POST | `/auth/login` | `LocalLoginRequest` | `LocalLoginResponse` |
 | `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
 | `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
@@ -468,10 +468,10 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `lecturerListCourseContentsLecturersCourseContentsGet` | GET | `/lecturers/course-contents` | — | `CourseContentLecturerList[]` |
-| `lecturerGetCourseContentsLecturersCourseContentsCourseContentIdGet` | GET | `/lecturers/course-contents/{course_content_id}` | — | `CourseContentLecturerGet` |
-| `lecturerListCoursesLecturersCoursesGet` | GET | `/lecturers/courses` | — | `CourseList[]` |
-| `lecturerGetCoursesLecturersCoursesCourseIdGet` | GET | `/lecturers/courses/{course_id}` | — | `CourseGet` |
+| `lecturerListCourseContentsEndpointLecturersCourseContentsGet` | GET | `/lecturers/course-contents` | — | `CourseContentLecturerList[]` |
+| `lecturerGetCourseContentsEndpointLecturersCourseContentsCourseContentIdGet` | GET | `/lecturers/course-contents/{course_content_id}` | — | `CourseContentLecturerGet` |
+| `lecturerListCoursesEndpointLecturersCoursesGet` | GET | `/lecturers/courses` | — | `CourseList[]` |
+| `lecturerGetCoursesEndpointLecturersCoursesCourseIdGet` | GET | `/lecturers/courses/{course_id}` | — | `CourseGet` |
 
 ## MiscClient
 - Base path: `/`
@@ -481,25 +481,16 @@
 | --- | --- | --- | --- | --- |
 | `getStatusHeadHead` | HEAD | `/` | — | `void` |
 
-## SignupClient
-- Base path: `/signup`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `gitlabSignupSignupGitlabPost` | POST | `/signup/gitlab` | `GitlabSignup` | `GitlabSignupResponse` |
-
 ## StudentsClient
 - Base path: `/students`
 - Note: custom operations discovered from OpenAPI schema
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `studentListCourseContentsStudentsCourseContentsGet` | GET | `/students/course-contents` | — | `CourseContentStudentList[]` |
-| `studentGetCourseContentStudentsCourseContentsCourseContentIdGet` | GET | `/students/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
-| `studentListCoursesStudentsCoursesGet` | GET | `/students/courses` | — | `CourseStudentList[]` |
-| `studentGetCourseStudentsCoursesCourseIdGet` | GET | `/students/courses/{course_id}` | — | `CourseStudentGet` |
-| `getSignupInitDataStudentsRepositoriesGet` | GET | `/students/repositories` | — | `string[]` |
+| `studentListCourseContentsEndpointStudentsCourseContentsGet` | GET | `/students/course-contents` | — | `CourseContentStudentList[]` |
+| `studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet` | GET | `/students/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
+| `studentListCoursesEndpointStudentsCoursesGet` | GET | `/students/courses` | — | `CourseStudentList[]` |
+| `studentGetCourseEndpointStudentsCoursesCourseIdGet` | GET | `/students/courses/{course_id}` | — | `CourseStudentGet` |
 
 ## SubmissionsClient
 - Base path: `/submissions`
@@ -512,7 +503,7 @@
 | `getSubmissionArtifactSubmissionsArtifactsArtifactIdGet` | GET | `/submissions/artifacts/{artifact_id}` | — | `SubmissionArtifactGet` |
 | `updateSubmissionArtifactSubmissionsArtifactsArtifactIdPatch` | PATCH | `/submissions/artifacts/{artifact_id}` | `SubmissionArtifactUpdate` | `SubmissionArtifactGet` |
 | `listArtifactGradesSubmissionsArtifactsArtifactIdGradesGet` | GET | `/submissions/artifacts/{artifact_id}/grades` | — | `SubmissionGradeListItem[]` |
-| `createArtifactGradeSubmissionsArtifactsArtifactIdGradesPost` | POST | `/submissions/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
+| `createArtifactGradeEndpointSubmissionsArtifactsArtifactIdGradesPost` | POST | `/submissions/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
 | `listArtifactReviewsSubmissionsArtifactsArtifactIdReviewsGet` | GET | `/submissions/artifacts/{artifact_id}/reviews` | — | `SubmissionReviewListItem[]` |
 | `createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost` | POST | `/submissions/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
 | `createTestResultSubmissionsArtifactsArtifactIdTestPost` | POST | `/submissions/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
@@ -569,13 +560,13 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `tutorListCourseMembersTutorsCourseMembersGet` | GET | `/tutors/course-members` | — | `TutorCourseMemberList[]` |
-| `tutorGetCourseMembersTutorsCourseMembersCourseMemberIdGet` | GET | `/tutors/course-members/{course_member_id}` | — | `TutorCourseMemberGet` |
-| `tutorListCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsGet` | GET | `/tutors/course-members/{course_member_id}/course-contents` | — | `CourseContentStudentList[]` |
-| `tutorGetCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet` | GET | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
-| `tutorUpdateCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdPatch` | PATCH | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | `TutorGradeCreate` | `TutorGradeResponse` |
-| `tutorListCoursesTutorsCoursesGet` | GET | `/tutors/courses` | — | `CourseTutorList[]` |
-| `tutorGetCoursesTutorsCoursesCourseIdGet` | GET | `/tutors/courses/{course_id}` | — | `CourseTutorGet` |
+| `tutorListCourseMembersEndpointTutorsCourseMembersGet` | GET | `/tutors/course-members` | — | `TutorCourseMemberList[]` |
+| `tutorGetCourseMembersEndpointTutorsCourseMembersCourseMemberIdGet` | GET | `/tutors/course-members/{course_member_id}` | — | `TutorCourseMemberGet` |
+| `tutorListCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsGet` | GET | `/tutors/course-members/{course_member_id}/course-contents` | — | `CourseContentStudentList[]` |
+| `tutorGetCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet` | GET | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | — | `CourseContentStudentGet` |
+| `tutorUpdateCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdPatch` | PATCH | `/tutors/course-members/{course_member_id}/course-contents/{course_content_id}` | `TutorGradeCreate` | `TutorGradeResponse` |
+| `tutorListCoursesEndpointTutorsCoursesGet` | GET | `/tutors/courses` | — | `CourseTutorList[]` |
+| `tutorGetCoursesEndpointTutorsCoursesCourseIdGet` | GET | `/tutors/courses/{course_id}` | — | `CourseTutorGet` |
 
 ## UserClient
 - Base path: `/user`
@@ -583,8 +574,8 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `getCurrentUserUserGet` | GET | `/user` | — | `UserGet` |
+| `getCurrentUserEndpointUserGet` | GET | `/user` | — | `UserGet` |
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
-| `setUserPasswordUserPasswordPost` | POST | `/user/password` | `UserPassword` | `void` |
+| `setUserPasswordEndpointUserPasswordPost` | POST | `/user/password` | `UserPassword` | `void` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |

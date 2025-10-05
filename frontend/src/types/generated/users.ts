@@ -22,6 +22,79 @@ export interface CourseMemberProviderAccountUpdate {
   provider_access_token?: string | null;
 }
 
+export interface AccountCreate {
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+}
+
+export interface AccountUpdate {
+  /** Authentication provider name */
+  provider?: string | null;
+  /** Type of authentication account */
+  type?: string | null;
+  /** Account ID from the provider */
+  provider_account_id?: string | null;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  provider?: string | null;
+  type?: string | null;
+  provider_account_id?: string | null;
+  user_id?: string | null;
+  properties?: string | null;
+}
+
 export interface UserGroupCreate {
   /** User ID */
   user_id: string;
@@ -73,38 +146,6 @@ export interface UserGroupQuery {
   group_id?: string | null;
   /** Filter by transient status */
   transient?: boolean | null;
-}
-
-export interface UserRoleCreate {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleList {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleUpdate {
-  role_id: string;
-}
-
-export interface UserRoleQuery {
-  skip?: number | null;
-  limit?: number | null;
-  user_id?: string | null;
-  role_id?: string | null;
 }
 
 export interface UserCreate {
@@ -207,77 +248,36 @@ export interface UserQuery {
   username?: string | null;
 }
 
-export interface AccountCreate {
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
+export interface UserRoleCreate {
   user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
+  role_id: string;
 }
 
-export interface AccountGet {
+export interface UserRoleGet {
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
   updated_at?: string | null;
   created_by?: string | null;
   updated_by?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
   user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
+  role_id: string;
 }
 
-export interface AccountList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
+export interface UserRoleList {
   user_id: string;
+  role_id: string;
 }
 
-export interface AccountUpdate {
-  /** Authentication provider name */
-  provider?: string | null;
-  /** Type of authentication account */
-  type?: string | null;
-  /** Account ID from the provider */
-  provider_account_id?: string | null;
-  /** Provider-specific properties */
-  properties?: any | null;
+export interface UserRoleUpdate {
+  role_id: string;
 }
 
-export interface AccountQuery {
+export interface UserRoleQuery {
   skip?: number | null;
   limit?: number | null;
-  id?: string | null;
-  provider?: string | null;
-  type?: string | null;
-  provider_account_id?: string | null;
   user_id?: string | null;
-  properties?: string | null;
+  role_id?: string | null;
 }
 
 export interface UserPassword {

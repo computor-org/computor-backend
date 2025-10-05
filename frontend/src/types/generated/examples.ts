@@ -9,14 +9,6 @@
 
 
 /**
- * Request to assign multiple examples to course contents.
- */
-export interface BulkAssignExamplesRequest {
-  /** List of assignments with course_content_id, example_id, and example_version */
-  assignments: Record<string, string>[];
-}
-
-/**
  * Create a new example repository.
  */
 export interface ExampleRepositoryCreate {
@@ -297,4 +289,12 @@ export interface ExampleDownloadResponse {
   test_yaml?: string | null;
   /** Dependency examples when with_dependencies=True */
   dependencies?: ExampleFileSet[] | null;
+}
+
+/**
+ * Request to assign multiple examples to course contents.
+ */
+export interface BulkAssignExamplesRequest {
+  /** List of assignments with course_content_id, example_id, and example_version */
+  assignments: Record<string, string>[];
 }
