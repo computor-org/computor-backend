@@ -49,6 +49,24 @@ def create_message_with_author(
     target_fields = ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']
     set_targets = [k for k in target_fields if model_dump.get(k)]
 
+    # If parent_id is set, inherit target from parent message
+    if model_dump.get('parent_id'):
+        from ctutor_backend.model.message import Message
+        parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
+        if not parent_message:
+            raise BadRequestException(detail=f"Parent message {model_dump['parent_id']} not found")
+
+        # Inherit target fields from parent
+        for field in target_fields:
+            parent_value = getattr(parent_message, field, None)
+            if parent_value is not None:
+                # Don't override if user explicitly set a target (will be caught by validation below)
+                if field not in model_dump or model_dump[field] is None:
+                    model_dump[field] = parent_value
+
+        # Recalculate set_targets after inheriting from parent
+        set_targets = [k for k in target_fields if model_dump.get(k)]
+
     if len(set_targets) == 0:
         # Allow user-only message by setting user_id to current user if nothing else provided
         model_dump['user_id'] = permissions.user_id
