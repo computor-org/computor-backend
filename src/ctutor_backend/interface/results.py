@@ -7,8 +7,9 @@ from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityI
 from ctutor_backend.model import CourseContentType, SubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
-from ctutor_backend.model.artifact import SubmissionArtifact
 from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
+from ctutor_backend.redis_cache import get_cache
+from ctutor_backend.repositories.result import ResultRepository
 
 class ResultCreate(BaseModel):
     course_member_id: str
@@ -213,8 +214,6 @@ async def post_update_result(updated_entity: Result, old_entity, db: Session):
 
     This is called by the CRUD update_db() function after a Result is updated.
     """
-    from ctutor_backend.redis_cache import get_cache
-    from ctutor_backend.repositories.result import ResultRepository
 
     cache = get_cache()
     result_repo = ResultRepository(db, cache)
@@ -245,36 +244,3 @@ class ResultWithGrading(ResultGet):
     grading_count: int = 0  # Number of times this result has been graded
     
     model_config = ConfigDict(from_attributes=True)
-
-
-# class ResultDetailed(BaseModel):
-#     """Detailed result information including submission group and grading."""
-#     id: str
-#     submit: bool
-#     course_member_id: str
-#     course_member_name: Optional[str] = None  # Name of the submitter
-#     course_content_id: str
-#     course_content_title: Optional[str] = None
-#     course_content_path: Optional[str] = None
-#     course_content_type_id: str
-#     submission_group_id: Optional[str] = None
-#     submission_group_members: Optional[List[dict]] = []  # Group member info
-#     execution_backend_id: str
-#     test_system_id: Optional[str] = None
-#     result: float
-#     result_json: Optional[dict | None] = None
-#     properties: Optional[dict | None] = None
-#     version_identifier: str
-#     reference_version_identifier: Optional[str] = None
-#     status: TaskStatus
-    
-#     # Grading information
-#     gradings: List[dict] = []  # All gradings for this result
-#     latest_grade: Optional[float] = None
-#     latest_grading_status: Optional[int] = None  # GradingStatus value
-#     latest_grading_feedback: Optional[str] = None
-    
-#     created_at: Optional[str] = None
-#     updated_at: Optional[str] = None
-    
-#     model_config = ConfigDict(from_attributes=True)

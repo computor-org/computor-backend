@@ -74,7 +74,7 @@ async def update_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> ResultGet:
-    return update_db(
+    return await update_db(
         permissions,
         db,
         result_id,
@@ -91,7 +91,7 @@ async def delete_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    delete_db(permissions, db, result_id, ResultInterface.model)
+    await delete_db(permissions, db, result_id, ResultInterface.model)
 
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
