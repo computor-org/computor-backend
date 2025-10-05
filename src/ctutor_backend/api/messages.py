@@ -78,7 +78,7 @@ async def update_message(
     db: Session = Depends(get_db),
 ):
     """Update a message."""
-    return update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
+    return await update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
 
 
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -88,7 +88,7 @@ async def delete_message(
     db: Session = Depends(get_db),
 ):
     """Delete a message."""
-    delete_db(permissions, db, id, MessageInterface.model)
+    await delete_db(permissions, db, id, MessageInterface.model)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

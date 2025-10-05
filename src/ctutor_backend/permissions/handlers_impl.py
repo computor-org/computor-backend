@@ -740,15 +740,15 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.course_group_id.in_(cg_subq))
 
-        # course_content_id: Readable for all submission_group_members with the course_content
-        # Messages in course content where user has a submission group
-        cc_with_sg_subq = (
-            db.query(SubmissionGroup.course_content_id)
-            .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
-            .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
+        # course_content_id: Readable for all course members in courses containing the content
+        # Students can see course_content messages for any content in their enrolled courses
+        # (not just content where they have a submission group - units don't have submission groups)
+        user_course_contents_subq = (
+            db.query(CourseContent.id)
+            .join(CourseMember, CourseMember.course_id == CourseContent.course_id)
             .filter(CourseMember.user_id == principal.user_id)
         )
-        filters.append(self.entity.course_content_id.in_(cc_with_sg_subq))
+        filters.append(self.entity.course_content_id.in_(user_course_contents_subq))
 
         # course_id: Readable for all course_members in the course
         # Messages in courses the user is a member of
