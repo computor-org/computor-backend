@@ -8,6 +8,7 @@ from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.model.message import MessageRead, Message
 from ctutor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
 from ctutor_backend.interface.messages import MessageCreate, MessageGet
+from ctutor_backend.cache import Cache
 
 
 def create_message_with_author(
@@ -191,7 +192,7 @@ def _check_course_content_write_permission(
     ).scalar()
 
     if not has_lecturer_role:
-        raise ForbiddenException(detail="Only lecturers and above can write messages to course_content_id. Students and tutors should use submission_group_id instead.")
+        raise ForbiddenException()
 
 
 def _check_course_write_permission(
@@ -219,7 +220,7 @@ def _check_course_write_permission(
     ).scalar()
 
     if not has_lecturer_role:
-        raise ForbiddenException(detail="Only lecturers and above can write messages to course_id. Students and tutors should use submission_group_id instead.")
+        raise ForbiddenException()
 
 
 def get_message_with_read_status(
@@ -289,10 +290,79 @@ def list_messages_with_read_status(
     return [item.model_copy(update={"is_read": item.id in read_ids}) for item in items]
 
 
+def _invalidate_message_cache(
+    message_id: UUID | str,
+    reader_user_id: str,
+    db: Session,
+    cache: Optional[Cache] = None,
+) -> None:
+    """
+    Invalidate cached views when a message's read status changes.
+
+    This function invalidates caches for the specific user who marked the message as read/unread,
+    since unread message counts are user-specific and appear in student/tutor course content views.
+
+    Strategy:
+    - Invalidate all user views for the reader (safest approach for unread counts)
+    - Additionally invalidate specific entity tags for broader cache coherence
+
+    Args:
+        message_id: Message ID
+        reader_user_id: User ID who read/unread the message
+        db: Database session
+        cache: Optional cache instance
+    """
+    if not cache:
+        return
+
+    # Fetch the message to get its target fields
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        return
+
+    # CRITICAL: Invalidate ALL cached views for this user
+    # This is necessary because unread message counts appear in course content lists,
+    # and those views are cached with complex query parameters and related_ids.
+    # The safest approach is to invalidate all views for the user.
+    cache.invalidate_user_views(user_id=str(reader_user_id))
+
+    # Additionally, invalidate entity-specific tags for broader cache coherence
+    # (in case other users' caches reference these entities)
+
+    if message.submission_group_id:
+        # Invalidate submission group entity tags
+        cache.invalidate_tags(f"submission_group:{message.submission_group_id}")
+
+    if message.course_content_id:
+        # Invalidate course content entity tags
+        cache.invalidate_tags(f"course_content:{message.course_content_id}")
+        cache.invalidate_tags(f"course_content_id:{message.course_content_id}")
+
+    if message.course_member_id:
+        # Invalidate course member entity tags
+        cache.invalidate_tags(f"course_member:{message.course_member_id}")
+        cache.invalidate_tags(f"course_member_id:{message.course_member_id}")
+
+    if message.course_group_id:
+        # Invalidate course group entity tags
+        cache.invalidate_tags(f"course_group:{message.course_group_id}")
+        cache.invalidate_tags(f"course_group_id:{message.course_group_id}")
+
+    if message.course_id:
+        # Invalidate course-level entity tags
+        cache.invalidate_tags(f"course:{message.course_id}")
+        cache.invalidate_tags(f"course_id:{message.course_id}")
+
+    if message.user_id:
+        # Invalidate user-specific entity tags
+        cache.invalidate_tags(f"user:{message.user_id}")
+
+
 def mark_message_as_read(
     message_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> None:
     """Mark a message as read for the current user.
 
@@ -300,6 +370,7 @@ def mark_message_as_read(
         message_id: Message ID
         permissions: Current user permissions
         db: Database session
+        cache: Optional cache instance for invalidation
     """
     # Upsert read record for current user
     exists = (
@@ -311,11 +382,15 @@ def mark_message_as_read(
         db.add(MessageRead(message_id=message_id, reader_user_id=permissions.user_id))
         db.commit()
 
+        # Invalidate cached views that include unread message counts
+        _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
+
 
 def mark_message_as_unread(
     message_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Optional[Cache] = None,
 ) -> None:
     """Mark a message as unread for the current user.
 
@@ -323,6 +398,7 @@ def mark_message_as_unread(
         message_id: Message ID
         permissions: Current user permissions
         db: Database session
+        cache: Optional cache instance for invalidation
     """
     read = (
         db.query(MessageRead)
@@ -332,3 +408,6 @@ def mark_message_as_unread(
     if read:
         db.delete(read)
         db.commit()
+
+        # Invalidate cached views that include unread message counts
+        _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)

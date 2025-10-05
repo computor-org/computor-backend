@@ -12,6 +12,8 @@ from ctutor_backend.business_logic.crud import (
     update_entity as update_db
 )
 from ctutor_backend.database import get_db
+from ctutor_backend.redis_cache import get_cache
+from ctutor_backend.cache import Cache
 from ctutor_backend.interface.messages import MessageInterface, MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
 from ctutor_backend.permissions.auth import get_current_principal
 from ctutor_backend.permissions.principal import Principal
@@ -97,11 +99,12 @@ async def mark_message_read(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Mark a message as read."""
     # Ensure user has visibility on the message
     await get_id_db(permissions, db, id, MessageInterface)
-    mark_message_as_read(id, permissions, db)
+    mark_message_as_read(id, permissions, db, cache)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -110,9 +113,10 @@ async def mark_message_unread(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Mark a message as unread."""
     # Ensure user has visibility on the message
     await get_id_db(permissions, db, id, MessageInterface)
-    mark_message_as_unread(id, permissions, db)
+    mark_message_as_unread(id, permissions, db, cache)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
