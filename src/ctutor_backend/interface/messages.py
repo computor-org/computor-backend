@@ -125,6 +125,8 @@ class MessageQuery(ListQuery):
     course_id: Optional[str] = None
     # Special parameter: when True, returns ALL messages related to the course (any target type)
     course_id_all_messages: Optional[bool] = None
+    # Filter by message scope (e.g., "course", "course_content", "submission_group")
+    scope: Optional[MessageScope] = None
 
 
 def message_search(db: Session, query, params: Optional[MessageQuery]):
@@ -182,6 +184,22 @@ def message_search(db: Session, query, params: Optional[MessageQuery]):
         else:
             # Return ONLY messages where message.course_id == course_id (course-scoped messages only)
             query = query.filter(Message.course_id == params.course_id)
+
+    # Filter by scope (must be applied after target filters to properly filter by scope)
+    if params.scope is not None:
+        # Map scope to the corresponding target field filter
+        scope_filters = {
+            "user": Message.user_id.isnot(None),
+            "course_member": Message.course_member_id.isnot(None),
+            "submission_group": Message.submission_group_id.isnot(None),
+            "course_group": Message.course_group_id.isnot(None),
+            "course_content": Message.course_content_id.isnot(None),
+            "course": Message.course_id.isnot(None)
+        }
+
+        scope_filter = scope_filters.get(params.scope)
+        if scope_filter is not None:
+            query = query.filter(scope_filter)
 
     return query
 

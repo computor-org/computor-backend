@@ -1922,7 +1922,7 @@ export interface CourseContentDeploymentCreate {
   /** Example version to deploy */
   example_version_id: string;
   /** Initial deployment status */
-  deployment_status?: any;
+  deployment_status?: "pending" | "deploying" | "deployed" | "failed" | "unassigned";
   /** Optional message */
   deployment_message?: string | null;
   /** Additional metadata */
@@ -1933,7 +1933,7 @@ export interface CourseContentDeploymentCreate {
  * Update deployment status.
  */
 export interface CourseContentDeploymentUpdate {
-  deployment_status?: any | null;
+  deployment_status?: "pending" | "deploying" | "deployed" | "failed" | "unassigned" | null;
   deployment_message?: string | null;
   deployed_at?: string | null;
   last_attempt_at?: string | null;
@@ -2004,7 +2004,7 @@ export interface CourseContentDeploymentQuery {
  */
 export interface DeploymentHistoryCreate {
   deployment_id: string;
-  action: any;
+  action: "assigned" | "reassigned" | "deploying" | "deployed" | "failed" | "unassigned" | "updated" | "migrated";
   example_version_id?: string | null;
   example_identifier?: string | null;
   version_tag?: string | null;
@@ -2564,6 +2564,21 @@ export interface TutorGradeCreate {
 }
 
 /**
+ * Information about the artifact that was graded.
+ * 
+ * This provides context about which specific artifact received the grade,
+ * useful for tracking grading history and artifact metadata.
+ */
+export interface GradedArtifactInfo {
+  /** The artifact ID that was graded */
+  id: string;
+  /** When the artifact was created (ISO format) */
+  created_at?: string | null;
+  /** Additional artifact properties (e.g., GitLab info) */
+  properties?: Record<string, any> | null;
+}
+
+/**
  * Response after creating a grade through the tutor endpoint.
  * 
  * Returns the updated course content information with the new grade applied.
@@ -2589,7 +2604,7 @@ export interface TutorGradeResponse {
   submission_group?: SubmissionGroupStudentList | null;
   unread_message_count?: number;
   graded_artifact_id?: string | null;
-  graded_artifact_info?: any | null;
+  graded_artifact_info?: GradedArtifactInfo | null;
 }
 
 /**

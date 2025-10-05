@@ -534,7 +534,7 @@ export interface CourseContentStudentList {
 }
 
 export interface CourseContentStudentUpdate {
-  status?: any | null;
+  status?: "corrected" | "correction_necessary" | "improvement_possible" | "not_reviewed" | null;
   grading?: number | null;
   feedback?: string | null;
 }
@@ -998,8 +998,4 @@ export interface CommentCreate {
 
 export interface CommentUpdate {
   message: string;
-}
-
-export interface CourseContentFileQuery {
-  filename?: string | null;
 }
