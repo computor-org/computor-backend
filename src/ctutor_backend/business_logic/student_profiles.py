@@ -124,13 +124,13 @@ def create_profile(
         ForbiddenException: If user lacks permission
         BadRequestException: If profile already exists or creation fails
     """
+    # Only admins and users with general permissions can create student profiles
+    # Regular students/users CANNOT create profiles
+    if not has_profile_permission(permissions):
+        raise ForbiddenException(detail="Only admins and user managers can create student profiles")
+
     # If no user_id provided, default to current user
     target_user_id = data.user_id if data.user_id else str(permissions.user_id)
-
-    # Check if user is trying to create for someone else
-    if str(target_user_id) != str(permissions.user_id):
-        if not has_profile_permission(permissions):
-            raise ForbiddenException(detail="Cannot create student profile for another user")
 
     # Check if profile already exists for this user
     existing = db.query(StudentProfile).filter(StudentProfile.user_id == target_user_id).first()
@@ -169,8 +169,14 @@ def update_profile(
 
     Raises:
         NotFoundException: If profile not found or user lacks access
+        ForbiddenException: If user lacks permission to update
         BadRequestException: If update fails
     """
+    # Only admins and users with general permissions can update student profiles
+    # Regular students/users CANNOT update profiles
+    if not has_profile_permission(permissions):
+        raise ForbiddenException(detail="Only admins and user managers can update student profiles")
+
     profile = db.query(StudentProfile).filter(StudentProfile.id == profile_id).first()
 
     if not profile:
@@ -206,8 +212,14 @@ def delete_profile(
 
     Raises:
         NotFoundException: If profile not found or user lacks access
+        ForbiddenException: If user lacks permission to delete
         BadRequestException: If deletion fails
     """
+    # Only admins and users with general permissions can delete student profiles
+    # Regular students/users CANNOT delete profiles
+    if not has_profile_permission(permissions):
+        raise ForbiddenException(detail="Only admins and user managers can delete student profiles")
+
     profile = db.query(StudentProfile).filter(StudentProfile.id == profile_id).first()
 
     if not profile:

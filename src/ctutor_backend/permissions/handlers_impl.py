@@ -125,7 +125,11 @@ class ProfilePermissionHandler(PermissionHandler):
 
 
 class StudentProfilePermissionHandler(PermissionHandler):
-    """Permission handler for StudentProfile entity"""
+    """Permission handler for StudentProfile entity
+
+    Students are READ-ONLY - they can only view their student profiles.
+    Only admins and users with general permissions can create/update/delete.
+    """
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
@@ -134,16 +138,12 @@ class StudentProfilePermissionHandler(PermissionHandler):
         if self.check_general_permission(principal, action):
             return True
 
-        # Users can create their own student profile
-        if action == "create":
-            if context and context.get("user_id") == principal.user_id:
-                return True
-            return False
-
-        # Users can view and update their own student profile
-        if action in ["list", "get", "update"]:
+        # Students can ONLY view (list/get) their own student profiles
+        # They CANNOT create, update, or delete
+        if action in ["list", "get"]:
             return True
 
+        # Block all other actions (create, update, delete) for regular users
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
@@ -153,7 +153,8 @@ class StudentProfilePermissionHandler(PermissionHandler):
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
 
-        if action in ["list", "get", "update"]:
+        # Users can only list/get their own student profiles
+        if action in ["list", "get"]:
             return db.query(self.entity).filter(self.entity.user_id == principal.user_id)
 
         raise ForbiddenException(detail={"entity": self.resource_name})
