@@ -7,13 +7,14 @@ def parse_requirements(requirements):
 requirements = parse_requirements("requirements.txt")
 
 setup(
-    name='execution_backend',
-    version='0.0.1',
+    name='computor_backend',
+    version='0.1.0',
     install_requires=requirements,
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "ctutor=ctutor_backend.cli.cli:cli",
+            # CLI moved to computor-cli package
+            # "computor=computor_backend.cli.cli:cli",
         ],
     }
 )
