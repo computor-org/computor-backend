@@ -37,34 +37,55 @@ class OpenAPIClientGenerator:
         return parts[0] if parts else ""
 
     def _get_method_name(self, method: str, path: str, operation: Dict) -> str:
-        """Generate method name from HTTP method and path."""
-        operation_id = operation.get('operationId', '')
+        """Generate clean Pythonic method name from HTTP method and path."""
+        http_method = method.lower()
 
-        if operation_id:
-            # Use operation ID if available
-            parts = operation_id.split('_')
-            # Remove common prefixes
-            if parts and parts[0] in ['get', 'post', 'put', 'patch', 'delete']:
-                parts = parts[1:]
-            return '_'.join(parts)
+        # Remove leading slash
+        path = path.lstrip('/')
 
-        # Generate from path
-        path_parts = [p for p in path.split('/') if p and not p.startswith('{')]
+        # Split by slash
+        segments = path.split('/')
 
-        if method.lower() == 'get':
-            if '{' in path:
-                return 'get_' + '_'.join(path_parts[-2:]) if len(path_parts) > 1 else 'get'
-            return 'list_' + '_'.join(path_parts[-1:]) if path_parts else 'list'
-        elif method.lower() == 'post':
-            return 'create_' + '_'.join(path_parts[-1:]) if path_parts else 'create'
-        elif method.lower() == 'put':
-            return 'replace_' + '_'.join(path_parts[-2:]) if len(path_parts) > 1 else 'replace'
-        elif method.lower() == 'patch':
-            return 'update_' + '_'.join(path_parts[-2:]) if len(path_parts) > 1 else 'update'
-        elif method.lower() == 'delete':
-            return 'delete_' + '_'.join(path_parts[-2:]) if len(path_parts) > 1 else 'delete'
+        # Process each segment
+        clean_segments = []
+        for i, segment in enumerate(segments):
+            # Skip empty segments
+            if not segment:
+                continue
 
-        return method.lower() + '_' + '_'.join(path_parts)
+            # Handle path parameters like {id}, {course_id}, etc.
+            if segment.startswith('{') and segment.endswith('}'):
+                param_name = segment[1:-1]
+                # Only add "by_{param}" for the main resource ID, not for nested IDs
+                if param_name == 'id':
+                    clean_segments.append('by_id')
+                elif i == len(segments) - 1:  # Last segment is a path param
+                    clean_segments.append(f'by_{param_name}')
+                # Skip intermediate path params, they're implied
+                continue
+
+            # Convert kebab-case to snake_case
+            segment = segment.replace('-', '_')
+
+            # Skip plural 's' at the end for single resource operations (GET/PATCH/DELETE with ID)
+            if segment.endswith('s') and ('{' in path or http_method in ['patch', 'delete']):
+                # This is a specific resource operation, use singular
+                if segment.endswith('ies'):
+                    # families -> family, repositories -> repository
+                    segment = segment[:-3] + 'y'
+                elif segment.endswith('ses'):
+                    # courses -> course (but 'ses' -> 'se')
+                    segment = segment[:-2]
+                else:
+                    segment = segment[:-1]  # Remove trailing 's'
+
+            clean_segments.append(segment)
+
+        # Join segments
+        method_name = '_'.join(clean_segments)
+
+        # Add HTTP method prefix
+        return f"{http_method}_{method_name}"
 
     def _extract_path_params(self, path: str) -> List[str]:
         """Extract path parameter names from path."""
@@ -212,36 +233,40 @@ class OpenAPIClientGenerator:
             f'        """{doc}"""',
         ]
 
-        # Build path with parameters
+        # Build path with parameters - use f-string if there are path params
         path_with_params = path
-        for param in path_params:
-            path_with_params = path_with_params.replace(f'{{{param}}}', f'{{{param}}}')
+        if path_params:
+            # Use f-string for path interpolation
+            path_str = f'f"{path}"'
+        else:
+            # Regular string
+            path_str = f'"{path}"'
 
         # Determine the request type
         if http_method == 'GET':
             query_params = [p.get('name') for p in operation.get('parameters', []) if p.get('in') == 'query']
             if query_params:
                 lines.append(f'        params = {{k: v for k, v in locals().items() if k in {query_params} and v is not None}}')
-                lines.append(f'        return await self._request("GET", "{path_with_params}", params=params)')
+                lines.append(f'        return await self._request("GET", {path_str}, params=params)')
             else:
-                lines.append(f'        return await self._request("GET", "{path_with_params}")')
+                lines.append(f'        return await self._request("GET", {path_str})')
 
         elif http_method == 'POST':
             if request_body:
                 lines.append(f'        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload')
-                lines.append(f'        return await self._request("POST", "{path_with_params}", json=json_data)')
+                lines.append(f'        return await self._request("POST", {path_str}, json=json_data)')
             else:
-                lines.append(f'        return await self._request("POST", "{path_with_params}")')
+                lines.append(f'        return await self._request("POST", {path_str})')
 
         elif http_method in ['PUT', 'PATCH']:
             if request_body:
                 lines.append(f'        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload')
-                lines.append(f'        return await self._request("{http_method}", "{path_with_params}", json=json_data)')
+                lines.append(f'        return await self._request("{http_method}", {path_str}, json=json_data)')
             else:
-                lines.append(f'        return await self._request("{http_method}", "{path_with_params}")')
+                lines.append(f'        return await self._request("{http_method}", {path_str})')
 
         elif http_method == 'DELETE':
-            lines.append(f'        return await self._request("DELETE", "{path_with_params}")')
+            lines.append(f'        return await self._request("DELETE", {path_str})')
 
         return '\n'.join(lines)
 
@@ -272,10 +297,25 @@ class OpenAPIClientGenerator:
 
         # Add type imports if needed
         if types_needed:
-            # Group by module (simplified - assumes types are in computor_types)
-            lines.append('# Import Pydantic models (adjust module paths as needed)')
+            # Group types by module
+            module_types = {}
             for type_name in sorted(types_needed):
-                lines.append(f'# from computor_types import {type_name}')
+                module = SCHEMA_TO_MODULE_MAP.get(type_name, 'unknown')
+                if module != 'unknown':
+                    if module not in module_types:
+                        module_types[module] = []
+                    module_types[module].append(type_name)
+            
+            # Generate grouped imports
+            for module in sorted(module_types.keys()):
+                types = sorted(set(module_types[module]))
+                if len(types) == 1:
+                    lines.append(f'from computor_types.{module} import {types[0]}')
+                else:
+                    lines.append(f'from computor_types.{module} import (')
+                    for t in types:
+                        lines.append(f'    {t},')
+                    lines.append(')')
             lines.append('')
 
         lines.extend([
@@ -327,8 +367,8 @@ def main(
 
     if output_dir is None:
         script_dir = Path(__file__).parent
-        project_root = script_dir.parent.parent.parent
-        output_dir = project_root / "computor-client" / "src" / "computor_client" / "openapi_generated"
+        project_root = script_dir.parent.parent.parent.parent
+        output_dir = project_root / "computor-client" / "src" / "computor_client" / "generated"
 
     print("🌐 Generating Python API clients from OpenAPI spec...")
     print(f"📂 Output directory: {output_dir}")
@@ -429,8 +469,214 @@ def main(
     return generated_files
 
 
+# Valid SCHEMA_TO_MODULE_MAP - only types that exist in computor-types
+# Auto-generated from OpenAPI spec and computor-types index
+SCHEMA_TO_MODULE_MAP = {
+    'AccountCreate': 'accounts',
+    'AccountGet': 'accounts',
+    'AccountList': 'accounts',
+    'AccountUpdate': 'accounts',
+    'AssignExampleRequest': 'deployment',
+    'BucketCreate': 'storage',
+    'BucketInfo': 'storage',
+    'CourseContentCreate': 'course_contents',
+    'CourseContentDeploymentGet': 'deployment',
+    'CourseContentDeploymentList': 'deployment',
+    'CourseContentGet': 'course_contents',
+    'CourseContentKindCreate': 'course_content_kind',
+    'CourseContentKindGet': 'course_content_kind',
+    'CourseContentKindList': 'course_content_kind',
+    'CourseContentKindUpdate': 'course_content_kind',
+    'CourseContentLecturerGet': 'lecturer_course_contents',
+    'CourseContentLecturerList': 'lecturer_course_contents',
+    'CourseContentList': 'course_contents',
+    'CourseContentProperties': 'course_contents',
+    'CourseContentPropertiesGet': 'course_contents',
+    'CourseContentRepositoryLecturerGet': 'lecturer_course_contents',
+    'CourseContentStudentGet': 'student_course_contents',
+    'CourseContentStudentList': 'student_course_contents',
+    'CourseContentTypeCreate': 'course_content_types',
+    'CourseContentTypeGet': 'course_content_types',
+    'CourseContentTypeList': 'course_content_types',
+    'CourseContentTypeUpdate': 'course_content_types',
+    'CourseContentUpdate': 'course_contents',
+    'CourseCreate': 'courses',
+    'CourseExecutionBackendCreate': 'course_execution_backends',
+    'CourseExecutionBackendGet': 'course_execution_backends',
+    'CourseExecutionBackendList': 'course_execution_backends',
+    'CourseFamilyCreate': 'course_families',
+    'CourseFamilyGet': 'course_families',
+    'CourseFamilyList': 'course_families',
+    'CourseFamilyProperties': 'course_families',
+    'CourseFamilyPropertiesGet': 'course_families',
+    'CourseFamilyTaskRequest': 'system',
+    'CourseFamilyUpdate': 'course_families',
+    'CourseGet': 'courses',
+    'CourseGroupCreate': 'course_groups',
+    'CourseGroupGet': 'course_groups',
+    'CourseGroupList': 'course_groups',
+    'CourseGroupUpdate': 'course_groups',
+    'CourseList': 'courses',
+    'CommentCreate': 'course_member_comments',
+    'CommentUpdate': 'course_member_comments',
+    'CourseMemberCommentList': 'course_member_comments',
+    'CourseMemberCreate': 'course_members',
+    'CourseMemberGet': 'course_members',
+    'CourseMemberGitLabConfig': 'course_members',
+    'CourseMemberList': 'course_members',
+    'CourseMemberProperties': 'course_members',
+    'CourseMemberProviderAccountUpdate': 'course_member_accounts',
+    'CourseMemberReadinessStatus': 'course_member_accounts',
+    'CourseMemberUpdate': 'course_members',
+    'CourseMemberValidationRequest': 'course_member_accounts',
+    'CourseProperties': 'courses',
+    'CoursePropertiesGet': 'courses',
+    'CourseRoleGet': 'course_roles',
+    'CourseRoleList': 'course_roles',
+    'CourseStudentGet': 'student_courses',
+    'CourseStudentList': 'student_courses',
+    'CourseStudentRepository': 'student_courses',
+    'CourseTaskRequest': 'system',
+    'CourseTutorGet': 'tutor_courses',
+    'CourseTutorList': 'tutor_courses',
+    'CourseTutorRepository': 'tutor_courses',
+    'CourseUpdate': 'courses',
+    'DeploymentHistoryGet': 'deployment',
+    'DeploymentSummary': 'deployment',
+    'DeploymentWithHistory': 'deployment',
+    'ExampleDependencyCreate': 'example',
+    'ExampleDependencyGet': 'example',
+    'ExampleDownloadResponse': 'example',
+    'ExampleFileSet': 'example',
+    'ExampleGet': 'example',
+    'ExampleList': 'example',
+    'ExampleRepositoryCreate': 'example',
+    'ExampleRepositoryGet': 'example',
+    'ExampleRepositoryList': 'example',
+    'ExampleRepositoryUpdate': 'example',
+    'ExampleUploadRequest': 'example',
+    'ExampleVersionCreate': 'example',
+    'ExampleVersionGet': 'example',
+    'ExampleVersionList': 'example',
+    'ExecutionBackendCreate': 'execution_backends',
+    'ExecutionBackendGet': 'execution_backends',
+    'ExecutionBackendList': 'execution_backends',
+    'ExecutionBackendUpdate': 'execution_backends',
+    'ExtensionMetadata': 'extensions',
+    'ExtensionPublishResponse': 'extensions',
+    'ExtensionVersionDetail': 'extensions',
+    'ExtensionVersionListItem': 'extensions',
+    'ExtensionVersionListResponse': 'extensions',
+    'ExtensionVersionYankRequest': 'extensions',
+    'GenerateAssignmentsRequest': 'system',
+    'GenerateAssignmentsResponse': 'system',
+    'GenerateTemplateRequest': 'system',
+    'GenerateTemplateResponse': 'system',
+    'GitLabConfig': 'deployments',
+    'GitLabConfigGet': 'deployments',
+    'GitLabCredentials': 'system',
+    'GradedArtifactInfo': 'tutor_grading',
+    'GradedByCourseMember': 'grading',
+    'GradingAuthor': 'grading',
+    'GradingStatus': 'grading',
+    'GroupCreate': 'groups',
+    'GroupGet': 'groups',
+    'GroupList': 'groups',
+    'GroupType': 'groups',
+    'GroupUpdate': 'groups',
+    'LanguageGet': 'languages',
+    'LanguageList': 'languages',
+    'LocalLoginRequest': 'auth',
+    'LocalLoginResponse': 'auth',
+    'LocalTokenRefreshRequest': 'auth',
+    'LocalTokenRefreshResponse': 'auth',
+    'LogoutResponse': 'auth',
+    'MessageAuthor': 'messages',
+    'MessageCreate': 'messages',
+    'MessageGet': 'messages',
+    'MessageList': 'messages',
+    'MessageUpdate': 'messages',
+    'OrganizationCreate': 'organizations',
+    'OrganizationGet': 'organizations',
+    'OrganizationList': 'organizations',
+    'OrganizationProperties': 'organizations',
+    'OrganizationPropertiesGet': 'organizations',
+    'OrganizationTaskRequest': 'system',
+    'OrganizationType': 'organizations',
+    'OrganizationUpdate': 'organizations',
+    'PresignedUrlRequest': 'storage',
+    'PresignedUrlResponse': 'storage',
+    'ProfileCreate': 'profiles',
+    'ProfileGet': 'profiles',
+    'ProfileList': 'profiles',
+    'ProfileUpdate': 'profiles',
+    'ReleaseOverride': 'system',
+    'ReleaseSelection': 'system',
+    'ResultCreate': 'results',
+    'ResultGet': 'results',
+    'ResultList': 'results',
+    'ResultStudentList': 'student_course_contents',
+    'ResultUpdate': 'results',
+    'RoleClaimList': 'roles_claims',
+    'RoleGet': 'roles',
+    'RoleList': 'roles',
+    'SessionCreate': 'sessions',
+    'SessionGet': 'sessions',
+    'SessionList': 'sessions',
+    'SessionUpdate': 'sessions',
+    'StorageObjectGet': 'storage',
+    'StorageObjectList': 'storage',
+    'StorageUsageStats': 'storage',
+    'StudentProfileCreate': 'student_profile',
+    'StudentProfileGet': 'student_profile',
+    'StudentProfileList': 'student_profile',
+    'StudentProfileUpdate': 'student_profile',
+    'SubmissionArtifactGet': 'artifacts',
+    'SubmissionArtifactList': 'artifacts',
+    'SubmissionArtifactUpdate': 'artifacts',
+    'SubmissionGradeCreate': 'artifacts',
+    'SubmissionGradeDetail': 'artifacts',
+    'SubmissionGradeListItem': 'artifacts',
+    'SubmissionGradeUpdate': 'artifacts',
+    'SubmissionGroupCreate': 'submission_groups',
+    'SubmissionGroupGet': 'submission_groups',
+    'SubmissionGroupGradingList': 'grading',
+    'SubmissionGroupList': 'submission_groups',
+    'SubmissionGroupMemberBasic': 'student_course_contents',
+    'SubmissionGroupMemberCreate': 'submission_group_members',
+    'SubmissionGroupMemberGet': 'submission_group_members',
+    'SubmissionGroupMemberList': 'submission_group_members',
+    'SubmissionGroupMemberProperties': 'submission_group_members',
+    'SubmissionGroupMemberUpdate': 'submission_group_members',
+    'SubmissionGroupProperties': 'submission_groups',
+    'SubmissionGroupRepository': 'student_course_contents',
+    'SubmissionGroupStudentGet': 'student_course_contents',
+    'SubmissionGroupStudentList': 'student_course_contents',
+    'SubmissionGroupUpdate': 'submission_groups',
+    'SubmissionReviewCreate': 'artifacts',
+    'SubmissionReviewListItem': 'artifacts',
+    'SubmissionReviewUpdate': 'artifacts',
+    'SubmissionUploadResponseModel': 'submissions',
+    'TaskResponse': 'system',
+    'TaskStatus': 'tasks',
+    'TestCreate': 'tests',
+    'TutorCourseMemberCourseContent': 'tutor_course_members',
+    'TutorCourseMemberGet': 'tutor_course_members',
+    'TutorCourseMemberList': 'tutor_course_members',
+    'TutorGradeCreate': 'tutor_grading',
+    'TutorGradeResponse': 'tutor_grading',
+    'UserCreate': 'users',
+    'UserGet': 'users',
+    'UserList': 'users',
+    'UserRoleCreate': 'user_roles',
+    'UserRoleGet': 'user_roles',
+    'UserRoleList': 'user_roles',
+    'UserTypeEnum': 'users',
+    'UserUpdate': 'users',
+}
+
+
 if __name__ == "__main__":
     import sys
-
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
     main(base_url=base_url)

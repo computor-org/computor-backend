@@ -12,38 +12,41 @@ from datetime import datetime
 
 
 def discover_interfaces() -> List[tuple[str, Type]]:
-    """Discover all EntityInterface subclasses from computor_types."""
+    """Discover all EntityInterface subclasses from computor_backend.interfaces."""
     try:
-        import computor_types
-        from computor_types.base import EntityInterface
-    except ImportError:
-        print("Error: computor-types package not installed")
-        print("Run: pip install -e computor-types")
+        import computor_backend.interfaces as backend_interfaces
+        from computor_backend.interfaces.base import BackendEntityInterface
+    except ImportError as e:
+        print(f"Error: Could not import backend interfaces: {e}")
+        print("Make sure you're running from the src directory")
         return []
 
     interfaces = []
     seen_names = set()
 
-    for module_info in pkgutil.walk_packages(
-        computor_types.__path__,
-        computor_types.__name__ + "."
-    ):
+    # Get all interface classes from the backend.interfaces module
+    for name, obj in inspect.getmembers(backend_interfaces, inspect.isclass):
         try:
-            module = __import__(module_info.name, fromlist=["__name__"])
+            if (
+                issubclass(obj, BackendEntityInterface) and
+                obj is not BackendEntityInterface and
+                hasattr(obj, 'endpoint') and
+                obj.endpoint and
+                name not in seen_names
+            ):
+                # Map back to types module for DTO imports
+                # e.g., UserInterface -> computor_types.users
+                interface_base_name = name.replace("Interface", "").lower()
+                # Convert CamelCase to snake_case
+                import re
+                snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', interface_base_name).lower()
+                module_name = f"computor_types.{snake_case}s" if not snake_case.endswith('s') else f"computor_types.{snake_case}"
 
-            for name, obj in inspect.getmembers(module, inspect.isclass):
-                if (
-                    issubclass(obj, EntityInterface) and
-                    obj is not EntityInterface and
-                    hasattr(obj, 'endpoint') and
-                    obj.endpoint and
-                    name not in seen_names
-                ):
-                    interfaces.append((module_info.name, obj))
-                    seen_names.add(name)
+                interfaces.append((module_name, obj))
+                seen_names.add(name)
 
         except Exception as e:
-            print(f"Warning: Could not import {module_info.name}: {e}")
+            print(f"Warning: Could not process {name}: {e}")
             continue
 
     # Sort by interface name for deterministic output

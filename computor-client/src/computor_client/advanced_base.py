@@ -14,6 +14,47 @@ UpdateT = TypeVar('UpdateT', bound=BaseModel)
 QueryT = TypeVar('QueryT', bound=BaseModel)
 
 
+class BaseEndpointClient:
+    """Minimal base class for auto-generated endpoint clients."""
+
+    def __init__(self, client: httpx.AsyncClient, base_path: str):
+        self.client = client
+        self.base_path = base_path.rstrip('/')
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Any:
+        """Make an HTTP request and return the response data."""
+        # Build full URL
+        url = self.base_path + (f"/{path}" if path and not path.startswith('/') else path)
+
+        response = await self.client.request(
+            method=method,
+            url=url,
+            json=json,
+            params=params,
+            files=files,
+            **kwargs
+        )
+
+        # Handle errors
+        if response.status_code >= 400:
+            raise_for_status(response.status_code, response.json())
+
+        response.raise_for_status()
+
+        # Return response data
+        if response.content:
+            return response.json()
+        return None
+
+
 class CustomActionClient(Generic[T]):
     """Base class for clients with custom actions beyond CRUD."""
 

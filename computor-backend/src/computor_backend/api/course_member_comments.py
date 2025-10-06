@@ -2,11 +2,14 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
-from computor_types.course_member_comments import CourseMemberCommentList
+from computor_types.course_member_comments import (
+    CourseMemberCommentList,
+    CommentCreate,
+    CommentUpdate,
+)
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
 
@@ -19,13 +22,6 @@ from computor_backend.business_logic.course_member_comments import (
 )
 
 router = APIRouter()
-
-class CommentCreate(BaseModel):
-    course_member_id: UUID | str
-    message: str
-
-class CommentUpdate(BaseModel):
-    message: str
 
 @router.get("", response_model=list[CourseMemberCommentList])
 async def list_comments(

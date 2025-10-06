@@ -1,85 +1,85 @@
-"""Auto-generated client imports."""
+"""Auto-generated clients from OpenAPI specification."""
 
-# This file is auto-generated. Do not edit manually.
+# This file is auto-generated from FastAPI OpenAPI spec
 
-from .accounts import AccountClient
-from .deployment import CourseContentDeploymentClient
-from .course_contents import CourseContentClient
-from .course_content_kind import CourseContentKindClient
-from .lecturer_course_contents import CourseContentLecturerClient
-from .student_course_contents import CourseContentStudentClient
-from .course_content_types import CourseContentTypeClient
-from .course_execution_backends import CourseExecutionBackendClient
-from .course_families import CourseFamilyClient
-from .course_groups import CourseGroupClient
-from .courses import CourseClient
-from .course_member_comments import CourseMemberCommentClient
-from .course_members import CourseMemberClient
-from .course_roles import CourseRoleClient
-from .student_courses import CourseStudentClient
-from .tutor_courses import CourseTutorClient
-from .deployment import DeploymentHistoryClient
-from .example import ExampleClient
-from .example import ExampleRepositoryClient
-from .execution_backends import ExecutionBackendClient
-from .extensions import ExtensionClient
-from .group_claims import GroupClaimClient
-from .groups import GroupClient
-from .languages import LanguageClient
-from .messages import MessageClient
-from .organizations import OrganizationClient
-from .profiles import ProfileClient
-from .results import ResultClient
-from .roles_claims import RoleClaimClient
-from .roles import RoleClient
-from .sessions import SessionClient
-from .storage import StorageClient
-from .student_profile import StudentProfileClient
-from .grading import SubmissionGroupGradingClient
-from .submission_groups import SubmissionGroupClient
-from .submission_group_members import SubmissionGroupMemberClient
-from .user_groups import UserGroupClient
-from .users import UserClient
-from .user_roles import UserRoleClient
+from .accounts_client import AccountsClient
+from .auth_client import AuthClient
+from .course_content_kind_client import CourseContentKindClient
+from .course_content_types_client import CourseContentTypesClient
+from .course_contents_client import CourseContentsClient
+from .course_execution_backends_client import CourseExecutionBackendsClient
+from .course_families_client import CourseFamiliesClient
+from .course_groups_client import CourseGroupsClient
+from .course_member_comments_client import CourseMemberCommentsClient
+from .course_members_client import CourseMembersClient
+from .course_roles_client import CourseRolesClient
+from .courses_client import CoursesClient
+from .example_repositories_client import ExampleRepositoriesClient
+from .examples_client import ExamplesClient
+from .execution_backends_client import ExecutionBackendsClient
+from .extensions_client import ExtensionsClient
+from .groups_client import GroupsClient
+from .languages_client import LanguagesClient
+from .lecturers_client import LecturersClient
+from .messages_client import MessagesClient
+from .organizations_client import OrganizationsClient
+from .profiles_client import ProfilesClient
+from .results_client import ResultsClient
+from .role_claims_client import RoleClaimsClient
+from .roles_client import RolesClient
+from .sessions_client import SessionsClient
+from .storage_client import StorageClient
+from .student_profiles_client import StudentProfilesClient
+from .students_client import StudentsClient
+from .submission_group_members_client import SubmissionGroupMembersClient
+from .submission_groups_client import SubmissionGroupsClient
+from .submissions_client import SubmissionsClient
+from .system_client import SystemClient
+from .tasks_client import TasksClient
+from .tests_client import TestsClient
+from .tutors_client import TutorsClient
+from .user_client import UserClient
+from .user_roles_client import UserRolesClient
+from .users_client import UsersClient
 
 __all__ = [
-    "AccountClient",
-    "CourseContentDeploymentClient",
-    "CourseContentClient",
+    "AccountsClient",
+    "AuthClient",
     "CourseContentKindClient",
-    "CourseContentLecturerClient",
-    "CourseContentStudentClient",
-    "CourseContentTypeClient",
-    "CourseExecutionBackendClient",
-    "CourseFamilyClient",
-    "CourseGroupClient",
-    "CourseClient",
-    "CourseMemberCommentClient",
-    "CourseMemberClient",
-    "CourseRoleClient",
-    "CourseStudentClient",
-    "CourseTutorClient",
-    "DeploymentHistoryClient",
-    "ExampleClient",
-    "ExampleRepositoryClient",
-    "ExecutionBackendClient",
-    "ExtensionClient",
-    "GroupClaimClient",
-    "GroupClient",
-    "LanguageClient",
-    "MessageClient",
-    "OrganizationClient",
-    "ProfileClient",
-    "ResultClient",
-    "RoleClaimClient",
-    "RoleClient",
-    "SessionClient",
+    "CourseContentTypesClient",
+    "CourseContentsClient",
+    "CourseExecutionBackendsClient",
+    "CourseFamiliesClient",
+    "CourseGroupsClient",
+    "CourseMemberCommentsClient",
+    "CourseMembersClient",
+    "CourseRolesClient",
+    "CoursesClient",
+    "ExampleRepositoriesClient",
+    "ExamplesClient",
+    "ExecutionBackendsClient",
+    "ExtensionsClient",
+    "GroupsClient",
+    "LanguagesClient",
+    "LecturersClient",
+    "MessagesClient",
+    "OrganizationsClient",
+    "ProfilesClient",
+    "ResultsClient",
+    "RoleClaimsClient",
+    "RolesClient",
+    "SessionsClient",
     "StorageClient",
-    "StudentProfileClient",
-    "SubmissionGroupGradingClient",
-    "SubmissionGroupClient",
-    "SubmissionGroupMemberClient",
-    "UserGroupClient",
+    "StudentProfilesClient",
+    "StudentsClient",
+    "SubmissionGroupMembersClient",
+    "SubmissionGroupsClient",
+    "SubmissionsClient",
+    "SystemClient",
+    "TasksClient",
+    "TestsClient",
+    "TutorsClient",
     "UserClient",
-    "UserRoleClient",
+    "UserRolesClient",
+    "UsersClient",
 ]

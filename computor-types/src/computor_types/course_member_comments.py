@@ -1,8 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from uuid import UUID
 
 
-    
+
 from computor_types.course_members import CourseMemberGet, CourseMemberList
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
@@ -45,3 +46,12 @@ class CourseMemberCommentInterface(EntityInterface):
     list = CourseMemberCommentList
     update = CourseMemberCommentUpdate
     query = CourseMemberCommentQuery
+
+
+# Simplified DTOs for API endpoints (matching the local definitions in course_member_comments.py)
+class CommentCreate(BaseModel):
+    course_member_id: UUID | str
+    message: str
+
+class CommentUpdate(BaseModel):
+    message: str
