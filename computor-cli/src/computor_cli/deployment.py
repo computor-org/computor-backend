@@ -13,8 +13,9 @@ import zipfile
 import yaml
 import click
 from pathlib import Path
+from typing import Any
 
-from ..interface.deployments_refactored import (
+from computor_types.deployments_refactored import (
     ComputorDeploymentConfig,
     HierarchicalOrganizationConfig,
     HierarchicalCourseFamilyConfig,
@@ -27,32 +28,74 @@ from ..interface.deployments_refactored import (
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
 )
-from computor_cli.auth import authenticate, get_crud_client, get_custom_client
+from computor_cli.auth import authenticate, get_computor_client_sync
 from computor_cli.config import CLIAuthConfig
-from ..client.crud_client import CustomClient, raise_if_response_is_error
-from ..interface.users import UserCreate, UserInterface, UserQuery
-from ..interface.accounts import AccountCreate, AccountInterface, AccountQuery
-from ..interface.courses import CourseInterface, CourseQuery
-from ..interface.course_members import CourseMemberCreate, CourseMemberInterface, CourseMemberQuery
-from ..interface.course_groups import CourseGroupInterface, CourseGroupQuery, CourseGroupCreate
-from ..interface.organizations import OrganizationInterface, OrganizationQuery
-from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
-from ..interface.execution_backends import ExecutionBackendCreate, ExecutionBackendInterface, ExecutionBackendQuery, ExecutionBackendUpdate
-from ..interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendInterface, CourseExecutionBackendQuery
-from ..interface.roles import RoleInterface, RoleQuery
-from ..interface.user_roles import UserRoleCreate, UserRoleInterface, UserRoleQuery
-from ..interface.example import (
-    ExampleRepositoryInterface,
+from computor_types.users import UserCreate, UserQuery
+from computor_types.accounts import AccountCreate, AccountQuery
+from computor_types.courses import CourseQuery
+from computor_types.course_members import CourseMemberCreate, CourseMemberQuery
+from computor_types.course_groups import CourseGroupQuery, CourseGroupCreate
+from computor_types.organizations import OrganizationQuery
+from computor_types.course_families import CourseFamilyQuery
+from computor_types.execution_backends import ExecutionBackendCreate, ExecutionBackendQuery, ExecutionBackendUpdate
+from computor_types.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendQuery
+from computor_types.roles import RoleQuery
+from computor_types.user_roles import UserRoleCreate, UserRoleQuery
+from computor_types.example import (
     ExampleRepositoryCreate,
     ExampleRepositoryQuery,
-    ExampleInterface,
     ExampleQuery,
 )
-from ..interface.course_contents import CourseContentCreate, CourseContentInterface, CourseContentQuery
-from ..interface.course_content_types import CourseContentTypeInterface, CourseContentTypeQuery
-from ..interface.course_content_kind import CourseContentKindInterface, CourseContentKindQuery
-from ..services.vsix_utils import VsixManifestError, parse_vsix_metadata
+from computor_types.course_contents import CourseContentCreate, CourseContentQuery
+from computor_types.course_content_types import CourseContentTypeQuery
+from computor_types.course_content_kind import CourseContentKindQuery
+from computor_utils.vsix_utils import parse_vsix_metadata
+from computor_types.exceptions import VsixManifestError
 # Deployment is handled through course-contents API, not a separate deployment endpoint
+
+def run_async(coro):
+    """Helper to run async functions synchronously in Click commands."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
+class SyncHTTPWrapper:
+    """Wrapper to make sync HTTP calls using ComputorClient's httpx client configuration."""
+
+    def __init__(self, computor_client):
+        """Initialize with a ComputorClient instance."""
+        import httpx
+        self._client = httpx.Client(
+            base_url=str(computor_client._client.base_url),
+            headers=dict(computor_client._client.headers),
+            timeout=computor_client._client.timeout
+        )
+
+    def get(self, path: str):
+        """GET request."""
+        response = self._client.get(path)
+        response.raise_for_status()
+        return response.json() if response.content else None
+
+    def list(self, path: str):
+        """GET request (alias for get)."""
+        return self.get(path)
+
+    def create(self, path: str, data: dict = None):
+        """POST request."""
+        response = self._client.post(path, json=data or {})
+        response.raise_for_status()
+        return response.json() if response.content else None
+
+    def __del__(self):
+        """Close client on deletion."""
+        if hasattr(self, '_client'):
+            self._client.close()
 
 
 @click.group()
@@ -143,15 +186,17 @@ def init(output: str, format: str):
 
 def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     """Deploy users and their course memberships from configuration."""
-    
+
+    client = get_computor_client_sync(auth)
+
     # Get API clients
-    user_client = get_crud_client(auth, UserInterface)
-    account_client = get_crud_client(auth, AccountInterface)
-    course_client = get_crud_client(auth, CourseInterface)
-    course_member_client = get_crud_client(auth, CourseMemberInterface)
-    course_group_client = get_crud_client(auth, CourseGroupInterface)
-    org_client = get_crud_client(auth, OrganizationInterface)
-    family_client = get_crud_client(auth, CourseFamilyInterface)
+    user_client = client.users
+    account_client = client.accounts
+    course_client = client.courses
+    course_member_client = client.course_members
+    course_group_client = client.course_groups
+    org_client = client.organizations
+    family_client = client.course_families
     
     processed_users = []
     failed_users = []
@@ -190,8 +235,8 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 
             # Assign system roles if provided
             if user_dep.roles:
-                role_client = get_crud_client(auth, RoleInterface)
-                user_role_client = get_crud_client(auth, UserRoleInterface)
+                role_client = client.roles
+                user_role_client = client.user_roles
                 
                 for role_id in user_dep.roles:
                     try:
@@ -223,8 +268,6 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Set password if provided
             if user_dep.password:
                 try:
-                    # Use get_custom_client to get the authenticated client
-                    client = get_custom_client(auth)
                     
                     password_payload = {
                         "username": user_dep.username,
@@ -385,14 +428,16 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
 
 def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     """Deploy execution backends from configuration."""
-    
+
+    client = get_computor_client_sync(auth)
+
     if not config.execution_backends:
         return
     
     click.echo(f"\n⚙️  Deploying {len(config.execution_backends)} execution backends...")
     
     # Get API client
-    backend_client = get_crud_client(auth, ExecutionBackendInterface)
+    backend_client = client.execution_backends
     
     for backend_config in config.execution_backends:
         click.echo(f"\n  Processing backend: {backend_config.slug}")
@@ -432,6 +477,9 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
 def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseConfig, auth: CLIAuthConfig, parent_path: str = None, position_counter: list = None):
     """Deploy course contents for a course."""
     
+    
+    client = get_computor_client_sync(auth)
+
     if not course_config.contents:
         return
     
@@ -440,12 +488,12 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
         position_counter = [1.0]
     
     # Get API clients
-    content_client = get_crud_client(auth, CourseContentInterface)
-    content_type_client = get_crud_client(auth, CourseContentTypeInterface)
-    content_kind_client = get_crud_client(auth, CourseContentKindInterface)
-    example_client = get_crud_client(auth, ExampleInterface)
-    backend_client = get_crud_client(auth, ExecutionBackendInterface)
-    custom_client = get_custom_client(auth)
+    content_client = client.course_contents
+    content_type_client = client.course_content_types
+    content_kind_client = client.course_content_kinds
+    example_client = client.examples
+    backend_client = client.execution_backends
+    custom_client = SyncHTTPWrapper(client)
     
     for content_config in course_config.contents:
         try:
@@ -727,13 +775,16 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
 def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     """Generate GitLab student template repositories for courses with contents."""
     
+
+    client = get_computor_client_sync(auth)
+
     click.echo(f"\n🚀 Generating student template repositories...")
     
     # Get API clients
-    org_client = get_crud_client(auth, OrganizationInterface)
-    family_client = get_crud_client(auth, CourseFamilyInterface)
-    course_client = get_crud_client(auth, CourseInterface)
-    custom_client = get_custom_client(auth)
+    org_client = client.organizations
+    family_client = client.course_families
+    course_client = client.courses
+    custom_client = SyncHTTPWrapper(client)
     
     generated_count = 0
     failed_count = 0
@@ -825,12 +876,15 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
 def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig, generate_student_template: bool = False):
     """Link execution backends to all deployed courses and create course contents."""
     
+
+    client = get_computor_client_sync(auth)
+
     click.echo(f"\n🔗 Linking execution backends to courses...")
     
     # Get API clients
-    org_client = get_crud_client(auth, OrganizationInterface)
-    family_client = get_crud_client(auth, CourseFamilyInterface)
-    course_client = get_crud_client(auth, CourseInterface)
+    org_client = client.organizations
+    family_client = client.course_families
+    course_client = client.courses
     
     # Process each organization
     for org_config in config.organizations:
@@ -887,13 +941,15 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
 
 def _link_execution_backends_to_course(course_id: str, execution_backends: list, auth: CLIAuthConfig):
     """Link execution backends to a course."""
-    
+
     if not execution_backends:
         return
-    
+
+    client = get_computor_client_sync(auth)
+
     # Get API clients
-    backend_client = get_crud_client(auth, ExecutionBackendInterface)
-    course_backend_client = get_crud_client(auth, CourseExecutionBackendInterface)
+    backend_client = client.execution_backends
+    course_backend_client = client.course_execution_backends
     
     for backend_ref in execution_backends:
         try:
@@ -939,11 +995,14 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
 
 def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
     """Find or create an example repository with MinIO backend."""
-    repo_client = get_crud_client(auth, ExampleRepositoryInterface)
+
+    client = get_computor_client_sync(auth)
+
+    repo_client = client.example_repositories
 
     # Try find by name
     try:
-        existing = repo_client.list(ExampleRepositoryQuery(name=repo_name))
+        existing = run_async(repo_client.list(ExampleRepositoryQuery(name=repo_name)))
         if existing:
             return existing[0]
     except Exception:
@@ -957,7 +1016,7 @@ def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
             source_type="minio",
             source_url="examples-bucket/local",
         )
-        return repo_client.create(repo_create)
+        return run_async(repo_client.create(repo_create))
     except Exception as e:
         raise RuntimeError(f"Failed to create example repository '{repo_name}': {e}")
 
@@ -1087,8 +1146,11 @@ def _toposort_by_dependencies(subdirs: list[Path]) -> list[Path]:
     return [slug_to_dir[s] for s in ordered_slugs]
 
 
-def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAuthConfig, custom_client: CustomClient):
+def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAuthConfig, client):
     """Upload VSIX extensions defined in the deployment configuration."""
+
+
+    client = get_computor_client_sync(auth)
 
     for entry in entries:
         entry_path = Path(entry.path)
@@ -1142,13 +1204,17 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
         }
 
         try:
-            response = custom_client.client.post(
-                f"extensions/{identity}/versions",
-                data=form_data,
-                files=files,
-            )
-            raise_if_response_is_error(response)
-            payload = response.json()
+            # Use the underlying httpx client for multipart/form-data upload
+            # Note: client._client is async, so we need to use the sync httpx client
+            import httpx
+            with httpx.Client(base_url=str(client._client.base_url), headers=dict(client._client.headers)) as sync_client:
+                response = sync_client.post(
+                    f"extensions/{identity}/versions",
+                    data=form_data,
+                    files=files,
+                )
+                response.raise_for_status()
+                payload = response.json()
         except Exception as exc:
             click.echo(f"  ❌ Upload failed: {exc}", err=True)
             continue
@@ -1158,11 +1224,15 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
         click.echo(f"  ✅ Uploaded version {uploaded_version} (sha256 {sha256})")
 
 
-def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CLIAuthConfig, custom_client: CustomClient):
+def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CLIAuthConfig, client):
     """Upload each subdirectory in examples_dir as a zipped example to the API.
 
     The upload order is topologically sorted by dependencies found in meta.yaml.
     """
+
+    client = get_computor_client_sync(auth)
+    custom_client = SyncHTTPWrapper(client)
+
     if not examples_dir.exists() or not examples_dir.is_dir():
         click.echo(f"⚠️  Examples directory not found or not a directory: {examples_dir}")
         return
@@ -1220,20 +1290,17 @@ def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CL
     default=True,
     help='Wait for deployment to complete'
 )
-@click.option(
-    '--generate-student-template',
-    is_flag=True,
-    default=False,
-    help='Generate GitLab student template repositories after creating course contents'
-)
 @authenticate
-def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template: bool, auth: CLIAuthConfig):
+def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     """
     Apply a deployment configuration to create the hierarchy.
     
     This command reads a YAML deployment configuration and creates the
     organization -> course family -> course structure using Temporal workflows.
     """
+
+    client = get_computor_client_sync(auth)
+
     click.echo(f"Loading deployment configuration from {config_file}...")
     
     # Load and parse the YAML file
@@ -1314,7 +1381,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
         sys.exit(1)
     
     # Setup client with authentication
-    custom_client = get_custom_client(auth)
+    custom_client = SyncHTTPWrapper(client)
     
     # Deploy execution backends first (before hierarchy)
     if config.execution_backends:
@@ -1324,7 +1391,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
     if getattr(config, 'extensions_upload', None):
         cfg_dir = Path(config_file).parent
         click.echo("\n📦 Preparing VSIX uploads...")
-        _upload_extensions_from_config(config.extensions_upload, cfg_dir, auth, custom_client)
+        _upload_extensions_from_config(config.extensions_upload, cfg_dir, auth, client)
 
     # Optionally upload examples prior to starting hierarchy deployment
     if getattr(config, 'examples_upload', None):
@@ -1332,7 +1399,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
         rel_path = Path(config.examples_upload.path)
         resolved_path = rel_path if rel_path.is_absolute() else (cfg_dir / rel_path).resolve()
         click.echo(f"\n🔼 Preparing example uploads from: {resolved_path}")
-        _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, custom_client)
+        _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, client)
 
     if not config.organizations:
         click.echo("\nℹ️ No hierarchy defined in configuration; skipping deployment API call.")
@@ -1370,7 +1437,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
                             click.echo("\n✅ Deployment completed successfully!")
                             
                             # Link execution backends to courses and create contents
-                            _link_backends_to_deployed_courses(config, auth, generate_student_template)
+                            _link_backends_to_deployed_courses(config, auth, True)
                             
                             # Deploy users if configured
                             if config.users:
@@ -1391,7 +1458,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template
             if not wait:
                 click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
                 # Try to link backends and create contents (might fail if hierarchy not ready)
-                _link_backends_to_deployed_courses(config, auth, generate_student_template)
+                _link_backends_to_deployed_courses(config, auth, True)
                 
                 if config.users:
                     click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")

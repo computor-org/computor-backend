@@ -7,6 +7,19 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .base import EntityInterface
 
+
+class VsixMetadata(BaseModel):
+    """Metadata extracted from a VSIX manifest."""
+
+    publisher: str = Field(..., description="Publisher identifier from manifest")
+    name: str = Field(..., description="Extension name/ID from manifest")
+    version: str = Field(..., description="Semantic version from manifest")
+    display_name: Optional[str] = Field(None, description="Display name from manifest")
+    description: Optional[str] = Field(None, description="Description from manifest")
+    engine_range: Optional[str] = Field(None, description="VS Code engine compatibility range")
+
+    model_config = ConfigDict(from_attributes=True)
+
 class ExtensionPublishRequest(BaseModel):
     """Form metadata submitted when publishing a new extension version."""
 

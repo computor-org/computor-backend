@@ -3,12 +3,11 @@ import click
 from computor_backend.api.system import ReleaseCourseCreate
 from computor_cli.auth import authenticate
 from computor_cli.config import CLIAuthConfig
-from computor_backend.client.crud_client import CustomClient
 from computor_types.deployments import DeploymentFactory
 from computor_types.deployments import ComputorDeploymentConfig
 from alive_progress import alive_bar
 
-def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str = "Flow run"):
+def handle_flow_runs(flow_run_id: str, custom_client, title: str = "Flow run"):
 
     # click.echo(f"Flow run with id [{click.style(flow_run_id,fg='green')}] started")
 
@@ -30,7 +29,7 @@ def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str =
           elapsed_time = 0
 
           try:
-            response = custom_client.get(f"system/status/{flow_run_id}")
+            response = custom_client.system.get_status(flow_run_id)
           except Exception as e:
               click.echo(e)
               return

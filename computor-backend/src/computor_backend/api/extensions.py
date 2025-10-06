@@ -9,6 +9,8 @@ import re
 from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
+from computor_utils.vsix_utils import parse_vsix_metadata
+from computor_types.exceptions import VsixManifestError
 from fastapi import (
     APIRouter,
     Depends,
@@ -38,7 +40,6 @@ from ..model.extension import Extension, ExtensionVersion
 from ..permissions.auth import get_current_principal
 from ..permissions.principal import Principal
 from ..services.storage_service import get_storage_service
-from ..services.vsix_utils import VsixManifestError, parse_vsix_metadata
 
 extensions_router = APIRouter(prefix="/extensions", tags=["extensions"])
 

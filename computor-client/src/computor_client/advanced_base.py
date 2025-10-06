@@ -54,6 +54,32 @@ class BaseEndpointClient:
             return response.json()
         return None
 
+    # Generic CRUD method aliases for backward compatibility
+    async def create(self, payload: BaseModel) -> Any:
+        """Create a new entity (generic wrapper for POST)."""
+        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
+        return await self._request("POST", self.base_path, json=json_data)
+
+    async def list(self, query: Optional[BaseModel] = None) -> List[Any]:
+        """List entities (generic wrapper for GET with params)."""
+        params = {}
+        if query:
+            params = query.model_dump(mode="json", exclude_unset=True) if hasattr(query, "model_dump") else query
+        return await self._request("GET", self.base_path, params=params)
+
+    async def get(self, id: str) -> Any:
+        """Get entity by ID (generic wrapper for GET /{id})."""
+        return await self._request("GET", f"{self.base_path}/{id}")
+
+    async def update(self, id: str, payload: BaseModel) -> Any:
+        """Update an entity (generic wrapper for PATCH /{id})."""
+        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
+        return await self._request("PATCH", f"{self.base_path}/{id}", json=json_data)
+
+    async def delete(self, id: str) -> Any:
+        """Delete an entity (generic wrapper for DELETE /{id})."""
+        return await self._request("DELETE", f"{self.base_path}/{id}")
+
 
 class CustomActionClient(Generic[T]):
     """Base class for clients with custom actions beyond CRUD."""

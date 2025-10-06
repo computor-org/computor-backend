@@ -1,7 +1,6 @@
 from typing import Annotated
 from uuid import UUID
 from fastapi import Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -13,13 +12,13 @@ from computor_backend.api.api_builder import CrudRouter
 from computor_backend.business_logic.organizations import update_organization_token
 from computor_backend.interfaces import OrganizationInterface
 
+# Import DTOs from computor_types
+from computor_types.organizations import (
+    OrganizationUpdateTokenQuery,
+    OrganizationUpdateTokenUpdate,
+)
+
 organization_router = CrudRouter(OrganizationInterface)
-
-class OrganizationUpdateTokenQuery(BaseModel):
-    type: str
-
-class OrganizationUpdateTokenUpdate(BaseModel):
-    token: str
 
 @organization_router.router.patch("/{organization_id}/token", status_code=201)
 def patch_organizations_token(

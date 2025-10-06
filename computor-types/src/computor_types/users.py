@@ -187,6 +187,15 @@ class UserQuery(ListQuery):
     username: Optional[str] = None
 
 
+# Additional user-related DTOs
+
+class UserPassword(BaseModel):
+    """Password update request for user endpoints."""
+    username: Optional[str] = Field(None, description="Target username (admin only, otherwise current user)")
+    password: str = Field(..., description="New password")
+    password_old: Optional[str] = Field(None, description="Old password (required for non-admin password changes)")
+
+
 class UserInterface(EntityInterface):
     create = UserCreate
     get = UserGet

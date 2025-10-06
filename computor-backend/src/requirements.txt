@@ -1,5 +1,6 @@
 # Computor packages
 computor-types>=0.1.0
+computor-utils>=0.1.0
 
 # External dependencies
 openpyxl==3.1.2

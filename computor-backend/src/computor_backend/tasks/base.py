@@ -3,25 +3,9 @@ Base classes and interfaces for task execution framework.
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any, Dict, Optional
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict
 
-from computor_types.tasks import TaskStatus
-
-class TaskResult(BaseModel):
-    """Task execution result container."""
-    task_id: str
-    status: TaskStatus
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    progress: Optional[Dict[str, Any]] = None
-    
-    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
+from computor_types.tasks import TaskStatus, TaskResult, TaskSubmission, TaskInfo
 
 
 class BaseTask(ABC):
@@ -97,43 +81,3 @@ class BaseTask(ABC):
         # Default implementation does nothing
         # This will be overridden by the Celery wrapper in executor.py
         pass
-
-
-class TaskSubmission(BaseModel):
-    """Task submission request."""
-    task_name: str
-    parameters: Dict[str, Any] = {}
-    queue: str = "computor-tasks"  # Task queue name
-    workflow_id: Optional[str] = None  # Custom workflow ID (if not provided, will be auto-generated)
-    delay: Optional[int] = None  # Delay in seconds before execution
-    
-    
-class TaskInfo(BaseModel):
-    """Task information for status queries."""
-    task_id: str
-    task_name: str
-    status: TaskStatus
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    progress: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    worker: Optional[str] = None
-    queue: Optional[str] = None
-    retries: Optional[int] = None
-    args: Optional[Any] = None
-    kwargs: Optional[Dict[str, Any]] = None
-    
-    # UI enhancement fields
-    short_task_id: Optional[str] = None
-    status_display: Optional[str] = None
-    completed_at: Optional[datetime] = None
-    has_result: Optional[bool] = None
-    result_available: Optional[str] = None
-    duration: Optional[str] = None
-    workflow_id: Optional[str] = None
-    run_id: Optional[str] = None
-    execution_time: Optional[datetime] = None
-    history_length: Optional[int] = None
-    
-    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)

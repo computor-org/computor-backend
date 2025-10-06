@@ -4,45 +4,37 @@ from typing import Optional
 import httpx
 
 from .generated import (
-    AccountClient,
-    CourseClient,
-    CourseContentClient,
+    AccountsClient,
+    CourseContentsClient,
     CourseContentKindClient,
-    CourseContentDeploymentClient,
-    CourseContentLecturerClient,
-    CourseContentStudentClient,
-    CourseContentTypeClient,
-    CourseExecutionBackendClient,
-    CourseFamilyClient,
-    CourseGroupClient,
-    CourseMemberClient,
-    CourseMemberCommentClient,
-    CourseRoleClient,
-    CourseStudentClient,
-    CourseTutorClient,
-    DeploymentHistoryClient,
-    ExampleClient as GeneratedExampleClient,
-    ExampleRepositoryClient,
-    ExecutionBackendClient,
-    ExtensionClient,
-    GroupClient,
-    GroupClaimClient,
-    LanguageClient,
-    MessageClient,
-    OrganizationClient,
-    ProfileClient,
-    ResultClient,
-    RoleClient,
-    RoleClaimClient,
-    SessionClient,
-    StorageClient as GeneratedStorageClient,
-    StudentProfileClient,
-    SubmissionGroupClient,
-    SubmissionGroupGradingClient,
-    SubmissionGroupMemberClient,
+    CourseContentTypesClient,
+    CourseExecutionBackendsClient,
+    CourseFamiliesClient,
+    CourseGroupsClient,
+    CourseMembersClient,
+    CourseMemberCommentsClient,
+    CourseRolesClient,
+    CoursesClient,
+    ExampleRepositoriesClient,
+    ExecutionBackendsClient,
+    ExtensionsClient,
+    GroupsClient,
+    LanguagesClient,
+    LecturersClient,
+    MessagesClient,
+    OrganizationsClient,
+    ProfilesClient,
+    ResultsClient,
+    RoleClaimsClient,
+    RolesClient,
+    SessionsClient,
+    StudentProfilesClient,
+    StudentsClient,
+    SubmissionGroupsClient,
+    SubmissionGroupMembersClient,
     UserClient,
-    UserGroupClient,
-    UserRoleClient,
+    UserRolesClient,
+    UsersClient,
 )
 
 # Import custom clients
@@ -113,46 +105,40 @@ class ComputorClient:
             headers=default_headers,
         )
 
-        # Initialize endpoint clients
-        self.accounts = AccountClient(self._client)
-        self.courses = CourseClient(self._client)
-        self.course_contents = CourseContentClient(self._client)
+        # Initialize generated endpoint clients
+        self.accounts = AccountsClient(self._client)
+        self.courses = CoursesClient(self._client)
+        self.course_contents = CourseContentsClient(self._client)
         self.course_content_kinds = CourseContentKindClient(self._client)
-        self.course_content_deployments = CourseContentDeploymentClient(self._client)
-        self.course_content_lecturers = CourseContentLecturerClient(self._client)
-        self.course_content_students = CourseContentStudentClient(self._client)
-        self.course_content_types = CourseContentTypeClient(self._client)
-        self.course_execution_backends = CourseExecutionBackendClient(self._client)
-        self.course_families = CourseFamilyClient(self._client)
-        self.course_groups = CourseGroupClient(self._client)
-        self.course_members = CourseMemberClient(self._client)
-        self.course_member_comments = CourseMemberCommentClient(self._client)
-        self.course_roles = CourseRoleClient(self._client)
-        self.course_students = CourseStudentClient(self._client)
-        self.course_tutors = CourseTutorClient(self._client)
-        self.deployment_history = DeploymentHistoryClient(self._client)
-        self.example_repositories = ExampleRepositoryClient(self._client)
-        self.execution_backends = ExecutionBackendClient(self._client)
-        self.extensions = ExtensionClient(self._client)
-        self.groups = GroupClient(self._client)
-        self.group_claims = GroupClaimClient(self._client)
-        self.languages = LanguageClient(self._client)
-        self.messages = MessageClient(self._client)
-        self.organizations = OrganizationClient(self._client)
-        self.profiles = ProfileClient(self._client)
-        self.results = ResultClient(self._client)
-        self.roles = RoleClient(self._client)
-        self.role_claims = RoleClaimClient(self._client)
-        self.sessions = SessionClient(self._client)
-        self.student_profiles = StudentProfileClient(self._client)
-        self.submission_groups = SubmissionGroupClient(self._client)
-        self.submission_group_gradings = SubmissionGroupGradingClient(self._client)
-        self.submission_group_members = SubmissionGroupMemberClient(self._client)
-        self.users = UserClient(self._client)
-        self.user_groups = UserGroupClient(self._client)
-        self.user_roles = UserRoleClient(self._client)
+        self.course_content_types = CourseContentTypesClient(self._client)
+        self.course_execution_backends = CourseExecutionBackendsClient(self._client)
+        self.course_families = CourseFamiliesClient(self._client)
+        self.course_groups = CourseGroupsClient(self._client)
+        self.course_members = CourseMembersClient(self._client)
+        self.course_member_comments = CourseMemberCommentsClient(self._client)
+        self.course_roles = CourseRolesClient(self._client)
+        self.example_repositories = ExampleRepositoriesClient(self._client)
+        self.execution_backends = ExecutionBackendsClient(self._client)
+        self.extensions = ExtensionsClient(self._client)
+        self.groups = GroupsClient(self._client)
+        self.languages = LanguagesClient(self._client)
+        self.lecturers = LecturersClient(self._client)
+        self.messages = MessagesClient(self._client)
+        self.organizations = OrganizationsClient(self._client)
+        self.profiles = ProfilesClient(self._client)
+        self.results = ResultsClient(self._client)
+        self.roles = RolesClient(self._client)
+        self.role_claims = RoleClaimsClient(self._client)
+        self.sessions = SessionsClient(self._client)
+        self.student_profiles = StudentProfilesClient(self._client)
+        self.students = StudentsClient(self._client)
+        self.submission_groups = SubmissionGroupsClient(self._client)
+        self.submission_group_members = SubmissionGroupMembersClient(self._client)
+        self.user = UserClient(self._client)
+        self.users = UsersClient(self._client)
+        self.user_roles = UserRolesClient(self._client)
 
-        # Custom clients with enhanced functionality
+        # Custom clients with enhanced functionality (override generated clients)
         self.auth = ComputorAuthClient(self._client)
         self.storage = StorageFileClient(self._client)
         self.tasks = ComputorTaskClient(self._client)

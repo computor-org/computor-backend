@@ -205,6 +205,18 @@ class OrganizationInterface(EntityInterface):
     update = OrganizationUpdate
     query = OrganizationQuery
 
+
+# Additional organization-related DTOs
+
+class OrganizationUpdateTokenQuery(BaseModel):
+    """Query parameters for updating organization token."""
+    type: str = Field(..., description="Token type (e.g., 'gitlab', 'github')")
+
+
+class OrganizationUpdateTokenUpdate(BaseModel):
+    """Payload for updating organization provider token."""
+    token: str = Field(..., description="Provider access token")
+
 # Import GitLabConfig after OrganizationProperties is defined to avoid circular import
 from computor_types.deployments import GitLabConfig, GitLabConfigGet
 # Rebuild the models to resolve forward references

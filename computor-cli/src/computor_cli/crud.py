@@ -1,19 +1,19 @@
 import click
 from fastapi import HTTPException
 from httpx import ConnectError
-from computor_cli.auth import authenticate, get_crud_client
+from computor_cli.auth import authenticate, get_computor_client_sync
 from computor_cli.config import CLIAuthConfig
 from computor_types import endpoints
-from computor_types.results import ResultInterface
-from computor_types.users import UserInterface
-from computor_types.courses import CourseInterface
-from computor_types.organizations import OrganizationInterface
-from computor_types.course_families import CourseFamilyInterface
-from computor_types.course_groups import CourseGroupInterface
-from computor_types.course_members import CourseMemberInterface
-from computor_types.course_roles import CourseRoleInterface
-from computor_types.course_content_types import CourseContentTypeInterface
-from computor_types.course_contents import CourseContentInterface
+from computor_types.results import ResultQuery
+from computor_types.users import UserQuery
+from computor_types.courses import CourseQuery
+from computor_types.organizations import OrganizationQuery
+from computor_types.course_families import CourseFamilyQuery
+from computor_types.course_groups import CourseGroupQuery
+from computor_types.course_members import CourseMemberQuery
+from computor_types.course_roles import CourseRoleQuery
+from computor_types.course_content_types import CourseContentTypeQuery
+from computor_types.course_contents import CourseContentQuery
 
 AVAILABLE_DTO_DEFINITIONS = [
     endpoints.ORGANIZATIONS_ENDPOINT,
@@ -28,28 +28,53 @@ AVAILABLE_DTO_DEFINITIONS = [
     endpoints.RESULTS_ENDPOINT,
 ]
 
-def DTO_DEFINITIONS(table: str):
-    """Map endpoint name to interface class."""
+def GET_CLIENT_ATTRIBUTE(client, table: str):
+    """Map endpoint name to ComputorClient attribute."""
     if endpoints.ORGANIZATIONS_ENDPOINT == table:
-        return OrganizationInterface
+        return client.organizations
     elif endpoints.COURSE_FAMILIES_ENDPOINT == table:
-        return CourseFamilyInterface
+        return client.course_families
     elif endpoints.COURSES_ENDPOINT == table:
-        return CourseInterface
+        return client.courses
     elif endpoints.COURSE_CONTENTS_ENDPOINT == table:
-        return CourseContentInterface
+        return client.course_contents
     elif endpoints.COURSE_CONTENT_TYPES_ENDPOINT == table:
-        return CourseContentTypeInterface
+        return client.course_content_types
     elif endpoints.COURSE_GROUPS_ENDPOINT == table:
-        return CourseGroupInterface
+        return client.course_groups
     elif endpoints.COURSE_MEMBERS_ENDPOINT == table:
-        return CourseMemberInterface
+        return client.course_members
     elif endpoints.COURSE_ROLES_ENDPOINT == table:
-        return CourseRoleInterface
+        return client.course_roles
     elif endpoints.USERS_ENDPOINT == table:
-        return UserInterface
+        return client.users
     elif endpoints.RESULTS_ENDPOINT == table:
-        return ResultInterface
+        return client.results
+    else:
+        raise Exception("Not found")
+
+def GET_QUERY_CLASS(table: str):
+    """Map endpoint name to Query class."""
+    if endpoints.ORGANIZATIONS_ENDPOINT == table:
+        return OrganizationQuery
+    elif endpoints.COURSE_FAMILIES_ENDPOINT == table:
+        return CourseFamilyQuery
+    elif endpoints.COURSES_ENDPOINT == table:
+        return CourseQuery
+    elif endpoints.COURSE_CONTENTS_ENDPOINT == table:
+        return CourseContentQuery
+    elif endpoints.COURSE_CONTENT_TYPES_ENDPOINT == table:
+        return CourseContentTypeQuery
+    elif endpoints.COURSE_GROUPS_ENDPOINT == table:
+        return CourseGroupQuery
+    elif endpoints.COURSE_MEMBERS_ENDPOINT == table:
+        return CourseMemberQuery
+    elif endpoints.COURSE_ROLES_ENDPOINT == table:
+        return CourseRoleQuery
+    elif endpoints.USERS_ENDPOINT == table:
+        return UserQuery
+    elif endpoints.RESULTS_ENDPOINT == table:
+        return ResultQuery
     else:
         raise Exception("Not found")
 
@@ -76,12 +101,14 @@ def handle_api_exceptions(func):
 @handle_api_exceptions
 def list_entities(table, query, auth: CLIAuthConfig):
 
+  client = get_computor_client_sync(auth)
+
   params = None
   query = dict(query)
   if dict(query) != {}:
-    params = DTO_DEFINITIONS(table).query(**query)
+    params = GET_QUERY_CLASS(table)(**query)
 
-  resp = get_crud_client(auth,DTO_DEFINITIONS(table)).list(params)
+  resp = GET_CLIENT_ATTRIBUTE(client, table).list(params)
 
   for entity in resp:
     click.echo(f"{entity.model_dump_json(indent=4)}")
@@ -90,11 +117,11 @@ def list_entities(table, query, auth: CLIAuthConfig):
 @click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
 def show_entities_query(table):
 
-  dto = DTO_DEFINITIONS(table)
+  query_class = GET_QUERY_CLASS(table)
 
-  query_fields = dto.query.model_fields
+  query_fields = query_class.model_fields
 
-  click.echo(f"Query parameters for endpoint [{click.style(dto.endpoint,fg='green')}]:\n")
+  click.echo(f"Query parameters for endpoint [{click.style(table,fg='green')}]:\n")
   for field, info in query_fields.items():
     click.echo(f"{click.style(field,fg='green')} - {info.annotation}")
 
@@ -105,7 +132,9 @@ def show_entities_query(table):
 @handle_api_exceptions
 def get_entity(table, id, auth: CLIAuthConfig):
 
-  entity = get_crud_client(auth,DTO_DEFINITIONS(table)).get(id)
+  client = get_computor_client_sync(auth)
+
+  entity = GET_CLIENT_ATTRIBUTE(client, table).get(id)
 
   click.echo(f"{entity.model_dump_json(indent=4)}")
 

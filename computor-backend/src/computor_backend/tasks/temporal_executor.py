@@ -9,8 +9,9 @@ from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
 from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
 from .temporal_base import WorkflowResult
-from .base import TaskStatus, TaskResult, TaskInfo, TaskSubmission
+from .base import BaseTask
 from .registry import task_registry
+from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
 
 
 class TemporalTaskExecutor:

@@ -212,69 +212,55 @@ def authenticate(func):
 
 async def get_computor_client(auth: CLIAuthConfig):
     """
-    Get an authenticated ComputorClient instance.
+    Create and authenticate a ComputorClient instance (async).
 
-    Returns a ComputorClient configured with the stored authentication.
+    Args:
+        auth: CLI authentication configuration
+
+    Returns:
+        Authenticated ComputorClient instance
     """
     from computor_client import ComputorClient
 
+    # Create client
     client = ComputorClient(base_url=auth.api_url)
 
-    if auth.basic != None:
+    # Authenticate based on auth type
+    if auth.basic is not None:
         await client.authenticate(
             username=auth.basic.username,
             password=auth.basic.password
         )
-    elif auth.gitlab != None:
-        # For GitLab auth, we need to set custom headers
-        # Note: This might need backend support for GitLab auth
-        from base64 import b64encode
-        crypt = b64encode(bytes(auth.gitlab.model_dump_json(), encoding="utf-8"))
-        client._client.headers.update({"GLP-CREDS": str(crypt, "utf-8")})
+    elif auth.gitlab is not None:
+        # For GitLab auth, set custom header
+        if hasattr(auth.gitlab, 'token') and auth.gitlab.token:
+            client._client.headers["X-GitLab-Auth"] = auth.gitlab.token
     else:
-        raise NotImplementedError("Unsupported auth method")
+        raise NotImplementedError("No authentication method configured")
 
     return client
 
 
-# Legacy compatibility - keep for now until all commands are migrated
-def get_crud_client(auth: CLIAuthConfig, entity_interface):
+def get_computor_client_sync(auth: CLIAuthConfig):
     """
-    DEPRECATED: Use get_computor_client() instead.
+    Create and authenticate a ComputorClient instance (synchronous wrapper).
 
-    This function is kept for backward compatibility with existing CLI commands.
+    This is a synchronous wrapper around get_computor_client() for use in
+    Click commands that haven't been converted to async yet.
+
+    Args:
+        auth: CLI authentication configuration
+
+    Returns:
+        Authenticated ComputorClient instance
     """
-    from computor_backend.client.crud_client import CrudClient
+    import asyncio
 
-    if auth.basic != None:
-        return CrudClient(
-            url_base=auth.api_url,
-            entity_interface=entity_interface,
-            auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-        return CrudClient(
-            url_base=auth.api_url,
-            entity_interface=entity_interface,
-            glp_auth_header=auth.gitlab.model_dump())
-    else:
-        raise NotImplementedError()
+    # Run the async function in a new event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
-
-def get_custom_client(auth: CLIAuthConfig):
-    """
-    DEPRECATED: Use get_computor_client() instead.
-
-    This function is kept for backward compatibility with existing CLI commands.
-    """
-    from computor_backend.client.crud_client import CustomClient
-
-    if auth.basic != None:
-        return CustomClient(
-            url_base=auth.api_url,
-            auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-        return CustomClient(
-            url_base=auth.api_url,
-            glp_auth_header=auth.gitlab.model_dump())
-    else:
-        raise NotImplementedError()
+    return loop.run_until_complete(get_computor_client(auth))

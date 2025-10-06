@@ -1,5 +1,5 @@
 import click
-from computor_cli.auth import authenticate, get_custom_client
+from computor_cli.auth import authenticate, get_computor_client_sync
 from computor_cli.config import CLIAuthConfig
 from computor_cli.crud import handle_api_exceptions
 
@@ -10,9 +10,11 @@ from computor_cli.crud import handle_api_exceptions
 @handle_api_exceptions
 def change_password(username, password, auth: CLIAuthConfig):
 
-  resp = get_custom_client(auth)
+  client = get_computor_client_sync(auth)
 
-  print(resp.create("/user/password",{"username": username,"password": password}))
+  # Use the users client to change password
+  result = client.users.change_password({"username": username, "password": password})
+  print(result)
 
 @click.group()
 def admin():

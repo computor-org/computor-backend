@@ -2,7 +2,6 @@ from typing import Annotated, Optional, List
 from uuid import UUID
 
 import logging
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
@@ -11,7 +10,7 @@ from computor_types.course_member_accounts import (
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
-from computor_types.users import UserGet
+from computor_types.users import UserGet, UserPassword
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from fastapi import APIRouter, Depends
@@ -28,11 +27,6 @@ from computor_backend.business_logic.users import (
 logger = logging.getLogger(__name__)
 
 user_router = APIRouter()
-
-class UserPassword(BaseModel):
-    username: Optional[str] = None
-    password: str
-    password_old: Optional[str] = None
 
 @user_router.get("", response_model=UserGet)
 def get_current_user_endpoint(

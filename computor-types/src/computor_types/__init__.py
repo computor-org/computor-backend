@@ -106,6 +106,20 @@ from .deployments import (
     BaseDeployment,
 )
 
+# Exceptions
+from .exceptions import (
+    VsixManifestError,
+)
+
+# Extensions
+from .extensions import (
+    VsixMetadata,
+    ExtensionInterface,
+    ExtensionPublishRequest,
+    ExtensionMetadata,
+    ExtensionVersionDetail,
+)
+
 __all__ = [
     "EntityInterface",
     "BaseEntityGet",
@@ -129,4 +143,10 @@ __all__ = [
     "GitLabConfig",
     "GitLabConfigGet",
     "BaseDeployment",
+    "VsixManifestError",
+    "VsixMetadata",
+    "ExtensionInterface",
+    "ExtensionPublishRequest",
+    "ExtensionMetadata",
+    "ExtensionVersionDetail",
 ]

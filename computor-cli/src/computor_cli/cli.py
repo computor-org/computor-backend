@@ -16,7 +16,7 @@ from computor_cli.generate_validators import generate_validators_cmd
 # from computor_cli.template import template
 # from computor_cli.imports import import_group
 # from computor_cli.test import run_test
-# from computor_cli.deployment import deployment
+from computor_cli.deployment import deployment
 
 @click.group()
 def cli():
@@ -37,7 +37,7 @@ cli.add_command(generate_validators_cmd, "generate-validators")
 # cli.add_command(import_group, "import")
 # cli.add_command(run_test, "test")
 # cli.add_command(template, "templates")
-# cli.add_command(deployment, "deployment")
+cli.add_command(deployment, "deployment")
 
 if __name__ == '__main__':
     cli()

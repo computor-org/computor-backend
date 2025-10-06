@@ -1796,6 +1796,22 @@
             }
           },
           {
+            "name": "language_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language Code"
+            }
+          },
+          {
             "name": "provider_url",
             "in": "query",
             "required": false,
@@ -3893,6 +3909,22 @@
                 }
               ],
               "title": "Name"
+            }
+          },
+          {
+            "name": "native_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Native Name"
             }
           }
         ],
@@ -6567,6 +6599,22 @@
             }
           },
           {
+            "name": "description",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Description"
+            }
+          },
+          {
             "name": "path",
             "in": "query",
             "required": false,
@@ -6708,6 +6756,22 @@
                 }
               ],
               "title": "Execution Backend Id"
+            }
+          },
+          {
+            "name": "example_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Example Version Id"
             }
           },
           {
@@ -10302,6 +10366,22 @@
             }
           },
           {
+            "name": "language_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language Code"
+            }
+          },
+          {
             "name": "provider_url",
             "in": "query",
             "required": false,
@@ -10646,6 +10726,102 @@
                 }
               ],
               "title": "Has Deployment"
+            }
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Directory"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          },
+          {
+            "name": "provider_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Url"
+            }
+          },
+          {
+            "name": "nlevel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nlevel"
+            }
+          },
+          {
+            "name": "descendants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Descendants"
+            }
+          },
+          {
+            "name": "ascendants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ascendants"
             }
           }
         ],
@@ -28766,7 +28942,7 @@
           "refresh_token"
         ],
         "title": "TokenRefreshRequest",
-        "description": "Token refresh request."
+        "description": "Token refresh request for SSO."
       },
       "TokenRefreshResponse": {
         "properties": {
@@ -28805,7 +28981,7 @@
           "access_token"
         ],
         "title": "TokenRefreshResponse",
-        "description": "Response after successful token refresh."
+        "description": "Response after successful SSO token refresh."
       },
       "TutorCourseMemberCourseContent": {
         "properties": {

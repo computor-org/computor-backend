@@ -9,8 +9,9 @@ from uuid import uuid4
 from temporalio.client import WorkflowExecutionStatus
 
 from computor_backend.tasks.temporal_executor import TemporalTaskExecutor
-from computor_backend.tasks.base import TaskSubmission, TaskStatus, TaskInfo, TaskResult
+from computor_backend.tasks.base import BaseTask
 from computor_backend.tasks.registry import task_registry
+from computor_types.tasks import TaskSubmission, TaskStatus, TaskInfo, TaskResult
 
 
 class MockWorkflow:

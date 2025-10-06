@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .base import TaskStatus, TaskSubmission
+from computor_types.tasks import TaskStatus, TaskSubmission
 
 
 @dataclass
