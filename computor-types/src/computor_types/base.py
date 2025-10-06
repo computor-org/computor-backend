@@ -32,10 +32,20 @@ class EntityInterface(ABC):
     def claim_values(self) -> List[tuple[str,str]]:
         model = self.model
         claims = []
+
+        # If model is None, convert plural endpoint name to singular tablename
+        # e.g., "users" -> "user", "courses" -> "course"
+        if model is None:
+            tablename = self.endpoint.rstrip('s') if self.endpoint else None
+        else:
+            tablename = model.__tablename__
+
+        if tablename is None:
+            return claims
+
         for attr, action in ACTIONS.items():
             if hasattr(self, attr):
-                # Normalize to plural form to match new permission system
-                claims.append(("permissions", f"{model.__tablename__}:{action}"))
+                claims.append(("permissions", f"{tablename}:{action}"))
         return claims
     
 class BaseEntityList(BaseModel):

@@ -257,7 +257,7 @@ This package is part of the Computor platform refactoring:
 
 ### Phase 3 Status
 - ✅ Package structure created
-- ✅ CLI files migrated from `ctutor_backend.cli`
+- ✅ CLI files migrated from `computor_backend.cli`
 - ✅ Imports updated to use `computor_types`
 - ✅ New `get_computor_client()` function added
 - ⚠️ Legacy `get_crud_client()` kept for backward compatibility
@@ -265,7 +265,7 @@ This package is part of the Computor platform refactoring:
 
 ### Legacy Compatibility
 
-Some commands still reference `ctutor_backend` directly:
+Some commands still reference `computor_backend` directly:
 - Generator commands (generate-types, generate-clients, generate-schema)
 - Template commands
 - Deployment commands

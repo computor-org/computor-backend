@@ -5,16 +5,16 @@ from functools import wraps
 from computor_cli.config import CLIAuthConfig
 
 HOME_DIR = os.path.expanduser("~") or os.environ.get("HOME") or os.environ.get("USERPROFILE")
-CTUTOR_DIR = os.path.join(HOME_DIR,".computor")
+COMPUTOR_DIR = os.path.join(HOME_DIR,".computor")
 AUTH_FILE = "active_profile.yaml"
 PROFILES_FILE = "profiles.yaml"
 
 def init_filesystem():
-    if not os.path.exists(CTUTOR_DIR):
-        os.makedirs(CTUTOR_DIR,exist_ok=True)
-    
-    if not os.path.exists(os.path.join(CTUTOR_DIR,PROFILES_FILE)):
-        open(os.path.join(CTUTOR_DIR,PROFILES_FILE), "x")
+    if not os.path.exists(COMPUTOR_DIR):
+        os.makedirs(COMPUTOR_DIR,exist_ok=True)
+
+    if not os.path.exists(os.path.join(COMPUTOR_DIR,PROFILES_FILE)):
+        open(os.path.join(COMPUTOR_DIR,PROFILES_FILE), "x")
 
 def api_heartbeat(client) -> bool:
     try:
@@ -29,7 +29,7 @@ def api_heartbeat(client) -> bool:
 def read_auth_profiles() -> list[CLIAuthConfig]:
     init_filesystem()
 
-    filename = os.path.join(CTUTOR_DIR,PROFILES_FILE)
+    filename = os.path.join(COMPUTOR_DIR,PROFILES_FILE)
 
     with open(filename, "r") as file:
         objs = yaml.safe_load(file)
@@ -49,7 +49,7 @@ def write_auth_profiles(profiles: list[CLIAuthConfig]):
     for profile in profiles:
         profiles_dict.append(profile.model_dump(exclude_unset=True))
 
-    filename = os.path.join(CTUTOR_DIR,PROFILES_FILE)
+    filename = os.path.join(COMPUTOR_DIR,PROFILES_FILE)
 
     with open(filename, "w") as file:
         file.write(yaml.safe_dump(profiles_dict))
@@ -73,7 +73,7 @@ def change_profile():
     
     profile = click.prompt('Profile', type=click.Choice(profile_dict.keys()))
 
-    profile_dict[profile].write_deployment(os.path.join(CTUTOR_DIR,AUTH_FILE))
+    profile_dict[profile].write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
 
     click.echo("Changed profile!")
 
@@ -166,7 +166,7 @@ def login(auth_method,base_url,username,password,gitlab_host,gitlab_token):
 
         write_auth_profiles(profiles)
 
-        cli_auth_config.write_deployment(os.path.join(CTUTOR_DIR,AUTH_FILE))
+        cli_auth_config.write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
 
         click.echo("Updated profile!")
         return True
@@ -177,7 +177,7 @@ def login(auth_method,base_url,username,password,gitlab_host,gitlab_token):
         profiles.append(cli_auth_config)
         write_auth_profiles(profiles)
 
-        cli_auth_config.write_deployment(os.path.join(CTUTOR_DIR,AUTH_FILE))
+        cli_auth_config.write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
 
         click.echo("Authentication successful!")
         return True
@@ -191,7 +191,7 @@ def authenticate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
 
-        file = os.path.join(CTUTOR_DIR,AUTH_FILE)
+        file = os.path.join(COMPUTOR_DIR,AUTH_FILE)
 
         from click import get_current_context
         from computor_types.deployments import DeploymentFactory

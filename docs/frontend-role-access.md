@@ -9,9 +9,9 @@ The current frontend refactor focuses on expanding beyond the existing admin-onl
 - **Routes missing for non-admin roles** (`frontend/src/app/routes/AppRoutes.tsx`) – only admin dashboards and shared dashboards are registered; there are no lecturer, tutor, or student pages to point navigation items at.
 - **Role information flattened in auth services** (`frontend/src/services/basicAuthService.ts`, `frontend/src/services/ssoAuthService.ts`) – both services collapse roles to `'admin' | 'lecturer' | 'student'`, discarding tutor/owner claims and per-course assignments returned by `/auth/me`.
 - **Backend already exposes scoped course APIs**:
-  - Lecturers: `/lecturers/courses` & `/lecturers/courses/{course_id}` (`src/ctutor_backend/api/lecturer.py`)
-  - Tutors: `/tutors/courses`, `/tutors/course-members`, graded content helpers (`src/ctutor_backend/api/tutor.py`)
-  - Students: `/students/courses`, `/students/course-contents`, submissions (`src/ctutor_backend/api/students.py`)
+  - Lecturers: `/lecturers/courses` & `/lecturers/courses/{course_id}` (`src/computor_backend/api/lecturer.py`)
+  - Tutors: `/tutors/courses`, `/tutors/course-members`, graded content helpers (`src/computor_backend/api/tutor.py`)
+  - Students: `/students/courses`, `/students/course-contents`, submissions (`src/computor_backend/api/students.py`)
   These endpoints enforce course-role checks via `check_course_permissions`, so they can drive frontend availability.
 
 ## Recommended Direction

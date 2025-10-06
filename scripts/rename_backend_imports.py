@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Update all imports from ctutor_backend to computor_backend.
+Update all imports from computor_backend to computor_backend.
 """
 
 import re
@@ -12,9 +12,9 @@ def update_imports(file_path: Path) -> bool:
     content = file_path.read_text()
     original_content = content
 
-    # Replace ctutor_backend with computor_backend
+    # Replace computor_backend with computor_backend
     content = re.sub(
-        r'\bctutor_backend\b',
+        r'\bcomputor_backend\b',
         'computor_backend',
         content
     )
@@ -33,7 +33,7 @@ def main():
         print(f"❌ Backend directory not found: {backend_dir}")
         return
 
-    print("🔄 Updating backend imports from ctutor_backend to computor_backend...")
+    print("🔄 Updating backend imports from computor_backend to computor_backend...")
     print(f"📂 Directory: {backend_dir}")
     print()
 

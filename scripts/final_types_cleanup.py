@@ -17,11 +17,11 @@ def clean_file(file_path: Path) -> bool:
     # Remove model imports (both relative and absolute)
     content = re.sub(r'^from \.\.model\..*$', '', content, flags=re.MULTILINE)
     content = re.sub(r'^from computor_types\.model\..*$', '', content, flags=re.MULTILINE)
-    content = re.sub(r'^from ctutor_backend\.model\..*$', '', content, flags=re.MULTILINE)
+    content = re.sub(r'^from computor_backend\.model\..*$', '', content, flags=re.MULTILINE)
 
-    # Remove any remaining ctutor_backend references
-    content = re.sub(r'from ctutor_backend\.', 'from computor_types.', content)
-    content = re.sub(r'import ctutor_backend\.', 'import computor_types.', content)
+    # Remove any remaining computor_backend references
+    content = re.sub(r'from computor_backend\.', 'from computor_types.', content)
+    content = re.sub(r'import computor_backend\.', 'import computor_types.', content)
 
     # Fix relative imports to be absolute
     content = re.sub(r'from \.\.([\w.]+)', r'from computor_types.\1', content)

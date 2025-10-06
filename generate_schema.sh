@@ -17,6 +17,6 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 fi
 
 PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m ctutor_backend.cli.cli generate-schema "$@"
+    "${PYTHON_BIN}" -m computor_backend.cli.cli generate-schema "$@"
 
 echo "✅ JSON Schema generation completed successfully!"

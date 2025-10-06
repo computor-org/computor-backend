@@ -22,7 +22,7 @@ fi
 
 # Generate validators with schema export
 PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m ctutor_backend.cli.cli generate-validators --export-schemas "$@"
+    "${PYTHON_BIN}" -m computor_backend.cli.cli generate-validators --export-schemas "$@"
 
 echo "✅ Validation classes generated successfully!"
 echo "📁 Schemas: frontend/src/types/schemas/"

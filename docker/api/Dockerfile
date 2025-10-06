@@ -6,6 +6,7 @@ RUN useradd -ms /bin/bash uvicorn
 WORKDIR /home/uvicorn
 
 # Copy source code and installation files as root, then change ownership
+ADD computor-types /home/uvicorn/computor-types
 ADD src /home/uvicorn/src
 ADD migrations.sh /home/uvicorn/migrations.sh
 ADD docker/api/startup.bash startup.bash
@@ -19,8 +20,11 @@ USER uvicorn
 # Set PATH to include local pip install directory
 ENV PATH="/home/uvicorn/.local/bin:${PATH}"
 
-# Install dependencies first (--user flag is implicit when running as non-root)
+# Install computor-types first (local package)
+RUN pip install --user -e computor-types
+
+# Install dependencies
 RUN pip install --user -r src/requirements.txt
 
-# Install the package in editable mode so CLI commands work
+# Install the backend package in editable mode
 RUN cd src && pip install --user -e .

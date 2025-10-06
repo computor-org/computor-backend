@@ -18,7 +18,7 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 fi
 
 PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m ctutor_backend.cli.cli generate-clients "$@"
+    "${PYTHON_BIN}" -m computor_backend.cli.cli generate-clients "$@"
 
 echo "✅ TypeScript API clients generated successfully!"
 echo "📁 Check frontend/src/api/generated/ for the generated files"

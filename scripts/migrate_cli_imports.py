@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migrate CLI imports from ctutor_backend to computor_types/computor_client.
+Migrate CLI imports from computor_backend to computor_types/computor_client.
 """
 
 import re
@@ -14,14 +14,14 @@ def update_cli_imports(file_path: Path) -> bool:
 
     # Replace interface imports with computor_types
     content = re.sub(
-        r'from ctutor_backend\.interface\.(\w+) import',
+        r'from computor_backend\.interface\.(\w+) import',
         r'from computor_types.\1 import',
         content
     )
 
     # Replace direct interface imports
     content = re.sub(
-        r'from ctutor_backend\.interface import',
+        r'from computor_backend\.interface import',
         r'from computor_types import',
         content
     )
@@ -31,7 +31,7 @@ def update_cli_imports(file_path: Path) -> bool:
 
     # Update cli internal imports
     content = re.sub(
-        r'from ctutor_backend\.cli\.',
+        r'from computor_backend\.cli\.',
         r'from computor_cli.',
         content
     )

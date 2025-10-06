@@ -11,7 +11,7 @@ from .base import Base
 class Group(Base):
     __tablename__ = 'group'
     __table_args__ = (
-        CheckConstraint('ctutor_valid_slug((slug)::text)'),
+        CheckConstraint('computor_valid_slug((slug)::text)'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -24,7 +24,7 @@ class Group(Base):
     title = Column(String(255))
     description = Column(String(4096))
     slug = Column(String(255), nullable=False)
-    type = Column(Enum('fixed', 'dynamic', name='ctutor_group_type'), server_default=text("'fixed'::ctutor_group_type"))
+    type = Column(Enum('fixed', 'dynamic', name='computor_group_type'), server_default=text("'fixed'::computor_group_type"))
 
     # Relationships
     group_claims = relationship('GroupClaim', back_populates='group', cascade='all, delete-orphan')

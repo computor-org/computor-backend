@@ -16,7 +16,7 @@ def main():
     try:
         subprocess.run([
             sys.executable, 
-            "ctutor_backend/scripts/initialize_system_data.py"
+            "computor_backend/scripts/initialize_system_data.py"
         ], check=True, cwd=str(Path(__file__).parent))
         print("✅ System data initialization completed")
     except subprocess.CalledProcessError as e:
@@ -28,7 +28,7 @@ def main():
     try:
         subprocess.run([
             sys.executable, 
-            "ctutor_backend/scripts/fake_data_seeder.py",
+            "computor_backend/scripts/fake_data_seeder.py",
             "--count", "10"
         ], check=True, cwd=str(Path(__file__).parent))
         print("✅ Fake data generation completed")

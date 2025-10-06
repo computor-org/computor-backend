@@ -26,16 +26,16 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS ltree;")
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
     
-    # Create enums (excluding ctutor_color which will be VARCHAR)
+    # Create enums (excluding computor_color which will be VARCHAR)
     op.execute("""
         CREATE TYPE organization_type AS ENUM ('user', 'community', 'organization');
         CREATE TYPE user_type AS ENUM ('user', 'token');
-        CREATE TYPE ctutor_group_type AS ENUM ('fixed', 'dynamic');
+        CREATE TYPE computor_group_type AS ENUM ('fixed', 'dynamic');
     """)
     
     # Create utility functions (with updated slug function that allows underscores)
     op.execute("""
-        CREATE OR REPLACE FUNCTION ctutor_valid_slug(value text) 
+        CREATE OR REPLACE FUNCTION computor_valid_slug(value text) 
         RETURNS boolean 
         LANGUAGE plpgsql 
         AS $function$
@@ -78,8 +78,8 @@ def upgrade() -> None:
     sa.Column('title', sa.String(length=255), nullable=True),
     sa.Column('description', sa.String(length=4096), nullable=True),
     sa.Column('slug', sa.String(length=255), nullable=False),
-    sa.Column('type', postgresql.ENUM(name='ctutor_group_type', create_type=False), server_default=sa.text("'fixed'::ctutor_group_type"), nullable=True),
-    sa.CheckConstraint('ctutor_valid_slug((slug)::text)'),
+    sa.Column('type', postgresql.ENUM(name='computor_group_type', create_type=False), server_default=sa.text("'fixed'::computor_group_type"), nullable=True),
+    sa.CheckConstraint('computor_valid_slug((slug)::text)'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('role',
@@ -88,7 +88,7 @@ def upgrade() -> None:
     sa.Column('description', sa.String(length=4096), nullable=True),
     sa.Column('builtin', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.CheckConstraint("(NOT builtin) OR ((id)::text ~ '^_'::text)"),
-    sa.CheckConstraint('(builtin AND ctutor_valid_slug(SUBSTRING(id FROM 2))) OR ((NOT builtin) AND ctutor_valid_slug((id)::text))'),
+    sa.CheckConstraint('(builtin AND computor_valid_slug(SUBSTRING(id FROM 2))) OR ((NOT builtin) AND computor_valid_slug((id)::text))'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
@@ -1144,10 +1144,10 @@ def downgrade() -> None:
     op.execute("DROP SEQUENCE IF EXISTS user_unique_fs_number_seq;")
     
     # Drop functions
-    op.execute("DROP FUNCTION IF EXISTS ctutor_valid_slug CASCADE;")
+    op.execute("DROP FUNCTION IF EXISTS computor_valid_slug CASCADE;")
     
     # Drop types
-    op.execute("DROP TYPE IF EXISTS ctutor_group_type CASCADE;")
+    op.execute("DROP TYPE IF EXISTS computor_group_type CASCADE;")
     op.execute("DROP TYPE IF EXISTS user_type CASCADE;")
     op.execute("DROP TYPE IF EXISTS organization_type CASCADE;")
     

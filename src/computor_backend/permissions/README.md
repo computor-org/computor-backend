@@ -140,7 +140,7 @@ Claims:
 export USE_NEW_PERMISSION_SYSTEM=true
 
 # Or use runtime toggle
-python -c "from ctutor_backend.permissions.integration import toggle_system; toggle_system(True)"
+python -c "from computor_backend.permissions.integration import toggle_system; toggle_system(True)"
 ```
 
 ### Phase 3: Full Migration
@@ -177,7 +177,7 @@ permission_registry.register(MyEntity, MyEntityPermissionHandler(MyEntity))
 
 ### Testing the New System
 ```python
-from ctutor_backend.permissions.migration import (
+from computor_backend.permissions.migration import (
     run_migration_tests,
     verify_entity_handler_coverage,
     MigrationHelper
@@ -201,14 +201,14 @@ print(f"Old: {comparison['old_count']}, New: {comparison['new_count']}")
 
 ### Cache Settings
 ```python
-from ctutor_backend.permissions.cache import PermissionCache
+from computor_backend.permissions.cache import PermissionCache
 # Configure TTL (seconds)
 cache = PermissionCache(ttl_seconds=600)  # 10 minutes
 ```
 
 ### Course Role Hierarchy
 ```python
-from ctutor_backend.permissions.principal import CourseRoleHierarchy
+from computor_backend.permissions.principal import CourseRoleHierarchy
 # Custom hierarchy
 hierarchy = CourseRoleHierarchy({
     "_admin": ["_admin"],
@@ -236,7 +236,7 @@ hierarchy = CourseRoleHierarchy({
 ## Files to Update During Migration
 
 When ready to migrate, these files will need updates:
-- All files importing from `ctutor_backend.api.permissions`
+- All files importing from `computor_backend.api.permissions`
 - All files using `get_current_principal` dependency
 - API endpoints using `check_permissions`
 - CRUD operations in `api/crud.py`
@@ -246,14 +246,14 @@ When ready to migrate, these files will need updates:
 ```bash
 # Run comparison tests
 python -c "
-from ctutor_backend.permissions.migration import run_migration_tests
+from computor_backend.permissions.migration import run_migration_tests
 results = run_migration_tests()
 print(results)
 "
 
 # Check specific endpoint
 python -c "
-from ctutor_backend.permissions.integration import toggle_system, get_active_system
+from computor_backend.permissions.integration import toggle_system, get_active_system
 print(f'Current system: {get_active_system()}')
 toggle_system(True)
 print(f'After toggle: {get_active_system()}')

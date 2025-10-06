@@ -92,8 +92,8 @@ def upgrade() -> None:
     op.execute("""
         CREATE TYPE organization_type AS ENUM ('user', 'community', 'organization');
         CREATE TYPE user_type AS ENUM ('user', 'token');
-        CREATE TYPE ctutor_group_type AS ENUM ('fixed', 'dynamic');
-        CREATE TYPE ctutor_color AS ENUM (
+        CREATE TYPE computor_group_type AS ENUM ('fixed', 'dynamic');
+        CREATE TYPE computor_color AS ENUM (
             'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 
             'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 
             'fuchsia', 'pink', 'rose'
@@ -102,7 +102,7 @@ def upgrade() -> None:
     
     # Create utility functions
     op.execute("""
-        CREATE OR REPLACE FUNCTION ctutor_valid_slug(value text) 
+        CREATE OR REPLACE FUNCTION computor_valid_slug(value text) 
         RETURNS boolean 
         LANGUAGE plpgsql 
         AS $function$
@@ -121,11 +121,11 @@ def downgrade() -> None:
     op.execute("DROP SEQUENCE IF EXISTS user_unique_fs_number_seq;")
     
     # Drop functions
-    op.execute("DROP FUNCTION IF EXISTS ctutor_valid_slug CASCADE;")
+    op.execute("DROP FUNCTION IF EXISTS computor_valid_slug CASCADE;")
     
     # Drop types
-    op.execute("DROP TYPE IF EXISTS ctutor_color CASCADE;")
-    op.execute("DROP TYPE IF EXISTS ctutor_group_type CASCADE;")
+    op.execute("DROP TYPE IF EXISTS computor_color CASCADE;")
+    op.execute("DROP TYPE IF EXISTS computor_group_type CASCADE;")
     op.execute("DROP TYPE IF EXISTS user_type CASCADE;")
     op.execute("DROP TYPE IF EXISTS organization_type CASCADE;")
     

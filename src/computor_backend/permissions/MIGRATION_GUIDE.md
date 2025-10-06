@@ -6,7 +6,7 @@ This guide explains the architecture of the new permission system and provides s
 
 ## Architecture Components
 
-All permission-related code is now organized in the `ctutor_backend/permissions/` directory:
+All permission-related code is now organized in the `computor_backend/permissions/` directory:
 
 ### 1. Permission Handlers (`permissions/handlers.py`)
 
@@ -56,7 +56,7 @@ Cleaner authentication with:
 ### Step 1: Enable Migration Helper
 
 ```python
-from ctutor_backend.permissions.migration import MigrationHelper, enable_new_system
+from computor_backend.permissions.migration import MigrationHelper, enable_new_system
 
 # Use migration helper during transition
 permissions_query = MigrationHelper.check_permissions(principal, User, "list", db)
@@ -69,14 +69,14 @@ enable_new_system()
 
 Old imports:
 ```python
-from ctutor_backend.interface.permissions import Principal, build_claim_actions
-from ctutor_backend.api.permissions import check_permissions
-from ctutor_backend.api.auth import get_current_principal
+from computor_backend.interface.permissions import Principal, build_claim_actions
+from computor_backend.api.permissions import check_permissions
+from computor_backend.api.auth import get_current_principal
 ```
 
 New imports:
 ```python
-from ctutor_backend.permissions import (
+from computor_backend.permissions import (
     Principal, 
     build_claims,
     check_permissions,
@@ -113,7 +113,7 @@ async def list_users(
 ### 1. Create a Permission Handler
 
 ```python
-from ctutor_backend.permissions.handlers import PermissionHandler
+from computor_backend.permissions.handlers import PermissionHandler
 
 class MyEntityPermissionHandler(PermissionHandler):
     
@@ -154,8 +154,8 @@ class MyEntityPermissionHandler(PermissionHandler):
 
 ```python
 # In permissions/core.py initialize_permission_handlers()
-from ctutor_backend.model.my_entity import MyEntity
-from ctutor_backend.permissions.handlers_impl import MyEntityPermissionHandler
+from computor_backend.model.my_entity import MyEntity
+from computor_backend.permissions.handlers_impl import MyEntityPermissionHandler
 
 permission_registry.register(MyEntity, MyEntityPermissionHandler(MyEntity))
 ```
@@ -194,7 +194,7 @@ permission_registry.register(MyEntity, MyEntityPermissionHandler(MyEntity))
 The default hierarchy can be customized:
 
 ```python
-from ctutor_backend.permissions import CourseRoleHierarchy
+from computor_backend.permissions import CourseRoleHierarchy
 
 custom_hierarchy = {
     "_admin": ["_admin"],
@@ -208,7 +208,7 @@ course_role_hierarchy = CourseRoleHierarchy(custom_hierarchy)
 ### Cache Configuration
 
 ```python
-from ctutor_backend.permissions import permission_cache, course_permission_cache
+from computor_backend.permissions import permission_cache, course_permission_cache
 
 # Configure cache TTL (seconds)
 permission_cache = PermissionCache(ttl_seconds=600)  # 10 minutes
@@ -220,7 +220,7 @@ course_permission_cache = CoursePermissionCache(ttl_seconds=300)  # 5 minutes
 ### Run Migration Tests
 
 ```python
-from ctutor_backend.permissions.migration import run_migration_tests, verify_entity_handler_coverage
+from computor_backend.permissions.migration import run_migration_tests, verify_entity_handler_coverage
 
 # Check handler coverage
 coverage = verify_entity_handler_coverage()
@@ -234,7 +234,7 @@ print(f"Migration tests: {results}")
 ### Compare Old vs New System
 
 ```python
-from ctutor_backend.permissions.migration import MigrationHelper
+from computor_backend.permissions.migration import MigrationHelper
 
 # Compare results from both systems
 comparison = MigrationHelper.compare_systems(principal, User, "list", db)
@@ -247,7 +247,7 @@ print(f"Systems match: {comparison['match']}")
 If issues arise, you can quickly rollback:
 
 ```python
-from ctutor_backend.permissions.migration import disable_new_system
+from computor_backend.permissions.migration import disable_new_system
 
 # Revert to old system
 disable_new_system()

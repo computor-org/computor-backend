@@ -15,7 +15,7 @@ def remove_model_imports(file_path: Path):
 
     # Remove direct model imports
     content = re.sub(
-        r'^from ctutor_backend\.model\..*$',
+        r'^from computor_backend\.model\..*$',
         '',
         content,
         flags=re.MULTILINE

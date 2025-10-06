@@ -34,7 +34,7 @@ export interface TaskStatus {
   error?: string;
 }
 
-// Backend TaskStatus enum values (from ctutor_backend.tasks.base.TaskStatus)
+// Backend TaskStatus enum values (from computor_backend.tasks.base.TaskStatus)
 export type BackendTaskStatus = 
   | 'queued'     // TaskStatus.QUEUED
   | 'started'    // TaskStatus.STARTED

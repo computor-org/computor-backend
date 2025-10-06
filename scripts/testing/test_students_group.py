@@ -16,15 +16,15 @@ from dotenv import load_dotenv
 env_file = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_file)
 
-from ctutor_backend.generator.gitlab_builder import GitLabBuilder
-from ctutor_backend.interface.deployments import (
+from computor_backend.generator.gitlab_builder import GitLabBuilder
+from computor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,
     CourseFamilyConfig,
     CourseConfig,
     GitLabConfig
 )
-from ctutor_backend.database import get_db
+from computor_backend.database import get_db
 import gitlab
 
 # Configure logging

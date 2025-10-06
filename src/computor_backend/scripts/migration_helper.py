@@ -26,7 +26,7 @@ def main():
         'POSTGRES_URL': os.environ.get('POSTGRES_URL', 'localhost'),
         'POSTGRES_USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'POSTGRES_PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
-        'POSTGRES_DB': os.environ.get('POSTGRES_DB', 'ctutor_test')
+        'POSTGRES_DB': os.environ.get('POSTGRES_DB', 'computor_test')
     }
     
     for key, value in env_vars.items():

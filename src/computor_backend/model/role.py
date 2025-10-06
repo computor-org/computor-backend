@@ -12,7 +12,7 @@ class Role(Base):
     __tablename__ = 'role'
     __table_args__ = (
         CheckConstraint("(NOT builtin) OR ((id)::text ~ '^_'::text)"),
-        CheckConstraint('(builtin AND ctutor_valid_slug(SUBSTRING(id FROM 2))) OR ((NOT builtin) AND ctutor_valid_slug((id)::text))')
+        CheckConstraint('(builtin AND computor_valid_slug(SUBSTRING(id FROM 2))) OR ((NOT builtin) AND computor_valid_slug((id)::text))')
     )
 
     id = Column(String(255), primary_key=True)

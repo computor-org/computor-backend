@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 env_file = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_file)
 
-from ctutor_backend.generator.gitlab_builder import GitLabBuilder
-from ctutor_backend.database import get_db
-from ctutor_backend.model.course import Course
+from computor_backend.generator.gitlab_builder import GitLabBuilder
+from computor_backend.database import get_db
+from computor_backend.model.course import Course
 from sqlalchemy_utils import Ltree
 import gitlab
 

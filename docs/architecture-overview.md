@@ -1,9 +1,9 @@
 # Computor System Architecture Overview
 
-## Backend (src/ctutor_backend)
-- **Entry Points**: `src/server.py` starts a FastAPI app and runs `startup_logic()` from `ctutor_backend.server`; `src/cli.py` exposes a rich CLI (`ctutor_backend.cli`).
-- **Runtime Configuration**: `ctutor_backend.settings.BackendSettings` reads environment flags (debug mode, storage roots, auth plugin config). Database (`ctutor_backend.database`) builds a pooled SQLAlchemy engine from PostgreSQL env vars, and `redis_cache.py` configures an aiocache Redis client.
-- **FastAPI Application**: `ctutor_backend/server.py` wires routers via helper builders (`CrudRouter`, `LookUpRouter`). Routes cover users, organizations, courses, course content, submissions, results, storage, messaging, tasks, SSO, etc. Startup seeds admin accounts, mirrors Git-backed content to local storage, and (optionally) initializes auth plugins.
+## Backend (src/computor_backend)
+- **Entry Points**: `src/server.py` starts a FastAPI app and runs `startup_logic()` from `computor_backend.server`; `src/cli.py` exposes a rich CLI (`computor_backend.cli`).
+- **Runtime Configuration**: `computor_backend.settings.BackendSettings` reads environment flags (debug mode, storage roots, auth plugin config). Database (`computor_backend.database`) builds a pooled SQLAlchemy engine from PostgreSQL env vars, and `redis_cache.py` configures an aiocache Redis client.
+- **FastAPI Application**: `computor_backend/server.py` wires routers via helper builders (`CrudRouter`, `LookUpRouter`). Routes cover users, organizations, courses, course content, submissions, results, storage, messaging, tasks, SSO, etc. Startup seeds admin accounts, mirrors Git-backed content to local storage, and (optionally) initializes auth plugins.
 - **Domain Models & DTOs**: SQLAlchemy models live under `model/`. Each resource exposes a matching Pydantic interface in `interface/` (e.g. `CourseInterface`, `UserInterface`). These interfaces declare endpoint names, CRUD schemas, filters, and post-processing hooks consumed by the router builders.
 - **Permissions & Roles**: `permissions/` describes claims, role assignment bootstrapping, auth dependencies (`get_current_principal`), and role claim management. Roles are applied on startup with `db_apply_roles`, and request handlers rely on dependency-injected `Principal` objects.
 - **Storage & Integrations**: `minio_client.py` and `services/storage_service.py` wrap MinIO for object storage. `api/filesystem.py` manages repository mirroring (currently mostly stubbed). GitLab helpers (`gitlab_utils.py`, `generator/git_helper.py`) and deployment interfaces orchestrate course repositories.

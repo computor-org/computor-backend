@@ -1,6 +1,6 @@
 from enum import Enum
 import os
-#from ctutor_backend.interface.course_content_types import CTutorUIColor
+#from computor_backend.interface.course_content_types import CTutorUIColor
 from misc.icons_template import TestedType, icon_assignment_template, icon_unit_template
 
 class CTutorUIColor(str, Enum):

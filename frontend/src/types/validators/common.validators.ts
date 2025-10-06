@@ -12751,7 +12751,7 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
                 "$ref": "#/$defs/ContainsFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__AndFilter__1"
               },
               {
                 "$ref": "#/$defs/OrFilter"
@@ -12781,7 +12781,7 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
       "title": "StartswithFilter",
       "type": "object"
     },
-    "ctutor_backend__interface__filter__AndFilter__1": {
+    "computor_backend__interface__filter__AndFilter__1": {
       "properties": {
         "and_": {
           "items": {
@@ -12829,7 +12829,7 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
                 "$ref": "#/$defs/ContainsFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__AndFilter__1"
               },
               {
                 "$ref": "#/$defs/OrFilter"
@@ -12846,7 +12846,7 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
       "title": "AndFilter",
       "type": "object"
     },
-    "ctutor_backend__interface__filter__AndFilter__2": {
+    "computor_backend__interface__filter__AndFilter__2": {
       "properties": {
         "and_": {
           "items": {
@@ -12894,13 +12894,13 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
                 "$ref": "#/$defs/ContainsFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__AndFilter__1"
               },
               {
                 "$ref": "#/$defs/OrFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__2"
+                "$ref": "#/$defs/computor_backend__interface__filter__AndFilter__2"
               }
             ]
           },
@@ -12915,7 +12915,7 @@ export class AndFilterValidator extends BaseValidator<AndFilter> {
       "type": "object"
     }
   },
-  "$ref": "#/$defs/ctutor_backend__interface__filter__AndFilter__2",
+  "$ref": "#/$defs/computor_backend__interface__filter__AndFilter__2",
   "x-model-name": "AndFilter"
 }`);
     }
@@ -13042,7 +13042,7 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
                 "$ref": "#/$defs/AndFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__OrFilter__1"
               }
             ]
           },
@@ -13237,7 +13237,7 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
       "title": "StartswithFilter",
       "type": "object"
     },
-    "ctutor_backend__interface__filter__OrFilter__1": {
+    "computor_backend__interface__filter__OrFilter__1": {
       "properties": {
         "or_": {
           "items": {
@@ -13288,7 +13288,7 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
                 "$ref": "#/$defs/AndFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__OrFilter__1"
               }
             ]
           },
@@ -13302,7 +13302,7 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
       "title": "OrFilter",
       "type": "object"
     },
-    "ctutor_backend__interface__filter__OrFilter__2": {
+    "computor_backend__interface__filter__OrFilter__2": {
       "properties": {
         "or_": {
           "items": {
@@ -13353,10 +13353,10 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
                 "$ref": "#/$defs/AndFilter"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__1"
+                "$ref": "#/$defs/computor_backend__interface__filter__OrFilter__1"
               },
               {
-                "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__2"
+                "$ref": "#/$defs/computor_backend__interface__filter__OrFilter__2"
               }
             ]
           },
@@ -13371,7 +13371,7 @@ export class OrFilterValidator extends BaseValidator<OrFilter> {
       "type": "object"
     }
   },
-  "$ref": "#/$defs/ctutor_backend__interface__filter__OrFilter__2",
+  "$ref": "#/$defs/computor_backend__interface__filter__OrFilter__2",
   "x-model-name": "OrFilter"
 }`);
     }

@@ -3,7 +3,7 @@
 This script reads the legacy organization/course CSV exports located in
 ``exports/`` and materialises a ``ComputorDeploymentConfig`` instance that
 matches the refactored deployment schema in
-``ctutor_backend.interface.deployments_refactored``.
+``computor_backend.interface.deployments_refactored``.
 
 Usage:
 
@@ -30,7 +30,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if SRC_ROOT.exists():
     sys.path.insert(0, str(SRC_ROOT))
 
-from ctutor_backend.interface.deployments_refactored import (
+from computor_backend.interface.deployments_refactored import (
     ComputorDeploymentConfig,
     CourseContentConfig,
     CourseContentTypeConfig,
