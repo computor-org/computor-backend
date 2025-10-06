@@ -1,9 +1,9 @@
 #!/bin/bash
 
 
-# Run Alembic migrations  
+# Run Alembic migrations
 echo "Applying Alembic migrations..."
-cd src/ctutor_backend && alembic upgrade head
+cd src/computor_backend && alembic upgrade head
 #export PYTHONPATH=$PWD:$PYTHONPATH
 
 echo "Initializing system data..."

@@ -16,4 +16,4 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 COPY docker/temporal-worker-python/python-worker.py /home/worker/python-worker.py
 
 ENTRYPOINT ["python", "/home/worker/python-worker.py"]
-#ENTRYPOINT ["python", "-m", "ctutor_backend.tasks.temporal_worker"]
+#ENTRYPOINT ["python", "-m", "computor_backend.tasks.temporal_worker"]

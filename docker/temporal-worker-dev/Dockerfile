@@ -19,4 +19,4 @@ RUN pip install --no-cache-dir --upgrade -r src/requirements.txt
 WORKDIR /home/worker/src
 
 # Default command - start temporal worker directly
-CMD ["python", "-m", "ctutor_backend.tasks.temporal_worker", "--queues=computor-tasks"]
+CMD ["python", "-m", "computor_backend.tasks.temporal_worker", "--queues=computor-tasks"]
