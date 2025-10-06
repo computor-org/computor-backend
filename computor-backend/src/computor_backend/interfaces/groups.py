@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.groups import GroupInterface as GroupInterfaceBase, GroupQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import Group
+from computor_backend.model.group import Group
 
 class GroupInterface(GroupInterfaceBase, BackendEntityInterface):
     """Backend-specific GroupInterface with model and API configuration."""
     
-    # model = Group  # TODO: Set when model is available
+    model = Group
     endpoint = "groups"
     cache_ttl = 600
 
@@ -28,5 +27,13 @@ class GroupInterface(GroupInterfaceBase, BackendEntityInterface):
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(Group.id == params.id)
+        if params.title is not None:
+            query = query.filter(Group.title == params.title)
+
         return query

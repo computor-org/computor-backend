@@ -20,11 +20,17 @@ class ProfileInterface(ProfileInterfaceBase, BackendEntityInterface):
 
     @staticmethod
     def search(db: Session, query, params: Optional[ProfileQuery]):
-        """
-        Apply search filters to profile query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
-        """
-        # TODO: Implement search filters based on ProfileQuery fields
+        """Apply search filters to profile query."""
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(Profile.id == params.id)
+        if params.nickname is not None:
+            query = query.filter(Profile.nickname == params.nickname)
+        if params.user_id is not None:
+            query = query.filter(Profile.user_id == params.user_id)
+        if params.language_code is not None:
+            query = query.filter(Profile.language_code == params.language_code)
+
         return query

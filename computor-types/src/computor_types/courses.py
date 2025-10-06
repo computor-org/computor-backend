@@ -80,6 +80,7 @@ class CourseQuery(ListQuery):
     path: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
+    language_code: Optional[str] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
 

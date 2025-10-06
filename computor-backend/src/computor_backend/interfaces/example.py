@@ -23,6 +23,9 @@ class ExampleRepositoryInterface(ExampleRepositoryInterfaceBase, BackendEntityIn
     @staticmethod
     def search(db: Session, query, params: Optional[ExampleRepositoryQuery]):
         """Apply search filters to example repository query."""
+        if params is None:
+            return query
+
         if params.id is not None:
             query = query.filter(ExampleRepository.id == params.id)
         if params.title is not None:
@@ -47,6 +50,9 @@ class ExampleInterface(ExampleInterfaceBase, BackendEntityInterface):
     @staticmethod
     def search(db: Session, query, params: Optional[ExampleQuery]):
         """Apply search filters to example query."""
+        if params is None:
+            return query
+
         if params.id is not None:
             query = query.filter(Example.id == params.id)
         if params.title is not None:

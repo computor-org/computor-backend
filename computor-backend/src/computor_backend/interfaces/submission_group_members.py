@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.submission_group_members import SubmissionGroupMemberInterface as SubmissionGroupMemberInterfaceBase, SubmissionGroupMemberQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import SubmissionGroupMember
+from computor_backend.model.course import SubmissionGroupMember
 
 class SubmissionGroupMemberInterface(SubmissionGroupMemberInterfaceBase, BackendEntityInterface):
     """Backend-specific SubmissionGroupMemberInterface with model and API configuration."""
     
-    # model = SubmissionGroupMember  # TODO: Set when model is available
+    model = SubmissionGroupMember
     endpoint = "submission-group-members"
     cache_ttl = 600
 
@@ -28,5 +27,15 @@ class SubmissionGroupMemberInterface(SubmissionGroupMemberInterfaceBase, Backend
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(SubmissionGroupMember.id == params.id)
+        if params.submission_group_id is not None:
+            query = query.filter(SubmissionGroupMember.submission_group_id == params.submission_group_id)
+        if params.course_member_id is not None:
+            query = query.filter(SubmissionGroupMember.course_member_id == params.course_member_id)
+
         return query

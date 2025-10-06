@@ -21,17 +21,18 @@ class CourseFamilyInterface(CourseFamilyInterfaceBase, BackendEntityInterface):
     @staticmethod
     def search(db: Session, query, params: Optional[CourseFamilyQuery]):
         """Apply search filters to course family query."""
+        if params is None:
+            return query
+
         if params.id is not None:
             query = query.filter(CourseFamily.id == params.id)
         if params.title is not None:
             query = query.filter(CourseFamily.title == params.title)
-        if params.abbreviation is not None:
-            query = query.filter(CourseFamily.abbreviation == params.abbreviation)
+        if params.description is not None:
+            query = query.filter(CourseFamily.description.ilike(f"%{params.description}%"))
+        if params.path is not None:
+            query = query.filter(CourseFamily.path == params.path)
         if params.organization_id is not None:
             query = query.filter(CourseFamily.organization_id == params.organization_id)
-        if params.archived is not None and params.archived:
-            query = query.filter(CourseFamily.archived_at.isnot(None))
-        else:
-            query = query.filter(CourseFamily.archived_at.is_(None))
 
         return query

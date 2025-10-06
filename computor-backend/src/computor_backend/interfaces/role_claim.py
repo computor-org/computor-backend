@@ -20,11 +20,15 @@ class RoleClaimInterface(RoleClaimInterfaceBase, BackendEntityInterface):
 
     @staticmethod
     def search(db: Session, query, params: Optional[RoleClaimQuery]):
-        """
-        Apply search filters to roleclaim query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
-        """
-        # TODO: Implement search filters based on RoleClaimQuery fields
+        """Apply search filters to role claim query."""
+        if params is None:
+            return query
+
+        if params.role_id is not None:
+            query = query.filter(RoleClaim.role_id == params.role_id)
+        if params.claim_type is not None:
+            query = query.filter(RoleClaim.claim_type == params.claim_type)
+        if params.claim_value is not None:
+            query = query.filter(RoleClaim.claim_value == params.claim_value)
+
         return query

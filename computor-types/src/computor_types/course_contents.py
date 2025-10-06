@@ -153,6 +153,7 @@ class CourseContentQuery(ListQuery):
     """Query parameters for course content."""
     id: Optional[str] = None
     title: Optional[str] = None
+    description: Optional[str] = None
     path: Optional[str] = None
     course_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
@@ -163,6 +164,11 @@ class CourseContentQuery(ListQuery):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    example_version_id: Optional[str] = Field(
+        None,
+        deprecated=True,
+        description="DEPRECATED: Filter by example version ID"
+    )
     # Deployment filtering is done via separate deployment endpoints
     has_deployment: Optional[bool] = Field(
         None,

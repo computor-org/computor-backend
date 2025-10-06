@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.sessions import SessionInterface as SessionInterfaceBase, SessionQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import Session
+from computor_backend.model.auth import Session as SessionModel
 
 class SessionInterface(SessionInterfaceBase, BackendEntityInterface):
     """Backend-specific SessionInterface with model and API configuration."""
     
-    # model = Session  # TODO: Set when model is available
+    model = SessionModel
     endpoint = "sessions"
     cache_ttl = 600
 
@@ -28,5 +27,13 @@ class SessionInterface(SessionInterfaceBase, BackendEntityInterface):
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(SessionModel.id == params.id)
+        if params.user_id is not None:
+            query = query.filter(SessionModel.user_id == params.user_id)
+
         return query

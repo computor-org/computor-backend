@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.execution_backends import ExecutionBackendInterface as ExecutionBackendInterfaceBase, ExecutionBackendQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import ExecutionBackend
+from computor_backend.model.execution import ExecutionBackend
 
 class ExecutionBackendInterface(ExecutionBackendInterfaceBase, BackendEntityInterface):
     """Backend-specific ExecutionBackendInterface with model and API configuration."""
     
-    # model = ExecutionBackend  # TODO: Set when model is available
+    model = ExecutionBackend
     endpoint = "execution-backends"
     cache_ttl = 600
 
@@ -28,5 +27,15 @@ class ExecutionBackendInterface(ExecutionBackendInterfaceBase, BackendEntityInte
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(ExecutionBackend.id == params.id)
+        if params.type is not None:
+            query = query.filter(ExecutionBackend.type == params.type)
+        if params.slug is not None:
+            query = query.filter(ExecutionBackend.slug == params.slug)
+
         return query

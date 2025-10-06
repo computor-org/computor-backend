@@ -22,8 +22,8 @@ from computor_types.student_course_contents import (
     CourseContentStudentGet,
     CourseContentStudentList,
     CourseContentStudentQuery,
-    CourseContentStudentInterface,
 )
+from computor_backend.interfaces.student_course_contents import CourseContentStudentInterface
 from computor_types.student_courses import (
     CourseStudentGet,
     CourseStudentList,

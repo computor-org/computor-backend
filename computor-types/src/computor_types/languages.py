@@ -41,6 +41,7 @@ class LanguageUpdate(BaseModel):
 class LanguageQuery(ListQuery):
     code: Optional[str] = Field(None, description="Filter by language code")
     name: Optional[str] = Field(None, description="Filter by language name")
+    native_name: Optional[str] = Field(None, description="Filter by native language name")
 
 
 class LanguageInterface(EntityInterface):

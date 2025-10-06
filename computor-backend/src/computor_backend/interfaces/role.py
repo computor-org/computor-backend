@@ -20,11 +20,17 @@ class RoleInterface(RoleInterfaceBase, BackendEntityInterface):
 
     @staticmethod
     def search(db: Session, query, params: Optional[RoleQuery]):
-        """
-        Apply search filters to role query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
-        """
-        # TODO: Implement search filters based on RoleQuery fields
+        """Apply search filters to role query."""
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(Role.id == params.id)
+        if params.title is not None:
+            query = query.filter(Role.title == params.title)
+        if params.description is not None:
+            query = query.filter(Role.description.ilike(f"%{params.description}%"))
+        if params.builtin is not None:
+            query = query.filter(Role.builtin == params.builtin)
+
         return query

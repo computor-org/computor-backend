@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.languages import LanguageInterface as LanguageInterfaceBase, LanguageQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import Language
+from computor_backend.model.language import Language
 
 class LanguageInterface(LanguageInterfaceBase, BackendEntityInterface):
     """Backend-specific LanguageInterface with model and API configuration."""
     
-    # model = Language  # TODO: Set when model is available
+    model = Language
     endpoint = "languages"
     cache_ttl = 600
 
@@ -28,5 +27,15 @@ class LanguageInterface(LanguageInterfaceBase, BackendEntityInterface):
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.code is not None:
+            query = query.filter(Language.code == params.code)
+        if params.name is not None:
+            query = query.filter(Language.name == params.name)
+        if params.native_name is not None:
+            query = query.filter(Language.native_name == params.native_name)
+
         return query

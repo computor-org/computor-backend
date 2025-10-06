@@ -22,9 +22,27 @@ class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
     def search(db: Session, query, params: Optional[CourseMemberQuery]):
         """
         Apply search filters to coursemember query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
+
+        Args:
+            db: Database session
+            query: SQLAlchemy query object
+            params: Query parameters
+
+        Returns:
+            Filtered query object
         """
-        # TODO: Implement search filters based on CourseMemberQuery fields
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(CourseMember.id == params.id)
+        if params.user_id is not None:
+            query = query.filter(CourseMember.user_id == params.user_id)
+        if params.course_id is not None:
+            query = query.filter(CourseMember.course_id == params.course_id)
+        if params.course_group_id is not None:
+            query = query.filter(CourseMember.course_group_id == params.course_group_id)
+        if params.course_role_id is not None:
+            query = query.filter(CourseMember.course_role_id == params.course_role_id)
+
         return query

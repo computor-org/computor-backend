@@ -31,6 +31,9 @@ class UserInterface(UserInterfaceBase, BackendEntityInterface):
         Returns:
             Filtered query object
         """
+        if params is None:
+            return query
+
         if params.id is not None:
             query = query.filter(User.id == params.id)
         if params.given_name is not None:

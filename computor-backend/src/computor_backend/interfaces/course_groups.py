@@ -5,13 +5,12 @@ from sqlalchemy.orm import Session
 
 from computor_types.course_groups import CourseGroupInterface as CourseGroupInterfaceBase, CourseGroupQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-# TODO: Import actual model when available
-# from computor_backend.model import CourseGroup
+from computor_backend.model.course import CourseGroup
 
 class CourseGroupInterface(CourseGroupInterfaceBase, BackendEntityInterface):
     """Backend-specific CourseGroupInterface with model and API configuration."""
     
-    # model = CourseGroup  # TODO: Set when model is available
+    model = CourseGroup
     endpoint = "course-groups"
     cache_ttl = 600
 
@@ -28,5 +27,15 @@ class CourseGroupInterface(CourseGroupInterfaceBase, BackendEntityInterface):
         Returns:
             Filtered query object
         """
-        # TODO: Implement search logic when model is available
+        
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(CourseGroup.id == params.id)
+        if params.title is not None:
+            query = query.filter(CourseGroup.title == params.title)
+        if params.course_id is not None:
+            query = query.filter(CourseGroup.course_id == params.course_id)
+
         return query

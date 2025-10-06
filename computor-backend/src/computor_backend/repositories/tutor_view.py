@@ -20,7 +20,8 @@ from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
 from ..api.exceptions import ForbiddenException
 from computor_types.student_courses import CourseStudentInterface, CourseStudentQuery
-from computor_types.student_course_contents import CourseContentStudentInterface, CourseContentStudentQuery
+from computor_types.student_course_contents import CourseContentStudentQuery
+from computor_backend.interfaces.student_course_contents import CourseContentStudentInterface
 from computor_types.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ..model.course import Course, CourseMember
 

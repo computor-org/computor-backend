@@ -92,6 +92,16 @@ class CourseContentLecturerQuery(ListQuery):
         description="Filter by whether content has a deployment"
     )
 
+    # GitLab-specific filters (query JSONB properties.gitlab)
+    directory: Optional[str] = None
+    project: Optional[str] = None
+    provider_url: Optional[str] = None
+
+    # Ltree hierarchy filters
+    nlevel: Optional[int] = None
+    descendants: Optional[str] = None
+    ascendants: Optional[str] = None
+
 # BACKEND FUNCTION - Moved to backend in Phase 4
 # def course_content_lecturer_search(db: 'Session', query, params: Optional[CourseContentLecturerQuery]):
 #     """Search course content based on query parameters for lecturer view.

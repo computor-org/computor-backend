@@ -19,8 +19,8 @@ from computor_types.lecturer_course_contents import (
     CourseContentLecturerGet,
     CourseContentLecturerList,
     CourseContentLecturerQuery,
-    CourseContentLecturerInterface
 )
+from computor_backend.interfaces.lecturer_course_contents import CourseContentLecturerInterface
 from ..model.course import Course, CourseContent
 
 

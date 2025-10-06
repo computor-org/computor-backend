@@ -20,11 +20,15 @@ class UserRoleInterface(UserRoleInterfaceBase, BackendEntityInterface):
 
     @staticmethod
     def search(db: Session, query, params: Optional[UserRoleQuery]):
-        """
-        Apply search filters to userrole query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
-        """
-        # TODO: Implement search filters based on UserRoleQuery fields
+        """Apply search filters to user role query."""
+        if params is None:
+            return query
+
+        if params.user_id is not None:
+            query = query.filter(UserRole.user_id == params.user_id)
+        if params.role_id is not None:
+            query = query.filter(UserRole.role_id == params.role_id)
+        if params.transient is not None:
+            query = query.filter(UserRole.transient == params.transient)
+
         return query

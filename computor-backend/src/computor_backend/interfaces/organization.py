@@ -21,15 +21,24 @@ class OrganizationInterface(OrganizationInterfaceBase, BackendEntityInterface):
     @staticmethod
     def search(db: Session, query, params: Optional[OrganizationQuery]):
         """Apply search filters to organization query."""
+        if params is None:
+            return query
+
         if params.id is not None:
             query = query.filter(Organization.id == params.id)
+        if params.number is not None:
+            query = query.filter(Organization.number == params.number)
         if params.title is not None:
             query = query.filter(Organization.title == params.title)
-        if params.abbreviation is not None:
-            query = query.filter(Organization.abbreviation == params.abbreviation)
-        if params.archived is not None and params.archived:
-            query = query.filter(Organization.archived_at.isnot(None))
-        else:
-            query = query.filter(Organization.archived_at.is_(None))
+        if params.description is not None:
+            query = query.filter(Organization.description.ilike(f"%{params.description}%"))
+        if params.email is not None:
+            query = query.filter(Organization.email == params.email)
+        if params.organization_type is not None:
+            query = query.filter(Organization.organization_type == params.organization_type)
+        if params.user_id is not None:
+            query = query.filter(Organization.user_id == params.user_id)
+        if params.path is not None:
+            query = query.filter(Organization.path == params.path)
 
         return query

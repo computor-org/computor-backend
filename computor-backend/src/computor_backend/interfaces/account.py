@@ -22,9 +22,27 @@ class AccountInterface(AccountInterfaceBase, BackendEntityInterface):
     def search(db: Session, query, params: Optional[AccountQuery]):
         """
         Apply search filters to account query.
-        
-        Note: Implement specific filters based on query parameters.
-        This is a placeholder - update with actual filter logic.
+
+        Args:
+            db: Database session
+            query: SQLAlchemy query object
+            params: Query parameters
+
+        Returns:
+            Filtered query object
         """
-        # TODO: Implement search filters based on AccountQuery fields
+        if params is None:
+            return query
+
+        if params.id is not None:
+            query = query.filter(Account.id == params.id)
+        if params.provider is not None:
+            query = query.filter(Account.provider == params.provider)
+        if params.type is not None:
+            query = query.filter(Account.type == params.type)
+        if params.provider_account_id is not None:
+            query = query.filter(Account.provider_account_id == params.provider_account_id)
+        if params.user_id is not None:
+            query = query.filter(Account.user_id == params.user_id)
+
         return query
