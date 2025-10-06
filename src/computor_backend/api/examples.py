@@ -122,16 +122,13 @@ def _guess_content_type(filename: str, is_binary: bool) -> str:
     # Final fallback based on binary/text
     return 'application/octet-stream' if is_binary else 'text/plain'
 
-
 _BINARY_EXTENSIONS = {
     '.png', '.jpg', '.jpeg', '.gif', '.pdf', '.zip', '.tar', '.tgz', '.tar.gz',
 }
 
-
 def _is_binary_by_extension(filename: str) -> bool:
     name = filename.lower()
     return any(name.endswith(ext) for ext in _BINARY_EXTENSIONS)
-
 
 def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, bool]:
     """Convert provided content to bytes and determine binary/text.
@@ -187,7 +184,6 @@ def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, boo
     # Default: treat as UTF-8 text
     return io.BytesIO(text.encode('utf-8')), False
 
-
 _TEXT_CONTENT_TYPES = {
     'application/json',
     'application/xml',
@@ -206,14 +202,12 @@ _TEXT_CONTENT_TYPES = {
     'image/svg+xml',
 }
 
-
 def _is_text_content_type(content_type: Optional[str]) -> bool:
     if not content_type:
         return False
     if content_type.startswith('text/'):
         return True
     return content_type in _TEXT_CONTENT_TYPES
-
 
 def _encode_for_response(filename: str, data: bytes, content_type: Optional[str]) -> str:
     """Return a string payload suitable for ExampleDownloadResponse.files.
@@ -267,7 +261,6 @@ async def list_examples(
     
     return list_result
 
-
 @examples_router.get("/{example_id}", response_model=ExampleGet)
 async def get_example(
     example_id: str,
@@ -277,7 +270,6 @@ async def get_example(
 ):
     """Get a specific example."""
     return await get_id_db(permissions, db, example_id, ExampleInterface)
-
 
 # ==============================================================================
 # Example Version Endpoints
@@ -318,9 +310,7 @@ async def create_version(
 
     return db_version
 
-
 from computor_types.example import ExampleVersionQuery
-
 
 @examples_router.get("/{example_id}/versions", response_model=List[ExampleVersionList])
 async def list_versions(
@@ -352,7 +342,6 @@ async def list_versions(
 
     return result
 
-
 @examples_router.get("/versions/{version_id}", response_model=ExampleVersionGet)
 async def get_version(
     version_id: str,
@@ -376,7 +365,6 @@ async def get_version(
 
     # Convert to response model
     return ExampleVersionGet.model_validate(version)
-
 
 # ==============================================================================
 # Example Dependencies Endpoints
@@ -425,7 +413,6 @@ async def add_dependency(
 
     return db_dependency
 
-
 @examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
 async def list_dependencies(
     example_id: str,
@@ -444,7 +431,6 @@ async def list_dependencies(
     dependencies = dependency_repo.find_dependencies_of(example_id)
 
     return [ExampleDependencyGet.model_validate(d) for d in dependencies]
-
 
 @examples_router.delete("/dependencies/{dependency_id}")
 async def remove_dependency(
@@ -470,7 +456,6 @@ async def remove_dependency(
     dependency_repo.delete(dependency)
 
     return {"message": "Dependency removed successfully"}
-
 
 # ==============================================================================
 # Upload/Download Endpoints
@@ -704,7 +689,6 @@ async def upload_example(
 
     return version
 
-
 @examples_router.get("/{example_id}/download", response_model=ExampleDownloadResponse)
 async def download_example_latest(
     example_id: str,
@@ -765,7 +749,6 @@ async def download_example_latest(
         permissions,
         storage_service
     )
-
 
 @examples_router.get("/download/{version_id}", response_model=ExampleDownloadResponse)
 async def download_example_version(
@@ -919,7 +902,6 @@ async def download_example_version(
         dependencies=dependency_files if with_dependencies else None,
     )
 
-
 @examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
 async def get_example_dependencies(
     example_id: str,
@@ -943,7 +925,6 @@ async def get_example_dependencies(
     dependencies = dependency_repo.find_dependencies_of(example_id)
 
     return dependencies
-
 
 @examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
 async def create_example_dependency(
@@ -990,7 +971,6 @@ async def create_example_dependency(
     dependency = dependency_repo.create(dependency)
 
     return dependency
-
 
 @examples_router.delete("/{example_id}/dependencies/{dependency_id}")
 async def delete_example_dependency(

@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 storage_router = APIRouter(prefix="/storage", tags=["storage"])
 
-
 @storage_router.post("/upload", response_model=StorageObjectGet)
 async def upload_file(
     file: UploadFile = File(...),
@@ -118,7 +117,6 @@ async def upload_file(
         updated_by=permissions.user_id
     )
 
-
 @storage_router.get("/download/{object_key:path}")
 async def download_file(
     object_key: str,
@@ -147,7 +145,6 @@ async def download_file(
             "ETag": metadata.etag
         }
     )
-
 
 @storage_router.get("/objects", response_model=List[StorageObjectList])
 async def list_objects(
@@ -204,7 +201,6 @@ async def list_objects(
     
     return paginated_result
 
-
 @storage_router.get("/objects/{object_key:path}", response_model=StorageObjectGet)
 async def get_object_info(
     object_key: str,
@@ -243,7 +239,6 @@ async def get_object_info(
         download_url=presigned.url
     )
 
-
 @storage_router.delete("/objects/{object_key:path}")
 async def delete_object(
     object_key: str,
@@ -270,7 +265,6 @@ async def delete_object(
         await redis_client.delete(*keys)
     
     return {"success": success, "message": f"Object {object_key} deleted successfully"}
-
 
 @storage_router.post("/copy")
 async def copy_object(
@@ -310,7 +304,6 @@ async def copy_object(
         "metadata": result.model_dump()
     }
 
-
 @storage_router.post("/presigned-url", response_model=PresignedUrlResponse)
 async def generate_presigned_url(
     request: PresignedUrlRequest,
@@ -334,7 +327,6 @@ async def generate_presigned_url(
         expiry_seconds=request.expiry_seconds
     )
 
-
 # Bucket management endpoints
 
 @storage_router.get("/buckets", response_model=List[BucketInfo])
@@ -348,7 +340,6 @@ async def list_buckets(
         raise ForbiddenException("You don't have permission to list buckets")
     
     return await storage_service.list_buckets()
-
 
 @storage_router.post("/buckets", response_model=BucketInfo)
 async def create_bucket(
@@ -366,7 +357,6 @@ async def create_bucket(
         region=bucket.region
     )
 
-
 @storage_router.delete("/buckets/{bucket_name}")
 async def delete_bucket(
     bucket_name: str,
@@ -382,7 +372,6 @@ async def delete_bucket(
     success = await storage_service.delete_bucket(bucket_name, force=force)
     
     return {"success": success, "message": f"Bucket {bucket_name} deleted successfully"}
-
 
 @storage_router.get("/buckets/{bucket_name}/stats", response_model=StorageUsageStats)
 async def get_bucket_stats(

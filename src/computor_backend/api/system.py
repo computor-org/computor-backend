@@ -17,8 +17,6 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.api.utils import get_course_id_from_url, sync_dependent_items
 from computor_backend.database import get_db
 from computor_types.course_groups import CourseGroupCreate
-from computor_types.course_members import CourseMemberCreate, CourseMemberInterface, CourseMemberProperties
-from computor_types.courses import CourseInterface, CourseUpdate
 from computor_types.deployments import ComputorDeploymentConfig, CourseConfig, CourseFamilyConfig, GitLabConfig, OrganizationConfig
 from computor_types.organizations import OrganizationProperties
 from computor_types.student_profile import StudentProfileCreate
@@ -858,6 +856,7 @@ async def generate_student_template(
     
     # Count contents to process - check for deployments instead of example_id
     from computor_backend.model.deployment import CourseContentDeployment
+
     contents_with_examples = db.query(func.count(CourseContent.id)).filter(
         and_(
             CourseContent.course_id == course_id,

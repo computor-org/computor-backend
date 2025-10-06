@@ -18,7 +18,7 @@ def fix_search_function_session(content: str) -> str:
             # Add TYPE_CHECKING to existing typing import
             content = re.sub(
                 r'from typing import ([^\n]+)',
-                r'from typing import \1, TYPE_CHECKING',
+                r'from typing import \1',
                 content,
                 count=1
             )

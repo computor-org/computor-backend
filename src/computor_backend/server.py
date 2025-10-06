@@ -4,7 +4,6 @@ import shutil
 from computor_backend.api.filesystem import mirror_db_to_filesystem
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager
 from computor_backend.permissions.core import db_apply_roles
-from computor_types.roles import RoleInterface
 from computor_types.tokens import encrypt_api_key
 from computor_backend.model.auth import User
 from computor_backend.model.execution import ExecutionBackend
@@ -19,20 +18,43 @@ from computor_backend.api.auth import auth_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
 from computor_backend.database import get_db
-from computor_types.accounts import AccountInterface
-from computor_types.execution_backends import ExecutionBackendInterface
-from computor_types.groups import GroupInterface
-from computor_types.sessions import SessionInterface
-from computor_types.submission_group_members import SubmissionGroupMemberInterface
-from computor_types.submission_groups import SubmissionGroupInterface
-from computor_types.users import UserInterface
-from computor_types.course_families import CourseFamilyInterface
-from computor_types.course_groups import CourseGroupInterface
-from computor_types.course_members import CourseMemberInterface
-from computor_types.course_roles import CourseRoleInterface
-from computor_types.course_content_types import CourseContentTypeInterface
-from computor_types.course_content_kind import CourseContentKindInterface
-from computor_types.languages import LanguageInterface
+
+from computor_backend.interfaces import (
+    AccountInterface,
+    UserInterface,
+    CourseFamilyInterface,
+    CourseMemberInterface,
+    RoleInterface,
+    ExampleRepositoryInterface,
+    ExecutionBackendInterface,
+    GroupInterface,
+    SessionInterface,
+    SubmissionGroupMemberInterface,
+    SubmissionGroupInterface,
+    CourseGroupInterface,
+    CourseRoleInterface,
+    CourseContentTypeInterface,
+    CourseContentKindInterface,
+    LanguageInterface,
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 from computor_backend.api.course_execution_backend import course_execution_backend_router
 from computor_backend.api.courses import course_router
 from computor_backend.api.system import system_router
@@ -55,7 +77,6 @@ from computor_backend.api.examples import examples_router
 from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
-from computor_types.example import ExampleRepositoryInterface
 import json
 import tempfile
 from pathlib import Path

@@ -11,14 +11,9 @@ from computor_backend.business_logic.crud import (
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.database import get_db
-from computor_types.user_roles import (
-    UserRoleCreate,
-    UserRoleGet,
-    UserRoleInterface,
-    UserRoleList,
-    UserRoleQuery
-)
 from computor_backend.model.role import UserRole
+from computor_backend.interfaces import UserRoleInterface
+from computor_types.user_roles import UserRoleGet, UserRoleList, UserRoleCreate, UserRoleQuery
 
 # Import business logic
 from computor_backend.business_logic.user_roles import (
@@ -27,7 +22,6 @@ from computor_backend.business_logic.user_roles import (
 )
 
 user_roles_router = APIRouter()
-
 
 @user_roles_router.get("", response_model=list[UserRoleList])
 async def list_user_roles(
@@ -43,7 +37,6 @@ async def list_user_roles(
 
     return list_result
 
-
 @user_roles_router.get("/users/{user_id}/roles/{role_id}", response_model=UserRoleGet)
 async def get_user_role_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -55,7 +48,6 @@ async def get_user_role_endpoint(
     entity = get_user_role(user_id, role_id, permissions, db)
     return UserRoleGet.model_validate(entity)
 
-
 @user_roles_router.post("", response_model=UserRoleGet)
 async def create_user_role(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -64,7 +56,6 @@ async def create_user_role(
 ):
     """Create a new user role."""
     return await create_db(permissions, db, entity, UserRole, UserRoleGet)
-
 
 @user_roles_router.delete("/users/{user_id}/roles/{role_id}", response_model=dict)
 async def delete_user_role_endpoint(

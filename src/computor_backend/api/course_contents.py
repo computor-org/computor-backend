@@ -27,7 +27,8 @@ from computor_backend.custom_types import Ltree
 from computor_backend.api.exceptions import BadRequestException, NotFoundException
 from computor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from computor_backend.database import get_db
-from computor_types.course_contents import CourseContentGet, CourseContentInterface
+from computor_types.course_contents import CourseContentGet
+from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
     AssignExampleRequest,
     DeploymentWithHistory,
@@ -49,7 +50,6 @@ from aiocache import BaseCache
 
 # Create the router
 course_content_router = CrudRouter(CourseContentInterface)
-
 
 def _build_deployment_with_history(
     deployment: CourseContentDeployment,
@@ -113,11 +113,9 @@ def _build_deployment_with_history(
         history=history_dicts,
     )
 
-
 # # File operations (unchanged)
 # class CourseContentFileQuery(BaseModel):
 #     filename: Optional[str] = None
-
 
 # @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
 # async def get_course_content_meta(
@@ -158,7 +156,6 @@ def _build_deployment_with_history(
 #         else:
 #             return {"content": content}
 
-
 # Event handlers for filesystem mirroring
 async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
     try:
@@ -166,10 +163,8 @@ async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Prin
     except Exception as e:
         print(e)
 
-
 course_content_router.on_created.append(event_wrapper)
 course_content_router.on_updated.append(event_wrapper)
-
 
 # New deployment endpoints
 
@@ -374,7 +369,6 @@ async def assign_example_to_content(
     
     return _build_deployment_with_history(deployment, db)
 
-
 @course_content_router.router.delete(
     "/{content_id}/example",
     response_model=Dict[str, str]
@@ -447,7 +441,6 @@ async def unassign_example_from_content(
         await cache.delete(f"course:{content.course_id}:deployments")
     
     return {"status": "unassigned", "message": "Example unassigned successfully"}
-
 
 @course_content_router.router.get(
     "/deployment/{content_id}",
@@ -613,7 +606,6 @@ async def get_deployment_status_with_workflow(
         "recent_history": history_items
     }
 
-
 @course_content_router.router.get(
     "/courses/{course_id}/deployment-summary",
     response_model=DeploymentSummary
@@ -691,7 +683,6 @@ async def get_course_deployment_summary(
         await cache.set(cache_key, json.dumps(summary.dict()), ex=300)  # 5 minutes
     
     return summary
-
 
 @course_content_router.router.get(
     "/{content_id}/deployment",

@@ -1,11 +1,10 @@
 """Pydantic DTOs for lecturer course content operations."""
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from computor_types.deployments import GitLabConfigGet
 from computor_types.base import EntityInterface, ListQuery
@@ -160,9 +159,6 @@ class CourseContentLecturerInterface(EntityInterface):
     get = CourseContentLecturerGet
     list = CourseContentLecturerList
     query = CourseContentLecturerQuery
-    search = None  # Moved to backend in Phase 4
-    endpoint = "lecturers/course-contents"  # Fixed: actual endpoint is /lecturers/course-contents
-    cache_ttl = 300  # 5 minutes cache for lecturer course content data
 
     # Note: This is a VIEW endpoint (read-only), not standard CRUD
     # Mounted at /lecturers/course-contents in backend

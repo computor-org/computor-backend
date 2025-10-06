@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.course_content_kind import CourseContentKindGet, CourseContentKindList
 
@@ -92,21 +91,6 @@ class CourseContentTypeQuery(ListQuery):
 
     model_config = ConfigDict(from_attributes=True)
 
-def course_content_type_search(db: 'Session', query, params: Optional[CourseContentTypeQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.slug != None:
-        query = query.filter(slug == params.slug)
-    if params.title != None:
-        query = query.filter(title == params.title)
-    if params.color != None:
-        query = query.filter(color == params.color)
-    if params.course_id != None:
-        query = query.filter(course_id == params.course_id)
-    if params.course_content_kind_id != None:
-        query = query.filter(course_content_kind_id == params.course_content_kind_id)
-
-    return query
 
 class CourseContentTypeInterface(EntityInterface):
     create = CourseContentTypeCreate
@@ -114,7 +98,3 @@ class CourseContentTypeInterface(EntityInterface):
     list = CourseContentTypeList
     update = CourseContentTypeUpdate
     query = CourseContentTypeQuery
-    search = course_content_type_search
-    endpoint = "course-content-types"
-    model = None  # Set by backend
-    cache_ttl=60

@@ -18,18 +18,14 @@ from computor_backend.business_logic.course_member_comments import (
     delete_course_member_comment,
 )
 
-
 router = APIRouter()
-
 
 class CommentCreate(BaseModel):
     course_member_id: UUID | str
     message: str
 
-
 class CommentUpdate(BaseModel):
     message: str
-
 
 @router.get("", response_model=list[CourseMemberCommentList])
 async def list_comments(
@@ -39,7 +35,6 @@ async def list_comments(
 ):
     """List comments for a course member."""
     return list_comments_for_course_member(course_member_id, permissions, db)
-
 
 @router.post("", response_model=list[CourseMemberCommentList])
 async def create_comment(
@@ -55,7 +50,6 @@ async def create_comment(
         db,
     )
 
-
 @router.patch("/{course_member_comment_id}", response_model=list[CourseMemberCommentList])
 async def update_comment(
     course_member_comment_id: UUID | str,
@@ -70,7 +64,6 @@ async def update_comment(
         permissions,
         db,
     )
-
 
 @router.delete("/{course_member_comment_id}", response_model=list[CourseMemberCommentList])
 async def delete_comment(

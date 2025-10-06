@@ -7,17 +7,19 @@ These are used during server startup to initialize the permission system.
 
 from typing import Generator, List, Tuple
 from computor_types import get_all_dtos
-from computor_types.accounts import AccountInterface
-from computor_types.course_families import CourseFamilyInterface
-from computor_types.courses import CourseInterface
-from computor_types.organizations import OrganizationInterface
-from computor_types.roles_claims import RoleClaimInterface
-from computor_types.user_roles import UserRoleInterface
-from computor_types.users import UserInterface
-from computor_types.student_profile import StudentProfileInterface
-from computor_types.profiles import ProfileInterface
-from computor_types.example import ExampleInterface
-from computor_types.extensions import ExtensionInterface
+from computor_backend.interfaces import (
+    AccountInterface,
+    CourseFamilyInterface,
+    CourseInterface,
+    OrganizationInterface,
+    RoleClaimInterface,
+    UserRoleInterface,
+    UserInterface,
+    StudentProfileInterface,
+    ProfileInterface,
+    ExampleInterface,
+    ExtensionInterface,
+)
 from computor_backend.model.example import Example
 
 

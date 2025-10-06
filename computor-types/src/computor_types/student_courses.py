@@ -1,9 +1,8 @@
 from pydantic import BaseModel, field_validator, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import EntityInterface, ListQuery
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 
@@ -84,6 +83,3 @@ class CourseStudentQuery(ListQuery):
 class CourseStudentInterface(EntityInterface):
     list = CourseStudentList
     query = CourseStudentQuery
-    search = None  # Moved to backend
-    endpoint = "students/courses"  # Fixed: actual endpoint is /students/courses
-    cache_ttl = 300  # 5 minutes - student course data changes moderately

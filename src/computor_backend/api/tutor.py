@@ -32,7 +32,6 @@ from computor_backend.business_logic.tutor import (
 
 tutor_router = APIRouter()
 
-
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 def tutor_get_course_contents_endpoint(
     course_content_id: UUID | str,
@@ -44,7 +43,6 @@ def tutor_get_course_contents_endpoint(
     """Get course content for a course member as a tutor."""
     return get_tutor_course_content(course_member_id, course_content_id, permissions, db, cache)
 
-
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 def tutor_list_course_contents_endpoint(
     course_member_id: UUID | str,
@@ -55,7 +53,6 @@ def tutor_list_course_contents_endpoint(
 ):
     """List course contents for a course member as a tutor."""
     return list_tutor_course_contents(course_member_id, permissions, params, db, cache)
-
 
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
 def tutor_update_course_contents_endpoint(
@@ -79,7 +76,6 @@ def tutor_update_course_contents_endpoint(
         cache=cache,
     )
 
-
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 def tutor_get_courses_endpoint(
     course_id: UUID | str,
@@ -89,7 +85,6 @@ def tutor_get_courses_endpoint(
 ):
     """Get a course for tutors."""
     return get_tutor_course(course_id, permissions, db, cache)
-
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
 def tutor_list_courses_endpoint(
@@ -101,7 +96,6 @@ def tutor_list_courses_endpoint(
     """List courses for tutors."""
     return list_tutor_courses(permissions, params, db, cache)
 
-
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members_endpoint(
     course_member_id: UUID | str,
@@ -112,7 +106,6 @@ def tutor_get_course_members_endpoint(
     """Get a course member with unreviewed course contents."""
     return get_tutor_course_member(course_member_id, permissions, db, cache)
 
-
 @tutor_router.get("/course-members", response_model=list[TutorCourseMemberList])
 def tutor_list_course_members_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -122,7 +115,6 @@ def tutor_list_course_members_endpoint(
 ):
     """List course members for tutors."""
     return list_tutor_course_members(permissions, params, db, cache)
-
 
 ## MR-based course-content messages removed (deprecated)
 

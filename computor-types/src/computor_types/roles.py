@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import EntityInterface, ListQuery
 
 class RoleGet(BaseModel):
@@ -42,14 +41,6 @@ class RoleQuery(ListQuery):
     description: Optional[str] = Field(None, description="Filter by description")
     builtin: Optional[bool] = Field(None, description="Filter by builtin status")
 
-def role_search(db: 'Session', query, params: Optional[RoleQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.title != None:
-        query = query.filter(title == params.title)
-    if params.description != None:
-        query = query.filter(description == params.description)
-    return query
 
 class RoleInterface(EntityInterface):
     create = None  # Roles are typically managed by system
@@ -57,7 +48,3 @@ class RoleInterface(EntityInterface):
     list = RoleList
     update = None  # Roles are typically immutable
     query = RoleQuery
-    search = role_search
-    endpoint = "roles"
-    model = None  # Set by backend
-    cache_ttl = 600  # 10 minutes cache for role data (changes very infrequently)

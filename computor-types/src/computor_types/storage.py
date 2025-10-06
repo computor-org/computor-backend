@@ -121,5 +121,3 @@ class StorageInterface(EntityInterface):
     list = StorageObjectList
     update = StorageObjectUpdate
     query = StorageObjectQuery
-    endpoint = "storage"
-    cache_ttl = 60  # Cache for 1 minute given the dynamic nature of storage

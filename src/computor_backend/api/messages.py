@@ -27,9 +27,7 @@ from computor_backend.business_logic.messages import (
     mark_message_as_unread,
 )
 
-
 messages_router = APIRouter()
-
 
 @messages_router.post("", response_model=MessageGet, status_code=status.HTTP_201_CREATED)
 async def create_message(
@@ -46,7 +44,6 @@ async def create_message(
     entity = _Create(**model_dump)
     return await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
 
-
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
     id: UUID | str,
@@ -56,7 +53,6 @@ async def get_message(
     """Get a message with read status."""
     message = await get_id_db(permissions, db, id, MessageInterface)
     return get_message_with_read_status(id, message, permissions, db)
-
 
 @messages_router.get("", response_model=list[MessageList])
 async def list_messages(
@@ -71,7 +67,6 @@ async def list_messages(
     response.headers["X-Total-Count"] = str(total)
     return items
 
-
 @messages_router.patch("/{id}", response_model=MessageGet)
 async def update_message(
     id: UUID | str,
@@ -82,7 +77,6 @@ async def update_message(
     """Update a message."""
     return await update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
 
-
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
     id: UUID | str,
@@ -92,7 +86,6 @@ async def delete_message(
     """Delete a message."""
     await delete_db(permissions, db, id, MessageInterface.model)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_read(
@@ -106,7 +99,6 @@ async def mark_message_read(
     await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_read(id, permissions, db, cache)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_unread(

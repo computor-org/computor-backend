@@ -58,9 +58,6 @@ class CourseTutorQuery(ListQuery):
 class CourseTutorInterface(EntityInterface):
     list = CourseTutorList
     query = CourseTutorQuery
-    search = None  # Moved to backend in Phase 4
-    endpoint = "tutors/courses"  # Fixed: actual endpoint is /tutors/courses (not /tutor-courses)
-    cache_ttl = 300  # 5 minutes - tutor course data changes moderately
 
     # Note: This is a VIEW endpoint (read-only), not standard CRUD
     # Mounted at /tutors/courses in backend

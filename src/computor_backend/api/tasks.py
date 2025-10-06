@@ -18,7 +18,6 @@ from computor_backend.tasks import (
 
 tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-
 @tasks_router.get("", response_model=Dict[str, Any])
 async def list_tasks(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -61,7 +60,6 @@ async def list_tasks(
             status_code=500,
             detail=f"Failed to list tasks: {str(e)}"
         )
-
 
 @tasks_router.post("/submit", response_model=Dict[str, str])
 async def submit_task(
@@ -107,7 +105,6 @@ async def submit_task(
             detail=f"Failed to submit task: {str(e)}"
         )
 
-
 @tasks_router.get("/{task_id}", response_model=TaskInfo)
 async def get_task(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -132,7 +129,6 @@ async def get_task(
         raise ForbiddenException()
 
     return await get_task_status(permissions, task_id)
-
 
 @tasks_router.get("/{task_id}/status", response_model=TaskInfo)
 async def get_task_status(
@@ -173,7 +169,6 @@ async def get_task_status(
             detail=f"Failed to get task status: {str(e)}"
         )
 
-
 @tasks_router.get("/{task_id}/result", response_model=TaskResult)
 async def get_task_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -212,7 +207,6 @@ async def get_task_result(
             status_code=500,
             detail=f"Failed to get task result: {str(e)}"
         )
-
 
 @tasks_router.delete("/{task_id}/cancel")
 async def cancel_task(
@@ -258,7 +252,6 @@ async def cancel_task(
             status_code=500,
             detail=f"Failed to cancel task: {str(e)}"
         )
-
 
 @tasks_router.delete("/{task_id}")
 async def delete_task(
@@ -318,7 +311,6 @@ async def delete_task(
             detail=f"Failed to delete task: {str(e)}"
         )
 
-
 @tasks_router.get("/types", response_model=List[str])
 async def list_task_types(
     permissions: Annotated[Principal, Depends(get_current_principal)]
@@ -346,7 +338,6 @@ async def list_task_types(
             status_code=500,
             detail=f"Failed to list task types: {str(e)}"
         )
-
 
 @tasks_router.get("/workers/status", response_model=Dict[str, Any])
 async def get_worker_status(

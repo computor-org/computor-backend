@@ -44,7 +44,6 @@ extensions_router = APIRouter(prefix="/extensions", tags=["extensions"])
 
 _SEGMENT_SANITIZER = re.compile(r"[^A-Za-z0-9._-]+")
 
-
 def _split_identity(identity: str) -> Tuple[str, str]:
     parts = identity.split(".", 1)
     if len(parts) != 2:
@@ -54,12 +53,10 @@ def _split_identity(identity: str) -> Tuple[str, str]:
         raise BadRequestException("Extension publisher and name must be provided")
     return publisher, name
 
-
 def _sanitize_segment(value: str) -> str:
     sanitized = _SEGMENT_SANITIZER.sub("-", value.strip().lower())
     sanitized = sanitized.strip("-")
     return sanitized or "unnamed"
-
 
 def _generate_object_key(publisher: str, name: str, version: str, sha256: str) -> str:
     safe_publisher = _sanitize_segment(publisher)
@@ -67,13 +64,11 @@ def _generate_object_key(publisher: str, name: str, version: str, sha256: str) -
     safe_version = _sanitize_segment(version)
     return f"extensions/{safe_publisher}/{safe_name}/{safe_version}/{sha256}.vsix"
 
-
 def _parse_version(value: str) -> Version:
     try:
         return Version(value)
     except InvalidVersion as exc:
         raise BadRequestException(f"Invalid semantic version '{value}'") from exc
-
 
 def _caret_to_specifier(base_version: str) -> SpecifierSet:
     parsed = _parse_version(base_version)
@@ -86,14 +81,12 @@ def _caret_to_specifier(base_version: str) -> SpecifierSet:
         upper = f"<0.0.{parsed.micro + 1}"
     return SpecifierSet(f"{lower},{upper}")
 
-
 def _tilde_to_specifier(base_version: str) -> SpecifierSet:
     parsed = _parse_version(base_version)
     lower = f">={base_version}"
     upper_minor = parsed.minor + 1
     upper = f"<{parsed.major}.{upper_minor}.0"
     return SpecifierSet(f"{lower},{upper}")
-
 
 def _coerce_specifier(value: str) -> Optional[SpecifierSet]:
     cleaned = value.strip()
@@ -110,11 +103,9 @@ def _coerce_specifier(value: str) -> Optional[SpecifierSet]:
     except InvalidSpecifier:
         return SpecifierSet(f"=={cleaned}")
 
-
 def _encode_cursor(version_number: int) -> str:
     payload = str(version_number)
     return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("utf-8")
-
 
 def _decode_cursor(cursor: str) -> int:
     try:
@@ -122,7 +113,6 @@ def _decode_cursor(cursor: str) -> int:
         return int(decoded)
     except Exception as exc:  # noqa: BLE001
         raise BadRequestException("Invalid cursor token") from exc
-
 
 def _get_extension_or_404(db: Session, publisher: str, name: str) -> Extension:
     extension = (
@@ -133,7 +123,6 @@ def _get_extension_or_404(db: Session, publisher: str, name: str) -> Extension:
     if not extension:
         raise NotFoundException("Extension not found")
     return extension
-
 
 def _get_or_create_extension(
     db: Session,
@@ -164,7 +153,6 @@ def _get_or_create_extension(
             extension.description = description
     return extension, created
 
-
 def _select_version(
     versions: Iterable[ExtensionVersion],
     specifier: Optional[SpecifierSet],
@@ -180,7 +168,6 @@ def _select_version(
         if parsed in specifier:
             return version
     return None
-
 
 @extensions_router.post(
     "/{extension_identity}/versions",
@@ -336,7 +323,6 @@ async def publish_extension_version(
         object_key=new_version.object_key,
     )
 
-
 @extensions_router.get(
     "/{extension_identity}/download",
     status_code=302,
@@ -371,7 +357,6 @@ async def download_extension(
     )
 
     return RedirectResponse(url=presigned.url, status_code=302)
-
 
 @extensions_router.get(
     "/{extension_identity}/versions",
@@ -413,7 +398,6 @@ async def list_extension_versions(
 
     return ExtensionVersionListResponse(items=items, next_cursor=next_cursor)
 
-
 @extensions_router.get("/", response_model=List[str])
 async def list_extensions(
     limit: int = Query(100, ge=1, le=200),
@@ -433,7 +417,6 @@ async def list_extensions(
     )
 
     return [f"{publisher}.{name}" for publisher, name in rows]
-
 
 @extensions_router.get(
     "/{extension_identity}",
@@ -486,7 +469,6 @@ async def get_extension_metadata(
         version_count=version_count,
         latest_version=latest_payload,
     )
-
 
 @extensions_router.patch(
     "/{extension_identity}/versions/{version}",

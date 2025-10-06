@@ -1,10 +1,9 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 class GroupClaimCreate(BaseModel):
@@ -70,15 +69,6 @@ class GroupClaimQuery(ListQuery):
     claim_type: Optional[str] = Field(None, description="Filter by claim type")
     claim_value: Optional[str] = Field(None, description="Filter by claim value")
 
-def group_claim_search(db: 'Session', query, params: Optional[GroupClaimQuery]):
-    if params.group_id is not None:
-        query = query.filter(group_id == params.group_id)
-    if params.claim_type is not None:
-        query = query.filter(claim_type == params.claim_type)
-    if params.claim_value is not None:
-        query = query.filter(claim_value.ilike(f"%{params.claim_value}%"))
-    
-    return query
 
 class GroupClaimInterface(EntityInterface):
     create = GroupClaimCreate
@@ -86,7 +76,3 @@ class GroupClaimInterface(EntityInterface):
     list = GroupClaimList
     update = GroupClaimUpdate
     query = GroupClaimQuery
-    search = group_claim_search
-    endpoint = "group-claims"
-    model = None  # Set by backend
-    cache_ttl = 180  # 3 minutes cache for claims (moderate change frequency)

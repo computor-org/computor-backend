@@ -29,7 +29,6 @@ from computor_backend.business_logic.results import get_result_status
 
 result_router = APIRouter(prefix="/results", tags=["results"])
 
-
 @result_router.get("", response_model=list[ResultList])
 async def list_results(
     response: Response,
@@ -41,7 +40,6 @@ async def list_results(
     response.headers["X-Total-Count"] = str(total)
     return results
 
-
 @result_router.get("/{result_id}", response_model=ResultGet)
 async def get_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -49,7 +47,6 @@ async def get_result(
     db: Session = Depends(get_db),
 ) -> ResultGet:
     return await get_id_db(permissions, db, result_id, ResultInterface)
-
 
 @result_router.post("", response_model=ResultGet, status_code=status.HTTP_201_CREATED)
 async def create_result(
@@ -65,7 +62,6 @@ async def create_result(
         ResultGet,
         getattr(ResultInterface, "post_create", None),
     )
-
 
 @result_router.patch("/{result_id}", response_model=ResultGet)
 async def update_result(
@@ -84,7 +80,6 @@ async def update_result(
         post_update=getattr(ResultInterface, "post_update", None),
     )
 
-
 @result_router.delete("/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(
     result_id: UUID | str,
@@ -92,7 +87,6 @@ async def delete_result(
     db: Session = Depends(get_db),
 ):
     await delete_db(permissions, db, result_id, ResultInterface.model)
-
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
 async def result_status(

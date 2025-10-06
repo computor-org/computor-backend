@@ -4,8 +4,7 @@ import shutil
 from uuid import UUID
 from sqlalchemy.orm import Session
 from aiocache import SimpleMemoryCache
-from computor_types.course_contents import CourseContentInterface, CourseContentProperties
-from computor_types.courses import CourseInterface, CourseProperties
+from computor_types.course_contents import CourseContentProperties
 from computor_types.organizations import OrganizationProperties
 from computor_types.base import EntityInterface
 from computor_types.tokens import decrypt_api_key
@@ -13,6 +12,7 @@ from computor_backend.model.course import Course, CourseContent, CourseFamily
 from computor_backend.model.organization import Organization
 from computor_backend.generator.git_helper import clone_or_pull_and_checkout
 from computor_backend.settings import settings
+from computor_backend.interfaces import CourseInterface, CourseContentInterface
 
 _local_git_cache = SimpleMemoryCache()
 
@@ -226,7 +226,6 @@ async def get_path_course(id: str | UUID, db: Session):
     await _local_git_cache.set(f"dir:courses:{id}",path,36000)
 
     return path
-
 
 async def get_path_course_content(id: str | UUID, db: Session):
 

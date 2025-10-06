@@ -1,10 +1,9 @@
 """Pydantic DTOs and query helpers for manual submission endpoints."""
 from datetime import datetime
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from computor_types.base import BaseEntityList, EntityInterface, ListQuery
@@ -113,8 +112,6 @@ def submission_search(db: 'Session', query, params: SubmissionQuery):
 class SubmissionInterface(EntityInterface):
     """Entity interface mapping manual submissions to the Result model."""
 
-    model = None  # Set by backend
     list = SubmissionListItem
     get = SubmissionListItem
     query = SubmissionQuery
-    search = submission_search

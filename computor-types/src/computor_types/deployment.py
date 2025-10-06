@@ -6,7 +6,7 @@ example assignments to course content.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from computor_types.example import ExampleVersionList
@@ -14,7 +14,6 @@ from computor_types.example import ExampleVersionList
 from .base import BaseEntityGet, EntityInterface, ListQuery
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
     from .example import ExampleVersionGet
     from .course_contents import CourseContentGet
 
@@ -226,26 +225,6 @@ class DeployExampleRequest(BaseModel):
 
 # Interface definitions
 
-def deployment_search(db: 'Session', query, params: Optional[CourseContentDeploymentQuery]):
-    """Search deployments based on query parameters."""
-    if params.course_content_id is not None:
-        query = query.filter(course_content_id == params.course_content_id)
-    if params.example_version_id is not None:
-        query = query.filter(example_version_id == params.example_version_id)
-    if params.deployment_status is not None:
-        query = query.filter(deployment_status == params.deployment_status)
-    if params.deployed is not None:
-        if params.deployed:
-            query = query.filter(deployed_at.isnot(None))
-        else:
-            query = query.filter(deployed_at.is_(None))
-    if params.failed is not None:
-        if params.failed:
-            query = query.filter(deployment_status == "failed")
-        else:
-            query = query.filter(deployment_status != "failed")
-    
-    return query
 
 class CourseContentDeploymentInterface(EntityInterface):
     """Interface for CourseContentDeployment entity."""
@@ -254,10 +233,6 @@ class CourseContentDeploymentInterface(EntityInterface):
     list = CourseContentDeploymentList
     update = CourseContentDeploymentUpdate
     query = CourseContentDeploymentQuery
-    search = deployment_search
-    endpoint = "deployments"
-    model = None  # Set by backend
-    cache_ttl = 60  # Short cache for deployment status
 
 class DeploymentHistoryInterface(EntityInterface):
     """Interface for DeploymentHistory entity (read-only)."""
@@ -266,7 +241,3 @@ class DeploymentHistoryInterface(EntityInterface):
     list = DeploymentHistoryList
     update = None  # History is immutable
     query = ListQuery  # Use base query
-    search = None
-    endpoint = "deployment-history"
-    model = None  # Set by backend
-    cache_ttl = 300  # Longer cache for historical data

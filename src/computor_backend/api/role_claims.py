@@ -12,7 +12,6 @@ from computor_backend.business_logic.role_claims import list_role_claims
 
 role_claim_router = APIRouter()
 
-
 @role_claim_router.get("", response_model=list[RoleClaimList])
 async def list_role_claim(
     permissions: Annotated[Principal, Depends(get_current_principal)],

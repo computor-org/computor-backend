@@ -1,10 +1,9 @@
 import json
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 from computor_types.tasks import TaskStatus, map_int_to_task_status
@@ -137,10 +136,6 @@ class ResultInterface(EntityInterface):
     list = ResultList
     update = ResultUpdate
     query = ResultQuery
-    search = None  # Moved to backend in Phase 4
-    endpoint = "results"
-    model = None  # Set by backend
-    cache_ttl = 60  # 1 minute - results change frequently as students submit work
     # post_update = staticmethod(post_update_result)  # Moved to backend
 
 # Extended Result DTOs

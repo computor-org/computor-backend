@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import EntityInterface, ListQuery
 
 class RoleClaimGet(BaseModel):
@@ -26,14 +25,6 @@ class RoleClaimQuery(ListQuery):
     claim_type: Optional[str] = None
     claim_value: Optional[str] = None
 
-def role_claim_search(db: 'Session', query, params: Optional[RoleClaimQuery]):
-    if params.role_id != None:
-        query = query.filter(role_id == params.role_id)
-    if params.claim_type != None:
-        query = query.filter(claim_type == params.claim_type)
-    if params.claim_value != None:
-        query = query.filter(claim_value == params.claim_value)
-    return query
 
 class RoleClaimInterface(EntityInterface):
     create = None
@@ -41,7 +32,3 @@ class RoleClaimInterface(EntityInterface):
     list = RoleClaimList
     update = None
     query = RoleClaimQuery
-    search = role_claim_search
-    endpoint = "role-claims"
-    model = None  # Set by backend
-    cache_ttl=600

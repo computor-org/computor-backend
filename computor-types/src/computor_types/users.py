@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 from text_unidecode import unidecode
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -10,8 +10,7 @@ from computor_types.student_profile import StudentProfileGet
 
 # Forward reference for ProfileGet to avoid circular import
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from computor_types.profiles import ProfileGet
+        from computor_types.profiles import ProfileGet
 
 class UserTypeEnum(str, Enum):
     user = "user"
@@ -187,29 +186,6 @@ class UserQuery(ListQuery):
     archived: Optional[bool] = None
     username: Optional[str] = None
 
-def user_search(db: 'Session', query, params: Optional[UserQuery]):
-
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.given_name != None:
-        query = query.filter(given_name == params.given_name)
-    if params.family_name != None:
-        query = query.filter(family_name == params.family_name)
-    if params.email != None:
-        query = query.filter(email == params.email)
-    if params.number != None:
-        query = query.filter(number == params.number)
-    if params.user_type != None:
-        query = query.filter(user_type == params.user_type)
-    if params.username != None:
-        query = query.filter(username == params.username)
-        
-    if params.archived != None and params.archived != False:
-        query = query.filter(archived_at != None)
-    else:
-        query = query.filter(archived_at == None)
-    
-    return query
 
 class UserInterface(EntityInterface):
     create = UserCreate
@@ -217,10 +193,6 @@ class UserInterface(EntityInterface):
     list = UserList
     update = UserUpdate
     query = UserQuery
-    search = user_search
-    endpoint = "users"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes cache for user data
 
 # Import ProfileGet after UserGet is defined to avoid circular import
 from computor_types.profiles import ProfileGet

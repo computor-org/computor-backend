@@ -34,7 +34,6 @@ class UserPassword(BaseModel):
     password: str
     password_old: Optional[str] = None
 
-
 @user_router.get("", response_model=UserGet)
 def get_current_user_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -42,7 +41,6 @@ def get_current_user_endpoint(
 ):
     """Get the current authenticated user."""
     return get_current_user(permissions.user_id, db)
-
 
 @user_router.post("/password", status_code=204)
 def set_user_password_endpoint(
@@ -59,7 +57,6 @@ def set_user_password_endpoint(
         db=db,
     )
 
-
 @user_router.get(
     "/views",
     response_model=List[str],
@@ -74,7 +71,6 @@ async def get_course_views_for_current_user(
         return []
 
     return get_course_views_for_user(user_id, db)
-
 
 @user_router.post(
     "/courses/{course_id}/validate",
@@ -93,7 +89,6 @@ async def validate_current_user_course(
         permissions=permissions,
         db=db,
     )
-
 
 @user_router.post(
     "/courses/{course_id}/register",

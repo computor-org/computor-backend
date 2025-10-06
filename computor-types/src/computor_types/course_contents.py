@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict, Any
 
 from starlette.concurrency import run_in_threadpool
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
@@ -10,7 +10,6 @@ from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.custom_types import Ltree
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
     from .deployment import CourseContentDeploymentGet
 
 # Course Content Properties - deployment history moved to separate deployment table
@@ -402,10 +401,6 @@ class CourseContentInterface(EntityInterface):
     list = CourseContentList  # Use CourseContentList for list views
     update = CourseContentUpdate
     query = CourseContentQuery
-    search = None  # Moved to backend in Phase 4
-    endpoint = "course-contents"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes cache for course content data
     # post_create = post_create  # Moved to backend in Phase 4
     # post_update = post_update  # Moved to backend in Phase 4
 

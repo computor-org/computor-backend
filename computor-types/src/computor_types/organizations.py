@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from datetime import datetime
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -9,8 +9,7 @@ from computor_types.custom_types import Ltree
 import re
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from computor_types.deployments import GitLabConfig, GitLabConfigGet
+        from computor_types.deployments import GitLabConfig, GitLabConfigGet
 
 class OrganizationType(str,Enum):
     user = "user"
@@ -198,41 +197,6 @@ class OrganizationQuery(ListQuery):
 
     model_config = ConfigDict(use_enum_values=True)
 
-def organization_search(db: 'Session', query, params: Optional[OrganizationQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.title != None:
-        query = query.filter(title == params.title)
-    if params.description != None:
-        query = query.filter(description == params.description)
-    if params.path != None:
-        query = query.filter(path == Ltree(params.path))
-    if params.organization_type != None:
-        query = query.filter(organization_type == params.organization_type)
-    if params.user_id != None:
-        query = query.filter(user_id == params.user_id)
-    if params.number != None:
-        query = query.filter(number == params.number)
-    if params.email != None:
-        query = query.filter(email == params.email)
-    if params.telephone != None:
-        query = query.filter(telephone == params.telephone)
-    if params.fax_number != None:
-        query = query.filter(fax_number == params.fax_number)
-    if params.url != None:
-        query = query.filter(url == params.url)
-    if params.postal_code != None:
-        query = query.filter(postal_code == params.postal_code)
-    if params.street_address != None:
-        query = query.filter(street_address == params.street_address)
-    if params.locality != None:
-        query = query.filter(locality == params.locality)
-    if params.region != None:
-        query = query.filter(region == params.region)
-    if params.country != None:
-        query = query.filter(country == params.country)
-
-    return query
 
 class OrganizationInterface(EntityInterface):
     create = OrganizationCreate
@@ -240,10 +204,6 @@ class OrganizationInterface(EntityInterface):
     list = OrganizationList
     update = OrganizationUpdate
     query = OrganizationQuery
-    search = organization_search
-    endpoint = "organizations"
-    model = None  # Set by backend
-    cache_ttl = 600  # 10 minutes cache for organization data (changes less frequently)
 
 # Import GitLabConfig after OrganizationProperties is defined to avoid circular import
 from computor_types.deployments import GitLabConfig, GitLabConfigGet

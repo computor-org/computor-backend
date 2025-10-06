@@ -8,8 +8,9 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import StudentProfile
 from computor_types.student_profile import (
     StudentProfileGet, StudentProfileList, StudentProfileUpdate,
-    StudentProfileCreate, StudentProfileQuery, student_profile_search
+    StudentProfileCreate, StudentProfileQuery
 )
+from computor_backend.interfaces import StudentProfileInterface
 
 
 def has_profile_permission(permissions: Principal) -> bool:
@@ -61,7 +62,7 @@ def list_profiles(
         query = query.filter(StudentProfile.user_id == permissions.user_id)
 
     # Apply search filters using the interface search function
-    query = student_profile_search(db, query, params)
+    query = StudentProfileInterface.search(db, query, params)
 
     # Get total count
     total = query.count()

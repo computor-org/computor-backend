@@ -86,7 +86,6 @@ logger = logging.getLogger(__name__)
 submissions_router = APIRouter(prefix="/submissions", tags=["submissions"])
 _DIR_ALLOWED_PATTERN = re.compile(r"[^A-Za-z0-9_.-]")
 
-
 def _sanitize_path_segment(segment: str, *, is_file: bool = False) -> str:
     """Sanitize a path segment (directory or filename)."""
     segment = segment.strip()
@@ -101,7 +100,6 @@ def _sanitize_path_segment(segment: str, *, is_file: bool = False) -> str:
         if len(sanitized) > 100:
             sanitized = sanitized[:100]
     return sanitized
-
 
 def _sanitize_archive_path(name: str) -> str:
     """Normalize and sanitize a path from inside a ZIP archive."""
@@ -121,7 +119,6 @@ def _sanitize_archive_path(name: str) -> str:
         raise BadRequestException("Archive contains an empty file path")
 
     return "/".join(parts)
-
 
 # ===============================
 # Submission Upload Endpoint
@@ -159,7 +156,6 @@ async def upload_submission(
         storage_service=storage_service,
         cache=cache,
     )
-
 
 # ===============================
 # Artifact Listing Endpoints
@@ -230,7 +226,6 @@ async def list_submission_artifacts(
     # Return using Pydantic model
     return [SubmissionArtifactList.model_validate(artifact) for artifact in artifacts]
 
-
 @submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def get_submission_artifact(
     artifact_id: str,
@@ -241,7 +236,6 @@ async def get_submission_artifact(
 
     artifact = check_artifact_access(artifact_id, permissions, db)
     return get_artifact_with_details(artifact)
-
 
 @submissions_router.patch("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def update_submission_artifact(
@@ -312,7 +306,6 @@ async def update_submission_artifact(
 
     return artifact_get
 
-
 # ===============================
 # Artifact Grade Endpoints
 # ===============================
@@ -336,7 +329,6 @@ async def create_artifact_grade_endpoint(
     )
 
     return SubmissionGradeDetail.model_validate(grade)
-
 
 @submissions_router.get("/artifacts/{artifact_id}/grades", response_model=list[SubmissionGradeListItem])
 async def list_artifact_grades(
@@ -391,7 +383,6 @@ async def list_artifact_grades(
 
     return [SubmissionGradeListItem.model_validate(grade) for grade in grades]
 
-
 @submissions_router.patch("/grades/{grade_id}", response_model=SubmissionGradeDetail)
 async def update_artifact_grade(
     grade_id: str,
@@ -430,7 +421,6 @@ async def update_artifact_grade(
 
     return SubmissionGradeDetail.model_validate(grade)
 
-
 @submissions_router.delete("/grades/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_grade(
     grade_id: str,
@@ -463,7 +453,6 @@ async def delete_artifact_grade(
     db.commit()
 
     logger.info(f"Deleted grade {grade_id}")
-
 
 # ===============================
 # Artifact Review Endpoints
@@ -517,7 +506,6 @@ async def create_artifact_review(
 
     return SubmissionReviewListItem.model_validate(review)
 
-
 @submissions_router.get("/artifacts/{artifact_id}/reviews", response_model=list[SubmissionReviewListItem])
 async def list_artifact_reviews(
     artifact_id: str,
@@ -561,7 +549,6 @@ async def list_artifact_reviews(
 
     return [SubmissionReviewListItem.model_validate(review) for review in reviews]
 
-
 @submissions_router.patch("/reviews/{review_id}", response_model=SubmissionReviewListItem)
 async def update_artifact_review(
     review_id: str,
@@ -593,7 +580,6 @@ async def update_artifact_review(
     db.refresh(review)
 
     return SubmissionReviewListItem.model_validate(review)
-
 
 @submissions_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact_review(
@@ -627,7 +613,6 @@ async def delete_artifact_review(
     db.commit()
 
     logger.info(f"Deleted review {review_id}")
-
 
 # ===============================
 # Test Result Endpoints
@@ -735,7 +720,6 @@ async def create_test_result(
 
     return ResultList.model_validate(result)
 
-
 @submissions_router.get("/artifacts/{artifact_id}/tests", response_model=list[ResultList])
 async def list_artifact_test_results(
     artifact_id: str,
@@ -786,7 +770,6 @@ async def list_artifact_test_results(
     response.headers["X-Total-Count"] = str(len(results))
 
     return [ResultList.model_validate(result) for result in results]
-
 
 @submissions_router.patch("/tests/{test_id}", response_model=ResultList)
 async def update_test_result(

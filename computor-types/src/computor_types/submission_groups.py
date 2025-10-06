@@ -1,10 +1,9 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.deployments import GitLabConfig
 from computor_types.base import EntityInterface, ListQuery, BaseEntityGet
 from computor_types.grading import GradingStatus
@@ -57,23 +56,6 @@ class SubmissionGroupQuery(ListQuery):
     properties: Optional[SubmissionGroupProperties] = None
     status: Optional[str] = None
 
-def submission_group_search(db: 'Session', query, params: Optional[SubmissionGroupQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.max_group_size != None:
-        query = query.filter(max_group_size == params.max_group_size)
-    if params.max_submissions != None:
-        query = query.filter(max_submissions == params.max_submissions)
-    if params.course_id != None:
-        query = query.filter(course_id == params.course_id)
-    if params.course_content_id != None:
-        query = query.filter(course_content_id == params.course_content_id)
-    # Note: status has been moved to SubmissionGroupGrading
-    # This filter needs to be rewritten to join with the grading table
-    # if params.status != None:
-    #     query = query.filter(status == params.status)
-        
-    return query
 
 class SubmissionGroupInterface(EntityInterface):
     create = SubmissionGroupCreate
@@ -81,10 +63,6 @@ class SubmissionGroupInterface(EntityInterface):
     list = SubmissionGroupList
     update = SubmissionGroupUpdate
     query = SubmissionGroupQuery
-    search = submission_group_search
-    endpoint = "submission-groups"
-    model = None  # Set by backend
-    cache_ttl = 120  # 2 minutes - submission groups change moderately frequently
 
 # # Student-specific DTOs
 # class SubmissionGroupRepository(BaseModel):

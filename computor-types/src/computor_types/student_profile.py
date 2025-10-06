@@ -1,11 +1,10 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict, Any
 
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from computor_types.organizations import OrganizationGet
+        from computor_types.organizations import OrganizationGet
 
 class StudentProfileCreate(BaseModel):
     # id: Optional[str] = None
@@ -47,19 +46,6 @@ class StudentProfileQuery(ListQuery):
     user_id: Optional[str] = None
     organization_id: Optional[str] = None
 
-def student_profile_search(db: 'Session', query, params: Optional[StudentProfileQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.student_id != None:
-        query = query.filter(student_id == params.student_id)
-    if params.student_email != None:
-        query = query.filter(student_email == params.student_email)
-    if params.user_id != None:
-        query = query.filter(user_id == params.user_id)
-    if params.organization_id != None:
-        query = query.filter(organization_id == params.organization_id)
-    
-    return query
 
 class StudentProfileInterface(EntityInterface):
     create = StudentProfileCreate
@@ -67,10 +53,6 @@ class StudentProfileInterface(EntityInterface):
     list = StudentProfileList
     update = StudentProfileUpdate
     query = StudentProfileQuery
-    search = student_profile_search
-    endpoint = "student-profiles"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes - student profile changes moderately
 
 # Import OrganizationGet after StudentProfileGet is defined to avoid circular import
 from computor_types.organizations import OrganizationGet

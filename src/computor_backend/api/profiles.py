@@ -22,7 +22,6 @@ from computor_backend.business_logic.profiles import (
 
 profile_router = APIRouter()
 
-
 @profile_router.get("", response_model=list[ProfileList])
 async def list_profiles_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -37,7 +36,6 @@ async def list_profiles_endpoint(
 
     return [ProfileList.model_validate(p, from_attributes=True) for p in profiles]
 
-
 @profile_router.get("/{id}", response_model=ProfileGet)
 async def get_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -49,7 +47,6 @@ async def get_profile_endpoint(
     profile = get_profile(id, permissions, db)
     return ProfileGet.model_validate(profile, from_attributes=True)
 
-
 @profile_router.post("", response_model=ProfileGet, status_code=201)
 async def create_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -60,7 +57,6 @@ async def create_profile_endpoint(
 
     profile = create_profile(data.user_id, data.model_dump(), permissions, db)
     return ProfileGet.model_validate(profile, from_attributes=True)
-
 
 @profile_router.patch("/{id}", response_model=ProfileGet)
 async def update_profile_endpoint(
@@ -74,7 +70,6 @@ async def update_profile_endpoint(
     update_data = data.model_dump(exclude_unset=True)
     profile = update_profile(id, update_data, permissions, db)
     return ProfileGet.model_validate(profile, from_attributes=True)
-
 
 @profile_router.delete("/{id}", status_code=204)
 async def delete_profile_endpoint(

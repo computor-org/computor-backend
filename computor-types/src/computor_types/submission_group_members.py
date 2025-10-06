@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.deployments import GitLabConfig
 from computor_types.base import EntityInterface, ListQuery, BaseEntityGet
 
@@ -59,25 +58,6 @@ class SubmissionGroupMemberQuery(ListQuery):
     status: Optional[str] = None
     properties: Optional[SubmissionGroupMemberProperties] = None
 
-def submission_group_member_search(db: 'Session', query, params: Optional[SubmissionGroupMemberQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.course_id != None:
-        query = query.filter(course_id == params.course_id)
-    if params.course_content_id != None:
-        query = query.filter(course_content_id == params.course_content_id)
-    if params.course_member_id != None:
-        query = query.filter(course_member_id == params.course_member_id)
-    if params.submission_group_id != None:
-        query = query.filter(submission_group_id == params.submission_group_id)
-    # Note: grading and status have been moved to SubmissionGroupGrading
-    # These filters need to be rewritten to join with the grading table
-    # if params.grading != None:
-    #     query = query.filter(grading == params.grading)
-    # if params.status != None:
-    #     query = query.filter(status == params.status)
-    
-    return query
 
 class SubmissionGroupMemberInterface(EntityInterface):
     create = SubmissionGroupMemberCreate
@@ -85,7 +65,3 @@ class SubmissionGroupMemberInterface(EntityInterface):
     list = SubmissionGroupMemberList
     update = SubmissionGroupMemberUpdate
     query = SubmissionGroupMemberQuery
-    search = submission_group_member_search
-    endpoint = "submission-group-members"
-    model = None  # Set by backend
-    cache_ttl = 120  # 2 minutes - submission data changes moderately frequently

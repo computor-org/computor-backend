@@ -106,5 +106,3 @@ class ExtensionInterface(EntityInterface):
     get = ExtensionMetadata
     list = ExtensionVersionListItem
     update = ExtensionVersionYankRequest
-    endpoint = "extensions"
-    model = None  # Set by backend

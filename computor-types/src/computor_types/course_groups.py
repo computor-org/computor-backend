@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 class CourseGroupCreate(BaseModel):
@@ -51,7 +50,3 @@ class CourseGroupInterface(EntityInterface):
     list = CourseGroupList
     update = CourseGroupUpdate
     query = CourseGroupQuery
-    search = course_group_search
-    endpoint = "course-groups"
-    model = None  # Set by backend
-    cache_ttl=60

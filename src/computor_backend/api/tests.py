@@ -39,7 +39,6 @@ logger = logging.getLogger(__name__)
 
 tests_router = APIRouter()
 
-
 @tests_router.post("", response_model=ResultList)
 async def create_test_run(
     test_create: TestCreate,
@@ -302,7 +301,6 @@ async def create_test_run(
         raise
 
     return ResultList.model_validate(result)
-
 
 @tests_router.get("/status/{result_id}")
 async def get_test_status(

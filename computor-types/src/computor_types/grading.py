@@ -1,11 +1,10 @@
 from datetime import datetime
 from enum import IntEnum
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import EntityInterface, ListQuery, BaseEntityGet
 
 class GradingAuthor(BaseModel):
@@ -126,10 +125,6 @@ class SubmissionGroupGradingInterface(EntityInterface):
     list = SubmissionGroupGradingList
     update = SubmissionGroupGradingUpdate
     query = SubmissionGroupGradingQuery
-    search = grading_search
-    endpoint = "submission-group-gradings"
-    model = None  # Set by backend
-    cache_ttl = 60  # 1 minute - gradings may change frequently
 
 # Student-friendly grading view (simplified, read-only)
 class GradingStudentView(BaseModel):

@@ -7,46 +7,27 @@ class ListQuery(BaseModel):
     skip: Optional[int] = 0
     limit: Optional[int] = 100
 
+# ACTIONS constant - used by backend for permission generation
 ACTIONS = {
     "create":  "create",
     "get":     "get",
     "list":    "list",
     "update":  "update",
 }
-    
+
 class EntityInterface(ABC):
+    """
+    Pure DTO interface - defines data structure only.
+
+    Contains references to Pydantic models for CRUD operations.
+    Backend-specific concerns (model, endpoint, caching, search) are handled
+    by BackendEntityInterface in computor_backend.interfaces.base.
+    """
     create: BaseModel = None
     get: BaseModel = None
     list: BaseModel = None
     update: BaseModel = None
     query: BaseModel = None
-    search: Any = None
-    endpoint: str = None
-    model: Any = None
-
-    cache_ttl: int = 15
-
-    post_create: Any = None
-    post_update: Any = None
-
-    def claim_values(self) -> List[tuple[str,str]]:
-        model = self.model
-        claims = []
-
-        # If model is None, convert plural endpoint name to singular tablename
-        # e.g., "users" -> "user", "courses" -> "course"
-        if model is None:
-            tablename = self.endpoint.rstrip('s') if self.endpoint else None
-        else:
-            tablename = model.__tablename__
-
-        if tablename is None:
-            return claims
-
-        for attr, action in ACTIONS.items():
-            if hasattr(self, attr):
-                claims.append(("permissions", f"{tablename}:{action}"))
-        return claims
     
 class BaseEntityList(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")

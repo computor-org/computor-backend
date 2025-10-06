@@ -6,7 +6,7 @@ separating deployment concerns from the hierarchical course structure.
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict, Any
 from sqlalchemy import (
     Column, String, Text, DateTime, ForeignKey, 
     UniqueConstraint, Index, text, JSON, Integer

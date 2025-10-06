@@ -4,7 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from .base import Base
 

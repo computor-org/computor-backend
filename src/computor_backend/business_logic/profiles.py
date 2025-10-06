@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from computor_backend.model.auth import Profile
 from computor_backend.permissions.principal import Principal
-from computor_types.profiles import ProfileQuery, profile_search
+from computor_types.profiles import ProfileQuery
+from computor_backend.interfaces import ProfileInterface
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def list_profiles(
         query = query.filter(Profile.user_id == permissions.user_id)
 
     # Apply search filters using the interface search function
-    query = profile_search(db, query, params)
+    query = ProfileInterface.search(db, query, params)
 
     # Get total count
     total = query.count()

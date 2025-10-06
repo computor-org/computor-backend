@@ -1,10 +1,9 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 class ProfileCreate(BaseModel):
@@ -130,15 +129,6 @@ class ProfileQuery(ListQuery):
     user_id: Optional[str] = Field(None, description="Filter by user ID")
     nickname: Optional[str] = Field(None, description="Filter by nickname")
 
-def profile_search(db: 'Session', query, params: Optional[ProfileQuery]):
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.user_id is not None:
-        query = query.filter(user_id == params.user_id)
-    if params.nickname is not None:
-        query = query.filter(nickname.ilike(f"%{params.nickname}%"))
-    
-    return query
 
 class ProfileInterface(EntityInterface):
     create = ProfileCreate
@@ -146,7 +136,3 @@ class ProfileInterface(EntityInterface):
     list = ProfileList
     update = ProfileUpdate
     query = ProfileQuery
-    search = profile_search
-    endpoint = "profiles"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes cache for profile data

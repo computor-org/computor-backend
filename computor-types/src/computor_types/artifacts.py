@@ -11,8 +11,7 @@ from computor_types.grading import GradingStatus
 # Forward reference imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from computor_types.results import ResultList
+        from computor_types.results import ResultList
 
 # ===============================
 # SubmissionArtifact DTOs
@@ -83,13 +82,11 @@ def submission_artifact_search(db: 'Session', query, params: SubmissionArtifactQ
 
 class SubmissionArtifactInterface(EntityInterface):
     """Entity interface for submission artifacts."""
-    model = None  # Set by backend
     list = SubmissionArtifactList
     get = SubmissionArtifactGet
     create = SubmissionArtifactCreate
     update = SubmissionArtifactUpdate
     query = SubmissionArtifactQuery
-    search = submission_artifact_search
 
 # ===============================
 # SubmissionGrade DTOs
@@ -154,13 +151,11 @@ def submission_grade_search(db: 'Session', query, params: SubmissionGradeQuery):
 
 class SubmissionGradeInterface(EntityInterface):
     """Entity interface for submission grades."""
-    model = None  # Set by backend
     list = SubmissionGradeListItem
     get = SubmissionGradeDetail
     create = SubmissionGradeCreate
     update = SubmissionGradeUpdate
     query = SubmissionGradeQuery
-    search = submission_grade_search
 
 # ===============================
 # SubmissionReview DTOs
@@ -215,13 +210,11 @@ def submission_review_search(db: 'Session', query, params: SubmissionReviewQuery
 
 class SubmissionReviewInterface(EntityInterface):
     """Entity interface for submission reviews."""
-    model = None  # Set by backend
     list = SubmissionReviewListItem
     get = SubmissionReviewDetail
     create = SubmissionReviewCreate
     update = SubmissionReviewUpdate
     query = SubmissionReviewQuery
-    search = submission_review_search
 
 # ===============================
 # ResultArtifact DTOs
@@ -268,12 +261,10 @@ def result_artifact_search(db: 'Session', query, params: ResultArtifactQuery):
 
 class ResultArtifactInterface(EntityInterface):
     """Entity interface for result artifacts."""
-    model = None  # Set by backend
     list = ResultArtifactListItem
     get = ResultArtifactListItem
     create = ResultArtifactCreate
     query = ResultArtifactQuery
-    search = result_artifact_search
 
 # Import the necessary types first
 from .results import ResultList

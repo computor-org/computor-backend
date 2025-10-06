@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.deployments import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.users import UserList
@@ -198,8 +197,4 @@ class CourseMemberInterface(EntityInterface):
     list = CourseMemberList
     update = CourseMemberUpdate
     query = CourseMemberQuery
-    search = None  # Moved to backend in Phase 4
-    endpoint = "course-members"
-    model = None  # Set by backend
     # post_create = post_create  # Moved to backend in Phase 4
-    cache_ttl = 300  # 5 minutes - membership changes moderately frequently

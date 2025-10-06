@@ -24,7 +24,6 @@ from .exceptions import BadRequestException
 logger = logging.getLogger(__name__)
 deployment_router = APIRouter()
 
-
 class DeploymentRequest(BaseModel):
     """Request model for deployment from configuration."""
     deployment_config: Dict[str, Any] = Field(
@@ -35,14 +34,12 @@ class DeploymentRequest(BaseModel):
         description="If true, only validate the configuration without deploying"
     )
 
-
 class DeploymentResponse(BaseModel):
     """Response model for deployment operations."""
     workflow_id: str = Field(description="Temporal workflow ID")
     status: str = Field(description="Deployment status")
     message: str = Field(description="Status message")
     deployment_path: Optional[str] = Field(None, description="Full deployment path")
-
 
 @deployment_router.post("/deploy/from-config", response_model=DeploymentResponse)
 async def deploy_from_config(
@@ -72,7 +69,6 @@ async def deploy_from_config(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Deployment failed: {str(e)}"
         )
-
 
 @deployment_router.post("/deploy/from-yaml", response_model=DeploymentResponse)
 async def deploy_from_yaml(
@@ -106,7 +102,6 @@ async def deploy_from_yaml(
             detail=f"Deployment failed: {str(e)}"
         )
 
-
 @deployment_router.get("/deploy/status/{workflow_id}")
 async def get_deployment_status(
     workflow_id: str,
@@ -127,7 +122,6 @@ async def get_deployment_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get status: {str(e)}"
         )
-
 
 @deployment_router.post("/deploy/validate")
 async def validate_deployment_config(

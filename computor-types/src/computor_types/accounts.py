@@ -1,9 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-from datetime import datetime
+    from datetime import datetime
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
@@ -89,22 +88,6 @@ class AccountQuery(ListQuery):
     user_id: Optional[str] = None
     properties: Optional[str] = None
     
-def account_search(db: 'Session', query, params: Optional[AccountQuery]):
-    if params is None:
-        return query
-        
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.provider != None:
-        query = query.filter(provider == params.provider)
-    if params.type != None:
-        query = query.filter(type == params.type)
-    if params.provider_account_id != None:
-        query = query.filter(provider_account_id == params.provider_account_id)
-    if params.user_id != None:
-        query = query.filter(user_id == params.user_id)
-
-    return query
 
 class AccountInterface(EntityInterface):
     create = AccountCreate
@@ -112,7 +95,3 @@ class AccountInterface(EntityInterface):
     list = AccountList
     update = AccountUpdate
     query = AccountQuery
-    search = account_search
-    endpoint = "accounts"
-    model = None  # Set by backend
-    cache_ttl = 180  # 3 minutes cache for account data

@@ -113,7 +113,3 @@ class SessionInterface(EntityInterface):
     list = SessionList
     update = SessionUpdate
     query = SessionQuery
-    search = None  # Moved to backend
-    endpoint = "sessions"
-    model = None  # Set by backend
-    cache_ttl = 60  # 1 minute cache for session data (changes frequently)

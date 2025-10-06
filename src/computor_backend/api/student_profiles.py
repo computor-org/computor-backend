@@ -22,7 +22,6 @@ from computor_backend.business_logic.student_profiles import (
 
 student_profile_router = APIRouter()
 
-
 @student_profile_router.get("", response_model=list[StudentProfileList])
 async def list_student_profiles(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -35,7 +34,6 @@ async def list_student_profiles(
     response.headers["X-Total-Count"] = str(total)
     return profiles
 
-
 @student_profile_router.get("/{id}", response_model=StudentProfileGet)
 async def get_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -44,7 +42,6 @@ async def get_student_profile(
 ):
     """Get a student profile by ID - users can only get their own, admins/_user_manager can get any"""
     return get_profile(id, permissions, db)
-
 
 @student_profile_router.post("", response_model=StudentProfileGet, status_code=201)
 async def create_student_profile(
@@ -55,7 +52,6 @@ async def create_student_profile(
     """Create a student profile - users can create for themselves (user_id optional), admins/_user_manager can create for anyone"""
     return create_profile(data, permissions, db)
 
-
 @student_profile_router.patch("/{id}", response_model=StudentProfileGet)
 async def update_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -65,7 +61,6 @@ async def update_student_profile(
 ):
     """Update a student profile - users can only update their own, admins/_user_manager can update any"""
     return update_profile(id, data, permissions, db)
-
 
 @student_profile_router.delete("/{id}", status_code=204)
 async def delete_student_profile(

@@ -1,9 +1,8 @@
 from pydantic import BaseModel, field_validator, ConfigDict
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.course_families import CourseFamilyGet
 from computor_types.deployments import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
@@ -84,24 +83,6 @@ class CourseQuery(ListQuery):
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
 
-def course_search(db: 'Session', query, params: Optional[CourseQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.title != None:
-        query = query.filter(title == params.title)
-    if params.description != None:
-        query = query.filter(description == params.description)
-    if params.path != None:
-        query = query.filter(path == Ltree(params.path))
-    if params.course_family_id != None:
-        query = query.filter(course_family_id == params.course_family_id)
-    if params.organization_id != None:
-        query = query.filter(organization_id == params.organization_id)
-    if params.provider_url != None:
-         query = query.filter(properties["gitlab"].op("->>")("url") == params.provider_url)
-    if params.full_path != None:
-        query = query.filter(properties["gitlab"].op("->>")("full_path") == params.full_path)
-    return query
 
 class CourseInterface(EntityInterface):
     create = CourseCreate
@@ -109,7 +90,3 @@ class CourseInterface(EntityInterface):
     list = CourseList
     update = CourseUpdate
     query = CourseQuery
-    search = course_search
-    endpoint = "courses"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes - course data changes moderately frequently

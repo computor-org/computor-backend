@@ -20,6 +20,7 @@ from computor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from fastapi import FastAPI, BackgroundTasks
 from fastapi import Response
+
 class CrudRouter:
 
     id_type = "id"

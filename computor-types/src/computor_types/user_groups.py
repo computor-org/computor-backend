@@ -1,10 +1,9 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 class UserGroupCreate(BaseModel):
@@ -59,15 +58,6 @@ class UserGroupQuery(ListQuery):
     group_id: Optional[str] = Field(None, description="Filter by group ID")
     transient: Optional[bool] = Field(None, description="Filter by transient status")
 
-def user_group_search(db: 'Session', query, params: Optional[UserGroupQuery]):
-    if params.user_id is not None:
-        query = query.filter(user_id == params.user_id)
-    if params.group_id is not None:
-        query = query.filter(group_id == params.group_id)
-    if params.transient is not None:
-        query = query.filter(transient == params.transient)
-    
-    return query
 
 class UserGroupInterface(EntityInterface):
     create = UserGroupCreate
@@ -75,7 +65,3 @@ class UserGroupInterface(EntityInterface):
     list = UserGroupList
     update = UserGroupUpdate
     query = UserGroupQuery
-    search = user_group_search
-    endpoint = "user-groups"
-    model = None  # Set by backend
-    cache_ttl = 120  # 2 minutes cache for memberships (can change frequently)

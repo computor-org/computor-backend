@@ -8,8 +8,9 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.database import get_db
 from computor_types.course_execution_backends import CourseExecutionBackendGet
+from computor_types.courses import CourseGet
 from computor_backend.api.api_builder import CrudRouter
-from computor_types.courses import CourseGet, CourseInterface
+from computor_backend.interfaces import CourseInterface
 
 # Import business logic
 from computor_backend.business_logic.courses import (

@@ -2,12 +2,11 @@
 Pydantic interfaces for Example Library models.
 """
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 from datetime import datetime
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Optional, List, Dict, Any, Union
+
+
 
 from computor_types.custom_types import Ltree
 
@@ -180,53 +179,7 @@ class ExampleRepositoryQuery(ListQuery):
     organization_id: Optional[str] = None
 
 # Search functions
-def example_repository_search(db: 'Session', query, params: Optional[ExampleRepositoryQuery]):
-    """Search function for example repositories."""
-    if params is None:
-        return query
-    
-    if params.name:
-        query = query.filter(name.ilike(f"%{params.name}%"))
-    if params.source_type:
-        query = query.filter(source_type == params.source_type)
-    if params.organization_id:
-        query = query.filter(organization_id == params.organization_id)
-    
-    return query
 
-def example_search(db: 'Session', query, params: Optional[ExampleQuery]):
-    """Search function for examples."""
-    if params is None:
-        return query
-    
-    if params.repository_id:
-        query = query.filter(example_repository_id == params.repository_id)
-    if params.identifier:
-        # Support Ltree patterns for identifier filtering
-        if '*' in params.identifier:
-            # Use Ltree pattern matching with ~ operator
-            query = query.filter(identifier.op('~')(params.identifier))
-        else:
-            # Exact match for Ltree
-            query = query.filter(identifier == Ltree(params.identifier))
-    if params.title:
-        query = query.filter(title.ilike(f"%{params.title}%"))
-    if params.category:
-        query = query.filter(category == params.category)
-    if params.tags:
-        # Filter by any of the provided tags
-        query = query.filter(tags.overlap(params.tags))
-    if params.search:
-        # Search in title, description, and identifier
-        query = query.filter(
-            or_(
-                Example.title.ilike(f"%{params.search}%"),
-                Example.description.ilike(f"%{params.search}%"),
-                Example.identifier.op('~')(f"*{params.search}*"),  # Ltree contains
-            )
-        )
-    
-    return query
 
 # EntityInterface classes
 class ExampleRepositoryInterface(EntityInterface):
@@ -236,9 +189,6 @@ class ExampleRepositoryInterface(EntityInterface):
     list = ExampleRepositoryList
     update = ExampleRepositoryUpdate
     query = ExampleRepositoryQuery
-    search = example_repository_search
-    endpoint = "example-repositories"
-    model = None  # Set by backend
 
 class ExampleInterface(EntityInterface):
     """Interface for Example entity."""
@@ -247,9 +197,6 @@ class ExampleInterface(EntityInterface):
     list = ExampleList
     update = ExampleUpdate
     query = ExampleQuery
-    search = example_search
-    endpoint = "examples"
-    model = None  # Set by backend
 
 class ExampleUploadRequest(BaseModel):
     """Request to upload an example to storage."""

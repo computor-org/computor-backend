@@ -2,7 +2,7 @@ import yaml
 from abc import ABC
 from enum import Enum
 from pydantic_yaml import to_yaml_str
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 if TYPE_CHECKING:

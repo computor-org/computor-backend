@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
-from computor_types.roles_claims import RoleClaimList, RoleClaimQuery, role_claim_search
+from computor_types.roles_claims import RoleClaimList, RoleClaimQuery
 from computor_backend.model.role import RoleClaim
+from computor_backend.interfaces import RoleClaimInterface
 
 
 def list_role_claims(
@@ -24,4 +25,4 @@ def list_role_claims(
         List of role claims
     """
     query = check_permissions(permissions, RoleClaim, "get", db)
-    return role_claim_search(db, query, role_claim_query).all()
+    return RoleClaimInterface.search(db, query, role_claim_query).all()

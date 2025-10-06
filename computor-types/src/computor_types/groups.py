@@ -1,11 +1,10 @@
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 
+    
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 class GroupType(str, Enum):
@@ -77,15 +76,6 @@ class GroupQuery(ListQuery):
     
     model_config = ConfigDict(use_enum_values=True)
 
-def group_search(db: 'Session', query, params: Optional[GroupQuery]):
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.name is not None:
-        query = query.filter(name.ilike(f"%{params.name}%"))
-    if params.group_type is not None:
-        query = query.filter(group_type == params.group_type)
-    
-    return query
 
 class GroupInterface(EntityInterface):
     create = GroupCreate
@@ -93,7 +83,3 @@ class GroupInterface(EntityInterface):
     list = GroupList
     update = GroupUpdate
     query = GroupQuery
-    search = group_search
-    endpoint = "groups"
-    model = None  # Set by backend
-    cache_ttl = 300  # 5 minutes cache for group data

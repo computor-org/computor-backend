@@ -41,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 auth_router = APIRouter(prefix="/auth")
 
-
 class ProviderInfo(BaseModel):
     """Information about an authentication provider."""
     name: str = Field(..., description="Provider name")
@@ -50,15 +49,12 @@ class ProviderInfo(BaseModel):
     enabled: bool = Field(..., description="Whether provider is enabled")
     login_url: Optional[str] = Field(None, description="Login URL if applicable")
 
-
 class LoginRequest(BaseModel):
     """Login request for SSO."""
     provider: str = Field(..., description="Provider name")
     redirect_uri: Optional[str] = Field(None, description="Redirect URI after login")
 
-
 # Deprecated DTOs removed - functionality handled by business logic layer
-
 
 class UserRegistrationRequest(BaseModel):
     """User registration request."""
@@ -70,7 +66,6 @@ class UserRegistrationRequest(BaseModel):
     provider: str = Field("keycloak", description="Authentication provider to register with")
     send_verification_email: bool = Field(True, description="Send email verification")
 
-
 class UserRegistrationResponse(BaseModel):
     """Response after successful user registration."""
     user_id: str = Field(..., description="User ID in Computor")
@@ -79,19 +74,16 @@ class UserRegistrationResponse(BaseModel):
     email: str = Field(..., description="Email address")
     message: str = Field(..., description="Success message")
 
-
 class TokenRefreshRequest(BaseModel):
     """Token refresh request."""
     refresh_token: str = Field(..., description="Refresh token from initial authentication")
     provider: str = Field("keycloak", description="Authentication provider")
-
 
 class TokenRefreshResponse(BaseModel):
     """Response after successful token refresh."""
     access_token: str = Field(..., description="New access token")
     expires_in: Optional[int] = Field(None, description="Token expiration time in seconds")
     refresh_token: Optional[str] = Field(None, description="New refresh token if rotated")
-
 
 @auth_router.post("/login", response_model=LocalLoginResponse)
 async def login_with_credentials(
@@ -114,7 +106,6 @@ async def login_with_credentials(
         password=request.password,
         db=db
     )
-
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers() -> List[ProviderInfo]:
@@ -143,7 +134,6 @@ async def list_providers() -> List[ProviderInfo]:
             ))
     
     return providers
-
 
 @auth_router.get("/{provider}/login")
 async def initiate_login(
@@ -205,7 +195,6 @@ async def initiate_login(
         logger.error(f"Exception traceback:", exc_info=True)
         from computor_backend.api.exceptions import InternalServerException
         raise InternalServerException(detail=f"Failed to initiate login: {str(e)}")
-
 
 @auth_router.get("/{provider}/callback", name="handle_callback")
 async def handle_callback(
@@ -284,12 +273,10 @@ async def handle_callback(
         error_url = f"/?{urlencode(error_params)}"
         return RedirectResponse(url=error_url, status_code=302)
 
-
 @auth_router.get("/success", name="sso_success")
 async def sso_success():
     """Default success page after SSO authentication."""
     return {"message": "Authentication successful", "status": "success"}
-
 
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
@@ -321,7 +308,6 @@ async def logout(
         db=db
     )
 
-
 @auth_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
 async def list_all_plugins(principal: Principal = Depends(get_current_principal)) -> dict:
     """
@@ -351,7 +337,6 @@ async def list_all_plugins(principal: Principal = Depends(get_current_principal)
     
     return plugins
 
-
 @auth_router.post("/admin/plugins/{plugin_name}/enable", dependencies=[Depends(get_current_principal)])
 async def enable_plugin(
     plugin_name: str,
@@ -374,7 +359,6 @@ async def enable_plugin(
     except Exception as e:
         return {"message": f"Plugin {plugin_name} enabled but failed to load: {e}"}
 
-
 @auth_router.post("/admin/plugins/{plugin_name}/disable", dependencies=[Depends(get_current_principal)])
 async def disable_plugin(
     plugin_name: str,
@@ -395,7 +379,6 @@ async def disable_plugin(
     
     return {"message": f"Plugin {plugin_name} disabled"}
 
-
 @auth_router.post("/admin/plugins/reload", dependencies=[Depends(get_current_principal)])
 async def reload_plugins(principal: Principal = Depends(get_current_principal)) -> dict:
     """Reload all plugins (admin only)."""
@@ -410,7 +393,6 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)) 
         "message": "Plugins reloaded",
         "loaded": registry.get_loaded_plugins()
     }
-
 
 @auth_router.post("/register", response_model=UserRegistrationResponse)
 async def register_user(
@@ -437,7 +419,6 @@ async def register_user(
 
     return UserRegistrationResponse(**result)
 
-
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
@@ -456,7 +437,6 @@ async def refresh_local_token(
         refresh_token=request.refresh_token,
         db=db
     )
-
 
 @auth_router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(

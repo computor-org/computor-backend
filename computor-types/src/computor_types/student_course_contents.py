@@ -2,8 +2,6 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Literal, Optional, List, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from computor_types.deployments import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
@@ -198,6 +196,3 @@ class CourseContentStudentInterface(EntityInterface):
     list = CourseContentStudentList
     update = CourseContentStudentUpdate
     query = CourseContentStudentQuery
-    search = None  # Moved to backend
-    endpoint = "students/course-contents"  # Fixed: actual endpoint is /students/course-contents
-    cache_ttl = 180  # 3 minutes - course content changes frequently during active sessions
