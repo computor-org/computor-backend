@@ -6,6 +6,7 @@ from .accounts import AccountClient
 from .deployment import CourseContentDeploymentClient
 from .course_contents import CourseContentClient
 from .course_content_kind import CourseContentKindClient
+from .lecturer_course_contents import CourseContentLecturerClient
 from .student_course_contents import CourseContentStudentClient
 from .course_content_types import CourseContentTypeClient
 from .course_execution_backends import CourseExecutionBackendClient
@@ -25,7 +26,6 @@ from .extensions import ExtensionClient
 from .group_claims import GroupClaimClient
 from .groups import GroupClient
 from .languages import LanguageClient
-from .lecturer_course_contents import CourseContentLecturerClient
 from .messages import MessageClient
 from .organizations import OrganizationClient
 from .profiles import ProfileClient
@@ -47,6 +47,7 @@ __all__ = [
     "CourseContentDeploymentClient",
     "CourseContentClient",
     "CourseContentKindClient",
+    "CourseContentLecturerClient",
     "CourseContentStudentClient",
     "CourseContentTypeClient",
     "CourseExecutionBackendClient",
@@ -66,7 +67,6 @@ __all__ = [
     "GroupClaimClient",
     "GroupClient",
     "LanguageClient",
-    "CourseContentLecturerClient",
     "MessageClient",
     "OrganizationClient",
     "ProfileClient",

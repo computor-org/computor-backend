@@ -4,6 +4,13 @@ __version__ = "0.1.0"
 
 from .client import ComputorClient
 from .base import BaseEndpointClient
+from .advanced_base import (
+    CustomActionClient,
+    RoleBasedViewClient,
+    FileOperationClient,
+    TaskClient,
+    AuthenticationClient,
+)
 from .exceptions import (
     ComputorClientError,
     ComputorAPIError,
@@ -26,7 +33,6 @@ from .generated import (
     CourseExecutionBackendClient,
     CourseTutorClient,
     DeploymentHistoryClient,
-    ExampleClient,
     ExampleRepositoryClient,
     ExecutionBackendClient,
     ExtensionClient,
@@ -38,11 +44,29 @@ from .generated import (
     ProfileClient,
     RoleClient,
     RoleClaimClient,
-    StorageClient,
     StudentProfileClient,
     SubmissionGroupMemberClient,
     UserClient,
     UserGroupClient,
+)
+
+# Import role-based clients
+from .role_clients import (
+    StudentViewClient,
+    TutorViewClient,
+    LecturerViewClient,
+)
+
+# Import custom clients
+from .custom_clients import (
+    ComputorAuthClient,
+    StorageFileClient,
+    ComputorTaskClient,
+    SystemAdminClient,
+    ExampleClient,
+    SubmissionClient,
+    TestExecutionClient,
+    DeploymentClient,
 )
 
 __all__ = [
@@ -50,6 +74,11 @@ __all__ = [
     "ComputorClient",
     # Base classes
     "BaseEndpointClient",
+    "CustomActionClient",
+    "RoleBasedViewClient",
+    "FileOperationClient",
+    "TaskClient",
+    "AuthenticationClient",
     # Exceptions
     "ComputorClientError",
     "ComputorAPIError",
@@ -58,7 +87,7 @@ __all__ = [
     "ComputorNotFoundError",
     "ComputorValidationError",
     "ComputorServerError",
-    # Generated clients
+    # Generated clients (CRUD)
     "AccountClient",
     "CourseClient",
     "CourseFamilyClient",
@@ -69,7 +98,6 @@ __all__ = [
     "CourseExecutionBackendClient",
     "CourseTutorClient",
     "DeploymentHistoryClient",
-    "ExampleClient",
     "ExampleRepositoryClient",
     "ExecutionBackendClient",
     "ExtensionClient",
@@ -81,9 +109,21 @@ __all__ = [
     "ProfileClient",
     "RoleClient",
     "RoleClaimClient",
-    "StorageClient",
     "StudentProfileClient",
     "SubmissionGroupMemberClient",
     "UserClient",
     "UserGroupClient",
+    # Role-based view clients
+    "StudentViewClient",
+    "TutorViewClient",
+    "LecturerViewClient",
+    # Custom clients
+    "ComputorAuthClient",
+    "StorageFileClient",
+    "ComputorTaskClient",
+    "SystemAdminClient",
+    "ExampleClient",
+    "SubmissionClient",
+    "TestExecutionClient",
+    "DeploymentClient",
 ]

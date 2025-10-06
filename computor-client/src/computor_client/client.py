@@ -21,7 +21,7 @@ from .generated import (
     CourseStudentClient,
     CourseTutorClient,
     DeploymentHistoryClient,
-    ExampleClient,
+    ExampleClient as GeneratedExampleClient,
     ExampleRepositoryClient,
     ExecutionBackendClient,
     ExtensionClient,
@@ -35,7 +35,7 @@ from .generated import (
     RoleClient,
     RoleClaimClient,
     SessionClient,
-    StorageClient,
+    StorageClient as GeneratedStorageClient,
     StudentProfileClient,
     SubmissionGroupClient,
     SubmissionGroupGradingClient,
@@ -43,6 +43,24 @@ from .generated import (
     UserClient,
     UserGroupClient,
     UserRoleClient,
+)
+
+# Import custom clients
+from .role_clients import (
+    StudentViewClient,
+    TutorViewClient,
+    LecturerViewClient,
+)
+
+from .custom_clients import (
+    ComputorAuthClient,
+    StorageFileClient,
+    ComputorTaskClient,
+    SystemAdminClient,
+    ExampleClient,
+    SubmissionClient,
+    TestExecutionClient,
+    DeploymentClient,
 )
 
 
@@ -113,7 +131,6 @@ class ComputorClient:
         self.course_students = CourseStudentClient(self._client)
         self.course_tutors = CourseTutorClient(self._client)
         self.deployment_history = DeploymentHistoryClient(self._client)
-        self.examples = ExampleClient(self._client)
         self.example_repositories = ExampleRepositoryClient(self._client)
         self.execution_backends = ExecutionBackendClient(self._client)
         self.extensions = ExtensionClient(self._client)
@@ -127,7 +144,6 @@ class ComputorClient:
         self.roles = RoleClient(self._client)
         self.role_claims = RoleClaimClient(self._client)
         self.sessions = SessionClient(self._client)
-        self.storage = StorageClient(self._client)
         self.student_profiles = StudentProfileClient(self._client)
         self.submission_groups = SubmissionGroupClient(self._client)
         self.submission_group_gradings = SubmissionGroupGradingClient(self._client)
@@ -135,6 +151,21 @@ class ComputorClient:
         self.users = UserClient(self._client)
         self.user_groups = UserGroupClient(self._client)
         self.user_roles = UserRoleClient(self._client)
+
+        # Custom clients with enhanced functionality
+        self.auth = ComputorAuthClient(self._client)
+        self.storage = StorageFileClient(self._client)
+        self.tasks = ComputorTaskClient(self._client)
+        self.system = SystemAdminClient(self._client)
+        self.examples = ExampleClient(self._client)
+        self.submissions = SubmissionClient(self._client)
+        self.tests = TestExecutionClient(self._client)
+        self.deploy = DeploymentClient(self._client)
+
+        # Role-based view clients
+        self.student_view = StudentViewClient(self._client)
+        self.tutor_view = TutorViewClient(self._client)
+        self.lecturer_view = LecturerViewClient(self._client)
 
     async def authenticate(self, username: str, password: str) -> dict:
         """
