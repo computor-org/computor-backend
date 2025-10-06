@@ -4361,6 +4361,22 @@
             }
           },
           {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          },
+          {
             "name": "name",
             "in": "query",
             "required": false,
@@ -13041,6 +13057,22 @@
               ],
               "default": 100,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
             }
           },
           {
@@ -24579,14 +24611,16 @@
         "properties": {
           "token": {
             "type": "string",
-            "title": "Token"
+            "title": "Token",
+            "description": "Provider access token"
           }
         },
         "type": "object",
         "required": [
           "token"
         ],
-        "title": "OrganizationUpdateTokenUpdate"
+        "title": "OrganizationUpdateTokenUpdate",
+        "description": "Payload for updating organization provider token."
       },
       "PresignedUrlRequest": {
         "properties": {
@@ -29743,11 +29777,13 @@
                 "type": "null"
               }
             ],
-            "title": "Username"
+            "title": "Username",
+            "description": "Target username (admin only, otherwise current user)"
           },
           "password": {
             "type": "string",
-            "title": "Password"
+            "title": "Password",
+            "description": "New password"
           },
           "password_old": {
             "anyOf": [
@@ -29758,14 +29794,16 @@
                 "type": "null"
               }
             ],
-            "title": "Password Old"
+            "title": "Password Old",
+            "description": "Old password (required for non-admin password changes)"
           }
         },
         "type": "object",
         "required": [
           "password"
         ],
-        "title": "UserPassword"
+        "title": "UserPassword",
+        "description": "Password update request for user endpoints."
       },
       "UserRegistrationRequest": {
         "properties": {

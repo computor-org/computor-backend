@@ -28,14 +28,12 @@ class ExampleRepositoryInterface(ExampleRepositoryInterfaceBase, BackendEntityIn
 
         if params.id is not None:
             query = query.filter(ExampleRepository.id == params.id)
-        if params.title is not None:
-            query = query.filter(ExampleRepository.title == params.title)
-        if params.url is not None:
-            query = query.filter(ExampleRepository.url == params.url)
-        if params.archived is not None and params.archived:
-            query = query.filter(ExampleRepository.archived_at.isnot(None))
-        else:
-            query = query.filter(ExampleRepository.archived_at.is_(None))
+        if params.name is not None:
+            query = query.filter(ExampleRepository.name.ilike(f"%{params.name}%"))
+        if params.source_type is not None:
+            query = query.filter(ExampleRepository.source_type == params.source_type)
+        if params.organization_id is not None:
+            query = query.filter(ExampleRepository.organization_id == params.organization_id)
 
         return query
 
@@ -55,13 +53,27 @@ class ExampleInterface(ExampleInterfaceBase, BackendEntityInterface):
 
         if params.id is not None:
             query = query.filter(Example.id == params.id)
+        if params.repository_id is not None:
+            query = query.filter(Example.example_repository_id == params.repository_id)
+        if params.identifier is not None:
+            # Support Ltree pattern matching with *
+            if '*' in params.identifier:
+                query = query.filter(Example.identifier.op('~')(params.identifier))
+            else:
+                query = query.filter(Example.identifier == params.identifier)
         if params.title is not None:
-            query = query.filter(Example.title == params.title)
-        if params.example_repository_id is not None:
-            query = query.filter(Example.example_repository_id == params.example_repository_id)
-        if params.archived is not None and params.archived:
-            query = query.filter(Example.archived_at.isnot(None))
-        else:
-            query = query.filter(Example.archived_at.is_(None))
+            query = query.filter(Example.title.ilike(f"%{params.title}%"))
+        if params.category is not None:
+            query = query.filter(Example.category == params.category)
+        if params.tags is not None and len(params.tags) > 0:
+            # Filter by tags (array contains all specified tags)
+            query = query.filter(Example.tags.contains(params.tags))
+        if params.search is not None:
+            # Full-text search in title and description
+            search_term = f"%{params.search}%"
+            query = query.filter(
+                (Example.title.ilike(search_term)) |
+                (Example.description.ilike(search_term))
+            )
 
         return query

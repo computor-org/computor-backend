@@ -165,18 +165,20 @@ class ExampleDependencyGet(BaseModel):
 
 class ExampleQuery(ListQuery):
     """Query parameters for listing examples."""
-    repository_id: Optional[str] = None
+    id: Optional[str] = Field(None, description="Filter by example ID")
+    repository_id: Optional[str] = Field(None, description="Filter by repository ID")
     identifier: Optional[str] = Field(None, description="Filter by identifier (supports Ltree patterns with *)")
-    title: Optional[str] = None
-    category: Optional[str] = None
-    tags: Optional[List[str]] = None
-    search: Optional[str] = None
+    title: Optional[str] = Field(None, description="Filter by title (partial match)")
+    category: Optional[str] = Field(None, description="Filter by category")
+    tags: Optional[List[str]] = Field(None, description="Filter by tags (array contains all)")
+    search: Optional[str] = Field(None, description="Full-text search in title and description")
 
 class ExampleRepositoryQuery(ListQuery):
     """Query parameters for listing repositories."""
-    name: Optional[str] = None
-    source_type: Optional[str] = None
-    organization_id: Optional[str] = None
+    id: Optional[str] = Field(None, description="Filter by repository ID")
+    name: Optional[str] = Field(None, description="Filter by name (partial match)")
+    source_type: Optional[str] = Field(None, description="Filter by source type")
+    organization_id: Optional[str] = Field(None, description="Filter by organization ID")
 
 # Search functions
 

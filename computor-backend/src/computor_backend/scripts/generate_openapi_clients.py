@@ -191,15 +191,26 @@ class OpenAPIClientGenerator:
 
         return dict(groups)
 
-    def generate_method(self, endpoint: Dict) -> str:
+    def generate_method(self, endpoint: Dict, base_path: str) -> str:
         """Generate a single method for an endpoint."""
         method_name = endpoint['method_name']
         http_method = endpoint['method']
-        path = endpoint['path']
+        full_path = endpoint['path']
         path_params = endpoint['path_params']
         response_type = endpoint['response_type'] or 'Any'
         request_body = endpoint['request_body_type']
         operation = endpoint['operation']
+
+        # Extract relative path by removing base_path prefix
+        # If path is /course-groups/123, and base_path is /course-groups, we want just /123
+        # If path is /course-groups, and base_path is /course-groups, we want empty string
+        base_path_normalized = f"/{base_path}"
+        if full_path == base_path_normalized:
+            path = ""  # Root path of the resource
+        elif full_path.startswith(base_path_normalized + "/"):
+            path = full_path[len(base_path_normalized):]  # Remove base_path, keep the /
+        else:
+            path = full_path  # Fallback to full path
 
         # Build method signature
         params = []
@@ -225,7 +236,7 @@ class OpenAPIClientGenerator:
         # Build docstring
         summary = operation.get('summary', '')
         description = operation.get('description', '')
-        doc = summary or description or f"{http_method} {path}"
+        doc = summary or description or f"{http_method} {full_path}"
 
         # Build method body
         lines = [
@@ -242,31 +253,52 @@ class OpenAPIClientGenerator:
             # Regular string
             path_str = f'"{path}"'
 
+        # Helper to parse response
+        def add_response_parsing(lines, response_type):
+            """Add response parsing logic."""
+            if not response_type or response_type == 'Any':
+                return
+
+            # Check if it's a List type
+            if response_type.startswith('List['):
+                inner_type = response_type[5:-1]  # Extract type from List[Type]
+                lines.append(f'        if isinstance(data, list):')
+                lines.append(f'            return [{inner_type}.model_validate(item) for item in data]')
+                lines.append(f'        return data')
+            else:
+                lines.append(f'        if data:')
+                lines.append(f'            return {response_type}.model_validate(data)')
+                lines.append(f'        return data')
+
         # Determine the request type
         if http_method == 'GET':
             query_params = [p.get('name') for p in operation.get('parameters', []) if p.get('in') == 'query']
             if query_params:
                 lines.append(f'        params = {{k: v for k, v in locals().items() if k in {query_params} and v is not None}}')
-                lines.append(f'        return await self._request("GET", {path_str}, params=params)')
+                lines.append(f'        data = await self._request("GET", {path_str}, params=params)')
             else:
-                lines.append(f'        return await self._request("GET", {path_str})')
+                lines.append(f'        data = await self._request("GET", {path_str})')
+            add_response_parsing(lines, response_type)
 
         elif http_method == 'POST':
             if request_body:
                 lines.append(f'        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload')
-                lines.append(f'        return await self._request("POST", {path_str}, json=json_data)')
+                lines.append(f'        data = await self._request("POST", {path_str}, json=json_data)')
             else:
-                lines.append(f'        return await self._request("POST", {path_str})')
+                lines.append(f'        data = await self._request("POST", {path_str})')
+            add_response_parsing(lines, response_type)
 
         elif http_method in ['PUT', 'PATCH']:
             if request_body:
                 lines.append(f'        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload')
-                lines.append(f'        return await self._request("{http_method}", {path_str}, json=json_data)')
+                lines.append(f'        data = await self._request("{http_method}", {path_str}, json=json_data)')
             else:
-                lines.append(f'        return await self._request("{http_method}", {path_str})')
+                lines.append(f'        data = await self._request("{http_method}", {path_str})')
+            add_response_parsing(lines, response_type)
 
         elif http_method == 'DELETE':
-            lines.append(f'        return await self._request("DELETE", {path_str})')
+            lines.append(f'        data = await self._request("DELETE", {path_str})')
+            add_response_parsing(lines, response_type)
 
         return '\n'.join(lines)
 
@@ -333,10 +365,84 @@ class OpenAPIClientGenerator:
             '',
         ])
 
+        # Add CRUD method overrides that delegate to generated methods
+        # Find the generated method names for standard CRUD operations
+        post_method = None
+        get_list_method = None
+        get_by_id_method = None
+        patch_method = None
+        delete_method = None
+
+        for endpoint in endpoints:
+            method_name = endpoint['method_name']
+            http_method = endpoint['method']
+            path = endpoint['path']
+            base_path_normalized = f"/{base_path}"
+
+            # POST to root = create
+            if http_method == 'POST' and path == base_path_normalized:
+                post_method = method_name
+            # GET to root = list
+            elif http_method == 'GET' and path == base_path_normalized:
+                get_list_method = method_name
+            # GET to /{id} = get by id
+            elif http_method == 'GET' and '/{' in path and path.count('/') == path.count('{'):
+                get_by_id_method = method_name
+            # PATCH to /{id} = update
+            elif http_method == 'PATCH' and '/{' in path:
+                patch_method = method_name
+            # DELETE to /{id} = delete
+            elif http_method == 'DELETE' and '/{' in path:
+                delete_method = method_name
+
+        # Generate CRUD override methods
+        if post_method:
+            lines.extend([
+                '    async def create(self, payload):'  ,
+                '        """Create a new entity (delegates to generated POST method)."""',
+                f'        return await self.{post_method}(payload)',
+                '',
+            ])
+
+        if get_list_method:
+            lines.extend([
+                '    async def list(self, query=None):',
+                '        """List entities (delegates to generated GET method)."""',
+                f'        if query:',
+                f'            params = query.model_dump(mode="json", exclude_unset=True) if hasattr(query, "model_dump") else query',
+                f'            return await self.{get_list_method}(**params)',
+                f'        return await self.{get_list_method}()',
+                '',
+            ])
+
+        if get_by_id_method:
+            lines.extend([
+                '    async def get(self, id: str):',
+                '        """Get entity by ID (delegates to generated GET method)."""',
+                f'        return await self.{get_by_id_method}(id)',
+                '',
+            ])
+
+        if patch_method:
+            lines.extend([
+                '    async def update(self, id: str, payload):',
+                '        """Update entity (delegates to generated PATCH method)."""',
+                f'        return await self.{patch_method}(id, payload)',
+                '',
+            ])
+
+        if delete_method:
+            lines.extend([
+                '    async def delete(self, id: str):',
+                '        """Delete entity (delegates to generated DELETE method)."""',
+                f'        return await self.{delete_method}(id)',
+                '',
+            ])
+
         # Generate methods
         for endpoint in endpoints:
             try:
-                method_code = self.generate_method(endpoint)
+                method_code = self.generate_method(endpoint, base_path)
                 lines.append(method_code)
                 lines.append('')
             except Exception as e:
