@@ -5,9 +5,9 @@ RUN apt-get update && apt-get install -y postgresql-client git
 RUN useradd -ms /bin/bash worker
 WORKDIR /home/worker
 
-# Copy computor-types and src as root
+# Copy computor-types and computor-backend as root
 ADD computor-types /home/worker/computor-types
-ADD src /home/worker/src
+ADD computor-backend /home/worker/computor-backend
 
 # Copy the python-worker.py script
 COPY docker/temporal-worker-python/python-worker.py /home/worker/python-worker.py
@@ -22,10 +22,10 @@ USER worker
 RUN pip install --user -e computor-types
 
 # Install dependencies
-RUN pip install --no-cache-dir --user --upgrade -r src/requirements.txt
+RUN pip install --no-cache-dir --user --upgrade -r computor-backend/src/requirements.txt
 
 # Add src to PYTHONPATH so imports work
-ENV PYTHONPATH=/home/worker/src:$PYTHONPATH
+ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH
 
 ENTRYPOINT ["python", "/home/worker/python-worker.py"]
 #ENTRYPOINT ["python", "-m", "computor_backend.tasks.temporal_worker"]

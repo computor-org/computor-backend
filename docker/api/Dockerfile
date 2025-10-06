@@ -7,7 +7,7 @@ WORKDIR /home/uvicorn
 
 # Copy source code and installation files as root, then change ownership
 ADD computor-types /home/uvicorn/computor-types
-ADD src /home/uvicorn/src
+ADD computor-backend /home/uvicorn/computor-backend
 ADD migrations.sh /home/uvicorn/migrations.sh
 ADD docker/api/startup.bash startup.bash
 
@@ -24,7 +24,7 @@ ENV PATH="/home/uvicorn/.local/bin:${PATH}"
 RUN pip install --user -e computor-types
 
 # Install dependencies
-RUN pip install --user -r src/requirements.txt
+RUN pip install --user -r computor-backend/src/requirements.txt
 
 # Install the backend package in editable mode
-RUN cd src && pip install --user -e .
+RUN cd computor-backend/src && pip install --user -e .

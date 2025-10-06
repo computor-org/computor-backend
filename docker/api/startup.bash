@@ -3,7 +3,7 @@
 
 # Run Alembic migrations
 echo "Applying Alembic migrations..."
-cd src/computor_backend && alembic upgrade head
+cd computor-backend/src/computor_backend && alembic upgrade head
 #export PYTHONPATH=$PWD:$PYTHONPATH
 
 echo "Initializing system data..."

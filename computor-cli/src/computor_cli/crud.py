@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from httpx import ConnectError
 from computor_cli.auth import authenticate, get_crud_client
 from computor_cli.config import CLIAuthConfig
+from computor_types import endpoints
 from computor_types.results import ResultInterface
 from computor_types.users import UserInterface
 from computor_types.courses import CourseInterface
@@ -14,41 +15,40 @@ from computor_types.course_roles import CourseRoleInterface
 from computor_types.course_content_types import CourseContentTypeInterface
 from computor_types.course_contents import CourseContentInterface
 
-
 AVAILABLE_DTO_DEFINITIONS = [
-    OrganizationInterface.endpoint,
-    CourseFamilyInterface.endpoint,
-    CourseInterface.endpoint,
-    CourseContentInterface.endpoint,
-    CourseContentTypeInterface.endpoint,
-    CourseGroupInterface.endpoint,
-    CourseMemberInterface.endpoint,
-    CourseRoleInterface.endpoint,
-    UserInterface.endpoint,
-    ResultInterface.endpoint
+    endpoints.ORGANIZATIONS_ENDPOINT,
+    endpoints.COURSE_FAMILIES_ENDPOINT,
+    endpoints.COURSES_ENDPOINT,
+    endpoints.COURSE_CONTENTS_ENDPOINT,
+    endpoints.COURSE_CONTENT_TYPES_ENDPOINT,
+    endpoints.COURSE_GROUPS_ENDPOINT,
+    endpoints.COURSE_MEMBERS_ENDPOINT,
+    endpoints.COURSE_ROLES_ENDPOINT,
+    endpoints.USERS_ENDPOINT,
+    endpoints.RESULTS_ENDPOINT,
 ]
 
 def DTO_DEFINITIONS(table: str):
-
-    if OrganizationInterface.endpoint == table:
+    """Map endpoint name to interface class."""
+    if endpoints.ORGANIZATIONS_ENDPOINT == table:
         return OrganizationInterface
-    elif CourseFamilyInterface.endpoint == table:
+    elif endpoints.COURSE_FAMILIES_ENDPOINT == table:
         return CourseFamilyInterface
-    elif CourseInterface.endpoint == table:
+    elif endpoints.COURSES_ENDPOINT == table:
         return CourseInterface
-    elif CourseContentInterface.endpoint == table:
+    elif endpoints.COURSE_CONTENTS_ENDPOINT == table:
         return CourseContentInterface
-    elif CourseContentTypeInterface.endpoint == table:
+    elif endpoints.COURSE_CONTENT_TYPES_ENDPOINT == table:
         return CourseContentTypeInterface
-    elif CourseGroupInterface.endpoint == table:
+    elif endpoints.COURSE_GROUPS_ENDPOINT == table:
         return CourseGroupInterface
-    elif CourseMemberInterface.endpoint == table:
+    elif endpoints.COURSE_MEMBERS_ENDPOINT == table:
         return CourseMemberInterface
-    elif CourseRoleInterface.endpoint == table:
+    elif endpoints.COURSE_ROLES_ENDPOINT == table:
         return CourseRoleInterface
-    elif UserInterface.endpoint == table:
+    elif endpoints.USERS_ENDPOINT == table:
         return UserInterface
-    elif ResultInterface.endpoint == table:
+    elif endpoints.RESULTS_ENDPOINT == table:
         return ResultInterface
     else:
         raise Exception("Not found")

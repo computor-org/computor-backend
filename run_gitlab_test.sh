@@ -5,7 +5,7 @@
 source .env
 
 # Change to src directory
-cd src
+cd computor-backend/src
 
 # Run the test
 python ../scripts/testing/test_complete_gitlab_setup.py

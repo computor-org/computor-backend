@@ -14,7 +14,7 @@ echo -e "${GREEN}🧪 Computor Backend Test Runner${NC}"
 echo "=================================="
 
 # Change to src directory
-cd src
+cd computor-backend/src
 
 # Check if virtual environment is activated
 if [[ -z "$VIRTUAL_ENV" ]]; then

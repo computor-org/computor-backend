@@ -4,4 +4,4 @@ set -a
 source .env
 set +a
 
-cd src && python3 server.py
+cd computor-backend/src && python3 server.py

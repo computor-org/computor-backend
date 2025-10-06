@@ -70,9 +70,9 @@ for dir in "${directories[@]}"; do
 done
 
 # Copy defaults if source exists
-if [ -d "src/defaults" ]; then
+if [ -d "computor-backend/src/defaults" ]; then
     echo "Copying defaults..."
-    cp -r src/defaults "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+    cp -r computor-backend/src/defaults "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
 fi
 
 # Create Keycloak directories if they don't exist
