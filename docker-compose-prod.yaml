@@ -218,7 +218,7 @@ services:
       context: ./
       dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","testing-python"]
+    command: ["python", "-m", "computor_backend.tasks.temporal_worker","--queues","testing-python"]
     deploy:
       replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-2}
     environment:
