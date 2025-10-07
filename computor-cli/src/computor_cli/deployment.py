@@ -722,14 +722,16 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                         version_tag = content_config.example_version_tag or "latest"
                         try:
                             if version_tag == "latest":
-                                all_versions = custom_client.list(f"examples/{example.id}/versions") or []
+                                all_versions = custom_client.list(f"examples/{example['id']}/versions") or []
                             else:
                                 all_versions = custom_client.list(
-                                    f"examples/{example.id}/versions",
+                                    f"examples/{example['id']}/versions",
                                     params={"version_tag": version_tag}
                                 ) or []
-                        except Exception:
+                        except Exception as e:
+                            print(e)
                             all_versions = []
+                        
                         version = None
                         if version_tag == "latest" and all_versions:
                             version = all_versions[0]
@@ -738,6 +740,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                                 if v.get('version_tag') == version_tag:
                                     version = v
                                     break
+
                         # Fetch full version details to access meta_yaml (if later needed)
                         if version and not version.get('meta_yaml'):
                             try:

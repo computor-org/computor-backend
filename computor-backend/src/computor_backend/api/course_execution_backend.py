@@ -12,7 +12,14 @@ from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.database import get_db
 from computor_backend.model.course import CourseExecutionBackend
-from computor_types.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendGet, CourseExecutionBackendInterface, CourseExecutionBackendList, CourseExecutionBackendQuery
+from computor_types.course_execution_backends import (
+    CourseExecutionBackendCreate,
+    CourseExecutionBackendGet,
+    CourseExecutionBackendList,
+    CourseExecutionBackendQuery,
+)
+from computor_backend.interfaces.course_execution_backend import CourseExecutionBackendInterface
+
 course_execution_backend_router = APIRouter()
 
 @course_execution_backend_router.post("", response_model=CourseExecutionBackendGet)

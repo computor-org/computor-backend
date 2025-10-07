@@ -31,9 +31,9 @@ from computor_types.example import (
     ExampleUploadRequest,
     ExampleDownloadResponse,
     ExampleFileSet,
-    ExampleInterface,
     ExampleQuery,
 )
+from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..permissions.auth import get_current_principal
 from computor_backend.business_logic.crud import (

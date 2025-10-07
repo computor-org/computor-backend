@@ -69,10 +69,6 @@ class CourseContentRepository(BaseRepository[CourseContent]):
             tags.add(f"tutor_view:{entity.course_id}")
             tags.add(f"lecturer_view:{entity.course_id}")
 
-        # If parent content exists, invalidate parent caches
-        if entity.parent_id:
-            tags.add(f"course_content:{entity.parent_id}")
-
         return tags
 
     def get_list_tags(self, **filters) -> Set[str]:

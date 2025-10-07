@@ -31,6 +31,8 @@ from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
     AssignExampleRequest,
+    CourseContentDeploymentGet,
+    DeploymentHistoryGet,
     DeploymentWithHistory,
     DeploymentSummary,
     CourseContentDeploymentCreate,
@@ -64,23 +66,20 @@ def _build_deployment_with_history(
         .all()
     )
 
+    # Convert deployment to Pydantic model - handle Ltree conversion
     deployment_dict = {
         "id": deployment.id,
         "course_content_id": deployment.course_content_id,
         "example_version_id": deployment.example_version_id,
-        "example_identifier": (
-            str(deployment.example_identifier)
-            if getattr(deployment, "example_identifier", None) is not None
-            else None
-        ),
+        "example_identifier": str(deployment.example_identifier) if deployment.example_identifier else None,
         "version_tag": deployment.version_tag,
         "deployment_status": deployment.deployment_status,
-        "deployment_path": deployment.deployment_path,
-        "version_identifier": deployment.version_identifier,
+        "deployment_message": deployment.deployment_message,
         "assigned_at": deployment.assigned_at,
         "deployed_at": deployment.deployed_at,
         "last_attempt_at": deployment.last_attempt_at,
-        "deployment_message": deployment.deployment_message,
+        "deployment_path": deployment.deployment_path,
+        "version_identifier": deployment.version_identifier,
         "deployment_metadata": deployment.deployment_metadata,
         "workflow_id": deployment.workflow_id,
         "created_at": deployment.created_at,
@@ -88,29 +87,28 @@ def _build_deployment_with_history(
         "created_by": deployment.created_by,
         "updated_by": deployment.updated_by,
     }
+    deployment_dto = CourseContentDeploymentGet.model_validate(deployment_dict)
 
-    history_dicts = []
+    # Convert history entries to Pydantic models - handle Ltree conversion
+    history_dtos = []
     for h in history:
-        history_dicts.append({
+        h_dict = {
             "id": h.id,
             "deployment_id": h.deployment_id,
             "action": h.action,
             "example_version_id": h.example_version_id,
             "previous_example_version_id": h.previous_example_version_id,
-            "example_identifier": (
-                str(h.example_identifier)
-                if getattr(h, "example_identifier", None) is not None
-                else None
-            ),
+            "example_identifier": str(h.example_identifier) if h.example_identifier else None,
             "version_tag": h.version_tag,
             "workflow_id": h.workflow_id,
             "created_at": h.created_at,
             "created_by": h.created_by,
-        })
+        }
+        history_dtos.append(DeploymentHistoryGet.model_validate(h_dict))
 
     return DeploymentWithHistory(
-        deployment=deployment_dict,
-        history=history_dicts,
+        deployment=deployment_dto,
+        history=history_dtos,
     )
 
 # # File operations (unchanged)
@@ -313,16 +311,19 @@ async def assign_example_to_content(
             db.refresh(deployment)
             return _build_deployment_with_history(deployment, db)
 
-        deployment.example_version_id = new_example_version_id
-        deployment.example_identifier = Ltree(src_identifier) if src_identifier else None
-        deployment.version_tag = src_version_tag
-        deployment.deployment_status = "pending"
-        deployment.deployment_message = request.deployment_message
-        deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
-        deployment.updated_at = datetime.utcnow()
-
         # Update via repository
-        deployment = deployment_repo.update(deployment)
+        deployment = deployment_repo.update(
+            deployment.id,
+            {
+                "example_version_id": new_example_version_id,
+                "example_identifier": Ltree(src_identifier) if src_identifier else None,
+                "version_tag": src_version_tag,
+                "deployment_status": "pending",
+                "deployment_message": request.deployment_message,
+                "updated_by": permissions.user_id if hasattr(permissions, 'user_id') else None,
+                "updated_at": datetime.utcnow()
+            }
+        )
 
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,

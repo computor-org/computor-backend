@@ -28,6 +28,7 @@ from computor_backend.interfaces.extension import ExtensionInterface
 
 # Minimal backend wrappers for lookup-type interfaces
 from computor_backend.interfaces.execution_backends import ExecutionBackendInterface
+from computor_backend.interfaces.course_execution_backend import CourseExecutionBackendInterface
 from computor_backend.interfaces.groups import GroupInterface
 from computor_backend.interfaces.sessions import SessionInterface
 from computor_backend.interfaces.submission_group_members import SubmissionGroupMemberInterface
@@ -55,6 +56,7 @@ __all__ = [
     "ExampleRepositoryInterface",
     "ExtensionInterface",
     "ExecutionBackendInterface",
+    "CourseExecutionBackendInterface",
     "GroupInterface",
     "SessionInterface",
     "SubmissionGroupMemberInterface",

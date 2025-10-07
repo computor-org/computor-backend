@@ -258,6 +258,33 @@ class ExampleClient(FileOperationClient):
             base_path="/examples",
         )
 
+    async def list(self, query: Optional[BaseModel] = None) -> List[Any]:
+        """
+        List examples with optional query parameters.
+
+        Args:
+            query: Optional query parameters (ExampleQuery)
+
+        Returns:
+            List of examples
+        """
+        params = {}
+        if query:
+            params = query.model_dump(mode="json", exclude_unset=True) if hasattr(query, "model_dump") else query
+        return await self.custom_get("", params=params)
+
+    async def get(self, example_id: str) -> Any:
+        """
+        Get a specific example by ID.
+
+        Args:
+            example_id: ID of the example
+
+        Returns:
+            Example details
+        """
+        return await self.custom_get(f"{example_id}")
+
     async def upload_example(
         self,
         file_path: Union[str, Path],

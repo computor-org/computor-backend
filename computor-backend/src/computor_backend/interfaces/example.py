@@ -9,6 +9,7 @@ from computor_types.example import (
     ExampleQuery,
     ExampleRepositoryQuery,
 )
+from computor_types.custom_types import Ltree
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.example import Example, ExampleRepository
 
@@ -60,7 +61,8 @@ class ExampleInterface(ExampleInterfaceBase, BackendEntityInterface):
             if '*' in params.identifier:
                 query = query.filter(Example.identifier.op('~')(params.identifier))
             else:
-                query = query.filter(Example.identifier == params.identifier)
+                # Convert string to Ltree for proper comparison
+                query = query.filter(Example.identifier == Ltree(params.identifier))
         if params.title is not None:
             query = query.filter(Example.title.ilike(f"%{params.title}%"))
         if params.category is not None:

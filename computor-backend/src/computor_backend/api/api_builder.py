@@ -224,26 +224,26 @@ class CrudRouter:
     async def _clear_entity_cache(self, cache: BaseCache, table_name: str):
         """Clear all cache entries for a given entity type"""
         try:
-            # Get the underlying Redis client from aiocache
-            if hasattr(cache, '_client'):
-                redis_client = cache._client
-            elif hasattr(cache, 'client'):
-                redis_client = cache.client
-            else:
-                # Try to get client directly from cache backend
-                redis_client = getattr(cache, '_client', None) or getattr(cache, 'client', None)
-            
-            if redis_client:
+            # The cache parameter is actually the async Redis client from get_redis_client()
+            # Check if it's a direct Redis client
+            if hasattr(cache, 'keys') and callable(cache.keys):
                 pattern = f"{table_name}:*"
-                keys = await redis_client.keys(pattern)
-                if keys:
-                    await redis_client.delete(*keys)
+                cache_keys = await cache.keys(pattern)
+                if cache_keys:
+                    await cache.delete(*cache_keys)
+            # Otherwise check if it has a wrapped client (for aiocache BaseCache)
+            elif hasattr(cache, '_client') or hasattr(cache, 'client'):
+                redis_client = getattr(cache, '_client', None) or getattr(cache, 'client', None)
+                if redis_client and hasattr(redis_client, 'keys') and callable(redis_client.keys):
+                    pattern = f"{table_name}:*"
+                    cache_keys = await redis_client.keys(pattern)
+                    if cache_keys:
+                        await redis_client.delete(*cache_keys)
+                else:
+                    print(f"Warning: Using fallback cache clear method for {table_name}")
             else:
-                # Fallback: clear cache entries individually (less efficient)
                 print(f"Warning: Using fallback cache clear method for {table_name}")
-                # We can't easily implement pattern matching without direct Redis access
-                # So we'll just skip the cache clear for now
-                
+
         except Exception as e:
             # Log error but don't fail the operation
             print(f"Cache clear error for {table_name}: {e}")
