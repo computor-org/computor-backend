@@ -24,7 +24,8 @@ from computor_backend.model.course import Course, CourseMember, SubmissionGroup,
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from computor_types.student_courses import CourseStudentQuery
 from computor_types.student_course_contents import CourseContentStudentQuery
-from computor_types.course_members import CourseMemberInterface, CourseMemberQuery
+from computor_types.course_members import CourseMemberQuery
+from computor_backend.interfaces.course_member import CourseMemberInterface
 from computor_types.tutor_courses import CourseTutorGet, CourseTutorList
 from computor_types.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from computor_types.grading import GradingStatus

@@ -28,9 +28,9 @@ from computor_types.student_courses import (
     CourseStudentGet,
     CourseStudentList,
     CourseStudentQuery,
-    CourseStudentInterface,
     CourseStudentRepository,
 )
+from computor_backend.interfaces.student_courses import CourseStudentInterface
 from ..model.course import Course
 
 

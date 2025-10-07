@@ -9,9 +9,9 @@ from computor_backend.model.course import CourseContentKind
 
 class CourseContentKindInterface(CourseContentKindInterfaceBase, BackendEntityInterface):
     """Backend-specific CourseContentKindInterface with model and API configuration."""
-    
+
     model = CourseContentKind
-    endpoint = "course-content-kind"
+    endpoint = "course-content-kinds"
     cache_ttl = 600
 
     @staticmethod

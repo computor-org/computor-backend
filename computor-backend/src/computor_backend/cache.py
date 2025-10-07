@@ -35,9 +35,9 @@ except ImportError:
 
 def _convert_datetime(obj: Any) -> Any:
     """
-    Recursively convert datetime objects to ISO format strings.
+    Recursively convert datetime and custom objects to JSON-serializable types.
 
-    This ensures datetime objects can be serialized to JSON.
+    This ensures datetime objects and custom types (like Ltree) can be serialized to JSON.
     """
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
@@ -45,6 +45,12 @@ def _convert_datetime(obj: Any) -> Any:
         return {k: _convert_datetime(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [_convert_datetime(item) for item in obj]
+    # Handle Ltree and other custom types from computor_backend.custom_types
+    elif hasattr(obj, '__str__') and type(obj).__module__.startswith('computor_backend.custom_types'):
+        return str(obj)
+    # Handle sqlalchemy_utils types (like Ltree from sqlalchemy_utils)
+    elif type(obj).__module__.startswith('sqlalchemy_utils'):
+        return str(obj)
     return obj
 
 import redis

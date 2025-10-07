@@ -14,7 +14,8 @@ from .course import CourseRepository
 from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
 from ..api.exceptions import NotFoundException
-from computor_types.courses import CourseInterface, CourseList, CourseQuery
+from computor_types.courses import CourseList, CourseQuery
+from computor_backend.interfaces.course import CourseInterface
 from computor_types.lecturer_course_contents import (
     CourseContentLecturerGet,
     CourseContentLecturerList,
