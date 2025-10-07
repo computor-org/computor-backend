@@ -1,6 +1,7 @@
 import os
+from contextlib import contextmanager
 from typing import Generator, Callable
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 
@@ -48,3 +49,33 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
+
+@contextmanager
+def db_session_with_user(session: Session, user_id: str | None) -> Generator[Session, None, None]:
+    """
+    Context manager that sets the PostgreSQL app.user_id local variable
+    for transaction-level user tracking (audit logging).
+
+    Usage:
+        with db_session_with_user(db, user.id):
+            # All operations in this block will have app.user_id set
+            db.execute(...)
+            db.commit()
+
+    Args:
+        session: SQLAlchemy session
+        user_id: User ID to set (if None, no variable is set)
+
+    Yields:
+        The same session with app.user_id set
+    """
+    # SET LOCAL is only valid within a transaction and automatically
+    # resets at transaction end
+    if user_id:
+        session.execute(text("SET LOCAL app.user_id = :uid"), {"uid": user_id})
+    try:
+        yield session
+    finally:
+        # Nothing needed - SET LOCAL is automatically transaction-scoped
+        pass
