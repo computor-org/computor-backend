@@ -55,7 +55,12 @@ async def create_test_run(
 
     Tests are executed via Temporal workflows.
     """
+    from computor_backend.database import set_db_user
+
     user_id = permissions.get_user_id()
+
+    # Set user context for audit tracking
+    set_db_user(db, user_id)
 
     # Determine which artifact to test
     artifact = None

@@ -391,6 +391,10 @@ async def update_artifact_grade(
     db: Session = Depends(get_db),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     grade = db.query(SubmissionGrade).options(
         joinedload(SubmissionGrade.graded_by)
@@ -428,6 +432,10 @@ async def delete_artifact_grade(
     db: Session = Depends(get_db),
 ):
     """Delete a grade. Only the grader or an admin can delete."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     grade = db.query(SubmissionGrade).filter(SubmissionGrade.id == grade_id).first()
 
@@ -466,6 +474,10 @@ async def create_artifact_review(
     db: Session = Depends(get_db),
 ):
     """Create a review for an artifact."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     # Get the artifact
     artifact = db.query(SubmissionArtifact).options(
@@ -557,6 +569,10 @@ async def update_artifact_review(
     db: Session = Depends(get_db),
 ):
     """Update an existing review. Only the reviewer can update their own review."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     review = db.query(SubmissionReview).options(
         joinedload(SubmissionReview.reviewer)
@@ -588,6 +604,10 @@ async def delete_artifact_review(
     db: Session = Depends(get_db),
 ):
     """Delete a review. Only the reviewer or an admin can delete."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     review = db.query(SubmissionReview).filter(SubmissionReview.id == review_id).first()
 
@@ -626,6 +646,10 @@ async def create_test_result(
     db: Session = Depends(get_db),
 ):
     """Create a test result for an artifact. Checks for test limitations."""
+    from computor_backend.database import set_db_user
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     # Get the artifact
     artifact = db.query(SubmissionArtifact).options(

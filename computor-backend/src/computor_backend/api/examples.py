@@ -469,10 +469,15 @@ async def upload_example(
     storage_service=Depends(get_storage_service),
 ):
     """Upload an example to storage (MinIO)."""
+    from computor_backend.database import set_db_user
+
     # Check permissions
     if not permissions.permitted("example", "upload"):
         raise ForbiddenException("You don't have permission to upload examples")
-    
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
+
     # Verify repository exists and is MinIO type
     repository = db.query(ExampleRepository).filter(
         ExampleRepository.id == request.repository_id

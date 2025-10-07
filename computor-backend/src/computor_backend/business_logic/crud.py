@@ -30,6 +30,7 @@ from computor_backend.permissions.principal import Principal
 from computor_types.base import EntityInterface, ListQuery
 from computor_backend.custom_types import Ltree, LtreeType
 from computor_types.tasks import TaskStatus, map_task_status_to_int
+from computor_backend.database import set_db_user
 
 
 async def create_entity(
@@ -58,6 +59,9 @@ async def create_entity(
         NotFoundException: If user lacks create permission
         BadRequestException: If validation or integrity constraints fail
     """
+    # Set user context for audit tracking (created_by/updated_by)
+    set_db_user(db, permissions.user_id)
+
     # Authorization for create
     # 1) Admin shortcut
     if not permissions.is_admin:
@@ -261,6 +265,9 @@ async def update_entity(
         NotFoundException: If entity not found or user lacks permission
         BadRequestException: If update fails validation
     """
+    # Set user context for audit tracking (updated_by)
+    set_db_user(db, permissions.user_id)
+
     # Wrap blocking database operations in threadpool
     def _update_entity():
         if id is not None:

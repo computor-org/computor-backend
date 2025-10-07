@@ -15,7 +15,6 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
 from computor_backend.permissions.principal import Principal
 from computor_types.base import EntityInterface
-# from computor_backend.api.cache import cache_route
 from computor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from fastapi import FastAPI, BackgroundTasks

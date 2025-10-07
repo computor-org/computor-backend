@@ -186,8 +186,13 @@ async def publish_extension_version(
     db: Session = Depends(get_db),
     storage_service=Depends(get_storage_service),
 ):
+    from computor_backend.database import set_db_user
+
     if not permissions.permitted("extension", "create"):
         raise ForbiddenException("You don't have permission to publish extensions")
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     publisher, name = _split_identity(extension_identity)
 
@@ -482,8 +487,13 @@ async def update_extension_version(
     permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
+    from computor_backend.database import set_db_user
+
     if not permissions.permitted("extension", "update"):
         raise ForbiddenException("You don't have permission to modify extension versions")
+
+    # Set user context for audit tracking
+    set_db_user(db, permissions.user_id)
 
     publisher, name = _split_identity(extension_identity)
     extension = _get_extension_or_404(db, publisher, name)
