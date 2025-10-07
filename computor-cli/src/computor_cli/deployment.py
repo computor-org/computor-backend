@@ -260,12 +260,15 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Set password if provided
             if user_dep.password:
                 try:
-                    
+                    import httpx
                     password_payload = {
                         "username": user_dep.username,
                         "password": user_dep.password
                     }
-                    client.create("/user/password", password_payload)
+                    # Use direct HTTP call since client doesn't have this method
+                    with httpx.Client(base_url=str(client._client.base_url), headers=dict(client._client.headers)) as sync_client:
+                        response = sync_client.post("user/password", json=password_payload)
+                        response.raise_for_status()
                     click.echo(f"  ✅ Set password for user: {user.display_name}")
                 except Exception as e:
                     click.echo(f"  ⚠️  Failed to set password: {e}")
@@ -1190,24 +1193,32 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
 
         form_data = {key: str(value) for key, value in form_data.items() if value is not None}
 
-        files = {
-            "file": (
-                resolved_path.name,
-                file_bytes,
-                "application/octet-stream",
-            )
-        }
-
         try:
             # Use the underlying httpx client for multipart/form-data upload
             # Note: client._client is async, so we need to use the sync httpx client
             import httpx
-            with httpx.Client(base_url=str(client._client.base_url), headers=dict(client._client.headers)) as sync_client:
+            import io
+
+            # Create file-like object for httpx
+            file_obj = io.BytesIO(file_bytes)
+            files = {
+                "file": (resolved_path.name, file_obj, "application/octet-stream")
+            }
+
+            # Copy headers but remove Content-Type to let httpx set it for multipart
+            headers = dict(client._client.headers)
+            headers.pop('content-type', None)
+            headers.pop('Content-Type', None)
+
+            with httpx.Client(base_url=str(client._client.base_url), headers=headers) as sync_client:
                 response = sync_client.post(
                     f"extensions/{identity}/versions",
                     data=form_data,
                     files=files,
                 )
+                if response.status_code != 201:
+                    click.echo(f"  ❌ Upload failed: HTTP {response.status_code}", err=True)
+                    click.echo(f"  Response: {response.text}", err=True)
                 response.raise_for_status()
                 payload = response.json()
         except Exception as exc:

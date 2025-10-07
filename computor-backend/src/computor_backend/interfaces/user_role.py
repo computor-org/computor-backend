@@ -28,7 +28,5 @@ class UserRoleInterface(UserRoleInterfaceBase, BackendEntityInterface):
             query = query.filter(UserRole.user_id == params.user_id)
         if params.role_id is not None:
             query = query.filter(UserRole.role_id == params.role_id)
-        if params.transient is not None:
-            query = query.filter(UserRole.transient == params.transient)
 
         return query
