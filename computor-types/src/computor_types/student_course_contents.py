@@ -157,39 +157,6 @@ class CourseContentStudentQuery(ListQuery):
     descendants: Optional[str] = None
     ascendants: Optional[str] = None
     
-
-# BACKEND FUNCTION - Moved to backend in Phase 4
-# def course_content_student_search(db: 'Session', query, params: Optional[CourseContentStudentQuery]):
-#     if params.id != None:
-#         query = query.filter(id == params.id)
-#     if params.title != None:
-#         query = query.filter(title == params.title)
-#     if params.path != None:
-#         query = query.filter(path == Ltree(params.path))
-#     if params.course_id != None:
-#         query = query.filter(course_id == params.course_id)
-#     if params.course_content_type_id != None:
-#         query = query.filter(course_content_type_id == params.course_content_type_id)
-#
-#     # TODO: only for gitlab courses. This has to be checked
-#     if params.directory != None:
-#          query = query.filter(properties["gitlab"].op("->>")("directory") == params.directory)
-#     if params.project != None:
-#          query = query.filter(properties["gitlab"].op("->>")("full_path") == params.project)
-#     if params.provider_url != None:
-#          query = query.filter(properties["gitlab"].op("->>")("url") == params.provider_url)
-#
-#     if params.nlevel != None:
-#         query = query.filter(nlevel(CourseContent.path) == params.nlevel)
-#     if params.descendants != None:
-#         query = query.filter(and_(CourseContent.path.descendant_of(Ltree(params.descendants)), CourseContent.path != Ltree(params.descendants)))
-#     if params.ascendants != None:
-#         query = query.filter(and_(CourseContent.path.ancestor_of(Ltree(params.ascendants)), CourseContent.path != Ltree(params.ascendants)))
-#
-#     query = query.order_by(CourseContent.position)
-#
-#     return query
-#
 class CourseContentStudentInterface(EntityInterface):
     create = None
     get = CourseContentStudentGet

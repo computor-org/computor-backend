@@ -25,6 +25,8 @@ from computor_backend.interfaces.role_claim import RoleClaimInterface
 from computor_backend.interfaces.user_role import UserRoleInterface
 from computor_backend.interfaces.example import ExampleInterface, ExampleRepositoryInterface
 from computor_backend.interfaces.extension import ExtensionInterface
+from computor_backend.interfaces.message import MessageInterface
+from computor_backend.interfaces.result import ResultInterface
 
 # Minimal backend wrappers for lookup-type interfaces
 from computor_backend.interfaces.execution_backends import ExecutionBackendInterface
@@ -55,6 +57,8 @@ __all__ = [
     "ExampleInterface",
     "ExampleRepositoryInterface",
     "ExtensionInterface",
+    "MessageInterface",
+    "ResultInterface",
     "ExecutionBackendInterface",
     "CourseExecutionBackendInterface",
     "GroupInterface",

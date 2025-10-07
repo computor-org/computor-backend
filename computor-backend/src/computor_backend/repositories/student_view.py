@@ -5,9 +5,8 @@ This repository handles complex student-view queries that aggregate data
 from multiple tables (courses, course_contents, submissions, results, etc.)
 """
 
-from typing import List, Optional
+from typing import List
 from uuid import UUID
-from sqlalchemy.orm import Session
 
 from .view_base import ViewRepository
 from ..api.mappers import course_member_course_content_result_mapper

@@ -14,7 +14,8 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MessageInterface, MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
+from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
+from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 

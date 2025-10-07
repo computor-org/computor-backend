@@ -15,11 +15,11 @@ from computor_backend.database import get_db
 from computor_types.results import (
     ResultCreate,
     ResultGet,
-    ResultInterface,
     ResultList,
     ResultUpdate,
     ResultQuery,
 )
+from computor_backend.interfaces.result import ResultInterface
 from computor_types.tasks import TaskStatus
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
