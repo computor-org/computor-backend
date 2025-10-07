@@ -5,8 +5,9 @@ RUN apt-get update && apt-get install -y postgresql-client git
 RUN useradd -ms /bin/bash worker
 WORKDIR /home/worker
 
-# Copy computor-types and computor-backend as root
+# Copy computor-types, computor-utils and computor-backend as root
 ADD computor-types /home/worker/computor-types
+ADD computor-utils /home/worker/computor-utils
 ADD computor-backend /home/worker/computor-backend
 
 # Copy the python-worker.py script
@@ -18,8 +19,9 @@ RUN chown -R worker:worker /home/worker
 # Switch to worker user
 USER worker
 
-# Install computor-types first (local package)
+# Install local packages first (computor-types and computor-utils)
 RUN pip install --user -e computor-types
+RUN pip install --user -e computor-utils
 
 # Install dependencies
 RUN pip install --no-cache-dir --user --upgrade -r computor-backend/src/requirements.txt

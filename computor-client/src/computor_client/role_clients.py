@@ -3,7 +3,7 @@
 from typing import Optional, Dict, Any, List
 import httpx
 
-from .advanced_base import RoleBasedViewClient
+from .base import RoleBasedViewClient
 
 
 class StudentViewClient(RoleBasedViewClient):

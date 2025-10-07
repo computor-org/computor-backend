@@ -1,4 +1,5 @@
 from enum import Enum
+from fastapi import Query
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
 from typing import TYPE_CHECKING, Optional
 from datetime import datetime
@@ -183,7 +184,6 @@ class OrganizationQuery(ListQuery):
     path: Optional[str] = None
     organization_type: Optional[OrganizationType] = None
     user_id: Optional[str] = None
-    properties: Optional[OrganizationProperties] = None
     number: Optional[str] = None
     email: Optional[str] = None
     telephone: Optional[str] = None

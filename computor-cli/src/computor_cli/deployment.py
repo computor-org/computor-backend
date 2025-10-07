@@ -230,7 +230,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                     properties=user_dep.properties
                 )
                 
-                user = user_client.create(user_create)
+                user = run_async(user_client.create(user_create))
                 click.echo(f"  ✅ Created user: {user.display_name}")
                 
             # Assign system roles if provided
@@ -241,16 +241,16 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 for role_id in user_dep.roles:
                     try:
                         # Check if role exists
-                        roles = role_client.list(RoleQuery(id=role_id))
+                        roles = run_async(role_client.list(RoleQuery(id=role_id)))
                         if not roles:
                             click.echo(f"  ⚠️  Role not found: {role_id}")
                             continue
                         
                         # Check if user already has this role
-                        existing_user_roles = user_role_client.list(UserRoleQuery(
+                        existing_user_roles = run_async(user_role_client.list(UserRoleQuery(
                             user_id=str(user.id),
                             role_id=role_id
-                        ))
+                        )))
                         
                         if existing_user_roles:
                             click.echo(f"  ℹ️  User already has role: {role_id}")
@@ -260,7 +260,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                 user_id=str(user.id),
                                 role_id=role_id
                             )
-                            user_role_client.create(user_role_create)
+                            run_async(user_role_client.create(user_role_create))
                             click.echo(f"  ✅ Assigned role: {role_id}")
                     except Exception as e:
                         click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
@@ -281,10 +281,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Create accounts
             for account_dep in user_deployment.accounts:
                 # Check if account already exists for this user
-                existing_accounts = account_client.list(AccountQuery(
+                existing_accounts = run_async(account_client.list(AccountQuery(
                     provider_account_id=account_dep.provider_account_id,
                     user_id=str(user.id)
-                ))
+                )))
                 
                 if existing_accounts:
                     click.echo(f"  Account already exists: {account_dep.type} @ {account_dep.provider}")
@@ -298,7 +298,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         properties=account_dep.properties or {}
                     )
                     
-                    account_client.create(account_create)
+                    run_async(account_client.create(account_create))
                     click.echo(f"  ✅ Created account: {account_dep.type} @ {account_dep.provider}")
             
             # Create course memberships
@@ -309,27 +309,27 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                     # Resolve course by path or ID
                     if cm_dep.is_path_based:
                         # Find organization
-                        orgs = org_client.list(OrganizationQuery(path=cm_dep.organization))
+                        orgs = run_async(org_client.list(OrganizationQuery(path=cm_dep.organization)))
                         if not orgs:
                             click.echo(f"  ⚠️  Organization not found: {cm_dep.organization}")
                             continue
                         org = orgs[0]
                         
                         # Find course family
-                        families = family_client.list(CourseFamilyQuery(
+                        families = run_async(family_client.list(CourseFamilyQuery(
                             organization_id=str(org.id),
                             path=cm_dep.course_family
-                        ))
+                        )))
                         if not families:
                             click.echo(f"  ⚠️  Course family not found: {cm_dep.course_family}")
                             continue
                         family = families[0]
                         
                         # Find course
-                        courses = course_client.list(CourseQuery(
+                        courses = run_async(course_client.list(CourseQuery(
                             course_family_id=str(family.id),
                             path=cm_dep.course
-                        ))
+                        )))
                         if not courses:
                             click.echo(f"  ⚠️  Course not found: {cm_dep.course}")
                             continue
@@ -337,7 +337,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                     
                     elif cm_dep.is_id_based:
                         # Direct course lookup by ID
-                        course = course_client.get(cm_dep.id)
+                        course = run_async(course_client.get(cm_dep.id))
                         if not course:
                             click.echo(f"  ⚠️  Course not found: {cm_dep.id}")
                             continue
@@ -347,10 +347,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         course_group_id = None
                         if cm_dep.role == "_student" and cm_dep.group:
                             # Find or create course group
-                            groups = course_group_client.list(CourseGroupQuery(
+                            groups = run_async(course_group_client.list(CourseGroupQuery(
                                 course_id=str(course.id),
                                 title=cm_dep.group
-                            ))
+                            )))
                             if groups:
                                 course_group_id = str(groups[0].id)
                                 click.echo(f"  Using existing group: {cm_dep.group}")
@@ -362,7 +362,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                         description=f"Course group {cm_dep.group}",
                                         course_id=str(course.id)
                                     )
-                                    new_group = course_group_client.create(group_create)
+                                    new_group = run_async(course_group_client.create(group_create))
                                     course_group_id = str(new_group.id)
                                     click.echo(f"  ✅ Created course group: {cm_dep.group}")
                                 except Exception as e:
@@ -370,10 +370,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                     continue
                         
                         # Check if course member already exists
-                        existing_members = course_member_client.list(CourseMemberQuery(
+                        existing_members = run_async(course_member_client.list(CourseMemberQuery(
                             user_id=str(user.id),
                             course_id=str(course.id)
-                        ))
+                        )))
                         
                         if existing_members:
                             existing_member = existing_members[0]
@@ -392,7 +392,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                     'course_role_id': cm_dep.role,
                                     'course_group_id': course_group_id
                                 }
-                                course_member_client.update(str(existing_member.id), member_update)
+                                run_async(course_member_client.update(str(existing_member.id), member_update))
                                 click.echo(f"  ✅ Updated course membership: {course.path} as {cm_dep.role}")
                             else:
                                 click.echo(f"  Already member of course: {course.path} as {cm_dep.role}")
@@ -405,7 +405,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                 course_group_id=course_group_id
                             )
                             
-                            course_member_client.create(member_create)
+                            run_async(course_member_client.create(member_create))
                             click.echo(f"  ✅ Added to course: {course.path} as {cm_dep.role}")
                         
                 except Exception as e:
@@ -444,7 +444,7 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
         
         try:
             # Check if backend already exists
-            existing_backends = backend_client.list(ExecutionBackendQuery(slug=backend_config.slug))
+            existing_backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_config.slug)))
             
             if existing_backends:
                 backend = existing_backends[0]
@@ -458,7 +458,7 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
                         properties=backend_config.properties or {}
                     )
 
-                    backend_client.update(str(backend.id), backend_update)
+                    run_async(backend_client.update(str(backend.id), backend_update))
                     click.echo(f"    ✅ Updated backend: {backend_config.slug}")
             else:
                 # Create new backend
@@ -467,7 +467,7 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
                     type=backend_config.type,
                     properties=backend_config.properties or {}
                 )
-                backend = backend_client.create(backend_create)
+                backend = run_async(backend_client.create(backend_create))
                 click.echo(f"    ✅ Created backend: {backend_config.slug}")
                 
         except Exception as e:
@@ -501,10 +501,10 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             full_path = None
             
             # Find the content type
-            content_types = content_type_client.list(CourseContentTypeQuery(
+            content_types = run_async(content_type_client.list(CourseContentTypeQuery(
                 course_id=course_id,
                 slug=content_config.content_type
-            ))
+            )))
             
             if not content_types:
                 click.echo(f"    ⚠️  Content type not found: {content_config.content_type}")
@@ -515,9 +515,9 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             # Determine if submittable by content kind (needed to fetch example metadata)
             is_submittable = False
             if content_type.course_content_kind_id:
-                content_kinds = content_kind_client.list(CourseContentKindQuery(
+                content_kinds = run_async(content_kind_client.list(CourseContentKindQuery(
                     id=content_type.course_content_kind_id
-                ))
+                )))
                 if content_kinds and len(content_kinds) > 0:
                     is_submittable = content_kinds[0].submittable
             
@@ -529,9 +529,9 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             ex_title = None
             if is_submittable and content_config.example_identifier:
                 try:
-                    examples = example_client.list(ExampleQuery(
+                    examples = run_async(example_client.list(ExampleQuery(
                         identifier=content_config.example_identifier
-                    ))
+                    )))
                     if examples:
                         example = examples[0]
                         ex_title = getattr(example, 'title', None)
@@ -586,7 +586,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 candidate = f"{parent_path}.{seg}" if parent_path else seg
                 idx = 1
                 while True:
-                    existing = content_client.list(CourseContentQuery(course_id=course_id, path=candidate))
+                    existing = run_async(content_client.list(CourseContentQuery(course_id=course_id, path=candidate)))
                     if not existing:
                         full_path = candidate
                         break
@@ -602,10 +602,10 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     return seg
 
             # Check if content already exists
-            existing_contents = content_client.list(CourseContentQuery(
+            existing_contents = run_async(content_client.list(CourseContentQuery(
                 course_id=course_id,
                 path=full_path
-            ))
+            )))
             
             if existing_contents:
                 content = existing_contents[0]
@@ -628,7 +628,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 if to_update:
                     try:
                         from computor_types.course_contents import CourseContentUpdate
-                        content_client.update(str(content.id), CourseContentUpdate(**to_update))
+                        run_async(content_client.update(str(content.id), CourseContentUpdate(**to_update)))
                         click.echo(f"      ✏️  Updated content description")
                     except Exception as e:
                         click.echo(f"      ⚠️  Failed to update content description: {e}")
@@ -640,7 +640,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 # Determine execution backend ID
                 execution_backend_id = None
                 if content_config.execution_backend:
-                    backends = backend_client.list(ExecutionBackendQuery(slug=content_config.execution_backend))
+                    backends = run_async(backend_client.list(ExecutionBackendQuery(slug=content_config.execution_backend)))
                     if backends:
                         execution_backend_id = str(backends[0].id)
                 
@@ -668,7 +668,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     properties=content_config.properties
                 )
                 
-                content = content_client.create(content_create)
+                content = run_async(content_client.create(content_create))
                 click.echo(f"    ✅ Created content: {effective_title} ({full_path})")
             
             # Handle example deployment for submittable content
@@ -696,9 +696,9 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                             click.echo(f"      ⚠️  Failed to assign example: {e}")
                 else:
                     # Legacy fallback: look up again if prefetch failed
-                    examples = example_client.list(ExampleQuery(
+                    examples = run_async(example_client.list(ExampleQuery(
                         identifier=content_config.example_identifier
-                    ))
+                    )))
                     if not examples:
                         click.echo(f"      ⚠️  Example not found in DB: {content_config.example_identifier}")
                         # Fallback: assign by identifier/version_tag (custom assignment)
@@ -792,7 +792,7 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
     # Process each organization
     for org_config in config.organizations:
         # Find the organization
-        orgs = org_client.list(OrganizationQuery(path=org_config.path))
+        orgs = run_async(org_client.list(OrganizationQuery(path=org_config.path)))
         if not orgs:
             continue
         org = orgs[0]
@@ -800,10 +800,10 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
         # Process each course family
         for family_config in org_config.course_families:
             # Find the course family
-            families = family_client.list(CourseFamilyQuery(
+            families = run_async(family_client.list(CourseFamilyQuery(
                 organization_id=str(org.id),
                 path=family_config.path
-            ))
+            )))
             if not families:
                 continue
             family = families[0]
@@ -815,10 +815,10 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
                     continue
                     
                 # Find the course
-                courses = course_client.list(CourseQuery(
+                courses = run_async(course_client.list(CourseQuery(
                     course_family_id=str(family.id),
                     path=course_config.path
-                ))
+                )))
                 if not courses:
                     continue
                 course = courses[0]
@@ -889,7 +889,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
     # Process each organization
     for org_config in config.organizations:
         # Find the organization
-        orgs = org_client.list(OrganizationQuery(path=org_config.path))
+        orgs = run_async(org_client.list(OrganizationQuery(path=org_config.path)))
         if not orgs:
             click.echo(f"  ⚠️  Organization not found: {org_config.path}")
             continue
@@ -898,10 +898,10 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
         # Process each course family
         for family_config in org_config.course_families:
             # Find the course family
-            families = family_client.list(CourseFamilyQuery(
+            families = run_async(family_client.list(CourseFamilyQuery(
                 organization_id=str(org.id),
                 path=family_config.path
-            ))
+            )))
             if not families:
                 click.echo(f"  ⚠️  Course family not found: {family_config.path}")
                 continue
@@ -910,10 +910,10 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
             # Process each course
             for course_config in family_config.courses:
                 # Find the course
-                courses = course_client.list(CourseQuery(
+                courses = run_async(course_client.list(CourseQuery(
                     course_family_id=str(family.id),
                     path=course_config.path
-                ))
+                )))
                 if not courses:
                     click.echo(f"  ⚠️  Course not found: {course_config.path}")
                     continue
@@ -954,7 +954,7 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
     for backend_ref in execution_backends:
         try:
             # Find the backend by slug
-            backends = backend_client.list(ExecutionBackendQuery(slug=backend_ref.slug))
+            backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_ref.slug)))
             
             if not backends:
                 click.echo(f"      ⚠️  Backend not found: {backend_ref.slug}")
@@ -963,10 +963,10 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
             backend = backends[0]
             
             # Check if link already exists
-            existing_links = course_backend_client.list(CourseExecutionBackendQuery(
+            existing_links = run_async(course_backend_client.list(CourseExecutionBackendQuery(
                 course_id=course_id,
                 execution_backend_id=str(backend.id)
-            ))
+            )))
             
             if existing_links:
                 click.echo(f"      ℹ️  Backend already linked: {backend_ref.slug}")
@@ -977,7 +977,7 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
                     link_update = {
                         'properties': backend_ref.properties
                     }
-                    course_backend_client.update(str(link.id), link_update)
+                    run_async(course_backend_client.update(str(link.id), link_update))
                     click.echo(f"      ✅ Updated link properties for: {backend_ref.slug}")
             else:
                 # Create new link
@@ -986,7 +986,7 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
                     execution_backend_id=str(backend.id),
                     properties=backend_ref.properties or {}
                 )
-                course_backend_client.create(link_create)
+                run_async(course_backend_client.create(link_create))
                 click.echo(f"      ✅ Linked backend: {backend_ref.slug}")
                 
         except Exception as e:

@@ -27,7 +27,6 @@ class ExecutionBackendQuery(ListQuery):
     id: Optional[str] = None
     type: Optional[str] = None
     slug: Optional[str] = None
-    properties: Optional[str] = None
 
 
 class ExecutionBackendInterface(EntityInterface):

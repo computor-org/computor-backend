@@ -86,7 +86,6 @@ class CourseContentTypeQuery(ListQuery):
     color: Optional[str] = None
     description: Optional[str] = None
     course_id: Optional[str] = None
-    properties: Optional[str] = None
     course_content_kind_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

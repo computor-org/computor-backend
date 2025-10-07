@@ -38,23 +38,6 @@ from computor_backend.interfaces import (
     LanguageInterface,
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 from computor_backend.api.course_execution_backend import course_execution_backend_router
 from computor_backend.api.courses import course_router
 from computor_backend.api.system import system_router

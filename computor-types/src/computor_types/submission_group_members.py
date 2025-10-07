@@ -56,7 +56,6 @@ class SubmissionGroupMemberQuery(ListQuery):
     submission_group_id: Optional[str] = None
     grading: Optional[float] = None
     status: Optional[str] = None
-    properties: Optional[SubmissionGroupMemberProperties] = None
 
 
 class SubmissionGroupMemberInterface(EntityInterface):

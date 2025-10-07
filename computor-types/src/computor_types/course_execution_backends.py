@@ -29,7 +29,6 @@ class CourseExecutionBackendUpdate(BaseModel):
 class CourseExecutionBackendQuery(ListQuery):
     execution_backend_id: Optional[str] = None
     course_id: Optional[str] = None
-    properties: Optional[str] = None
 
 
 class CourseExecutionBackendInterface(EntityInterface):

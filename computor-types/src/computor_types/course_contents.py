@@ -157,7 +157,6 @@ class CourseContentQuery(ListQuery):
     path: Optional[str] = None
     course_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
-    properties: Optional[CourseContentProperties] = None
     archived: Optional[bool] = None
     position: Optional[float] = None
     max_group_size: Optional[int] = None

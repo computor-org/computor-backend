@@ -5,7 +5,7 @@ from pathlib import Path
 import httpx
 from pydantic import BaseModel
 
-from .advanced_base import (
+from .base import (
     AuthenticationClient,
     FileOperationClient,
     TaskClient,

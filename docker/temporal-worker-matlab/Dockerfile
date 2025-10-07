@@ -26,15 +26,17 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
 
-# Copy computor-types and computor-backend
+# Copy computor-types, computor-utils and computor-backend
 ADD computor-types /home/matlab/computor-types
+ADD computor-utils /home/matlab/computor-utils
 ADD computor-backend /home/matlab/computor-backend
 
 # Copy the matlab-server.py script
 COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
 
-# Install computor-types first (local package)
+# Install local packages first (computor-types and computor-utils)
 RUN pip install --no-cache-dir -e /home/matlab/computor-types
+RUN pip install --no-cache-dir -e /home/matlab/computor-utils
 
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade -r /home/matlab/computor-backend/src/requirements.txt

@@ -3,8 +3,12 @@
 __version__ = "0.1.0"
 
 from .client import ComputorClient
-from .base import BaseEndpointClient
-from .advanced_base import (
+from .base import (
+    # Base client classes
+    SimpleEndpointClient,
+    TypedEndpointClient,
+    BaseEndpointClient,  # Alias for SimpleEndpointClient (backward compat)
+    # Specialized client classes
     CustomActionClient,
     RoleBasedViewClient,
     FileOperationClient,
@@ -71,7 +75,10 @@ __all__ = [
     # Main client
     "ComputorClient",
     # Base classes
-    "BaseEndpointClient",
+    "SimpleEndpointClient",
+    "TypedEndpointClient",
+    "BaseEndpointClient",  # Alias for backward compatibility
+    # Specialized classes
     "CustomActionClient",
     "RoleBasedViewClient",
     "FileOperationClient",

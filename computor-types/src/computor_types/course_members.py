@@ -61,7 +61,6 @@ class CourseMemberQuery(ListQuery):
     course_id: Optional[str] = None
     course_group_id: Optional[str] = None
     course_role_id: Optional[str] = None
-    properties: Optional[CourseMemberProperties] = None
     given_name: Optional[str] = None
     family_name: Optional[str] = None
 

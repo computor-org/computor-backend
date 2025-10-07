@@ -7,6 +7,7 @@ from computor_types.course_families import (
     CourseFamilyInterface as CourseFamilyInterfaceBase,
     CourseFamilyQuery,
 )
+from computor_types.custom_types import Ltree
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseFamily
 
@@ -31,7 +32,8 @@ class CourseFamilyInterface(CourseFamilyInterfaceBase, BackendEntityInterface):
         if params.description is not None:
             query = query.filter(CourseFamily.description.ilike(f"%{params.description}%"))
         if params.path is not None:
-            query = query.filter(CourseFamily.path == params.path)
+            # Convert string to Ltree for proper comparison
+            query = query.filter(CourseFamily.path == Ltree(params.path))
         if params.organization_id is not None:
             query = query.filter(CourseFamily.organization_id == params.organization_id)
 

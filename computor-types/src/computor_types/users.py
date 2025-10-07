@@ -182,7 +182,6 @@ class UserQuery(ListQuery):
     email: Optional[str] = None
     number: Optional[str] = None
     user_type: Optional[UserTypeEnum] = None
-    properties: Optional[dict] = None
     archived: Optional[bool] = None
     username: Optional[str] = None
 

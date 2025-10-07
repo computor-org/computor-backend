@@ -7,6 +7,7 @@ from computor_types.course_contents import (
     CourseContentInterface as CourseContentInterfaceBase,
     CourseContentQuery,
 )
+from computor_types.custom_types import Ltree
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseContent
 
@@ -41,7 +42,8 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
         if params.description is not None:
             query = query.filter(CourseContent.description.ilike(f"%{params.description}%"))
         if params.path is not None:
-            query = query.filter(CourseContent.path == params.path)
+            # Convert string to Ltree for proper comparison
+            query = query.filter(CourseContent.path == Ltree(params.path))
         if params.course_id is not None:
             query = query.filter(CourseContent.course_id == params.course_id)
         if params.course_content_type_id is not None:

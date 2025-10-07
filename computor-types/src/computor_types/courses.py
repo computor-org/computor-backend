@@ -71,7 +71,6 @@ class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None
-    properties: Optional[CourseProperties] = None
 
 class CourseQuery(ListQuery):
     id: Optional[str] = None

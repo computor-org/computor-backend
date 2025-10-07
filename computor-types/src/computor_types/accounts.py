@@ -86,7 +86,6 @@ class AccountQuery(ListQuery):
     type: Optional[str] = None
     provider_account_id: Optional[str] = None
     user_id: Optional[str] = None
-    properties: Optional[str] = None
     
 
 class AccountInterface(EntityInterface):

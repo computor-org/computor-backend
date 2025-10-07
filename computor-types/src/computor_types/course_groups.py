@@ -32,7 +32,6 @@ class CourseGroupQuery(ListQuery):
     id: Optional[str] = None
     title: Optional[str] = None
     course_id: Optional[str] = None
-    properties: Optional[str] = None
     
 def course_group_search(db: 'Session', query, params: Optional[CourseGroupQuery]):
     if params.id != None:

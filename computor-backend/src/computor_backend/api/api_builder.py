@@ -43,7 +43,13 @@ class CrudRouter:
         self.on_archived = []
 
     def create(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], entity: self.dto.create, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(
+                background_tasks: BackgroundTasks, 
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                entity: self.dto.create, 
+                cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                db: Session = Depends(get_db)
+        ) -> self.dto.get:
             entity_created = await create_db(permissions, db, entity, self.dto.model, self.dto.get, self.dto.post_create)
 
             # Clear related cache entries
@@ -56,7 +62,11 @@ class CrudRouter:
         return route
     
     def get(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                db: Session = Depends(get_db)
+        ) -> self.dto.get:
             # Check cache first
             # cache_key = f"{self.dto.model.__tablename__}:get:{permissions.user_id}:{id}"
             # cached_result = await cache.get(cache_key)
@@ -73,7 +83,13 @@ class CrudRouter:
         return route
 
     def list(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], cache: Annotated[BaseCache, Depends(get_redis_client)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                response: Response, 
+                params: Annotated[self.dto.query , Depends()],
+                db: Session = Depends(get_db)
+        ) -> list[self.dto.list]:
             # Generate cache key based on params and user permissions
             # import hashlib
             # params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
@@ -99,7 +115,14 @@ class CrudRouter:
         return route
     
     def update(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, entity: self.dto.update, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(
+                background_tasks: BackgroundTasks, 
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                id: UUID | str, 
+                entity: self.dto.update, 
+                cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                db: Session = Depends(get_db)
+        ) -> self.dto.get:
             entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update)
 
             # Clear related cache entries
@@ -112,7 +135,13 @@ class CrudRouter:
         return route
 
     def delete(self):
-        async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)):
+        async def route(
+                background_tasks: BackgroundTasks, 
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                id: UUID | str, 
+                cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                db: Session = Depends(get_db)
+        ):
 
             entity_deleted = None
             if len(self.on_deleted) > 0:
@@ -132,7 +161,11 @@ class CrudRouter:
     
     def archive(self):  
         if hasattr(self.dto.model, "archived_at"):   
-            async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_principal)], id: UUID | str, db: Session = Depends(get_db)):
+            async def route(
+                    background_tasks: BackgroundTasks, 
+                    permissions: Annotated[Principal, Depends(get_current_principal)], 
+                    id: UUID | str, db: Session = Depends(get_db)
+            ):
 
                 if len(self.on_archived) > 0:
 
@@ -147,7 +180,12 @@ class CrudRouter:
             return None
 
     def filter(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], filters: Optional[dict] = None, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(
+                permissions: Annotated[Principal, Depends(get_current_principal)], 
+                filters: Optional[dict] = None, 
+                params: self.dto.query = Depends(), 
+                db: Session = Depends(get_db)
+        ) -> list[self.dto.list]:
             return await filter_db(permissions, db, self.dto.model, params, self.dto.search, filters)
         return route
 

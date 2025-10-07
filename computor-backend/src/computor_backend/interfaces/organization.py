@@ -7,6 +7,7 @@ from computor_types.organizations import (
     OrganizationInterface as OrganizationInterfaceBase,
     OrganizationQuery,
 )
+from computor_types.custom_types import Ltree
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.organization import Organization
 
@@ -39,6 +40,7 @@ class OrganizationInterface(OrganizationInterfaceBase, BackendEntityInterface):
         if params.user_id is not None:
             query = query.filter(Organization.user_id == params.user_id)
         if params.path is not None:
-            query = query.filter(Organization.path == params.path)
+            # Convert string to Ltree for proper comparison
+            query = query.filter(Organization.path == Ltree(params.path))
 
         return query

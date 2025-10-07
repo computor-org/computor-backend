@@ -73,7 +73,6 @@ class CourseFamilyQuery(ListQuery):
     description: Optional[str] = None
     path: Optional[str] = None
     organization_id: Optional[str] = None
-    properties: Optional[str] = None
     
 
 class CourseFamilyInterface(EntityInterface):
