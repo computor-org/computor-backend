@@ -239,28 +239,3 @@ async def get_computor_client(auth: CLIAuthConfig):
         raise NotImplementedError("No authentication method configured")
 
     return client
-
-
-def get_computor_client_sync(auth: CLIAuthConfig):
-    """
-    Create and authenticate a ComputorClient instance (synchronous wrapper).
-
-    This is a synchronous wrapper around get_computor_client() for use in
-    Click commands that haven't been converted to async yet.
-
-    Args:
-        auth: CLI authentication configuration
-
-    Returns:
-        Authenticated ComputorClient instance
-    """
-    import asyncio
-
-    # Run the async function in a new event loop
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(get_computor_client(auth))

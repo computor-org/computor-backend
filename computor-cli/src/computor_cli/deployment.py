@@ -28,7 +28,7 @@ from computor_types.deployments_refactored import (
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
 )
-from computor_cli.auth import authenticate, get_computor_client_sync
+from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_types.users import UserCreate, UserQuery
 from computor_types.accounts import AccountCreate, AccountQuery
@@ -53,15 +53,7 @@ from computor_utils.vsix_utils import parse_vsix_metadata
 from computor_types.exceptions import VsixManifestError
 # Deployment is handled through course-contents API, not a separate deployment endpoint
 
-def run_async(coro):
-    """Helper to run async functions synchronously in Click commands."""
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+from computor_cli.utils import run_async
 
 
 class SyncHTTPWrapper:
@@ -187,7 +179,7 @@ def init(output: str, format: str):
 def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     """Deploy users and their course memberships from configuration."""
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     # Get API clients
     user_client = client.users
@@ -197,23 +189,23 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     course_group_client = client.course_groups
     org_client = client.organizations
     family_client = client.course_families
-    
+
     processed_users = []
     failed_users = []
-    
+
     for user_deployment in config.users:
         user_dep = user_deployment.user
         click.echo(f"\n👤 Processing: {user_dep.display_name} ({user_dep.username})")
-        
+
         try:
             # Check if user already exists by email or username
             existing_users = []
             if user_dep.email:
-                existing_users.extend(user_client.list(UserQuery(email=user_dep.email)))
-            
+                existing_users.extend(run_async(user_client.list(UserQuery(email=user_dep.email))))
+
             # Also check by username if not found by email
             if not existing_users and user_dep.username:
-                existing_users.extend(user_client.list(UserQuery(username=user_dep.username)))
+                existing_users.extend(run_async(user_client.list(UserQuery(username=user_dep.username))))
             
             if existing_users:
                 user = existing_users[0]
@@ -429,7 +421,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
 def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     """Deploy execution backends from configuration."""
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     if not config.execution_backends:
         return
@@ -478,7 +470,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
     """Deploy course contents for a course."""
     
     
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     if not course_config.contents:
         return
@@ -779,7 +771,7 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
     """Generate GitLab student template repositories for courses with contents."""
     
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     click.echo(f"\n🚀 Generating student template repositories...")
     
@@ -880,7 +872,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
     """Link execution backends to all deployed courses and create course contents."""
     
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     click.echo(f"\n🔗 Linking execution backends to courses...")
     
@@ -948,7 +940,7 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
     if not execution_backends:
         return
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     # Get API clients
     backend_client = client.execution_backends
@@ -999,7 +991,7 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
 def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
     """Find or create an example repository with MinIO backend."""
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     repo_client = client.example_repositories
 
@@ -1153,7 +1145,7 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
     """Upload VSIX extensions defined in the deployment configuration."""
 
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     for entry in entries:
         entry_path = Path(entry.path)
@@ -1233,7 +1225,7 @@ def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CL
     The upload order is topologically sorted by dependencies found in meta.yaml.
     """
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
     custom_client = SyncHTTPWrapper(client)
 
     if not examples_dir.exists() or not examples_dir.is_dir():
@@ -1302,7 +1294,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     organization -> course family -> course structure using Temporal workflows.
     """
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     click.echo(f"Loading deployment configuration from {config_file}...")
     

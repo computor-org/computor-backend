@@ -2,9 +2,10 @@ import json
 import os
 import click
 from computor_backend.api.exceptions import BadRequestException
-from computor_cli.auth import authenticate, get_computor_client_sync
+from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.crud import handle_api_exceptions
+from computor_cli.utils import run_async
 from computor_cli.release import handle_flow_runs
 from computor_types.results import ResultGet
 from computor_types.tests import TestCreate
@@ -31,7 +32,7 @@ def get_repo_info():
 @handle_api_exceptions
 def run_test(auth: CLIAuthConfig):
 
-    client = get_computor_client_sync(auth)
+    client = run_async(get_computor_client(auth))
 
     repo_url, directory = get_repo_info()
 

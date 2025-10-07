@@ -1,8 +1,9 @@
 import click
 from fastapi import HTTPException
 from httpx import ConnectError
-from computor_cli.auth import authenticate, get_computor_client_sync
+from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
+from computor_cli.utils import run_async
 from computor_types import endpoints
 from computor_types.results import ResultQuery
 from computor_types.users import UserQuery
@@ -101,7 +102,7 @@ def handle_api_exceptions(func):
 @handle_api_exceptions
 def list_entities(table, query, auth: CLIAuthConfig):
 
-  client = get_computor_client_sync(auth)
+  client = run_async(get_computor_client(auth))
 
   params = None
   query = dict(query)
@@ -132,7 +133,7 @@ def show_entities_query(table):
 @handle_api_exceptions
 def get_entity(table, id, auth: CLIAuthConfig):
 
-  client = get_computor_client_sync(auth)
+  client = run_async(get_computor_client(auth))
 
   entity = GET_CLIENT_ATTRIBUTE(client, table).get(id)
 
