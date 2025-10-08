@@ -33,13 +33,13 @@ def provision_submission_groups_for_user(
     Creates individual submission groups (max_group_size None or 1) for all
     submittable course contents where the user doesn't have a submission group yet.
 
+    Team assignments (max_group_size > 1) are skipped - these require manual creation
+    through instructor actions or student team formation workflow.
+
     Args:
         user_id: User ID
         course_id: Optional course ID to limit provisioning to specific course
         db: Database session
-
-    Raises:
-        NotImplementedException: If any course content has max_group_size > 1
     """
     # Get all course members for this user
     course_members_query = db.query(CourseMember).filter(
@@ -68,10 +68,13 @@ def provision_submission_groups_for_user(
         for course_content, course_content_kind in submittable_contents:
             # Check max_group_size
             if course_content.max_group_size is not None and course_content.max_group_size > 1:
-                raise NotImplementedException(
-                    detail=f"Group submissions with max_group_size > 1 are not yet implemented. "
-                           f"Course content '{course_content.title}' has max_group_size={course_content.max_group_size}."
+                # Skip team submissions - these require manual creation or student self-organization
+                logger.info(
+                    f"Skipping automatic submission group creation for team assignment "
+                    f"'{course_content.title}' (max_group_size={course_content.max_group_size}). "
+                    f"Teams must be created manually or through team formation workflow."
                 )
+                continue
 
             # Check if submission group already exists for this member and content
             existing_group = (

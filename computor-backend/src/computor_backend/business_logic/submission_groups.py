@@ -28,6 +28,9 @@ def ensure_submission_group_exists(
     - Course content is submittable (course_content_kind.submittable = True)
     - max_group_size is None or 1 (individual submissions)
 
+    Team assignments (max_group_size > 1) are not auto-created - these require
+    manual creation through instructor actions or student team formation workflow.
+
     Args:
         course_member_id: ID of the course member
         course_content_id: ID of the course content
@@ -35,9 +38,7 @@ def ensure_submission_group_exists(
 
     Returns:
         SubmissionGroup if content is submittable and group was created/found, None otherwise
-
-    Raises:
-        NotImplementedException: If max_group_size > 1 (group submissions not implemented)
+        Returns None for team assignments (max_group_size > 1) that haven't been created yet
     """
     # Get course content with related data
     course_content = db.query(CourseContent).filter(
@@ -59,13 +60,6 @@ def ensure_submission_group_exists(
     # Check max_group_size
     max_group_size = course_content.max_group_size
 
-    if max_group_size is not None and max_group_size > 1:
-        # Group submissions not implemented
-        raise NotImplementedException(
-            detail=f"Group submissions with max_group_size > 1 are not yet implemented. "
-                   f"Course content '{course_content.title}' has max_group_size={max_group_size}."
-        )
-
     # Check if submission group already exists for this member and content
     existing_group = (
         db.query(SubmissionGroup)
@@ -83,6 +77,14 @@ def ensure_submission_group_exists(
             f"member {course_member_id} and content {course_content_id}"
         )
         return existing_group
+
+    # For team assignments, don't auto-create - return None
+    if max_group_size is not None and max_group_size > 1:
+        logger.info(
+            f"Team assignment '{course_content.title}' (max_group_size={max_group_size}) has no team "
+            f"for student {course_member_id}. Team must be created through team formation workflow."
+        )
+        return None
 
     # Create new submission group for individual submission
     logger.info(
