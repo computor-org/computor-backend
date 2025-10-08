@@ -96,6 +96,7 @@ def provision_submission_groups_for_user(
             submission_group = SubmissionGroup(
                 course_content_id=course_content.id,
                 course_id=course_member.course_id,
+                max_group_size=course_content.max_group_size if course_content.max_group_size is not None else 1,
                 max_test_runs=course_content.max_test_runs,
                 properties={}
             )
@@ -105,7 +106,8 @@ def provision_submission_groups_for_user(
             # Create submission group member
             submission_group_member = SubmissionGroupMember(
                 submission_group_id=submission_group.id,
-                course_member_id=course_member.id
+                course_member_id=course_member.id,
+                course_id=course_member.course_id
             )
             db.add(submission_group_member)
 
