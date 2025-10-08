@@ -151,8 +151,8 @@ async def create_test_run(
         # If completed successfully, don't allow another test
         elif existing_test.status == 0:  # COMPLETED/FINISHED
             raise BadRequestException(
-                detail="You have already successfully tested this artifact. "
-                       "Multiple tests are not allowed unless the previous test failed."
+                detail="You have already tested this artifact. "
+                       "Multiple tests are not allowed unless the previous test crashed or was cancelled."
             )
 
     # Check max test runs limit for the submission group

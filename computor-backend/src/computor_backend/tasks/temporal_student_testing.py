@@ -21,8 +21,7 @@ from computor_types.tests import TestJob
 from computor_types.repositories import Repository
 from computor_types.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate
 from computor_types.tasks import TaskStatus, map_task_status_to_int
-# TODO Phase 4: Update to use computor_client instead of old CrudClient
-# from computor_backend.client.crud_client import CrudClient
+from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
 
@@ -257,25 +256,27 @@ async def commit_test_results_activity(
 ) -> bool:
     """Commit test results to the API."""
     try:
-        # Initialize API client
-        client = CrudClient(
-            url_base=transform_localhost_url(api_config.get("url", "http://localhost:8000")),
-            entity_interface=ResultInterface,
-            auth=(api_config.get("username", "admin"),api_config.get("password", "admin"))
-        )
-        
-        # Create result update
-        result_update = ResultUpdate(
-            status=TaskStatus.FINISHED,
-            result=test_results["result_value"],
-            result_json=test_results
-        )
-        
-        # Update the result directly using the ID
-        response = client.update(result_id, result_update)
+        # Initialize API client with ComputorClient
+        base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
-        return isinstance(response,ResultGet)
-        
+        async with ComputorClient(base_url=base_url) as client:
+            # Authenticate
+            username = api_config.get("username", "admin")
+            password = api_config.get("password", "admin")
+            await client.authenticate(username=username, password=password)
+
+            # Create result update
+            result_update = ResultUpdate(
+                status=TaskStatus.FINISHED,
+                result=test_results["result_value"],
+                result_json=test_results
+            )
+
+            # Update the result directly using the ID
+            response = await client.results.update(result_id, result_update)
+
+            return isinstance(response, ResultGet)
+
     except Exception as e:
         raise ApplicationError(message=str(e))
 

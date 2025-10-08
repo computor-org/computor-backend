@@ -167,6 +167,7 @@ async def list_submission_artifacts(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     submission_group_id: Optional[str] = None,
     course_content_id: Optional[str] = None,
+    version_identifier: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -214,6 +215,10 @@ async def list_submission_artifacts(
         query = query.join(SubmissionGroup).filter(
             SubmissionGroup.course_content_id == course_content_id
         )
+
+    # Filter by version identifier if provided
+    if version_identifier:
+        query = query.filter(SubmissionArtifact.version_identifier == version_identifier)
 
     # Apply pagination
     total = query.count()
@@ -703,8 +708,8 @@ async def create_test_result(
 
     if existing_test:
         raise BadRequestException(
-            detail="You have already run a successful test on this artifact. "
-                   "Multiple tests are not allowed unless the previous test failed."
+            detail="You have already run a test on this artifact. "
+                   "Multiple tests are not allowed unless the previous test crashed or was cancelled."
         )
 
     # Check max test runs limit if configured

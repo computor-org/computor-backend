@@ -647,8 +647,8 @@ def create_test_result(
 
     if existing_test:
         raise BadRequestException(
-            detail="You have already run a successful test on this artifact. "
-                   "Multiple tests are not allowed unless the previous test failed."
+            detail="You have already run a test on this artifact. "
+                   "Multiple tests are not allowed unless the previous test crashed or was cancelled."
         )
 
     # Check max test runs limit if configured
