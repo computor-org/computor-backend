@@ -59,7 +59,8 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
 
     # Trigger StudentRepositoryCreationWorkflow
     try:
-        from computor_types.tasks import get_task_executor, TaskSubmission
+        from computor_backend.tasks import get_task_executor
+        from computor_types.tasks import TaskSubmission
 
         task_executor = get_task_executor()
 
