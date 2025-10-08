@@ -13,6 +13,7 @@ from computor_backend.repositories.tutor_view import TutorViewRepository
 from computor_backend.repositories.course_member import CourseMemberRepository
 from computor_backend.repositories.submission_group import SubmissionGroupRepository
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
+from computor_backend.repositories.submission_grade_repo import SubmissionGradeRepository
 from computor_backend.repositories.course_content import (
     course_course_member_list_query,
     course_member_course_content_list_query,
@@ -86,20 +87,23 @@ def update_tutor_course_content_grade(
         TutorGradeResponse with updated course content and graded artifact info
     """
 
-    if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
-        CourseMember.id == course_member_id
-    ).first() is None:
-        raise ForbiddenException()
-
     # Initialize repositories with cache
     course_member_repo = CourseMemberRepository(db, cache)
     submission_group_repo = SubmissionGroupRepository(db, cache)
     submission_artifact_repo = SubmissionArtifactRepository(db, cache)
+    submission_grade_repo = SubmissionGradeRepository(db, cache)
 
     # 1) Resolve the student's course member and related submission group for this content
     student_cm = course_member_repo.get_by_id_optional(course_member_id)
     if student_cm is None:
-        raise NotFoundException()
+        raise NotFoundException(detail=f"Course member {course_member_id} not found")
+
+    # Check if current user has tutor permissions for the student's course
+    if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
+        CourseMember.course_id == student_cm.course_id,
+        CourseMember.user_id == permissions.get_user_id_or_throw()
+    ).first() is None:
+        raise ForbiddenException()
 
     # Find submission group for this course member and content
     submission_groups = submission_group_repo.find_by_course_content(course_content_id)
@@ -114,12 +118,12 @@ def update_tutor_course_content_grade(
             break
 
     if submission_group is None:
-        raise NotFoundException()
+        raise NotFoundException(detail=f"No submission group found for course member {course_member_id} in course content {course_content_id}. The student may not have been assigned to this content yet.")
 
     # 2) Resolve the grader's course member (the current user in the same course)
-    grader_cm = course_member_repo.find_by_user_and_course(
-        user_id=permissions.get_user_id_or_throw(),
-        course_id=student_cm.course_id
+    grader_cm = course_member_repo.find_by_course_and_user(
+        course_id=student_cm.course_id,
+        user_id=permissions.get_user_id_or_throw()
     )
     if grader_cm is None:
         raise ForbiddenException()
@@ -151,21 +155,19 @@ def update_tutor_course_content_grade(
             status=status.value,
             comment=feedback,
         )
-        db.add(new_grading)
-        db.commit()
+        # Use repository to ensure cache invalidation
+        submission_grade_repo.create(new_grading)
 
         logger.info(f"Created grade for artifact {artifact_to_grade.id} by grader {grader_cm.id}")
 
-        # Invalidate cached views after grading
+        # CRITICAL: Invalidate student view cache so students see the new grade
         if cache:
-            cache.invalidate_user_views(
-                entity_type="course_member_id",
-                entity_id=str(course_member_id)
-            )
-            cache.invalidate_user_views(
-                entity_type="course_content_id",
-                entity_id=str(course_content_id)
-            )
+            # Invalidate student view for this course (tagged in StudentViewRepository)
+            cache.invalidate_tags(f"student_view:{student_cm.course_id}")
+            # Also invalidate tutor/lecturer views
+            cache.invalidate_tags(f"tutor_view:{student_cm.course_id}")
+            cache.invalidate_tags(f"lecturer_view:{student_cm.course_id}")
+            logger.info(f"Invalidated view caches for course {student_cm.course_id} after grading")
 
     # 6) Return fresh data
     reader_user_id = permissions.get_user_id_or_throw()
