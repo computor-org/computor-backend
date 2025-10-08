@@ -106,16 +106,16 @@ def update_tutor_course_content_grade(
         raise ForbiddenException()
 
     # Find submission group for this course member and content
-    submission_groups = submission_group_repo.find_by_course_content(course_content_id)
-    submission_group = None
-    for sg in submission_groups:
-        # Check if this submission group has the course member
-        for member in sg.members:
-            if str(member.course_member_id) == str(course_member_id):
-                submission_group = sg
-                break
-        if submission_group:
-            break
+    # Query directly to ensure members are loaded
+    from sqlalchemy.orm import joinedload
+    submission_group = db.query(SubmissionGroup).options(
+        joinedload(SubmissionGroup.members)
+    ).join(
+        SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id
+    ).filter(
+        SubmissionGroup.course_content_id == course_content_id,
+        SubmissionGroupMember.course_member_id == course_member_id
+    ).first()
 
     if submission_group is None:
         raise NotFoundException(detail=f"No submission group found for course member {course_member_id} in course content {course_content_id}. The student may not have been assigned to this content yet.")
