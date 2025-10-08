@@ -71,6 +71,10 @@ class StudentViewRepository(ViewRepository):
         if cached is not None:
             return CourseContentStudentGet.model_validate(cached, from_attributes=True)
 
+        # Provision submission groups for this user (all courses)
+        from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
+        provision_submission_groups_for_user(user_id, None, self.db)
+
         # Query from DB using existing query function
         course_contents_result = user_course_content_query(user_id, course_content_id, self.db)
         result = course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
@@ -120,6 +124,10 @@ class StudentViewRepository(ViewRepository):
         )
         if cached is not None:
             return [CourseContentStudentList.model_validate(item, from_attributes=True) for item in cached]
+
+        # Provision submission groups for this user before querying
+        from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
+        provision_submission_groups_for_user(user_id, params.course_id, self.db)
 
         # Query from DB using existing query function
         query = user_course_content_list_query(user_id, self.db)

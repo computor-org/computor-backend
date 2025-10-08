@@ -1,0 +1,123 @@
+"""Business logic for submission group management."""
+
+import logging
+from uuid import UUID
+from sqlalchemy.orm import Session
+
+from computor_backend.model.course import (
+    CourseContent,
+    CourseMember,
+    SubmissionGroup,
+    SubmissionGroupMember,
+    CourseContentKind,
+)
+from computor_backend.api.exceptions import NotImplementedException
+
+logger = logging.getLogger(__name__)
+
+
+def ensure_submission_group_exists(
+    course_member_id: UUID | str,
+    course_content_id: UUID | str,
+    db: Session
+) -> SubmissionGroup | None:
+    """
+    Ensure a submission group exists for a course member and course content.
+
+    Creates submission group lazily when:
+    - Course content is submittable (course_content_kind.submittable = True)
+    - max_group_size is None or 1 (individual submissions)
+
+    Args:
+        course_member_id: ID of the course member
+        course_content_id: ID of the course content
+        db: Database session
+
+    Returns:
+        SubmissionGroup if content is submittable and group was created/found, None otherwise
+
+    Raises:
+        NotImplementedException: If max_group_size > 1 (group submissions not implemented)
+    """
+    # Get course content with related data
+    course_content = db.query(CourseContent).filter(
+        CourseContent.id == course_content_id
+    ).first()
+
+    if not course_content:
+        return None
+
+    # Check if content is submittable
+    course_content_kind = db.query(CourseContentKind).filter(
+        CourseContentKind.id == course_content.course_content_kind_id
+    ).first()
+
+    if not course_content_kind or not course_content_kind.submittable:
+        # Not submittable, no submission group needed
+        return None
+
+    # Check max_group_size
+    max_group_size = course_content.max_group_size
+
+    if max_group_size is not None and max_group_size > 1:
+        # Group submissions not implemented
+        raise NotImplementedException(
+            detail=f"Group submissions with max_group_size > 1 are not yet implemented. "
+                   f"Course content '{course_content.title}' has max_group_size={max_group_size}."
+        )
+
+    # Check if submission group already exists for this member and content
+    existing_group = (
+        db.query(SubmissionGroup)
+        .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+        .filter(
+            SubmissionGroup.course_content_id == course_content_id,
+            SubmissionGroupMember.course_member_id == course_member_id
+        )
+        .first()
+    )
+
+    if existing_group:
+        logger.debug(
+            f"Submission group {existing_group.id} already exists for "
+            f"member {course_member_id} and content {course_content_id}"
+        )
+        return existing_group
+
+    # Create new submission group for individual submission
+    logger.info(
+        f"Creating submission group for member {course_member_id} "
+        f"and content {course_content_id} (individual submission)"
+    )
+
+    # Get course member to access course_id
+    course_member = db.query(CourseMember).filter(
+        CourseMember.id == course_member_id
+    ).first()
+
+    if not course_member:
+        return None
+
+    # Create submission group
+    submission_group = SubmissionGroup(
+        course_content_id=course_content_id,
+        course_id=course_member.course_id,
+        max_test_runs=course_content.max_test_runs,
+        properties={}
+    )
+    db.add(submission_group)
+    db.flush()  # Get the ID
+
+    # Create submission group member
+    submission_group_member = SubmissionGroupMember(
+        submission_group_id=submission_group.id,
+        course_member_id=course_member_id
+    )
+    db.add(submission_group_member)
+    db.commit()
+
+    logger.info(
+        f"Created submission group {submission_group.id} with member {course_member_id}"
+    )
+
+    return submission_group
