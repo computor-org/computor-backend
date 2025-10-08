@@ -89,6 +89,8 @@ class Course(Base):
     __tablename__ = 'course'
     __table_args__ = (
         Index('course_path_key', 'course_family_id', 'path', unique=True),
+        CheckConstraint("team_mode IS NULL OR team_mode IN ('self_organized', 'instructor_predefined', 'hybrid')", name='course_team_mode_check'),
+        CheckConstraint('team_min_group_size IS NULL OR team_min_group_size >= 1', name='course_team_min_group_size_check'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -104,6 +106,16 @@ class Course(Base):
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     language_code = Column(String(2), ForeignKey('language.code', ondelete='SET NULL', onupdate='CASCADE'))
+
+    # Team formation defaults (apply to all assignments in this course)
+    team_mode = Column(String(50), nullable=True)  # 'self_organized' | 'instructor_predefined' | 'hybrid'
+    team_min_group_size = Column(Integer, nullable=True)
+    team_allow_student_creation = Column(Boolean, nullable=True)
+    team_allow_join = Column(Boolean, nullable=True)
+    team_allow_leave = Column(Boolean, nullable=True)
+    team_auto_assign_unmatched = Column(Boolean, nullable=True)
+    team_lock_at_deadline = Column(Boolean, nullable=True)
+    team_require_approval = Column(Boolean, nullable=True)
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
@@ -195,11 +207,14 @@ class CourseGroup(Base):
 class CourseContent(Base):
     __tablename__ = 'course_content'
     __table_args__ = (
-        ForeignKeyConstraint(['course_id', 'course_content_type_id'], 
-                           ['course_content_type.course_id', 'course_content_type.id'], 
+        ForeignKeyConstraint(['course_id', 'course_content_type_id'],
+                           ['course_content_type.course_id', 'course_content_type.id'],
                            ondelete='RESTRICT', onupdate='RESTRICT'),
         Index('course_content_path_key', 'course_id', 'path', unique=True),
-        CheckConstraint("path::text ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)*$'", name='course_content_path_format')
+        CheckConstraint("path::text ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)*$'", name='course_content_path_format'),
+        CheckConstraint("team_mode IS NULL OR team_mode IN ('self_organized', 'instructor_predefined', 'hybrid')", name='course_content_team_mode_check'),
+        CheckConstraint('team_min_group_size IS NULL OR team_min_group_size >= 1', name='course_content_team_min_group_size_check'),
+        CheckConstraint('team_min_group_size IS NULL OR max_group_size IS NULL OR team_min_group_size <= max_group_size', name='course_content_team_size_consistency_check'),
         # Note: Example-submittable validation is enforced by database trigger
         # validate_course_content_example_submittable_trigger
     )
@@ -222,9 +237,20 @@ class CourseContent(Base):
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
-    
+
     # Example version tracking (DEPRECATED - will be removed, use CourseContentDeployment.example_version_id)
     example_version_id = Column(UUID, ForeignKey('example_version.id', ondelete='SET NULL'), nullable=True)
+
+    # Team formation overrides (override course defaults for this specific assignment)
+    team_mode = Column(String(50), nullable=True)  # Override course default
+    team_min_group_size = Column(Integer, nullable=True)  # Override course default
+    team_formation_deadline = Column(DateTime(True), nullable=True)  # Assignment-specific deadline
+    team_allow_student_creation = Column(Boolean, nullable=True)  # Override course default
+    team_allow_join = Column(Boolean, nullable=True)  # Override course default
+    team_allow_leave = Column(Boolean, nullable=True)  # Override course default
+    team_auto_assign_unmatched = Column(Boolean, nullable=True)  # Override course default
+    team_lock_at_deadline = Column(Boolean, nullable=True)  # Override course default
+    team_require_approval = Column(Boolean, nullable=True)  # Override course default
     
 
     # Relationships

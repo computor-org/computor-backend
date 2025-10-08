@@ -60,6 +60,7 @@ from computor_backend.api.examples import examples_router
 from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
+from computor_backend.api.team_management import team_management_router
 import json
 import tempfile
 from pathlib import Path
@@ -311,6 +312,12 @@ app.include_router(
 app.include_router(
     tasks_router,
     tags=["tasks"],
+    dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    team_management_router,
+    tags=["team-management"],
     dependencies=[Depends(get_current_principal)]
 )
 
