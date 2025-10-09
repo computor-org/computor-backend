@@ -327,6 +327,60 @@ async def update_entity(
     return response_type(**db_item.__dict__)
 
 
+def _validate_course_content_deletion(entity, db: Session):
+    """
+    Validate that a course content can be safely deleted.
+
+    Rules:
+    1. Cannot delete if this course content or any descendant has submission artifacts
+    2. Deleting a parent will cascade delete all descendants via Ltree path
+
+    Args:
+        entity: CourseContent entity to delete
+        db: Database session
+
+    Raises:
+        BadRequestException: If deletion would violate business rules
+    """
+    from computor_backend.model.course import CourseContent, SubmissionGroup
+    from computor_backend.model.artifact import SubmissionArtifact
+    from sqlalchemy import and_
+
+    # Find all descendants (including this course content)
+    # Ltree path matching: descendant.path <@ parent.path means "descendant is under parent"
+    # We use path @> entity.path to find "paths that contain entity.path"
+    descendants = db.query(CourseContent).filter(
+        CourseContent.path.op('<@')(entity.path)  # Ltree descendant-of operator
+    ).all()
+
+    descendant_ids = [d.id for d in descendants]
+
+    if not descendant_ids:
+        return  # No descendants, safe to delete
+
+    # Check if any descendant has submission artifacts
+    has_submissions = db.query(SubmissionArtifact).join(
+        SubmissionGroup,
+        SubmissionArtifact.submission_group_id == SubmissionGroup.id
+    ).filter(
+        SubmissionGroup.course_content_id.in_(descendant_ids)
+    ).first()
+
+    if has_submissions:
+        if len(descendant_ids) == 1:
+            # Only this course content
+            raise BadRequestException(
+                detail="Cannot delete this course content because students have already submitted work. "
+                       "Deletion would result in data loss."
+            )
+        else:
+            # Parent with descendants that have submissions
+            raise BadRequestException(
+                detail=f"Cannot delete this course content because it contains {len(descendant_ids)-1} "
+                       f"descendant item(s) with student submissions. Deletion would result in data loss."
+            )
+
+
 async def delete_entity(
     permissions: Principal,
     db: Session,
@@ -352,12 +406,29 @@ async def delete_entity(
     """
     # Wrap blocking database operations in threadpool
     def _delete_entity():
+        from computor_backend.model.course import CourseContent
+
         query = check_permissions(permissions, db_type, "delete", db)
 
         entity = query.filter(db_type.id == id).first()
 
         if not entity:
             raise NotFoundException(detail=f"{db_type.__name__} not found")
+
+        # Special validation for CourseContent deletion
+        if db_type.__tablename__ == 'course_content':
+            _validate_course_content_deletion(entity, db)
+
+            # Delete all descendants via Ltree path
+            # This will cascade delete submission_groups, which cascade delete submission_artifacts
+            descendants = db.query(CourseContent).filter(
+                CourseContent.path.op('<@')(entity.path),
+                CourseContent.id != entity.id  # Exclude self, will be deleted below
+            ).all()
+
+            for descendant in descendants:
+                db.delete(descendant)
+            # Note: self (entity) will be deleted below
 
         try:
             db.delete(entity)
