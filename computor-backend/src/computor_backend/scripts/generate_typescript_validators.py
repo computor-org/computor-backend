@@ -105,11 +105,11 @@ class ValidationClassGenerator:
         lines.append("")
 
         # Imports
-        lines.append(f"import type {{ {', '.join(sorted(models.keys()))} }} from '../generated/{category}';")
+        lines.append(f"import type {{ {', '.join(sorted(models.keys()))} }} from '../types/{category}';")
 
         # Import enums if any
         if enums:
-            lines.append(f"import {{ {', '.join(sorted(enums.keys()))} }} from '../generated/{category}';")
+            lines.append(f"import {{ {', '.join(sorted(enums.keys()))} }} from '../types/{category}';")
 
         lines.append("import { BaseValidator, ValidationError } from './BaseValidator';")
         lines.append("")
@@ -447,7 +447,7 @@ def main(
         schema_dir = project_root / "frontend" / "src" / "types" / "schemas"
 
     if output_dir is None:
-        output_dir = project_root / "frontend" / "src" / "types" / "validators"
+        output_dir = project_root / "generated" / "validators"
 
     print("🚀 TypeScript Validator Generator")
     print("=" * 50)

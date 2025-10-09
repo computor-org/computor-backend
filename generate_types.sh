@@ -17,8 +17,9 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
     PYTHON_BIN="python3"
 fi
 
-PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_backend.cli.cli generate-types "$@"
+cd "${ROOT_DIR}" && \
+PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${PYTHON_BIN}" -m computor_cli.cli generate-types "$@"
 
 echo "✅ TypeScript interfaces generated successfully!"
 echo "📁 Check frontend/src/types/generated/ for the generated files"

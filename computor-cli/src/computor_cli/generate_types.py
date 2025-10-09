@@ -40,20 +40,20 @@ def generate_types(output_dir: Path = None, watch: bool = False, clean: bool = F
     """Generate TypeScript interfaces from Pydantic models."""
     
     # Determine paths
-    backend_dir = Path(__file__).parent.parent  # computor_backend
-    src_dir = backend_dir.parent  # src
-    project_root = src_dir.parent  # computor-fullstack
-    frontend_dir = project_root / "frontend"
-    
+    cli_dir = Path(__file__).parent  # computor_cli
+    cli_src_dir = cli_dir.parent  # src (computor-cli/src)
+    cli_root = cli_src_dir.parent  # computor-cli
+    project_root = cli_root.parent  # computor-fullstack
+    backend_root = project_root / "computor-backend"
+    types_package = project_root / "computor-types" / "src" / "computor_types"
+
     # Default output directory
     if output_dir is None:
-        output_dir = frontend_dir / "src" / "types" / "generated"
-    
-    # Directories to scan for models
+        output_dir = project_root / "generated" / "types"
+
+    # Directories to scan for models - use computor-types package
     scan_dirs = [
-        backend_dir / "interface",  # Pydantic DTOs
-        backend_dir / "api",        # API models
-        backend_dir / "tasks",      # Task DTOs
+        types_package,  # All Pydantic DTOs are in computor-types
     ]
     
     click.echo(click.style("🚀 TypeScript Interface Generator", fg='green', bold=True))

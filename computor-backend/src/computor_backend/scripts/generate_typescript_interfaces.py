@@ -270,8 +270,24 @@ class TypeScriptGenerator:
             # Try to import the module once so we can inspect classes (including nested)
             module = None
             try:
-                relative_path = py_file.relative_to(Path(__file__).parent.parent.parent)
-                module_path = str(relative_path).replace('/', '.').replace('.py', '')
+                # Try to determine the module path by finding the package root
+                # Look for a directory named "src" or the package name in the path
+                module_path = None
+                py_file_parts = py_file.parts
+
+                # Check if this is in a src/ directory structure
+                if 'src' in py_file_parts:
+                    src_index = py_file_parts.index('src')
+                    # Get everything after src/ and before the filename
+                    relative_parts = py_file_parts[src_index + 1:-1]
+                    # Add the filename without .py extension
+                    relative_parts = list(relative_parts) + [py_file.stem]
+                    module_path = '.'.join(relative_parts)
+
+                if not module_path:
+                    # Fallback: try to use the immediate parent as package name
+                    module_path = f"{py_file.parent.name}.{py_file.stem}"
+
                 spec = importlib.util.spec_from_file_location(module_path, py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)

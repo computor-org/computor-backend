@@ -21,8 +21,9 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 fi
 
 # Generate validators with schema export
-PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_backend.cli.cli generate-validators --export-schemas "$@"
+cd "${ROOT_DIR}" && \
+PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${PYTHON_BIN}" -m computor_cli.cli generate-validators --export-schemas "$@"
 
 echo "✅ Validation classes generated successfully!"
 echo "📁 Schemas: frontend/src/types/schemas/"

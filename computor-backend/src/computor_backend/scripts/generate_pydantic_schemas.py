@@ -63,8 +63,23 @@ class SchemaExporter:
             # Import the module to access classes
             module = None
             try:
-                relative_path = py_file.relative_to(Path(__file__).parent.parent.parent)
-                module_path = str(relative_path).replace('/', '.').replace('.py', '')
+                # Try to determine the module path by finding the package root
+                module_path = None
+                py_file_parts = py_file.parts
+
+                # Check if this is in a src/ directory structure
+                if 'src' in py_file_parts:
+                    src_index = py_file_parts.index('src')
+                    # Get everything after src/ and before the filename
+                    relative_parts = py_file_parts[src_index + 1:-1]
+                    # Add the filename without .py extension
+                    relative_parts = list(relative_parts) + [py_file.stem]
+                    module_path = '.'.join(relative_parts)
+
+                if not module_path:
+                    # Fallback: try to use the immediate parent as package name
+                    module_path = f"{py_file.parent.name}.{py_file.stem}"
+
                 spec = importlib.util.spec_from_file_location(module_path, py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
@@ -307,17 +322,18 @@ class SchemaExporter:
 
 def main(output_dir: Path | None = None, include_timestamp: bool = False) -> Dict[str, Path]:
     """Main entry point for schema export."""
-    backend_dir = Path(__file__).parent.parent
-    src_dir = backend_dir.parent
-    project_root = src_dir.parent
+    # Path: scripts -> computor_backend -> src -> computor-backend -> computor-fullstack
+    backend_dir = Path(__file__).parent.parent  # computor_backend
+    src_dir = backend_dir.parent  # src
+    backend_root = src_dir.parent  # computor-backend
+    project_root = backend_root.parent  # computor-fullstack
+    types_package = project_root / "computor-types" / "src" / "computor_types"
 
     if output_dir is None:
-        output_dir = project_root / "frontend" / "src" / "types" / "schemas"
+        output_dir = project_root / "generated" / "schemas"
 
     scan_dirs = [
-        backend_dir / "interface",
-        backend_dir / "api",
-        backend_dir / "tasks",
+        types_package,  # All Pydantic DTOs are in computor-types
     ]
 
     print("🚀 Pydantic Schema Exporter")

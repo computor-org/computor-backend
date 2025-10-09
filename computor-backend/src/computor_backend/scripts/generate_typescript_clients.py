@@ -15,10 +15,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Type
 
 # Ensure the backend package is importable when running as a script
-CURRENT_DIR = Path(__file__).resolve().parent
-BACKEND_DIR = CURRENT_DIR.parent
-SRC_DIR = BACKEND_DIR.parent
-PROJECT_ROOT = SRC_DIR.parent
+CURRENT_DIR = Path(__file__).resolve().parent  # scripts/
+BACKEND_DIR = CURRENT_DIR.parent  # computor_backend/
+SRC_DIR = BACKEND_DIR.parent  # src/
+BACKEND_ROOT = SRC_DIR.parent  # computor-backend/
+PROJECT_ROOT = BACKEND_ROOT.parent  # computor-fullstack/
 
 sys.path.insert(0, str(BACKEND_DIR))
 sys.path.insert(0, str(SRC_DIR))
@@ -191,9 +192,9 @@ class TypeScriptClientGenerator:
         return interfaces
 
     def _iter_interface_modules(self) -> Iterable[object]:
-        import computor_backend.interface  # noqa: WPS433, E402
+        import computor_types  # noqa: WPS433, E402
 
-        package = computor_backend.interface
+        package = computor_types
 
         for module_info in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
             try:
@@ -1299,7 +1300,7 @@ class TypeScriptClientGenerator:
 
 def main(output_dir: Optional[Path] = None, clean: bool = False, include_timestamp: bool = False) -> list[Path]:
     if output_dir is None:
-        output_dir = PROJECT_ROOT / "frontend" / "src" / "api" / "generated"
+        output_dir = PROJECT_ROOT / "generated" / "clients"
 
     generator = TypeScriptClientGenerator(output_dir, include_timestamp=include_timestamp)
     return generator.generate(clean=clean)

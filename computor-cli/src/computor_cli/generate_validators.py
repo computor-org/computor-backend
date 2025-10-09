@@ -47,10 +47,10 @@ def generate_validators_cmd(
     project_root = src_dir.parent
 
     if schema_dir is None:
-        schema_dir = project_root / "frontend" / "src" / "types" / "schemas"
+        schema_dir = project_root / "generated" / "schemas"
 
     if output_dir is None:
-        output_dir = project_root / "frontend" / "src" / "types" / "validators"
+        output_dir = project_root / "generated" / "validators"
 
     # Export schemas if requested
     if export_schemas:
