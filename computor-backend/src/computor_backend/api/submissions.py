@@ -213,9 +213,44 @@ async def list_submission_artifacts(
 
     # Filter by course content if provided
     if course_content_id:
-        query = query.join(SubmissionGroup).filter(
-            SubmissionGroup.course_content_id == course_content_id
-        )
+        # Get course_id for the course content to check permissions
+        course_content = db.query(CourseContent).filter(
+            CourseContent.id == course_content_id
+        ).first()
+
+        if not course_content:
+            raise NotFoundException(detail="Course content not found")
+
+        user_id = permissions.get_user_id()
+        if user_id and not permissions.is_admin:
+            # Check for tutor/instructor permissions in the course
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == course_content.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if has_elevated_perms:
+                # Tutor/Instructor: can see all artifacts for this course content
+                query = query.join(SubmissionGroup).filter(
+                    SubmissionGroup.course_content_id == course_content_id
+                )
+            else:
+                # Student: only see artifacts from their own submission groups
+                query = query.join(SubmissionGroup).join(
+                    SubmissionGroupMember
+                ).join(
+                    CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id
+                ).filter(
+                    SubmissionGroup.course_content_id == course_content_id,
+                    CourseMember.user_id == user_id
+                )
+        else:
+            # Admin: can see all artifacts
+            query = query.join(SubmissionGroup).filter(
+                SubmissionGroup.course_content_id == course_content_id
+            )
 
     # Filter by version identifier if provided
     if version_identifier:

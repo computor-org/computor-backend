@@ -667,6 +667,58 @@ class ReadOnlyPermissionHandler(PermissionHandler):
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
+class ExamplePermissionHandler(PermissionHandler):
+    """Permission handler for Example entities - restricted to lecturers and above.
+
+    Access rules:
+    - _lecturer and above: Full read/write access
+    - _tutor and _student: NO access
+    - Admin: Full access
+    """
+
+    ACTION_ROLE_MAP = {
+        "get": "_lecturer",
+        "list": "_lecturer",
+        "create": "_lecturer",
+        "update": "_lecturer",
+        "delete": "_lecturer",
+        "download": "_lecturer",
+    }
+
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+        if self.check_admin(principal):
+            return True
+
+        # Check if user has general permission for this action
+        if self.check_general_permission(principal, action):
+            return True
+
+        # Check if user has lecturer role in ANY course
+        # This allows lecturers to view examples from any course
+        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
+        courses_with_role = principal.get_courses_with_role(min_role)
+        if courses_with_role:  # Has lecturer role in at least one course
+            return True
+
+        return False
+
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        if self.check_admin(principal):
+            return db.query(self.entity)
+
+        if self.check_general_permission(principal, action):
+            return db.query(self.entity)
+
+        # Check if user has lecturer role in any course
+        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
+        courses_with_role = principal.get_courses_with_role(min_role)
+        if courses_with_role:  # Has lecturer role in at least one course
+            return db.query(self.entity)
+
+        # No access for students or tutors
+        raise ForbiddenException(detail={"entity": self.resource_name, "message": "Examples are only accessible to lecturers and above"})
+
+
 class MessagePermissionHandler(PermissionHandler):
     """Permission handler for Message entity with multi-context visibility.
 

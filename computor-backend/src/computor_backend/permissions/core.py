@@ -22,7 +22,8 @@ from computor_backend.permissions.handlers_impl import (
     CourseMemberPermissionHandler,
     ReadOnlyPermissionHandler,
     ResultPermissionHandler,
-    MessagePermissionHandler
+    MessagePermissionHandler,
+    ExamplePermissionHandler
 )
 
 # Import refactored Principal and related classes
@@ -85,11 +86,11 @@ def initialize_permission_handlers():
     permission_registry.register(CourseContentKind, ReadOnlyPermissionHandler(CourseContentKind))
     permission_registry.register(Language, ReadOnlyPermissionHandler(Language))
     
-    # Example entities (read-only for most users)
-    permission_registry.register(Example, ReadOnlyPermissionHandler(Example))
-    permission_registry.register(ExampleRepository, ReadOnlyPermissionHandler(ExampleRepository))
-    permission_registry.register(ExampleVersion, ReadOnlyPermissionHandler(ExampleVersion))
-    permission_registry.register(ExampleDependency, ReadOnlyPermissionHandler(ExampleDependency))
+    # Example entities (lecturer-only access)
+    permission_registry.register(Example, ExamplePermissionHandler(Example))
+    permission_registry.register(ExampleRepository, ExamplePermissionHandler(ExampleRepository))
+    permission_registry.register(ExampleVersion, ExamplePermissionHandler(ExampleVersion))
+    permission_registry.register(ExampleDependency, ExamplePermissionHandler(ExampleDependency))
     
     # System entities - admin only by default
     permission_registry.register(Role, UserPermissionHandler(Role))  # Can be customized
