@@ -8,20 +8,28 @@ import ipaddress
 
 class SessionCreate(BaseModel):
     user_id: str = Field(description="Associated user ID")
-    session_id: str = Field(min_length=1, max_length=1024, description="Session identifier/token")
-    ip_address: str = Field(description="IP address of the session")
-    properties: Optional[dict] = Field(None, description="Additional session properties")
-    
+    session_id: str = Field(min_length=1, max_length=1024, description="Hashed session token")
+    refresh_token_hash: Optional[bytes] = Field(None, description="Hashed refresh token (binary)")
+    created_ip: str = Field(description="IP address at session creation")
+    last_ip: Optional[str] = Field(None, description="Last seen IP address")
+    user_agent: Optional[str] = Field(None, description="User agent string")
+    device_label: Optional[str] = Field(None, description="Human-readable device description")
+    expires_at: Optional[datetime] = Field(None, description="Session expiration time")
+    refresh_expires_at: Optional[datetime] = Field(None, description="Refresh token expiration")
+    properties: Optional[dict] = Field(default_factory=dict, description="Additional session properties")
+
     @field_validator('session_id')
     @classmethod
     def validate_session_id(cls, v):
         if not v.strip():
             raise ValueError('Session ID cannot be empty or only whitespace')
         return v.strip()
-    
-    @field_validator('ip_address')
+
+    @field_validator('created_ip', 'last_ip')
     @classmethod
     def validate_ip_address(cls, v):
+        if v is None:
+            return v
         try:
             # This validates both IPv4 and IPv6 addresses
             ipaddress.ip_address(v)
@@ -31,50 +39,88 @@ class SessionCreate(BaseModel):
 
 class SessionGet(BaseEntityGet):
     id: str = Field(description="Session unique identifier")
+    sid: str = Field(description="Unique session ID per device")
     user_id: str = Field(description="Associated user ID")
-    session_id: str = Field(description="Session identifier/token")
-    logout_time: Optional[datetime] = Field(None, description="Logout timestamp")
-    ip_address: str = Field(description="IP address")
+    session_id: str = Field(description="Hashed session token")
+    created_at: datetime = Field(description="Session creation time")
+    last_seen_at: Optional[datetime] = Field(None, description="Last activity time")
+    expires_at: Optional[datetime] = Field(None, description="Expiration time")
+    revoked_at: Optional[datetime] = Field(None, description="Revocation timestamp")
+    revocation_reason: Optional[str] = Field(None, description="Reason for revocation")
+    ended_at: Optional[datetime] = Field(None, description="End timestamp (logout)")
+    refresh_counter: int = Field(default=0, description="Number of token refreshes")
+    created_ip: str = Field(description="IP at creation")
+    last_ip: Optional[str] = Field(None, description="Last seen IP")
+    device_label: Optional[str] = Field(None, description="Device description")
     properties: Optional[dict] = Field(None, description="Additional properties")
-    
+
+    # Legacy fields
+    logout_time: Optional[datetime] = Field(None, description="Deprecated: use ended_at")
+    ip_address: Optional[str] = Field(None, description="Deprecated: use created_ip")
+
     @property
     def is_active(self) -> bool:
         """Check if session is still active"""
-        return self.logout_time is None
-    
+        from datetime import datetime, timezone
+        if self.revoked_at or self.ended_at:
+            return False
+        if self.expires_at and self.expires_at < datetime.now(timezone.utc):
+            return False
+        return True
+
     @property
     def session_duration(self) -> Optional[int]:
-        """Get session duration in seconds (if logged out)"""
-        if self.logout_time and self.created_at:
-            return int((self.logout_time - self.created_at).total_seconds())
+        """Get session duration in seconds (if ended)"""
+        end_time = self.ended_at or self.logout_time
+        if end_time and self.created_at:
+            return int((end_time - self.created_at).total_seconds())
         return None
-    
+
     @property
     def display_name(self) -> str:
         """Get display name for the session"""
-        status = "Active" if self.is_active else "Logged out"
-        return f"Session {self.session_id[:8]}... ({status})"
-    
+        device = self.device_label or "Unknown Device"
+        status = "Active" if self.is_active else "Ended"
+        return f"{device} ({status})"
+
     model_config = ConfigDict(from_attributes=True)
 
 class SessionList(BaseEntityList):
     id: str = Field(description="Session unique identifier")
+    sid: str = Field(description="Unique session ID per device")
     user_id: str = Field(description="Associated user ID")
-    session_id: str = Field(description="Session identifier/token")
-    logout_time: Optional[datetime] = Field(None, description="Logout timestamp")
-    ip_address: str = Field(description="IP address")
-    
+    session_id: str = Field(description="Hashed session token")
+    created_at: datetime = Field(description="Session creation time")
+    last_seen_at: Optional[datetime] = Field(None, description="Last activity time")
+    expires_at: Optional[datetime] = Field(None, description="Expiration time")
+    revoked_at: Optional[datetime] = Field(None, description="Revocation timestamp")
+    ended_at: Optional[datetime] = Field(None, description="End timestamp")
+    created_ip: str = Field(description="IP at creation")
+    last_ip: Optional[str] = Field(None, description="Last seen IP")
+    device_label: Optional[str] = Field(None, description="Device description")
+    refresh_counter: int = Field(default=0, description="Refresh count")
+
+    # Legacy fields
+    logout_time: Optional[datetime] = Field(None, description="Deprecated")
+    ip_address: Optional[str] = Field(None, description="Deprecated")
+
     @property
     def is_active(self) -> bool:
         """Check if session is active"""
-        return self.logout_time is None
-    
+        from datetime import datetime, timezone
+        if self.revoked_at or self.ended_at:
+            return False
+        if self.expires_at and self.expires_at < datetime.now(timezone.utc):
+            return False
+        return True
+
     @property
     def display_name(self) -> str:
         """Get display name for lists"""
-        status = "Active" if self.is_active else "Logged out"
-        return f"Session from {self.ip_address} ({status})"
-    
+        device = self.device_label or f"Session from {self.created_ip}"
+        status = "Active" if self.is_active else "Ended"
+        return f"{device} ({status})"
+
     model_config = ConfigDict(from_attributes=True)
 
 class SessionUpdate(BaseModel):

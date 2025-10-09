@@ -1,6 +1,6 @@
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Column, DateTime, 
-    Enum, ForeignKey, Index, String, text, Integer
+    BigInteger, Boolean, CheckConstraint, Column, DateTime,
+    Enum, ForeignKey, Index, Integer, LargeBinary, String, text
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -116,17 +116,54 @@ class StudentProfile(Base):
 
 class Session(Base):
     __tablename__ = 'session'
+    __table_args__ = (
+        Index(
+            'ix_session_user_active',
+            'user_id',
+            postgresql_where=text("revoked_at IS NULL AND ended_at IS NULL AND (expires_at IS NULL OR expires_at > now())")
+        ),
+        Index('ix_session_last_seen', 'last_seen_at'),
+    )
 
+    # Primary key
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
+
+    # Unique session identifier per device/login
+    sid = Column(UUID, unique=True, nullable=False, server_default=text("uuid_generate_v4()"))
+
+    # User relationship
+    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    user = relationship('User', back_populates='sessions')
+
+    # Timestamps
     created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    last_seen_at = Column(DateTime(True))
+    expires_at = Column(DateTime(True))
+
+    # Status
+    revoked_at = Column(DateTime(True))
+    revocation_reason = Column(String(255))
+    ended_at = Column(DateTime(True))  # Replaces logout_time
+
+    # Tokens (hashed for security)
+    session_id = Column(String(1024), nullable=False)  # Access token hash
+    refresh_token_hash = Column(LargeBinary)  # Refresh token hash (binary)
+    refresh_expires_at = Column(DateTime(True))
+    refresh_counter = Column(Integer, nullable=False, server_default=text("0"))
+
+    # Network context
+    created_ip = Column(INET, nullable=False)  # IP at session creation
+    last_ip = Column(INET)  # Last seen IP
+    user_agent = Column(String(4096))  # Raw user agent string
+    device_label = Column(String(512))  # Human-readable device description
+
+    # Metadata and versioning
+    version = Column(BigInteger, nullable=False, server_default=text("0"))
+    properties = Column(JSONB, server_default=text("'{}'::jsonb"))
+
+    # Legacy fields for backwards compatibility
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB)
-    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    session_id = Column(String(1024), nullable=False)
-    logout_time = Column(DateTime(True))
-    ip_address = Column(INET, nullable=False)
-
-    user = relationship('User', back_populates='sessions')
+    logout_time = Column(DateTime(True))  # Deprecated: use ended_at
+    ip_address = Column(INET)  # Deprecated: use created_ip

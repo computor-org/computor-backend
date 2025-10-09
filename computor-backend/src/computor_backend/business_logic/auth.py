@@ -39,7 +39,10 @@ REFRESH_TOKEN_TTL = 604800  # 7 days
 async def login_with_local_credentials(
     username: str,
     password: str,
+    ip_address: str,
+    user_agent: str,
     db: Session,
+    cache = None,
 ) -> LocalLoginResponse:
     """
     Authenticate user with local credentials and generate Bearer tokens.
@@ -47,7 +50,10 @@ async def login_with_local_credentials(
     Args:
         username: Username or email
         password: User password
+        ip_address: Client IP address
+        user_agent: User agent string
         db: Database session
+        cache: Redis cache instance
 
     Returns:
         LocalLoginResponse with access and refresh tokens
@@ -55,52 +61,82 @@ async def login_with_local_credentials(
     Raises:
         UnauthorizedException: If credentials are invalid
     """
+    from computor_backend.utils.token_hash import generate_token, hash_token, hash_token_binary
+    from computor_backend.utils.client_info import make_device_label
+    from computor_backend.repositories.session_repo import SessionRepository
+
     # Authenticate using the AuthenticationService (wrap blocking DB query)
     auth_result = await run_in_threadpool(
         lambda: AuthenticationService.authenticate_basic(username, password, db)
     )
 
     # Generate session tokens
-    access_token = secrets.token_urlsafe(32)
-    refresh_token = secrets.token_urlsafe(32)
+    access_token = generate_token(32)
+    refresh_token = generate_token(32)
+
+    # Hash tokens for storage
+    access_token_hash = hash_token(access_token)
+    refresh_token_hash_binary = hash_token_binary(refresh_token)
 
     # Store session in Redis
     redis_client = await get_redis_client()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=ACCESS_TOKEN_TTL)
+    refresh_expires_at = now + timedelta(seconds=REFRESH_TOKEN_TTL)
 
-    # Store access token session
+    # Store HASHED access token in Redis
     access_session_data = {
         "user_id": str(auth_result.user_id),
         "provider": "local",
-        "created_at": str(datetime.now(timezone.utc)),
+        "created_at": str(now),
         "token_type": "access",
     }
 
     await redis_client.set(
-        f"sso_session:{access_token}",
+        f"sso_session:{access_token_hash}",  # Store hash, not plain token
         json.dumps(access_session_data),
         ex=ACCESS_TOKEN_TTL,
     )
 
-    # Store refresh token session
+    # Store HASHED refresh token in Redis
     refresh_session_data = {
         "user_id": str(auth_result.user_id),
         "provider": "local",
-        "created_at": str(datetime.now(timezone.utc)),
+        "created_at": str(now),
         "token_type": "refresh",
-        "access_token": access_token,
+        "access_token_hash": access_token_hash,  # Reference to access token
     }
 
     await redis_client.set(
-        f"refresh_token:{refresh_token}",
+        f"refresh_token:{hash_token(refresh_token)}",  # Store hash
         json.dumps(refresh_session_data),
         ex=REFRESH_TOKEN_TTL,
     )
 
-    logger.info(f"Local login successful for user {auth_result.user_id}")
+    # Create Session in database with device tracking
+    device_label = make_device_label(user_agent)
+    session_repo = SessionRepository(db, cache)
+    session = session_repo.create({
+        "user_id": str(auth_result.user_id),
+        "session_id": access_token_hash,  # Store HASH in DB
+        "refresh_token_hash": refresh_token_hash_binary,  # Binary hash
+        "created_ip": ip_address,
+        "last_ip": ip_address,
+        "user_agent": user_agent,
+        "device_label": device_label,
+        "expires_at": expires_at,
+        "refresh_expires_at": refresh_expires_at,
+        "properties": {
+            "provider": "local",
+            "login_method": "credentials"
+        }
+    })
+
+    logger.info(f"Local login successful for user {auth_result.user_id}, session {session.id}, device: {device_label}")
 
     return LocalLoginResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+        access_token=access_token,  # Return PLAIN token to client
+        refresh_token=refresh_token,  # Return PLAIN token to client
         expires_in=ACCESS_TOKEN_TTL,
         user_id=str(auth_result.user_id),
         token_type="Bearer",

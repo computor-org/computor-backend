@@ -51,7 +51,9 @@ auth_router = APIRouter(prefix="/auth")
 @auth_router.post("/login", response_model=LocalLoginResponse)
 async def login_with_credentials(
     request: LocalLoginRequest,
-    db: Session = Depends(get_db)
+    http_request: Request,
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LocalLoginResponse:
     """
     Login with username and password to obtain Bearer tokens.
@@ -63,11 +65,19 @@ async def login_with_credentials(
     `Authorization: Bearer <access_token>`
     """
     from computor_backend.business_logic.auth import login_with_local_credentials
+    from computor_backend.utils.client_info import get_client_ip, get_user_agent
+
+    # Extract client information
+    ip_address = get_client_ip(http_request)
+    user_agent = get_user_agent(http_request)
 
     return await login_with_local_credentials(
         username=request.username,
         password=request.password,
-        db=db
+        ip_address=ip_address,
+        user_agent=user_agent,
+        db=db,
+        cache=cache
     )
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
