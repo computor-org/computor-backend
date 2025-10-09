@@ -12,6 +12,8 @@ from computor_backend.business_logic.crud import (
     update_entity as update_db
 )
 from computor_backend.database import get_db
+from computor_backend.redis_cache import get_cache
+from computor_backend.cache import Cache
 from computor_types.results import (
     ResultCreate,
     ResultGet,
@@ -23,6 +25,7 @@ from computor_backend.interfaces.result import ResultInterface
 from computor_types.tasks import TaskStatus
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
+from computor_backend.repositories.result import ResultRepository
 
 # Import business logic
 from computor_backend.business_logic.results import get_result_status
@@ -69,16 +72,38 @@ async def update_result(
     payload: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ) -> ResultGet:
-    return await update_db(
-        permissions,
-        db,
-        result_id,
-        payload,
-        ResultInterface.model,
-        ResultGet,
-        post_update=getattr(ResultInterface, "post_update", None),
-    )
+    """
+    Update a result.
+
+    CRITICAL: Uses ResultRepository for automatic cache invalidation of:
+    - Student views (GET /students/course-contents)
+    - Tutor views (GET /tutors/course-members/{id}/course-contents)
+    - Lecturer views
+    """
+    # Initialize repository with cache for automatic invalidation
+    result_repo = ResultRepository(db, cache)
+
+    # Check permissions using the standard permission system
+    from computor_backend.permissions.core import check_permissions
+    from computor_backend.api.exceptions import NotFoundException
+
+    query = check_permissions(permissions, ResultInterface.model, "update", db)
+    if query is None:
+        raise NotFoundException()
+
+    db_result = query.filter(ResultInterface.model.id == result_id).first()
+    if db_result is None:
+        raise NotFoundException()
+
+    # Convert payload to dict
+    updates = payload.model_dump(exclude_unset=True)
+
+    # Use repository for cache-aware update (triggers invalidation)
+    result = result_repo.update(str(result_id), updates)
+
+    return ResultGet.model_validate(result, from_attributes=True)
 
 @result_router.delete("/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(

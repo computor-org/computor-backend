@@ -49,6 +49,7 @@ class SubmissionArtifactList(BaseEntityList):
     uploaded_at: datetime
     version_identifier: Optional[str] = None
     properties: Optional[dict[str, Any]] = None  # Additional metadata
+    latest_result: Optional['ResultList'] = None  # Latest successful result (status=0)
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -169,11 +169,16 @@ async def list_submission_artifacts(
     submission_group_id: Optional[str] = None,
     course_content_id: Optional[str] = None,
     version_identifier: Optional[str] = None,
+    with_latest_result: bool = False,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
-    """List submission artifacts with optional filtering."""
+    """List submission artifacts with optional filtering.
+
+    Query parameters:
+    - with_latest_result: If True, include latest successful result (status=0) for each artifact
+    """
 
     query = db.query(SubmissionArtifact)
 
@@ -264,8 +269,27 @@ async def list_submission_artifacts(
 
     response.headers["X-Total-Count"] = str(total)
 
-    # Return using Pydantic model
-    return [SubmissionArtifactList.model_validate(artifact) for artifact in artifacts]
+    # Build response with optional latest result
+    result_list = []
+    for artifact in artifacts:
+        artifact_dto = SubmissionArtifactList.model_validate(artifact, from_attributes=True)
+
+        # Fetch latest successful result if requested
+        if with_latest_result:
+            latest_result = db.query(Result).filter(
+                Result.submission_artifact_id == artifact.id,
+                Result.status == 0  # FINISHED status
+            ).order_by(
+                Result.created_at.desc()
+            ).first()
+
+            if latest_result:
+                from computor_types.results import ResultList
+                artifact_dto.latest_result = ResultList.model_validate(latest_result, from_attributes=True)
+
+        result_list.append(artifact_dto)
+
+    return result_list
 
 @submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
 async def get_submission_artifact(
