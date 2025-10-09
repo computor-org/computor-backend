@@ -41,8 +41,11 @@ def provision_submission_groups_for_user(
         course_id: Optional course ID to limit provisioning to specific course
         db: Database session
     """
-    # Get all course members for this user
-    course_members_query = db.query(CourseMember).filter(
+    # Get all course members for this user with user info loaded
+    from sqlalchemy.orm import joinedload
+    course_members_query = db.query(CourseMember).options(
+        joinedload(CourseMember.user)
+    ).filter(
         CourseMember.user_id == user_id
     )
     if course_id:
@@ -96,11 +99,22 @@ def provision_submission_groups_for_user(
                 f"member {course_member.id}, content {course_content.id}"
             )
 
+            # Generate display name for individual submission (max_group_size == 1 or None)
+            display_name = None
+            max_group_size = course_content.max_group_size if course_content.max_group_size is not None else 1
+            if max_group_size == 1 and course_member.user:
+                given_name = course_member.user.given_name or ""
+                family_name = course_member.user.family_name or ""
+                display_name = f"{given_name} {family_name}".strip()
+                if not display_name:
+                    display_name = course_member.user.email
+
             submission_group = SubmissionGroup(
                 course_content_id=course_content.id,
                 course_id=course_member.course_id,
-                max_group_size=course_content.max_group_size if course_content.max_group_size is not None else 1,
+                max_group_size=max_group_size,
                 max_test_runs=course_content.max_test_runs,
+                display_name=display_name,
                 properties={}
             )
             db.add(submission_group)

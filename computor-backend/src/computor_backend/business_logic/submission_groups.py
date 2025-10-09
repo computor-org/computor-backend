@@ -92,19 +92,32 @@ def ensure_submission_group_exists(
         f"and content {course_content_id} (individual submission)"
     )
 
-    # Get course member to access course_id
-    course_member = db.query(CourseMember).filter(
+    # Get course member to access course_id and user info
+    from sqlalchemy.orm import joinedload
+    course_member = db.query(CourseMember).options(
+        joinedload(CourseMember.user)
+    ).filter(
         CourseMember.id == course_member_id
     ).first()
 
     if not course_member:
         return None
 
+    # Generate display name for individual submission
+    display_name = None
+    if course_member.user:
+        given_name = course_member.user.given_name or ""
+        family_name = course_member.user.family_name or ""
+        display_name = f"{given_name} {family_name}".strip()
+        if not display_name:
+            display_name = course_member.user.email
+
     # Create submission group
     submission_group = SubmissionGroup(
         course_content_id=course_content_id,
         course_id=course_member.course_id,
         max_test_runs=course_content.max_test_runs,
+        display_name=display_name,
         properties={}
     )
     db.add(submission_group)

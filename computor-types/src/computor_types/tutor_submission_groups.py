@@ -75,6 +75,7 @@ class TutorSubmissionGroupQuery(BaseModel):
     """Query parameters for filtering submission groups."""
     course_id: Optional[str] = None
     course_content_id: Optional[str] = None
+    course_group_id: Optional[str] = None
     has_submissions: Optional[bool] = None
     has_ungraded_submissions: Optional[bool] = None
     limit: int = 100

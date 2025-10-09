@@ -59,9 +59,11 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
         f"in course {course_content.course_id}"
     )
 
-    # Get all student members in this course
+    # Get all student members in this course with user info loaded
+    from sqlalchemy.orm import joinedload
     student_members = (
         db.query(CourseMember)
+        .options(joinedload(CourseMember.user))
         .filter(
             CourseMember.course_id == course_content.course_id,
             CourseMember.course_role_id == "_student"
@@ -85,12 +87,23 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
         if existing_group:
             continue  # Already exists
 
+        # Generate display name for individual submission (max_group_size == 1 or None)
+        display_name = None
+        resolved_max_group_size = max_group_size if max_group_size is not None else 1
+        if resolved_max_group_size == 1 and course_member.user:
+            given_name = course_member.user.given_name or ""
+            family_name = course_member.user.family_name or ""
+            display_name = f"{given_name} {family_name}".strip()
+            if not display_name:
+                display_name = course_member.user.email
+
         # Create submission group
         submission_group = SubmissionGroup(
             course_content_id=course_content.id,
             course_id=course_content.course_id,
-            max_group_size=max_group_size if max_group_size is not None else 1,
+            max_group_size=resolved_max_group_size,
             max_test_runs=course_content.max_test_runs,
+            display_name=display_name,
             properties={}
         )
         db.add(submission_group)
