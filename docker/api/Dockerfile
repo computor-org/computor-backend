@@ -8,6 +8,7 @@ WORKDIR /home/uvicorn
 # Copy source code and installation files as root, then change ownership
 ADD computor-types /home/uvicorn/computor-types
 ADD computor-utils /home/uvicorn/computor-utils
+ADD computor-client /home/uvicorn/computor-client
 ADD computor-backend /home/uvicorn/computor-backend
 ADD migrations.sh /home/uvicorn/migrations.sh
 ADD docker/api/startup.bash startup.bash
@@ -21,12 +22,10 @@ USER uvicorn
 # Set PATH to include local pip install directory
 ENV PATH="/home/uvicorn/.local/bin:${PATH}"
 
-# Install local packages first (computor-types and computor-utils)
+# Install local packages first (needed by computor-backend)
 RUN pip install --user -e computor-types
 RUN pip install --user -e computor-utils
+RUN pip install --user -e computor-client
 
-# Install dependencies
-RUN pip install --user -r computor-backend/src/requirements.txt
-
-# Install the backend package in editable mode
-RUN cd computor-backend/src && pip install --user -e .
+# Install computor-backend (installs all dependencies from pyproject.toml)
+RUN pip install --user -e computor-backend
