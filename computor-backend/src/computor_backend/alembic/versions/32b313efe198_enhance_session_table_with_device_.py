@@ -45,11 +45,11 @@ def upgrade() -> None:
     # Add unique constraint on sid
     op.create_unique_constraint('uq_session_sid', 'session', ['sid'])
 
-    # Add partial index for active sessions
+    # Add partial index for active sessions (not revoked/ended)
+    # Note: Cannot include expires_at check as now() is not immutable
     op.execute("""
         CREATE INDEX ix_session_user_active ON session(user_id)
         WHERE revoked_at IS NULL AND ended_at IS NULL
-        AND (expires_at IS NULL OR expires_at > now())
     """)
 
     # Add index on last_seen_at for activity tracking

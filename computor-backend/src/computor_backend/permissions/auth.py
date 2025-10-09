@@ -140,11 +140,16 @@ class AuthenticationService:
     
     @staticmethod
     async def authenticate_sso(token: str, db: Session) -> AuthenticationResult:
-        """Authenticate using SSO token"""
+        """Authenticate using SSO token with hashed token lookup"""
 
         from computor_backend.redis_cache import get_redis_client
+        from computor_backend.utils.token_hash import hash_token
+
         redis_client = await get_redis_client()
-        session_key = f"sso_session:{token}"
+
+        # Hash token for lookup
+        token_hash = hash_token(token)
+        session_key = f"sso_session:{token_hash}"
         session_data_raw = await redis_client.get(session_key)
 
         if not session_data_raw:

@@ -255,7 +255,8 @@ async def sso_success():
 async def logout(
     request: Request,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LogoutResponse:
     """
     Logout from current session.
@@ -278,7 +279,8 @@ async def logout(
     return await logout_session(
         access_token=current_token,
         principal=principal,
-        db=db
+        db=db,
+        cache=cache
     )
 
 @auth_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
@@ -396,7 +398,8 @@ async def register_user(
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LocalTokenRefreshResponse:
     """
     Refresh local access token using refresh token.
@@ -412,7 +415,8 @@ async def refresh_local_token(
     return await refresh_local_token(
         refresh_token=request.refresh_token,
         principal=principal,
-        db=db
+        db=db,
+        cache=cache
     )
 
 @auth_router.post("/refresh", response_model=TokenRefreshResponse)

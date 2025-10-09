@@ -15,6 +15,7 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.api.auth import auth_router
+from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
 from computor_backend.database import get_db
@@ -362,6 +363,12 @@ app.include_router(
     prefix="/messages",
     tags=["messages"],
     dependencies=[Depends(get_current_principal)]
+)
+
+# Session management router
+app.include_router(
+    session_router,
+    tags=["sessions"]
 )
 
 

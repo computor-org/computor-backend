@@ -120,7 +120,7 @@ class Session(Base):
         Index(
             'ix_session_user_active',
             'user_id',
-            postgresql_where=text("revoked_at IS NULL AND ended_at IS NULL AND (expires_at IS NULL OR expires_at > now())")
+            postgresql_where=text("revoked_at IS NULL AND ended_at IS NULL")
         ),
         Index('ix_session_last_seen', 'last_seen_at'),
     )
@@ -166,4 +166,3 @@ class Session(Base):
     created_by = Column(UUID)
     updated_by = Column(UUID)
     logout_time = Column(DateTime(True))  # Deprecated: use ended_at
-    ip_address = Column(INET)  # Deprecated: use created_ip

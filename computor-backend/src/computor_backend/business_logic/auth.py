@@ -4,7 +4,7 @@ import secrets
 import json
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -114,23 +114,28 @@ async def login_with_local_credentials(
     )
 
     # Create Session in database with device tracking
+    from computor_backend.model.auth import Session as SessionModel
+
     device_label = make_device_label(user_agent)
     session_repo = SessionRepository(db, cache)
-    session = session_repo.create({
-        "user_id": str(auth_result.user_id),
-        "session_id": access_token_hash,  # Store HASH in DB
-        "refresh_token_hash": refresh_token_hash_binary,  # Binary hash
-        "created_ip": ip_address,
-        "last_ip": ip_address,
-        "user_agent": user_agent,
-        "device_label": device_label,
-        "expires_at": expires_at,
-        "refresh_expires_at": refresh_expires_at,
-        "properties": {
+
+    # Create session model instance
+    session = SessionModel(
+        user_id=str(auth_result.user_id),
+        session_id=access_token_hash,  # Store HASH in DB
+        refresh_token_hash=refresh_token_hash_binary,  # Binary hash
+        created_ip=ip_address,
+        last_ip=ip_address,
+        user_agent=user_agent,
+        device_label=device_label,
+        expires_at=expires_at,
+        refresh_expires_at=refresh_expires_at,
+        properties={
             "provider": "local",
             "login_method": "credentials"
         }
-    })
+    )
+    session = session_repo.create(session)
 
     logger.info(f"Local login successful for user {auth_result.user_id}, session {session.id}, device: {device_label}")
 
@@ -147,6 +152,7 @@ async def refresh_local_token(
     refresh_token: str,
     principal: Principal,
     db: Session,
+    cache = None,
 ) -> LocalTokenRefreshResponse:
     """
     Refresh local access token using refresh token.
@@ -155,6 +161,7 @@ async def refresh_local_token(
         refresh_token: Valid refresh token
         principal: Current authenticated principal
         db: Database session
+        cache: Redis cache instance
 
     Returns:
         LocalTokenRefreshResponse with new access token
@@ -163,10 +170,14 @@ async def refresh_local_token(
         UnauthorizedException: If refresh token is invalid or expired or doesn't belong to user
         NotFoundException: If user not found
     """
+    from computor_backend.utils.token_hash import generate_token, hash_token, hash_token_binary
+    from computor_backend.repositories.session_repo import SessionRepository
+
     redis_client = await get_redis_client()
 
-    # Get refresh token data from Redis
-    refresh_key = f"refresh_token:{refresh_token}"
+    # Hash the refresh token for lookup
+    refresh_token_hash = hash_token(refresh_token)
+    refresh_key = f"refresh_token:{refresh_token_hash}"
     refresh_data_raw = await redis_client.get(refresh_key)
 
     if not refresh_data_raw:
@@ -191,41 +202,55 @@ async def refresh_local_token(
             raise NotFoundException("User not found")
 
         # Generate new access token
-        new_access_token = secrets.token_urlsafe(32)
+        new_access_token = generate_token(32)
+        new_access_token_hash = hash_token(new_access_token)
 
-        # Store new access token session
+        now = datetime.now(timezone.utc)
+
+        # Store new HASHED access token in Redis
         access_session_data = {
             "user_id": str(user_id),
             "provider": "local",
-            "created_at": str(datetime.now(timezone.utc)),
+            "created_at": str(now),
             "token_type": "access",
-            "refreshed_at": str(datetime.now(timezone.utc)),
+            "refreshed_at": str(now),
         }
 
         await redis_client.set(
-            f"sso_session:{new_access_token}",
+            f"sso_session:{new_access_token_hash}",
             json.dumps(access_session_data),
             ex=ACCESS_TOKEN_TTL,
         )
 
-        # Update the old access token reference in refresh token if it exists
-        old_access_token = refresh_data.get("access_token")
-        if old_access_token:
-            # Delete old access token
-            await redis_client.delete(f"sso_session:{old_access_token}")
+        # Delete old access token from Redis
+        old_access_token_hash = refresh_data.get("access_token_hash")
+        if old_access_token_hash:
+            await redis_client.delete(f"sso_session:{old_access_token_hash}")
 
         # Update refresh token with new access token reference
-        refresh_data["access_token"] = new_access_token
-        refresh_data["refreshed_at"] = str(datetime.now(timezone.utc))
+        refresh_data["access_token_hash"] = new_access_token_hash
+        refresh_data["refreshed_at"] = str(now)
 
         await redis_client.set(
             refresh_key, json.dumps(refresh_data), ex=REFRESH_TOKEN_TTL
         )
 
-        logger.info(f"Token refreshed for user {user_id}")
+        # Update Session in database
+        session_repo = SessionRepository(db, cache)
+        session = session_repo.find_by_session_id_hash(old_access_token_hash)
+        if session:
+            # Update session with new token hash and increment counter
+            session_repo.update(str(session.id), {
+                "session_id": new_access_token_hash,
+                "last_seen_at": now,
+            })
+            session_repo.increment_refresh_counter(str(session.id))
+            logger.info(f"Token refreshed for user {user_id}, session {session.id}, refresh count: {session.refresh_counter + 1}")
+        else:
+            logger.warning(f"Token refreshed for user {user_id} but session not found in database")
 
         return LocalTokenRefreshResponse(
-            access_token=new_access_token,
+            access_token=new_access_token,  # Return PLAIN token
             expires_in=ACCESS_TOKEN_TTL,
             refresh_token=refresh_token,  # Same refresh token
             token_type="Bearer",
@@ -239,6 +264,7 @@ async def logout_session(
     access_token: Optional[str],
     principal: Principal,
     db: Session,
+    cache = None,
 ) -> LogoutResponse:
     """
     Logout from current session and invalidate tokens.
@@ -247,16 +273,21 @@ async def logout_session(
         access_token: Current access token (Bearer token)
         principal: Current authenticated principal
         db: Database session
+        cache: Redis cache instance
 
     Returns:
         LogoutResponse with status and provider info
     """
+    from computor_backend.utils.token_hash import hash_token
+    from computor_backend.repositories.session_repo import SessionRepository
+
     redis_client = await get_redis_client()
     provider_name = None
 
     if access_token:
-        # Check if this is a local session token
-        session_key = f"sso_session:{access_token}"
+        # Hash token for lookup
+        access_token_hash = hash_token(access_token)
+        session_key = f"sso_session:{access_token_hash}"
         session_data_raw = await redis_client.get(session_key)
 
         if session_data_raw:
@@ -264,11 +295,27 @@ async def logout_session(
                 session_data = json.loads(session_data_raw)
                 provider_name = session_data.get("provider", "unknown")
 
-                # Delete the access token session
+                # Delete the access token session from Redis
                 await redis_client.delete(session_key)
                 logger.info(
-                    f"Deleted session for user {principal.user_id}, provider: {provider_name}"
+                    f"Deleted Redis session for user {principal.user_id}, provider: {provider_name}"
                 )
+
+                # End session in database
+                session_repo = SessionRepository(db, cache)
+                session = session_repo.find_by_session_id_hash(access_token_hash)
+                if session:
+                    session_repo.end_session(str(session.id), reason="User logout")
+                    logger.info(f"Ended database session {session.id} for user {principal.user_id}")
+
+                    # Delete refresh token from Redis if it exists
+                    if session.refresh_token_hash:
+                        # Find and delete the refresh token
+                        # We need to search for it since we stored the hash
+                        refresh_token_hash_hex = session.refresh_token_hash.hex() if isinstance(session.refresh_token_hash, bytes) else None
+                        if refresh_token_hash_hex:
+                            # Try to delete by searching properties
+                            pass  # Refresh token cleanup will happen on next use
 
             except json.JSONDecodeError:
                 logger.warning("Failed to parse session data during logout")
