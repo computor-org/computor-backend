@@ -35,8 +35,9 @@ ADD computor-backend /home/matlab/computor-backend
 COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
 
 # Install local packages first (computor-types and computor-utils)
-RUN pip install --no-cache-dir -e /home/matlab/computor-types
-RUN pip install --no-cache-dir -e /home/matlab/computor-utils
+# Use normal install instead of editable (-e) for production compatibility
+RUN pip install --no-cache-dir /home/matlab/computor-types
+RUN pip install --no-cache-dir /home/matlab/computor-utils
 
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade -r /home/matlab/computor-backend/src/requirements.txt
