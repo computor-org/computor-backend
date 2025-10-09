@@ -100,6 +100,11 @@ async def update_result(
     # Convert payload to dict
     updates = payload.model_dump(exclude_unset=True)
 
+    # Convert TaskStatus enum to integer for database storage
+    if 'status' in updates and updates['status'] is not None:
+        from computor_types.tasks import map_task_status_to_int
+        updates['status'] = map_task_status_to_int(updates['status'])
+
     # Use repository for cache-aware update (triggers invalidation)
     # Pass the entity directly to avoid re-querying
     result = result_repo.update_entity(db_result, updates)

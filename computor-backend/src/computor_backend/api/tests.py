@@ -250,6 +250,57 @@ async def create_test_run(
     # Generate workflow ID
     workflow_id = f"student-testing-{str(uuid.uuid4())}"
 
+    # Check for existing result with same (member, version, content)
+    # This prevents unique constraint violations from the partial index
+    existing_result = db.query(Result).filter(
+        Result.course_member_id == course_member.id,
+        Result.version_identifier == version_identifier,
+        Result.course_content_id == course_content.id,
+        Result.status.notin_([1, 2, 6])  # Not already FAILED(1), CANCELLED(2), or CRASHED(6)
+    ).first()
+
+    if existing_result:
+        # Check if the Temporal workflow is still actually running
+        workflow_still_running = False
+        if existing_result.test_system_id:
+            try:
+                task_executor = get_task_executor()
+                task_info = await task_executor.get_task_status(existing_result.test_system_id)
+
+                # Check if workflow is still running
+                if task_info.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                    workflow_still_running = True
+                    logger.info(f"Temporal workflow {existing_result.test_system_id} is still running, rejecting duplicate test")
+                else:
+                    # Workflow is done but Result status is stale - sync it
+                    logger.warning(f"Result {existing_result.id} has stale status {existing_result.status}, Temporal workflow is {task_info.status}")
+
+                    # Update Result status to match Temporal reality
+                    if task_info.status == TaskStatus.FINISHED:
+                        existing_result.status = 0  # FINISHED
+                    elif task_info.status == TaskStatus.FAILED:
+                        existing_result.status = 1  # FAILED
+                    elif task_info.status == TaskStatus.CANCELLED:
+                        existing_result.status = 2  # CANCELLED
+                    else:
+                        existing_result.status = 6  # CRASHED (unknown state)
+
+                    existing_result.log_text = (existing_result.log_text or "") + f"\n[Status synced from Temporal: {task_info.status.value}]"
+                    db.commit()
+                    logger.info(f"Updated stale Result {existing_result.id} to status {existing_result.status}")
+            except Exception as e:
+                # Workflow doesn't exist in Temporal - mark as crashed
+                logger.warning(f"Temporal workflow {existing_result.test_system_id} not found, marking Result as CRASHED: {e}")
+                existing_result.status = 6  # CRASHED
+                existing_result.log_text = (existing_result.log_text or "") + f"\n[Marked as CRASHED: Temporal workflow not found]"
+                db.commit()
+
+        # If workflow is still running, reject the duplicate test
+        if workflow_still_running:
+            raise BadRequestException(
+                detail=f"A test is already running for this version. Please wait for it to complete."
+            )
+
     # Create test result record
     result = Result(
         submission_artifact_id=artifact.id,
