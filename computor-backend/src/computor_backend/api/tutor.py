@@ -9,8 +9,9 @@ from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException
+from computor_backend.api.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
+from computor_backend.services.storage_service import get_storage_service
 from computor_backend.model.course import CourseContent, CourseMember
 from computor_types.student_courses import CourseStudentQuery
 from computor_types.student_course_contents import (
@@ -168,19 +169,26 @@ async def download_course_content_reference(
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
+    storage_service = Depends(get_storage_service),
 ):
     """
-    Download the reference/example solution for a course content.
+    Download the reference/example solution for a course content as a ZIP file.
 
     This endpoint allows tutors to download the example/reference repository
     associated with an assignment for grading or reference purposes.
 
     Query parameters:
     - with_dependencies: Include all example dependencies recursively (default: False)
+
+    Returns:
+        StreamingResponse containing a ZIP file with the example files
     """
+    import zipfile
+    import io
+    from fastapi.responses import StreamingResponse
+    from computor_backend.model.deployment import CourseContentDeployment
+    from computor_backend.model.example import ExampleVersion
     from computor_backend.repositories.example_version_repo import ExampleVersionRepository
-    from computor_backend.api.examples import download_example_latest
-    from computor_backend.services.storage_service import get_storage_service
 
     # Get course content
     course_content = db.query(CourseContent).filter(
@@ -206,40 +214,86 @@ async def download_course_content_reference(
             )
 
     # Check for deployment first (newer approach), then fall back to example_version_id (deprecated)
-    from computor_backend.model.deployment import CourseContentDeployment
-
     deployment = db.query(CourseContentDeployment).filter(
         CourseContentDeployment.course_content_id == course_content_id
     ).order_by(CourseContentDeployment.assigned_at.desc()).first()
 
-    example_version = None
+    example_version_id = None
 
     if deployment and deployment.example_version_id:
-        # Use deployment's example version (preferred method)
-        from computor_backend.model.example import ExampleVersion
-        example_version = db.query(ExampleVersion).filter(
-            ExampleVersion.id == deployment.example_version_id
-        ).first()
+        example_version_id = deployment.example_version_id
     elif course_content.example_version_id:
-        # Fall back to deprecated direct example_version_id on course_content
-        from computor_backend.model.example import ExampleVersion
-        example_version = db.query(ExampleVersion).filter(
-            ExampleVersion.id == course_content.example_version_id
-        ).first()
+        example_version_id = course_content.example_version_id
 
-    if not example_version:
+    if not example_version_id:
         raise NotFoundException(
             detail=f"No reference/example deployment found for this course content"
         )
 
-    # Download the example using the existing examples endpoint logic
-    storage_service = get_storage_service()
-    return await download_example_latest(
-        example_id=str(example_version.example_id),
-        with_dependencies=with_dependencies,
-        db=db,
-        permissions=permissions,
-        storage_service=storage_service,
+    # Get the example version with relationships loaded
+    version_repo = ExampleVersionRepository(db, cache)
+    version = version_repo.get_with_relationships(example_version_id)
+
+    if not version:
+        raise NotFoundException(detail=f"Example version {example_version_id} not found")
+
+    example = version.example
+    repository = example.repository
+
+    # Only support MinIO/S3 repositories
+    if repository.source_type == "git":
+        raise NotImplementedException("Git download not implemented - use git clone instead")
+
+    if repository.source_type not in ["minio", "s3"]:
+        raise BadRequestException(f"Download not supported for {repository.source_type} repositories")
+
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Get bucket name and list objects
+        bucket_name = repository.source_url.split('/')[0]
+
+        objects = await storage_service.list_objects(
+            bucket_name=bucket_name,
+            prefix=version.storage_path,
+        )
+
+        for obj in objects:
+            if obj.object_name.endswith('/'):
+                continue  # Skip directories
+
+            # Get relative filename
+            filename = obj.object_name.replace(f"{version.storage_path}/", "")
+
+            # Filter out unwanted files and directories
+            if filename.startswith('localTests/'):
+                continue
+            if filename in ['meta.yaml', 'test.yaml']:
+                continue
+
+            # Download file content
+            file_data = await storage_service.download_file(
+                bucket_name=bucket_name,
+                object_key=obj.object_name,
+            )
+
+            # Add to ZIP
+            zip_file.writestr(filename, file_data)
+
+    # Seek to beginning of buffer
+    zip_buffer.seek(0)
+
+    # Create filename
+    safe_title = course_content.title.replace(' ', '_').replace('/', '_')
+    filename = f"{safe_title}_reference.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
     )
 
 ## MR-based course-content messages removed (deprecated)
