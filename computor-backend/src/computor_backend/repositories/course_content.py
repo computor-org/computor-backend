@@ -852,3 +852,78 @@ def course_course_member_list_query(db: Session):
         .outerjoin(latest_result_per_member, latest_result_per_member.c.course_member_id == CourseMember.id)
 
     return course_member_results
+
+
+def get_ungraded_submission_count_per_member(db: Session, course_id: Optional[str] = None):
+    """
+    Get count of ungraded latest submission artifacts per course member.
+
+    For each course member, counts how many course contents have a latest submitted
+    artifact that has NO associated submission_grade.
+
+    Args:
+        db: Database session
+        course_id: Optional course ID to filter by
+
+    Returns:
+        Dictionary mapping course_member_id -> count of ungraded submissions
+    """
+    from sqlalchemy import func, and_
+    from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
+
+    # Subquery to get the latest artifact per submission group
+    latest_artifact_subquery = db.query(
+        SubmissionArtifact.submission_group_id,
+        func.max(SubmissionArtifact.created_at).label("latest_created_at")
+    ).filter(
+        SubmissionArtifact.submit == True  # Only submitted artifacts
+    ).group_by(
+        SubmissionArtifact.submission_group_id
+    ).subquery()
+
+    # Query to get latest artifacts with their submission group and course member info
+    latest_artifacts_query = db.query(
+        CourseMember.id.label("course_member_id"),
+        SubmissionArtifact.id.label("artifact_id")
+    ).select_from(SubmissionArtifact).join(
+        latest_artifact_subquery,
+        and_(
+            SubmissionArtifact.submission_group_id == latest_artifact_subquery.c.submission_group_id,
+            SubmissionArtifact.created_at == latest_artifact_subquery.c.latest_created_at
+        )
+    ).join(
+        SubmissionGroup,
+        SubmissionGroup.id == SubmissionArtifact.submission_group_id
+    ).join(
+        SubmissionGroupMember,
+        SubmissionGroupMember.submission_group_id == SubmissionGroup.id
+    ).join(
+        CourseMember,
+        CourseMember.id == SubmissionGroupMember.course_member_id
+    ).filter(
+        SubmissionArtifact.submit == True
+    )
+
+    # Filter by course if provided
+    if course_id:
+        latest_artifacts_query = latest_artifacts_query.filter(
+            CourseMember.course_id == course_id
+        )
+
+    latest_artifacts = latest_artifacts_query.subquery()
+
+    # Count artifacts that have NO grade
+    ungraded_counts = db.query(
+        latest_artifacts.c.course_member_id,
+        func.count(latest_artifacts.c.artifact_id).label("ungraded_count")
+    ).outerjoin(
+        SubmissionGrade,
+        SubmissionGrade.artifact_id == latest_artifacts.c.artifact_id
+    ).filter(
+        SubmissionGrade.id.is_(None)  # No grade exists
+    ).group_by(
+        latest_artifacts.c.course_member_id
+    ).all()
+
+    # Convert to dictionary
+    return {str(row[0]): row[1] for row in ungraded_counts}

@@ -30,6 +30,7 @@ class TutorCourseMemberList(BaseModel):
     course_group_id: Optional[str] = None
     course_role_id: str
     unreviewed: Optional[bool] = None
+    ungraded_submissions_count: Optional[int] = None
 
     user: UserList
 
