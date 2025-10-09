@@ -50,13 +50,13 @@ run_tests() {
     cd src
     
     echo "📝 Running Docker setup verification tests..."
-    python -m pytest ctutor_backend/tests/test_task_executor.py::TestDockerComposeSetup -v
+    python -m pytest computor_backend/tests/test_task_executor.py::TestDockerComposeSetup -v
     
     echo "📝 Running Docker integration tests..."
-    python -m pytest ctutor_backend/tests/test_task_executor.py -m docker -v -s
+    python -m pytest computor_backend/tests/test_task_executor.py -m docker -v -s
     
     echo "📝 Running all task tests (including unit tests)..."
-    python -m pytest ctutor_backend/tests/test_task_executor.py -v
+    python -m pytest computor_backend/tests/test_task_executor.py -v
 }
 
 # Function to show logs

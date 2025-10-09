@@ -224,7 +224,7 @@ const Tasks: React.FC = () => {
 
   const formatTaskName = (name: string) => {
     // Remove common prefixes for cleaner display
-    return name.replace('ctutor_backend.tasks.', '');
+    return name.replace('computor_backend.tasks.', '');
   };
 
   const handleOpenCreateDialog = () => {

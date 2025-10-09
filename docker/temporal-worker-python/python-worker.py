@@ -2,7 +2,7 @@
 import os
 import sys
 import subprocess
-from ctutor_backend.interface.repositories import Repository
+from computor_types.repositories import Repository
 
 if __name__ == '__main__':
 
@@ -28,6 +28,6 @@ if __name__ == '__main__':
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-python
     args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
-    cmd = f"python -m ctutor_backend.tasks.temporal_worker {args}"
+    cmd = f"python -m computor_backend.tasks.temporal_worker {args}"
     print(f"Starting temporal worker with command: {cmd}")
     subprocess.run(cmd, cwd=os.path.abspath(os.path.expanduser("~")), shell=True)

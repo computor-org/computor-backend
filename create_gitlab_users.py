@@ -24,7 +24,7 @@ if script_path.parent.name == 'computor-fullstack':
     # Script is in root directory
     sys.path.insert(0, str(script_path.parent / 'src'))
 else:
-    # Script is in src/ctutor_backend/scripts/
+    # Script is in src/computor_backend/scripts/
     sys.path.insert(0, str(script_path.parent.parent.parent))
 
 # GitLab API client
@@ -35,7 +35,7 @@ except ImportError:
     sys.exit(1)
 
 # Import our deployment classes
-from ctutor_backend.interface.deployments_refactored import (
+from computor_backend.interface.deployments_refactored import (
     UsersDeploymentConfig, 
     UserAccountDeployment, 
     UserDeployment, 
@@ -74,6 +74,7 @@ class GitLabUserManager:
         # Verify admin permissions
         try:
             current_user = self.gitlab.user
+            print(current_user)
             if not current_user.is_admin:
                 raise ValueError("Provided token does not have admin privileges")
             print(f"Connected to GitLab as admin user: {current_user.username}")

@@ -157,7 +157,7 @@ const TaskDetail: React.FC = () => {
   };
 
   const formatTaskName = (name: string) => {
-    return name.replace('ctutor_backend.tasks.', '');
+    return name.replace('computor_backend.tasks.', '');
   };
 
   const formatDuration = (start?: string, end?: string) => {

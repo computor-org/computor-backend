@@ -14,7 +14,7 @@ echo -e "${GREEN}🧪 Computor Backend Test Runner${NC}"
 echo "=================================="
 
 # Change to src directory
-cd src
+cd computor-backend/src
 
 # Check if virtual environment is activated
 if [[ -z "$VIRTUAL_ENV" ]]; then
@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
         --file)
             # Add the test file with proper path
             if [[ "$2" == *"test_"* ]]; then
-                PYTEST_ARGS="$PYTEST_ARGS ctutor_backend/tests/$2.py"
+                PYTEST_ARGS="$PYTEST_ARGS computor_backend/tests/$2.py"
             else
                 PYTEST_ARGS="$PYTEST_ARGS $2"
             fi

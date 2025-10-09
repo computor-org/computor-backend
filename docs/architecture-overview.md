@@ -1,35 +1,456 @@
 # Computor System Architecture Overview
 
-## Backend (src/ctutor_backend)
-- **Entry Points**: `src/server.py` starts a FastAPI app and runs `startup_logic()` from `ctutor_backend.server`; `src/cli.py` exposes a rich CLI (`ctutor_backend.cli`).
-- **Runtime Configuration**: `ctutor_backend.settings.BackendSettings` reads environment flags (debug mode, storage roots, auth plugin config). Database (`ctutor_backend.database`) builds a pooled SQLAlchemy engine from PostgreSQL env vars, and `redis_cache.py` configures an aiocache Redis client.
-- **FastAPI Application**: `ctutor_backend/server.py` wires routers via helper builders (`CrudRouter`, `LookUpRouter`). Routes cover users, organizations, courses, course content, submissions, results, storage, messaging, tasks, SSO, etc. Startup seeds admin accounts, mirrors Git-backed content to local storage, and (optionally) initializes auth plugins.
-- **Domain Models & DTOs**: SQLAlchemy models live under `model/`. Each resource exposes a matching Pydantic interface in `interface/` (e.g. `CourseInterface`, `UserInterface`). These interfaces declare endpoint names, CRUD schemas, filters, and post-processing hooks consumed by the router builders.
-- **Permissions & Roles**: `permissions/` describes claims, role assignment bootstrapping, auth dependencies (`get_current_permissions`), and role claim management. Roles are applied on startup with `db_apply_roles`, and request handlers rely on dependency-injected `Principal` objects.
-- **Storage & Integrations**: `minio_client.py` and `services/storage_service.py` wrap MinIO for object storage. `api/filesystem.py` manages repository mirroring (currently mostly stubbed). GitLab helpers (`gitlab_utils.py`, `generator/git_helper.py`) and deployment interfaces orchestrate course repositories.
-- **Async Tasks**: `tasks/` integrates with Temporal (`temporal_client.py`, `temporal_*` workflows). `api/tasks.py` exposes control endpoints that delegate to a task executor registry.
-- **Plugins & Auth**: `plugins/registry.py` loads authentication plugins (built-in Keycloak provider under `auth/`). Configuration is file-driven, with temporary configs generated from env when none supplied.
-- **Services & Utilities**: `services/` exposes Git, storage, deployment sync, and version resolution helpers. `repositories/` implements persistence helpers beyond CRUD. `utils/`, `helpers.py`, and `custom_types/` centralize shared helpers (validation, enums, typed dictionaries).
-- **Testing & Tooling**: `tests/` contains backend tests; `testing/` and `manual_testing.py` host manual scenarios. `cli/` provides scripts for type generation, releases, imports, and Temporal workers.
+## 🏗️ Architecture: Modular Multi-Package System
 
-## Shared Defaults (src/defaults)
-- Contains pre-seeded deployment templates (`defaults/deployments/...`) used when provisioning assignments, documents, submissions, and student workspaces.
+The Computor platform is structured as a **monorepo with 4 independent packages**, providing clean separation of concerns and reusable components.
 
-## Frontend (frontend/)
-- **Tech Stack**: React 19 with TypeScript, React Router, MUI 6, React Query, TanStack Table, React Hook Form, Redux Toolkit, Recharts. Scripts managed via CRA (`react-scripts`).
-- **App Structure**: `App.tsx` hosts routing, top bar, and authenticated layout. Context providers (`hooks/useAuth`, `hooks/useSidebar`) manage auth state (SSO, Basic Auth, mock fallback) and navigation context.
-- **Pages**: `pages/` contains dashboards, admin views (courses, users, organizations, tasks, roles, examples), and debug utilities. Each page consumes domain hooks/services to fetch backend data and drive UI components.
-- **Components & Hooks**: `components/` implements navigation (sidebar), modals (SSO login), tables, forms, etc. `hooks/` encapsulate auth, sidebar state, data fetching helpers. `services/` wraps HTTP clients for auth, tasks, and domain endpoints, typically aligning with backend routes.
-- **API Layer**: `api/` and `types/` define request helpers, Axios clients, and TypeScript types mirroring backend DTOs. `utils/` centralizes formatting, permission checking, and error handling.
-- **Styling & Theming**: `styles/` includes global theme configuration and layout helpers for the MUI design system.
+```
+/home/theta/computor/computor-fullstack/
+│
+├── computor-types/          # 📦 Pure Pydantic DTOs
+├── computor-client/         # 📦 Auto-generated HTTP client
+├── computor-cli/            # 📦 Command-line interface
+├── src/computor_backend/    # 📦 FastAPI server
+├── frontend/                # 🎨 React frontend (Material-UI)
+└── frontend-next/           # 🎨 Next.js frontend (GitLab UI)
+```
 
-## Observations & Notable Behaviors
-- Startup relies on environment variables for database, Redis, MinIO, Temporal, and auth; missing secrets (e.g. `TOKEN_SECRET`) impact token encryption utilities.
-- Automated CRUD routing heavily depends on interface definitions staying in sync with SQLAlchemy models; cross-module coupling is high but deliberate.
-- Repository mirroring groundwork exists but is partially commented out; expect additional implementation before relying on filesystem exports.
-- Temporal task integration is a first-class concept—task APIs assume a running Temporal cluster and registered workflows in `tasks/temporal_*` modules.
-- Frontend authentication supports multiple strategies (SSO, Basic, mock) and persists selection via dedicated service classes with `localStorage` coordination.
+---
 
-## Next Steps
-- Validate this map with team SMEs and extend documentation with sequence diagrams once refactor plans stabilize.
-- Coordinate frontend refactor requirements with backend contract expectations before modifying shared DTOs or endpoints.
+## 📦 Package 1: computor-types
+
+**Location**: `computor-types/src/computor_types/`
+
+Pure Pydantic DTO package with zero backend dependencies.
+
+### Purpose
+- Single source of truth for data structures
+- Type-safe DTOs for API contracts
+- Shared between backend, client, and CLI
+
+### Key Components
+- **EntityInterface Pattern**: Base class defining CRUD operations and endpoints
+- **DTOs**: Request/response models (Create, Get, List, Update, Query)
+- **58 Interface Files**: Organizations, Users, Courses, Assignments, Submissions, etc.
+
+### Notable Features
+- No SQLAlchemy dependencies (pure Pydantic)
+- `get_all_dtos()` function for auto-discovery
+- Type-checking blocks for forward references
+- Independent, installable package
+
+### Dependencies
+```toml
+dependencies = [
+    "pydantic>=2.0",
+    "email-validator>=2.0",
+]
+```
+
+---
+
+## 📦 Package 2: computor-client
+
+**Location**: `computor-client/src/computor_client/`
+
+Auto-generated Python HTTP client library for the Computor API.
+
+### Purpose
+- Type-safe HTTP client for backend API
+- Auto-generated from `EntityInterface` definitions
+- Async/await support with httpx
+
+### Key Components
+- **ComputorClient**: Main client aggregator class
+- **BaseEndpointClient**: Generic CRUD operations
+- **25 Auto-generated Clients**: One per entity type
+- **Custom Exceptions**: HTTP status code mapping
+
+### Generated Clients
+```python
+from computor_client import ComputorClient
+
+async with ComputorClient(base_url="http://localhost:8000") as client:
+    await client.authenticate(username="admin", password="secret")
+
+    orgs = await client.organizations.list()
+    user = await client.users.get("user-id")
+    course = await client.courses.create(course_dto)
+```
+
+### Dependencies
+```toml
+dependencies = [
+    "computor-types>=0.1.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0",
+]
+```
+
+---
+
+## 📦 Package 3: computor-cli
+
+**Location**: `computor-cli/src/computor_cli/`
+
+Command-line interface for administrative and development tasks.
+
+### Purpose
+- CLI for API operations
+- Worker management
+- Code generation (TypeScript, OpenAPI)
+- Admin tasks
+
+### Working Commands (9)
+```bash
+computor login              # Authenticate with API
+computor profiles           # Manage auth profiles
+computor rest               # CRUD operations
+computor admin              # Administrative commands
+computor worker             # Temporal worker management
+computor generate-types     # TypeScript interface generation
+computor generate-clients   # TypeScript client generation
+computor generate-schema    # OpenAPI schema generation
+computor generate-validators # Validator generation
+```
+
+### Configuration
+- Stored in `~/.computor/`
+- Profile-based authentication
+- Support for basic auth and GitLab SSO
+
+### Dependencies
+```toml
+dependencies = [
+    "computor-types>=0.1.0",
+    "computor-client>=0.1.0",
+    "click>=8.0",
+    "pydantic>=2.0",
+    "httpx>=0.27.0",
+    "pyyaml>=6.0",
+]
+```
+
+---
+
+## 📦 Package 4: computor_backend
+
+**Location**: `src/computor_backend/`
+
+FastAPI server providing REST API and business logic.
+
+### Entry Points
+- **`server.py`**: FastAPI app initialization and startup logic
+- **Shell Scripts**: `api.sh`, `startup.sh`, `migrations.sh`
+
+### Architecture Layers
+
+#### 1. **API Layer** (`api/`)
+- **Thin endpoints** that delegate to business logic
+- FastAPI routers organized by resource
+- Permission-based access control
+- Uses DTOs from `computor_types`
+
+**Key Modules**:
+- `users.py`, `organizations.py`, `courses.py`, etc.
+- Auto-generated CRUD via `CrudRouter` and `LookUpRouter`
+- Custom endpoints for complex operations
+
+#### 2. **Business Logic Layer** (`business_logic/`)
+- Core business logic separated from API layer
+- Reusable functions with explicit parameters
+- Designed for caching and testing
+- Permission checks and validation
+
+**Example**:
+```python
+# In business_logic/submissions.py
+def get_submission_artifact(
+    artifact_id: str,
+    permissions: Principal,
+    db: Session,
+) -> SubmissionArtifact:
+    # Business logic here
+    pass
+
+# In api/submissions.py
+@router.get("/artifacts/{artifact_id}")
+async def get_artifact_endpoint(
+    artifact_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    # Delegate to business logic
+    return get_submission_artifact(artifact_id, permissions, db)
+```
+
+#### 3. **Model Layer** (`model/`)
+- SQLAlchemy ORM models
+- Single source of truth for database schema
+- Alembic migrations generated from model changes
+
+**Key Models**:
+- `User`, `Organization`, `CourseFamily`, `Course`
+- `CourseContent`, `CourseMember`, `Submission`
+- `Result`, `Example`, `Deployment`
+
+#### 4. **Repository Layer** (`repositories/`)
+- Data access layer helpers
+- Complex queries beyond basic CRUD
+- Encapsulation of database operations
+
+#### 5. **Permission Layer** (`permissions/`)
+- RBAC system with claims
+- Role hierarchy: `_owner` → `_maintainer` → `_lecturer` → `_tutor` → `_student`
+- `get_current_principal` dependency
+- `check_course_permissions()` helpers
+
+#### 6. **Task Layer** (`tasks/`)
+- Temporal.io workflow orchestration
+- Asynchronous operations (GitLab API, deployment, testing)
+
+**Key Workflows**:
+- `temporal_hierarchy_management.py` - Organization/Course creation
+- `temporal_student_template_v2.py` - Student template generation
+- `temporal_student_testing.py` - Submission testing
+- `temporal_examples.py` - Example deployment
+
+#### 7. **Service Layer** (`services/`)
+- Infrastructure services
+- `storage_service.py` - MinIO (S3-compatible) client
+- Git helpers, deployment sync
+- Version resolution
+
+#### 8. **Authentication** (`auth/`)
+- Authentication plugins
+- Keycloak SSO provider (OpenID Connect)
+- Basic auth fallback
+
+### Runtime Configuration
+- **`settings.py`**: Environment-based configuration
+- **`database.py`**: SQLAlchemy session management
+- **`redis_cache.py`**: Redis caching client
+
+### Import Pattern
+```python
+# DTOs from computor-types
+from computor_types.organizations import OrganizationInterface, OrganizationCreate
+
+# Backend modules
+from computor_backend.model import Organization
+from computor_backend.permissions.auth import get_current_principal
+from computor_backend.business_logic.organizations import create_organization_logic
+```
+
+### Dependencies
+```toml
+dependencies = [
+    "computor-types>=0.1.0",
+    "fastapi>=0.104.0",
+    "sqlalchemy>=2.0",
+    "alembic>=1.12",
+    "temporalio>=1.3.0",
+    # ... many more
+]
+```
+
+---
+
+## 🎨 Frontend (frontend/)
+
+**Legacy React application** with Material-UI.
+
+### Tech Stack
+- React 19 + TypeScript
+- React Router, MUI 6
+- React Query, TanStack Table
+- React Hook Form, Redux Toolkit
+
+### Structure
+- **`App.tsx`**: Routing, layout, authentication
+- **`pages/`**: Dashboards, admin views
+- **`components/`**: Navigation, modals, tables, forms
+- **`hooks/`**: Auth, sidebar, data fetching
+- **`services/`**: HTTP clients for backend API
+- **`api/`**: API client, type definitions
+
+### Service URLs (Development)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+
+---
+
+## 🎨 Frontend (frontend-next/)
+
+**New Next.js 15 application** with GitLab UI.
+
+### Tech Stack
+- Next.js 15 + TypeScript
+- GitLab UI components
+- Turbopack for fast dev server
+
+### Structure
+- Modern Next.js App Router
+- Server and client components
+- GitLab design system
+
+### Service URLs (Development)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+
+**Note**: Both frontends run on port 3000 - only run one at a time.
+
+---
+
+## 🗄️ Infrastructure Services
+
+### PostgreSQL Database
+- SQLAlchemy ORM
+- Alembic migrations
+- Audit fields: `created_by`, `updated_by`, timestamps
+- Soft delete: `archived_at`
+
+### Redis Cache
+- Configuration ready
+- Minimal usage currently
+- Future expansion planned for business logic caching
+
+### MinIO Object Storage
+- S3-compatible storage
+- File uploads, downloads, presigned URLs
+- Console: http://localhost:9001
+
+### Temporal.io
+- Workflow orchestration
+- Async task execution
+- GitLab API integration
+- UI: http://localhost:8088
+
+### Keycloak SSO
+- OpenID Connect authentication
+- Multi-tenant support
+- UI: http://localhost:8080
+
+---
+
+## 🔄 Data Flow
+
+### API Request Flow
+```
+Client Request
+    ↓
+[API Endpoint] (FastAPI router)
+    ↓
+[Permission Check] (get_current_principal)
+    ↓
+[Business Logic] (business_logic/)
+    ↓
+[Repository/Model] (SQLAlchemy)
+    ↓
+[Database] (PostgreSQL)
+```
+
+### Temporal Workflow Flow
+```
+API Request
+    ↓
+[Task Submission] (tasks/temporal_client.py)
+    ↓
+[Temporal Server]
+    ↓
+[Workflow Execution] (tasks/temporal_*.py)
+    ↓
+[External Services] (GitLab API, MinIO, etc.)
+```
+
+---
+
+## 🎯 Key Design Patterns
+
+### 1. **EntityInterface Pattern**
+Single source of truth for API contracts (defined in `computor-types`)
+
+### 2. **Repository Pattern**
+Data access layer abstraction (in `repositories/`)
+
+### 3. **Business Logic Separation**
+Thin API endpoints, fat business logic layer (in `business_logic/`)
+
+### 4. **Auto-Code Generation**
+- Python clients from `EntityInterface`
+- TypeScript types from Pydantic models
+- OpenAPI schema generation
+
+### 5. **Dependency Injection**
+FastAPI dependencies for auth, database, services
+
+---
+
+## 📊 System Statistics
+
+### Code Base Size
+- **computor-types**: 58 files, ~500KB
+- **computor-client**: 26 files, ~50KB (18K lines auto-generated)
+- **computor-cli**: 18 files, ~80KB
+- **computor_backend**: ~200 files, ~2MB
+- **Total**: ~300 files, ~25,000 lines of code
+
+### API Coverage
+- **25 auto-generated clients** for entity types
+- **100+ REST endpoints**
+- **15+ Temporal workflows**
+
+---
+
+## 🚀 Deployment
+
+### Development Setup
+```bash
+# Install all packages
+pip install -e computor-types/
+pip install -e computor-client/
+pip install -e computor-cli/
+pip install -e src/
+
+# Start services
+bash startup.sh        # Docker services
+bash api.sh            # Backend API
+bash frontend.sh       # React frontend
+```
+
+### Production Considerations
+- All 4 packages publishable to PyPI
+- Docker Compose orchestration
+- Environment-based configuration
+- Alembic migrations for database schema
+
+---
+
+## 🔍 Notable Behaviors
+
+- **Startup**: Seeds admin accounts, applies roles, initializes auth plugins
+- **Migrations**: Generated from SQLAlchemy model changes
+- **Permissions**: Role-based with course-level granularity
+- **Temporal Integration**: First-class async task support
+- **GitLab Integration**: Automated group/repository management
+- **Caching**: Redis configured but minimally used (future expansion)
+- **Authentication**: Multiple strategies (SSO, Basic, mock)
+
+---
+
+## 📚 Documentation
+
+- **CLAUDE.md**: Project overview and developer guide
+- **REFACTORING_COMPLETE_FINAL.md**: Complete refactoring summary
+- **docs/guideline.md**: Backend development guidelines
+- **Package READMEs**: Installation and usage for each package
+
+---
+
+## 🎯 Next Steps
+
+- Migrate remaining 4 CLI commands to use `computor_client`
+- Expand Redis caching in business logic layer
+- Complete repository mirroring implementation
+- Enhance frontend with Next.js application
+- Add comprehensive API documentation

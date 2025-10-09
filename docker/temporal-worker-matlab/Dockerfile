@@ -26,9 +26,21 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
 
-ADD src /home/matlab/
+# Copy computor-types, computor-utils and computor-backend
+ADD computor-types /home/matlab/computor-types
+ADD computor-utils /home/matlab/computor-utils
+ADD computor-backend /home/matlab/computor-backend
 
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+# Copy the matlab-server.py script
+COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
+
+# Install local packages first (computor-types and computor-utils)
+RUN pip install --no-cache-dir -e /home/matlab/computor-types
+RUN pip install --no-cache-dir -e /home/matlab/computor-utils
+
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade -r /home/matlab/computor-backend/src/requirements.txt
+
 RUN chmod -R 777 /home/matlab
 
 RUN rm /etc/sudoers.d/localsudo
@@ -43,8 +55,8 @@ ENV TZ=Europe/Berlin
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
 
-# Copy the matlab-server.py script
-COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
+# Add src to PYTHONPATH so imports work
+ENV PYTHONPATH=/home/matlab/computor-backend/src:$PYTHONPATH
 
 # Default entrypoint - matlab-server.py will start the temporal worker internally
 ENTRYPOINT ["python", "/home/matlab/matlab-server.py"]

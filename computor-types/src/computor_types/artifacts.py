@@ -1,0 +1,274 @@
+"""Pydantic DTOs for artifact-related models."""
+from datetime import datetime
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from computor_types.base import BaseEntityList, EntityInterface, ListQuery
+from computor_types.tasks import TaskStatus, map_int_to_task_status
+from computor_types.grading import GradingStatus
+
+# Forward reference imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+        from computor_types.results import ResultList
+
+# ===============================
+# SubmissionArtifact DTOs
+# ===============================
+
+class SubmissionArtifactCreate(BaseModel):
+    """DTO for creating submission artifacts.
+
+    This is used internally when processing submission uploads.
+    The upload endpoint accepts SubmissionCreate which only has:
+    - submission_group_id
+    - version_identifier (optional)
+    """
+    submission_group_id: str
+    version_identifier: Optional[str] = None
+
+class SubmissionArtifactUpdate(BaseModel):
+    """DTO for updating submission artifacts."""
+    submit: Optional[bool] = None  # True = official submission, False = test/practice run
+    properties: Optional[dict[str, Any]] = None
+
+class SubmissionArtifactList(BaseEntityList):
+    """List item representation for submission artifacts.
+
+    Essential metadata is stored in proper database columns.
+    Properties field is kept for legacy compatibility and future extensibility.
+    """
+    id: str
+    submission_group_id: str
+    uploaded_by_course_member_id: Optional[str] = None
+    content_type: Optional[str] = None
+    file_size: int
+    bucket_name: str
+    object_key: str
+    uploaded_at: datetime
+    version_identifier: Optional[str] = None
+    properties: Optional[dict[str, Any]] = None  # Additional metadata
+    latest_result: Optional['ResultList'] = None  # Latest successful result (status=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionArtifactGet(SubmissionArtifactList):
+    """Detailed view of submission artifact with related data."""
+    test_results_count: Optional[int] = None
+    grades_count: Optional[int] = None
+    reviews_count: Optional[int] = None
+    latest_result: Optional['ResultList'] = None
+    average_grade: Optional[float] = None
+
+class SubmissionArtifactQuery(ListQuery):
+    """Query parameters for listing submission artifacts."""
+    id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    uploaded_by_course_member_id: Optional[str] = None
+    content_type: Optional[str] = None
+
+def submission_artifact_search(db: 'Session', query, params: SubmissionArtifactQuery):
+    """Apply filters for submission artifact listings."""
+    if params.id is not None:
+        query = query.filter(id == params.id)
+    if params.submission_group_id is not None:
+        query = query.filter(submission_group_id == params.submission_group_id)
+    if params.uploaded_by_course_member_id is not None:
+        query = query.filter(uploaded_by_course_member_id == params.uploaded_by_course_member_id)
+    if params.content_type is not None:
+        query = query.filter(content_type == params.content_type)
+
+    return query.order_by(SubmissionArtifact.uploaded_at.desc())
+
+class SubmissionArtifactInterface(EntityInterface):
+    """Entity interface for submission artifacts."""
+    list = SubmissionArtifactList
+    get = SubmissionArtifactGet
+    create = SubmissionArtifactCreate
+    update = SubmissionArtifactUpdate
+    query = SubmissionArtifactQuery
+
+# ===============================
+# SubmissionGrade DTOs
+# ===============================
+
+class SubmissionGradeCreate(BaseModel):
+    """DTO for creating submission grades."""
+    artifact_id: str
+    graded_by_course_member_id: str
+    grade: float
+    status: GradingStatus = GradingStatus.NOT_REVIEWED
+    comment: Optional[str] = None
+
+class SubmissionGradeUpdate(BaseModel):
+    """DTO for updating submission grades."""
+    grade: Optional[float] = None
+    status: Optional[GradingStatus] = None
+    comment: Optional[str] = None
+
+class SubmissionGradeListItem(BaseEntityList):
+    """List item representation for submission grades."""
+    id: str
+    artifact_id: str
+    graded_by_course_member_id: str
+    grade: float
+    status: GradingStatus
+    comment: Optional[str] = None
+    graded_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if isinstance(value, GradingStatus):
+            return value
+        return GradingStatus(value) if value is not None else GradingStatus.NOT_REVIEWED
+
+class SubmissionGradeDetail(SubmissionGradeListItem):
+    """Detailed view of submission grade."""
+    pass  # No additional fields beyond the list item
+
+class SubmissionGradeQuery(ListQuery):
+    """Query parameters for listing submission grades."""
+    id: Optional[str] = None
+    artifact_id: Optional[str] = None
+    graded_by_course_member_id: Optional[str] = None
+    status: Optional[GradingStatus] = None
+
+def submission_grade_search(db: 'Session', query, params: SubmissionGradeQuery):
+    """Apply filters for submission grade listings."""
+    if params.id is not None:
+        query = query.filter(id == params.id)
+    if params.artifact_id is not None:
+        query = query.filter(artifact_id == params.artifact_id)
+    if params.graded_by_course_member_id is not None:
+        query = query.filter(graded_by_course_member_id == params.graded_by_course_member_id)
+    if params.status is not None:
+        query = query.filter(status == params.status.value)
+
+    return query.order_by(SubmissionGrade.graded_at.desc())
+
+class SubmissionGradeInterface(EntityInterface):
+    """Entity interface for submission grades."""
+    list = SubmissionGradeListItem
+    get = SubmissionGradeDetail
+    create = SubmissionGradeCreate
+    update = SubmissionGradeUpdate
+    query = SubmissionGradeQuery
+
+# ===============================
+# SubmissionReview DTOs
+# ===============================
+
+class SubmissionReviewCreate(BaseModel):
+    """DTO for creating submission reviews."""
+    artifact_id: str
+    reviewer_course_member_id: str
+    body: str
+    review_type: Optional[str] = None
+
+class SubmissionReviewUpdate(BaseModel):
+    """DTO for updating submission reviews."""
+    body: Optional[str] = None
+    review_type: Optional[str] = None
+
+class SubmissionReviewListItem(BaseEntityList):
+    """List item representation for submission reviews."""
+    id: str
+    artifact_id: str
+    reviewer_course_member_id: str
+    body: str
+    review_type: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionReviewDetail(SubmissionReviewListItem):
+    """Detailed view of submission review."""
+    pass  # Same as list item for now
+
+class SubmissionReviewQuery(ListQuery):
+    """Query parameters for listing submission reviews."""
+    id: Optional[str] = None
+    artifact_id: Optional[str] = None
+    reviewer_course_member_id: Optional[str] = None
+    review_type: Optional[str] = None
+
+def submission_review_search(db: 'Session', query, params: SubmissionReviewQuery):
+    """Apply filters for submission review listings."""
+    if params.id is not None:
+        query = query.filter(id == params.id)
+    if params.artifact_id is not None:
+        query = query.filter(artifact_id == params.artifact_id)
+    if params.reviewer_course_member_id is not None:
+        query = query.filter(reviewer_course_member_id == params.reviewer_course_member_id)
+    if params.review_type is not None:
+        query = query.filter(review_type == params.review_type)
+
+    return query.order_by(SubmissionReview.created_at.desc())
+
+class SubmissionReviewInterface(EntityInterface):
+    """Entity interface for submission reviews."""
+    list = SubmissionReviewListItem
+    get = SubmissionReviewDetail
+    create = SubmissionReviewCreate
+    update = SubmissionReviewUpdate
+    query = SubmissionReviewQuery
+
+# ===============================
+# ResultArtifact DTOs
+# ===============================
+
+class ResultArtifactCreate(BaseModel):
+    """DTO for creating result artifacts."""
+    result_id: str
+    content_type: Optional[str] = None
+    file_size: int
+    bucket_name: str
+    object_key: str
+    properties: Optional[dict[str, Any]] = None
+
+class ResultArtifactListItem(BaseEntityList):
+    """List item representation for result artifacts."""
+    id: str
+    result_id: str
+    content_type: Optional[str] = None
+    file_size: int
+    bucket_name: str
+    object_key: str
+    created_at: datetime
+    properties: Optional[dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ResultArtifactQuery(ListQuery):
+    """Query parameters for listing result artifacts."""
+    id: Optional[str] = None
+    result_id: Optional[str] = None
+    content_type: Optional[str] = None
+
+def result_artifact_search(db: 'Session', query, params: ResultArtifactQuery):
+    """Apply filters for result artifact listings."""
+    if params.id is not None:
+        query = query.filter(id == params.id)
+    if params.result_id is not None:
+        query = query.filter(result_id == params.result_id)
+    if params.content_type is not None:
+        query = query.filter(content_type == params.content_type)
+
+    return query.order_by(ResultArtifact.created_at.desc())
+
+class ResultArtifactInterface(EntityInterface):
+    """Entity interface for result artifacts."""
+    list = ResultArtifactListItem
+    get = ResultArtifactListItem
+    create = ResultArtifactCreate
+    query = ResultArtifactQuery
+
+# Import the necessary types first
+from .results import ResultList
+
+# Rebuild all models that have forward references
+SubmissionArtifactGet.model_rebuild()

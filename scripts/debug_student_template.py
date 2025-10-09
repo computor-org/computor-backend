@@ -7,9 +7,9 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from sqlalchemy.orm import Session
-from ctutor_backend.database import get_db
-from ctutor_backend.model.course import Course, CourseFamily
-from ctutor_backend.model.organization import Organization
+from computor_backend.database import get_db
+from computor_backend.model.course import Course, CourseFamily
+from computor_backend.model.organization import Organization
 import json
 
 
