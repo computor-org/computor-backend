@@ -300,20 +300,47 @@ async def upload_submission_artifact(
                     f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
                 )
 
+            # Detect and strip common root directory if all files are under it
+            common_root = None
+            if members:
+                # Get the first path component of each file
+                first_components = []
+                for member in members:
+                    parts = member.filename.split('/')
+                    if len(parts) > 1:  # Has at least one directory
+                        first_components.append(parts[0])
+
+                # Check if all files share the same first component
+                if first_components and len(set(first_components)) == 1 and len(first_components) == len(members):
+                    # All files are under the same root directory
+                    common_root = first_components[0]
+                    logger.debug(f"Detected common root directory: {common_root}")
+
             # Extract, filter, and upload each file individually to MinIO
             bucket_name = str(submission_group.id).lower()
 
             for member in members:
+                # Strip common root directory if detected
+                actual_filename = member.filename
+                if common_root and actual_filename.startswith(f"{common_root}/"):
+                    actual_filename = actual_filename[len(common_root) + 1:]
+                    logger.debug(f"Stripped common root: {member.filename} -> {actual_filename}")
+
+                # Skip if stripping left us with nothing
+                if not actual_filename:
+                    logger.debug(f"Skipping empty path after stripping root: {member.filename}")
+                    continue
+
                 # Skip system files, hidden files, and dangerous files
-                if _should_skip_file(member.filename):
-                    logger.debug(f"Filtering out file: {member.filename}")
+                if _should_skip_file(actual_filename):
+                    logger.debug(f"Filtering out file: {actual_filename}")
                     continue
 
                 # Sanitize the archive path
                 try:
-                    sanitized_path = _sanitize_archive_path(member.filename)
+                    sanitized_path = _sanitize_archive_path(actual_filename)
                 except BadRequestException as e:
-                    logger.warning(f"Skipping invalid path {member.filename}: {e}")
+                    logger.warning(f"Skipping invalid path {actual_filename}: {e}")
                     continue
 
                 # Extract file content
