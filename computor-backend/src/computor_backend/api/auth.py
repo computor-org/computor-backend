@@ -385,6 +385,7 @@ async def register_user(
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
+    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> LocalTokenRefreshResponse:
     """
@@ -393,17 +394,21 @@ async def refresh_local_token(
     This endpoint allows users to refresh their session token for local
     (username/password) authentication using the refresh token obtained
     during initial login.
+
+    Requires authentication to ensure only the token owner can refresh it.
     """
     from computor_backend.business_logic.auth import refresh_local_token
 
     return await refresh_local_token(
         refresh_token=request.refresh_token,
+        principal=principal,
         db=db
     )
 
 @auth_router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(
     request: TokenRefreshRequest,
+    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> TokenRefreshResponse:
     """
@@ -411,12 +416,15 @@ async def refresh_token(
 
     This endpoint allows users to refresh their session token using
     the refresh token obtained during initial SSO authentication.
+
+    Requires authentication to ensure only the token owner can refresh it.
     """
     from computor_backend.business_logic.auth import refresh_sso_token
 
     result = await refresh_sso_token(
         refresh_token=request.refresh_token,
         provider=request.provider,
+        principal=principal,
         db=db
     )
 

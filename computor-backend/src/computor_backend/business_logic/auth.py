@@ -109,6 +109,7 @@ async def login_with_local_credentials(
 
 async def refresh_local_token(
     refresh_token: str,
+    principal: Principal,
     db: Session,
 ) -> LocalTokenRefreshResponse:
     """
@@ -116,13 +117,14 @@ async def refresh_local_token(
 
     Args:
         refresh_token: Valid refresh token
+        principal: Current authenticated principal
         db: Database session
 
     Returns:
         LocalTokenRefreshResponse with new access token
 
     Raises:
-        UnauthorizedException: If refresh token is invalid or expired
+        UnauthorizedException: If refresh token is invalid or expired or doesn't belong to user
         NotFoundException: If user not found
     """
     redis_client = await get_redis_client()
@@ -140,6 +142,10 @@ async def refresh_local_token(
 
         if not user_id:
             raise UnauthorizedException("Invalid refresh token data")
+
+        # Verify the refresh token belongs to the authenticated user
+        if str(user_id) != str(principal.user_id):
+            raise UnauthorizedException("Refresh token does not belong to authenticated user")
 
         # Verify user still exists (wrap blocking DB query)
         user = await run_in_threadpool(
@@ -544,6 +550,7 @@ async def register_sso_user(
 async def refresh_sso_token(
     refresh_token: str,
     provider: str,
+    principal: Principal,
     db: Session,
 ) -> Dict[str, Any]:
     """
@@ -552,6 +559,7 @@ async def refresh_sso_token(
     Args:
         refresh_token: Refresh token from provider
         provider: Authentication provider name
+        principal: Current authenticated principal
         db: Database session
 
     Returns:
@@ -559,7 +567,7 @@ async def refresh_sso_token(
 
     Raises:
         BadRequestException: If provider not enabled or refresh not supported
-        UnauthorizedException: If token refresh fails
+        UnauthorizedException: If token refresh fails or token doesn't belong to user
         NotFoundException: If provider or account not found
     """
     registry = get_plugin_registry()
@@ -602,6 +610,10 @@ async def refresh_sso_token(
             raise NotFoundException("User account not found")
 
         user = account.user
+
+        # Verify the account belongs to the authenticated user
+        if str(user.id) != str(principal.user_id):
+            raise UnauthorizedException("Refresh token does not belong to authenticated user")
 
         # Generate new API session token
         new_session_token = secrets.token_urlsafe(32)
