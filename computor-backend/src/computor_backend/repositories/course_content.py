@@ -677,6 +677,8 @@ def course_member_course_content_query(
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
+        # Load deployment information
+        joinedload(CourseContent.deployment),
     )
 
     raw_result = course_contents_query.first()
@@ -799,6 +801,8 @@ def course_member_course_content_list_query(
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
+        # Load deployment information
+        joinedload(CourseContent.deployment),
     )
 
     return query

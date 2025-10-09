@@ -7,6 +7,7 @@ from computor_types.deployments import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.tasks import TaskStatus
 from computor_types.grading import SubmissionGroupGradingList
+from computor_types.deployment import CourseContentDeploymentList
 
 from computor_types.custom_types import Ltree
 
@@ -99,6 +100,8 @@ class CourseContentStudentGet(BaseEntityGet):
     directory: Optional[str] = None
     color: str
     submission_group: Optional[SubmissionGroupStudentGet] = None
+    deployment: Optional[CourseContentDeploymentList] = None
+    has_deployment: Optional[bool] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -129,7 +132,9 @@ class CourseContentStudentList(BaseModel):
 
     submission_group:  Optional[SubmissionGroupStudentList] = None
     unread_message_count: int = 0
-    
+    deployment: Optional[CourseContentDeploymentList] = None
+    has_deployment: Optional[bool] = None
+
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):

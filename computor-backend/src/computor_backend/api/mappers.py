@@ -12,6 +12,7 @@ from computor_types.student_course_contents import (
 )
 from computor_types.grading import GradingStatus, SubmissionGroupGradingList, GradedByCourseMember
 from computor_types.tasks import map_int_to_task_status
+from computor_types.deployment import CourseContentDeploymentList
 from computor_backend.model.course import CourseMember
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
@@ -62,6 +63,16 @@ def course_member_course_content_result_mapper(
     latest_grading_value = submission_grading
 
     directory = course_content.deployment.deployment_path if course_content.deployment else None
+
+    # Build deployment information if present
+    deployment_payload = None
+    has_deployment = False
+    if hasattr(course_content, 'deployment') and course_content.deployment:
+        has_deployment = True
+        deployment_payload = CourseContentDeploymentList.model_validate(
+            course_content.deployment,
+            from_attributes=True
+        )
 
     repository = None
     if submission_group != None and submission_group.properties != None:
@@ -196,6 +207,8 @@ def course_member_course_content_result_mapper(
         result=result_payload,
         submission_group=submission_group_payload,
         unread_message_count=unread_message_count,
+        deployment=deployment_payload,
+        has_deployment=has_deployment,
     )
 
     if not detailed:
@@ -227,4 +240,6 @@ def course_member_course_content_result_mapper(
             SubmissionGroupStudentGet(**submission_group_payload.model_dump())
             if submission_group_payload is not None else None
         ),
+        deployment=deployment_payload,
+        has_deployment=has_deployment,
     )
