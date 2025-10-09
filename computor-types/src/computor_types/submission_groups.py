@@ -17,6 +17,7 @@ class SubmissionGroupProperties(BaseModel):
     
 class SubmissionGroupCreate(BaseModel):
     properties: Optional[SubmissionGroupProperties] = None
+    display_name: Optional[str] = None  # Team name (optional, auto-computed if not provided)
     max_group_size: int = 1
     max_submissions: Optional[int] = None
     course_content_id: str
@@ -25,6 +26,7 @@ class SubmissionGroupCreate(BaseModel):
 class SubmissionGroupGet(BaseEntityGet, SubmissionGroupCreate):
     id: str
     course_id: str
+    display_name: Optional[str] = None  # Team name or auto-computed from first member
     status: Optional[str] = None  # Deprecated - use latest grading status
     last_submitted_result_id: Optional[str] = None  # ID of the last submitted result
 
@@ -32,6 +34,7 @@ class SubmissionGroupGet(BaseEntityGet, SubmissionGroupCreate):
 class SubmissionGroupList(BaseModel):
     id: str
     properties: Optional[SubmissionGroupProperties] = None
+    display_name: Optional[str] = None  # Team name or auto-computed from first member
     max_group_size: int
     max_submissions: Optional[int] = None
     course_id: str
@@ -43,12 +46,14 @@ class SubmissionGroupList(BaseModel):
     
 class SubmissionGroupUpdate(BaseModel):
     properties: Optional[SubmissionGroupProperties] = None
+    display_name: Optional[str] = None  # Update team name
     max_group_size: Optional[int] = None
     max_submissions: Optional[int] = None
     status: Optional[str] = None
 
 class SubmissionGroupQuery(ListQuery):
     id: Optional[str] = None
+    display_name: Optional[str] = None  # Filter by team name
     max_group_size: Optional[int] = None
     max_submissions: Optional[int] = None
     course_id: Optional[str] = None
@@ -135,23 +140,24 @@ class SubmissionGroupDetailed(BaseModel):
     course_id: str
     course_content_id: str
     properties: Optional[SubmissionGroupProperties] = None
+    display_name: Optional[str] = None  # Team name or auto-computed from first member
     max_group_size: int
     max_submissions: Optional[int] = None
     max_test_runs: Optional[int] = None
-    
+
     # Related data
     members: List[dict] = []  # List of member info
     gradings: List[dict] = []  # List of all gradings
     last_submitted_result: Optional[dict] = None  # Last submitted result info
-    
+
     # Computed fields
     current_group_size: int = 0
     submission_count: int = 0
     test_run_count: int = 0
     latest_grade: Optional[float] = None
     latest_grading_status: Optional[GradingStatus] = None
-    
+
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
