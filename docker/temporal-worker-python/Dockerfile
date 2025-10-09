@@ -20,13 +20,13 @@ RUN chown -R worker:worker /home/worker
 # Switch to worker user
 USER worker
 
-# Install local packages first (computor-types, computor-utils, and computor-client)
-RUN pip install --user -e computor-types
-RUN pip install --user -e computor-utils
-RUN pip install --user -e computor-client
+# Install local packages first (needed by computor-backend)
+RUN pip install --user /home/worker/computor-types
+RUN pip install --user /home/worker/computor-utils
+RUN pip install --user /home/worker/computor-client
 
-# Install dependencies
-RUN pip install --no-cache-dir --user --upgrade -r computor-backend/src/requirements.txt
+# Install computor-backend with all dependencies
+RUN pip install --user /home/worker/computor-backend
 
 # Add src to PYTHONPATH so imports work
 ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH

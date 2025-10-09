@@ -37,3 +37,9 @@ dev = [
 Homepage = "https://github.com/computor/computor-types"
 Documentation = "https://docs.computor.dev/types"
 Repository = "https://github.com/computor/computor-types"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

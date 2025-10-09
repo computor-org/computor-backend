@@ -373,6 +373,48 @@ class BaseRepository(ABC, Generic[T]):
         except SQLAlchemyError as e:
             self.db.rollback()
             raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}")
+
+    def update_entity(self, entity: T, updates: Dict[str, Any]) -> T:
+        """
+        Update an already-fetched entity and invalidate related caches.
+
+        Use this when you already have the entity instance (e.g., from permission checks)
+        to avoid redundant database queries.
+
+        Args:
+            entity: Entity instance to update (must be attached to session)
+            updates: Dictionary of fields to update
+
+        Returns:
+            Updated entity
+
+        Raises:
+            RepositoryError: If update fails
+        """
+        try:
+            # Get entity ID for cache invalidation
+            inspector = inspect(entity)
+            entity_id = inspector.identity[0] if inspector.identity else None
+
+            # Apply updates
+            for key, value in updates.items():
+                if hasattr(entity, key):
+                    setattr(entity, key, value)
+
+            self.db.commit()
+            self.db.refresh(entity)
+
+            # Invalidate caches if enabled
+            if self._use_cache() and entity_id:
+                tags = self.get_entity_tags(entity)
+                tags.add(f"{self.entity_type}:{entity_id}")  # Ensure entity key invalidated
+                if tags:
+                    self.cache.invalidate_tags(*tags)
+
+            return entity
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}")
     
     def delete(self, entity_id: Any) -> bool:
         """

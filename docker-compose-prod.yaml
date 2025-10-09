@@ -263,7 +263,7 @@ services:
       - DEBUG_MODE=${DEBUG_MODE}
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
-      - PYTHONPATH=/home/matlab/src
+      - PYTHONPATH=/home/matlab/computor-backend/src
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
@@ -275,6 +275,8 @@ services:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
+      - postgres
+      - redis
     labels:
       - traefik.enable=false
 

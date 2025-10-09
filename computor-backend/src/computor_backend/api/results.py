@@ -101,7 +101,8 @@ async def update_result(
     updates = payload.model_dump(exclude_unset=True)
 
     # Use repository for cache-aware update (triggers invalidation)
-    result = result_repo.update(str(result_id), updates)
+    # Pass the entity directly to avoid re-querying
+    result = result_repo.update_entity(db_result, updates)
 
     return ResultGet.model_validate(result, from_attributes=True)
 

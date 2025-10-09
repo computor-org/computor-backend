@@ -244,7 +244,6 @@ services:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
     command: ["--queues=testing-matlab"]
-    hostname: ''
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:
