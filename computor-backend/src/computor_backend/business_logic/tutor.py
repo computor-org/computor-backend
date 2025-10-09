@@ -31,6 +31,12 @@ from computor_types.tutor_courses import CourseTutorGet, CourseTutorList
 from computor_types.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from computor_types.grading import GradingStatus
 from computor_types.tutor_grading import TutorGradeResponse, GradedArtifactInfo
+from computor_types.tutor_submission_groups import (
+    TutorSubmissionGroupList,
+    TutorSubmissionGroupGet,
+    TutorSubmissionGroupQuery,
+    TutorSubmissionGroupMember,
+)
 
 logger = logging.getLogger(__name__)
 

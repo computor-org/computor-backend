@@ -371,6 +371,7 @@ class SubmissionGroup(Base):
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)  # Should contain gitlab/git repository info
     # Removed: status and grading - moved to SubmissionGrade
+    display_name = Column(String(255), nullable=True)  # Team name or auto-generated from student name
     max_group_size = Column(Integer, nullable=False)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
@@ -387,6 +388,27 @@ class SubmissionGroup(Base):
     # Gradings moved to SubmissionGrade tied to artifacts
     submission_artifacts = relationship('SubmissionArtifact', back_populates='submission_group')
     
+    def get_computed_display_name(self):
+        """
+        Compute display name for the submission group.
+
+        Returns "GivenName FamilyName" of the first member.
+        If no members or no name available, returns email or "Unknown Group".
+        """
+        if not self.members:
+            return "Unknown Group"
+
+        # Get first member's name
+        member = self.members[0]
+        if member.course_member and member.course_member.user:
+            user = member.course_member.user
+            given_name = user.given_name or ""
+            family_name = user.family_name or ""
+            full_name = f"{given_name} {family_name}".strip()
+            return full_name or user.email or "Unknown Group"
+
+        return "Unknown Group"
+
     # Hybrid property for the last submitted result
     @hybrid_property
     def last_submitted_result(self):
