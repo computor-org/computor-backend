@@ -1,6 +1,8 @@
 """Business logic for submission management."""
 import io
 import logging
+import mimetypes
+import re
 import zipfile
 from datetime import datetime
 from pathlib import PurePosixPath
@@ -37,7 +39,6 @@ from computor_backend.storage_security import perform_full_file_validation, sani
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 from computor_types.artifacts import SubmissionArtifactGet
 from computor_types.submissions import SubmissionUploadResponseModel
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,108 @@ def _sanitize_archive_path(name: str) -> str:
         raise BadRequestException("Archive contains an empty file path")
 
     return "/".join(parts)
+
+
+def _should_skip_file(filename: str) -> bool:
+    """
+    Determine if a file should be skipped during submission extraction.
+
+    Skips:
+    - Executable and binary files (.exe, .bin, .dll, .so, .dylib, etc.)
+    - Dangerous file types (.bat, .cmd, .sh, .ps1, etc.)
+    - macOS system files (.DS_Store, __MACOSX/)
+    - Windows system files (Thumbs.db, desktop.ini)
+    - Version control files (.git/, .gitignore, .gitattributes, .svn/)
+    - IDE files (.idea/, .vscode/)
+    - Build artifacts (node_modules/, __pycache__/)
+    - Documentation files (README.md, README_*.md)
+    - Media directories (mediaFiles/, media/)
+    - Hidden files starting with . (except .gitignore is explicitly skipped)
+    """
+    filename_lower = filename.lower()
+    path_parts = filename.split('/')
+
+    # Get the base filename (last part of path)
+    base_filename = path_parts[-1] if path_parts else filename
+
+    # Get file extension (including the dot)
+    file_ext = ''
+    if '.' in base_filename:
+        file_ext = base_filename[base_filename.rfind('.'):].lower()
+
+    # Skip dangerous executable and binary file extensions
+    dangerous_extensions = {
+        # Windows executables
+        '.exe', '.dll', '.com', '.bat', '.cmd', '.msi', '.scr', '.vbs', '.wsf',
+        # Linux/Unix executables and libraries
+        '.bin', '.so', '.a', '.o',
+        # macOS executables and libraries
+        '.dylib', '.app', '.dmg', '.pkg',
+        # Scripts (potentially dangerous)
+        '.ps1', '.psm1',  # PowerShell scripts
+        # Compiled Java
+        '.class',  # Compiled Java class files (but allow .jar for libraries)
+        # Native code
+        '.elf',
+        # Database files (often binary, large)
+        '.db', '.sqlite', '.sqlite3',
+        # Disk images
+        '.iso', '.img', '.vhd', '.vmdk',
+    }
+
+    if file_ext in dangerous_extensions:
+        logger.warning(f"Skipping dangerous file extension: {filename} ({file_ext})")
+        return True
+
+    # Skip README files (README.md, README_*.md, readme.txt, etc.)
+    if base_filename.lower().startswith('readme'):
+        return True
+
+    # Skip mediaFiles directory and its contents
+    if 'mediafiles' in filename_lower or 'media' in path_parts:
+        return True
+
+    # Skip version control files
+    version_control_files = {'.gitignore', '.gitattributes', '.gitmodules', '.git'}
+    if any(part in version_control_files for part in path_parts):
+        return True
+    if base_filename.lower() in {'.gitignore', '.gitattributes', '.gitmodules'}:
+        return True
+
+    # Skip hidden files and directories (starting with .) except some wanted files
+    # Allow: None currently, but structure is here for future additions
+    wanted_hidden_files = set()  # Example: {'.env.example', '.editorconfig'}
+    if any(part.startswith('.') and part not in wanted_hidden_files for part in path_parts):
+        return True
+
+    # Skip macOS system files
+    if '.ds_store' in filename_lower or '__macosx' in filename_lower:
+        return True
+
+    # Skip Windows system files
+    if 'thumbs.db' in filename_lower or 'desktop.ini' in filename_lower:
+        return True
+
+    # Skip common build/cache directories
+    skip_dirs = {
+        'node_modules', '__pycache__', '.pytest_cache', '.mypy_cache',
+        'build', 'dist', 'target', 'bin', 'obj', '.gradle', '.next',
+        'coverage', '.nyc_output', 'out'
+    }
+    if any(skip_dir in path_parts for skip_dir in skip_dirs):
+        return True
+
+    # Skip backup files
+    if filename.endswith('~') or filename.endswith('.bak'):
+        return True
+
+    # Skip editor swap/temp files
+    if base_filename.endswith('.swp') or base_filename.endswith('.swo'):
+        return True
+    if base_filename.startswith('.~') or base_filename.endswith('.tmp'):
+        return True
+
+    return False
 
 
 async def upload_submission_artifact(
@@ -178,11 +281,14 @@ async def upload_submission_artifact(
     if archive_suffix != ".zip":
         raise BadRequestException("Only ZIP archives are supported for submissions")
 
-    # Validate the ZIP file content
+    # Validate and filter ZIP file content, then upload individual files
     file_data.seek(0)
     try:
-        with zipfile.ZipFile(file_data) as archive:
-            members = [info for info in archive.infolist() if not info.is_dir()]
+        files_included = []
+        total_filtered_size = 0
+
+        with zipfile.ZipFile(file_data, 'r') as source_archive:
+            members = [info for info in source_archive.infolist() if not info.is_dir()]
             if not members:
                 raise BadRequestException("Archive does not contain any files")
 
@@ -193,61 +299,191 @@ async def upload_submission_artifact(
                 raise BadRequestException(
                     f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
                 )
+
+            # Extract, filter, and upload each file individually to MinIO
+            bucket_name = str(submission_group.id).lower()
+
+            for member in members:
+                # Skip system files, hidden files, and dangerous files
+                if _should_skip_file(member.filename):
+                    logger.debug(f"Filtering out file: {member.filename}")
+                    continue
+
+                # Sanitize the archive path
+                try:
+                    sanitized_path = _sanitize_archive_path(member.filename)
+                except BadRequestException as e:
+                    logger.warning(f"Skipping invalid path {member.filename}: {e}")
+                    continue
+
+                # Extract file content
+                file_content = source_archive.read(member.filename)
+                file_size = len(file_content)
+
+                # Skip empty files
+                if file_size == 0:
+                    logger.debug(f"Skipping empty file: {member.filename}")
+                    continue
+
+                # Validate individual file (security check)
+                file_stream = io.BytesIO(file_content)
+                try:
+                    # Basic validation for each file
+                    guessed_type, _ = mimetypes.guess_type(sanitized_path)
+                    content_type = guessed_type or "application/octet-stream"
+
+                    # Perform security validation
+                    perform_full_file_validation(
+                        filename=sanitized_path.split("/")[-1],  # Get filename only
+                        content_type=content_type,
+                        file_size=file_size,
+                        file_data=file_stream,
+                    )
+                except BadRequestException as e:
+                    logger.warning(f"Skipping invalid file {member.filename}: {e}")
+                    continue
+
+                # Upload file to MinIO with structure: {version_identifier}/{sanitized_path}
+                object_key = f"{manual_version_identifier}/{sanitized_path}"
+
+                storage_metadata = {
+                    "submission_group_id": str(submission_group.id),
+                    "version_identifier": manual_version_identifier,
+                    "original_path": member.filename,
+                }
+
+                file_stream.seek(0)
+                stored = await storage_service.upload_file(
+                    file_data=file_stream,
+                    object_key=object_key,
+                    bucket_name=bucket_name,
+                    content_type=content_type,
+                    metadata=storage_metadata,
+                )
+
+                files_included.append({
+                    "original_path": member.filename,
+                    "sanitized_path": sanitized_path,
+                    "object_key": object_key,
+                    "size": file_size,
+                })
+                total_filtered_size += file_size
+
+                logger.debug(f"Uploaded file to MinIO: {object_key} ({format_bytes(file_size)})")
+
+            if not files_included:
+                raise BadRequestException("No valid files found in archive after filtering")
+
     except zipfile.BadZipFile as exc:
         raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
 
-    # Store the entire ZIP file as a single artifact
-    timestamp_prefix = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
-    submission_prefix = f"submission-{timestamp_prefix}-{uuid4().hex}"
+    # Create single SubmissionArtifact record representing this submission
+    # The object_key is just the version_identifier (the directory prefix in MinIO)
     bucket_name = str(submission_group.id).lower()
-    object_key = f"{submission_prefix}/{filename or 'submission.zip'}"
+    object_key = manual_version_identifier  # Just the version identifier, no .zip
 
-    # Minimal metadata for MinIO
-    storage_metadata = {
-        "submission_group_id": str(submission_group.id),
-        "version_identifier": manual_version_identifier,
-    }
-
-    # Upload the entire ZIP file to MinIO
-    file_data.seek(0)
-    stored = await storage_service.upload_file(
-        file_data=file_data,
-        object_key=object_key,
-        bucket_name=bucket_name,
-        content_type="application/zip",
-        metadata=storage_metadata,
-    )
-
-    # Create single SubmissionArtifact record for the ZIP file
+    artifact_repo = SubmissionArtifactRepository(db, cache)
     artifact = SubmissionArtifact(
         submission_group_id=submission_group.id,
         uploaded_by_course_member_id=submitting_member.id,
-        content_type=stored.content_type,
-        file_size=stored.size,
+        content_type="application/x-directory",  # Indicates this is a directory structure
+        file_size=total_filtered_size,  # Total uncompressed size of all files
         bucket_name=bucket_name,
-        object_key=object_key,
+        object_key=object_key,  # Just the version_identifier
         version_identifier=manual_version_identifier,
         submit=submit,  # True = official submission, False = test/practice run
-        properties={}  # Keep empty for future extensibility and legacy compatibility
+        properties={
+            "files_count": len(files_included),
+            "files_included": files_included,  # List of all files with their object_keys
+            "original_filename": filename or "submission.zip",
+            "total_size": total_filtered_size,
+        }
     )
 
     # CRITICAL: Use repository for automatic cache invalidation
-    artifact_repo = SubmissionArtifactRepository(db, cache)
-    artifact = artifact_repo.create(artifact)
+    created_artifact = artifact_repo.create(artifact)
 
     logger.info(
-        "Created submission artifact %s for group %s (cache invalidated)", artifact.id, submission_group.id
+        "Created submission artifact %s for group %s with version %s (%d files, %s total, cache invalidated)",
+        created_artifact.id,
+        submission_group.id,
+        manual_version_identifier,
+        len(files_included),
+        format_bytes(total_filtered_size),
     )
 
     return SubmissionUploadResponseModel(
-        artifacts=[artifact.id],
+        artifacts=[created_artifact.id],
         submission_group_id=submission_group.id,
         uploaded_by_course_member_id=submitting_member.id,
-        total_size=stored.size,
-        files_count=1,  # Single ZIP file
+        total_size=total_filtered_size,
+        files_count=len(files_included),
         uploaded_at=datetime.utcnow(),
         version_identifier=manual_version_identifier,
     )
+
+
+async def download_submission_as_zip(
+    artifact_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+    storage_service,
+) -> tuple[io.BytesIO, str]:
+    """
+    Download a submission artifact and reconstruct it as a ZIP file.
+
+    Returns:
+        tuple[io.BytesIO, str]: (zip_buffer, filename)
+    """
+    # Check access permissions
+    artifact = check_artifact_access(artifact_id, permissions, db)
+
+    # Get list of files from properties
+    files_included = artifact.properties.get("files_included", [])
+    if not files_included:
+        raise NotFoundException(detail="No files found in this submission")
+
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file_info in files_included:
+            object_key = file_info.get("object_key")
+            sanitized_path = file_info.get("sanitized_path")
+
+            if not object_key or not sanitized_path:
+                logger.warning(f"Skipping file with missing info: {file_info}")
+                continue
+
+            try:
+                # Download file from MinIO
+                file_data = await storage_service.download_file(
+                    object_key=object_key,
+                    bucket_name=artifact.bucket_name
+                )
+
+                # Add to ZIP with sanitized path
+                zip_file.writestr(sanitized_path, file_data)
+                logger.debug(f"Added file to ZIP: {sanitized_path}")
+
+            except Exception as e:
+                logger.error(f"Failed to download file {object_key}: {e}")
+                # Continue with other files
+                continue
+
+    # Reset buffer position
+    zip_buffer.seek(0)
+
+    # Generate filename
+    filename = f"submission-{artifact.version_identifier}.zip"
+
+    logger.info(
+        "Created ZIP download for artifact %s with %d files",
+        artifact_id,
+        len(files_included)
+    )
+
+    return zip_buffer, filename
 
 
 def check_artifact_access(

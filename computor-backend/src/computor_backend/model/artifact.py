@@ -14,10 +14,12 @@ if TYPE_CHECKING:
 
 class SubmissionArtifact(Base):
     """
-    Tracks student uploaded files (submissions) with database storage + MinIO tracking.
+    Tracks student uploaded submissions with database storage + MinIO tracking.
 
     This model replaces the use of Result.submit=True for tracking student submissions.
-    Each artifact represents a file that was uploaded by a student as part of their submission.
+    Each artifact represents a submission version stored as individual files in MinIO.
+    The object_key is the version_identifier, and files are stored at:
+    {bucket}/{version_identifier}/{file_path}
     """
     __tablename__ = 'submission_artifact'
     __table_args__ = (
@@ -26,7 +28,7 @@ class SubmissionArtifact(Base):
         Index('submission_artifact_uploaded_at_idx', 'uploaded_at'),
         Index('submission_artifact_version_idx', 'version_identifier'),
         Index('submission_artifact_group_version_idx', 'submission_group_id', 'version_identifier'),
-        UniqueConstraint('submission_group_id', 'version_identifier', name='uq_submission_artifact_group_version'),
+        # Note: No unique constraint - allows multiple submissions with same version_identifier
     )
 
     # Primary key and versioning
@@ -48,8 +50,8 @@ class SubmissionArtifact(Base):
         nullable=True  # Nullable in case the member is removed later
     )
 
-    # File information (removed filename since we upload zip archives)
-    content_type = Column(String(120), nullable=True)  # Should typically be 'application/zip'
+    # File information
+    content_type = Column(String(120), nullable=True)  # MIME type of the individual file
     file_size = Column(BigInteger, nullable=False)
 
     # Storage information (MinIO/S3)

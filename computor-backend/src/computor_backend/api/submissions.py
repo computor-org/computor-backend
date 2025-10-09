@@ -79,6 +79,7 @@ from computor_backend.business_logic.submissions import (
     delete_review,
     create_test_result,
     update_test_result,
+    download_submission_as_zip,
 )
 
 logger = logging.getLogger(__name__)
@@ -310,6 +311,150 @@ async def update_submission_artifact(
         artifact_get.average_grade = sum(grades) / len(grades) if grades else None
 
     return artifact_get
+
+@submissions_router.get("/artifacts/download")
+async def download_latest_submission(
+    response: Response,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    submission_group_id: Optional[str] = None,
+    course_content_id: Optional[str] = None,
+    course_member_id: Optional[str] = None,
+    version_identifier: Optional[str] = None,  # Optional
+    submit_only: bool = True,  # Only download official submissions by default
+    db: Session = Depends(get_db),
+    storage_service = Depends(get_storage_service),
+):
+    """
+    Download the latest submission artifact as a ZIP file.
+
+    You must provide EITHER:
+    - submission_group_id: Direct submission group ID
+    OR
+    - course_content_id + course_member_id: To find the submission group
+
+    Optional filters:
+    - version_identifier: Filter by specific version (e.g., "v1.0.0", "commit-abc123")
+    - submit_only: Only include official submissions (submit=True), default: True
+    """
+    from fastapi.responses import StreamingResponse
+
+    # Validate input: must provide either submission_group_id OR (course_content_id + course_member_id)
+    if submission_group_id:
+        if course_content_id or course_member_id:
+            raise BadRequestException(
+                detail="Provide either submission_group_id OR (course_content_id + course_member_id), not both"
+            )
+
+        # Find submission group by ID
+        submission_group = db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == submission_group_id
+        ).first()
+
+        if not submission_group:
+            raise NotFoundException(detail="Submission group not found")
+
+    elif course_content_id and course_member_id:
+        # Find submission group for this course member and course content
+        submission_group = db.query(SubmissionGroup).join(
+            SubmissionGroupMember
+        ).filter(
+            SubmissionGroup.course_content_id == course_content_id,
+            SubmissionGroupMember.course_member_id == course_member_id
+        ).first()
+
+        if not submission_group:
+            raise NotFoundException(detail="No submission group found for this course member and content")
+
+    else:
+        raise BadRequestException(
+            detail="Must provide either submission_group_id OR (course_content_id + course_member_id)"
+        )
+
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        # Check if user is a member of the submission group
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
+        ).filter(
+            SubmissionGroupMember.submission_group_id == submission_group.id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_group_member:
+            # Check for tutor/instructor permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == submission_group.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You don't have permission to download this submission")
+
+    # Build query for artifacts
+    query = db.query(SubmissionArtifact).filter(
+        SubmissionArtifact.submission_group_id == submission_group.id
+    )
+
+    # Filter by version identifier if provided
+    if version_identifier:
+        query = query.filter(SubmissionArtifact.version_identifier == version_identifier)
+
+    # Filter by submit flag
+    if submit_only:
+        query = query.filter(SubmissionArtifact.submit == True)
+
+    # Get the latest artifact
+    artifact = query.order_by(
+        SubmissionArtifact.uploaded_at.desc()
+    ).first()
+
+    if not artifact:
+        raise NotFoundException(detail="No submission found matching the criteria")
+
+    # Delegate to business logic layer
+    zip_buffer, filename = await download_submission_as_zip(
+        artifact_id=str(artifact.id),
+        permissions=permissions,
+        db=db,
+        storage_service=storage_service,
+    )
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+@submissions_router.get("/artifacts/{artifact_id}/download")
+async def download_submission_artifact(
+    artifact_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    storage_service = Depends(get_storage_service),
+):
+    """Download a specific submission artifact as a ZIP file by artifact ID."""
+    from fastapi.responses import StreamingResponse
+
+    # Delegate to business logic layer
+    zip_buffer, filename = await download_submission_as_zip(
+        artifact_id=artifact_id,
+        permissions=permissions,
+        db=db,
+        storage_service=storage_service,
+    )
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 # ===============================
 # Artifact Grade Endpoints
