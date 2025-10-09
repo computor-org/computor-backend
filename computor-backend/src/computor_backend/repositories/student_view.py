@@ -82,8 +82,10 @@ class StudentViewRepository(ViewRepository):
         # Cache result
         if result:
             # CRITICAL: Tag with student_view for invalidation when results/submissions change
+            # CRITICAL: Tag with course_content for deployment-related invalidation
             related_ids = {
-                'course_content_id': str(course_content_id)
+                'course_content_id': str(course_content_id),
+                'course_content': str(course_content_id)  # ← For deployment invalidation
             }
             if hasattr(result, 'course_id') and result.course_id:
                 related_ids['student_view'] = str(result.course_id)  # ← CRITICAL for invalidation
@@ -140,11 +142,16 @@ class StudentViewRepository(ViewRepository):
             response_list.append(course_member_course_content_result_mapper(typed_result, self.db))
 
         # Cache result with query-aware key
-        # CRITICAL: Extract course_id for proper invalidation
-        course_ids = {}
+        # CRITICAL: Tag with course_id AND individual course_content IDs for proper invalidation
+        related_ids = {}
         if params.course_id:
             # Single course filter - tag with that course_id
-            course_ids = {'student_view': str(params.course_id)}
+            related_ids['student_view'] = str(params.course_id)
+
+        # CRITICAL: Tag each course_content for deployment-related invalidation
+        for result in response_list:
+            if hasattr(result, 'id') and result.id:
+                related_ids[f'course_content:{result.id}'] = None
 
         self._set_cached_query_view(
             user_id=str(user_id),
@@ -152,7 +159,7 @@ class StudentViewRepository(ViewRepository):
             params=params,
             data=self._serialize_dto_list(response_list),
             ttl=self.get_default_ttl(),
-            related_ids=course_ids if course_ids else None
+            related_ids=related_ids if related_ids else None
         )
 
         return response_list

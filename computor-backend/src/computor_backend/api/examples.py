@@ -715,8 +715,8 @@ async def download_example_latest(
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
 
-    # Get the latest version
-    latest_version = version_repo.find_latest_version(example_id)
+    # Get the latest version with relationships loaded
+    latest_version = version_repo.find_latest_version(example_id, with_relationships=True)
     
     if not latest_version:
         # If no version exists, return minimal response with just the example directory structure
@@ -771,13 +771,13 @@ async def download_example_version(
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
 
-    # Get version
-    version = version_repo.get_by_id(version_id)
-    
+    # Get version with relationships eagerly loaded
+    version = version_repo.get_with_relationships(version_id)
+
     if not version:
         raise NotFoundException(f"Version {version_id} not found")
-    
-    # Get example and repository
+
+    # Get example and repository (now safely loaded)
     example = version.example
     repository = example.repository
     

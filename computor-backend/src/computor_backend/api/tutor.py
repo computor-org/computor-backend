@@ -178,9 +178,9 @@ async def download_course_content_reference(
     Query parameters:
     - with_dependencies: Include all example dependencies recursively (default: False)
     """
-    from computor_backend.repositories.example_version import ExampleVersionRepository
+    from computor_backend.repositories.example_version_repo import ExampleVersionRepository
     from computor_backend.api.examples import download_example_latest
-    from computor_backend.storage import get_storage_service
+    from computor_backend.services.storage_service import get_storage_service
 
     # Get course content
     course_content = db.query(CourseContent).filter(
@@ -205,19 +205,31 @@ async def download_course_content_reference(
                 detail="You don't have tutor permissions for this course"
             )
 
-    # Check if course content has an example version
-    if not course_content.example_version_id:
-        raise NotFoundException(
-            detail=f"No reference/example is associated with this course content"
-        )
+    # Check for deployment first (newer approach), then fall back to example_version_id (deprecated)
+    from computor_backend.model.deployment import CourseContentDeployment
 
-    # Get the example version to find the example_id
-    version_repo = ExampleVersionRepository(db, cache)
-    example_version = version_repo.get_by_id(str(course_content.example_version_id))
+    deployment = db.query(CourseContentDeployment).filter(
+        CourseContentDeployment.course_content_id == course_content_id
+    ).order_by(CourseContentDeployment.assigned_at.desc()).first()
+
+    example_version = None
+
+    if deployment and deployment.example_version_id:
+        # Use deployment's example version (preferred method)
+        from computor_backend.model.example import ExampleVersion
+        example_version = db.query(ExampleVersion).filter(
+            ExampleVersion.id == deployment.example_version_id
+        ).first()
+    elif course_content.example_version_id:
+        # Fall back to deprecated direct example_version_id on course_content
+        from computor_backend.model.example import ExampleVersion
+        example_version = db.query(ExampleVersion).filter(
+            ExampleVersion.id == course_content.example_version_id
+        ).first()
 
     if not example_version:
         raise NotFoundException(
-            detail=f"Example version {course_content.example_version_id} not found"
+            detail=f"No reference/example deployment found for this course content"
         )
 
     # Download the example using the existing examples endpoint logic

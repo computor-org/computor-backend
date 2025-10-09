@@ -87,10 +87,12 @@ class TutorViewRepository(ViewRepository):
         # Cache result
         if result:
             # CRITICAL: Tag with submission_group_id for proper invalidation
+            # CRITICAL: Tag with course_content for deployment-related invalidation
             # When artifacts/results change, they have submission_group_id, so we tag with that
             related_ids = {
                 'course_member_id': str(course_member_id),
                 'course_content_id': str(course_content_id),
+                'course_content': str(course_content_id),  # ← For deployment invalidation
                 'tutor_view': str(course_member.course_id)  # Course-level invalidation
             }
 
@@ -156,16 +158,24 @@ class TutorViewRepository(ViewRepository):
 
         # Cache result with query-aware key
         # CRITICAL: Include course_id for proper invalidation when submissions/results change
+        # CRITICAL: Tag each course_content for deployment-related invalidation
+        related_ids = {
+            'course_member_id': str(course_member_id),
+            'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id for invalidation
+        }
+
+        # Tag each course_content for deployment-related invalidation
+        for result in response_list:
+            if hasattr(result, 'id') and result.id:
+                related_ids[f'course_content:{result.id}'] = None
+
         self._set_cached_query_view(
             user_id=str(reader_user_id),
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params,
             data=self._serialize_dto_list(response_list),
             ttl=self.get_default_ttl(),
-            related_ids={
-                'course_member_id': str(course_member_id),
-                'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id for invalidation
-            }
+            related_ids=related_ids
         )
 
         return response_list

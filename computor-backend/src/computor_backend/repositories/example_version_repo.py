@@ -86,6 +86,112 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
         return tags
 
     # ========================================================================
+    # Overridden CRUD methods for cascading cache invalidation
+    # ========================================================================
+
+    def create(self, entity: ExampleVersion) -> ExampleVersion:
+        """
+        Create example version and cascade cache invalidation to deployments.
+
+        When a new ExampleVersion is created, any CourseContentDeployment
+        that references the parent Example needs cache invalidation so
+        student/tutor views show updated deployment information.
+
+        Args:
+            entity: ExampleVersion to create
+
+        Returns:
+            Created ExampleVersion
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Create the entity using parent's create method (handles normal cache invalidation)
+        result = super().create(entity)
+
+        # CRITICAL: Cascade invalidation to course_content deployments
+        if self.cache and result.example_id:
+            from ..model.deployment import CourseContentDeployment
+
+            # Find all deployments that reference this example (by example_identifier)
+            # We need to check the parent Example's identifier
+            from ..model.example import Example
+            example = self.db.query(Example).filter(Example.id == result.example_id).first()
+
+            if example and example.identifier:
+                # Find all deployments using this example's identifier
+                deployments = self.db.query(CourseContentDeployment).filter(
+                    CourseContentDeployment.example_identifier == str(example.identifier)
+                ).all()
+
+                if deployments:
+                    # Collect unique course_content_ids to invalidate
+                    tags_to_invalidate = set()
+                    for deployment in deployments:
+                        if deployment.course_content_id:
+                            tags_to_invalidate.add(f"course_content:{deployment.course_content_id}")
+
+                    # Invalidate all affected course_content caches
+                    if tags_to_invalidate:
+                        self.cache.invalidate_tags(*tags_to_invalidate)
+                        logger.info(
+                            f"Invalidated {len(tags_to_invalidate)} course_content caches "
+                            f"after creating example version {result.id} for example {example.identifier}"
+                        )
+
+        return result
+
+    def update(self, entity_id, updates: dict) -> ExampleVersion:
+        """
+        Update example version and cascade cache invalidation to deployments.
+
+        Args:
+            entity_id: ExampleVersion ID
+            updates: Dictionary of fields to update
+
+        Returns:
+            Updated ExampleVersion
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Get the entity before update to check if it affects deployments
+        entity = self.get_by_id(entity_id)
+        if not entity:
+            raise ValueError(f"ExampleVersion {entity_id} not found")
+
+        # Update using parent's method (handles normal cache invalidation)
+        result = super().update(entity_id, updates)
+
+        # CRITICAL: Cascade invalidation to course_content deployments if relevant fields changed
+        # (e.g., version_tag, status, storage_path)
+        if self.cache and entity.example_id:
+            from ..model.deployment import CourseContentDeployment
+            from ..model.example import Example
+
+            example = self.db.query(Example).filter(Example.id == entity.example_id).first()
+
+            if example and example.identifier:
+                deployments = self.db.query(CourseContentDeployment).filter(
+                    CourseContentDeployment.example_identifier == str(example.identifier)
+                ).all()
+
+                if deployments:
+                    tags_to_invalidate = set()
+                    for deployment in deployments:
+                        if deployment.course_content_id:
+                            tags_to_invalidate.add(f"course_content:{deployment.course_content_id}")
+
+                    if tags_to_invalidate:
+                        self.cache.invalidate_tags(*tags_to_invalidate)
+                        logger.info(
+                            f"Invalidated {len(tags_to_invalidate)} course_content caches "
+                            f"after updating example version {result.id}"
+                        )
+
+        return result
+
+    # ========================================================================
     # Specialized queries
     # ========================================================================
 
@@ -125,17 +231,27 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
             ExampleVersion.version_tag == version_tag
         ).first()
 
-    def find_latest_version(self, example_id: str | UUID) -> Optional[ExampleVersion]:
+    def find_latest_version(self, example_id: str | UUID, with_relationships: bool = False) -> Optional[ExampleVersion]:
         """
         Find the latest version of an example.
 
         Args:
             example_id: Example identifier
+            with_relationships: If True, eagerly load example and repository relationships
 
         Returns:
             Latest ExampleVersion if exists, None otherwise
         """
-        return self.db.query(ExampleVersion).filter(
+        query = self.db.query(ExampleVersion)
+
+        if with_relationships:
+            from sqlalchemy.orm import joinedload
+            from ..model.example import Example
+            query = query.options(
+                joinedload(ExampleVersion.example).joinedload(Example.repository)
+            )
+
+        return query.filter(
             ExampleVersion.example_id == str(example_id)
         ).order_by(ExampleVersion.version_number.desc()).first()
 
@@ -171,6 +287,28 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
         """
         return self.db.query(ExampleVersion).filter(
             ExampleVersion.storage_path == storage_path
+        ).first()
+
+    def get_with_relationships(self, version_id: str | UUID) -> Optional[ExampleVersion]:
+        """
+        Get an ExampleVersion with example and repository relationships eagerly loaded.
+
+        This is useful for operations that need to access version.example.repository
+        without triggering lazy loading issues.
+
+        Args:
+            version_id: ExampleVersion identifier
+
+        Returns:
+            ExampleVersion with relationships loaded, or None if not found
+        """
+        from sqlalchemy.orm import joinedload
+        from ..model.example import Example, ExampleRepository
+
+        return self.db.query(ExampleVersion).options(
+            joinedload(ExampleVersion.example).joinedload(Example.repository)
+        ).filter(
+            ExampleVersion.id == str(version_id)
         ).first()
 
     def get_next_version_number(self, example_id: str | UUID) -> int:
