@@ -128,13 +128,27 @@ def _sanitize_archive_path(name: str) -> str:
 @submissions_router.post("/artifacts", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
+    request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
     cache: Cache = Depends(get_cache),
 ):
-    """Upload a submission file to MinIO and create matching SubmissionArtifact records."""
+    """
+    Upload a submission file to MinIO and create matching SubmissionArtifact records.
+
+    Security & Limits:
+    - Maximum file size: 10MB (configurable via MINIO_MAX_UPLOAD_SIZE env var)
+    - Request body size enforced by middleware before processing
+    - File validation: extension, MIME type, and content checks
+
+    Performance Notes:
+    - Entire file is read into memory for validation
+    - For large files, this endpoint may take 5-15 seconds
+    - Configure uvicorn timeout if needed: --timeout-keep-alive 300
+    - Does NOT block other API requests (async processing)
+    """
 
     try:
         submission_data = SubmissionCreate.model_validate_json(submission_create)

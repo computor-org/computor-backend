@@ -192,6 +192,10 @@ origins = [
     "*"
 ]
 
+# Add upload size limiter middleware (should be before CORS)
+from computor_backend.middleware import UploadSizeLimiterMiddleware
+app.add_middleware(UploadSizeLimiterMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
