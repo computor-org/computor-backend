@@ -25,12 +25,9 @@ RUN pip install --user -e computor-client
 # Install computor-backend in editable mode with all dependencies
 RUN pip install --user -e computor-backend
 
-# The source code will be mounted as a volume for hot reload
-# We'll add the source to PYTHONPATH instead of using editable install
-WORKDIR /home/worker/computor-backend/src
-
 # Add src to PYTHONPATH so imports work
 ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH
 
 # Default command - start temporal worker directly
+# Stay in /home/worker so editable installs resolve correctly
 CMD ["python", "-m", "computor_backend.tasks.temporal_worker", "--queues=computor-tasks"]
