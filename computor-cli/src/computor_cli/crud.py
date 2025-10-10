@@ -109,10 +109,15 @@ def list_entities(table, query, auth: CLIAuthConfig):
   if dict(query) != {}:
     params = GET_QUERY_CLASS(table)(**query)
 
-  resp = GET_CLIENT_ATTRIBUTE(client, table).list(params)
+  resp = run_async(GET_CLIENT_ATTRIBUTE(client, table).list(params))
 
   for entity in resp:
-    click.echo(f"{entity.model_dump_json(indent=4)}")
+    # Handle both dict and Pydantic model responses
+    if hasattr(entity, 'model_dump_json'):
+      click.echo(f"{entity.model_dump_json(indent=4)}")
+    else:
+      import json
+      click.echo(json.dumps(entity, indent=4))
 
 @click.command()
 @click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
@@ -135,9 +140,14 @@ def get_entity(table, id, auth: CLIAuthConfig):
 
   client = run_async(get_computor_client(auth))
 
-  entity = GET_CLIENT_ATTRIBUTE(client, table).get(id)
+  entity = run_async(GET_CLIENT_ATTRIBUTE(client, table).get(id))
 
-  click.echo(f"{entity.model_dump_json(indent=4)}")
+  # Handle both dict and Pydantic model responses
+  if hasattr(entity, 'model_dump_json'):
+    click.echo(f"{entity.model_dump_json(indent=4)}")
+  else:
+    import json
+    click.echo(json.dumps(entity, indent=4))
 
 @click.group()
 def rest():
