@@ -99,7 +99,17 @@ class AuthenticationService:
                 raise UnauthorizedException("Token expired")
         
         # Verify password
-        if password != decrypt_api_key(user_password):
+        try:
+            if user_password is None:
+                raise UnauthorizedException("Invalid credentials")
+
+            if password != decrypt_api_key(user_password):
+                raise UnauthorizedException("Invalid credentials")
+        except Exception as e:
+            # Catch decryption errors (wrong secret, corrupted data, NULL password, etc.)
+            # Log for debugging but return generic error to user
+            import logging
+            logging.error(f"Password verification failed for user '{username}': {str(e)}")
             raise UnauthorizedException("Invalid credentials")
         
         # Collect roles
