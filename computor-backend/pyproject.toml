@@ -58,6 +58,7 @@ dependencies = [
     "python-multipart==0.0.9",
     "Pyro5==5.15",
     "uvicorn==0.35.0",
+    "slowapi==0.1.9",
 ]
 
 [project.optional-dependencies]

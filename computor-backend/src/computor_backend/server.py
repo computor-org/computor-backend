@@ -9,8 +9,11 @@ from computor_backend.model.auth import User
 from computor_backend.model.execution import ExecutionBackend
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal
@@ -175,10 +178,15 @@ async def lifespan(app: FastAPI):
     # else:
         # Initialize plugin registry in development mode
         # await initialize_plugin_registry_with_config()
-    
+
     yield
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 origins = [
     "*"

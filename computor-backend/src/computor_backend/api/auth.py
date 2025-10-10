@@ -17,6 +17,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
@@ -45,13 +47,45 @@ from computor_types.auth import (
 
 logger = logging.getLogger(__name__)
 
+# Initialize rate limiter for this router
+limiter = Limiter(key_func=get_remote_address)
+
 auth_router = APIRouter(prefix="/auth")
 
 
+async def check_username_rate_limit(username: str, cache) -> bool:
+    """
+    Check username-based rate limiting using Redis.
+    Returns True if limit exceeded, False otherwise.
+    """
+    try:
+        rate_limit_key = f"rate_limit:username:{username}"
+        current_count = await cache.get(rate_limit_key)
+
+        if current_count is None:
+            # First attempt, set counter with 60 second expiry
+            await cache.set(rate_limit_key, "1", ex=60)
+            return False
+        else:
+            count = int(current_count)
+            if count >= 5:
+                # Rate limit exceeded
+                return True
+            else:
+                # Increment counter
+                await cache.incr(rate_limit_key)
+                return False
+    except Exception as e:
+        logger.error(f"Error checking username rate limit: {e}")
+        # On error, allow the request (fail open)
+        return False
+
+
 @auth_router.post("/login", response_model=LocalLoginResponse)
+@limiter.limit("100/minute")  # IP-based: 100 attempts per minute per IP (for shared networks)
 async def login_with_credentials(
-    request: LocalLoginRequest,
-    http_request: Request,
+    login_request: LocalLoginRequest,
+    request: Request,
     db: Session = Depends(get_db),
     cache = Depends(get_redis_client)
 ) -> LocalLoginResponse:
@@ -63,17 +97,31 @@ async def login_with_credentials(
 
     The access token should be included in the Authorization header as:
     `Authorization: Bearer <access_token>`
+
+    Rate Limits (to prevent brute-force attacks):
+    - 100 attempts per minute per IP address (allows multiple users on same network)
+    - 5 attempts per minute per username (prevents account takeover)
+
+    Returns 429 Too Many Requests if either limit is exceeded.
     """
+    # Check username-based rate limit
+    username_limit_exceeded = await check_username_rate_limit(login_request.username, cache)
+    if username_limit_exceeded:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=429,
+            detail={"error": f"Rate limit exceeded: 5 per 1 minute for username '{login_request.username}'"}
+        )
     from computor_backend.business_logic.auth import login_with_local_credentials
     from computor_backend.utils.client_info import get_client_ip, get_user_agent
 
     # Extract client information
-    ip_address = get_client_ip(http_request)
-    user_agent = get_user_agent(http_request)
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
 
     return await login_with_local_credentials(
-        username=request.username,
-        password=request.password,
+        username=login_request.username,
+        password=login_request.password,
         ip_address=ip_address,
         user_agent=user_agent,
         db=db,
