@@ -445,7 +445,6 @@ async def register_user(
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
-    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
     cache = Depends(get_redis_client)
 ) -> LocalTokenRefreshResponse:
@@ -456,13 +455,14 @@ async def refresh_local_token(
     (username/password) authentication using the refresh token obtained
     during initial login.
 
-    Requires authentication to ensure only the token owner can refresh it.
+    Authentication is not required for this endpoint since the access token
+    may be expired. The refresh token itself is validated to ensure security.
     """
     from computor_backend.business_logic.auth import refresh_local_token
 
     return await refresh_local_token(
         refresh_token=request.refresh_token,
-        principal=principal,
+        principal=None,  # Don't require authentication - refresh token is sufficient
         db=db,
         cache=cache
     )

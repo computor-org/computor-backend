@@ -306,41 +306,100 @@ async def get_current_principal(
     Main dependency for getting the current authenticated principal.
     This replaces get_current_principal from the old system.
     """
-    
+
     with next(get_db()) as db:
         # Route to appropriate authentication method
         if isinstance(credentials, HTTPBasicCredentials):
             auth_result = AuthenticationService.authenticate_basic(
                 credentials.username, credentials.password, db
             )
-            
+
             # Build Principal without caching for basic auth
             return PrincipalBuilder.build(auth_result, db)
-        
+
         elif isinstance(credentials, GLPAuthConfig):
             auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
-            
+
             # Build Principal with caching for GitLab auth
             cache_key = hashlib.sha256(
                 f"{credentials.url}::{credentials.token}".encode()
             ).hexdigest()
-            
+
             return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
-        
+
         elif isinstance(credentials, SSOAuthCredentials):
             auth_result = await AuthenticationService.authenticate_sso(
                 credentials.token, db
             )
-            
+
             # Build Principal with caching for SSO
             cache_key = hashlib.sha256(
                 f"sso_permissions:{credentials.token}".encode()
             ).hexdigest()
-            
+
             return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
-        
+
         else:
             raise UnauthorizedException("Unknown authentication type")
+
+
+def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
+    """
+    Parse authorization header but return None instead of raising exception.
+    Used for endpoints that accept but don't require authentication (like token refresh).
+    """
+    try:
+        return parse_authorization_header(request)
+    except UnauthorizedException:
+        return None
+
+
+async def get_current_principal_optional(
+    request: Request,
+    credentials: Annotated[
+        Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials],
+        Depends(parse_authorization_header_optional)
+    ] = None
+) -> Optional[Principal]:
+    """
+    Get current principal if valid credentials are provided, None otherwise.
+    This allows endpoints to work with both authenticated and unauthenticated requests.
+    Used for token refresh where the access token may be expired.
+    """
+    if not credentials:
+        return None
+
+    try:
+        with next(get_db()) as db:
+            # Route to appropriate authentication method
+            if isinstance(credentials, HTTPBasicCredentials):
+                auth_result = AuthenticationService.authenticate_basic(
+                    credentials.username, credentials.password, db
+                )
+                return PrincipalBuilder.build(auth_result, db)
+
+            elif isinstance(credentials, GLPAuthConfig):
+                auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
+                cache_key = hashlib.sha256(
+                    f"{credentials.url}::{credentials.token}".encode()
+                ).hexdigest()
+                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+
+            elif isinstance(credentials, SSOAuthCredentials):
+                auth_result = await AuthenticationService.authenticate_sso(
+                    credentials.token, db
+                )
+                cache_key = hashlib.sha256(
+                    f"sso_permissions:{credentials.token}".encode()
+                ).hexdigest()
+                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+
+            else:
+                return None
+    except (UnauthorizedException, Exception) as e:
+        # If authentication fails (e.g., expired token), return None
+        logger.debug(f"Optional authentication failed: {e}")
+        return None
 
 
 class HeaderAuthCredentials(BaseModel):

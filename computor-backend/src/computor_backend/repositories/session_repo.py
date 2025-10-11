@@ -21,26 +21,34 @@ class SessionRepository(BaseRepository[Session]):
             "session:list",
         }
     
-    def find_by_session_id_hash(self, session_id_hash: str) -> Optional[Session]:
+    def find_by_session_id_hash(self, session_id_hash: str, check_expiry: bool = True) -> Optional[Session]:
         """
         Find active session by hashed access token.
-        
+
         Args:
             session_id_hash: SHA-256 hash of access token
-            
+            check_expiry: If False, ignores access token expiry (useful for refresh operations)
+
         Returns:
             Active Session or None
         """
         now = datetime.now(timezone.utc)
-        return self.db.query(Session).filter(
+        query = self.db.query(Session).filter(
             Session.session_id == session_id_hash,
             Session.revoked_at.is_(None),
-            Session.ended_at.is_(None),
-            or_(
-                Session.expires_at.is_(None),
-                Session.expires_at > now
+            Session.ended_at.is_(None)
+        )
+
+        # Only check access token expiry if requested
+        if check_expiry:
+            query = query.filter(
+                or_(
+                    Session.expires_at.is_(None),
+                    Session.expires_at > now
+                )
             )
-        ).first()
+
+        return query.first()
     
     def find_by_refresh_token_hash(self, refresh_hash: bytes) -> Optional[Session]:
         """
@@ -108,14 +116,14 @@ class SessionRepository(BaseRepository[Session]):
     def increment_refresh_counter(self, session_id: str | UUID) -> Optional[Session]:
         """
         Increment refresh counter when token is refreshed.
-        
+
         Args:
             session_id: Session ID
-            
+
         Returns:
             Updated Session or None
         """
-        session = self.get(session_id)
+        session = self.get_by_id(session_id)
         if session:
             updates = {"refresh_counter": session.refresh_counter + 1}
             return self.update(str(session_id), updates)

@@ -81,34 +81,6 @@ class SubmissionQuery(ListQuery):
 
     model_config = ConfigDict(from_attributes=True)
 
-def submission_search(db: 'Session', query, params: SubmissionQuery):
-    """Apply filters for manual submission listings based on query params."""
-
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.submit is not None:
-        # Join with SubmissionArtifact to filter by submit field
-        query = query.join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id) \
-            .filter(submit == params.submit)
-    if params.course_member_id is not None:
-        query = query.filter(course_member_id == params.course_member_id)
-    if params.submission_group_id is not None:
-        query = query.filter(submission_group_id == params.submission_group_id)
-    if params.course_content_id is not None:
-        query = query.filter(course_content_id == params.course_content_id)
-    if params.execution_backend_id is not None:
-        query = query.filter(execution_backend_id == params.execution_backend_id)
-    if params.test_system_id is not None:
-        query = query.filter(test_system_id == params.test_system_id)
-    if params.version_identifier is not None:
-        query = query.filter(version_identifier == params.version_identifier)
-    if params.reference_version_identifier is not None:
-        query = query.filter(reference_version_identifier == params.reference_version_identifier)
-    if params.status is not None:
-        query = query.filter(status == map_task_status_to_int(params.status))
-
-    return query.order_by(Result.created_at.desc())
-
 class SubmissionInterface(EntityInterface):
     """Entity interface mapping manual submissions to the Result model."""
 

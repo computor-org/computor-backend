@@ -32,16 +32,6 @@ class CourseGroupQuery(ListQuery):
     id: Optional[str] = None
     title: Optional[str] = None
     course_id: Optional[str] = None
-    
-def course_group_search(db: 'Session', query, params: Optional[CourseGroupQuery]):
-    if params.id != None:
-        query = query.filter(id == params.id)
-    if params.title != None:
-        query = query.filter(title == params.title)
-    if params.course_id != None:
-        query = query.filter(course_id == params.course_id)
-
-    return query.order_by(CourseGroup.title)
 
 class CourseGroupInterface(EntityInterface):
     create = CourseGroupCreate
