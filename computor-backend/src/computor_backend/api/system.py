@@ -30,6 +30,7 @@ from computor_types.system import (
     BulkAssignExamplesRequest,
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
+from computor_types.lecturer_deployments import ReleaseValidationError
 from computor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization  
 from computor_backend.model.auth import User, StudentProfile
@@ -37,6 +38,10 @@ from computor_backend.model.example import Example
 from computor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from computor_backend.tasks import get_task_executor, TaskSubmission
+from computor_backend.business_logic.release_validation import (
+    validate_course_for_release,
+    validate_course_contents_for_release
+)
 
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -854,6 +859,29 @@ async def generate_student_template(
             detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
         )
     
+    # PRE-FLIGHT VALIDATION: Check that all assignments have valid examples
+    is_valid, validation_errors = validate_course_for_release(
+        course_id=course_id,
+        db=db,
+        force_redeploy=request.force_redeploy
+    )
+
+    if not is_valid:
+        logger.error(
+            f"Release validation failed for course {course_id}: "
+            f"{len(validation_errors)} issues found"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ReleaseValidationError(
+                error="Cannot release course: Some assignments are missing examples or have invalid deployments",
+                validation_errors=validation_errors,
+                total_issues=len(validation_errors)
+            ).model_dump()
+        )
+
+    logger.info(f"Pre-flight validation passed for course {course_id}")
+
     # Count contents to process - check for deployments instead of example_id
     from computor_backend.model.deployment import CourseContentDeployment
 
@@ -866,7 +894,7 @@ async def generate_student_template(
             )
         )
     ).scalar()
-    
+
     # Use Temporal task executor
     task_executor = get_task_executor()
     
@@ -941,6 +969,30 @@ async def generate_assignments(
             gitlab_url = (org.properties or {}).get('gitlab', {}).get('url') if org and org.properties else None
             if gitlab_url:
                 assignments_url = f"{gitlab_url}/{course_gitlab['full_path']}/assignments"
+
+    # PRE-FLIGHT VALIDATION: Check that selected assignments have valid examples
+    is_valid, validation_errors = validate_course_contents_for_release(
+        course_id=course_id,
+        course_content_ids=request.course_content_ids if request.course_content_ids else None,
+        db=db,
+        force_redeploy=False  # Assignments repository doesn't support force_redeploy
+    )
+
+    if not is_valid:
+        logger.error(
+            f"Release validation failed for assignments in course {course_id}: "
+            f"{len(validation_errors)} issues found"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ReleaseValidationError(
+                error="Cannot release assignments: Some assignments are missing examples or have invalid deployments",
+                validation_errors=validation_errors,
+                total_issues=len(validation_errors)
+            ).model_dump()
+        )
+
+    logger.info(f"Pre-flight validation passed for assignments in course {course_id}")
 
     # Count selected contents (best-effort)
     contents_q = db.query(func.count(CourseContent.id)).filter(CourseContent.course_id == course_id)

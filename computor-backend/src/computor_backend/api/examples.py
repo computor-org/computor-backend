@@ -51,6 +51,7 @@ from ..services.storage_service import get_storage_service
 from ..services.version_resolver import VersionResolver
 from ..services.dependency_sync import DependencySyncService
 from ..repositories import ExampleVersionRepository, ExampleDependencyRepository
+from computor_types.validation import SemanticVersion
 
 logger = logging.getLogger(__name__)
 
@@ -559,10 +560,18 @@ async def upload_example(
     title = meta_data.get('title', request.directory.replace('-', ' ').replace('_', ' ').title())
     description = meta_data.get('description', '')
     slug = meta_data.get('slug', request.directory.replace('-', '.').replace('_', '.'))
-    
+
     # Extract version from meta.yaml (use exactly as specified)
-    version_tag = meta_data.get('version', '1.0')
-    
+    version_tag = meta_data.get('version', '1.0.0')  # Default to 1.0.0 for semantic versioning
+
+    # Validate version format (must follow semantic versioning)
+    try:
+        SemanticVersion.from_string(version_tag)
+    except ValueError as e:
+        raise BadRequestException(
+            f"Invalid version format in meta.yaml: {str(e)}"
+        )
+
     # Extract tags and other metadata
     tags = []
     if 'tags' in meta_data:
