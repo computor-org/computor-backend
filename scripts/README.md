@@ -19,6 +19,10 @@ General utility scripts for development:
 - `generate_types.sh` - Generate TypeScript interfaces from Pydantic models
 - `setup_env.sh` - Set up environment file based on mode (dev/prod)
 
+### Root Level Scripts
+Architecture and quality assurance:
+- `check_forbidden_imports.py` - Enforce package dependency boundaries (runs on git commit)
+
 ## 🚀 Usage
 
 All scripts should be run from the project root directory:
@@ -29,6 +33,10 @@ bash scripts/utilities/setup_env.sh dev
 
 # Generate TypeScript types
 bash scripts/utilities/generate_types.sh
+
+# Check for forbidden imports (architectural boundaries)
+python scripts/check_forbidden_imports.py
+python scripts/check_forbidden_imports.py --package computor-types
 
 # Run database migrations (from root)
 bash migrations.sh
