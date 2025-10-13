@@ -1407,21 +1407,24 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         click.echo(f"\n🔼 Preparing example uploads from: {resolved_path}")
         _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, client)
 
-    if not config.organizations:
-        click.echo("\nℹ️ No hierarchy defined in configuration; skipping deployment API call.")
+    # Check if there's anything to deploy
+    if not config.organizations and not config.users:
+        click.echo("\nℹ️ No hierarchy or users defined in configuration; nothing to deploy.")
         return
 
-    # Deploy using API endpoint
-    click.echo(f"\nStarting deployment via API...")
-    
-    payload = {
-        "deployment_config": config.model_dump(),
-        "validate_only": False
-    }
-    
-    try:
-        # Send deployment request
-        result = custom_client.create("system/hierarchy/create", payload)
+    # Deploy hierarchy if it exists
+    if config.organizations:
+        # Deploy using API endpoint
+        click.echo(f"\nStarting hierarchy deployment via API...")
+
+        payload = {
+            "deployment_config": config.model_dump(),
+            "validate_only": False
+        }
+
+        try:
+            # Send deployment request
+            result = custom_client.create("system/hierarchy/create", payload)
         
         if result:
             click.echo(f"✅ Deployment workflow started!")
@@ -1469,13 +1472,19 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 if config.users:
                     click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
                     _deploy_users(config, auth)
-        else:
-            click.echo("❌ Failed to start deployment", err=True)
+            else:
+                click.echo("❌ Failed to start deployment", err=True)
+                sys.exit(1)
+
+        except Exception as e:
+            click.echo(f"❌ Error during deployment: {e}", err=True)
             sys.exit(1)
-            
-    except Exception as e:
-        click.echo(f"❌ Error during deployment: {e}", err=True)
-        sys.exit(1)
+    else:
+        # No hierarchy deployment - just deploy users if they exist
+        if config.users:
+            click.echo(f"\n📥 Deploying {len(config.users)} users (no hierarchy deployment)...")
+            _deploy_users(config, auth)
+            click.echo("✅ User deployment completed!")
 
 
 @deployment.command()
