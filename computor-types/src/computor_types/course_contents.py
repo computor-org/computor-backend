@@ -2,7 +2,6 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import TYPE_CHECKING, Optional, Dict, Any
 
-from starlette.concurrency import run_in_threadpool
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from computor_types.deployments import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
