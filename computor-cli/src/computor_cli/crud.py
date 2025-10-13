@@ -1,6 +1,5 @@
 import click
-from fastapi import HTTPException
-from httpx import ConnectError
+from httpx import ConnectError, HTTPStatusError
 from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
@@ -86,10 +85,14 @@ def handle_api_exceptions(func):
       return func(*args, **kwargs)
     except ConnectError as e:
       click.echo(f"Connection to [{click.style(kwargs['auth'].api_url,fg='red')}] could not be established.")
-    except HTTPException as e:
-      message = e.detail.get("detail")
-      message = message if message != None else e.detail
-      click.echo(f"[{click.style(e.status_code,fg='red')}] {message}")
+    except HTTPStatusError as e:
+      # httpx HTTPStatusError has response.status_code and response.json()
+      try:
+        error_detail = e.response.json()
+        message = error_detail.get("detail", str(error_detail))
+      except:
+        message = e.response.text or str(e)
+      click.echo(f"[{click.style(str(e.response.status_code),fg='red')}] {message}")
     except Exception as e:
       click.echo(f"[{click.style('500',fg='red')}] {e.args if e.args != () else 'Internal Server Error'}")
 
