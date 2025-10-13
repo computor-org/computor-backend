@@ -859,11 +859,27 @@ async def generate_student_template(
             detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
         )
     
-    # PRE-FLIGHT VALIDATION: Check that all assignments have valid examples
+    # PRE-FLIGHT VALIDATION: Check that selected assignments have valid examples
+    # Extract selection parameters from release if available
+    course_content_ids = None
+    parent_id = None
+    include_descendants = True
+    all_flag = False
+
+    if request.release:
+        course_content_ids = request.release.course_content_ids
+        parent_id = request.release.parent_id
+        include_descendants = request.release.include_descendants if hasattr(request.release, 'include_descendants') else True
+        all_flag = getattr(request.release, 'all', False)
+
     is_valid, validation_errors = validate_course_for_release(
         course_id=course_id,
         db=db,
-        force_redeploy=request.force_redeploy
+        force_redeploy=request.force_redeploy,
+        course_content_ids=course_content_ids,
+        parent_id=parent_id,
+        include_descendants=include_descendants,
+        all_flag=all_flag
     )
 
     if not is_valid:
@@ -975,7 +991,10 @@ async def generate_assignments(
         course_id=course_id,
         course_content_ids=request.course_content_ids if request.course_content_ids else None,
         db=db,
-        force_redeploy=False  # Assignments repository doesn't support force_redeploy
+        force_redeploy=False,  # Assignments repository doesn't support force_redeploy
+        parent_id=request.parent_id,
+        include_descendants=request.include_descendants,
+        all_flag=request.all
     )
 
     if not is_valid:

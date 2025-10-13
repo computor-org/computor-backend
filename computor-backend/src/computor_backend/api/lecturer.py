@@ -18,6 +18,10 @@ from computor_types.lecturer_deployments import (
     DeploymentGet,
     UnassignExampleResponse,
 )
+from computor_types.lecturer_content_validation import (
+    ContentValidationCreate,
+    ContentValidationGet,
+)
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 
@@ -32,6 +36,7 @@ from computor_backend.business_logic.lecturer_deployment import (
     assign_example_to_content,
     get_deployment_for_content,
     unassign_example_from_content,
+    batch_validate_content,
 )
 
 lecturer_router = APIRouter()
@@ -238,3 +243,97 @@ def unassign_example_from_course_content(
     )
 
     return UnassignExampleResponse(**result)
+
+
+@lecturer_router.post(
+    "/courses/{course_id}/validate",
+    response_model=ContentValidationGet
+)
+def validate_course_content_batch(
+    course_id: UUID | str,
+    request: ContentValidationCreate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db)
+):
+    """
+    Batch validate multiple course contents with their assigned examples and versions.
+
+    This endpoint optimizes validation from 100+ HTTP requests (N examples × 2 endpoints)
+    to a single request by batch fetching all examples and versions at once.
+
+    The endpoint validates that:
+    1. Each example identifier exists in the database
+    2. Each version tag exists for the corresponding example
+
+    Args:
+        course_id: ID of the course
+        request: Batch validation request with list of content_validations
+        permissions: Current user permissions
+        db: Database session
+
+    Returns:
+        ContentValidationGet with validation results for each content item
+
+    Raises:
+        403: Insufficient permissions (requires _lecturer role)
+        404: Course not found
+
+    Example request:
+    ```json
+    {
+        "content_validations": [
+            {
+                "content_id": "abc-123",
+                "example_identifier": "unit01.test_1",
+                "version_tag": "1.0.0"
+            },
+            {
+                "content_id": "def-456",
+                "example_identifier": "unit02.test_2",
+                "version_tag": "2.1.0"
+            }
+        ]
+    }
+    ```
+
+    Example response:
+    ```json
+    {
+        "valid": true,
+        "total_validated": 2,
+        "total_issues": 0,
+        "validation_results": [
+            {
+                "content_id": "abc-123",
+                "valid": true,
+                "example_validation": {
+                    "identifier": "unit01.test_1",
+                    "exists": true,
+                    "example_id": "example-uuid",
+                    "message": null
+                },
+                "version_validation": {
+                    "version_tag": "1.0.0",
+                    "exists": true,
+                    "version_id": "version-uuid",
+                    "message": null
+                },
+                "validation_message": null
+            }
+        ]
+    }
+    ```
+    """
+    # Convert Pydantic models to dicts for business logic
+    content_validations = [
+        item.model_dump() for item in request.content_validations
+    ]
+
+    result = batch_validate_content(
+        course_id=course_id,
+        content_validations=content_validations,
+        permissions=permissions,
+        db=db
+    )
+
+    return ContentValidationGet(**result)

@@ -22,6 +22,7 @@ from computor_backend.api.exceptions import (
     BadRequestException
 )
 from computor_types.validation import SemanticVersion
+from computor_types.custom_types import Ltree
 
 logger = logging.getLogger(__name__)
 
@@ -357,4 +358,182 @@ def unassign_example_from_content(
         'previous_example_id': str(previous_example_id) if previous_example_id else None,
         'previous_version_tag': previous_version_tag,
         'message': 'Example successfully unassigned from course content'
+    }
+
+
+def batch_validate_content(
+    course_id: str | UUID,
+    content_validations: list[dict],
+    permissions: Principal,
+    db: Session
+) -> dict:
+    """
+    Batch validate multiple course contents with their assigned examples and versions.
+
+    This optimizes validation from N×2 HTTP requests to a single request by:
+    1. Batch fetching all examples by identifier
+    2. Batch fetching all versions for found examples
+    3. Building lookup maps for O(1) validation
+
+    Args:
+        course_id: ID of the course
+        content_validations: List of dicts with content_id, content_path, example_identifier, version_tag
+        permissions: Current user's permissions
+        db: Database session
+
+    Returns:
+        Dictionary with validation results:
+        {
+            "valid": bool,
+            "total_validated": int,
+            "total_issues": int,
+            "validation_results": [...]
+        }
+
+    Raises:
+        ForbiddenException: If user lacks permissions
+        NotFoundException: If course doesn't exist
+    """
+
+    # 1. Check permissions (lecturer or higher)
+    course_query = check_course_permissions(
+        permissions,
+        Course,
+        "_lecturer",
+        db
+    )
+    course = course_query.filter(Course.id == course_id).first()
+
+    if not course:
+        raise ForbiddenException(
+            "You don't have permission to validate content for this course"
+        )
+
+    # 2. Extract all unique example identifiers and build content map
+    identifiers = set()
+    content_map = {}  # content_id -> validation_item
+
+    for item in content_validations:
+        identifiers.add(item['example_identifier'])
+        content_map[item['content_id']] = item
+
+    # 3. Batch fetch all examples by identifier
+    # Convert string identifiers to Ltree objects for proper SQLAlchemy comparison
+    ltree_identifiers = [Ltree(identifier) for identifier in identifiers]
+
+    examples = db.query(Example).filter(
+        Example.identifier.in_(ltree_identifiers)
+    ).all()
+
+    # Build example lookup map: identifier -> example
+    example_map = {str(ex.identifier): ex for ex in examples}
+
+    # 4. Get all example IDs for version lookup
+    example_ids = [ex.id for ex in examples]
+
+    # 5. Batch fetch all versions for these examples
+    versions = db.query(ExampleVersion).filter(
+        ExampleVersion.example_id.in_(example_ids)
+    ).all()
+
+    # Build version lookup map: (example_id, version_tag) -> version
+    version_map = {}
+    for version in versions:
+        key = (str(version.example_id), version.version_tag)
+        version_map[key] = version
+
+    # 6. Validate each content item
+    validation_results = []
+    total_issues = 0
+
+    for item in content_validations:
+        content_id = item['content_id']
+        example_identifier = item['example_identifier']
+        version_tag = item['version_tag']
+
+        # Validate example exists
+        example = example_map.get(example_identifier)
+
+        if example:
+            example_validation = {
+                'identifier': example_identifier,
+                'exists': True,
+                'example_id': str(example.id),
+                'message': None
+            }
+        else:
+            example_validation = {
+                'identifier': example_identifier,
+                'exists': False,
+                'example_id': None,
+                'message': f"Example '{example_identifier}' not found"
+            }
+
+        # Validate version exists (only if example exists)
+        if example:
+            version_key = (str(example.id), version_tag)
+            version = version_map.get(version_key)
+
+            if version:
+                version_validation = {
+                    'version_tag': version_tag,
+                    'exists': True,
+                    'version_id': str(version.id),
+                    'message': None
+                }
+            else:
+                version_validation = {
+                    'version_tag': version_tag,
+                    'exists': False,
+                    'version_id': None,
+                    'message': f"Version '{version_tag}' not found for example '{example_identifier}'"
+                }
+        else:
+            # Can't check version if example doesn't exist
+            version_validation = {
+                'version_tag': version_tag,
+                'exists': False,
+                'version_id': None,
+                'message': 'Cannot validate version - example does not exist'
+            }
+
+        # Determine overall validity
+        is_valid = example_validation['exists'] and version_validation['exists']
+
+        if not is_valid:
+            total_issues += 1
+
+        # Build validation message
+        validation_message = None
+        if not is_valid:
+            messages = []
+            if not example_validation['exists']:
+                messages.append(example_validation['message'])
+            if not version_validation['exists']:
+                messages.append(version_validation['message'])
+            validation_message = '; '.join(messages)
+
+        # Add result
+        validation_results.append({
+            'content_id': content_id,
+            'valid': is_valid,
+            'example_validation': example_validation,
+            'version_validation': version_validation,
+            'validation_message': validation_message
+        })
+
+    # 7. Build response
+    overall_valid = total_issues == 0
+
+    logger.info(
+        f"Batch validation for course {course_id}: "
+        f"{len(content_validations)} items validated, "
+        f"{total_issues} issues found"
+    )
+
+    return {
+        'valid': overall_valid,
+        'total_validated': len(content_validations),
+        'total_issues': total_issues,
+        'validation_results': validation_results
     }
