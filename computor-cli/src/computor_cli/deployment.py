@@ -1425,53 +1425,53 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         try:
             # Send deployment request
             result = custom_client.create("system/hierarchy/create", payload)
-        
-        if result:
-            click.echo(f"✅ Deployment workflow started!")
-            click.echo(f"  Workflow ID: {result.get('workflow_id')}")
-            click.echo(f"  Status: {result.get('status')}")
-            click.echo(f"  Path: {result.get('deployment_path')}")
-            
-            if wait and result.get('workflow_id'):
-                # Poll for status
-                click.echo("\nWaiting for deployment to complete...")
-                import time
-                workflow_id = result.get('workflow_id')
-                
-                for _ in range(60):  # Wait up to 5 minutes
-                    time.sleep(5)
-                    try:
-                        status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
-                        if status_data.get('status') == 'completed':
-                            click.echo("\n✅ Deployment completed successfully!")
-                            
-                            # Link execution backends to courses and create contents
-                            _link_backends_to_deployed_courses(config, auth, True)
-                            
-                            # Deploy users if configured
-                            if config.users:
-                                click.echo(f"\n📥 Creating {len(config.users)} users...")
-                                _deploy_users(config, auth)
+
+            if result:
+                click.echo(f"✅ Deployment workflow started!")
+                click.echo(f"  Workflow ID: {result.get('workflow_id')}")
+                click.echo(f"  Status: {result.get('status')}")
+                click.echo(f"  Path: {result.get('deployment_path')}")
+
+                if wait and result.get('workflow_id'):
+                    # Poll for status
+                    click.echo("\nWaiting for deployment to complete...")
+                    import time
+                    workflow_id = result.get('workflow_id')
+
+                    for _ in range(60):  # Wait up to 5 minutes
+                        time.sleep(5)
+                        try:
+                            status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
+                            if status_data.get('status') == 'completed':
+                                click.echo("\n✅ Deployment completed successfully!")
+
+                                # Link execution backends to courses and create contents
+                                _link_backends_to_deployed_courses(config, auth, True)
+
+                                # Deploy users if configured
+                                if config.users:
+                                    click.echo(f"\n📥 Creating {len(config.users)} users...")
+                                    _deploy_users(config, auth)
+                                break
+                            elif status_data.get('status') == 'failed':
+                                click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
+                                sys.exit(1)
+                            click.echo(".", nl=False)
+                        except Exception as e:
+                            click.echo(f"\n⚠️  Error checking status: {e}")
                             break
-                        elif status_data.get('status') == 'failed':
-                            click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
-                            sys.exit(1)
-                        click.echo(".", nl=False)
-                    except Exception as e:
-                        click.echo(f"\n⚠️  Error checking status: {e}")
-                        break
-                else:
-                    click.echo("\n⚠️  Deployment is still running. Check status later.")
-            
-            # If not waiting but deployment started, try to continue with remaining tasks
-            if not wait:
-                click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
-                # Try to link backends and create contents (might fail if hierarchy not ready)
-                _link_backends_to_deployed_courses(config, auth, True)
-                
-                if config.users:
-                    click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
-                    _deploy_users(config, auth)
+                    else:
+                        click.echo("\n⚠️  Deployment is still running. Check status later.")
+
+                # If not waiting but deployment started, try to continue with remaining tasks
+                if not wait:
+                    click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
+                    # Try to link backends and create contents (might fail if hierarchy not ready)
+                    _link_backends_to_deployed_courses(config, auth, True)
+
+                    if config.users:
+                        click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
+                        _deploy_users(config, auth)
             else:
                 click.echo("❌ Failed to start deployment", err=True)
                 sys.exit(1)
