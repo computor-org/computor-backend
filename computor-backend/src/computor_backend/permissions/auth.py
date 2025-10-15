@@ -88,7 +88,7 @@ class AuthenticationService:
         )
         
         if not results:
-            raise UnauthorizedException("Invalid credentials")
+            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
         user_id, user_password, user_type, token_expiration = results[0][:4]
         
@@ -96,21 +96,24 @@ class AuthenticationService:
         if user_type == 'token':
             now = datetime.datetime.now(datetime.timezone.utc)
             if token_expiration is None or token_expiration < now:
-                raise UnauthorizedException("Token expired")
+                raise UnauthorizedException(error_code="AUTH_003", detail="Token expired")
         
         # Verify password
         try:
             if user_password is None:
-                raise UnauthorizedException("Invalid credentials")
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
 
             if password != decrypt_api_key(user_password):
-                raise UnauthorizedException("Invalid credentials")
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+        except UnauthorizedException:
+            # Re-raise our authentication exceptions
+            raise
         except Exception as e:
             # Catch decryption errors (wrong secret, corrupted data, NULL password, etc.)
             # Log for debugging but return generic error to user
             import logging
             logging.error(f"Password verification failed for user '{username}': {str(e)}")
-            raise UnauthorizedException("Invalid credentials")
+            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
         # Collect roles
         role_ids = [res[4] for res in results if res[4] is not None]

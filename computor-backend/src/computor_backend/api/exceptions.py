@@ -1,68 +1,60 @@
-from typing import Any
-from fastapi import HTTPException, status
-from typing import Any, Dict, Optional
+"""
+DEPRECATED: This module has been moved to computor_backend.exceptions
 
-class NotFoundException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_404_NOT_FOUND
-        self.detail = detail or "Not found"
+This file provides backward compatibility for existing imports.
+Please update your imports to use the new location:
 
-class ForbiddenException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_403_FORBIDDEN
-        self.detail = detail or "Forbidden"
+    from computor_backend.exceptions import NotFoundException, ForbiddenException
 
-class BadRequestException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_400_BAD_REQUEST
-        self.detail = detail or "Bad request"
+Instead of:
 
-class UnauthorizedException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_401_UNAUTHORIZED
-        self.detail = detail or "Unauthorized"
+    from computor_backend.api.exceptions import NotFoundException, ForbiddenException
+"""
 
-class BasicAuthException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = {"WWW-Authenticate": "Basic"}
-        self.status_code = status.HTTP_401_UNAUTHORIZED
-        self.detail = "Incorrect username or password"
+import warnings
 
-class NotImplementedException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.status_code = status.HTTP_501_NOT_IMPLEMENTED
-        self.detail = "Not Implemented"
+# Issue deprecation warning
+warnings.warn(
+    "Importing from computor_backend.api.exceptions is deprecated. "
+    "Use computor_backend.exceptions instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
-class InternalServerException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        self.detail = detail or "Internal server error"
+# Re-export everything from the new location for backward compatibility
+from computor_backend.exceptions.exceptions import *  # noqa: F401, F403
 
-class ServiceUnavailableException(HTTPException):
-    def __init__(self,detail: Any = None, headers: Optional[Dict[str, str]] = None):
-        self.headers = headers
-        self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        self.detail = detail or "Service unavailable error"
-
-def response_to_http_exception(status_code: int, details: dict):
-    if status_code == status.HTTP_404_NOT_FOUND:
-        return NotFoundException(detail=details)
-    elif status_code == status.HTTP_403_FORBIDDEN:
-        return ForbiddenException(detail=details)
-    elif status_code == status.HTTP_400_BAD_REQUEST:
-        return BadRequestException(detail=details)
-    elif status_code == status.HTTP_403_FORBIDDEN:
-        return UnauthorizedException(detail=details)
-    elif status_code == status.HTTP_501_NOT_IMPLEMENTED:
-        return NotImplementedException(detail=details)
-    elif status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        return InternalServerException(detail=details)
-    elif status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
-        return ServiceUnavailableException(detail=details)
-    else:
-        return None
+__all__ = [
+    "ComputorException",
+    "UnauthorizedException",
+    "BasicAuthException",
+    "TokenExpiredException",
+    "SSOAuthException",
+    "ForbiddenException",
+    "AdminRequiredException",
+    "CourseAccessDeniedException",
+    "InsufficientCourseRoleException",
+    "BadRequestException",
+    "MissingFieldException",
+    "InvalidFieldFormatException",
+    "InvalidFileUploadException",
+    "NotFoundException",
+    "UserNotFoundException",
+    "CourseNotFoundException",
+    "EndpointNotFoundException",
+    "ConflictException",
+    "ConcurrentModificationException",
+    "RateLimitException",
+    "GitLabServiceException",
+    "GitLabAuthException",
+    "MinIOServiceException",
+    "TemporalServiceException",
+    "DatabaseConnectionException",
+    "DatabaseQueryException",
+    "DatabaseTransactionException",
+    "InternalServerException",
+    "ConfigurationException",
+    "NotImplementedException",
+    "ServiceUnavailableException",
+    "response_to_http_exception",
+]

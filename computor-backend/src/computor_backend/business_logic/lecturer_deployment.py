@@ -16,7 +16,7 @@ from computor_backend.model.deployment import CourseContentDeployment, Deploymen
 from computor_backend.model.example import Example, ExampleVersion
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException,
     BadRequestException
@@ -43,7 +43,11 @@ def validate_semantic_version(version_str: str) -> SemanticVersion:
     try:
         return SemanticVersion.from_string(version_str)
     except ValueError as e:
-        raise BadRequestException(str(e))
+        raise BadRequestException(
+            error_code="VAL_003",
+            detail=str(e),
+            context={"version_string": version_str}
+        )
 
 
 def assign_example_to_content(
@@ -84,7 +88,11 @@ def assign_example_to_content(
     ).filter(CourseContent.id == course_content_id).first()
 
     if not course_content:
-        raise NotFoundException(f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)}
+        )
 
     # 3. Check permissions (lecturer or higher)
     course_query = check_course_permissions(
@@ -97,26 +105,42 @@ def assign_example_to_content(
 
     if not course:
         raise ForbiddenException(
-            "You don't have permission to assign examples to this course"
+            error_code="AUTHZ_001",
+            detail="You don't have permission to assign examples to this course",
+            context={
+                "course_content_id": str(course_content_id),
+                "course_id": str(course_content.course_id)
+            }
         )
 
     # 4. Validate course content is submittable (assignment)
     content_type = course_content.course_content_type
     if not content_type or not content_type.course_content_kind:
         raise BadRequestException(
-            f"Course content {course_content_id} has no content type or kind"
+            error_code="CONTENT_002",
+            detail="Course content has no content type or kind",
+            context={"course_content_id": str(course_content_id)}
         )
 
     if not content_type.course_content_kind.submittable:
         raise BadRequestException(
-            f"Cannot assign examples to non-submittable content. "
-            f"Content kind '{content_type.course_content_kind.id}' is not submittable."
+            error_code="CONTENT_003",
+            detail="Cannot assign examples to non-submittable content",
+            context={
+                "course_content_id": str(course_content_id),
+                "content_kind": content_type.course_content_kind.id,
+                "is_submittable": False
+            }
         )
 
     # 5. Validate example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
-        raise NotFoundException(f"Example {example_id} not found")
+        raise NotFoundException(
+            error_code="CONTENT_004",
+            detail="Example not found",
+            context={"example_id": str(example_id)}
+        )
 
     # 6. Find specific version
     example_version = db.query(ExampleVersion).filter(
@@ -128,7 +152,12 @@ def assign_example_to_content(
 
     if not example_version:
         raise NotFoundException(
-            f"Example version '{version_tag}' not found for example {example_id}"
+            error_code="CONTENT_005",
+            detail=f"Example version '{version_tag}' not found",
+            context={
+                "example_id": str(example_id),
+                "version_tag": version_tag
+            }
         )
 
     # 7. Check if deployment already exists
@@ -140,8 +169,12 @@ def assign_example_to_content(
         # Update existing deployment (only if not already deployed)
         if existing_deployment.deployment_status == 'deployed':
             raise BadRequestException(
-                f"Cannot reassign: Example already deployed. "
-                f"Current deployment status: {existing_deployment.deployment_status}"
+                error_code="DEPLOY_001",
+                detail="Cannot reassign: Example already deployed",
+                context={
+                    "course_content_id": str(course_content_id),
+                    "current_status": existing_deployment.deployment_status
+                }
             )
 
         # Track previous version for history
@@ -240,7 +273,11 @@ def get_deployment_for_content(
     ).filter(CourseContent.id == course_content_id).first()
 
     if not course_content:
-        raise NotFoundException(f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)}
+        )
 
     # Check permissions (lecturer or higher)
     course_query = check_course_permissions(
@@ -253,7 +290,12 @@ def get_deployment_for_content(
 
     if not course:
         raise ForbiddenException(
-            "You don't have permission to view deployments for this course"
+            error_code="AUTHZ_001",
+            detail="You don't have permission to view deployments for this course",
+            context={
+                "course_content_id": str(course_content_id),
+                "course_id": str(course_content.course_id)
+            }
         )
 
     # Get deployment with relationships
@@ -295,7 +337,11 @@ def unassign_example_from_content(
     ).filter(CourseContent.id == course_content_id).first()
 
     if not course_content:
-        raise NotFoundException(f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)}
+        )
 
     # Check permissions (lecturer or higher)
     course_query = check_course_permissions(
@@ -308,7 +354,12 @@ def unassign_example_from_content(
 
     if not course:
         raise ForbiddenException(
-            "You don't have permission to unassign examples from this course"
+            error_code="AUTHZ_001",
+            detail="You don't have permission to unassign examples from this course",
+            context={
+                "course_content_id": str(course_content_id),
+                "course_id": str(course_content.course_id)
+            }
         )
 
     # Get deployment
@@ -318,14 +369,20 @@ def unassign_example_from_content(
 
     if not deployment:
         raise NotFoundException(
-            f"No example assigned to course content {course_content_id}"
+            error_code="DEPLOY_002",
+            detail="No example assigned to this course content",
+            context={"course_content_id": str(course_content_id)}
         )
 
     # Check if already deployed
     if deployment.deployment_status in ('deployed', 'deploying'):
         raise BadRequestException(
-            f"Cannot unassign: Example is already deployed or being deployed. "
-            f"Current status: {deployment.deployment_status}"
+            error_code="DEPLOY_001",
+            detail="Cannot unassign: Example is already deployed or being deployed",
+            context={
+                "course_content_id": str(course_content_id),
+                "current_status": deployment.deployment_status
+            }
         )
 
     # Store info for response
@@ -406,7 +463,9 @@ def batch_validate_content(
 
     if not course:
         raise ForbiddenException(
-            "You don't have permission to validate content for this course"
+            error_code="AUTHZ_003",
+            detail="You don't have permission to validate content for this course",
+            context={"course_id": str(course_id)}
         )
 
     # 2. Extract all unique example identifiers and build content map

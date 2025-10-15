@@ -4,7 +4,7 @@ API endpoints for deployment operations.
 
 import logging
 from typing import Annotated, Optional, Dict, Any
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,7 @@ from computor_backend.business_logic.deployment import (
     get_deployment_workflow_status,
     validate_deployment_configuration,
 )
-from .exceptions import BadRequestException
+from computor_backend.exceptions import BadRequestException, InternalServerException
 
 logger = logging.getLogger(__name__)
 deployment_router = APIRouter()
@@ -65,9 +65,10 @@ async def deploy_from_config(
         raise BadRequestException(f"Invalid configuration: {str(e)}")
     except Exception as e:
         logger.error(f"Deployment failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Deployment failed: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Deployment failed: {str(e)}",
+            context={"operation": "deploy_from_configuration"}
         )
 
 @deployment_router.post("/deploy/from-yaml", response_model=DeploymentResponse)
@@ -97,9 +98,10 @@ async def deploy_from_yaml(
 
     except Exception as e:
         logger.error(f"Deployment from YAML failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Deployment failed: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Deployment failed: {str(e)}",
+            context={"operation": "deploy_from_yaml", "filename": file.filename}
         )
 
 @deployment_router.get("/deploy/status/{workflow_id}")
@@ -118,9 +120,10 @@ async def get_deployment_status(
 
     except Exception as e:
         logger.error(f"Failed to get deployment status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get status: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to get status: {str(e)}",
+            context={"operation": "get_deployment_status", "workflow_id": workflow_id}
         )
 
 @deployment_router.post("/deploy/validate")

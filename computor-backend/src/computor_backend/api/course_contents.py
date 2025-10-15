@@ -12,7 +12,7 @@ from uuid import UUID
 from datetime import datetime
 
 import yaml
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
@@ -24,7 +24,11 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.model.example import Example as ExampleModel
 from computor_backend.custom_types import Ltree
-from computor_backend.api.exceptions import BadRequestException, NotFoundException
+from computor_backend.exceptions import (
+    BadRequestException,
+    NotFoundException,
+    ForbiddenException
+)
 from computor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from computor_backend.database import get_db
 from computor_types.course_contents import CourseContentGet
@@ -191,39 +195,48 @@ async def assign_example_to_content(
     # Get course content
     content = content_repo.get_by_id(str(content_id))
     if not content:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"CourseContent {content_id} not found"
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(content_id)}
         )
-    
+
     # Check permissions on the course
     if check_course_permissions(permissions, Course, "_lecturer", db).filter(
         Course.id == content.course_id
     ).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to modify this course content"
+        raise ForbiddenException(
+            detail="Not authorized to modify this course content",
+            context={
+                "course_content_id": str(content_id),
+                "required_permission": "modify_content"
+            }
         )
-    
+
     # Verify this is submittable content
     content_type = db.query(CourseContentType).filter(
         CourseContentType.id == content.course_content_type_id
     ).first()
-    
+
     if not content_type:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Course content type not found"
+        raise NotFoundException(
+            error_code="CONTENT_002",
+            detail="Content type not configured",
+            context={"content_type_id": str(content.course_content_type_id)}
         )
-    
+
     content_kind = db.query(CourseContentKind).filter(
         CourseContentKind.id == content_type.course_content_kind_id
     ).first()
-    
+
     if not content_kind or not content_kind.submittable:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot assign examples to non-submittable content types"
+        raise BadRequestException(
+            error_code="CONTENT_003",
+            detail="Cannot assign examples to non-submittable content types",
+            context={
+                "content_type": content_kind.name if content_kind else "unknown",
+                "is_submittable": False
+            }
         )
     
     # Resolve source: either by ExampleVersion ID, or resolve identifier+version_tag to a concrete ExampleVersion
@@ -234,9 +247,10 @@ async def assign_example_to_content(
     if request.example_version_id is not None:
         example_version = example_version_repo.get_by_id(request.example_version_id)
         if not example_version:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Example version {request.example_version_id} not found"
+            raise NotFoundException(
+                error_code="CONTENT_005",
+                detail="Example version not found",
+                context={"example_version_id": request.example_version_id}
             )
         if example_version.example:
             src_identifier = str(example_version.example.identifier)
@@ -244,9 +258,13 @@ async def assign_example_to_content(
     else:
         # identifier + version_tag (may be 'latest')
         if not request.example_identifier:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either example_version_id or example_identifier must be provided"
+            raise BadRequestException(
+                error_code="VAL_002",
+                detail="Either example_version_id or example_identifier must be provided",
+                context={
+                    "provided_version_id": request.example_version_id,
+                    "provided_identifier": request.example_identifier
+                }
             )
         src_identifier = request.example_identifier
         requested_tag = (request.version_tag or '').strip() if request.version_tag else None
@@ -258,27 +276,36 @@ async def assign_example_to_content(
             if not requested_tag or requested_tag.lower() == 'latest':
                 latest_ev = example_version_repo.find_latest_version(example_row.id)
                 if not latest_ev:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="No versions found for example"
+                    raise NotFoundException(
+                        error_code="CONTENT_005",
+                        detail="No versions found for example",
+                        context={"example_id": str(example_row.id)}
                     )
                 example_version = latest_ev
                 src_version_tag = latest_ev.version_tag
             else:
                 ev = example_version_repo.find_by_version_tag(example_row.id, requested_tag)
                 if not ev:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Version '{requested_tag}' not found for example"
+                    raise NotFoundException(
+                        error_code="CONTENT_005",
+                        detail=f"Version '{requested_tag}' not found for example",
+                        context={
+                            "example_id": str(example_row.id),
+                            "requested_tag": requested_tag
+                        }
                     )
                 example_version = ev
                 src_version_tag = ev.version_tag
         else:
             # Custom (non-library) source: require explicit non-'latest' tag
             if not requested_tag or requested_tag.lower() == 'latest':
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="version_tag is required and cannot be 'latest' for non-library sources"
+                raise BadRequestException(
+                    error_code="VAL_003",
+                    detail="version_tag is required and cannot be 'latest' for non-library sources",
+                    context={
+                        "provided_tag": requested_tag,
+                        "source_type": "non-library"
+                    }
                 )
             src_version_tag = requested_tag
     
@@ -393,27 +420,32 @@ async def unassign_example_from_content(
     # Get course content
     content = content_repo.get_by_id(str(content_id))
     if not content:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"CourseContent {content_id} not found"
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(content_id)}
         )
 
     # Check permissions
     if check_course_permissions(permissions, Course, "_maintainer", db).filter(
         Course.id == content.course_id
     ).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to modify this course content"
+        raise ForbiddenException(
+            detail="Not authorized to modify this course content",
+            context={
+                "course_content_id": str(content_id),
+                "required_permission": "modify_content"
+            }
         )
 
     # Get deployment record
     deployment = deployment_repo.find_by_content(str(content_id))
-    
+
     if not deployment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No deployment found for this content"
+        raise NotFoundException(
+            error_code="DEPLOY_001",
+            detail="No deployment found for this content",
+            context={"course_content_id": str(content_id)}
         )
     
     # Update deployment status
@@ -464,18 +496,19 @@ async def get_deployment_status_with_workflow(
     # Check content exists
     content = content_repo.get_by_id(str(content_id))
     if not content:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course content not found"
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(content_id)}
         )
     
     # Check permissions
     if check_course_permissions(permissions, Course, "_student", db).filter(
         Course.id == content.course_id
     ).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view deployment status"
+        raise ForbiddenException(
+            detail="Not authorized to view deployment status",
+            context={"course_content_id": str(content_id)}
         )
     
     # Get deployment with relationships
@@ -630,9 +663,9 @@ async def get_course_deployment_summary(
     if check_course_permissions(permissions, Course, "_tutor", db).filter(
         Course.id == course_id
     ).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this course"
+        raise ForbiddenException(
+            detail="Not authorized to view this course",
+            context={"course_id": course_id, "required_permission": "view_course"}
         )
 
     # Try cache first
@@ -706,18 +739,22 @@ async def get_content_deployment(
     # Get course content to check permissions
     content = content_repo.get_by_id(str(content_id))
     if not content:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"CourseContent {content_id} not found"
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": str(content_id)}
         )
-    
+
     # Check permissions
     if check_course_permissions(permissions, Course, "_tutor", db).filter(
         Course.id == content.course_id
     ).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this content"
+        raise ForbiddenException(
+            detail="Not authorized to view this content",
+            context={
+                "course_content_id": str(content_id),
+                "required_permission": "view_content"
+            }
         )
     
     # Get deployment

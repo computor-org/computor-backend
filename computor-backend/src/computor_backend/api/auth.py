@@ -22,10 +22,11 @@ from slowapi.util import get_remote_address
 
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
-    NotFoundException
+    NotFoundException,
+    RateLimitException
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
@@ -107,10 +108,15 @@ async def login_with_credentials(
     # Check username-based rate limit
     username_limit_exceeded = await check_username_rate_limit(login_request.username, cache)
     if username_limit_exceeded:
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=429,
-            detail={"error": f"Rate limit exceeded: 5 per 1 minute for username '{login_request.username}'"}
+        raise RateLimitException(
+            error_code="RATE_002",
+            detail=f"Too many login attempts for username '{login_request.username}'",
+            retry_after=60,
+            context={
+                "username": login_request.username,
+                "limit": 5,
+                "window_seconds": 60
+            }
         )
     from computor_backend.business_logic.auth import login_with_local_credentials
     from computor_backend.utils.client_info import get_client_ip, get_user_agent

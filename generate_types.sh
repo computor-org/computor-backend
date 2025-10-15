@@ -23,3 +23,8 @@ PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${RO
 
 echo "✅ TypeScript interfaces generated successfully!"
 echo "📁 Check frontend/src/types/generated/ for the generated files"
+
+# Also generate error codes
+echo ""
+echo "🚀 Generating error code definitions..."
+bash "${ROOT_DIR}/generate_error_codes.sh"

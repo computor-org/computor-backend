@@ -65,6 +65,7 @@ from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
+from computor_backend.exceptions import register_exception_handlers
 import json
 import tempfile
 from pathlib import Path
@@ -187,6 +188,9 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Register custom exception handlers for structured error responses
+register_exception_handlers(app)
 
 origins = [
     "*"

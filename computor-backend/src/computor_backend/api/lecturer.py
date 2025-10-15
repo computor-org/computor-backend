@@ -1,9 +1,10 @@
 from uuid import UUID
 from typing import Annotated
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from computor_backend.database import get_db
+from computor_backend.exceptions import NotFoundException
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
 from computor_types.courses import CourseGet, CourseList, CourseQuery
@@ -176,9 +177,10 @@ def get_course_content_deployment(
     )
 
     if not deployment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No deployment found for course content {course_content_id}"
+        raise NotFoundException(
+            error_code="DEPLOY_001",
+            detail="Assignment not released",
+            context={"course_content_id": str(course_content_id)}
         )
 
     # Build enriched response
