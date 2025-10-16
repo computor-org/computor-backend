@@ -351,7 +351,7 @@ async def create_test_run(
     except Exception as e:
         # If task submission fails, update result status to FAILED
         result.status = map_task_status_to_int(TaskStatus.FAILED)
-        result.properties = {**result.properties, "error": str(e)}
+        result.log_text = f"Task submission failed: {str(e)}"
         db.commit()
         db.refresh(result)
         raise

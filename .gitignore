@@ -1,5 +1,7 @@
 # Generated files (TypeScript types, schemas, validators, clients)
 /generated/
+# But keep computor-client generated files (needed for Docker builds)
+!computor-client/src/computor_client/generated/
 
 __pycache__
 .vscode
