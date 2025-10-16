@@ -238,9 +238,6 @@ class CourseContent(Base):
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
 
-    # Example version tracking (DEPRECATED - will be removed, use CourseContentDeployment.example_version_id)
-    example_version_id = Column(UUID, ForeignKey('example_version.id', ondelete='SET NULL'), nullable=True)
-
     # Team formation overrides (override course defaults for this specific assignment)
     team_mode = Column(String(50), nullable=True)  # Override course default
     team_min_group_size = Column(Integer, nullable=True)  # Override course default
@@ -262,10 +259,7 @@ class CourseContent(Base):
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     submission_groups = relationship('SubmissionGroup', back_populates='course_content')
     # Removed: submission_group_members - relationship removed as course_content_id was removed from SubmissionGroupMember
-    
-    # Example relationships (via example_version_id - DEPRECATED)
-    example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
-    
+
     # Deployment tracking - One-to-one relationship with CourseContentDeployment
     deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False)
 

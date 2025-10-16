@@ -745,21 +745,25 @@ async def generate_student_template_activity_v2(
                         # Skip non-assigned items (e.g., container units)
                         logger.info(f"Skipping {content.path}: no deployment assigned")
                         continue
-                    
-                    # Ensure deployment path exists
+
+                    # Validate deployment_path is set (should be set during assignment)
                     if not content.deployment.deployment_path:
-                        # Try to derive from assigned example identifier
-                        ev = content.deployment.example_version
-                        if ev and ev.example and ev.example.identifier:
-                            content.deployment.deployment_path = str(ev.example.identifier)
-                            logger.info(f"Derived deployment path for {content.path} -> {content.deployment.deployment_path}")
-                        elif getattr(content.deployment, 'example_identifier', None):
-                            content.deployment.deployment_path = str(content.deployment.example_identifier)
-                            logger.info(f"Derived deployment path from source identifier for {content.path} -> {content.deployment.deployment_path}")
-                        else:
-                            logger.error(f"Deployment path not set for {content.path}")
-                            errors.append(f"Deployment path not set for {content.path}")
-                            continue
+                        error_msg = f"deployment_path not set for {content.path} - this should be set during assignment"
+                        logger.error(error_msg)
+                        errors.append(error_msg)
+
+                        # Mark deployment as failed
+                        if content.deployment.deployment_status == "deploying":
+                            content.deployment.deployment_status = "failed"
+                            content.deployment.deployment_message = "deployment_path not set"
+                            history = DeploymentHistory(
+                                deployment_id=content.deployment.id,
+                                action="failed",
+                                example_version_id=content.deployment.example_version_id,
+                                workflow_id=workflow_id,
+                            )
+                            db.add(history)
+                        continue
 
                     # Resolve commit to use for this content
                     overrides_list = []

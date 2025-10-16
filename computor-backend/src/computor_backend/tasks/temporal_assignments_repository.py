@@ -4,14 +4,14 @@ Temporal activity and workflow to generate the assignments repository from Examp
 This activity clones (or initializes) the assignments repository and, for selected
 course contents that have an ExampleVersion assigned, copies the full example files
 unmodified into the repository under the assignment directory. After committing and
-pushing, it records the HEAD commit SHA into CourseContentDeployment.version_identifier
-and ensures CourseContentDeployment.deployment_path is set.
+pushing, it records the HEAD commit SHA into CourseContentDeployment.version_identifier.
 """
 from datetime import timedelta, datetime, timezone
 from typing import Any, Dict, List, Optional
 import os
 import tempfile
 import shutil
+import logging
 from pathlib import Path
 
 from temporalio import workflow, activity
@@ -19,6 +19,8 @@ from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
+
+logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="generate_assignments_repository")
@@ -157,8 +159,15 @@ async def generate_assignments_repository_activity(
                     if not example or not example.repository:
                         continue
 
-                    # Build dir
-                    directory_name = content.deployment.deployment_path or str(example.identifier)
+                    # Validate deployment_path is set (should be set during assignment)
+                    if not content.deployment.deployment_path:
+                        error_msg = f"deployment_path not set for {content.path} - this should be set during assignment"
+                        logger.error(error_msg)
+                        errors.append(error_msg)
+                        continue
+
+                    # Build dir using deployment_path
+                    directory_name = content.deployment.deployment_path
                     target_dir = Path(repo_path) / directory_name
 
                     if target_dir.exists() and overwrite_strategy != 'force_update':
@@ -176,10 +185,6 @@ async def generate_assignments_repository_activity(
                         file_path = target_dir / rel_path
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_bytes(data)
-
-                    # Update deployment path if needed
-                    if not content.deployment.deployment_path:
-                        content.deployment.deployment_path = directory_name
 
                     processed += 1
                 except Exception as e:

@@ -184,6 +184,7 @@ def assign_example_to_content(
         existing_deployment.example_version_id = example_version.id
         existing_deployment.example_identifier = example.identifier
         existing_deployment.version_tag = version_tag
+        existing_deployment.deployment_path = str(example.identifier)  # Set deployment path to example identifier
         existing_deployment.deployment_status = 'pending'
         existing_deployment.assigned_at = datetime.now(timezone.utc)
         existing_deployment.deployment_message = None
@@ -217,6 +218,7 @@ def assign_example_to_content(
             example_version_id=example_version.id,
             example_identifier=example.identifier,
             version_tag=version_tag,
+            deployment_path=str(example.identifier),  # Set deployment path to example identifier by default
             deployment_status='pending',
             assigned_at=datetime.now(timezone.utc),
             created_by=permissions.user_id,
