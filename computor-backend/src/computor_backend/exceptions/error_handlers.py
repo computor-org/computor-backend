@@ -42,16 +42,28 @@ async def computor_exception_handler(request: Request, exc: ComputorException) -
     # Log error for monitoring (includes all details)
     log_error(request, exc, error_response.model_dump())
 
-    # Return minimal response to client (only error_code and message for security)
-    # Additional fields like severity, category, documentation_url expose internal details
-    response_data = {
-        "error_code": error_response.error_code,
-        "message": error_response.message,
-    }
+    # SECURITY: For 401 Unauthorized, return minimal generic response
+    # This prevents information disclosure about authentication mechanisms
+    # Do NOT include specific error messages like "Invalid token format", "Wrong credentials", etc.
+    if exc.status_code == 401:
+        response_data = {
+            "detail": "Unauthorized",
+        }
+    else:
+        # For other errors, include message and optionally error_code
+        response_data = {
+            "message": error_response.message,
+        }
 
-    # Only include debug info in development mode
-    if include_debug and error_response.debug:
-        response_data["debug"] = error_response.debug.model_dump(exclude_none=True)
+        # Only include error_code if it's a valid code (not None, not a message string)
+        # Valid codes follow pattern: AUTH_001, VAL_001, etc.
+        if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
+            response_data["error_code"] = error_response.error_code
+
+    # NEVER include debug info by default (security risk)
+    # Only include if explicitly enabled AND in development mode
+    # if include_debug and error_response.debug:
+    #     response_data["debug"] = error_response.debug.model_dump(exclude_none=True)
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -101,19 +113,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
 
-    # Return minimal response (only error_code and message)
+    # Return minimal response (message and optionally error_code)
     response_data = {
-        "error_code": error_response.error_code,
         "message": error_response.message,
     }
+
+    # Only include error_code if it's a valid code
+    if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
+        response_data["error_code"] = error_response.error_code
 
     # Include validation errors in details for client to fix
     if errors:
         response_data["details"] = {"validation_errors": errors}
 
-    # Only include debug info in development mode
-    if include_debug and error_response.debug:
-        response_data["debug"] = error_response.debug.model_dump(exclude_none=True)
+    # NEVER include debug info (security risk)
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -197,15 +210,16 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     error_response = exception.to_error_response(include_debug=include_debug)
 
-    # Return minimal response (only error_code and message)
+    # Return minimal response (message and optionally error_code)
     response_data = {
-        "error_code": error_response.error_code,
         "message": error_response.message,
     }
 
-    # Only include debug info in development mode
-    if include_debug and error_response.debug:
-        response_data["debug"] = error_response.debug.model_dump(exclude_none=True)
+    # Only include error_code if it's a valid code
+    if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
+        response_data["error_code"] = error_response.error_code
+
+    # NEVER include debug info (security risk)
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

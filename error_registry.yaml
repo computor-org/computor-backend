@@ -1,0 +1,1199 @@
+# Computor Error Registry
+#
+# This file defines all error codes used in the Computor platform.
+# Error codes follow the pattern: CATEGORY_NUMBER
+#
+# Categories:
+# - AUTH: Authentication errors (401)
+# - AUTHZ: Authorization errors (403)
+# - VAL: Validation errors (400)
+# - NF: Not Found errors (404)
+# - CONFLICT: Conflict errors (409)
+# - RATE: Rate limiting errors (429)
+# - EXT: External service errors (502, 503)
+# - DB: Database errors (500, 503)
+# - INT: Internal server errors (500)
+# - NIMPL: Not implemented errors (501)
+
+version: "1.0.0"
+errors:
+  # ============================================================================
+  # AUTHENTICATION ERRORS (401)
+  # ============================================================================
+
+  - code: AUTH_001
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "Authentication Required"
+    message:
+      plain: "You must be authenticated to access this resource."
+      markdown: "**Authentication Required**\n\nYou must be authenticated to access this resource. Please log in and try again."
+      html: "<strong>Authentication Required</strong><p>You must be authenticated to access this resource. Please log in and try again.</p>"
+    internal_description: "User attempted to access a protected endpoint without valid authentication credentials"
+    affected_functions:
+      - "get_current_principal"
+      - "verify_token"
+    common_causes:
+      - "Missing or invalid authentication token"
+      - "Expired session"
+      - "Token not included in request headers"
+    resolution_steps:
+      - "Ensure you are logged in"
+      - "Check that the authentication token is included in the Authorization header"
+      - "Verify the token has not expired"
+    documentation_url: "/docs/authentication"
+
+  - code: AUTH_002
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "Invalid Credentials"
+    message:
+      plain: "The username or password provided is incorrect."
+      markdown: "**Invalid Credentials**\n\nThe username or password you provided is incorrect. Please check your credentials and try again."
+      html: "<strong>Invalid Credentials</strong><p>The username or password you provided is incorrect. Please check your credentials and try again.</p>"
+    internal_description: "User provided incorrect username or password during basic authentication"
+    affected_functions:
+      - "verify_basic_auth"
+      - "authenticate_user"
+    common_causes:
+      - "Incorrect password"
+      - "Username does not exist"
+      - "Account locked or disabled"
+    resolution_steps:
+      - "Verify your username and password"
+      - "Check for typos in credentials"
+      - "Contact administrator if account is locked"
+    documentation_url: "/docs/authentication"
+
+  - code: AUTH_003
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "Token Expired"
+    message:
+      plain: "Your authentication token has expired. Please log in again."
+      markdown: "**Token Expired**\n\nYour authentication token has expired. Please log in again to continue."
+      html: "<strong>Token Expired</strong><p>Your authentication token has expired. Please log in again to continue.</p>"
+    internal_description: "JWT or session token has expired and needs renewal"
+    affected_functions:
+      - "verify_token"
+      - "decode_jwt"
+    common_causes:
+      - "Session timeout reached"
+      - "Token TTL exceeded"
+      - "Server time synchronization issues"
+    resolution_steps:
+      - "Log in again to obtain a new token"
+      - "Enable auto-refresh if available"
+    documentation_url: "/docs/authentication#token-refresh"
+
+  - code: AUTH_004
+    http_status: 401
+    category: authentication
+    severity: error
+    title: "SSO Authentication Failed"
+    message:
+      plain: "Single Sign-On authentication failed. Please try again or contact support."
+      markdown: "**SSO Authentication Failed**\n\nSingle Sign-On authentication failed. Please try again or contact support if the problem persists."
+      html: "<strong>SSO Authentication Failed</strong><p>Single Sign-On authentication failed. Please try again or contact support if the problem persists.</p>"
+    internal_description: "Keycloak or other SSO provider authentication failed"
+    affected_functions:
+      - "sso_callback"
+      - "verify_sso_token"
+    common_causes:
+      - "SSO provider is unavailable"
+      - "Invalid SSO configuration"
+      - "User not authorized in SSO provider"
+    resolution_steps:
+      - "Retry authentication"
+      - "Check SSO provider status"
+      - "Contact administrator to verify SSO configuration"
+    documentation_url: "/docs/authentication#sso"
+
+  # ============================================================================
+  # AUTHORIZATION ERRORS (403)
+  # ============================================================================
+
+  - code: AUTHZ_001
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Insufficient Permissions"
+    message:
+      plain: "You do not have permission to perform this action."
+      markdown: "**Insufficient Permissions**\n\nYou do not have the required permissions to perform this action."
+      html: "<strong>Insufficient Permissions</strong><p>You do not have the required permissions to perform this action.</p>"
+    internal_description: "User lacks required permissions for the requested operation"
+    affected_functions:
+      - "check_course_permissions"
+      - "check_admin"
+    common_causes:
+      - "User role insufficient for operation"
+      - "Course membership missing or insufficient"
+      - "Admin privileges required but not granted"
+    resolution_steps:
+      - "Contact course administrator to request appropriate permissions"
+      - "Verify you are enrolled in the course with correct role"
+      - "Check if admin privileges are required"
+    documentation_url: "/docs/permissions"
+
+  - code: AUTHZ_002
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Admin Access Required"
+    message:
+      plain: "This operation requires administrator privileges."
+      markdown: "**Admin Access Required**\n\nThis operation requires administrator privileges. Please contact your system administrator."
+      html: "<strong>Admin Access Required</strong><p>This operation requires administrator privileges. Please contact your system administrator.</p>"
+    internal_description: "Operation requires admin role but user is not an admin"
+    affected_functions:
+      - "check_admin"
+      - "require_admin"
+    common_causes:
+      - "User is not an administrator"
+      - "Admin role not assigned"
+    resolution_steps:
+      - "Contact system administrator"
+      - "Request admin privileges if appropriate"
+    documentation_url: "/docs/permissions#admin"
+
+  - code: AUTHZ_003
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Course Access Denied"
+    message:
+      plain: "You do not have access to this course."
+      markdown: "**Course Access Denied**\n\nYou do not have access to this course. Please enroll or contact the course instructor."
+      html: "<strong>Course Access Denied</strong><p>You do not have access to this course. Please enroll or contact the course instructor.</p>"
+    internal_description: "User attempted to access course resources without proper enrollment"
+    affected_functions:
+      - "check_course_permissions"
+      - "get_permitted_course_ids"
+    common_causes:
+      - "Not enrolled in course"
+      - "Enrollment pending approval"
+      - "Course archived or disabled"
+    resolution_steps:
+      - "Enroll in the course"
+      - "Contact course instructor"
+      - "Verify course is active"
+    documentation_url: "/docs/courses#enrollment"
+
+  - code: AUTHZ_004
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Insufficient Course Role"
+    message:
+      plain: "Your course role is insufficient for this operation."
+      markdown: "**Insufficient Course Role**\n\nYour current role in this course does not allow this operation. Required role: {required_role}."
+      html: "<strong>Insufficient Course Role</strong><p>Your current role in this course does not allow this operation. Required role: <code>{required_role}</code>.</p>"
+    internal_description: "User's course role is below required level for operation"
+    affected_functions:
+      - "check_course_permissions"
+    common_causes:
+      - "Student trying to perform lecturer action"
+      - "Tutor trying to perform maintainer action"
+      - "Role hierarchy not satisfied"
+    resolution_steps:
+      - "Contact course administrator to request role upgrade"
+      - "Verify operation requirements"
+    documentation_url: "/docs/permissions#course-roles"
+
+  # ============================================================================
+  # VALIDATION ERRORS (400)
+  # ============================================================================
+
+  - code: VAL_001
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid Request Data"
+    message:
+      plain: "The request data is invalid or malformed."
+      markdown: "**Invalid Request Data**\n\nThe request data you provided is invalid or malformed. Please check your input and try again."
+      html: "<strong>Invalid Request Data</strong><p>The request data you provided is invalid or malformed. Please check your input and try again.</p>"
+    internal_description: "Request body failed Pydantic validation"
+    affected_functions:
+      - "parse_request_body"
+      - "validate_dto"
+    common_causes:
+      - "Missing required fields"
+      - "Invalid data types"
+      - "Format constraints violated"
+    resolution_steps:
+      - "Check API documentation for required fields"
+      - "Verify data types match schema"
+      - "Review validation error details"
+    documentation_url: "/docs/api/validation"
+
+  - code: VAL_002
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Missing Required Field"
+    message:
+      plain: "A required field is missing from the request."
+      markdown: "**Missing Required Field**\n\nA required field is missing from your request: `{field_name}`."
+      html: "<strong>Missing Required Field</strong><p>A required field is missing from your request: <code>{field_name}</code>.</p>"
+    internal_description: "Required field not provided in request"
+    affected_functions:
+      - "validate_dto"
+    common_causes:
+      - "Field omitted from request body"
+      - "Null value provided for required field"
+    resolution_steps:
+      - "Include the required field in request"
+      - "Check API documentation for required fields"
+    documentation_url: "/docs/api/validation"
+
+  - code: VAL_003
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid Field Format"
+    message:
+      plain: "A field has an invalid format."
+      markdown: "**Invalid Field Format**\n\nThe field `{field_name}` has an invalid format. Expected: {expected_format}."
+      html: "<strong>Invalid Field Format</strong><p>The field <code>{field_name}</code> has an invalid format. Expected: <code>{expected_format}</code>.</p>"
+    internal_description: "Field value does not match expected format or pattern"
+    affected_functions:
+      - "validate_email"
+      - "validate_uuid"
+      - "validate_url"
+    common_causes:
+      - "Invalid email format"
+      - "Malformed UUID"
+      - "URL format incorrect"
+    resolution_steps:
+      - "Check field format requirements"
+      - "Use valid format for the field type"
+    documentation_url: "/docs/api/validation"
+
+  - code: VAL_004
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid File Upload"
+    message:
+      plain: "The uploaded file is invalid or exceeds size limits."
+      markdown: "**Invalid File Upload**\n\nThe uploaded file is invalid or exceeds size limits. Maximum size: {max_size}."
+      html: "<strong>Invalid File Upload</strong><p>The uploaded file is invalid or exceeds size limits. Maximum size: <code>{max_size}</code>.</p>"
+    internal_description: "File upload validation failed"
+    affected_functions:
+      - "validate_file_upload"
+      - "upload_file"
+    common_causes:
+      - "File too large"
+      - "Invalid file type"
+      - "Corrupted file"
+    resolution_steps:
+      - "Reduce file size"
+      - "Use supported file types"
+      - "Verify file is not corrupted"
+    documentation_url: "/docs/api/file-uploads"
+
+  # ============================================================================
+  # NOT FOUND ERRORS (404)
+  # ============================================================================
+
+  - code: NF_001
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Resource Not Found"
+    message:
+      plain: "The requested resource was not found."
+      markdown: "**Resource Not Found**\n\nThe requested resource was not found. It may have been deleted or the URL is incorrect."
+      html: "<strong>Resource Not Found</strong><p>The requested resource was not found. It may have been deleted or the URL is incorrect.</p>"
+    internal_description: "Database query returned no results for the requested resource"
+    affected_functions:
+      - "get_by_id"
+      - "query.first()"
+    common_causes:
+      - "Resource deleted"
+      - "Invalid ID provided"
+      - "Resource archived"
+      - "Typo in URL or ID"
+    resolution_steps:
+      - "Verify the resource ID is correct"
+      - "Check if resource was deleted"
+      - "Review URL for typos"
+    documentation_url: "/docs/api/resources"
+
+  - code: NF_002
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "User Not Found"
+    message:
+      plain: "The specified user was not found."
+      markdown: "**User Not Found**\n\nThe specified user was not found in the system."
+      html: "<strong>User Not Found</strong><p>The specified user was not found in the system.</p>"
+    internal_description: "User lookup failed - no user with given ID or email"
+    affected_functions:
+      - "get_user_by_id"
+      - "get_user_by_email"
+    common_causes:
+      - "Invalid user ID"
+      - "User account deleted"
+      - "Email address not registered"
+    resolution_steps:
+      - "Verify user ID or email"
+      - "Check if user account exists"
+    documentation_url: "/docs/api/users"
+
+  - code: NF_003
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Course Not Found"
+    message:
+      plain: "The specified course was not found."
+      markdown: "**Course Not Found**\n\nThe specified course was not found or you do not have permission to access it."
+      html: "<strong>Course Not Found</strong><p>The specified course was not found or you do not have permission to access it.</p>"
+    internal_description: "Course lookup failed or user lacks permission to view"
+    affected_functions:
+      - "get_course_by_id"
+      - "check_course_permissions"
+    common_causes:
+      - "Invalid course ID"
+      - "Course archived or deleted"
+      - "Insufficient permissions to view course"
+    resolution_steps:
+      - "Verify course ID"
+      - "Check course enrollment status"
+      - "Contact administrator"
+    documentation_url: "/docs/api/courses"
+
+  - code: NF_004
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Endpoint Not Found"
+    message:
+      plain: "The requested API endpoint does not exist."
+      markdown: "**Endpoint Not Found**\n\nThe requested API endpoint does not exist. Please check the URL and API version."
+      html: "<strong>Endpoint Not Found</strong><p>The requested API endpoint does not exist. Please check the URL and API version.</p>"
+    internal_description: "HTTP route not registered in FastAPI application"
+    affected_functions:
+      - "fastapi_router"
+    common_causes:
+      - "Typo in URL path"
+      - "Endpoint deprecated or removed"
+      - "Wrong API version"
+      - "Wrong HTTP method"
+    resolution_steps:
+      - "Check API documentation for correct endpoint"
+      - "Verify API version"
+      - "Check HTTP method (GET, POST, etc.)"
+    documentation_url: "/docs/api"
+
+  # ============================================================================
+  # CONFLICT ERRORS (409)
+  # ============================================================================
+
+  - code: CONFLICT_001
+    http_status: 409
+    category: conflict
+    severity: warning
+    title: "Resource Already Exists"
+    message:
+      plain: "A resource with this identifier already exists."
+      markdown: "**Resource Already Exists**\n\nA resource with this identifier already exists. Use a different identifier or update the existing resource."
+      html: "<strong>Resource Already Exists</strong><p>A resource with this identifier already exists. Use a different identifier or update the existing resource.</p>"
+    internal_description: "Unique constraint violation - duplicate key"
+    affected_functions:
+      - "create_entity"
+      - "db.add()"
+    common_causes:
+      - "Duplicate email address"
+      - "Duplicate name or identifier"
+      - "Unique constraint violation"
+    resolution_steps:
+      - "Use a different identifier"
+      - "Update existing resource instead"
+      - "Check for duplicate entries"
+    documentation_url: "/docs/api/conflicts"
+
+  - code: CONFLICT_002
+    http_status: 409
+    category: conflict
+    severity: warning
+    title: "Concurrent Modification"
+    message:
+      plain: "The resource was modified by another user. Please refresh and try again."
+      markdown: "**Concurrent Modification**\n\nThe resource was modified by another user. Please refresh and try again."
+      html: "<strong>Concurrent Modification</strong><p>The resource was modified by another user. Please refresh and try again.</p>"
+    internal_description: "Optimistic locking failure - resource modified since read"
+    affected_functions:
+      - "update_entity"
+      - "db.commit()"
+    common_causes:
+      - "Resource updated by another user"
+      - "Stale data in request"
+      - "Race condition"
+    resolution_steps:
+      - "Refresh resource data"
+      - "Retry operation"
+      - "Merge changes if appropriate"
+    documentation_url: "/docs/api/concurrency"
+
+  # ============================================================================
+  # RATE LIMITING ERRORS (429)
+  # ============================================================================
+
+  - code: RATE_001
+    http_status: 429
+    category: rate_limit
+    severity: warning
+    title: "Rate Limit Exceeded"
+    message:
+      plain: "You have exceeded the rate limit. Please try again later."
+      markdown: "**Rate Limit Exceeded**\n\nYou have exceeded the rate limit. Please try again in {retry_after} seconds."
+      html: "<strong>Rate Limit Exceeded</strong><p>You have exceeded the rate limit. Please try again in <code>{retry_after}</code> seconds.</p>"
+    retry_after: 60
+    internal_description: "Request rate exceeded configured limits"
+    affected_functions:
+      - "rate_limit_middleware"
+      - "check_rate_limit"
+    common_causes:
+      - "Too many requests in short time"
+      - "API abuse"
+      - "Missing request throttling"
+    resolution_steps:
+      - "Wait for retry_after period"
+      - "Implement request throttling"
+      - "Use batch endpoints if available"
+    documentation_url: "/docs/api/rate-limits"
+
+  - code: RATE_002
+    http_status: 429
+    category: rate_limit
+    severity: warning
+    title: "Login Rate Limit Exceeded"
+    message:
+      plain: "Too many login attempts. Please try again later."
+      markdown: "**Login Rate Limit Exceeded**\n\nToo many login attempts for this username. Please wait {retry_after} seconds before trying again."
+      html: "<strong>Login Rate Limit Exceeded</strong><p>Too many login attempts for this username. Please wait <code>{retry_after}</code> seconds before trying again.</p>"
+    retry_after: 60
+    internal_description: "Username-specific login rate limiting triggered"
+    affected_functions:
+      - "login_endpoint"
+      - "authenticate_user"
+    common_causes:
+      - "Multiple failed login attempts"
+      - "Automated login attempts"
+      - "Brute force attack"
+    resolution_steps:
+      - "Wait for the retry period (60 seconds)"
+      - "Verify correct credentials"
+      - "Contact administrator if locked out"
+    documentation_url: "/docs/authentication#rate-limits"
+
+  # ============================================================================
+  # COURSE CONTENT ERRORS (400, 404)
+  # ============================================================================
+
+  - code: CONTENT_001
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Course Content Not Found"
+    message:
+      plain: "The requested course content was not found."
+      markdown: "**Course Content Not Found**\n\nThe requested course content (assignment, exercise, etc.) was not found or you do not have permission to access it."
+      html: "<strong>Course Content Not Found</strong><p>The requested course content was not found or you do not have permission to access it.</p>"
+    internal_description: "Course content lookup failed or user lacks permission"
+    affected_functions:
+      - "get_course_content"
+      - "update_course_content"
+    common_causes:
+      - "Invalid course content ID"
+      - "Content archived or deleted"
+      - "Insufficient permissions"
+    resolution_steps:
+      - "Verify course content ID"
+      - "Check enrollment status"
+      - "Contact course instructor"
+    documentation_url: "/docs/api/course-content"
+
+  - code: CONTENT_002
+    http_status: 404
+    category: not_found
+    severity: warning
+    title: "Content Type Not Configured"
+    message:
+      plain: "The content type for this assignment is not configured."
+      markdown: "**Content Type Not Configured**\n\nThe content type for this assignment is not properly configured. Please contact your instructor."
+      html: "<strong>Content Type Not Configured</strong><p>The content type for this assignment is not properly configured. Please contact your instructor.</p>"
+    internal_description: "CourseContentType missing or misconfigured"
+    affected_functions:
+      - "get_course_content_type"
+      - "validate_content_type"
+    common_causes:
+      - "Content type deleted"
+      - "Invalid content type ID"
+      - "Database inconsistency"
+    resolution_steps:
+      - "Contact course administrator"
+      - "Verify content type configuration"
+    documentation_url: "/docs/api/course-content#types"
+
+  - code: CONTENT_003
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid Content Type Operation"
+    message:
+      plain: "This operation is not valid for this content type."
+      markdown: "**Invalid Content Type Operation**\n\nThis operation cannot be performed on this content type. For example, you cannot assign examples to non-submittable content."
+      html: "<strong>Invalid Content Type Operation</strong><p>This operation cannot be performed on this content type.</p>"
+    internal_description: "Operation not supported for content type (e.g., examples on non-submittable)"
+    affected_functions:
+      - "assign_examples"
+      - "validate_content_operation"
+    common_causes:
+      - "Assigning examples to non-submittable content"
+      - "Invalid operation for content kind"
+    resolution_steps:
+      - "Check content type properties"
+      - "Use correct operation for content type"
+      - "Consult API documentation"
+    documentation_url: "/docs/api/course-content#operations"
+
+  - code: CONTENT_004
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Example Not Found"
+    message:
+      plain: "The requested example was not found."
+      markdown: "**Example Not Found**\n\nThe requested example or example version was not found."
+      html: "<strong>Example Not Found</strong><p>The requested example or example version was not found.</p>"
+    internal_description: "Example lookup by ID or identifier failed"
+    affected_functions:
+      - "get_example"
+      - "get_example_by_identifier"
+    common_causes:
+      - "Invalid example ID or identifier"
+      - "Example deleted"
+      - "No matching example"
+    resolution_steps:
+      - "Verify example ID or identifier"
+      - "Check if example was deleted"
+    documentation_url: "/docs/api/examples"
+
+  - code: CONTENT_005
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Example Version Not Found"
+    message:
+      plain: "The requested example version was not found."
+      markdown: "**Example Version Not Found**\n\nThe requested version of this example was not found. It may not exist or may have been deleted."
+      html: "<strong>Example Version Not Found</strong><p>The requested version of this example was not found.</p>"
+    internal_description: "Example version lookup failed - no version with given tag/ID"
+    affected_functions:
+      - "get_example_version"
+      - "get_version_by_tag"
+    common_causes:
+      - "Invalid version tag"
+      - "No versions exist"
+      - "Version deleted"
+    resolution_steps:
+      - "Verify version tag"
+      - "Check available versions"
+      - "Use 'latest' for most recent version"
+    documentation_url: "/docs/api/examples#versions"
+
+  # ============================================================================
+  # DEPLOYMENT ERRORS (400, 404)
+  # ============================================================================
+
+  - code: DEPLOY_001
+    http_status: 404
+    category: not_found
+    severity: warning
+    title: "Assignment Not Released"
+    message:
+      plain: "This assignment has not been released yet."
+      markdown: "**Assignment Not Released**\n\nThis assignment has not been released to students yet. Please wait for your instructor to release it."
+      html: "<strong>Assignment Not Released</strong><p>This assignment has not been released to students yet.</p>"
+    internal_description: "CourseContentDeployment not found or not yet deployed"
+    affected_functions:
+      - "get_deployment"
+      - "check_deployment_status"
+    common_causes:
+      - "Assignment not yet deployed"
+      - "Deployment pending"
+      - "Deployment deleted"
+    resolution_steps:
+      - "Wait for instructor to release assignment"
+      - "Contact instructor for release date"
+    documentation_url: "/docs/assignments#deployment"
+
+  - code: DEPLOY_002
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Deployment Not Found"
+    message:
+      plain: "The requested deployment was not found."
+      markdown: "**Deployment Not Found**\n\nThe requested deployment configuration was not found."
+      html: "<strong>Deployment Not Found</strong><p>The requested deployment configuration was not found.</p>"
+    internal_description: "Deployment lookup by ID failed"
+    affected_functions:
+      - "get_deployment_by_id"
+    common_causes:
+      - "Invalid deployment ID"
+      - "Deployment deleted"
+    resolution_steps:
+      - "Verify deployment ID"
+      - "Check deployment status"
+    documentation_url: "/docs/api/deployments"
+
+  - code: DEPLOY_003
+    http_status: 400
+    category: validation
+    severity: error
+    title: "Repository Not Configured"
+    message:
+      plain: "The GitLab repository is not configured for this resource."
+      markdown: "**Repository Not Configured**\n\nThe GitLab repository has not been configured. Please contact your administrator."
+      html: "<strong>Repository Not Configured</strong><p>The GitLab repository has not been configured. Please contact your administrator.</p>"
+    internal_description: "GitLab repository configuration missing from properties"
+    affected_functions:
+      - "validate_gitlab_config"
+      - "get_repository_config"
+    common_causes:
+      - "Organization GitLab not configured"
+      - "Course repository not created"
+      - "Student repository not initialized"
+    resolution_steps:
+      - "Contact administrator to configure GitLab"
+      - "Verify organization settings"
+      - "Wait for repository creation workflow"
+    documentation_url: "/docs/integrations/gitlab#configuration"
+
+  - code: DEPLOY_004
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Missing Deployment Information"
+    message:
+      plain: "Required deployment information is missing."
+      markdown: "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured."
+      html: "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>"
+    internal_description: "Deployment missing required fields (deployment_path, version_identifier)"
+    affected_functions:
+      - "validate_deployment"
+      - "create_test_run"
+    common_causes:
+      - "Incomplete deployment configuration"
+      - "Missing version identifier"
+      - "Missing deployment path"
+    resolution_steps:
+      - "Contact instructor"
+      - "Wait for proper deployment"
+    documentation_url: "/docs/assignments#deployment"
+
+  # ============================================================================
+  # SUBMISSION AND TESTING ERRORS (400, 404)
+  # ============================================================================
+
+  - code: SUBMIT_001
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Submission Artifact Not Found"
+    message:
+      plain: "The requested submission artifact was not found."
+      markdown: "**Submission Artifact Not Found**\n\nThe requested submission artifact was not found. You may need to submit first."
+      html: "<strong>Submission Artifact Not Found</strong><p>The requested submission artifact was not found.</p>"
+    internal_description: "SubmissionArtifact lookup failed"
+    affected_functions:
+      - "get_submission_artifact"
+      - "create_test_run"
+    common_causes:
+      - "Invalid artifact ID"
+      - "No submission made yet"
+      - "Artifact deleted"
+    resolution_steps:
+      - "Verify artifact ID"
+      - "Check if submission was made"
+      - "Submit assignment first"
+    documentation_url: "/docs/api/submissions"
+
+  - code: SUBMIT_002
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Submission Group Not Found"
+    message:
+      plain: "The requested submission group was not found."
+      markdown: "**Submission Group Not Found**\n\nThe requested submission group was not found or you do not have access to it."
+      html: "<strong>Submission Group Not Found</strong><p>The requested submission group was not found or you do not have access to it.</p>"
+    internal_description: "SubmissionGroup lookup failed or permission denied"
+    affected_functions:
+      - "get_submission_group"
+      - "check_group_membership"
+    common_causes:
+      - "Invalid submission group ID"
+      - "Not a member of group"
+      - "Group deleted"
+    resolution_steps:
+      - "Verify submission group ID"
+      - "Check group membership"
+      - "Contact instructor"
+    documentation_url: "/docs/assignments#groups"
+
+  - code: SUBMIT_003
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Test Already Running"
+    message:
+      plain: "A test is already running for this submission."
+      markdown: "**Test Already Running**\n\nA test is already running for this submission. Please wait for it to complete before starting another test."
+      html: "<strong>Test Already Running</strong><p>A test is already running for this submission.</p>"
+    internal_description: "Duplicate test attempt while existing test still running"
+    affected_functions:
+      - "create_test_run"
+      - "check_existing_test"
+    common_causes:
+      - "Multiple test requests"
+      - "Test already in progress"
+    resolution_steps:
+      - "Wait for current test to complete"
+      - "Check test status"
+    documentation_url: "/docs/testing#status"
+
+  - code: SUBMIT_004
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Maximum Test Runs Exceeded"
+    message:
+      plain: "You have reached the maximum number of test runs for this submission."
+      markdown: "**Maximum Test Runs Exceeded**\n\nYou have reached the maximum number of test runs allowed for this submission."
+      html: "<strong>Maximum Test Runs Exceeded</strong><p>You have reached the maximum number of test runs allowed.</p>"
+    internal_description: "Submission group max_test_runs limit reached"
+    affected_functions:
+      - "create_test_run"
+      - "check_test_limit"
+    common_causes:
+      - "Test limit configured on assignment"
+      - "Too many test attempts"
+    resolution_steps:
+      - "Review previous test results"
+      - "Contact instructor for additional test runs"
+    documentation_url: "/docs/testing#limits"
+
+  - code: SUBMIT_005
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Execution Backend Not Configured"
+    message:
+      plain: "The execution backend for this assignment is not configured."
+      markdown: "**Execution Backend Not Configured**\n\nThe execution backend for this assignment is not properly configured. Please contact your instructor."
+      html: "<strong>Execution Backend Not Configured</strong><p>The execution backend is not configured.</p>"
+    internal_description: "CourseContent missing execution_backend_id or ExecutionBackend not found"
+    affected_functions:
+      - "create_test_run"
+      - "validate_execution_backend"
+    common_causes:
+      - "Execution backend not assigned"
+      - "Backend deleted or misconfigured"
+    resolution_steps:
+      - "Contact instructor"
+      - "Verify assignment configuration"
+    documentation_url: "/docs/testing#backends"
+
+  - code: SUBMIT_006
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Version Identifier Required"
+    message:
+      plain: "A version identifier (commit) is required for testing."
+      markdown: "**Version Identifier Required**\n\nA version identifier (commit hash) is required to test your submission. Please ensure your submission includes version information."
+      html: "<strong>Version Identifier Required</strong><p>A version identifier is required for testing.</p>"
+    internal_description: "No version_identifier found in artifact or request"
+    affected_functions:
+      - "create_test_run"
+      - "validate_version"
+    common_causes:
+      - "Missing commit information"
+      - "Artifact missing version_identifier"
+    resolution_steps:
+      - "Submit with proper version information"
+      - "Contact administrator"
+    documentation_url: "/docs/testing#versioning"
+
+  - code: SUBMIT_007
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Test Identifier Required"
+    message:
+      plain: "You must provide either an artifact ID or submission group ID to test."
+      markdown: "**Test Identifier Required**\n\nYou must provide either an artifact ID or submission group ID to identify what to test."
+      html: "<strong>Test Identifier Required</strong><p>You must provide an identifier for what to test.</p>"
+    internal_description: "Neither artifact_id nor submission_group_id provided in request"
+    affected_functions:
+      - "create_test_run"
+    common_causes:
+      - "Missing required parameters"
+      - "Invalid test request"
+    resolution_steps:
+      - "Provide artifact_id or submission_group_id"
+      - "Check API documentation"
+    documentation_url: "/docs/api/testing"
+
+  # ============================================================================
+  # TASK EXECUTION ERRORS (404, 500)
+  # ============================================================================
+
+  - code: TASK_001
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Task Not Found"
+    message:
+      plain: "The requested task execution was not found."
+      markdown: "**Task Not Found**\n\nThe requested task execution was not found or you do not have permission to view it."
+      html: "<strong>Task Not Found</strong><p>The requested task execution was not found.</p>"
+    internal_description: "Result (task execution) lookup failed"
+    affected_functions:
+      - "get_test_status"
+      - "get_task_result"
+    common_causes:
+      - "Invalid task/result ID"
+      - "Task deleted"
+      - "Permission denied"
+    resolution_steps:
+      - "Verify task ID"
+      - "Check task history"
+      - "Verify permissions"
+    documentation_url: "/docs/api/tasks"
+
+  - code: TASK_002
+    http_status: 500
+    category: internal
+    severity: error
+    title: "Task Submission Failed"
+    message:
+      plain: "Failed to submit the task for execution."
+      markdown: "**Task Submission Failed**\n\nFailed to submit the task to the execution system. Please try again or contact support."
+      html: "<strong>Task Submission Failed</strong><p>Failed to submit the task for execution.</p>"
+    internal_description: "Temporal workflow submission failed"
+    affected_functions:
+      - "task_executor.submit_task"
+      - "create_test_run"
+    common_causes:
+      - "Temporal service unavailable"
+      - "Invalid workflow parameters"
+      - "Network error"
+    resolution_steps:
+      - "Retry operation"
+      - "Check Temporal service status"
+      - "Contact administrator"
+    documentation_url: "/docs/workflows#troubleshooting"
+
+  - code: TASK_003
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Unsupported Execution Backend"
+    message:
+      plain: "The execution backend type is not supported."
+      markdown: "**Unsupported Execution Backend**\n\nThe execution backend type configured for this assignment is not supported."
+      html: "<strong>Unsupported Execution Backend</strong><p>The execution backend type is not supported.</p>"
+    internal_description: "ExecutionBackend.type not recognized or supported"
+    affected_functions:
+      - "create_test_run"
+      - "validate_backend_type"
+    common_causes:
+      - "Invalid backend type configuration"
+      - "Backend not implemented"
+    resolution_steps:
+      - "Contact administrator"
+      - "Verify backend configuration"
+    documentation_url: "/docs/testing#backends"
+
+  - code: TASK_004
+    http_status: 404
+    category: not_found
+    severity: info
+    title: "Course Membership Not Found"
+    message:
+      plain: "You are not a member of this course."
+      markdown: "**Course Membership Not Found**\n\nYou are not enrolled as a member of this course."
+      html: "<strong>Course Membership Not Found</strong><p>You are not enrolled in this course.</p>"
+    internal_description: "CourseMember lookup failed for user and course"
+    affected_functions:
+      - "get_course_member"
+      - "check_course_membership"
+    common_causes:
+      - "Not enrolled in course"
+      - "Enrollment pending"
+      - "Enrollment removed"
+    resolution_steps:
+      - "Enroll in the course"
+      - "Contact instructor"
+      - "Check enrollment status"
+    documentation_url: "/docs/courses#enrollment"
+
+  # ============================================================================
+  # EXTERNAL SERVICE ERRORS (502, 503)
+  # ============================================================================
+
+  - code: EXT_001
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "GitLab Service Unavailable"
+    message:
+      plain: "GitLab service is temporarily unavailable."
+      markdown: "**GitLab Service Unavailable**\n\nThe GitLab service is temporarily unavailable. Please try again later."
+      html: "<strong>GitLab Service Unavailable</strong><p>The GitLab service is temporarily unavailable. Please try again later.</p>"
+    retry_after: 300
+    internal_description: "GitLab API request failed or timed out"
+    affected_functions:
+      - "gitlab_client.request"
+      - "create_gitlab_group"
+      - "create_gitlab_repository"
+    common_causes:
+      - "GitLab server down"
+      - "Network connectivity issues"
+      - "GitLab API rate limiting"
+    resolution_steps:
+      - "Wait and retry"
+      - "Check GitLab status page"
+      - "Verify network connectivity"
+    documentation_url: "/docs/integrations/gitlab"
+
+  - code: EXT_002
+    http_status: 502
+    category: external_service
+    severity: error
+    title: "GitLab Authentication Failed"
+    message:
+      plain: "Failed to authenticate with GitLab."
+      markdown: "**GitLab Authentication Failed**\n\nFailed to authenticate with GitLab. Please check API token configuration."
+      html: "<strong>GitLab Authentication Failed</strong><p>Failed to authenticate with GitLab. Please check API token configuration.</p>"
+    internal_description: "GitLab API token invalid or expired"
+    affected_functions:
+      - "gitlab_client.authenticate"
+    common_causes:
+      - "Invalid GitLab token"
+      - "Token expired"
+      - "Insufficient token permissions"
+    resolution_steps:
+      - "Verify GitLab token is valid"
+      - "Check token permissions"
+      - "Generate new token if needed"
+    documentation_url: "/docs/integrations/gitlab#authentication"
+
+  - code: EXT_003
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "MinIO Service Unavailable"
+    message:
+      plain: "Object storage service is temporarily unavailable."
+      markdown: "**MinIO Service Unavailable**\n\nThe object storage service is temporarily unavailable. Please try again later."
+      html: "<strong>MinIO Service Unavailable</strong><p>The object storage service is temporarily unavailable. Please try again later.</p>"
+    retry_after: 60
+    internal_description: "MinIO/S3 service connection failed"
+    affected_functions:
+      - "storage_service.upload_file"
+      - "storage_service.download_file"
+    common_causes:
+      - "MinIO server down"
+      - "Network issues"
+      - "Storage quota exceeded"
+    resolution_steps:
+      - "Retry operation"
+      - "Check MinIO service status"
+      - "Verify storage quota"
+    documentation_url: "/docs/storage"
+
+  - code: EXT_004
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "Temporal Service Unavailable"
+    message:
+      plain: "Workflow service is temporarily unavailable."
+      markdown: "**Temporal Service Unavailable**\n\nThe workflow orchestration service is temporarily unavailable. Please try again later."
+      html: "<strong>Temporal Service Unavailable</strong><p>The workflow orchestration service is temporarily unavailable. Please try again later.</p>"
+    retry_after: 120
+    internal_description: "Temporal server connection failed"
+    affected_functions:
+      - "task_executor.submit_task"
+      - "temporal_client.connect"
+    common_causes:
+      - "Temporal server down"
+      - "Network connectivity issues"
+      - "Worker not running"
+    resolution_steps:
+      - "Check Temporal server status"
+      - "Verify worker is running"
+      - "Retry operation"
+    documentation_url: "/docs/workflows"
+
+  # ============================================================================
+  # DATABASE ERRORS (500, 503)
+  # ============================================================================
+
+  - code: DB_001
+    http_status: 503
+    category: database
+    severity: critical
+    title: "Database Connection Failed"
+    message:
+      plain: "Unable to connect to the database."
+      markdown: "**Database Connection Failed**\n\nUnable to connect to the database. The service is temporarily unavailable."
+      html: "<strong>Database Connection Failed</strong><p>Unable to connect to the database. The service is temporarily unavailable.</p>"
+    retry_after: 120
+    internal_description: "PostgreSQL connection failed or timed out"
+    affected_functions:
+      - "get_db"
+      - "database.connect"
+    common_causes:
+      - "Database server down"
+      - "Connection pool exhausted"
+      - "Network issues"
+      - "Invalid credentials"
+    resolution_steps:
+      - "Check database server status"
+      - "Verify database credentials"
+      - "Check connection pool settings"
+    documentation_url: "/docs/database"
+
+  - code: DB_002
+    http_status: 500
+    category: database
+    severity: error
+    title: "Database Query Failed"
+    message:
+      plain: "A database query failed. Please try again."
+      markdown: "**Database Query Failed**\n\nA database query failed. Please try again or contact support if the problem persists."
+      html: "<strong>Database Query Failed</strong><p>A database query failed. Please try again or contact support if the problem persists.</p>"
+    internal_description: "SQL query execution failed"
+    affected_functions:
+      - "db.query()"
+      - "db.execute()"
+    common_causes:
+      - "SQL syntax error"
+      - "Constraint violation"
+      - "Database timeout"
+    resolution_steps:
+      - "Retry operation"
+      - "Check query parameters"
+      - "Contact administrator"
+    documentation_url: "/docs/database"
+
+  - code: DB_003
+    http_status: 500
+    category: database
+    severity: error
+    title: "Transaction Failed"
+    message:
+      plain: "Database transaction failed and was rolled back."
+      markdown: "**Transaction Failed**\n\nThe database transaction failed and was rolled back. No changes were made."
+      html: "<strong>Transaction Failed</strong><p>The database transaction failed and was rolled back. No changes were made.</p>"
+    internal_description: "Database commit failed, transaction rolled back"
+    affected_functions:
+      - "db.commit()"
+    common_causes:
+      - "Constraint violation"
+      - "Deadlock"
+      - "Connection lost during transaction"
+    resolution_steps:
+      - "Retry operation"
+      - "Check for conflicting updates"
+      - "Verify data integrity"
+    documentation_url: "/docs/database#transactions"
+
+  # ============================================================================
+  # INTERNAL SERVER ERRORS (500)
+  # ============================================================================
+
+  - code: INT_001
+    http_status: 500
+    category: internal
+    severity: critical
+    title: "Internal Server Error"
+    message:
+      plain: "An unexpected error occurred. Please try again later."
+      markdown: "**Internal Server Error**\n\nAn unexpected error occurred. Please try again later or contact support."
+      html: "<strong>Internal Server Error</strong><p>An unexpected error occurred. Please try again later or contact support.</p>"
+    internal_description: "Unhandled exception or unexpected error condition"
+    affected_functions:
+      - "generic_handler"
+    common_causes:
+      - "Unhandled exception"
+      - "Bug in code"
+      - "Resource exhaustion"
+    resolution_steps:
+      - "Retry operation"
+      - "Contact support with error details"
+      - "Check server logs"
+    documentation_url: "/docs/support"
+
+  - code: INT_002
+    http_status: 500
+    category: internal
+    severity: critical
+    title: "Configuration Error"
+    message:
+      plain: "Server configuration error. Please contact administrator."
+      markdown: "**Configuration Error**\n\nA server configuration error occurred. Please contact your administrator."
+      html: "<strong>Configuration Error</strong><p>A server configuration error occurred. Please contact your administrator.</p>"
+    internal_description: "Invalid or missing configuration settings"
+    affected_functions:
+      - "load_settings"
+      - "initialize_service"
+    common_causes:
+      - "Missing environment variables"
+      - "Invalid configuration values"
+      - "Service misconfiguration"
+    resolution_steps:
+      - "Contact administrator"
+      - "Check server configuration"
+      - "Verify environment variables"
+    documentation_url: "/docs/configuration"
+
+  # ============================================================================
+  # NOT IMPLEMENTED ERRORS (501)
+  # ============================================================================
+
+  - code: NIMPL_001
+    http_status: 501
+    category: not_implemented
+    severity: info
+    title: "Feature Not Implemented"
+    message:
+      plain: "This feature is not yet implemented."
+      markdown: "**Feature Not Implemented**\n\nThis feature is not yet implemented. Check the documentation for available alternatives."
+      html: "<strong>Feature Not Implemented</strong><p>This feature is not yet implemented. Check the documentation for available alternatives.</p>"
+    internal_description: "Requested feature exists in API but not implemented"
+    affected_functions:
+      - "not_implemented_handler"
+    common_causes:
+      - "Feature under development"
+      - "Deprecated endpoint"
+      - "Future functionality"
+    resolution_steps:
+      - "Check roadmap for implementation timeline"
+      - "Use alternative endpoints"
+      - "Contact support for updates"
+    documentation_url: "/docs/roadmap"
