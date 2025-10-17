@@ -391,109 +391,6 @@ async def create_course_activity(
         return error_response
 
 
-@activity.defn(name="create_course_content_types_activity")
-async def create_course_content_types_activity(
-    course_id: str,
-    content_types_config: list,
-    user_id: str
-) -> Dict[str, Any]:
-    """Activity to create course content types for a course."""
-    from ..model.course import CourseContentType
-    
-    logger.info(f"🎯 CONTENT TYPES ACTIVITY CALLED!")
-    logger.info(f"Creating course content types for course: {course_id}")
-    logger.info(f"Content types config: {content_types_config}")
-    logger.info(f"User ID: {user_id}")
-    
-    try:
-        db_gen = get_db()
-        db = next(db_gen)
-        
-        try:
-            created_types = []
-            
-            for content_type_config in content_types_config:
-                logger.info(f"Creating content type: {content_type_config}")
-                
-                # Check if content type already exists
-                existing_type = db.query(CourseContentType).filter(
-                    CourseContentType.course_id == course_id,
-                    CourseContentType.slug == content_type_config["slug"]
-                ).first()
-                
-                if existing_type:
-                    logger.info(f"Content type already exists: {content_type_config['slug']}")
-                    created_types.append({
-                        "id": str(existing_type.id),
-                        "slug": existing_type.slug,
-                        "status": "exists"
-                    })
-                    continue
-                
-                # Create new content type
-                content_type = CourseContentType(
-                    slug=content_type_config["slug"],
-                    title=content_type_config.get("title"),
-                    description=content_type_config.get("description"),
-                    color=content_type_config.get("color", "green"),
-                    properties=content_type_config.get("properties", {}),
-                    course_id=course_id,
-                    course_content_kind_id=content_type_config.get("kind", content_type_config.get("course_content_kind_id")),
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                
-                db.add(content_type)
-                db.flush()  # Get the ID
-                
-                created_types.append({
-                    "id": str(content_type.id),
-                    "slug": content_type.slug,
-                    "status": "created"
-                })
-                
-                logger.info(f"Created content type: {content_type.slug} with ID: {content_type.id}")
-            
-            db.commit()
-            
-            response = {
-                "status": "success",
-                "course_id": course_id,
-                "content_types": created_types,
-                "total_created": len([ct for ct in created_types if ct["status"] == "created"]),
-                "total_existing": len([ct for ct in created_types if ct["status"] == "exists"])
-            }
-            
-            logger.info(f"Course content types creation completed: {response}")
-            return response
-            
-        except Exception as e:
-            db.rollback()
-            error_msg = str(e)
-            logger.exception(f"Database error in course content types creation: {error_msg}")
-            error_response = {
-                "status": "failed",
-                "course_id": course_id,
-                "error": error_msg,
-                "content_types": []
-            }
-            return error_response
-            
-        finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
-
-    except Exception as e:
-        error_msg = str(e)
-        logger.exception(f"Exception in course content types creation activity: {error_msg}")
-        return {
-            "status": "failed",
-            "course_id": course_id,
-            "error": error_msg,
-            "content_types": []
-        }
 
 
 # Workflows
@@ -831,8 +728,7 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
             created_entities = {
                 "organizations": [],
                 "course_families": [],
-                "courses": [],
-                "content_types": []
+                "courses": []
             }
             
             organizations = deployment_config.get("organizations", [])
@@ -937,61 +833,26 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
                         
                         course_result = await course_workflow_handle
                         workflow.logger.info(f"Course creation result: {course_result}")
-                        
+
                         if course_result.status != "completed":
                             raise Exception(f"Course '{course_config['name']}' creation failed: {course_result.error}")
-                        
+
                         created_entities["courses"].append(course_result.result)
-                        
-                        # Create content types if configured
-                        content_types = course_config.get('content_types', [])
-                        workflow.logger.info(f"Found {len(content_types)} content types for course: {course_config['name']}")
-                        
-                        if content_types:
-                            workflow.logger.info(f"Creating {len(content_types)} content types for course: {course_config['name']}")
-                            workflow.logger.info(f"Course result structure: {course_result.result}")
-                            
-                            course_id = course_result.result.get("course_id") if course_result.result else None
-                            workflow.logger.info(f"Extracted course_id: {course_id}")
-                            
-                            if not course_id:
-                                workflow.logger.error(f"No course ID found in result: {course_result.result}")
-                                continue
-                            
-                            content_types_result = await workflow.execute_activity(
-                                create_course_content_types_activity,
-                                args=[course_id, content_types, user_id],
-                                start_to_close_timeout=timedelta(minutes=3),
-                                retry_policy=RetryPolicy(
-                                    initial_interval=timedelta(seconds=1),
-                                    backoff_coefficient=2.0,
-                                    maximum_attempts=3,
-                                )
-                            )
-                            
-                            created_entities["content_types"].append(content_types_result)
-                            
-                            if content_types_result.get("status") == "success":
-                                workflow.logger.info(f"Created content types for course {course_config['name']}: {content_types_result.get('total_created')} created, {content_types_result.get('total_existing')} existing")
-                            else:
-                                workflow.logger.error(f"Failed to create content types for course {course_config['name']}: {content_types_result}")
+
+                        # Note: Content types are now created via API calls in the CLI deployment script
+                        # after hierarchy deployment completes. This separates concerns and allows
+                        # for more flexible content type management.
             
-            # Calculate content types statistics
-            total_content_types_created = sum(r.get("total_created", 0) for r in created_entities["content_types"] if r.get("status") == "success")
-            total_content_types_existing = sum(r.get("total_existing", 0) for r in created_entities["content_types"] if r.get("status") == "success")
-            
-            workflow.logger.info(f"Hierarchical deployment completed: {total_orgs} orgs, {total_families} families, {total_courses} courses, {total_content_types_created} content types created")
-            
+            workflow.logger.info(f"Hierarchical deployment completed: {total_orgs} orgs, {total_families} families, {total_courses} courses")
+
             return WorkflowResult(
                 status="completed",
                 result={
                     "created_entities": created_entities,
                     "counts": {
                         "organizations": total_orgs,
-                        "course_families": total_families,  
-                        "courses": total_courses,
-                        "content_types_created": total_content_types_created,
-                        "content_types_existing": total_content_types_existing
+                        "course_families": total_families,
+                        "courses": total_courses
                     }
                 },
                 metadata={"workflow_type": "deploy_computor_hierarchy"}

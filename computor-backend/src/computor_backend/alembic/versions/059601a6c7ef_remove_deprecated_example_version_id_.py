@@ -25,10 +25,26 @@ def upgrade() -> None:
     This column is deprecated and replaced by CourseContentDeployment.example_version_id.
     All example assignments should now be tracked through the CourseContentDeployment table.
     """
-    # Drop the foreign key constraint first
+    # Data migration: Fix any existing NULL deployment_path values
+    # Set deployment_path to example_identifier for existing deployments that don't have it set
+    op.execute("""
+        UPDATE course_content_deployment
+        SET deployment_path = example_identifier::text
+        WHERE deployment_path IS NULL
+          AND example_identifier IS NOT NULL
+    """)
+
+    # Drop the trigger that validates example assignments on course_content
+    # (This validation now happens through CourseContentDeployment business logic)
+    op.execute("DROP TRIGGER IF EXISTS trg_validate_course_content_example ON course_content CASCADE")
+
+    # Drop the trigger function
+    op.execute("DROP FUNCTION IF EXISTS validate_course_content_example_submittable() CASCADE")
+
+    # Drop the foreign key constraint
     op.drop_constraint('course_content_example_version_id_fkey', 'course_content', type_='foreignkey')
 
-    # Drop the column
+    # Drop the deprecated column
     op.drop_column('course_content', 'example_version_id')
 
 
@@ -51,3 +67,38 @@ def downgrade() -> None:
         ['id'],
         ondelete='SET NULL'
     )
+
+    # Re-create the trigger function
+    op.execute("""
+        CREATE OR REPLACE FUNCTION validate_course_content_example_submittable()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            is_submittable boolean;
+        BEGIN
+            -- Skip if no example is set
+            IF NEW.example_version_id IS NULL THEN
+                RETURN NEW;
+            END IF;
+
+            -- Check if the content type's kind is submittable
+            SELECT cck.submittable INTO is_submittable
+            FROM course_content_type cct
+            JOIN course_content_kind cck ON cct.course_content_kind_id = cck.id
+            WHERE cct.id = NEW.course_content_type_id;
+
+            IF NOT is_submittable THEN
+                RAISE EXCEPTION 'Only submittable content can have examples';
+            END IF;
+
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+    """)
+
+    # Re-create the trigger
+    op.execute("""
+        CREATE TRIGGER trg_validate_course_content_example
+        BEFORE INSERT OR UPDATE OF example_version_id ON course_content
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_course_content_example_submittable();
+    """)
