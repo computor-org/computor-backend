@@ -856,6 +856,28 @@ errors:
       - "Check API documentation"
     documentation_url: "/docs/api/testing"
 
+  - code: SUBMIT_008
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Artifact Already Tested"
+    message:
+      plain: "You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled."
+      markdown: "**Artifact Already Tested**\n\nYou have already successfully tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled."
+      html: "<strong>Artifact Already Tested</strong><p>You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.</p>"
+    internal_description: "User attempted to test an artifact that already has a successful test result"
+    affected_functions:
+      - "create_test_run"
+      - "check_existing_test"
+    common_causes:
+      - "Duplicate test attempt"
+      - "Previous test completed successfully"
+    resolution_steps:
+      - "Review your previous test results"
+      - "Submit a new version if you need to test again"
+      - "Contact instructor if test needs to be reset"
+    documentation_url: "/docs/testing#duplicate-tests"
+
   # ============================================================================
   # TASK EXECUTION ERRORS (404, 500)
   # ============================================================================

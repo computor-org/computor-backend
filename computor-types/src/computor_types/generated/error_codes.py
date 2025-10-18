@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-10-14T14:32:49.594322
+Generated at: 2025-10-17T13:17:52.880138
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -48,6 +48,7 @@ class ErrorCode(str, Enum):
     SUBMIT_005 = "SUBMIT_005"  # Execution Backend Not Configured
     SUBMIT_006 = "SUBMIT_006"  # Version Identifier Required
     SUBMIT_007 = "SUBMIT_007"  # Test Identifier Required
+    SUBMIT_008 = "SUBMIT_008"  # Artifact Already Tested
     TASK_001 = "TASK_001"  # Task Not Found
     TASK_002 = "TASK_002"  # Task Submission Failed
     TASK_003 = "TASK_003"  # Unsupported Execution Backend
@@ -116,6 +117,7 @@ ERROR_CATEGORIES = {
     ErrorCode.SUBMIT_005: "validation",
     ErrorCode.SUBMIT_006: "validation",
     ErrorCode.SUBMIT_007: "validation",
+    ErrorCode.SUBMIT_008: "validation",
     ErrorCode.TASK_001: "not_found",
     ErrorCode.TASK_002: "internal",
     ErrorCode.TASK_003: "validation",
