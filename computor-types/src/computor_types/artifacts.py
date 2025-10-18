@@ -48,6 +48,7 @@ class SubmissionArtifactList(BaseEntityList):
     object_key: str
     uploaded_at: datetime
     version_identifier: Optional[str] = None
+    submit: bool = False  # Whether this is an official submission
     properties: Optional[dict[str, Any]] = None  # Additional metadata
     latest_result: Optional['ResultList'] = None  # Latest successful result (status=0)
 
