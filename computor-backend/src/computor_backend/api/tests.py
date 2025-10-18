@@ -72,7 +72,10 @@ async def create_test_run(
         ).first()
 
         if not artifact:
-            raise NotFoundException(detail="Submission artifact not found")
+            raise NotFoundException(
+                error_code="SUBMIT_001",
+                detail="Submission artifact not found"
+            )
 
     elif test_create.submission_group_id:
         # Find artifact by submission group and optional version
@@ -85,6 +88,7 @@ async def create_test_run(
 
             if not artifact:
                 raise NotFoundException(
+                    error_code="SUBMIT_001",
                     detail=f"No artifact found for submission group {test_create.submission_group_id} "
                            f"with version {test_create.version_identifier}"
                 )
@@ -96,11 +100,13 @@ async def create_test_run(
 
             if not artifact:
                 raise NotFoundException(
+                    error_code="SUBMIT_001",
                     detail=f"No artifacts found for submission group {test_create.submission_group_id}. "
                            f"Student must submit first."
                 )
     else:
         raise BadRequestException(
+            error_code="SUBMIT_007",
             detail="Must provide either artifact_id or submission_group_id to identify what to test"
         )
 
@@ -112,7 +118,10 @@ async def create_test_run(
     ).first()
 
     if not submission_group:
-        raise NotFoundException(detail="Submission group not found or access denied")
+        raise NotFoundException(
+            error_code="SUBMIT_002",
+            detail="Submission group not found or access denied"
+        )
 
     # Get course member who is running the test
     course_member = db.query(CourseMember).filter(
@@ -121,7 +130,10 @@ async def create_test_run(
     ).first()
 
     if not course_member:
-        raise NotFoundException(detail="You are not a member of this course")
+        raise NotFoundException(
+            error_code="NF_003",
+            detail="You are not a member of this course"
+        )
 
     # Check for existing test results for this artifact by this member
     # Apply test limitation: prevent multiple successful tests
@@ -151,6 +163,7 @@ async def create_test_run(
         # If completed successfully, don't allow another test
         elif existing_test.status == 0:  # COMPLETED/FINISHED
             raise BadRequestException(
+                error_code="SUBMIT_008",
                 detail="You have already tested this artifact. "
                        "Multiple tests are not allowed unless the previous test crashed or was cancelled."
             )
@@ -163,6 +176,7 @@ async def create_test_run(
 
         if test_count >= submission_group.max_test_runs:
             raise BadRequestException(
+                error_code="SUBMIT_004",
                 detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
             )
 
@@ -172,7 +186,10 @@ async def create_test_run(
     ).first()
 
     if not course_content or not course_content.execution_backend_id:
-        raise BadRequestException(detail="Assignment or execution backend not configured")
+        raise BadRequestException(
+            error_code="SUBMIT_005",
+            detail="Assignment or execution backend not configured"
+        )
 
     # Get execution backend
     execution_backend = db.query(ExecutionBackend).filter(
@@ -180,7 +197,10 @@ async def create_test_run(
     ).first()
 
     if not execution_backend:
-        raise BadRequestException(detail="Execution backend not found")
+        raise BadRequestException(
+            error_code="SUBMIT_005",
+            detail="Execution backend not found"
+        )
 
     # Get course and organization for GitLab configuration
     course = db.query(Course).filter(Course.id == submission_group.course_id).first()
@@ -196,7 +216,10 @@ async def create_test_run(
     ).first()
 
     if not deployment or not deployment.deployment_path or not deployment.version_identifier:
-        raise BadRequestException(detail="Assignment not released: missing deployment information")
+        raise BadRequestException(
+            error_code="DEPLOY_001",
+            detail="Assignment not released: missing deployment information"
+        )
 
     # Build repository configurations
     submission_group_properties = submission_group.properties or {}
@@ -204,6 +227,7 @@ async def create_test_run(
 
     if not gitlab_config or not gitlab_config.get('full_path'):
         raise BadRequestException(
+            error_code="DEPLOY_003",
             detail="Student repository not configured. Please ensure repository has been created."
         )
 
@@ -216,7 +240,10 @@ async def create_test_run(
     )
 
     if not version_identifier:
-        raise BadRequestException(detail="Version identifier (commit) is required")
+        raise BadRequestException(
+            error_code="SUBMIT_006",
+            detail="Version identifier (commit) is required"
+        )
 
     # Build GitLab repository configurations
     provider = organization_properties.gitlab.url
@@ -298,6 +325,7 @@ async def create_test_run(
         # If workflow is still running, reject the duplicate test
         if workflow_still_running:
             raise BadRequestException(
+                error_code="SUBMIT_003",
                 detail=f"A test is already running for this version. Please wait for it to complete."
             )
 
@@ -346,7 +374,10 @@ async def create_test_run(
             if submitted_id != workflow_id:
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
         else:
-            raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported")
+            raise BadRequestException(
+                error_code="CONTENT_001",
+                detail=f"Execution backend type '{execution_backend.type}' not supported"
+            )
 
     except Exception as e:
         # If task submission fails, update result status to FAILED
@@ -389,7 +420,10 @@ async def get_test_status(
     ).first()
 
     if not result_data:
-        raise NotFoundException(detail="Test result not found")
+        raise NotFoundException(
+            error_code="NF_004",
+            detail="Test result not found"
+        )
 
     # Check permissions
     user_id = permissions.get_user_id()
@@ -412,7 +446,10 @@ async def get_test_status(
             ).first()
 
             if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to view this test result")
+                raise ForbiddenException(
+                    error_code="AUTHZ_003",
+                    detail="You don't have permission to view this test result"
+                )
 
     # If test has a workflow ID, check Temporal status for running tests
     status = result_data.status
