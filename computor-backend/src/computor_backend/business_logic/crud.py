@@ -9,7 +9,7 @@ async/await compatibility.
 
 from uuid import UUID
 from typing import Any, Optional, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from fastapi import HTTPException
@@ -528,7 +528,7 @@ async def archive_entity(
             if not db_item:
                 raise NotFoundException(detail=f"{db_type.__name__} not found")
 
-            setattr(db_item, "archived_at", datetime.now())
+            setattr(db_item, "archived_at", datetime.now(timezone.utc))
 
             db.commit()
             db.refresh(db_item)

@@ -12,7 +12,7 @@ import hashlib
 import json
 from typing import Dict, Optional, Set, List
 from functools import lru_cache
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from computor_backend.redis_cache import get_redis_client
@@ -56,7 +56,7 @@ class PermissionCache:
             return False
         
         timestamp = self._cache_timestamps[key]
-        return datetime.now() - timestamp < timedelta(seconds=self.ttl_seconds)
+        return datetime.now(timezone.utc) - timestamp < timedelta(seconds=self.ttl_seconds)
     
     async def get(self, user_id: str, resource: str, action: str,
                   resource_id: Optional[str] = None) -> Optional[bool]:
@@ -84,7 +84,7 @@ class PermissionCache:
                 
                 # Update local cache
                 self._local_cache[key] = result
-                self._cache_timestamps[key] = datetime.now()
+                self._cache_timestamps[key] = datetime.now(timezone.utc)
                 
                 return result
         except Exception as e:
@@ -102,7 +102,7 @@ class PermissionCache:
         
         # Update local cache
         self._local_cache[key] = result
-        self._cache_timestamps[key] = datetime.now()
+        self._cache_timestamps[key] = datetime.now(timezone.utc)
         
         # Update Redis cache
         try:
@@ -171,7 +171,7 @@ class CoursePermissionCache:
         """Store user's courses in cache"""
         key = f"{user_id}:{minimum_role}"
         self._course_members_cache[key] = course_ids
-        self._cache_timestamps[key] = datetime.now()
+        self._cache_timestamps[key] = datetime.now(timezone.utc)
     
     def _is_cache_valid(self, key: str) -> bool:
         """Check if cache entry is still valid"""
@@ -179,7 +179,7 @@ class CoursePermissionCache:
             return False
         
         timestamp = self._cache_timestamps[key]
-        return datetime.now() - timestamp < timedelta(seconds=self.ttl_seconds)
+        return datetime.now(timezone.utc) - timestamp < timedelta(seconds=self.ttl_seconds)
     
     def invalidate_user(self, user_id: str):
         """Invalidate all course cache entries for a user"""

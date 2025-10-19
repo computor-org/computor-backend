@@ -8,7 +8,7 @@ import sys
 import os
 from pathlib import Path
 from typing import Dict, List, Set, Type, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import importlib.util
 import ast
 import inspect
@@ -37,7 +37,7 @@ class SchemaExporter:
         if not self.include_timestamp:
             raise RuntimeError("Timestamp requested but include_timestamp is False")
         if self._timestamp_value is None:
-            self._timestamp_value = datetime.now().isoformat()
+            self._timestamp_value = datetime.now(timezone.utc).isoformat()
         return self._timestamp_value
 
     def scan_directory(self, directory: Path, pattern: str = "*.py") -> tuple[List[Type[BaseModel]], List[Type[Enum]]]:

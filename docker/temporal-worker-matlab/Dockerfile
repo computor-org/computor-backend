@@ -56,8 +56,8 @@ RUN passwd -d matlab
 USER matlab
 WORKDIR /home/matlab
 
+# Set timezone to UTC
 ENV TZ=UTC
-ENV TZ=Europe/Berlin
 
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10

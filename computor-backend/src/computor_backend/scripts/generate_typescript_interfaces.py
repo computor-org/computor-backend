@@ -12,7 +12,7 @@ import ast
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Set, Any, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import re
 from enum import Enum
@@ -57,7 +57,7 @@ class TypeScriptGenerator:
         if not self.include_timestamp:
             raise RuntimeError("Timestamp requested but include_timestamp is False")
         if self._timestamp_value is None:
-            self._timestamp_value = datetime.now().isoformat()
+            self._timestamp_value = datetime.now(timezone.utc).isoformat()
         return self._timestamp_value
     
     def python_type_to_typescript(self, py_type: Any) -> str:

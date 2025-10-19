@@ -1,7 +1,7 @@
 from sqlalchemy import (
     BigInteger, CheckConstraint, Column, DateTime, 
     Enum, ForeignKey, Index, String, text, Computed
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 try:
@@ -24,15 +24,15 @@ class Organization(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     number = Column(String(255))
     title = Column(String(255))
     description = Column(String(4096))
-    archived_at = Column(DateTime(True))
+    archived_at = Column(DateTime(timezone=True))
     email = Column(String(320))
     telephone = Column(String(255))
     fax_number = Column(String(255))

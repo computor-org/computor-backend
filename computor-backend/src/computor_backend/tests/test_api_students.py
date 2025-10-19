@@ -7,7 +7,7 @@ endpoint and the proper population of the example_identifier field.
 
 import pytest
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
@@ -49,8 +49,8 @@ class TestStudentSubmissionGroupsUnit:
         mock_submission_group.course_id = str(uuid4())
         mock_submission_group.course_content_id = course_content_id
         mock_submission_group.max_group_size = 2
-        mock_submission_group.created_at = datetime.now()
-        mock_submission_group.updated_at = datetime.now()
+        mock_submission_group.created_at = datetime.now(timezone.utc)
+        mock_submission_group.updated_at = datetime.now(timezone.utc)
         mock_submission_group.properties = {}
         
         # The test verifies that when a CourseContent has an associated Example,
@@ -215,8 +215,8 @@ class TestSubmissionGroupsDataConsistency:
             "members": [],
             "repository": None,
             "latest_grading": None,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         }
         
         # Should not raise ValidationError

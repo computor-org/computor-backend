@@ -7,7 +7,7 @@ Provides proper database mocking and test utilities.
 import pytest
 from typing import Generator, Dict, Any, Optional
 from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -170,8 +170,8 @@ def sample_organization() -> Dict[str, Any]:
             "name": "Test Organization",
             "description": "A test organization"
         },
-        "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
     }
 
 
@@ -188,8 +188,8 @@ def sample_course() -> Dict[str, Any]:
             "name": "Test Course",
             "description": "A test course"
         },
-        "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
     }
 
 
@@ -203,8 +203,8 @@ def sample_course_content() -> Dict[str, Any]:
         "path": "1.basics.hello-world",
         "course_content_type_id": "assignment",
         "properties": {},
-        "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
     }
 
 

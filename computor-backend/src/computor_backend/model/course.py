@@ -4,7 +4,7 @@ from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Float, ForeignKey, ForeignKeyConstraint, Index, 
     Integer, String, text, select
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, column_property, Mapped
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -68,8 +68,8 @@ class CourseFamily(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -95,8 +95,8 @@ class Course(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -141,8 +141,8 @@ class CourseContentType(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -168,8 +168,8 @@ class CourseExecutionBackend(Base):
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'), primary_key=True, nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), primary_key=True, nullable=False)
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
@@ -188,8 +188,8 @@ class CourseGroup(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -221,12 +221,12 @@ class CourseContent(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    archived_at = Column(DateTime(True))
+    archived_at = Column(DateTime(timezone=True))
     title = Column(String(255))
     description = Column(String(4096))
     path = Column(LtreeType, nullable=False)
@@ -241,7 +241,7 @@ class CourseContent(Base):
     # Team formation overrides (override course defaults for this specific assignment)
     team_mode = Column(String(50), nullable=True)  # Override course default
     team_min_group_size = Column(Integer, nullable=True)  # Override course default
-    team_formation_deadline = Column(DateTime(True), nullable=True)  # Assignment-specific deadline
+    team_formation_deadline = Column(DateTime(timezone=True), nullable=True)  # Assignment-specific deadline
     team_allow_student_creation = Column(Boolean, nullable=True)  # Override course default
     team_allow_join = Column(Boolean, nullable=True)  # Override course default
     team_allow_leave = Column(Boolean, nullable=True)  # Override course default
@@ -318,8 +318,8 @@ class CourseMember(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -359,8 +359,8 @@ class SubmissionGroup(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)  # Should contain gitlab/git repository info
@@ -442,8 +442,8 @@ class SubmissionGroupMember(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -469,8 +469,8 @@ class CourseMemberComment(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     message = Column(String(4096), nullable=False)

@@ -13,7 +13,7 @@ import sys
 import os
 from pathlib import Path
 from typing import Dict, List, Set, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add parent directories to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -33,7 +33,7 @@ class ValidationClassGenerator:
         if not self.include_timestamp:
             raise RuntimeError("Timestamp requested but include_timestamp is False")
         if self._timestamp_value is None:
-            self._timestamp_value = datetime.now().isoformat()
+            self._timestamp_value = datetime.now(timezone.utc).isoformat()
         return self._timestamp_value
 
     def generate_from_schemas(self, schema_dir: Path, output_dir: Path) -> List[Path]:

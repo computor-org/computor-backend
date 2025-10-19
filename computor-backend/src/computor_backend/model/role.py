@@ -1,7 +1,7 @@
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     ForeignKey, String, text
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -32,8 +32,8 @@ class RoleClaim(Base):
     claim_type = Column(String(255), primary_key=True, nullable=False)
     claim_value = Column(String(255), primary_key=True, nullable=False)
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
@@ -48,8 +48,8 @@ class UserRole(Base):
     role_id = Column(ForeignKey('role.id', ondelete='RESTRICT', onupdate='CASCADE'), primary_key=True, nullable=False)
     transient = Column(Boolean, server_default=text("false"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
 

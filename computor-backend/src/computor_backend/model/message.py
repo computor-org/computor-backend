@@ -1,7 +1,7 @@
 from sqlalchemy import (
     BigInteger, Column, DateTime, ForeignKey,
     Index, String, text, Integer
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -23,12 +23,12 @@ class Message(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    archived_at = Column(DateTime(True))
+    archived_at = Column(DateTime(timezone=True))
 
     # Author of the message
     author_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -73,8 +73,8 @@ class MessageRead(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)

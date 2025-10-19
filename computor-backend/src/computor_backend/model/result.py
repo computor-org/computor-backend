@@ -1,7 +1,7 @@
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float,
     ForeignKey, Index, Integer, String, text
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
 from typing import TYPE_CHECKING
@@ -35,8 +35,8 @@ class Result(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
@@ -57,8 +57,8 @@ class Result(Base):
     result = Column(Float(53), nullable=True)  # Deprecated alias for grade, kept for backward compatibility
     # result_json moved to MinIO storage: results/{result_id}/result.json
     # log_text removed - use application logging instead
-    started_at = Column(DateTime(True), nullable=True)
-    finished_at = Column(DateTime(True), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
     version_identifier = Column(String(2048), nullable=False)
     # Reference commit used for the assignment (from assignments repo)
     reference_version_identifier = Column(String(64), nullable=True)

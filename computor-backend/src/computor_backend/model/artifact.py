@@ -1,6 +1,6 @@
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float,
-    ForeignKey, Index, Integer, String, text, LargeBinary, UniqueConstraint
+    ForeignKey, Index, Integer, String, text, LargeBinary, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
@@ -36,9 +36,9 @@ class SubmissionArtifact(Base):
     version = Column(BigInteger, server_default=text("0"))
 
     # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    uploaded_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    uploaded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Foreign keys
     submission_group_id = Column(
@@ -105,8 +105,8 @@ class ResultArtifact(Base):
     version = Column(BigInteger, server_default=text("0"))
 
     # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Foreign keys
     result_id = Column(
@@ -150,9 +150,9 @@ class SubmissionGrade(Base):
     version = Column(BigInteger, server_default=text("0"))
 
     # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    graded_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    graded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Foreign keys
     artifact_id = Column(
@@ -196,8 +196,8 @@ class SubmissionReview(Base):
     version = Column(BigInteger, server_default=text("0"))
 
     # Timestamps
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Foreign keys
     artifact_id = Column(

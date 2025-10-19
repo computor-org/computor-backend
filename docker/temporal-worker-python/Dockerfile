@@ -1,6 +1,10 @@
 FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y postgresql-client git
+RUN apt-get update && apt-get install -y postgresql-client git tzdata
+
+# Set timezone to UTC
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN useradd -ms /bin/bash worker
 WORKDIR /home/worker
