@@ -238,7 +238,7 @@ def get_message_with_read_status(
         db: Database session
 
     Returns:
-        Message with is_read and is_author fields populated
+        Message with is_read, is_author, is_deleted, and deleted_by fields populated
     """
     reader_user_id = permissions.user_id
     is_read = False
@@ -258,7 +258,17 @@ def get_message_with_read_status(
         # Check if the current user is the author
         is_author = str(message.author_id) == str(reader_user_id)
 
-    return message.model_copy(update={"is_read": is_read, "is_author": is_author})
+    # Get deletion status from database
+    db_message = db.query(Message).filter(Message.id == message_id).first()
+    is_deleted = db_message.is_deleted if db_message else False
+    deleted_by = db_message.deleted_by if db_message and db_message.is_deleted else None
+
+    return message.model_copy(update={
+        "is_read": is_read,
+        "is_author": is_author,
+        "is_deleted": is_deleted,
+        "deleted_by": deleted_by
+    })
 
 
 def list_messages_with_read_status(
@@ -274,7 +284,7 @@ def list_messages_with_read_status(
         db: Database session
 
     Returns:
-        List of messages with is_read and is_author fields populated
+        List of messages with is_read, is_author, is_deleted, and deleted_by fields populated
     """
     reader_user_id = permissions.user_id
 
@@ -292,10 +302,26 @@ def list_messages_with_read_status(
     else:
         read_ids = set()
 
+    # Get deletion status for all messages in batch
+    if items:
+        message_ids = [item.id for item in items]
+        db_messages = db.query(Message).filter(Message.id.in_(message_ids)).all()
+        deletion_map = {
+            str(msg.id): {
+                "is_deleted": msg.is_deleted,
+                "deleted_by": msg.deleted_by if msg.is_deleted else None
+            }
+            for msg in db_messages
+        }
+    else:
+        deletion_map = {}
+
     return [
         item.model_copy(update={
             "is_read": item.id in read_ids,
-            "is_author": str(item.author_id) == str(reader_user_id) if reader_user_id else False
+            "is_author": str(item.author_id) == str(reader_user_id) if reader_user_id else False,
+            "is_deleted": deletion_map.get(item.id, {}).get("is_deleted", False),
+            "deleted_by": deletion_map.get(item.id, {}).get("deleted_by")
         })
         for item in items
     ]

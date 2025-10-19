@@ -64,6 +64,25 @@ class Message(Base):
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
 
+    @property
+    def is_deleted(self) -> bool:
+        """Check if message is soft-deleted."""
+        return self.archived_at is not None
+
+    @property
+    def deletion_reason(self) -> str:
+        """Get deletion reason from properties."""
+        if not self.is_deleted or not self.properties:
+            return None
+        return self.properties.get('deletion_reason')
+
+    @property
+    def deleted_by(self) -> str:
+        """Get who deleted the message (author/moderator/admin)."""
+        if not self.is_deleted or not self.properties:
+            return 'author'
+        return self.properties.get('deleted_by', 'author')
+
 
 class MessageRead(Base):
     __tablename__ = 'message_read'

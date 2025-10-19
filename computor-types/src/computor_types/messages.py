@@ -40,6 +40,8 @@ class MessageGet(BaseEntityGet):
     author: Optional[MessageAuthor] = Field(None, description="Author details")
     is_read: bool = False
     is_author: bool = Field(False, description="True if the requesting user is the message author")
+    is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
+    deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
@@ -79,6 +81,8 @@ class MessageList(BaseEntityList):
     author: Optional[MessageAuthor] = Field(None, description="Author details")
     is_read: bool = False
     is_author: bool = Field(False, description="True if the requesting user is the message author")
+    is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
+    deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None

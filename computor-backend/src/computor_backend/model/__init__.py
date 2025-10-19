@@ -21,6 +21,7 @@ from .result import Result
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
 from .message import Message, MessageRead
+from .message_audit import MessageAuditLog, MessageAuditAction
 from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
@@ -37,6 +38,7 @@ from . import (
     course,
     result,
     message,
+    message_audit,
     example,
     extension,
     deployment,
@@ -84,6 +86,8 @@ __all__ = [
     # Message models
     'Message',
     'MessageRead',
+    'MessageAuditLog',
+    'MessageAuditAction',
     # Example models
     'ExampleRepository',
     'Example',

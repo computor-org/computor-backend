@@ -27,6 +27,12 @@ from computor_backend.business_logic.messages import (
     mark_message_as_read,
     mark_message_as_unread,
 )
+from computor_backend.business_logic.message_operations import (
+    soft_delete_message,
+    update_message_with_audit,
+    create_message_audit,
+    get_message_audit_history,
+)
 
 messages_router = APIRouter()
 
@@ -43,7 +49,15 @@ async def create_message(
     class _Create(MessageCreate):
         author_id: str
     entity = _Create(**model_dump)
-    return await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
+    message = await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
+
+    # Create audit log entry
+    from computor_backend.model.message import Message
+    db_message = db.query(Message).filter(Message.id == message.id).first()
+    if db_message:
+        create_message_audit(db_message, permissions, db)
+
+    return message
 
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
@@ -75,8 +89,21 @@ async def update_message(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Update a message."""
-    return await update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
+    """Update a message with audit logging."""
+    # First verify user has access via permissions
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    # Update with audit
+    message = update_message_with_audit(
+        message_id=id,
+        principal=permissions,
+        db=db,
+        new_title=payload.title,
+        new_content=payload.content
+    )
+
+    # Convert to MessageGet
+    return get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
 
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
@@ -84,8 +111,17 @@ async def delete_message(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Delete a message."""
-    await delete_db(permissions, db, id, MessageInterface.model)
+    """Soft delete a message (preserves thread structure)."""
+    # Verify user has access
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    # Soft delete with audit
+    soft_delete_message(
+        message_id=id,
+        principal=permissions,
+        db=db,
+        reason="user_request"
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
@@ -113,3 +149,36 @@ async def mark_message_unread(
     await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_unread(id, permissions, db, cache)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@messages_router.get("/{id}/audit")
+async def get_message_audit(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Get audit history for a message (author or admin only)."""
+    # Verify user has access
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    # Get audit history
+    audit_logs = get_message_audit_history(
+        message_id=id,
+        principal=permissions,
+        db=db
+    )
+
+    # Convert to dict for response
+    return [
+        {
+            "id": str(log.id),
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "message_id": str(log.message_id),
+            "user_id": str(log.user_id) if log.user_id else None,
+            "action": log.action.value,
+            "old_title": log.old_title,
+            "old_content": log.old_content,
+            "new_title": log.new_title,
+            "new_content": log.new_content,
+        }
+        for log in audit_logs
+    ]
