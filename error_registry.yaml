@@ -495,6 +495,30 @@ errors:
       - "Contact administrator if locked out"
     documentation_url: "/docs/authentication#rate-limits"
 
+  - code: RATE_003
+    http_status: 429
+    category: rate_limit
+    severity: warning
+    title: "Test Request Rate Limit Exceeded"
+    message:
+      plain: "Too many test requests. Please wait before submitting another test."
+      markdown: "**Test Request Rate Limit Exceeded**\n\nYou are submitting tests too quickly. Please wait {retry_after} second before trying again."
+      html: "<strong>Test Request Rate Limit Exceeded</strong><p>You are submitting tests too quickly. Please wait <code>{retry_after}</code> second before trying again.</p>"
+    retry_after: 1
+    internal_description: "User-specific test submission rate limiting triggered to prevent abuse"
+    affected_functions:
+      - "create_test_run"
+      - "check_user_rate_limit"
+    common_causes:
+      - "Submitting tests too rapidly"
+      - "Automated test submissions"
+      - "Multiple concurrent test requests"
+    resolution_steps:
+      - "Wait 1 second between test requests"
+      - "Avoid rapid successive test submissions"
+      - "Ensure only one test is submitted at a time"
+    documentation_url: "/docs/testing#rate-limits"
+
   # ============================================================================
   # COURSE CONTENT ERRORS (400, 404)
   # ============================================================================

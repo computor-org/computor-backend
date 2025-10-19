@@ -23,7 +23,7 @@ fi
 # Generate validators with schema export
 cd "${ROOT_DIR}" && \
 PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_cli.cli generate-validators --export-schemas "$@"
+    "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_validators.py" --export-schemas "$@"
 
 echo "✅ Validation classes generated successfully!"
 echo "📁 Schemas: frontend/src/types/schemas/"

@@ -18,6 +18,6 @@ fi
 
 cd "${ROOT_DIR}" && \
 PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_cli.cli generate-schema "$@"
+    "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_pydantic_schemas.py" "$@"
 
 echo "✅ JSON Schema generation completed successfully!"

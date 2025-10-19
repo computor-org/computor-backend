@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-10-17T13:17:52.880138
+Generated at: 2025-10-20T00:08:53.336707
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -32,6 +32,7 @@ class ErrorCode(str, Enum):
     CONFLICT_002 = "CONFLICT_002"  # Concurrent Modification
     RATE_001 = "RATE_001"  # Rate Limit Exceeded
     RATE_002 = "RATE_002"  # Login Rate Limit Exceeded
+    RATE_003 = "RATE_003"  # Test Request Rate Limit Exceeded
     CONTENT_001 = "CONTENT_001"  # Course Content Not Found
     CONTENT_002 = "CONTENT_002"  # Content Type Not Configured
     CONTENT_003 = "CONTENT_003"  # Invalid Content Type Operation
@@ -101,6 +102,7 @@ ERROR_CATEGORIES = {
     ErrorCode.CONFLICT_002: "conflict",
     ErrorCode.RATE_001: "rate_limit",
     ErrorCode.RATE_002: "rate_limit",
+    ErrorCode.RATE_003: "rate_limit",
     ErrorCode.CONTENT_001: "not_found",
     ErrorCode.CONTENT_002: "not_found",
     ErrorCode.CONTENT_003: "validation",

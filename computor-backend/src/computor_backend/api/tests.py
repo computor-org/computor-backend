@@ -9,11 +9,12 @@ from fastapi import Depends, APIRouter
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException
+from computor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException, RateLimitException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.database import get_db
+from computor_backend.redis_cache import get_redis_client
 from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
@@ -39,11 +40,42 @@ logger = logging.getLogger(__name__)
 
 tests_router = APIRouter()
 
+
+async def check_user_rate_limit(user_id: str, cache) -> bool:
+    """
+    Check user_id-based rate limiting using Redis.
+    Returns True if limit exceeded, False otherwise.
+
+    Limit: 1 test request per 1 second per user
+    """
+    try:
+        rate_limit_key = f"rate_limit:user_id:{user_id}"
+        current_count = await cache.get(rate_limit_key)
+
+        if current_count is None:
+            # First attempt, set counter with 1 second expiry
+            await cache.set(rate_limit_key, "1", ex=1)
+            return False
+        else:
+            count = int(current_count)
+            if count >= 1:
+                # Rate limit exceeded
+                return True
+            else:
+                # Increment counter
+                await cache.incr(rate_limit_key)
+                return False
+    except Exception as e:
+        logger.error(f"Error checking user rate limit: {e}")
+        # On error, allow the request (fail open)
+        return False
+
 @tests_router.post("", response_model=ResultList)
 async def create_test_run(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ):
     """
     Create and execute a test for a submission artifact.
@@ -54,10 +86,29 @@ async def create_test_run(
     3. Provide submission_group_id only to test the latest submission
 
     Tests are executed via Temporal workflows.
+
+    Rate Limits (to prevent test abuse):
+    - 1 test request per 1 second per user
+
+    Returns 429 Too Many Requests if limit is exceeded.
     """
     from computor_backend.database import set_db_user
 
     user_id = permissions.get_user_id()
+
+    # Check user-based rate limit
+    user_limit_exceeded = await check_user_rate_limit(str(user_id), cache)
+    if user_limit_exceeded:
+        raise RateLimitException(
+            error_code="RATE_003",
+            detail=f"Too many test requests. Please wait before submitting another test.",
+            retry_after=1,
+            context={
+                "user_id": str(user_id),
+                "limit": 1,
+                "window_seconds": 1
+            }
+        )
 
     # Set user context for audit tracking
     set_db_user(db, user_id)

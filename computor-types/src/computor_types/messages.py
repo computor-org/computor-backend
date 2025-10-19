@@ -39,6 +39,7 @@ class MessageGet(BaseEntityGet):
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details")
     is_read: bool = False
+    is_author: bool = Field(False, description="True if the requesting user is the message author")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
@@ -77,6 +78,7 @@ class MessageList(BaseEntityList):
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details")
     is_read: bool = False
+    is_author: bool = Field(False, description="True if the requesting user is the message author")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None

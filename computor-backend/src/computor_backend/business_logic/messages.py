@@ -229,7 +229,7 @@ def get_message_with_read_status(
     permissions: Principal,
     db: Session,
 ) -> MessageGet:
-    """Get a message with read status for current user.
+    """Get a message with read status and author status for current user.
 
     Args:
         message_id: Message ID
@@ -238,10 +238,12 @@ def get_message_with_read_status(
         db: Database session
 
     Returns:
-        Message with is_read field populated
+        Message with is_read and is_author fields populated
     """
     reader_user_id = permissions.user_id
     is_read = False
+    is_author = False
+
     if reader_user_id:
         exists = (
             db.query(MessageRead.id)
@@ -253,7 +255,10 @@ def get_message_with_read_status(
         )
         is_read = exists is not None
 
-    return message.model_copy(update={"is_read": is_read})
+        # Check if the current user is the author
+        is_author = str(message.author_id) == str(reader_user_id)
+
+    return message.model_copy(update={"is_read": is_read, "is_author": is_author})
 
 
 def list_messages_with_read_status(
@@ -261,7 +266,7 @@ def list_messages_with_read_status(
     permissions: Principal,
     db: Session,
 ) -> list[MessageGet]:
-    """Add read status to a list of messages for current user.
+    """Add read status and author status to a list of messages for current user.
 
     Args:
         items: List of messages
@@ -269,7 +274,7 @@ def list_messages_with_read_status(
         db: Database session
 
     Returns:
-        List of messages with is_read field populated
+        List of messages with is_read and is_author fields populated
     """
     reader_user_id = permissions.user_id
 
@@ -287,7 +292,13 @@ def list_messages_with_read_status(
     else:
         read_ids = set()
 
-    return [item.model_copy(update={"is_read": item.id in read_ids}) for item in items]
+    return [
+        item.model_copy(update={
+            "is_read": item.id in read_ids,
+            "is_author": str(item.author_id) == str(reader_user_id) if reader_user_id else False
+        })
+        for item in items
+    ]
 
 
 def _invalidate_message_cache(
