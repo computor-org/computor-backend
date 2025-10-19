@@ -42,7 +42,7 @@ from computor_types.tutor_submission_groups import (
 logger = logging.getLogger(__name__)
 
 
-def get_tutor_course_content(
+async def get_tutor_course_content(
     course_member_id: UUID | str,
     course_content_id: UUID | str,
     permissions: Principal,
@@ -51,10 +51,10 @@ def get_tutor_course_content(
 ):
     """Get course content for a course member as a tutor with caching via repository."""
     repo = TutorViewRepository(db, cache)
-    return repo.get_course_content(course_member_id, course_content_id, permissions)
+    return await repo.get_course_content(course_member_id, course_content_id, permissions)
 
 
-def list_tutor_course_contents(
+async def list_tutor_course_contents(
     course_member_id: UUID | str,
     permissions: Principal,
     params: CourseContentStudentQuery,
@@ -63,7 +63,7 @@ def list_tutor_course_contents(
 ):
     """List course contents for a course member as a tutor with caching via repository."""
     repo = TutorViewRepository(db, cache)
-    return repo.list_course_contents(course_member_id, permissions, params)
+    return await repo.list_course_contents(course_member_id, permissions, params)
 
 
 def update_tutor_course_content_grade(

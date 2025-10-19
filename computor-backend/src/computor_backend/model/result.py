@@ -55,8 +55,8 @@ class Result(Base):
     # Test execution data
     grade = Column(Float(53), nullable=True)  # Grade as percentage (0.0 to 1.0)
     result = Column(Float(53), nullable=True)  # Deprecated alias for grade, kept for backward compatibility
-    result_json = Column(JSONB)
-    log_text = Column(String, nullable=True)  # Test execution logs
+    # result_json moved to MinIO storage: results/{result_id}/result.json
+    # log_text removed - use application logging instead
     started_at = Column(DateTime(True), nullable=True)
     finished_at = Column(DateTime(True), nullable=True)
     version_identifier = Column(String(2048), nullable=False)

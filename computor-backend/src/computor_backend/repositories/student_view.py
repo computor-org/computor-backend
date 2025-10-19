@@ -47,7 +47,7 @@ class StudentViewRepository(ViewRepository):
         """Students get 5-minute cache TTL."""
         return 300  # 5 minutes
 
-    def get_course_content(
+    async def get_course_content(
         self,
         user_id: str,
         course_content_id: UUID | str,
@@ -77,7 +77,7 @@ class StudentViewRepository(ViewRepository):
 
         # Query from DB using existing query function
         course_contents_result = user_course_content_query(user_id, course_content_id, self.db)
-        result = course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
+        result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
         # Cache result
         if result:
@@ -103,7 +103,7 @@ class StudentViewRepository(ViewRepository):
 
         return result
 
-    def list_course_contents(
+    async def list_course_contents(
         self,
         user_id: str,
         params: CourseContentStudentQuery,
@@ -139,7 +139,7 @@ class StudentViewRepository(ViewRepository):
         for course_contents_result in course_contents_results:
             # Convert tuple to typed model before mapping
             typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(course_member_course_content_result_mapper(typed_result, self.db))
+            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
 
         # Cache result with query-aware key
         # CRITICAL: Tag with course_id AND individual course_content IDs for proper invalidation

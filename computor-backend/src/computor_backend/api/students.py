@@ -30,13 +30,13 @@ logger = logging.getLogger(__name__)
 ## MR-based course-content messages removed (deprecated)
 
 @student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
-def student_get_course_content_endpoint(
+async def student_get_course_content_endpoint(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
-    return get_student_course_content(
+    return await get_student_course_content(
         course_content_id=course_content_id,
         user_id=permissions.get_user_id_or_throw(),
         db=db,
@@ -44,13 +44,13 @@ def student_get_course_content_endpoint(
     )
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
-def student_list_course_contents_endpoint(
+async def student_list_course_contents_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
-    return list_student_course_contents(
+    return await list_student_course_contents(
         user_id=permissions.get_user_id_or_throw(),
         params=params,
         db=db,

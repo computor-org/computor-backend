@@ -18,8 +18,8 @@ class SubmissionArtifact(Base):
 
     This model replaces the use of Result.submit=True for tracking student submissions.
     Each artifact represents a submission version stored as individual files in MinIO.
-    The object_key is the version_identifier, and files are stored at:
-    {bucket}/{version_identifier}/{file_path}
+    Files are stored in the "submissions" bucket at:
+    submissions/{submission_group_id}/{version_identifier}/{file_path}
     """
     __tablename__ = 'submission_artifact'
     __table_args__ = (

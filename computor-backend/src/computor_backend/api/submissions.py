@@ -944,6 +944,10 @@ async def create_test_result(
 
     # Create the test result (use authenticated user's course member id)
     from computor_types.tasks import map_task_status_to_int
+    from computor_backend.services.result_storage import store_result_json
+
+    # Extract result_json to store separately
+    result_json_data = test_data.result_json
 
     result = Result(
         submission_artifact_id=artifact_id,
@@ -952,9 +956,7 @@ async def create_test_result(
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
         grade=test_data.grade,
-        result_json=test_data.result_json,
         properties=test_data.properties,
-        log_text=test_data.log_text,
         version_identifier=test_data.version_identifier,
         reference_version_identifier=test_data.reference_version_identifier,
     )
@@ -962,6 +964,10 @@ async def create_test_result(
     db.add(result)
     db.commit()
     db.refresh(result)
+
+    # Store result_json in MinIO if provided
+    if result_json_data is not None:
+        await store_result_json(result.id, result_json_data)
 
     logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
@@ -1050,20 +1056,27 @@ async def update_test_result(
             raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
     # Build updates dict
+    from computor_backend.services.result_storage import store_result_json
+
     updates = {}
+    result_json_update = None
+
     if update_data.status is not None:
         from computor_types.tasks import map_task_status_to_int
         updates['status'] = map_task_status_to_int(update_data.status)
     if update_data.grade is not None:
         updates['grade'] = update_data.grade
     if update_data.result_json is not None:
-        updates['result_json'] = update_data.result_json
+        # Handle result_json separately - store in MinIO
+        result_json_update = update_data.result_json
     if update_data.properties is not None:
         updates['properties'] = update_data.properties
-    if update_data.log_text is not None:
-        updates['log_text'] = update_data.log_text
     if update_data.finished_at is not None:
         updates['finished_at'] = update_data.finished_at
+
+    # Store result_json in MinIO if provided
+    if result_json_update is not None:
+        await store_result_json(test_id, result_json_update)
 
     # CRITICAL: Use repository.update() for automatic cache invalidation
     if updates:

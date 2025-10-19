@@ -312,14 +312,13 @@ async def create_test_run(
                     else:
                         existing_result.status = 6  # CRASHED (unknown state)
 
-                    existing_result.log_text = (existing_result.log_text or "") + f"\n[Status synced from Temporal: {task_info.status.value}]"
+                    logger.info(f"Status synced from Temporal for Result {existing_result.id}: {task_info.status.value} -> status {existing_result.status}")
                     db.commit()
                     logger.info(f"Updated stale Result {existing_result.id} to status {existing_result.status}")
             except Exception as e:
                 # Workflow doesn't exist in Temporal - mark as crashed
-                logger.warning(f"Temporal workflow {existing_result.test_system_id} not found, marking Result as CRASHED: {e}")
+                logger.warning(f"Temporal workflow {existing_result.test_system_id} not found, marking Result {existing_result.id} as CRASHED: {e}")
                 existing_result.status = 6  # CRASHED
-                existing_result.log_text = (existing_result.log_text or "") + f"\n[Marked as CRASHED: Temporal workflow not found]"
                 db.commit()
 
         # If workflow is still running, reject the duplicate test
@@ -341,9 +340,7 @@ async def create_test_run(
         status=map_task_status_to_int(TaskStatus.QUEUED),
         grade=0.0,
         result=0,
-        result_json=None,
         properties=None,
-        log_text=None,
         version_identifier=version_identifier,
         reference_version_identifier=deployment.version_identifier,
     )
@@ -381,8 +378,8 @@ async def create_test_run(
 
     except Exception as e:
         # If task submission fails, update result status to FAILED
+        logger.error(f"Task submission failed for Result {result.id}: {str(e)}")
         result.status = map_task_status_to_int(TaskStatus.FAILED)
-        result.log_text = f"Task submission failed: {str(e)}"
         db.commit()
         db.refresh(result)
         raise
