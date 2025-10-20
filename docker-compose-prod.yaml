@@ -80,19 +80,19 @@ services:
       - traefik.enable=false
       
   # Temporal Web UI
-  temporal-ui:
-    image: temporalio/ui:latest
-    container_name: temporal-ui
-    restart: unless-stopped
-    ports:
-      - 8088:8080
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
-    depends_on:
-      - temporal
-    labels:
-      - traefik.enable=false
+#  temporal-ui:
+#    image: temporalio/ui:latest
+#    container_name: temporal-ui
+#    restart: unless-stopped
+#    ports:
+#      - 8088:8080
+#    environment:
+#      - TEMPORAL_ADDRESS=temporal:7233
+#      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+#    depends_on:
+#      - temporal
+#    labels:
+#      - traefik.enable=false
 
   uvicorn:
     build:
@@ -140,22 +140,22 @@ services:
       - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
   
   # Frontend service
-  frontend:
-    build:
-      context: ./
-      dockerfile: ./docker/frontend/Dockerfile
-      args:
-        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:8080/api}
-    restart: unless-stopped
-    ports:
-      - 3000:80
-    depends_on:
-      - uvicorn
-      - traefik
-    labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-    - "traefik.http.routers.frontend.entrypoints=web"
+#  frontend:
+#    build:
+#      context: ./
+#      dockerfile: ./docker/frontend/Dockerfile
+#      args:
+#        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:8080/api}
+#    restart: unless-stopped
+#    ports:
+#      - 3000:80
+#    depends_on:
+#      - uvicorn
+#      - traefik
+#    labels:
+#    - "traefik.enable=true"
+#    - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+#    - "traefik.http.routers.frontend.entrypoints=web"
 
   # Simple static file server (replaces nginx)
   static-server:

@@ -510,7 +510,7 @@ def main():
     """Main generator function."""
     # Paths
     script_dir = Path(__file__).parent
-    registry_path = script_dir / "error_registry.yaml"
+    registry_path = script_dir / "computor-backend" / "error_registry.yaml"
 
     # Output paths - following project structure conventions
     # TypeScript goes to generated/types/ (shared by frontend projects)

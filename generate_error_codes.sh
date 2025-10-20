@@ -18,8 +18,8 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # Check if error_registry.yaml exists
-if [ ! -f "error_registry.yaml" ]; then
-    echo "Error: error_registry.yaml not found in project root"
+if [ ! -f "computor-backend/error_registry.yaml" ]; then
+    echo "Error: error_registry.yaml not found in computor-backend/"
     exit 1
 fi
 

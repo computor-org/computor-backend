@@ -33,18 +33,18 @@ def load_error_registry() -> Dict[str, ErrorDefinition]:
     if _error_registry is not None:
         return _error_registry
 
-    # Find error_registry.yaml in project root
-    # Go up from computor-backend/src/computor_backend/error_handling/error_registry.py
-    # to the project root
+    # Find error_registry.yaml in computor-backend package root
+    # Go up from computor-backend/src/computor_backend/exceptions/error_registry.py
+    # to the computor-backend package root
     current_file = Path(__file__)
-    # Up to error_handling -> computor_backend -> src -> computor-backend -> project root
-    project_root = current_file.parent.parent.parent.parent.parent
-    registry_path = project_root / "error_registry.yaml"
+    # Up to exceptions -> computor_backend -> src -> computor-backend
+    package_root = current_file.parent.parent.parent.parent
+    registry_path = package_root / "error_registry.yaml"
 
     if not registry_path.exists():
         raise FileNotFoundError(
             f"Error registry not found at {registry_path}. "
-            "Please ensure error_registry.yaml exists in project root."
+            "Please ensure error_registry.yaml exists in computor-backend package root."
         )
 
     # Load YAML
@@ -185,8 +185,8 @@ def get_registry_version() -> str:
         Registry version string
     """
     current_file = Path(__file__)
-    project_root = current_file.parent.parent.parent.parent.parent
-    registry_path = project_root / "error_registry.yaml"
+    package_root = current_file.parent.parent.parent.parent
+    registry_path = package_root / "error_registry.yaml"
 
     with open(registry_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
