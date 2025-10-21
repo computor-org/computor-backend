@@ -15,7 +15,7 @@ from .base import EntityInterface
 class ContentValidationItem(BaseModel):
     """Single content item to validate."""
     content_id: str = Field(description="UUID of course content")
-    example_identifier: str = Field(description="Example identifier/slug from meta.yaml")
+    example_identifier: str = Field(description="Example identifier/slug from meta.yaml (dot-separated ltree path)")
     version_tag: str = Field(description="Version tag from meta.yaml (e.g., '1.0.0')")
 
     model_config = ConfigDict(from_attributes=True)

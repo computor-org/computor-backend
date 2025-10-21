@@ -26,7 +26,8 @@ from .temporal_student_testing import (
     StudentTestingWorkflow,
     clone_repository_activity,
     execute_tests_activity,
-    commit_test_results_activity
+    commit_test_results_activity,
+    run_complete_student_test_activity
 )
 from .temporal_system import (
     ReleaseStudentsWorkflow,
@@ -104,6 +105,7 @@ class TemporalWorker:
             clone_repository_activity,
             execute_tests_activity,
             commit_test_results_activity,
+            run_complete_student_test_activity,  # Complete test run (all steps on one worker)
             release_students_activity,
             release_course_activity,
             create_organization_activity,

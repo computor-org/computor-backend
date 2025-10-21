@@ -6,6 +6,7 @@ between content hierarchy and example deployments.
 """
 
 import json
+import logging
 import os
 from typing import Annotated, Optional, List, Dict, Any
 from uuid import UUID
@@ -15,6 +16,8 @@ import yaml
 from fastapi import Depends, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -165,7 +168,38 @@ async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Prin
     except Exception as e:
         print(e)
 
+# Event handler for submission group provisioning
+async def provision_submission_groups_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
+    """
+    Provision submission groups for all enrolled students when a new assignment is created.
+
+    This is called as a background task after a CourseContent is created.
+    Only creates groups for individual assignments (max_group_size = 1 or None).
+    Team assignments (max_group_size > 1) require manual creation or team formation workflow.
+    """
+    try:
+        from computor_backend.repositories.submission_group_provisioning import (
+            provision_submission_groups_for_course_content
+        )
+
+        created_count = provision_submission_groups_for_course_content(
+            course_content_id=str(entity.id),
+            db=db
+        )
+
+        if created_count > 0:
+            logger.info(
+                f"Successfully provisioned {created_count} submission groups "
+                f"for CourseContent {entity.id}"
+            )
+    except Exception as e:
+        logger.error(
+            f"Error provisioning submission groups for CourseContent {entity.id}: {e}",
+            exc_info=True
+        )
+
 course_content_router.on_created.append(event_wrapper)
+course_content_router.on_created.append(provision_submission_groups_wrapper)
 course_content_router.on_updated.append(event_wrapper)
 
 # New deployment endpoints

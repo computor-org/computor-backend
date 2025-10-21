@@ -423,8 +423,8 @@ async def create_test_run(
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
         else:
             raise BadRequestException(
-                error_code="CONTENT_001",
-                detail=f"Execution backend type '{execution_backend.type}' not supported"
+                error_code="TASK_003",
+                detail=f"Execution backend type '{execution_backend.type}' not supported. Expected type starting with 'temporal:', got '{execution_backend.type}'"
             )
 
     except Exception as e:

@@ -746,24 +746,32 @@ async def generate_student_template_activity_v2(
                         logger.info(f"Skipping {content.path}: no deployment assigned")
                         continue
 
-                    # Validate deployment_path is set (should be set during assignment)
-                    if not content.deployment.deployment_path:
-                        error_msg = f"deployment_path not set for {content.path} - this should be set during assignment"
-                        logger.error(error_msg)
-                        errors.append(error_msg)
+                    # Get deployment path - use deployment_path if set, otherwise fall back to example_identifier
+                    directory_name = content.deployment.deployment_path
+                    if not directory_name:
+                        if content.deployment.example_identifier:
+                            # Use example_identifier as-is for the directory name
+                            directory_name = str(content.deployment.example_identifier)
+                            # Save it to deployment_path so it's persisted in the database
+                            content.deployment.deployment_path = directory_name
+                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
+                        else:
+                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
+                            logger.error(error_msg)
+                            errors.append(error_msg)
 
-                        # Mark deployment as failed
-                        if content.deployment.deployment_status == "deploying":
-                            content.deployment.deployment_status = "failed"
-                            content.deployment.deployment_message = "deployment_path not set"
-                            history = DeploymentHistory(
-                                deployment_id=content.deployment.id,
-                                action="failed",
-                                example_version_id=content.deployment.example_version_id,
-                                workflow_id=workflow_id,
-                            )
-                            db.add(history)
-                        continue
+                            # Mark deployment as failed
+                            if content.deployment.deployment_status == "deploying":
+                                content.deployment.deployment_status = "failed"
+                                content.deployment.deployment_message = "deployment_path not set"
+                                history = DeploymentHistory(
+                                    deployment_id=content.deployment.id,
+                                    action="failed",
+                                    example_version_id=content.deployment.example_version_id,
+                                    workflow_id=workflow_id,
+                                )
+                                db.add(history)
+                            continue
 
                     # Resolve commit to use for this content
                     overrides_list = []
@@ -799,7 +807,7 @@ async def generate_student_template_activity_v2(
                     if not content.execution_backend_id:
                         try:
                             commit_obj = assignments_repo.commit(commit_to_use)
-                            meta_blob = commit_obj.tree / content.deployment.deployment_path / 'meta.yaml'
+                            meta_blob = commit_obj.tree / directory_name / 'meta.yaml'
                             meta_yaml_bytes = meta_blob.data_stream.read()
                             import yaml
                             meta_data = yaml.safe_load(meta_yaml_bytes) if meta_yaml_bytes else None
@@ -821,10 +829,10 @@ async def generate_student_template_activity_v2(
                     if commit_to_use:
                         try:
                             commit_obj = assignments_repo.commit(commit_to_use)
-                            sub_tree = commit_obj.tree / content.deployment.deployment_path
+                            sub_tree = commit_obj.tree / directory_name
                             for item in sub_tree.traverse():
                                 if item.type == 'blob':
-                                    rel_path = os.path.relpath(item.path, content.deployment.deployment_path)
+                                    rel_path = os.path.relpath(item.path, directory_name)
                                     files[rel_path] = item.data_stream.read()
                         except Exception as e:
                             logger.warning(f"Failed to load files from assignments for {content.path}: {e}")
@@ -850,7 +858,7 @@ async def generate_student_template_activity_v2(
                     
                     # Determine target directory in student template
                     # Use the example identifier as directory name for better organization
-                    target_dir = str(content.deployment.deployment_path)
+                    target_dir = str(directory_name)
                     full_target_path = os.path.join(template_repo_path, target_dir)
                     
                     # Process the example files for student template

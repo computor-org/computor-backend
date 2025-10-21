@@ -125,6 +125,10 @@ services:
       TEMPORAL_HOST: temporal
       TEMPORAL_PORT: 7233
       TEMPORAL_NAMESPACE: default
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SECURE: false
     # depends_on:
     #   postgres:
     #     condition: service_healthy
@@ -132,6 +136,7 @@ services:
     #     condition: service_started
     depends_on:
       - postgres
+      - minio
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
@@ -207,12 +212,17 @@ services:
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
       - postgres
       - redis
+      - minio
     labels:
       - traefik.enable=false
 
@@ -220,9 +230,9 @@ services:
   temporal-worker-python:
     build:
       context: ./
-      dockerfile: ./docker/api/Dockerfile
+      dockerfile: ./docker/temporal-worker-python/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "computor_backend.tasks.temporal_worker","--queues","testing-python"]
+    command: ["--queues=testing-python"]
     deploy:
       replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-2}
     environment:
@@ -242,10 +252,15 @@ services:
       - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
       - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
       - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
+      - minio
     labels:
       - traefik.enable=false
 
@@ -277,12 +292,17 @@ services:
       - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
       - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
       - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
       - postgres
       - redis
+      - minio
     labels:
       - traefik.enable=false
 

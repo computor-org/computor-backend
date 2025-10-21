@@ -159,15 +159,20 @@ async def generate_assignments_repository_activity(
                     if not example or not example.repository:
                         continue
 
-                    # Validate deployment_path is set (should be set during assignment)
-                    if not content.deployment.deployment_path:
-                        error_msg = f"deployment_path not set for {content.path} - this should be set during assignment"
-                        logger.error(error_msg)
-                        errors.append(error_msg)
-                        continue
-
-                    # Build dir using deployment_path
+                    # Get deployment path - use deployment_path if set, otherwise fall back to example_identifier
                     directory_name = content.deployment.deployment_path
+                    if not directory_name:
+                        if content.deployment.example_identifier:
+                            # Use example_identifier as-is for the directory name
+                            directory_name = str(content.deployment.example_identifier)
+                            # Save it to deployment_path so it's persisted in the database
+                            content.deployment.deployment_path = directory_name
+                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
+                        else:
+                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
+                            logger.error(error_msg)
+                            errors.append(error_msg)
+                            continue
                     target_dir = Path(repo_path) / directory_name
 
                     if target_dir.exists() and overwrite_strategy != 'force_update':

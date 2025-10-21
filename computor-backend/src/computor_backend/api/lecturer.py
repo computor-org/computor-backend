@@ -326,6 +326,7 @@ def validate_course_content_batch(
     }
     ```
     """
+
     # Convert Pydantic models to dicts for business logic
     content_validations = [
         item.model_dump() for item in request.content_validations

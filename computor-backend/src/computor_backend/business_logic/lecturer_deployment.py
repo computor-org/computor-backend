@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from computor_backend.model.course import Course, CourseContent, CourseContentType
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
@@ -21,8 +21,8 @@ from computor_backend.exceptions import (
     ForbiddenException,
     BadRequestException
 )
+from computor_backend.custom_types.ltree import Ltree
 from computor_types.validation import SemanticVersion
-from computor_types.custom_types import Ltree
 
 logger = logging.getLogger(__name__)
 
@@ -471,20 +471,35 @@ def batch_validate_content(
         )
 
     # 2. Extract all unique example identifiers and build content map
-    identifiers = set()
+    identifiers = []  # Changed from set() to list to preserve order and handle any type
     content_map = {}  # content_id -> validation_item
 
     for item in content_validations:
-        identifiers.add(item['example_identifier'])
+        # Extract identifier (should already be a string from Pydantic validation)
+        identifier = str(item['example_identifier'])
+
+        # # Convert list/tuple to dot-separated string (frontend sends arrays)
+        # if isinstance(identifier, (list, tuple)):
+        #     identifier = '.'.join(str(part) for part in identifier)
+        #     item['example_identifier'] = identifier
+        # elif not isinstance(identifier, str):
+        #     identifier = str(identifier)
+        #     item['example_identifier'] = identifier
+
+        # Add to identifiers list if not already present
+        if identifier not in identifiers:
+            identifiers.append(identifier)
         content_map[item['content_id']] = item
 
     # 3. Batch fetch all examples by identifier
-    # Convert string identifiers to Ltree objects for proper SQLAlchemy comparison
-    ltree_identifiers = [Ltree(identifier) for identifier in identifiers]
-
-    examples = db.query(Example).filter(
-        Example.identifier.in_(ltree_identifiers)
-    ).all()
+    # Use OR conditions for ltree equality comparisons (ltree doesn't support IN operator)
+    if not identifiers:
+        examples = []
+    else:
+        # Build OR conditions: wrap string identifiers in Ltree() for proper SQLAlchemy binding
+        # Use backend's Ltree class which SQLAlchemy-utils expects (has .path property)
+        ltree_conditions = [Example.identifier == Ltree(identifier) for identifier in identifiers]
+        examples = db.query(Example).filter(or_(*ltree_conditions)).all()
 
     # Build example lookup map: identifier -> example
     example_map = {str(ex.identifier): ex for ex in examples}
@@ -493,9 +508,12 @@ def batch_validate_content(
     example_ids = [ex.id for ex in examples]
 
     # 5. Batch fetch all versions for these examples
-    versions = db.query(ExampleVersion).filter(
-        ExampleVersion.example_id.in_(example_ids)
-    ).all()
+    if not example_ids:
+        versions = []
+    else:
+        versions = db.query(ExampleVersion).filter(
+            ExampleVersion.example_id.in_(example_ids)
+        ).all()
 
     # Build version lookup map: (example_id, version_tag) -> version
     version_map = {}

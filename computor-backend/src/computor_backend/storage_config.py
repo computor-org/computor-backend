@@ -74,6 +74,10 @@ ALLOWED_MIME_TYPES: Set[str] = {
     'text/xml',
     'application/x-yaml',
     'text/yaml',
+    # MATLAB files
+    'text/x-matlab',  # MATLAB code files (.m)
+    'application/vnd.wolfram.mathematica.package',  # Sometimes .m is detected as Mathematica
+    'application/x-matlab-data',  # MATLAB data files (.mat)
     # Archives
     'application/zip',
     'application/x-zip-compressed',
