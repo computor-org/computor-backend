@@ -6,9 +6,6 @@ import json
 import matlab
 import matlab.engine
 import subprocess
-import asyncio
-import signal
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from threading import Thread
 from Pyro5.api import expose, Daemon
 from computor_types.repositories import Repository
@@ -36,19 +33,9 @@ class MatlabServer(object):
     engine: matlab.engine = None
     server_thread: Thread
     testing_environment_path: str
-    executor: ThreadPoolExecutor = None
-    engine_lock_file: str = None
-
-    # Configuration from environment variables
-    MAX_EXECUTION_TIME: int = int(os.getenv("MATLAB_MAX_EXECUTION_TIME", "300"))  # 5 minutes default
-    MAX_MEMORY_MB: int = int(os.getenv("MATLAB_MAX_MEMORY_MB", "2048"))  # 2GB default
-    ENABLE_TIMEOUT: bool = os.getenv("MATLAB_ENABLE_TIMEOUT", "true").lower() == "true"
-    ENABLE_MEMORY_LIMIT: bool = os.getenv("MATLAB_ENABLE_MEMORY_LIMIT", "true").lower() == "true"
 
     def __init__(self,  worker_path: str):
       self.testing_environment_path = worker_path
-      self.executor = ThreadPoolExecutor(max_workers=1)  # Single worker for MATLAB execution
-      self.engine_lock_file = os.path.join(os.path.expanduser("~"), ".matlab_engine.lock")
       self.connect()
 
     def connect(self):
@@ -86,48 +73,6 @@ class MatlabServer(object):
       # Notification MATLAB SERVER CRASHED
       sys.exit(2)
 
-    def restart_engine(self):
-        """Forcefully restart the MATLAB engine after a timeout or error."""
-        print("!! Restarting MATLAB engine due to timeout or error")
-
-        try:
-            if self.engine is not None:
-                # Try to quit gracefully
-                try:
-                    self.engine.quit()
-                except:
-                    pass
-                self.engine = None
-
-            # Force reconnect
-            self.connect()
-            print("!! MATLAB engine restarted successfully")
-            return True
-
-        except Exception as e:
-            print(f"!! Failed to restart MATLAB engine: {e}")
-            return False
-
-    def _execute_matlab_with_timeout(self, command: str, timeout_seconds: int):
-        """Execute MATLAB command with timeout using ThreadPoolExecutor."""
-        def run_command():
-            return self.engine.evalc(command)
-
-        # Submit to executor and wait with timeout
-        future = self.executor.submit(run_command)
-
-        try:
-            result = future.result(timeout=timeout_seconds)
-            return result, False  # result, timed_out
-        except FuturesTimeoutError:
-            print(f"!! MATLAB command timed out after {timeout_seconds} seconds")
-            # Cancel the future (won't stop MATLAB, but cleans up Python side)
-            future.cancel()
-            return None, True  # None, timed_out
-        except Exception as e:
-            print(f"!! MATLAB command failed: {e}")
-            raise
-
     def evalc(self, arg):
         self.connect()
 
@@ -137,84 +82,27 @@ class MatlabServer(object):
         return result
 
     def test_student_example(self, test_file, spec_file, submit, test_number, submission_number):
-        """
-        Execute student test with timeout and memory protection.
 
-        Resource limits:
-        - Timeout: Configurable via MATLAB_MAX_EXECUTION_TIME (default 300s)
-        - Memory: Configurable via MATLAB_MAX_MEMORY_MB (default 2048MB)
-        """
-        # Ensure connection
         try:
            self.connect()
         except Exception as e:
           return MatlabServer.raise_exception(e, "MatlabInitException")
 
         try:
-          # Build the main test command
           command = f"CodeAbilityTestSuite('{test_file}','{spec_file}')"
 
-          # Wrap command with resource limits if enabled
-          if self.ENABLE_MEMORY_LIMIT:
-              # Add memory limit wrapper (clear workspace before test)
-              # Note: Just clearing workspace, memory monitoring happens via Docker limits
-              memory_limit_cmd = f"clear all; {command}"
-              command = memory_limit_cmd
-
-          print(f"Executing with timeout={self.MAX_EXECUTION_TIME}s, memory_limit={self.MAX_MEMORY_MB}MB")
-          print(f"Command: {command}")
-
           try:
-            # Execute with timeout if enabled
-            if self.ENABLE_TIMEOUT:
-                lscmd, timed_out = self._execute_matlab_with_timeout(
-                    command,
-                    self.MAX_EXECUTION_TIME
-                )
-
-                if timed_out:
-                    # Timeout occurred - restart engine for next test
-                    print("!! Test timed out - restarting MATLAB engine")
-                    self.restart_engine()
-
-                    return MatlabServer.commit({
-                        "details": {
-                            "exception": {
-                                "message": f"Test execution timed out after {self.MAX_EXECUTION_TIME} seconds",
-                                "trace": "Possible infinite loop or excessive computation",
-                                "timeout": True,
-                                "timeout_seconds": self.MAX_EXECUTION_TIME
-                            }
-                        }
-                    })
-            else:
-                # No timeout - direct execution (original behavior)
-                lscmd = self.engine.evalc(command)
-
-            # Successful execution
-            return MatlabServer.commit({"details": lscmd})
-
-          except MatlabTerminated as e:
-            print("!! MATLAB engine terminated - restarting")
-            self.restart_engine()
-            return MatlabServer.raise_exception(e, "MatlabTerminated")
+            lscmd = self.engine.evalc(command)
+            return MatlabServer.commit({ "details": lscmd})
 
           except Exception as ei:
-            print(f"!! Test execution failed: {ei}")
-            # Try to restart engine on error
-            try:
-                self.restart_engine()
-            except:
-                pass
+            print("Failed! Commit error message...")
             return MatlabServer.raise_exception(ei, f"command failed: {command}")
 
         except MatlabTerminated as e:
-          print("!! MATLAB terminated exception")
-          self.restart_engine()
           return MatlabServer.raise_exception(e, "MatlabTerminated")
 
         except Exception as e:
-          print(f"!! Unexpected error: {e}")
           return MatlabServer.raise_exception(e)
 
     def rpc_server(self):
@@ -222,7 +110,7 @@ class MatlabServer(object):
             uri = daemon.register(self, objectId=MatlabServer.PYRO_OBJECT_ID())
             print("Server started, uri: %s" % uri)
             daemon.requestLoop()
-            
+
     def start_thread(self):
         server_thread = Thread(target=self.rpc_server)
         server_thread.daemon = True
@@ -239,9 +127,9 @@ if __name__ == '__main__':
     if MATLAB_TEST_ENGINE_TOKEN is None:
        print("No test repository token available. Please assign environment variable MATLAB_TEST_ENGINE_TOKEN to matlab worker!")
        sys.exit(2)
-       
+
     worker_path = os.path.join(os.path.expanduser("~"), "test-engine")
-      
+
     try:
       print(Repository(url=MATLAB_TEST_ENGINE_URL,token=MATLAB_TEST_ENGINE_TOKEN,branch=MATLAB_TEST_ENGINE_VERSION).clone_or_fetch(worker_path))
     except Exception as e:
@@ -251,7 +139,7 @@ if __name__ == '__main__':
     MATLAB = MatlabServer(worker_path=worker_path)
 
     MATLAB.start_thread()
-    
+
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-matlab
     args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
