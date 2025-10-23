@@ -381,26 +381,36 @@ def _ensure_project_access(
 
 def _ensure_group_access(
     client: Gitlab,
-    group_identifier: Optional[str | int],
+    group_full_path: Optional[str],
     gitlab_user_id: int,
     access_level: int,
     context: str,
 ):
     """Ensure user has access to a GitLab group."""
-    if not group_identifier:
+    if not group_full_path:
         return
 
     try:
-        group = client.groups.get(group_identifier)
-    except GitlabGetError as exc:
-        logger.warning("GitLab group %s not found for %s: %s", group_identifier, context, exc)
+        # Use groups.list() with search instead of groups.get() since we have full_path not ID
+        groups = list(filter(
+            lambda g: g.full_path == group_full_path,
+            client.groups.list(search=group_full_path)
+        ))
+
+        if not groups:
+            logger.warning("GitLab group %s not found for %s", group_full_path, context)
+            return
+
+        group = groups[0]
+    except GitlabHttpError as exc:
+        logger.warning("GitLab group lookup failed for %s (%s): %s", group_full_path, context, exc)
         return
 
     try:
         group.members.create({"user_id": gitlab_user_id, "access_level": access_level})
         logger.info(
             "Granted GitLab group access: group=%s user_id=%s level=%s (%s)",
-            getattr(group, "full_path", group_identifier),
+            group.full_path,
             gitlab_user_id,
             access_level,
             context,
@@ -409,7 +419,7 @@ def _ensure_group_access(
         if getattr(exc, "response_code", None) != 409:
             logger.warning(
                 "Failed to add member to group %s for %s: %s",
-                group_identifier,
+                group_full_path,
                 context,
                 exc,
             )
@@ -421,7 +431,7 @@ def _ensure_group_access(
                 member.save()
                 logger.info(
                     "Updated GitLab group access: group=%s user_id=%s level=%s (%s)",
-                    getattr(group, "full_path", group_identifier),
+                    group.full_path,
                     gitlab_user_id,
                     access_level,
                     context,
@@ -429,7 +439,7 @@ def _ensure_group_access(
         except (GitlabGetError, GitlabHttpError) as member_exc:
             logger.warning(
                 "Unable to adjust membership for group %s (%s): %s",
-                group_identifier,
+                group_full_path,
                 context,
                 member_exc,
             )
@@ -504,11 +514,10 @@ def _sync_gitlab_memberships(
         )
 
     elif role == "_tutor":
-        if course_props.gitlab:
-            group_identifier = course_props.gitlab.group_id or course_props.gitlab.full_path
+        if course_props.gitlab and course_props.gitlab.full_path:
             _ensure_group_access(
                 client,
-                group_identifier,
+                course_props.gitlab.full_path,
                 gitlab_user_id,
                 30,  # Developer
                 "tutor course group membership",
@@ -524,8 +533,7 @@ def _sync_gitlab_memberships(
             )
 
     elif role in {"_lecturer", "_maintainer", "_owner"}:
-        if course_props.gitlab:
-            group_identifier = course_props.gitlab.group_id or course_props.gitlab.full_path
+        if course_props.gitlab and course_props.gitlab.full_path:
             access_mapping = {
                 "_lecturer": 40,  # Maintainer
                 "_maintainer": 40,
@@ -534,7 +542,7 @@ def _sync_gitlab_memberships(
             access_level = access_mapping.get(role, 40)
             _ensure_group_access(
                 client,
-                group_identifier,
+                course_props.gitlab.full_path,
                 gitlab_user_id,
                 access_level,
                 "course group membership",
