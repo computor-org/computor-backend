@@ -259,7 +259,7 @@ class SSOAuthCredentials(BaseModel):
 
 def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
     """Parse authorization header to determine auth type"""
-    
+
     # Check for GitLab credentials
     header_creds = request.headers.get("GLP-CREDS")
     if header_creds:
@@ -269,21 +269,27 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
         except Exception as e:
             logger.error(f"Failed to parse GitLab credentials: {e}")
             raise UnauthorizedException("Invalid GitLab credentials")
-    
+
     # Check for standard Authorization header
     authorization = request.headers.get("Authorization")
+
+    # If no Authorization header, check for access_token cookie
     if not authorization:
+        access_token = request.cookies.get("access_token")
+        if access_token:
+            logger.debug("Using access_token from cookie")
+            return SSOAuthCredentials(token=access_token, scheme="Bearer")
         raise UnauthorizedException("No authorization provided")
-    
+
     scheme, param = get_authorization_scheme_param(authorization)
-    
+
     if not param:
         raise UnauthorizedException("Invalid authorization format")
-    
+
     # Handle Bearer token (SSO)
     if scheme.lower() == "bearer":
         return SSOAuthCredentials(token=param, scheme="Bearer")
-    
+
     # Handle Basic auth
     elif scheme.lower() == "basic":
         try:
@@ -295,7 +301,7 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
         except (ValueError, UnicodeDecodeError, binascii.Error) as e:
             logger.error(f"Failed to decode Basic auth: {e}")
             raise UnauthorizedException("Invalid Basic auth encoding")
-    
+
     raise UnauthorizedException(f"Unsupported auth scheme: {scheme}")
 
 

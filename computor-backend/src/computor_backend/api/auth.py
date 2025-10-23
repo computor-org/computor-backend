@@ -13,8 +13,8 @@ import secrets
 from typing import List, Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -87,6 +87,7 @@ async def check_username_rate_limit(username: str, cache) -> bool:
 async def login_with_credentials(
     login_request: LocalLoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     cache = Depends(get_redis_client)
 ) -> LocalLoginResponse:
@@ -98,6 +99,9 @@ async def login_with_credentials(
 
     The access token should be included in the Authorization header as:
     `Authorization: Bearer <access_token>`
+
+    Alternatively, the access token is also set as an httponly cookie for
+    browser-based applications.
 
     Rate Limits (to prevent brute-force attacks):
     - 100 attempts per minute per IP address (allows multiple users on same network)
@@ -125,7 +129,7 @@ async def login_with_credentials(
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
 
-    return await login_with_local_credentials(
+    result = await login_with_local_credentials(
         username=login_request.username,
         password=login_request.password,
         ip_address=ip_address,
@@ -133,6 +137,28 @@ async def login_with_credentials(
         db=db,
         cache=cache
     )
+
+    # Set access token as httponly cookie
+    response.set_cookie(
+        key="access_token",
+        value=result.access_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=3600  # 1 hour - should match token expiry
+    )
+
+    # Also set refresh token as httponly cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=result.refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=604800  # 7 days - should match refresh token expiry
+    )
+
+    return result
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers() -> List[ProviderInfo]:
@@ -308,6 +334,7 @@ async def sso_success():
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
     request: Request,
+    response: Response,
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
     cache = Depends(get_redis_client)
@@ -320,22 +347,32 @@ async def logout(
     - SSO authentication (provider tokens)
 
     The Bearer token from the Authorization header will be invalidated.
+    Cookies will also be cleared.
     """
     from computor_backend.business_logic.auth import logout_session
 
-    # Extract token from Authorization header
+    # Extract token from Authorization header or cookie
     authorization = request.headers.get("Authorization")
     current_token = None
 
     if authorization and authorization.startswith("Bearer "):
         current_token = authorization.replace("Bearer ", "")
+    else:
+        # Try to get from cookie
+        current_token = request.cookies.get("access_token")
 
-    return await logout_session(
+    result = await logout_session(
         access_token=current_token,
         principal=principal,
         db=db,
         cache=cache
     )
+
+    # Clear cookies
+    response.delete_cookie(key="access_token", samesite="lax")
+    response.delete_cookie(key="refresh_token", samesite="lax")
+
+    return result
 
 @auth_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
 async def list_all_plugins(principal: Principal = Depends(get_current_principal)) -> dict:

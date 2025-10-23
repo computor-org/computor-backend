@@ -193,7 +193,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 register_exception_handlers(app)
 
 origins = [
-    "*"
+    "http://localhost:3000",  # Next.js frontend
+    "http://localhost:3001",  # Alternative frontend port
+    "http://localhost:8000",  # Backend (for docs)
 ]
 
 # Add upload size limiter middleware (should be before CORS)
