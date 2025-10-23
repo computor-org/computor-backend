@@ -219,7 +219,10 @@ def _build_validation_status(
 def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -> dict:
     """Fetch GitLab user profile using access token."""
     if not provider_url:
-        raise BadRequestException("GitLab provider URL is required for verification.")
+        raise BadRequestException(
+            error_code="GITLAB_001",
+            detail="GitLab provider URL is required for verification."
+        )
 
     base_url = provider_url.rstrip("/")
     api_url = urljoin(f"{base_url}/", "api/v4/user")
@@ -230,7 +233,9 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
     except RequestException as exc:
         logger.warning("GitLab user lookup failed: %s", exc)
         raise BadRequestException(
-            "Could not reach GitLab to verify the access token."
+            error_code="GITLAB_007",
+            detail="Could not reach GitLab to verify the access token.",
+            context={"provider_url": provider_url, "error": str(exc)}
         ) from exc
 
     if response.status_code != 200:
@@ -241,15 +246,25 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
         )
         if response.status_code in {401, 403}:
             raise UnauthorizedException(
-                "GitLab rejected the access token. Please ensure it is valid and has API scope."
+                error_code="GITLAB_006",
+                detail="GitLab rejected the access token. Please ensure it is valid and has API scope.",
+                context={"status_code": response.status_code}
             )
-        raise BadRequestException("Unexpected response from GitLab user API.")
+        raise BadRequestException(
+            error_code="EXT_001",
+            detail="Unexpected response from GitLab user API.",
+            context={"status_code": response.status_code}
+        )
 
     try:
         return response.json()
     except ValueError as exc:
         logger.warning("Failed to decode GitLab user response: %s", exc)
-        raise BadRequestException("Unexpected response from GitLab user API.") from exc
+        raise BadRequestException(
+            error_code="EXT_001",
+            detail="Unexpected response from GitLab user API.",
+            context={"error": str(exc)}
+        ) from exc
 
 
 def _get_gitlab_client(
@@ -546,17 +561,26 @@ def validate_user_course(
         if existing_account:
             if not provider_access_token:
                 raise UnauthorizedException(
-                    "GitLab access token is required to validate account ownership."
+                    error_code="GITLAB_005",
+                    detail="GitLab access token is required to validate account ownership."
                 )
 
             current_user = _fetch_gitlab_user_profile(provider_url, provider_access_token)
             current_username = (current_user or {}).get("username")
             if not current_username:
-                raise BadRequestException("Unable to determine GitLab user from provided token.")
+                raise BadRequestException(
+                    error_code="GITLAB_006",
+                    detail="Unable to determine GitLab user from provided token."
+                )
 
             if current_username.lower() != existing_account.provider_account_id.lower():
                 raise BadRequestException(
-                    "The GitLab access token does not match the linked provider account."
+                    error_code="GITLAB_003",
+                    detail="The GitLab access token does not match the linked provider account.",
+                    context={
+                        "actual_username": current_username,
+                        "expected_username": existing_account.provider_account_id
+                    }
                 )
         else:
             # No linked account yet; report readiness without forcing token checks.
@@ -589,12 +613,16 @@ def register_user_course_account(
 
     if not provider_url:
         raise BadRequestException(
-            "Course organization does not define a GitLab provider, no account required."
+            error_code="GITLAB_001",
+            detail="Course organization does not define a GitLab provider, no account required."
         )
 
     provider_account_id = provider_account_id.strip()
     if not provider_account_id:
-        raise BadRequestException("Provider account ID must not be empty.")
+        raise BadRequestException(
+            error_code="GITLAB_008",
+            detail="Provider account ID must not be empty."
+        )
 
     provider_access_token = (
         provider_access_token.strip()
@@ -605,16 +633,25 @@ def register_user_course_account(
     if provider_type == "gitlab":
         if not provider_access_token:
             raise BadRequestException(
-                "GitLab access token is required to verify account ownership."
+                error_code="GITLAB_005",
+                detail="GitLab access token is required to verify account ownership."
             )
         current_user = _fetch_gitlab_user_profile(provider_url, provider_access_token)
         current_username = (current_user or {}).get("username")
         if not current_username:
-            raise BadRequestException("Unable to determine GitLab user from provided token.")
+            raise BadRequestException(
+                error_code="GITLAB_006",
+                detail="Unable to determine GitLab user from provided token."
+            )
 
         if current_username.lower() != provider_account_id.lower():
             raise BadRequestException(
-                "The GitLab access token does not belong to the specified account."
+                error_code="GITLAB_003",
+                detail="The GitLab access token does not belong to the specified account.",
+                context={
+                    "actual_username": current_username,
+                    "expected_username": provider_account_id
+                }
             )
 
     existing_account = _get_existing_account(db, course_member.user_id, provider_url)
@@ -632,7 +669,9 @@ def register_user_course_account(
 
     if conflicting_account:
         raise BadRequestException(
-            "Provider account ID is already linked to another user for this provider."
+            error_code="GITLAB_004",
+            detail="Provider account ID is already linked to another user for this provider.",
+            context={"username": provider_account_id}
         )
 
     if existing_account:

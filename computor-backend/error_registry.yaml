@@ -997,6 +997,187 @@ errors:
     documentation_url: "/docs/courses#enrollment"
 
   # ============================================================================
+  # GITLAB INTEGRATION ERRORS (400, 401, 409, 502, 503)
+  # ============================================================================
+
+  - code: GITLAB_001
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "GitLab Not Configured"
+    message:
+      plain: "GitLab integration is not configured for this course."
+      markdown: "**GitLab Not Configured**\n\nGitLab integration has not been set up for this course. Please contact your instructor."
+      html: "<strong>GitLab Not Configured</strong><p>GitLab integration has not been set up for this course. Please contact your instructor.</p>"
+    internal_description: "Course organization does not have GitLab provider configured"
+    affected_functions:
+      - "validate_user_course"
+      - "register_user_course_account"
+    common_causes:
+      - "Organization missing GitLab URL"
+      - "GitLab integration not enabled"
+      - "Course not configured for GitLab"
+    resolution_steps:
+      - "Contact course administrator"
+      - "Verify course supports GitLab integration"
+    documentation_url: "/docs/integrations/gitlab"
+
+  - code: GITLAB_002
+    http_status: 400
+    category: validation
+    severity: info
+    title: "GitLab Account Not Registered"
+    message:
+      plain: "You have not registered your GitLab account for this course."
+      markdown: "**GitLab Account Not Registered**\n\nYou need to register your GitLab account to access course repositories. Please register via `/user/courses/{course_id}/register`."
+      html: "<strong>GitLab Account Not Registered</strong><p>You need to register your GitLab account to access course repositories.</p>"
+    internal_description: "User has not linked GitLab account via Account table"
+    affected_functions:
+      - "validate_user_course"
+    common_causes:
+      - "First time accessing course"
+      - "Account not yet linked"
+    resolution_steps:
+      - "Register your GitLab username and access token"
+      - "Use POST /user/courses/{course_id}/register endpoint"
+    documentation_url: "/docs/integrations/gitlab#registration"
+
+  - code: GITLAB_003
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "GitLab Token Mismatch"
+    message:
+      plain: "The GitLab access token does not match your registered account."
+      markdown: "**GitLab Token Mismatch**\n\nThe access token you provided belongs to GitLab user `{actual_username}`, but your registered account is `{expected_username}`."
+      html: "<strong>GitLab Token Mismatch</strong><p>The access token belongs to a different GitLab user than your registered account.</p>"
+    internal_description: "GitLab /user endpoint returned different username than Account.provider_account_id"
+    affected_functions:
+      - "validate_user_course"
+      - "register_user_course_account"
+    common_causes:
+      - "Using wrong personal access token"
+      - "Token belongs to different GitLab user"
+      - "Multiple GitLab accounts"
+    resolution_steps:
+      - "Use token from your registered GitLab account"
+      - "Verify token username matches registered username"
+      - "Re-register with correct account if needed"
+    documentation_url: "/docs/integrations/gitlab#tokens"
+
+  - code: GITLAB_004
+    http_status: 409
+    category: conflict
+    severity: warning
+    title: "GitLab Account Already Linked"
+    message:
+      plain: "This GitLab username is already linked to another user."
+      markdown: "**GitLab Account Already Linked**\n\nThe GitLab username `{username}` is already linked to another user account in this course."
+      html: "<strong>GitLab Account Already Linked</strong><p>This GitLab username is already linked to another user account.</p>"
+    internal_description: "Account table constraint violation - provider_account_id already exists for different user"
+    affected_functions:
+      - "register_user_course_account"
+    common_causes:
+      - "GitLab username already registered by another student"
+      - "Duplicate registration attempt"
+      - "Shared GitLab account (not allowed)"
+    resolution_steps:
+      - "Use a different GitLab username"
+      - "Contact administrator if this is an error"
+      - "Ensure each student uses their own GitLab account"
+    documentation_url: "/docs/integrations/gitlab#registration"
+
+  - code: GITLAB_005
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "GitLab Token Required"
+    message:
+      plain: "A GitLab personal access token is required for this operation."
+      markdown: "**GitLab Token Required**\n\nPlease provide your GitLab personal access token to register or validate your account. The token must have `api` scope."
+      html: "<strong>GitLab Token Required</strong><p>Please provide your GitLab personal access token with <code>api</code> scope.</p>"
+    internal_description: "GitLab access token missing from request when required"
+    affected_functions:
+      - "validate_user_course"
+      - "register_user_course_account"
+    common_causes:
+      - "Token field empty or null"
+      - "Request missing provider_access_token field"
+    resolution_steps:
+      - "Generate GitLab personal access token with api scope"
+      - "Include token in request payload"
+      - "Verify token is not expired"
+    documentation_url: "/docs/integrations/gitlab#tokens"
+
+  - code: GITLAB_006
+    http_status: 502
+    category: external_service
+    severity: error
+    title: "GitLab Token Invalid"
+    message:
+      plain: "The GitLab access token is invalid or has been revoked."
+      markdown: "**GitLab Token Invalid**\n\nThe GitLab access token you provided is invalid, expired, or has been revoked. Please generate a new token with `api` scope."
+      html: "<strong>GitLab Token Invalid</strong><p>The GitLab access token is invalid, expired, or revoked. Please generate a new token.</p>"
+    internal_description: "GitLab API returned 401/403 when validating token via /user endpoint"
+    affected_functions:
+      - "_fetch_gitlab_user_profile"
+    common_causes:
+      - "Token expired"
+      - "Token revoked or deleted"
+      - "Token missing required scopes (api)"
+      - "Token belongs to deleted GitLab user"
+    resolution_steps:
+      - "Generate new GitLab personal access token"
+      - "Ensure token has api scope"
+      - "Re-register with new token"
+    documentation_url: "/docs/integrations/gitlab#tokens"
+
+  - code: GITLAB_007
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "GitLab API Unreachable"
+    message:
+      plain: "Unable to connect to GitLab API. Please try again later."
+      markdown: "**GitLab API Unreachable**\n\nUnable to connect to the GitLab API to verify your account. Please try again later."
+      html: "<strong>GitLab API Unreachable</strong><p>Unable to connect to GitLab. Please try again later.</p>"
+    retry_after: 60
+    internal_description: "Network error or timeout when calling GitLab API"
+    affected_functions:
+      - "_fetch_gitlab_user_profile"
+    common_causes:
+      - "GitLab server temporarily down"
+      - "Network connectivity issues"
+      - "DNS resolution failure"
+      - "Firewall blocking request"
+    resolution_steps:
+      - "Wait and retry in a few moments"
+      - "Check GitLab service status"
+      - "Contact administrator if persists"
+    documentation_url: "/docs/integrations/gitlab"
+
+  - code: GITLAB_008
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid GitLab Username"
+    message:
+      plain: "The GitLab username format is invalid."
+      markdown: "**Invalid GitLab Username**\n\nThe provided GitLab username is empty or has invalid format. Please provide a valid GitLab username."
+      html: "<strong>Invalid GitLab Username</strong><p>Please provide a valid GitLab username.</p>"
+    internal_description: "Provider account ID is empty or whitespace-only"
+    affected_functions:
+      - "register_user_course_account"
+    common_causes:
+      - "Empty username field"
+      - "Whitespace-only username"
+      - "Missing provider_account_id"
+    resolution_steps:
+      - "Provide your GitLab username"
+      - "Verify username is not empty"
+    documentation_url: "/docs/integrations/gitlab#registration"
+
+  # ============================================================================
   # EXTERNAL SERVICE ERRORS (502, 503)
   # ============================================================================
 
