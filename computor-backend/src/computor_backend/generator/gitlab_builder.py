@@ -1042,7 +1042,7 @@ class GitLabBuilder:
                 "group_id": students_group.id,
                 "full_path": students_group.full_path,
                 "web_url": f"{self.gitlab_url}/groups/{students_group.full_path}",
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
             
             flag_modified(course, "properties")
@@ -1114,7 +1114,7 @@ class GitLabBuilder:
                 "group_id": tutors_group.id,
                 "full_path": tutors_group.full_path,
                 "web_url": f"{self.gitlab_url}/groups/{tutors_group.full_path}",
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
             
             flag_modified(course, "properties")
@@ -1225,7 +1225,7 @@ class GitLabBuilder:
                     "web_url": f"{self.gitlab_url}/{parent_group.full_path}/assignments",
                     "description": "Reference repository with full example content"
                 },
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
             
             # Store URLs at the top level for easy access

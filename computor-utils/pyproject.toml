@@ -36,3 +36,9 @@ dev = [
 Homepage = "https://github.com/computor/computor-utils"
 Documentation = "https://docs.computor.dev/utils"
 Repository = "https://github.com/computor/computor-utils"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

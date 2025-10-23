@@ -8,7 +8,7 @@ with joins, subqueries, and aggregations for efficient data retrieval.
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import func, case, select, and_, literal
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload
@@ -238,7 +238,7 @@ def latest_grading_subquery(db: Session):
         SubmissionGroup.id.label('submission_group_id'),
         sa.literal(0).label('status'),
         sa.literal(0.0).label('grading'),
-        sa.literal(datetime.now()).label('created_at'),
+        sa.literal(datetime.now(timezone.utc)).label('created_at'),
         SubmissionGroup.id.label('id'),
         sa.literal(1).label('rn')
     ).filter(sa.literal(False)).subquery()  # Always empty for now

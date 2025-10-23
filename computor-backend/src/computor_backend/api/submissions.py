@@ -7,7 +7,7 @@ from pathlib import PurePosixPath
 from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Response, status, File, Form, UploadFile
+from fastapi import APIRouter, Depends, Response, status, File, Form, UploadFile, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
@@ -39,6 +39,7 @@ from computor_types.artifacts import (
     SubmissionArtifactList,
     SubmissionArtifactGet,
     SubmissionArtifactUpdate,
+    SubmissionArtifactQuery,
     SubmissionGradeCreate,
     SubmissionGradeUpdate,
     SubmissionGradeListItem,
@@ -128,13 +129,27 @@ def _sanitize_archive_path(name: str) -> str:
 @submissions_router.post("/artifacts", response_model=SubmissionUploadResponseModel, status_code=status.HTTP_201_CREATED)
 async def upload_submission(
     submission_create: Annotated[str, Form(..., description="Submission metadata as JSON")],
+    request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     file: UploadFile = File(..., description="Submission ZIP archive"),
     db: Session = Depends(get_db),
     storage_service = Depends(get_storage_service),
     cache: Cache = Depends(get_cache),
 ):
-    """Upload a submission file to MinIO and create matching SubmissionArtifact records."""
+    """
+    Upload a submission file to MinIO and create matching SubmissionArtifact records.
+
+    Security & Limits:
+    - Maximum file size: 10MB (configurable via MINIO_MAX_UPLOAD_SIZE env var)
+    - Request body size enforced by middleware before processing
+    - File validation: extension, MIME type, and content checks
+
+    Performance Notes:
+    - Entire file is read into memory for validation
+    - For large files, this endpoint may take 5-15 seconds
+    - Configure uvicorn timeout if needed: --timeout-keep-alive 300
+    - Does NOT block other API requests (async processing)
+    """
 
     try:
         submission_data = SubmissionCreate.model_validate_json(submission_create)
@@ -166,27 +181,28 @@ async def upload_submission(
 async def list_submission_artifacts(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    submission_group_id: Optional[str] = None,
+    params: SubmissionArtifactQuery = Depends(),
     course_content_id: Optional[str] = None,
-    version_identifier: Optional[str] = None,
     with_latest_result: bool = False,
-    limit: int = 100,
-    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     """List submission artifacts with optional filtering.
 
     Query parameters:
+    - submission_group_id: Filter by submission group
+    - uploaded_by_course_member_id: Filter by uploader
+    - content_type: Filter by content type
+    - submit: Filter by official submissions (True) or test runs (False)
     - with_latest_result: If True, include latest successful result (status=0) for each artifact
     """
 
     query = db.query(SubmissionArtifact)
 
     # Filter by submission group if provided
-    if submission_group_id:
+    if params.submission_group_id:
         # Check permissions for this submission group
         submission_group = db.query(SubmissionGroup).filter(
-            SubmissionGroup.id == submission_group_id
+            SubmissionGroup.id == params.submission_group_id
         ).first()
 
         if not submission_group:
@@ -198,7 +214,7 @@ async def list_submission_artifacts(
             is_group_member = db.query(SubmissionGroupMember).join(
                 CourseMember
             ).filter(
-                SubmissionGroupMember.submission_group_id == submission_group_id,
+                SubmissionGroupMember.submission_group_id == params.submission_group_id,
                 CourseMember.user_id == user_id
             ).first()
 
@@ -214,7 +230,7 @@ async def list_submission_artifacts(
                 if not has_elevated_perms:
                     raise ForbiddenException(detail="You don't have permission to view these artifacts")
 
-        query = query.filter(SubmissionArtifact.submission_group_id == submission_group_id)
+        query = query.filter(SubmissionArtifact.submission_group_id == params.submission_group_id)
 
     # Filter by course content if provided
     if course_content_id:
@@ -258,14 +274,26 @@ async def list_submission_artifacts(
             )
 
     # Filter by version identifier if provided
-    if version_identifier:
-        query = query.filter(SubmissionArtifact.version_identifier == version_identifier)
+    if params.version_identifier:
+        query = query.filter(SubmissionArtifact.version_identifier == params.version_identifier)
+
+    # Filter by submit flag if provided
+    if params.submit is not None:
+        query = query.filter(SubmissionArtifact.submit == params.submit)
+
+    # Filter by uploaded_by_course_member_id if provided
+    if params.uploaded_by_course_member_id:
+        query = query.filter(SubmissionArtifact.uploaded_by_course_member_id == params.uploaded_by_course_member_id)
+
+    # Filter by content_type if provided
+    if params.content_type:
+        query = query.filter(SubmissionArtifact.content_type == params.content_type)
 
     # Apply pagination
     total = query.count()
     artifacts = query.order_by(
         SubmissionArtifact.created_at.desc()
-    ).limit(limit).offset(offset).all()
+    ).limit(params.limit).offset(params.skip).all()
 
     response.headers["X-Total-Count"] = str(total)
 
@@ -930,6 +958,10 @@ async def create_test_result(
 
     # Create the test result (use authenticated user's course member id)
     from computor_types.tasks import map_task_status_to_int
+    from computor_backend.services.result_storage import store_result_json
+
+    # Extract result_json to store separately
+    result_json_data = test_data.result_json
 
     result = Result(
         submission_artifact_id=artifact_id,
@@ -938,9 +970,7 @@ async def create_test_result(
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
         grade=test_data.grade,
-        result_json=test_data.result_json,
         properties=test_data.properties,
-        log_text=test_data.log_text,
         version_identifier=test_data.version_identifier,
         reference_version_identifier=test_data.reference_version_identifier,
     )
@@ -948,6 +978,10 @@ async def create_test_result(
     db.add(result)
     db.commit()
     db.refresh(result)
+
+    # Store result_json in MinIO if provided
+    if result_json_data is not None:
+        await store_result_json(result.id, result_json_data)
 
     logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
@@ -1036,20 +1070,27 @@ async def update_test_result(
             raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
     # Build updates dict
+    from computor_backend.services.result_storage import store_result_json
+
     updates = {}
+    result_json_update = None
+
     if update_data.status is not None:
         from computor_types.tasks import map_task_status_to_int
         updates['status'] = map_task_status_to_int(update_data.status)
     if update_data.grade is not None:
         updates['grade'] = update_data.grade
     if update_data.result_json is not None:
-        updates['result_json'] = update_data.result_json
+        # Handle result_json separately - store in MinIO
+        result_json_update = update_data.result_json
     if update_data.properties is not None:
         updates['properties'] = update_data.properties
-    if update_data.log_text is not None:
-        updates['log_text'] = update_data.log_text
     if update_data.finished_at is not None:
         updates['finished_at'] = update_data.finished_at
+
+    # Store result_json in MinIO if provided
+    if result_json_update is not None:
+        await store_result_json(test_id, result_json_update)
 
     # CRITICAL: Use repository.update() for automatic cache invalidation
     if updates:

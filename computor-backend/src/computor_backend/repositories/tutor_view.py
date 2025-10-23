@@ -41,7 +41,7 @@ class TutorViewRepository(ViewRepository):
         """Tutors get 3-minute cache TTL (fresher data for grading)."""
         return 180  # 3 minutes
 
-    def get_course_content(
+    async def get_course_content(
         self,
         course_member_id: UUID | str,
         course_content_id: UUID | str,
@@ -82,7 +82,7 @@ class TutorViewRepository(ViewRepository):
         course_contents_result = course_member_course_content_query(
             course_member_id, course_content_id, self.db, reader_user_id=reader_user_id
         )
-        result = course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
+        result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
         # Cache result
         if result:
@@ -110,7 +110,7 @@ class TutorViewRepository(ViewRepository):
 
         return result
 
-    def list_course_contents(
+    async def list_course_contents(
         self,
         course_member_id: UUID | str,
         permissions: Principal,
@@ -154,7 +154,7 @@ class TutorViewRepository(ViewRepository):
         for course_contents_result in course_contents_results:
             # Convert tuple to typed model before mapping
             typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(course_member_course_content_result_mapper(typed_result, self.db))
+            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
 
         # Cache result with query-aware key
         # CRITICAL: Include course_id for proper invalidation when submissions/results change

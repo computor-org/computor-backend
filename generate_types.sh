@@ -19,7 +19,12 @@ fi
 
 cd "${ROOT_DIR}" && \
 PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_cli.cli generate-types "$@"
+    "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_interfaces.py" "$@"
 
 echo "✅ TypeScript interfaces generated successfully!"
 echo "📁 Check frontend/src/types/generated/ for the generated files"
+
+# Also generate error codes
+echo ""
+echo "🚀 Generating error code definitions..."
+bash "${ROOT_DIR}/generate_error_codes.sh"

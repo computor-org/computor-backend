@@ -95,52 +95,106 @@ async def add_members_to_project(
     project,
     member_ids: list[str],
     db: Session,
-    access_level: int = 40
+    access_level: int = 40,
+    provider_url: str = None
 ) -> None:
     """
     Add course members as maintainers to a GitLab project.
-    
+
+    Uses the Account table to get GitLab usernames and resolve numeric user IDs.
+    Gracefully skips members who haven't registered their GitLab account yet.
+
     Args:
         gitlab: GitLab client instance
         project: GitLab project object
         member_ids: List of course member IDs to add
         db: Database session
-        access_level: GitLab access level (40 = Maintainer)
+        access_level: GitLab access level (40 = Maintainer, 30 = Developer)
+        provider_url: GitLab provider URL (e.g., "https://gitlab.com")
     """
+    from ..model.auth import Account
+    from gitlab.exceptions import GitlabCreateError, GitlabGetError
+
     for member_id in member_ids:
         member = db.query(CourseMember).filter(CourseMember.id == member_id).first()
         if not member or not member.user:
+            logger.warning(f"CourseMember {member_id} not found or has no user")
             continue
-            
-        gitlab_user_id = None
-        member_props = member.properties or {}
-        
-        # Get or find GitLab user ID
-        if member_props.get('gitlab_user_id'):
-            gitlab_user_id = member_props['gitlab_user_id']
-        elif member.user.email:
-            # Try to find by email
-            try:
-                users = gitlab.users.list(search=member.user.email)
-                if users:
-                    gitlab_user_id = users[0].id
-                    # Store for future use
-                    member.properties = member_props
-                    member.properties['gitlab_user_id'] = gitlab_user_id
-                    db.add(member)
-                    db.commit()
-            except Exception as e:
-                logger.warning(f"Could not find GitLab user for {member.user.email}: {e}")
-        
-        if gitlab_user_id:
-            try:
-                project.members.create({
-                    'user_id': gitlab_user_id,
-                    'access_level': access_level
-                })
-                logger.info(f"Added user {gitlab_user_id} as maintainer to project {project.id}")
-            except Exception as e:
-                logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
+
+        # Look up GitLab account for this user
+        account = db.query(Account).filter(
+            Account.user_id == member.user_id,
+            Account.provider == provider_url,
+            Account.type == "gitlab"
+        ).first()
+
+        if not account:
+            # User hasn't registered their GitLab account yet - skip gracefully
+            logger.info(
+                f"User {member.user.email} (course_member {member_id}) has not registered "
+                f"GitLab account yet - skipping permission grant for project {project.id}"
+            )
+            continue
+
+        # Get GitLab username from Account
+        gitlab_username = account.provider_account_id
+
+        # Fetch numeric GitLab user ID by username
+        try:
+            users = gitlab.users.list(username=gitlab_username)
+            if not users:
+                logger.warning(
+                    f"GitLab user '{gitlab_username}' not found on GitLab instance "
+                    f"for user {member.user.email} (course_member {member_id})"
+                )
+                continue
+
+            gitlab_user_id = users[0].id
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch GitLab user ID for username '{gitlab_username}': {e}"
+            )
+            continue
+
+        # Add user to project
+        try:
+            project.members.create({
+                'user_id': gitlab_user_id,
+                'access_level': access_level
+            })
+            logger.info(
+                f"Added GitLab user '{gitlab_username}' (ID {gitlab_user_id}) "
+                f"to project {project.path_with_namespace} with access level {access_level}"
+            )
+        except GitlabCreateError as e:
+            # Check if already a member
+            if e.response_code == 409:
+                logger.info(
+                    f"User '{gitlab_username}' already member of project "
+                    f"{project.path_with_namespace} - ensuring access level"
+                )
+                try:
+                    existing_member = project.members.get(gitlab_user_id)
+                    if existing_member.access_level != access_level:
+                        existing_member.access_level = access_level
+                        existing_member.save()
+                        logger.info(
+                            f"Updated access level for '{gitlab_username}' to {access_level}"
+                        )
+                except Exception as update_error:
+                    logger.warning(
+                        f"Could not update member access level for '{gitlab_username}': {update_error}"
+                    )
+            else:
+                logger.warning(
+                    f"Could not add member '{gitlab_username}' (ID {gitlab_user_id}) "
+                    f"to project {project.path_with_namespace}: {e}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Unexpected error adding member '{gitlab_username}' to project: {e}"
+            )
 
 
 def get_gitlab_client(organization: Organization) -> Gitlab:
@@ -403,6 +457,7 @@ async def create_student_repository(
         gitlab = get_gitlab_client(organization)
         gitlab_config = get_course_gitlab_config(course, gitlab)
         gitlab_url = organization.properties.get('gitlab', {}).get('url')
+        provider_url = gitlab_url  # Provider URL for Account lookup
         
         # Get student-template project ID
         student_template_id = gitlab_config.get('template_project_id')
@@ -472,7 +527,8 @@ async def create_student_repository(
                     gitlab=gitlab,
                     project=forked_project,
                     member_ids=[course_member_id],
-                    db=db
+                    db=db,
+                    provider_url=provider_url
                 )
             except Exception as e:
                 logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
@@ -509,7 +565,8 @@ async def create_student_repository(
                 gitlab=gitlab,
                 project=forked_project,
                 member_ids=[course_member_id],
-                db=db
+                db=db,
+                provider_url=provider_url
             )
         
         # Prepare repository information
@@ -697,13 +754,14 @@ async def create_team_repository(
         # Unprotect branches
         gitlab_unprotect_branches(gitlab, team_project.id, "main")
         gitlab_unprotect_branches(gitlab, team_project.id, "master")
-        
+
         # Add team members as maintainers
         await add_members_to_project(
             gitlab=gitlab,
             project=team_project,
             member_ids=team_members,
-            db=db
+            db=db,
+            provider_url=gitlab_url
         )
                     
         # Get assignment directory from course content's example

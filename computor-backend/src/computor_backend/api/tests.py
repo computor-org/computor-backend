@@ -9,11 +9,12 @@ from fastapi import Depends, APIRouter
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException
+from computor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException, RateLimitException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.database import get_db
+from computor_backend.redis_cache import get_redis_client
 from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
@@ -39,11 +40,42 @@ logger = logging.getLogger(__name__)
 
 tests_router = APIRouter()
 
+
+async def check_user_rate_limit(user_id: str, cache) -> bool:
+    """
+    Check user_id-based rate limiting using Redis.
+    Returns True if limit exceeded, False otherwise.
+
+    Limit: 1 test request per 1 second per user
+    """
+    try:
+        rate_limit_key = f"rate_limit:user_id:{user_id}"
+        current_count = await cache.get(rate_limit_key)
+
+        if current_count is None:
+            # First attempt, set counter with 1 second expiry
+            await cache.set(rate_limit_key, "1", ex=1)
+            return False
+        else:
+            count = int(current_count)
+            if count >= 1:
+                # Rate limit exceeded
+                return True
+            else:
+                # Increment counter
+                await cache.incr(rate_limit_key)
+                return False
+    except Exception as e:
+        logger.error(f"Error checking user rate limit: {e}")
+        # On error, allow the request (fail open)
+        return False
+
 @tests_router.post("", response_model=ResultList)
 async def create_test_run(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ):
     """
     Create and execute a test for a submission artifact.
@@ -54,10 +86,29 @@ async def create_test_run(
     3. Provide submission_group_id only to test the latest submission
 
     Tests are executed via Temporal workflows.
+
+    Rate Limits (to prevent test abuse):
+    - 1 test request per 1 second per user
+
+    Returns 429 Too Many Requests if limit is exceeded.
     """
     from computor_backend.database import set_db_user
 
     user_id = permissions.get_user_id()
+
+    # Check user-based rate limit
+    user_limit_exceeded = await check_user_rate_limit(str(user_id), cache)
+    if user_limit_exceeded:
+        raise RateLimitException(
+            error_code="RATE_003",
+            detail=f"Too many test requests. Please wait before submitting another test.",
+            retry_after=1,
+            context={
+                "user_id": str(user_id),
+                "limit": 1,
+                "window_seconds": 1
+            }
+        )
 
     # Set user context for audit tracking
     set_db_user(db, user_id)
@@ -72,7 +123,10 @@ async def create_test_run(
         ).first()
 
         if not artifact:
-            raise NotFoundException(detail="Submission artifact not found")
+            raise NotFoundException(
+                error_code="SUBMIT_001",
+                detail="Submission artifact not found"
+            )
 
     elif test_create.submission_group_id:
         # Find artifact by submission group and optional version
@@ -85,6 +139,7 @@ async def create_test_run(
 
             if not artifact:
                 raise NotFoundException(
+                    error_code="SUBMIT_001",
                     detail=f"No artifact found for submission group {test_create.submission_group_id} "
                            f"with version {test_create.version_identifier}"
                 )
@@ -96,11 +151,13 @@ async def create_test_run(
 
             if not artifact:
                 raise NotFoundException(
+                    error_code="SUBMIT_001",
                     detail=f"No artifacts found for submission group {test_create.submission_group_id}. "
                            f"Student must submit first."
                 )
     else:
         raise BadRequestException(
+            error_code="SUBMIT_007",
             detail="Must provide either artifact_id or submission_group_id to identify what to test"
         )
 
@@ -112,7 +169,10 @@ async def create_test_run(
     ).first()
 
     if not submission_group:
-        raise NotFoundException(detail="Submission group not found or access denied")
+        raise NotFoundException(
+            error_code="SUBMIT_002",
+            detail="Submission group not found or access denied"
+        )
 
     # Get course member who is running the test
     course_member = db.query(CourseMember).filter(
@@ -121,7 +181,10 @@ async def create_test_run(
     ).first()
 
     if not course_member:
-        raise NotFoundException(detail="You are not a member of this course")
+        raise NotFoundException(
+            error_code="NF_003",
+            detail="You are not a member of this course"
+        )
 
     # Check for existing test results for this artifact by this member
     # Apply test limitation: prevent multiple successful tests
@@ -151,6 +214,7 @@ async def create_test_run(
         # If completed successfully, don't allow another test
         elif existing_test.status == 0:  # COMPLETED/FINISHED
             raise BadRequestException(
+                error_code="SUBMIT_008",
                 detail="You have already tested this artifact. "
                        "Multiple tests are not allowed unless the previous test crashed or was cancelled."
             )
@@ -163,6 +227,7 @@ async def create_test_run(
 
         if test_count >= submission_group.max_test_runs:
             raise BadRequestException(
+                error_code="SUBMIT_004",
                 detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
             )
 
@@ -172,7 +237,10 @@ async def create_test_run(
     ).first()
 
     if not course_content or not course_content.execution_backend_id:
-        raise BadRequestException(detail="Assignment or execution backend not configured")
+        raise BadRequestException(
+            error_code="SUBMIT_005",
+            detail="Assignment or execution backend not configured"
+        )
 
     # Get execution backend
     execution_backend = db.query(ExecutionBackend).filter(
@@ -180,7 +248,10 @@ async def create_test_run(
     ).first()
 
     if not execution_backend:
-        raise BadRequestException(detail="Execution backend not found")
+        raise BadRequestException(
+            error_code="SUBMIT_005",
+            detail="Execution backend not found"
+        )
 
     # Get course and organization for GitLab configuration
     course = db.query(Course).filter(Course.id == submission_group.course_id).first()
@@ -196,7 +267,10 @@ async def create_test_run(
     ).first()
 
     if not deployment or not deployment.deployment_path or not deployment.version_identifier:
-        raise BadRequestException(detail="Assignment not released: missing deployment information")
+        raise BadRequestException(
+            error_code="DEPLOY_001",
+            detail="Assignment not released: missing deployment information"
+        )
 
     # Build repository configurations
     submission_group_properties = submission_group.properties or {}
@@ -204,6 +278,7 @@ async def create_test_run(
 
     if not gitlab_config or not gitlab_config.get('full_path'):
         raise BadRequestException(
+            error_code="DEPLOY_003",
             detail="Student repository not configured. Please ensure repository has been created."
         )
 
@@ -216,7 +291,10 @@ async def create_test_run(
     )
 
     if not version_identifier:
-        raise BadRequestException(detail="Version identifier (commit) is required")
+        raise BadRequestException(
+            error_code="SUBMIT_006",
+            detail="Version identifier (commit) is required"
+        )
 
     # Build GitLab repository configurations
     provider = organization_properties.gitlab.url
@@ -250,6 +328,57 @@ async def create_test_run(
     # Generate workflow ID
     workflow_id = f"student-testing-{str(uuid.uuid4())}"
 
+    # Check for existing result with same (member, version, content)
+    # This prevents unique constraint violations from the partial index
+    existing_result = db.query(Result).filter(
+        Result.course_member_id == course_member.id,
+        Result.version_identifier == version_identifier,
+        Result.course_content_id == course_content.id,
+        Result.status.notin_([1, 2, 6])  # Not already FAILED(1), CANCELLED(2), or CRASHED(6)
+    ).first()
+
+    if existing_result:
+        # Check if the Temporal workflow is still actually running
+        workflow_still_running = False
+        if existing_result.test_system_id:
+            try:
+                task_executor = get_task_executor()
+                task_info = await task_executor.get_task_status(existing_result.test_system_id)
+
+                # Check if workflow is still running
+                if task_info.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                    workflow_still_running = True
+                    logger.info(f"Temporal workflow {existing_result.test_system_id} is still running, rejecting duplicate test")
+                else:
+                    # Workflow is done but Result status is stale - sync it
+                    logger.warning(f"Result {existing_result.id} has stale status {existing_result.status}, Temporal workflow is {task_info.status}")
+
+                    # Update Result status to match Temporal reality
+                    if task_info.status == TaskStatus.FINISHED:
+                        existing_result.status = 0  # FINISHED
+                    elif task_info.status == TaskStatus.FAILED:
+                        existing_result.status = 1  # FAILED
+                    elif task_info.status == TaskStatus.CANCELLED:
+                        existing_result.status = 2  # CANCELLED
+                    else:
+                        existing_result.status = 6  # CRASHED (unknown state)
+
+                    logger.info(f"Status synced from Temporal for Result {existing_result.id}: {task_info.status.value} -> status {existing_result.status}")
+                    db.commit()
+                    logger.info(f"Updated stale Result {existing_result.id} to status {existing_result.status}")
+            except Exception as e:
+                # Workflow doesn't exist in Temporal - mark as crashed
+                logger.warning(f"Temporal workflow {existing_result.test_system_id} not found, marking Result {existing_result.id} as CRASHED: {e}")
+                existing_result.status = 6  # CRASHED
+                db.commit()
+
+        # If workflow is still running, reject the duplicate test
+        if workflow_still_running:
+            raise BadRequestException(
+                error_code="SUBMIT_003",
+                detail=f"A test is already running for this version. Please wait for it to complete."
+            )
+
     # Create test result record
     result = Result(
         submission_artifact_id=artifact.id,
@@ -262,9 +391,7 @@ async def create_test_run(
         status=map_task_status_to_int(TaskStatus.QUEUED),
         grade=0.0,
         result=0,
-        result_json=None,
         properties=None,
-        log_text=None,
         version_identifier=version_identifier,
         reference_version_identifier=deployment.version_identifier,
     )
@@ -295,12 +422,15 @@ async def create_test_run(
             if submitted_id != workflow_id:
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
         else:
-            raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported")
+            raise BadRequestException(
+                error_code="TASK_003",
+                detail=f"Execution backend type '{execution_backend.type}' not supported. Expected type starting with 'temporal:', got '{execution_backend.type}'"
+            )
 
     except Exception as e:
         # If task submission fails, update result status to FAILED
+        logger.error(f"Task submission failed for Result {result.id}: {str(e)}")
         result.status = map_task_status_to_int(TaskStatus.FAILED)
-        result.properties = {**result.properties, "error": str(e)}
         db.commit()
         db.refresh(result)
         raise
@@ -338,7 +468,10 @@ async def get_test_status(
     ).first()
 
     if not result_data:
-        raise NotFoundException(detail="Test result not found")
+        raise NotFoundException(
+            error_code="NF_004",
+            detail="Test result not found"
+        )
 
     # Check permissions
     user_id = permissions.get_user_id()
@@ -361,7 +494,10 @@ async def get_test_status(
             ).first()
 
             if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to view this test result")
+                raise ForbiddenException(
+                    error_code="AUTHZ_003",
+                    detail="You don't have permission to view this test result"
+                )
 
     # If test has a workflow ID, check Temporal status for running tests
     status = result_data.status

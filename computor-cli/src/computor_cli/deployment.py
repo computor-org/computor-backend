@@ -47,7 +47,7 @@ from computor_types.example import (
     ExampleQuery,
 )
 from computor_types.course_contents import CourseContentCreate, CourseContentQuery
-from computor_types.course_content_types import CourseContentTypeQuery
+from computor_types.course_content_types import CourseContentTypeQuery, CourseContentTypeCreate
 from computor_types.course_content_kind import CourseContentKindQuery
 from computor_utils.vsix_utils import parse_vsix_metadata
 from computor_types.exceptions import VsixManifestError
@@ -469,10 +469,56 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
             click.echo(f"    ❌ Failed to deploy backend {backend_config.slug}: {e}")
 
 
+def _deploy_course_content_types(course_id: str, content_types_config: list, auth: CLIAuthConfig):
+    """Deploy course content types for a course via API."""
+    if not content_types_config:
+        return
+
+    client = run_async(get_computor_client(auth))
+    content_type_client = client.course_content_types
+
+    created_count = 0
+    existing_count = 0
+
+    for content_type_config in content_types_config:
+        try:
+            # Check if content type already exists
+            existing_types = run_async(content_type_client.list(CourseContentTypeQuery(
+                course_id=course_id,
+                slug=content_type_config.get("slug")
+            )))
+
+            if existing_types:
+                click.echo(f"    ℹ️  Content type already exists: {content_type_config.get('slug')}")
+                existing_count += 1
+                continue
+
+            # Create new content type
+            content_type_create = CourseContentTypeCreate(
+                slug=content_type_config.get("slug"),
+                title=content_type_config.get("title"),
+                description=content_type_config.get("description"),
+                color=content_type_config.get("color", "green"),
+                properties=content_type_config.get("properties", {}),
+                course_id=course_id,
+                course_content_kind_id=content_type_config.get("kind", content_type_config.get("course_content_kind_id"))
+            )
+
+            run_async(content_type_client.create(content_type_create))
+            click.echo(f"    ✅ Created content type: {content_type_config.get('slug')}")
+            created_count += 1
+
+        except Exception as e:
+            click.echo(f"    ❌ Failed to create content type {content_type_config.get('slug')}: {e}")
+
+    if created_count > 0 or existing_count > 0:
+        click.echo(f"    📊 Content types: {created_count} created, {existing_count} existing")
+
+
 def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseConfig, auth: CLIAuthConfig, parent_path: str = None, position_counter: list = None):
     """Deploy course contents for a course."""
-    
-    
+
+
     client = run_async(get_computor_client(auth))
 
     if not course_config.contents:
@@ -918,7 +964,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                 course = courses[0]
                 
                 click.echo(f"  Course: {course_config.name} ({course_config.path})")
-                
+
                 # Link execution backends to this course
                 if course_config.execution_backends:
                     _link_execution_backends_to_course(
@@ -926,7 +972,12 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                         course_config.execution_backends,
                         auth
                     )
-                
+
+                # Deploy course content types first (must exist before creating contents)
+                if course_config.content_types:
+                    click.echo(f"\n📋 Creating course content types for {course_config.name}...")
+                    _deploy_course_content_types(str(course.id), course_config.content_types, auth)
+
                 # Deploy course contents
                 if course_config.contents:
                     click.echo(f"\n📚 Creating course contents for {course_config.name}...")
@@ -1407,75 +1458,84 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         click.echo(f"\n🔼 Preparing example uploads from: {resolved_path}")
         _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, client)
 
-    if not config.organizations:
-        click.echo("\nℹ️ No hierarchy defined in configuration; skipping deployment API call.")
+    # Check if there's anything to deploy
+    if not config.organizations and not config.users:
+        click.echo("\nℹ️ No hierarchy or users defined in configuration; nothing to deploy.")
         return
 
-    # Deploy using API endpoint
-    click.echo(f"\nStarting deployment via API...")
-    
-    payload = {
-        "deployment_config": config.model_dump(),
-        "validate_only": False
-    }
-    
-    try:
-        # Send deployment request
-        result = custom_client.create("system/hierarchy/create", payload)
-        
-        if result:
-            click.echo(f"✅ Deployment workflow started!")
-            click.echo(f"  Workflow ID: {result.get('workflow_id')}")
-            click.echo(f"  Status: {result.get('status')}")
-            click.echo(f"  Path: {result.get('deployment_path')}")
-            
-            if wait and result.get('workflow_id'):
-                # Poll for status
-                click.echo("\nWaiting for deployment to complete...")
-                import time
-                workflow_id = result.get('workflow_id')
-                
-                for _ in range(60):  # Wait up to 5 minutes
-                    time.sleep(5)
-                    try:
-                        status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
-                        if status_data.get('status') == 'completed':
-                            click.echo("\n✅ Deployment completed successfully!")
-                            
-                            # Link execution backends to courses and create contents
-                            _link_backends_to_deployed_courses(config, auth, True)
-                            
-                            # Deploy users if configured
-                            if config.users:
-                                click.echo(f"\n📥 Creating {len(config.users)} users...")
-                                _deploy_users(config, auth)
+    # Deploy hierarchy if it exists
+    if config.organizations:
+        # Deploy using API endpoint
+        click.echo(f"\nStarting hierarchy deployment via API...")
+
+        payload = {
+            "deployment_config": config.model_dump(),
+            "validate_only": False
+        }
+
+        try:
+            # Send deployment request
+            result = custom_client.create("system/hierarchy/create", payload)
+
+            if result:
+                click.echo(f"✅ Deployment workflow started!")
+                click.echo(f"  Workflow ID: {result.get('workflow_id')}")
+                click.echo(f"  Status: {result.get('status')}")
+                click.echo(f"  Path: {result.get('deployment_path')}")
+
+                if wait and result.get('workflow_id'):
+                    # Poll for status
+                    click.echo("\nWaiting for deployment to complete...")
+                    import time
+                    workflow_id = result.get('workflow_id')
+
+                    for _ in range(60):  # Wait up to 5 minutes
+                        time.sleep(5)
+                        try:
+                            status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
+                            if status_data.get('status') == 'completed':
+                                click.echo("\n✅ Deployment completed successfully!")
+
+                                # Link execution backends to courses and create contents
+                                _link_backends_to_deployed_courses(config, auth, True)
+
+                                # Deploy users if configured
+                                if config.users:
+                                    click.echo(f"\n📥 Creating {len(config.users)} users...")
+                                    _deploy_users(config, auth)
+                                break
+                            elif status_data.get('status') == 'failed':
+                                click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
+                                sys.exit(1)
+                            click.echo(".", nl=False)
+                        except Exception as e:
+                            click.echo(f"\n⚠️  Error checking status: {e}")
                             break
-                        elif status_data.get('status') == 'failed':
-                            click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
-                            sys.exit(1)
-                        click.echo(".", nl=False)
-                    except Exception as e:
-                        click.echo(f"\n⚠️  Error checking status: {e}")
-                        break
-                else:
-                    click.echo("\n⚠️  Deployment is still running. Check status later.")
-            
-            # If not waiting but deployment started, try to continue with remaining tasks
-            if not wait:
-                click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
-                # Try to link backends and create contents (might fail if hierarchy not ready)
-                _link_backends_to_deployed_courses(config, auth, True)
-                
-                if config.users:
-                    click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
-                    _deploy_users(config, auth)
-        else:
-            click.echo("❌ Failed to start deployment", err=True)
+                    else:
+                        click.echo("\n⚠️  Deployment is still running. Check status later.")
+
+                # If not waiting but deployment started, try to continue with remaining tasks
+                if not wait:
+                    click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
+                    # Try to link backends and create contents (might fail if hierarchy not ready)
+                    _link_backends_to_deployed_courses(config, auth, True)
+
+                    if config.users:
+                        click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
+                        _deploy_users(config, auth)
+            else:
+                click.echo("❌ Failed to start deployment", err=True)
+                sys.exit(1)
+
+        except Exception as e:
+            click.echo(f"❌ Error during deployment: {e}", err=True)
             sys.exit(1)
-            
-    except Exception as e:
-        click.echo(f"❌ Error during deployment: {e}", err=True)
-        sys.exit(1)
+    else:
+        # No hierarchy deployment - just deploy users if they exist
+        if config.users:
+            click.echo(f"\n📥 Deploying {len(config.users)} users (no hierarchy deployment)...")
+            _deploy_users(config, auth)
+            click.echo("✅ User deployment completed!")
 
 
 @deployment.command()

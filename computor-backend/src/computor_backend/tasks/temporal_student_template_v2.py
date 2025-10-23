@@ -745,20 +745,32 @@ async def generate_student_template_activity_v2(
                         # Skip non-assigned items (e.g., container units)
                         logger.info(f"Skipping {content.path}: no deployment assigned")
                         continue
-                    
-                    # Ensure deployment path exists
-                    if not content.deployment.deployment_path:
-                        # Try to derive from assigned example identifier
-                        ev = content.deployment.example_version
-                        if ev and ev.example and ev.example.identifier:
-                            content.deployment.deployment_path = str(ev.example.identifier)
-                            logger.info(f"Derived deployment path for {content.path} -> {content.deployment.deployment_path}")
-                        elif getattr(content.deployment, 'example_identifier', None):
-                            content.deployment.deployment_path = str(content.deployment.example_identifier)
-                            logger.info(f"Derived deployment path from source identifier for {content.path} -> {content.deployment.deployment_path}")
+
+                    # Get deployment path - use deployment_path if set, otherwise fall back to example_identifier
+                    directory_name = content.deployment.deployment_path
+                    if not directory_name:
+                        if content.deployment.example_identifier:
+                            # Use example_identifier as-is for the directory name
+                            directory_name = str(content.deployment.example_identifier)
+                            # Save it to deployment_path so it's persisted in the database
+                            content.deployment.deployment_path = directory_name
+                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
                         else:
-                            logger.error(f"Deployment path not set for {content.path}")
-                            errors.append(f"Deployment path not set for {content.path}")
+                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
+                            logger.error(error_msg)
+                            errors.append(error_msg)
+
+                            # Mark deployment as failed
+                            if content.deployment.deployment_status == "deploying":
+                                content.deployment.deployment_status = "failed"
+                                content.deployment.deployment_message = "deployment_path not set"
+                                history = DeploymentHistory(
+                                    deployment_id=content.deployment.id,
+                                    action="failed",
+                                    example_version_id=content.deployment.example_version_id,
+                                    workflow_id=workflow_id,
+                                )
+                                db.add(history)
                             continue
 
                     # Resolve commit to use for this content
@@ -795,7 +807,7 @@ async def generate_student_template_activity_v2(
                     if not content.execution_backend_id:
                         try:
                             commit_obj = assignments_repo.commit(commit_to_use)
-                            meta_blob = commit_obj.tree / content.deployment.deployment_path / 'meta.yaml'
+                            meta_blob = commit_obj.tree / directory_name / 'meta.yaml'
                             meta_yaml_bytes = meta_blob.data_stream.read()
                             import yaml
                             meta_data = yaml.safe_load(meta_yaml_bytes) if meta_yaml_bytes else None
@@ -817,10 +829,10 @@ async def generate_student_template_activity_v2(
                     if commit_to_use:
                         try:
                             commit_obj = assignments_repo.commit(commit_to_use)
-                            sub_tree = commit_obj.tree / content.deployment.deployment_path
+                            sub_tree = commit_obj.tree / directory_name
                             for item in sub_tree.traverse():
                                 if item.type == 'blob':
-                                    rel_path = os.path.relpath(item.path, content.deployment.deployment_path)
+                                    rel_path = os.path.relpath(item.path, directory_name)
                                     files[rel_path] = item.data_stream.read()
                         except Exception as e:
                             logger.warning(f"Failed to load files from assignments for {content.path}: {e}")
@@ -846,7 +858,7 @@ async def generate_student_template_activity_v2(
                     
                     # Determine target directory in student template
                     # Use the example identifier as directory name for better organization
-                    target_dir = str(content.deployment.deployment_path)
+                    target_dir = str(directory_name)
                     full_target_path = os.path.join(template_repo_path, target_dir)
                     
                     # Process the example files for student template
@@ -896,66 +908,81 @@ async def generate_student_template_activity_v2(
             # Don't commit yet - wait until after git operations
             
             # Generate main README.md with assignment structure
-            if processed_count > 0:
+            # IMPORTANT: Show ALL deployed assignments in the repository, not just newly released ones
+            if processed_count > 0 or True:  # Always generate README, even if no new assignments
                 main_readme_path = os.path.join(template_repo_path, "README.md")
+
+                # Fetch ALL course contents with DEPLOYED status to show current repository state
+                all_deployed_contents = db.query(CourseContent).options(
+                    joinedload(CourseContent.deployment)
+                        .joinedload(CourseContentDeployment.example_version)
+                        .joinedload(ExampleVersion.example)
+                ).filter(
+                    CourseContent.course_id == course_id,
+                    CourseContent.archived_at.is_(None),
+                    CourseContent.deployment.has(CourseContentDeployment.deployment_status == 'deployed')
+                ).order_by(CourseContent.path).all()
+
+                logger.info(f"Found {len(all_deployed_contents)} deployed assignments for README generation")
+
                 with open(main_readme_path, 'w') as f:
                     f.write(f"# {course.title} - Student Template\n\n")
-                    f.write(f"This repository contains {processed_count} assignments for {course.title}.\n\n")
-                    
+                    f.write(f"This repository contains {len(all_deployed_contents)} assignments for {course.title}.\n\n")
+
                     # Generate assignment structure table
-                    if successfully_processed:
+                    if all_deployed_contents:
                         f.write(f"## Assignment Structure\n\n")
                         f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
                         f.write(f"|-------------|---------------------|-------|----------|\n")
-                        
-                        # Sort by course content path for better organization
-                        sorted_contents = sorted(successfully_processed, key=lambda x: str(x.path))
-                        
+
                         # Fetch all course contents to build complete path hierarchy
                         all_contents = db.query(CourseContent).filter(
                             CourseContent.course_id == course_id,
                             CourseContent.archived_at.is_(None)
                         ).all()
-                        
+
                         # Build a complete map of paths to titles
                         path_to_title = {}
                         for content in all_contents:
                             path_to_title[str(content.path)] = content.title
-                        
-                        for content in sorted_contents:
+
+                        for content in all_deployed_contents:
                             if content.deployment and content.deployment.example_version:
                                 example = content.deployment.example_version.example
                                 version = content.deployment.example_version.version_tag
-                                
+
                                 # Build title path with "/" separation
                                 path_parts = str(content.path).split('.')
                                 title_parts = []
-                                
+
                                 # Build up the path progressively to find each part's title
                                 for i, part in enumerate(path_parts):
                                     # Reconstruct path up to this part
                                     current_path = '.'.join(path_parts[:i+1])
-                                    
+
                                     # Try to find title for this path segment
                                     if current_path in path_to_title:
                                         title_parts.append(path_to_title[current_path])
                                     else:
                                         # If we can't find the title, use the path segment as fallback
                                         title_parts.append(part)
-                                
+
                                 # Join with " / " as requested
                                 title_path = " / ".join(title_parts)
-                                
+
                                 f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
-                    
+                    else:
+                        f.write(f"*No assignments deployed yet.*\n\n")
+
                     f.write(f"\n## Instructions\n\n")
                     f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
                     f.write(f"## Submission\n\n")
                     f.write(f"Follow your course submission guidelines for each assignment.\n\n")
                     f.write(f"---\n")
+                    f.write(f"*Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*\n")
                     f.write(f"*Generated by Computor Example Library*\n")
-                
-                logger.info("Generated main README.md with assignment structure")
+
+                logger.info(f"Generated main README.md with {len(all_deployed_contents)} deployed assignments (current state)")
             
             # If we processed any content, commit and push to Git
             git_push_successful = False

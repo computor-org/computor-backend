@@ -69,8 +69,10 @@ class ResultStudentList(BaseModel):
     version_identifier: Optional[str] = None
     status: Optional[TaskStatus] = None
     result: Optional[float] = None
-    result_json: Optional[dict] = None
     submit: Optional[bool] = None
+
+class ResultStudentGet(ResultStudentList):
+    result_json: Optional[dict] = None
 
 class CourseContentStudentProperties(BaseModel):
     gitlab: Optional[GitLabConfigGet] = None
@@ -96,7 +98,7 @@ class CourseContentStudentGet(BaseEntityGet):
     submission_count: int
     max_test_runs: Optional[int] = None
     unread_message_count: int = 0
-    result: Optional[ResultStudentList] = None
+    result: Optional[ResultStudentGet] = None
     directory: Optional[str] = None
     color: str
     submission_group: Optional[SubmissionGroupStudentGet] = None

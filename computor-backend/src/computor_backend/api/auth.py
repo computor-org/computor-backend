@@ -13,17 +13,20 @@ import secrets
 from typing import List, Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
-    NotFoundException
+    NotFoundException,
+    RateLimitException
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
@@ -45,13 +48,48 @@ from computor_types.auth import (
 
 logger = logging.getLogger(__name__)
 
+# Initialize rate limiter for this router
+limiter = Limiter(key_func=get_remote_address)
+
 auth_router = APIRouter(prefix="/auth")
 
 
+async def check_username_rate_limit(username: str, cache) -> bool:
+    """
+    Check username-based rate limiting using Redis.
+    Returns True if limit exceeded, False otherwise.
+    """
+    try:
+        rate_limit_key = f"rate_limit:username:{username}"
+        current_count = await cache.get(rate_limit_key)
+
+        if current_count is None:
+            # First attempt, set counter with 60 second expiry
+            await cache.set(rate_limit_key, "1", ex=60)
+            return False
+        else:
+            count = int(current_count)
+            if count >= 5:
+                # Rate limit exceeded
+                return True
+            else:
+                # Increment counter
+                await cache.incr(rate_limit_key)
+                return False
+    except Exception as e:
+        logger.error(f"Error checking username rate limit: {e}")
+        # On error, allow the request (fail open)
+        return False
+
+
 @auth_router.post("/login", response_model=LocalLoginResponse)
+@limiter.limit("100/minute")  # IP-based: 100 attempts per minute per IP (for shared networks)
 async def login_with_credentials(
-    request: LocalLoginRequest,
-    db: Session = Depends(get_db)
+    login_request: LocalLoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LocalLoginResponse:
     """
     Login with username and password to obtain Bearer tokens.
@@ -61,14 +99,66 @@ async def login_with_credentials(
 
     The access token should be included in the Authorization header as:
     `Authorization: Bearer <access_token>`
-    """
-    from computor_backend.business_logic.auth import login_with_local_credentials
 
-    return await login_with_local_credentials(
-        username=request.username,
-        password=request.password,
-        db=db
+    Alternatively, the access token is also set as an httponly cookie for
+    browser-based applications.
+
+    Rate Limits (to prevent brute-force attacks):
+    - 100 attempts per minute per IP address (allows multiple users on same network)
+    - 5 attempts per minute per username (prevents account takeover)
+
+    Returns 429 Too Many Requests if either limit is exceeded.
+    """
+    # Check username-based rate limit
+    username_limit_exceeded = await check_username_rate_limit(login_request.username, cache)
+    if username_limit_exceeded:
+        raise RateLimitException(
+            error_code="RATE_002",
+            detail=f"Too many login attempts for username '{login_request.username}'",
+            retry_after=60,
+            context={
+                "username": login_request.username,
+                "limit": 5,
+                "window_seconds": 60
+            }
+        )
+    from computor_backend.business_logic.auth import login_with_local_credentials
+    from computor_backend.utils.client_info import get_client_ip, get_user_agent
+
+    # Extract client information
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    result = await login_with_local_credentials(
+        username=login_request.username,
+        password=login_request.password,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        db=db,
+        cache=cache
     )
+
+    # Set access token as httponly cookie
+    response.set_cookie(
+        key="access_token",
+        value=result.access_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=3600  # 1 hour - should match token expiry
+    )
+
+    # Also set refresh token as httponly cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=result.refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=604800  # 7 days - should match refresh token expiry
+    )
+
+    return result
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers() -> List[ProviderInfo]:
@@ -244,8 +334,10 @@ async def sso_success():
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
     request: Request,
+    response: Response,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LogoutResponse:
     """
     Logout from current session.
@@ -255,21 +347,32 @@ async def logout(
     - SSO authentication (provider tokens)
 
     The Bearer token from the Authorization header will be invalidated.
+    Cookies will also be cleared.
     """
     from computor_backend.business_logic.auth import logout_session
 
-    # Extract token from Authorization header
+    # Extract token from Authorization header or cookie
     authorization = request.headers.get("Authorization")
     current_token = None
 
     if authorization and authorization.startswith("Bearer "):
         current_token = authorization.replace("Bearer ", "")
+    else:
+        # Try to get from cookie
+        current_token = request.cookies.get("access_token")
 
-    return await logout_session(
+    result = await logout_session(
         access_token=current_token,
         principal=principal,
-        db=db
+        db=db,
+        cache=cache
     )
+
+    # Clear cookies
+    response.delete_cookie(key="access_token", samesite="lax")
+    response.delete_cookie(key="refresh_token", samesite="lax")
+
+    return result
 
 @auth_router.get("/admin/plugins", dependencies=[Depends(get_current_principal)])
 async def list_all_plugins(principal: Principal = Depends(get_current_principal)) -> dict:
@@ -385,8 +488,8 @@ async def register_user(
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
-    principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client)
 ) -> LocalTokenRefreshResponse:
     """
     Refresh local access token using refresh token.
@@ -395,14 +498,16 @@ async def refresh_local_token(
     (username/password) authentication using the refresh token obtained
     during initial login.
 
-    Requires authentication to ensure only the token owner can refresh it.
+    Authentication is not required for this endpoint since the access token
+    may be expired. The refresh token itself is validated to ensure security.
     """
     from computor_backend.business_logic.auth import refresh_local_token
 
     return await refresh_local_token(
         refresh_token=request.refresh_token,
-        principal=principal,
-        db=db
+        principal=None,  # Don't require authentication - refresh token is sufficient
+        db=db,
+        cache=cache
     )
 
 @auth_router.post("/refresh", response_model=TokenRefreshResponse)

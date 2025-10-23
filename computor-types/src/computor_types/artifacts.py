@@ -48,6 +48,7 @@ class SubmissionArtifactList(BaseEntityList):
     object_key: str
     uploaded_at: datetime
     version_identifier: Optional[str] = None
+    submit: bool = False  # Whether this is an official submission
     properties: Optional[dict[str, Any]] = None  # Additional metadata
     latest_result: Optional['ResultList'] = None  # Latest successful result (status=0)
 
@@ -67,19 +68,8 @@ class SubmissionArtifactQuery(ListQuery):
     submission_group_id: Optional[str] = None
     uploaded_by_course_member_id: Optional[str] = None
     content_type: Optional[str] = None
-
-def submission_artifact_search(db: 'Session', query, params: SubmissionArtifactQuery):
-    """Apply filters for submission artifact listings."""
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.submission_group_id is not None:
-        query = query.filter(submission_group_id == params.submission_group_id)
-    if params.uploaded_by_course_member_id is not None:
-        query = query.filter(uploaded_by_course_member_id == params.uploaded_by_course_member_id)
-    if params.content_type is not None:
-        query = query.filter(content_type == params.content_type)
-
-    return query.order_by(SubmissionArtifact.uploaded_at.desc())
+    version_identifier: Optional[str] = None  # Filter by version (e.g., "v1.0.0", "commit-abc123")
+    submit: Optional[bool] = None  # Filter by official submissions (True) or test runs (False)
 
 class SubmissionArtifactInterface(EntityInterface):
     """Entity interface for submission artifacts."""
@@ -137,19 +127,6 @@ class SubmissionGradeQuery(ListQuery):
     graded_by_course_member_id: Optional[str] = None
     status: Optional[GradingStatus] = None
 
-def submission_grade_search(db: 'Session', query, params: SubmissionGradeQuery):
-    """Apply filters for submission grade listings."""
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.artifact_id is not None:
-        query = query.filter(artifact_id == params.artifact_id)
-    if params.graded_by_course_member_id is not None:
-        query = query.filter(graded_by_course_member_id == params.graded_by_course_member_id)
-    if params.status is not None:
-        query = query.filter(status == params.status.value)
-
-    return query.order_by(SubmissionGrade.graded_at.desc())
-
 class SubmissionGradeInterface(EntityInterface):
     """Entity interface for submission grades."""
     list = SubmissionGradeListItem
@@ -196,19 +173,6 @@ class SubmissionReviewQuery(ListQuery):
     reviewer_course_member_id: Optional[str] = None
     review_type: Optional[str] = None
 
-def submission_review_search(db: 'Session', query, params: SubmissionReviewQuery):
-    """Apply filters for submission review listings."""
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.artifact_id is not None:
-        query = query.filter(artifact_id == params.artifact_id)
-    if params.reviewer_course_member_id is not None:
-        query = query.filter(reviewer_course_member_id == params.reviewer_course_member_id)
-    if params.review_type is not None:
-        query = query.filter(review_type == params.review_type)
-
-    return query.order_by(SubmissionReview.created_at.desc())
-
 class SubmissionReviewInterface(EntityInterface):
     """Entity interface for submission reviews."""
     list = SubmissionReviewListItem
@@ -248,17 +212,6 @@ class ResultArtifactQuery(ListQuery):
     id: Optional[str] = None
     result_id: Optional[str] = None
     content_type: Optional[str] = None
-
-def result_artifact_search(db: 'Session', query, params: ResultArtifactQuery):
-    """Apply filters for result artifact listings."""
-    if params.id is not None:
-        query = query.filter(id == params.id)
-    if params.result_id is not None:
-        query = query.filter(result_id == params.result_id)
-    if params.content_type is not None:
-        query = query.filter(content_type == params.content_type)
-
-    return query.order_by(ResultArtifact.created_at.desc())
 
 class ResultArtifactInterface(EntityInterface):
     """Entity interface for result artifacts."""

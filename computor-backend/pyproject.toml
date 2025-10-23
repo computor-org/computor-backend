@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "computor-backend"
+version = "0.1.0"
+description = "Backend API and services for Computor platform"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Computor Team", email = "team@computor.dev"}
+]
+keywords = ["computor", "backend", "api", "fastapi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    # Note: computor-types and computor-utils must be installed separately
+    # as they are local packages not on PyPI
+
+    # External dependencies
+    "openpyxl==3.1.2",
+    "python-gitlab==5.0.0",
+    "pydantic==2.11.0",
+    "pydantic_yaml==1.2.1",
+    "PyYAML==6.0.1",
+    "email-validator==2.1.0",
+    "lz4==4.3.2",
+    "numpy==1.26.2",
+    "pandas==2.1.3",
+    "text-unidecode==1.3",
+    "docker==6.1.3",
+    "junit-xml==1.9",
+    "psycopg2-binary==2.9.9",
+    "keycove==0.3.5",
+    "fastapi==0.109.0",
+    "sqlalchemy_utils==0.41.2",
+    "click==8.1.7",
+    "alive-progress==3.2.0",
+    "gitpython==3.1.43",
+    "aiocache[redis]==0.12.3",
+    "SQLAlchemy==1.4.54",
+    "minio==7.2.5",
+    "alembic==1.15.1",
+    "Faker==37.1.0",
+    "dotenv==0.9.9",
+    "pytest==8.3.4",
+    "pytest-env==1.1.5",
+    "pytest-asyncio==0.25.0",
+    "temporalio==1.5.1",
+    "httpx==0.27.0",
+    "python-jose[cryptography]==3.3.0",
+    "python-multipart==0.0.9",
+    "Pyro5==5.15",
+    "uvicorn==0.35.0",
+    "slowapi==0.1.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "mypy>=1.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/computor/computor-backend"
+Documentation = "https://docs.computor.dev/backend"
+Repository = "https://github.com/computor/computor-backend"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

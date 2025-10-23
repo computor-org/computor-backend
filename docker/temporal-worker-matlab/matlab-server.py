@@ -17,23 +17,23 @@ class MatlabServer(object):
     @staticmethod
     def ENGINE_NAME():
       return "engine_1"
-    
+
     @staticmethod
     def PYRO_OBJECT_ID():
       return "matlab_server"
-  
+
     @staticmethod
     def commit(value: dict):
       return json.dumps(value)
-    
+
     @staticmethod
     def raise_exception(e: Exception, msg: str = "Internal Server Error"):
       return MatlabServer.commit({'details': {"exception": {"message": msg,"trace": str(e)}}})
-  
+
     engine: matlab.engine = None
     server_thread: Thread
     testing_environment_path: str
-    
+
     def __init__(self,  worker_path: str):
       self.testing_environment_path = worker_path
       self.connect()
@@ -90,11 +90,11 @@ class MatlabServer(object):
 
         try:
           command = f"CodeAbilityTestSuite('{test_file}','{spec_file}')"
-          
+
           try:
             lscmd = self.engine.evalc(command)
             return MatlabServer.commit({ "details": lscmd})
-          
+
           except Exception as ei:
             print("Failed! Commit error message...")
             return MatlabServer.raise_exception(ei, f"command failed: {command}")
@@ -110,7 +110,7 @@ class MatlabServer(object):
             uri = daemon.register(self, objectId=MatlabServer.PYRO_OBJECT_ID())
             print("Server started, uri: %s" % uri)
             daemon.requestLoop()
-            
+
     def start_thread(self):
         server_thread = Thread(target=self.rpc_server)
         server_thread.daemon = True
@@ -127,9 +127,9 @@ if __name__ == '__main__':
     if MATLAB_TEST_ENGINE_TOKEN is None:
        print("No test repository token available. Please assign environment variable MATLAB_TEST_ENGINE_TOKEN to matlab worker!")
        sys.exit(2)
-       
+
     worker_path = os.path.join(os.path.expanduser("~"), "test-engine")
-      
+
     try:
       print(Repository(url=MATLAB_TEST_ENGINE_URL,token=MATLAB_TEST_ENGINE_TOKEN,branch=MATLAB_TEST_ENGINE_VERSION).clone_or_fetch(worker_path))
     except Exception as e:
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     MATLAB = MatlabServer(worker_path=worker_path)
 
     MATLAB.start_thread()
-    
+
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-matlab
     args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''

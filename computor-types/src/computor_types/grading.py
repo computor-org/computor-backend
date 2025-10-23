@@ -97,27 +97,6 @@ class SubmissionGroupGradingQuery(ListQuery):
     
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
-def grading_search(db: 'Session', query, params: Optional[SubmissionGroupGradingQuery]):
-    """Search function for gradings.
-
-    TODO: Migrate to use SubmissionGrade from artifact model
-    """
-    # Temporarily disabled - needs migration to new artifact-based system
-    return query.filter(False)  # Return empty result
-
-    # Original code commented out:
-    # query = query.options(
-    #     joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.user),
-    #     joinedload(SubmissionGroupGrading.graded_by).joinedload(CourseMember.course_role),
-    # )
-    # if params.id is not None:
-    #     query = query.filter(id == params.id)
-    # Commented out rest of function - needs migration
-    # if params.submission_group_id is not None:
-    #     query = query.filter(submission_group_id == params.submission_group_id)
-    # ... rest of filters
-    # return query
-
 # TODO: Migrate this interface to use SubmissionGrade from artifact model
 class SubmissionGroupGradingInterface(EntityInterface):
     create = SubmissionGroupGradingCreate

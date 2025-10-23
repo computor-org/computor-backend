@@ -3,12 +3,18 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from typing import Annotated, Optional, List, Dict, Any
-from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile, HTTPException, status
+from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile, status
 from datetime import datetime, timezone
 import logging
 
 from computor_backend.business_logic.crud import get_entity_by_id as get_id_db
-from computor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
+from computor_backend.exceptions import (
+    BadRequestException,
+    NotFoundException,
+    NotImplementedException,
+    ForbiddenException,
+    InternalServerException
+)
 from computor_backend.api.filesystem import mirror_entity_to_filesystem
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_admin, check_course_permissions, get_permitted_course_ids
@@ -30,6 +36,7 @@ from computor_types.system import (
     BulkAssignExamplesRequest,
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
+from computor_types.lecturer_deployments import ReleaseValidationError
 from computor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization  
 from computor_backend.model.auth import User, StudentProfile
@@ -37,6 +44,10 @@ from computor_backend.model.example import Example
 from computor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from computor_backend.tasks import get_task_executor, TaskSubmission
+from computor_backend.business_logic.release_validation import (
+    validate_course_for_release,
+    validate_course_contents_for_release
+)
 
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -785,17 +796,18 @@ async def generate_student_template(
     """
     # Check permissions
     if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to generate template for this course"
+        raise ForbiddenException(
+            detail="Not authorized to generate template for this course",
+            context={"course_id": str(course_id)}
         )
-    
+
     # Verify course exists
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Course {course_id} not found"
+        raise NotFoundException(
+            error_code="NF_003",
+            detail="Course not found",
+            context={"course_id": str(course_id)}
         )
     
     # Get student-template and assignments URLs
@@ -812,34 +824,44 @@ async def generate_student_template(
         if "assignments_url" in course_gitlab:
             assignments_url = course_gitlab["assignments_url"]
         
-        # Option 2: Construct from course's full_path  
+        # Option 2: Construct from course's full_path
         if "full_path" in course_gitlab and (not student_template_url or not assignments_url):
             # Get GitLab URL from organization
             if not course.course_family_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Course missing course family reference"
+                raise BadRequestException(
+                    error_code="VAL_001",
+                    detail="Course missing course family reference",
+                    context={"course_id": str(course_id)}
                 )
-            
+
             family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
             if not family or not family.organization_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Course family or organization not found"
+                raise BadRequestException(
+                    error_code="VAL_001",
+                    detail="Course family or organization not found",
+                    context={
+                        "course_id": str(course_id),
+                        "course_family_id": str(course.course_family_id)
+                    }
                 )
-            
+
             org = db.query(Organization).filter(Organization.id == family.organization_id).first()
             if not org or not org.properties or "gitlab" not in org.properties:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Organization missing GitLab configuration"
+                raise BadRequestException(
+                    error_code="DEPLOY_003",
+                    detail="Organization missing GitLab configuration",
+                    context={
+                        "organization_id": str(family.organization_id),
+                        "course_id": str(course_id)
+                    }
                 )
-            
+
             gitlab_url = org.properties["gitlab"].get("url")
             if not gitlab_url:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Organization missing GitLab URL"
+                raise BadRequestException(
+                    error_code="DEPLOY_003",
+                    detail="Organization missing GitLab URL",
+                    context={"organization_id": str(org.id)}
                 )
             
             # Construct URLs: {gitlab_url}/{course_full_path}/student-template and assignments
@@ -849,11 +871,55 @@ async def generate_student_template(
                 assignments_url = f"{gitlab_url}/{course_gitlab['full_path']}/assignments"
     
     if not student_template_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
+        raise BadRequestException(
+            error_code="DEPLOY_003",
+            detail="Unable to determine student-template repository URL",
+            context={
+                "course_id": str(course_id),
+                "required_fields": ["student_template_url", "full_path"]
+            }
         )
     
+    # PRE-FLIGHT VALIDATION: Check that selected assignments have valid examples
+    # Extract selection parameters from release if available
+    course_content_ids = None
+    parent_id = None
+    include_descendants = True
+    all_flag = False
+
+    if request.release:
+        course_content_ids = request.release.course_content_ids
+        parent_id = request.release.parent_id
+        include_descendants = request.release.include_descendants if hasattr(request.release, 'include_descendants') else True
+        all_flag = getattr(request.release, 'all', False)
+
+    is_valid, validation_errors = validate_course_for_release(
+        course_id=course_id,
+        db=db,
+        force_redeploy=request.force_redeploy,
+        course_content_ids=course_content_ids,
+        parent_id=parent_id,
+        include_descendants=include_descendants,
+        all_flag=all_flag
+    )
+
+    if not is_valid:
+        logger.error(
+            f"Release validation failed for course {course_id}: "
+            f"{len(validation_errors)} issues found"
+        )
+        raise BadRequestException(
+            error_code="VAL_001",
+            detail="Cannot release course: Some assignments are missing examples or have invalid deployments",
+            context={
+                "course_id": str(course_id),
+                "validation_errors": validation_errors,
+                "total_issues": len(validation_errors)
+            }
+        )
+
+    logger.info(f"Pre-flight validation passed for course {course_id}")
+
     # Count contents to process - check for deployments instead of example_id
     from computor_backend.model.deployment import CourseContentDeployment
 
@@ -866,7 +932,7 @@ async def generate_student_template(
             )
         )
     ).scalar()
-    
+
     # Use Temporal task executor
     task_executor = get_task_executor()
     
@@ -920,12 +986,19 @@ async def generate_assignments(
 ):
     # Permissions
     if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise ForbiddenException(
+            detail="Not authorized to generate assignments",
+            context={"course_id": str(course_id)}
+        )
 
     # Verify course exists
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Course {course_id} not found")
+        raise NotFoundException(
+            error_code="NF_003",
+            detail="Course not found",
+            context={"course_id": str(course_id)}
+        )
 
     # Determine assignments URL if not provided
     assignments_url = request.assignments_url
@@ -936,11 +1009,46 @@ async def generate_assignments(
         elif 'full_path' in course_gitlab:
             family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
             if not family:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Course family not found")
+                raise NotFoundException(
+                    error_code="NF_001",
+                    detail="Course family not found",
+                    context={
+                        "course_id": str(course_id),
+                        "course_family_id": str(course.course_family_id)
+                    }
+                )
             org = db.query(Organization).filter(Organization.id == family.organization_id).first()
             gitlab_url = (org.properties or {}).get('gitlab', {}).get('url') if org and org.properties else None
             if gitlab_url:
                 assignments_url = f"{gitlab_url}/{course_gitlab['full_path']}/assignments"
+
+    # PRE-FLIGHT VALIDATION: Check that selected assignments have valid examples
+    is_valid, validation_errors = validate_course_contents_for_release(
+        course_id=course_id,
+        course_content_ids=request.course_content_ids if request.course_content_ids else None,
+        db=db,
+        force_redeploy=False,  # Assignments repository doesn't support force_redeploy
+        parent_id=request.parent_id,
+        include_descendants=request.include_descendants,
+        all_flag=request.all
+    )
+
+    if not is_valid:
+        logger.error(
+            f"Release validation failed for assignments in course {course_id}: "
+            f"{len(validation_errors)} issues found"
+        )
+        raise BadRequestException(
+            error_code="VAL_001",
+            detail="Cannot release assignments: Some assignments are missing examples or have invalid deployments",
+            context={
+                "course_id": str(course_id),
+                "validation_errors": validation_errors,
+                "total_issues": len(validation_errors)
+            }
+        )
+
+    logger.info(f"Pre-flight validation passed for assignments in course {course_id}")
 
     # Count selected contents (best-effort)
     contents_q = db.query(func.count(CourseContent.id)).filter(CourseContent.course_id == course_id)
@@ -1071,17 +1179,18 @@ async def get_course_gitlab_status(
     """
     # Check permissions
     if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this course"
+        raise ForbiddenException(
+            detail="Not authorized to view this course",
+            context={"course_id": str(course_id)}
         )
-    
+
     # Get course
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Course {course_id} not found"
+        raise NotFoundException(
+            error_code="NF_003",
+            detail="Course not found",
+            context={"course_id": str(course_id)}
         )
     
     # Check GitLab configuration
@@ -1161,19 +1270,20 @@ async def create_hierarchy(
     """
     # Check admin permissions
     if not check_admin(permissions):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can deploy configurations"
+        raise ForbiddenException(
+            detail="Only administrators can deploy configurations",
+            context={"operation": "create_hierarchy"}
         )
-    
+
     # Extract configuration
     deployment_config = payload.get("deployment_config")
     validate_only = payload.get("validate_only", False)
-    
+
     if not deployment_config:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="deployment_config is required"
+        raise BadRequestException(
+            error_code="VAL_002",
+            detail="deployment_config is required",
+            context={"missing_field": "deployment_config"}
         )
     
     # Validate the configuration structure
@@ -1181,9 +1291,10 @@ async def create_hierarchy(
     try:
         config = ComputorDeploymentConfig(**deployment_config)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid deployment configuration: {str(e)}"
+        raise BadRequestException(
+            error_code="VAL_001",
+            detail=f"Invalid deployment configuration: {str(e)}",
+            context={"validation_error": str(e)}
         )
     
     if validate_only:

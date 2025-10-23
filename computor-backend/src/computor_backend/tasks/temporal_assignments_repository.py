@@ -4,14 +4,14 @@ Temporal activity and workflow to generate the assignments repository from Examp
 This activity clones (or initializes) the assignments repository and, for selected
 course contents that have an ExampleVersion assigned, copies the full example files
 unmodified into the repository under the assignment directory. After committing and
-pushing, it records the HEAD commit SHA into CourseContentDeployment.version_identifier
-and ensures CourseContentDeployment.deployment_path is set.
+pushing, it records the HEAD commit SHA into CourseContentDeployment.version_identifier.
 """
 from datetime import timedelta, datetime, timezone
 from typing import Any, Dict, List, Optional
 import os
 import tempfile
 import shutil
+import logging
 from pathlib import Path
 
 from temporalio import workflow, activity
@@ -19,6 +19,8 @@ from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
+
+logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="generate_assignments_repository")
@@ -157,8 +159,20 @@ async def generate_assignments_repository_activity(
                     if not example or not example.repository:
                         continue
 
-                    # Build dir
-                    directory_name = content.deployment.deployment_path or str(example.identifier)
+                    # Get deployment path - use deployment_path if set, otherwise fall back to example_identifier
+                    directory_name = content.deployment.deployment_path
+                    if not directory_name:
+                        if content.deployment.example_identifier:
+                            # Use example_identifier as-is for the directory name
+                            directory_name = str(content.deployment.example_identifier)
+                            # Save it to deployment_path so it's persisted in the database
+                            content.deployment.deployment_path = directory_name
+                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
+                        else:
+                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
+                            logger.error(error_msg)
+                            errors.append(error_msg)
+                            continue
                     target_dir = Path(repo_path) / directory_name
 
                     if target_dir.exists() and overwrite_strategy != 'force_update':
@@ -176,10 +190,6 @@ async def generate_assignments_repository_activity(
                         file_path = target_dir / rel_path
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_bytes(data)
-
-                    # Update deployment path if needed
-                    if not content.deployment.deployment_path:
-                        content.deployment.deployment_path = directory_name
 
                     processed += 1
                 except Exception as e:

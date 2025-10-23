@@ -49,7 +49,18 @@ async def get_result(
     result_id: UUID | str,
     db: Session = Depends(get_db),
 ) -> ResultGet:
-    return await get_id_db(permissions, db, result_id, ResultInterface)
+    # Get the base result from database
+    result = await get_id_db(permissions, db, result_id, ResultInterface)
+
+    # Fetch result_json from MinIO
+    from computor_backend.services.result_storage import retrieve_result_json
+    result_json = await retrieve_result_json(result_id)
+
+    # Add result_json to the response
+    result_dict = result.model_dump()
+    result_dict['result_json'] = result_json
+
+    return ResultGet.model_validate(result_dict)
 
 @result_router.post("", response_model=ResultGet, status_code=status.HTTP_201_CREATED)
 async def create_result(
@@ -100,10 +111,30 @@ async def update_result(
     # Convert payload to dict
     updates = payload.model_dump(exclude_unset=True)
 
-    # Use repository for cache-aware update (triggers invalidation)
-    result = result_repo.update(str(result_id), updates)
+    # Convert TaskStatus enum to integer for database storage
+    if 'status' in updates and updates['status'] is not None:
+        from computor_types.tasks import map_task_status_to_int
+        updates['status'] = map_task_status_to_int(updates['status'])
 
-    return ResultGet.model_validate(result, from_attributes=True)
+    # Handle result_json separately - store in MinIO if provided
+    result_json_update = updates.pop('result_json', None)
+    if result_json_update is not None:
+        from computor_backend.services.result_storage import store_result_json
+        await store_result_json(result_id, result_json_update)
+
+    # Use repository for cache-aware update (triggers invalidation)
+    # Pass the entity directly to avoid re-querying
+    result = result_repo.update_entity(db_result, updates)
+
+    # Fetch result_json from MinIO for response
+    from computor_backend.services.result_storage import retrieve_result_json
+    result_json = await retrieve_result_json(result_id)
+
+    # Build response with result_json
+    result_dict = ResultGet.model_validate(result, from_attributes=True).model_dump()
+    result_dict['result_json'] = result_json
+
+    return ResultGet.model_validate(result_dict)
 
 @result_router.delete("/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(

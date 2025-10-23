@@ -19,7 +19,7 @@ fi
 
 cd "${ROOT_DIR}" && \
 PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}" \
-    "${PYTHON_BIN}" -m computor_cli.cli generate-clients "$@"
+    "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_clients.py" "$@"
 
 echo "✅ TypeScript API clients generated successfully!"
 echo "📁 Check frontend/src/api/generated/ for the generated files"

@@ -88,7 +88,7 @@ class AuthenticationService:
         )
         
         if not results:
-            raise UnauthorizedException("Invalid credentials")
+            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
         user_id, user_password, user_type, token_expiration = results[0][:4]
         
@@ -96,11 +96,24 @@ class AuthenticationService:
         if user_type == 'token':
             now = datetime.datetime.now(datetime.timezone.utc)
             if token_expiration is None or token_expiration < now:
-                raise UnauthorizedException("Token expired")
+                raise UnauthorizedException(error_code="AUTH_003", detail="Token expired")
         
         # Verify password
-        if password != decrypt_api_key(user_password):
-            raise UnauthorizedException("Invalid credentials")
+        try:
+            if user_password is None:
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+
+            if password != decrypt_api_key(user_password):
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+        except UnauthorizedException:
+            # Re-raise our authentication exceptions
+            raise
+        except Exception as e:
+            # Catch decryption errors (wrong secret, corrupted data, NULL password, etc.)
+            # Log for debugging but return generic error to user
+            import logging
+            logging.error(f"Password verification failed for user '{username}': {str(e)}")
+            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
         # Collect roles
         role_ids = [res[4] for res in results if res[4] is not None]
@@ -140,11 +153,16 @@ class AuthenticationService:
     
     @staticmethod
     async def authenticate_sso(token: str, db: Session) -> AuthenticationResult:
-        """Authenticate using SSO token"""
+        """Authenticate using SSO token with hashed token lookup"""
 
         from computor_backend.redis_cache import get_redis_client
+        from computor_backend.utils.token_hash import hash_token
+
         redis_client = await get_redis_client()
-        session_key = f"sso_session:{token}"
+
+        # Hash token for lookup
+        token_hash = hash_token(token)
+        session_key = f"sso_session:{token_hash}"
         session_data_raw = await redis_client.get(session_key)
 
         if not session_data_raw:
@@ -241,7 +259,7 @@ class SSOAuthCredentials(BaseModel):
 
 def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
     """Parse authorization header to determine auth type"""
-    
+
     # Check for GitLab credentials
     header_creds = request.headers.get("GLP-CREDS")
     if header_creds:
@@ -251,21 +269,27 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
         except Exception as e:
             logger.error(f"Failed to parse GitLab credentials: {e}")
             raise UnauthorizedException("Invalid GitLab credentials")
-    
+
     # Check for standard Authorization header
     authorization = request.headers.get("Authorization")
+
+    # If no Authorization header, check for access_token cookie
     if not authorization:
+        access_token = request.cookies.get("access_token")
+        if access_token:
+            logger.debug("Using access_token from cookie")
+            return SSOAuthCredentials(token=access_token, scheme="Bearer")
         raise UnauthorizedException("No authorization provided")
-    
+
     scheme, param = get_authorization_scheme_param(authorization)
-    
+
     if not param:
         raise UnauthorizedException("Invalid authorization format")
-    
+
     # Handle Bearer token (SSO)
     if scheme.lower() == "bearer":
         return SSOAuthCredentials(token=param, scheme="Bearer")
-    
+
     # Handle Basic auth
     elif scheme.lower() == "basic":
         try:
@@ -277,7 +301,7 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
         except (ValueError, UnicodeDecodeError, binascii.Error) as e:
             logger.error(f"Failed to decode Basic auth: {e}")
             raise UnauthorizedException("Invalid Basic auth encoding")
-    
+
     raise UnauthorizedException(f"Unsupported auth scheme: {scheme}")
 
 
@@ -291,41 +315,100 @@ async def get_current_principal(
     Main dependency for getting the current authenticated principal.
     This replaces get_current_principal from the old system.
     """
-    
+
     with next(get_db()) as db:
         # Route to appropriate authentication method
         if isinstance(credentials, HTTPBasicCredentials):
             auth_result = AuthenticationService.authenticate_basic(
                 credentials.username, credentials.password, db
             )
-            
+
             # Build Principal without caching for basic auth
             return PrincipalBuilder.build(auth_result, db)
-        
+
         elif isinstance(credentials, GLPAuthConfig):
             auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
-            
+
             # Build Principal with caching for GitLab auth
             cache_key = hashlib.sha256(
                 f"{credentials.url}::{credentials.token}".encode()
             ).hexdigest()
-            
+
             return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
-        
+
         elif isinstance(credentials, SSOAuthCredentials):
             auth_result = await AuthenticationService.authenticate_sso(
                 credentials.token, db
             )
-            
+
             # Build Principal with caching for SSO
             cache_key = hashlib.sha256(
                 f"sso_permissions:{credentials.token}".encode()
             ).hexdigest()
-            
+
             return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
-        
+
         else:
             raise UnauthorizedException("Unknown authentication type")
+
+
+def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
+    """
+    Parse authorization header but return None instead of raising exception.
+    Used for endpoints that accept but don't require authentication (like token refresh).
+    """
+    try:
+        return parse_authorization_header(request)
+    except UnauthorizedException:
+        return None
+
+
+async def get_current_principal_optional(
+    request: Request,
+    credentials: Annotated[
+        Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials],
+        Depends(parse_authorization_header_optional)
+    ] = None
+) -> Optional[Principal]:
+    """
+    Get current principal if valid credentials are provided, None otherwise.
+    This allows endpoints to work with both authenticated and unauthenticated requests.
+    Used for token refresh where the access token may be expired.
+    """
+    if not credentials:
+        return None
+
+    try:
+        with next(get_db()) as db:
+            # Route to appropriate authentication method
+            if isinstance(credentials, HTTPBasicCredentials):
+                auth_result = AuthenticationService.authenticate_basic(
+                    credentials.username, credentials.password, db
+                )
+                return PrincipalBuilder.build(auth_result, db)
+
+            elif isinstance(credentials, GLPAuthConfig):
+                auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
+                cache_key = hashlib.sha256(
+                    f"{credentials.url}::{credentials.token}".encode()
+                ).hexdigest()
+                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+
+            elif isinstance(credentials, SSOAuthCredentials):
+                auth_result = await AuthenticationService.authenticate_sso(
+                    credentials.token, db
+                )
+                cache_key = hashlib.sha256(
+                    f"sso_permissions:{credentials.token}".encode()
+                ).hexdigest()
+                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+
+            else:
+                return None
+    except (UnauthorizedException, Exception) as e:
+        # If authentication fails (e.g., expired token), return None
+        logger.debug(f"Optional authentication failed: {e}")
+        return None
 
 
 class HeaderAuthCredentials(BaseModel):

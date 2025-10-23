@@ -2,10 +2,16 @@
 FastAPI endpoints for task management.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Depends
+from fastapi import APIRouter, BackgroundTasks, Query, Depends
 from typing import Dict, List, Any, Optional, Annotated
 
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import (
+    ForbiddenException,
+    NotFoundException,
+    BadRequestException,
+    InternalServerException,
+    NotImplementedException
+)
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.tasks import (
@@ -56,9 +62,10 @@ async def list_tasks(
         return result
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list tasks: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to list tasks: {str(e)}",
+            context={"operation": "list_tasks"}
         )
 
 @tasks_router.post("/submit", response_model=Dict[str, str])
@@ -95,14 +102,16 @@ async def submit_task(
         }
 
     except KeyError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown task type: {str(e)}"
+        raise BadRequestException(
+            error_code="VAL_001",
+            detail=f"Unknown task type: {str(e)}",
+            context={"task_name": submission.task_name}
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to submit task: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to submit task: {str(e)}",
+            context={"operation": "submit_task", "task_name": submission.task_name}
         )
 
 @tasks_router.get("/{task_id}", response_model=TaskInfo)
@@ -159,14 +168,16 @@ async def get_task_status(
         return task_info
 
     except KeyError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Task with ID {task_id} not found"
+        raise NotFoundException(
+            error_code="TASK_001",
+            detail="Task execution not found",
+            context={"task_id": task_id}
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get task status: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to get task status: {str(e)}",
+            context={"operation": "get_task_status", "task_id": task_id}
         )
 
 @tasks_router.get("/{task_id}/result", response_model=TaskResult)
@@ -198,14 +209,16 @@ async def get_task_result(
         return task_result
 
     except KeyError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Task with ID {task_id} not found"
+        raise NotFoundException(
+            error_code="TASK_001",
+            detail="Task execution not found",
+            context={"task_id": task_id}
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get task result: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to get task result: {str(e)}",
+            context={"operation": "get_task_result", "task_id": task_id}
         )
 
 @tasks_router.delete("/{task_id}/cancel")
@@ -242,15 +255,17 @@ async def cancel_task(
                 "message": "Task cancelled successfully"
             }
         else:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Task with ID {task_id} not found or cannot be cancelled"
+            raise NotFoundException(
+                error_code="TASK_001",
+                detail="Task not found or cannot be cancelled",
+                context={"task_id": task_id}
             )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to cancel task: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to cancel task: {str(e)}",
+            context={"operation": "cancel_task", "task_id": task_id}
         )
 
 @tasks_router.delete("/{task_id}")
@@ -290,25 +305,29 @@ async def delete_task(
                 "message": "Task deleted successfully"
             }
         else:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Task with ID {task_id} not found"
+            raise NotFoundException(
+                error_code="TASK_001",
+                detail="Task execution not found",
+                context={"task_id": task_id}
             )
 
     except NotImplementedError as e:
-        raise HTTPException(
-            status_code=501,
-            detail=str(e)
+        raise NotImplementedException(
+            error_code="NIMPL_001",
+            detail=str(e),
+            context={"operation": "delete_task"}
         )
     except KeyError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Task with ID {task_id} not found"
+        raise NotFoundException(
+            error_code="TASK_001",
+            detail="Task execution not found",
+            context={"task_id": task_id}
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete task: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to delete task: {str(e)}",
+            context={"operation": "delete_task", "task_id": task_id}
         )
 
 @tasks_router.get("/types", response_model=List[str])
@@ -334,9 +353,10 @@ async def list_task_types(
         return list(registered_tasks.keys())
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list task types: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to list task types: {str(e)}",
+            context={"operation": "list_task_types"}
         )
 
 @tasks_router.get("/workers/status", response_model=Dict[str, Any])
@@ -363,7 +383,8 @@ async def get_worker_status(
         return status_info
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get worker status: {str(e)}"
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to get worker status: {str(e)}",
+            context={"operation": "get_worker_status"}
         )

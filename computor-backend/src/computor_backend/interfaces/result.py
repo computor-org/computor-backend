@@ -52,8 +52,6 @@ class ResultInterface(ResultInterfaceBase, BackendEntityInterface):
             query = query.filter(Result.result == params.result)
         if params.grade is not None:
             query = query.filter(Result.grade == params.grade)
-        if params.result_json is not None:
-            query = query.filter(Result.result_json == params.result_json)
 
         # Handle 'latest' flag if needed
         if params.latest:

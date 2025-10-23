@@ -1,7 +1,7 @@
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Column, DateTime, 
-    Enum, ForeignKey, Index, String, text, Integer
-)
+    BigInteger, Boolean, CheckConstraint, Column, DateTime,
+    Enum, ForeignKey, Index, Integer, LargeBinary, String, text
+, func)
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -20,18 +20,18 @@ class User(Base):
     number = Column(String(255), unique=True)
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    archived_at = Column(DateTime(True))
+    archived_at = Column(DateTime(timezone=True))
     given_name = Column(String(255))
     family_name = Column(String(255))
     email = Column(String(320), unique=True)
     user_type = Column(Enum('user', 'token', name='user_type'), nullable=False, server_default=text("'user'::user_type"))
     fs_number = Column(BigInteger, nullable=False, server_default=text("nextval('user_unique_fs_number_seq'::regclass)"))
-    token_expiration = Column(DateTime(True))
+    token_expiration = Column(DateTime(timezone=True))
     username = Column(String(255), unique=True)
     password = Column(String(255))
     auth_token = Column(String(4096))  # Added from PostgreSQL migrations
@@ -60,8 +60,8 @@ class Account(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
@@ -78,8 +78,8 @@ class Profile(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
@@ -100,8 +100,8 @@ class StudentProfile(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
@@ -116,17 +116,53 @@ class StudentProfile(Base):
 
 class Session(Base):
     __tablename__ = 'session'
+    __table_args__ = (
+        Index(
+            'ix_session_user_active',
+            'user_id',
+            postgresql_where=text("revoked_at IS NULL AND ended_at IS NULL")
+        ),
+        Index('ix_session_last_seen', 'last_seen_at'),
+    )
 
+    # Primary key
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+
+    # Unique session identifier per device/login
+    sid = Column(UUID, unique=True, nullable=False, server_default=text("uuid_generate_v4()"))
+
+    # User relationship
+    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    user = relationship('User', back_populates='sessions')
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_seen_at = Column(DateTime(timezone=True))
+    expires_at = Column(DateTime(timezone=True))
+
+    # Status
+    revoked_at = Column(DateTime(timezone=True))
+    revocation_reason = Column(String(255))
+    ended_at = Column(DateTime(timezone=True))  # Replaces logout_time
+
+    # Tokens (hashed for security)
+    session_id = Column(String(1024), nullable=False)  # Access token hash
+    refresh_token_hash = Column(LargeBinary)  # Refresh token hash (binary)
+    refresh_expires_at = Column(DateTime(timezone=True))
+    refresh_counter = Column(Integer, nullable=False, server_default=text("0"))
+
+    # Network context
+    created_ip = Column(INET, nullable=False)  # IP at session creation
+    last_ip = Column(INET)  # Last seen IP
+    user_agent = Column(String(4096))  # Raw user agent string
+    device_label = Column(String(512))  # Human-readable device description
+
+    # Metadata and versioning
+    version = Column(BigInteger, nullable=False, server_default=text("0"))
+    properties = Column(JSONB, server_default=text("'{}'::jsonb"))
+
+    # Legacy fields for backwards compatibility
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB)
-    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    session_id = Column(String(1024), nullable=False)
-    logout_time = Column(DateTime(True))
-    ip_address = Column(INET, nullable=False)
-
-    user = relationship('User', back_populates='sessions')
+    logout_time = Column(DateTime(timezone=True))  # Deprecated: use ended_at

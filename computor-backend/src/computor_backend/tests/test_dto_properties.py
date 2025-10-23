@@ -3,7 +3,7 @@ Tests for computed properties and advanced DTO functionality.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, AsyncMock
 
 from computor_types.users import UserGet, UserList
@@ -183,7 +183,7 @@ class TestComputedProperties:
             user_id="user-123",
             session_id="session-123",
             ip_address="10.0.0.1",
-            logout_time=datetime.now()
+            logout_time=datetime.now(timezone.utc)
         )
         assert session_list.is_active is False
         assert "10.0.0.1" in session_list.display_name

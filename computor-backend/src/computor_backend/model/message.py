@@ -1,7 +1,7 @@
 from sqlalchemy import (
     BigInteger, Column, DateTime, ForeignKey,
     Index, String, text, Integer
-)
+, func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -23,12 +23,12 @@ class Message(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    archived_at = Column(DateTime(True))
+    archived_at = Column(DateTime(timezone=True))
 
     # Author of the message
     author_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -64,6 +64,25 @@ class Message(Base):
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
 
+    @property
+    def is_deleted(self) -> bool:
+        """Check if message is soft-deleted."""
+        return self.archived_at is not None
+
+    @property
+    def deletion_reason(self) -> str:
+        """Get deletion reason from properties."""
+        if not self.is_deleted or not self.properties:
+            return None
+        return self.properties.get('deletion_reason')
+
+    @property
+    def deleted_by(self) -> str:
+        """Get who deleted the message (author/moderator/admin)."""
+        if not self.is_deleted or not self.properties:
+            return 'author'
+        return self.properties.get('deleted_by', 'author')
+
 
 class MessageRead(Base):
     __tablename__ = 'message_read'
@@ -73,8 +92,8 @@ class MessageRead(Base):
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
-    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)

@@ -1,6 +1,5 @@
 import click
-from fastapi import HTTPException
-from httpx import ConnectError
+from httpx import ConnectError, HTTPStatusError
 from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
@@ -86,10 +85,14 @@ def handle_api_exceptions(func):
       return func(*args, **kwargs)
     except ConnectError as e:
       click.echo(f"Connection to [{click.style(kwargs['auth'].api_url,fg='red')}] could not be established.")
-    except HTTPException as e:
-      message = e.detail.get("detail")
-      message = message if message != None else e.detail
-      click.echo(f"[{click.style(e.status_code,fg='red')}] {message}")
+    except HTTPStatusError as e:
+      # httpx HTTPStatusError has response.status_code and response.json()
+      try:
+        error_detail = e.response.json()
+        message = error_detail.get("detail", str(error_detail))
+      except:
+        message = e.response.text or str(e)
+      click.echo(f"[{click.style(str(e.response.status_code),fg='red')}] {message}")
     except Exception as e:
       click.echo(f"[{click.style('500',fg='red')}] {e.args if e.args != () else 'Internal Server Error'}")
 
@@ -109,10 +112,15 @@ def list_entities(table, query, auth: CLIAuthConfig):
   if dict(query) != {}:
     params = GET_QUERY_CLASS(table)(**query)
 
-  resp = GET_CLIENT_ATTRIBUTE(client, table).list(params)
+  resp = run_async(GET_CLIENT_ATTRIBUTE(client, table).list(params))
 
   for entity in resp:
-    click.echo(f"{entity.model_dump_json(indent=4)}")
+    # Handle both dict and Pydantic model responses
+    if hasattr(entity, 'model_dump_json'):
+      click.echo(f"{entity.model_dump_json(indent=4)}")
+    else:
+      import json
+      click.echo(json.dumps(entity, indent=4))
 
 @click.command()
 @click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
@@ -135,9 +143,14 @@ def get_entity(table, id, auth: CLIAuthConfig):
 
   client = run_async(get_computor_client(auth))
 
-  entity = GET_CLIENT_ATTRIBUTE(client, table).get(id)
+  entity = run_async(GET_CLIENT_ATTRIBUTE(client, table).get(id))
 
-  click.echo(f"{entity.model_dump_json(indent=4)}")
+  # Handle both dict and Pydantic model responses
+  if hasattr(entity, 'model_dump_json'):
+    click.echo(f"{entity.model_dump_json(indent=4)}")
+  else:
+    import json
+    click.echo(json.dumps(entity, indent=4))
 
 @click.group()
 def rest():

@@ -26,20 +26,27 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
 
-# Copy computor-types, computor-utils and computor-backend
+# Upgrade pip, setuptools and packaging to support modern pyproject.toml
+# Use setuptools < 70 to avoid grapheme package compatibility issues
+RUN python3.10 -m pip install --upgrade pip "setuptools>=65.0,<70" wheel packaging
+
+# Copy computor-types, computor-utils, computor-client and computor-backend
 ADD computor-types /home/matlab/computor-types
 ADD computor-utils /home/matlab/computor-utils
+ADD computor-client /home/matlab/computor-client
 ADD computor-backend /home/matlab/computor-backend
 
 # Copy the matlab-server.py script
 COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
 
-# Install local packages first (computor-types and computor-utils)
-RUN pip install --no-cache-dir -e /home/matlab/computor-types
-RUN pip install --no-cache-dir -e /home/matlab/computor-utils
+# Install local packages first (needed by computor-backend)
+# Use python3.10 explicitly to ensure correct Python version
+RUN python3.10 -m pip install --no-cache-dir /home/matlab/computor-types
+RUN python3.10 -m pip install --no-cache-dir /home/matlab/computor-utils
+RUN python3.10 -m pip install --no-cache-dir /home/matlab/computor-client
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade -r /home/matlab/computor-backend/src/requirements.txt
+# Install computor-backend with all dependencies
+RUN python3.10 -m pip install --no-cache-dir /home/matlab/computor-backend
 
 RUN chmod -R 777 /home/matlab
 
@@ -49,8 +56,8 @@ RUN passwd -d matlab
 USER matlab
 WORKDIR /home/matlab
 
+# Set timezone to UTC
 ENV TZ=UTC
-ENV TZ=Europe/Berlin
 
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
@@ -59,4 +66,4 @@ ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
 ENV PYTHONPATH=/home/matlab/computor-backend/src:$PYTHONPATH
 
 # Default entrypoint - matlab-server.py will start the temporal worker internally
-ENTRYPOINT ["python", "/home/matlab/matlab-server.py"]
+ENTRYPOINT ["python3.10", "/home/matlab/matlab-server.py"]

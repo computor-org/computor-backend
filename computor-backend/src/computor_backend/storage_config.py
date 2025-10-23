@@ -5,7 +5,7 @@ import os
 from typing import Set, Dict
 
 # Size limits
-MAX_UPLOAD_SIZE = int(os.environ.get('MINIO_MAX_UPLOAD_SIZE', 20 * 1024 * 1024))  # 20MB default
+MAX_UPLOAD_SIZE = int(os.environ.get('MINIO_MAX_UPLOAD_SIZE', 10 * 1024 * 1024))  # 10MB default
 MAX_STORAGE_PER_USER = int(os.environ.get('MAX_STORAGE_PER_USER', 1024 * 1024 * 1024))  # 1GB default
 MAX_STORAGE_PER_COURSE = int(os.environ.get('MAX_STORAGE_PER_COURSE', 10 * 1024 * 1024 * 1024))  # 10GB default
 
@@ -74,6 +74,10 @@ ALLOWED_MIME_TYPES: Set[str] = {
     'text/xml',
     'application/x-yaml',
     'text/yaml',
+    # MATLAB files
+    'text/x-matlab',  # MATLAB code files (.m)
+    'application/vnd.wolfram.mathematica.package',  # Sometimes .m is detected as Mathematica
+    'application/x-matlab-data',  # MATLAB data files (.mat)
     # Archives
     'application/zip',
     'application/x-zip-compressed',

@@ -23,6 +23,10 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0",
     "email-validator>=2.0",
+    "keycove>=0.1.0",
+    "text-unidecode>=1.3",
+    "pydantic-yaml>=1.0.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -37,3 +41,9 @@ dev = [
 Homepage = "https://github.com/computor/computor-types"
 Documentation = "https://docs.computor.dev/types"
 Repository = "https://github.com/computor/computor-types"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

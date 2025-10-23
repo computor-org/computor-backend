@@ -12,7 +12,7 @@ import ast
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Set, Any, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import re
 from enum import Enum
@@ -57,7 +57,7 @@ class TypeScriptGenerator:
         if not self.include_timestamp:
             raise RuntimeError("Timestamp requested but include_timestamp is False")
         if self._timestamp_value is None:
-            self._timestamp_value = datetime.now().isoformat()
+            self._timestamp_value = datetime.now(timezone.utc).isoformat()
         return self._timestamp_value
     
     def python_type_to_typescript(self, py_type: Any) -> str:
@@ -580,18 +580,19 @@ def main():
     # Determine paths
     backend_dir = Path(__file__).parent.parent  # computor_backend
     src_dir = backend_dir.parent  # src
-    project_root = src_dir.parent  # computor-fullstack
-    frontend_dir = project_root / "frontend"
+    project_root = src_dir.parent.parent  # project root (up from computor-backend/src)
 
     # Directories to scan for models
+    types_dir = project_root / "computor-types" / "src" / "computor_types"
     scan_dirs = [
         backend_dir / "interface",  # Pydantic DTOs
         backend_dir / "api",        # API models
         backend_dir / "tasks",      # Task DTOs
+        types_dir,                  # computor_types DTOs (messages, etc.)
     ]
-    
+
     # Output directory
-    output_dir = frontend_dir / "src" / "types" / "generated"
+    output_dir = project_root / "generated" / "types"
     
     print("🚀 TypeScript Interface Generator")
     print("=" * 50)

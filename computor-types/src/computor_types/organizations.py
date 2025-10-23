@@ -1,5 +1,4 @@
 from enum import Enum
-from fastapi import Query
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
 from typing import TYPE_CHECKING, Optional
 from datetime import datetime

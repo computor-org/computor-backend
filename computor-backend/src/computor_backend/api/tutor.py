@@ -45,7 +45,7 @@ from computor_backend.business_logic.tutor import (
 tutor_router = APIRouter()
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
-def tutor_get_course_contents_endpoint(
+async def tutor_get_course_contents_endpoint(
     course_content_id: UUID | str,
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -53,10 +53,10 @@ def tutor_get_course_contents_endpoint(
     cache: Cache = Depends(get_cache)
 ):
     """Get course content for a course member as a tutor."""
-    return get_tutor_course_content(course_member_id, course_content_id, permissions, db, cache)
+    return await get_tutor_course_content(course_member_id, course_content_id, permissions, db, cache)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
-def tutor_list_course_contents_endpoint(
+async def tutor_list_course_contents_endpoint(
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
@@ -64,7 +64,7 @@ def tutor_list_course_contents_endpoint(
     cache: Cache = Depends(get_cache)
 ):
     """List course contents for a course member as a tutor."""
-    return list_tutor_course_contents(course_member_id, permissions, params, db, cache)
+    return await list_tutor_course_contents(course_member_id, permissions, params, db, cache)
 
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
 def tutor_update_course_contents_endpoint(

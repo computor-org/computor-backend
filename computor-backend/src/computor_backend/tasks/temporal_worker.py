@@ -26,7 +26,8 @@ from .temporal_student_testing import (
     StudentTestingWorkflow,
     clone_repository_activity,
     execute_tests_activity,
-    commit_test_results_activity
+    commit_test_results_activity,
+    run_complete_student_test_activity
 )
 from .temporal_system import (
     ReleaseStudentsWorkflow,
@@ -41,8 +42,7 @@ from .temporal_hierarchy_management import (
     DeployComputorHierarchyWorkflow,
     create_organization_activity,
     create_course_family_activity,
-    create_course_activity,
-    create_course_content_types_activity
+    create_course_activity
 )
 from .temporal_student_template_v2 import (
     GenerateStudentTemplateWorkflowV2,
@@ -105,12 +105,12 @@ class TemporalWorker:
             clone_repository_activity,
             execute_tests_activity,
             commit_test_results_activity,
+            run_complete_student_test_activity,  # Complete test run (all steps on one worker)
             release_students_activity,
             release_course_activity,
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
-            create_course_content_types_activity,
             generate_student_template_activity_v2,  # Student template generation
             generate_assignments_repository_activity,  # Assignments init/populate
             create_student_repository,  # Fork student-template for individual student

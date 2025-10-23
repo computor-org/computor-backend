@@ -116,7 +116,6 @@ class ResultQuery(ListQuery):
     latest: Optional[bool] = False
     result: Optional[float] = None
     grade: Optional[float] = None
-    result_json: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

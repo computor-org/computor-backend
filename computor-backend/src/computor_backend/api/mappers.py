@@ -16,10 +16,11 @@ from computor_types.deployment import CourseContentDeploymentList
 from computor_backend.model.course import CourseMember
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
+from computor_backend.services.result_storage import retrieve_result_json
 
 logger = logging.getLogger(__name__)
 
-def course_member_course_content_result_mapper(
+async def course_member_course_content_result_mapper(
     course_member_course_content_result: CourseMemberCourseContentQueryResult,
     db: Session = None,
     detailed: bool = False
@@ -95,15 +96,29 @@ def course_member_course_content_result_mapper(
         if result.submission_artifact:
             submit_value = result.submission_artifact.submit
 
-        result_payload = ResultStudentList(
-            execution_backend_id=result.execution_backend_id,
-            test_system_id=result.test_system_id,
-            version_identifier=result.version_identifier,
-            status=map_int_to_task_status(result.status),
-            result=result.result,
-            result_json=result.result_json,
-            submit=submit_value,
-        )
+        # Fetch result_json from MinIO only for detailed views
+        if detailed:
+            result_json_data = await retrieve_result_json(result.id)
+            from computor_types.student_course_contents import ResultStudentGet
+            result_payload = ResultStudentGet(
+                execution_backend_id=result.execution_backend_id,
+                test_system_id=result.test_system_id,
+                version_identifier=result.version_identifier,
+                status=map_int_to_task_status(result.status),
+                result=result.result,
+                result_json=result_json_data,
+                submit=submit_value,
+            )
+        else:
+            # For list views, don't fetch result_json from MinIO
+            result_payload = ResultStudentList(
+                execution_backend_id=result.execution_backend_id,
+                test_system_id=result.test_system_id,
+                version_identifier=result.version_identifier,
+                status=map_int_to_task_status(result.status),
+                result=result.result,
+                submit=submit_value,
+            )
 
     # Query grades directly from database for this submission group
     gradings_payload = []

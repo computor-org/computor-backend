@@ -317,7 +317,8 @@ async def upload_submission_artifact(
                     logger.debug(f"Detected common root directory: {common_root}")
 
             # Extract, filter, and upload each file individually to MinIO
-            bucket_name = str(submission_group.id).lower()
+            # Use single "submissions" bucket with structure: {group_id}/{version}/{file_path}
+            bucket_name = "submissions"
 
             for member in members:
                 # Strip common root directory if detected
@@ -370,8 +371,8 @@ async def upload_submission_artifact(
                     logger.warning(f"Skipping invalid file {member.filename}: {e}")
                     continue
 
-                # Upload file to MinIO with structure: {version_identifier}/{sanitized_path}
-                object_key = f"{manual_version_identifier}/{sanitized_path}"
+                # Upload file to MinIO with structure: {group_id}/{version_identifier}/{sanitized_path}
+                object_key = f"{submission_group.id}/{manual_version_identifier}/{sanitized_path}"
 
                 storage_metadata = {
                     "submission_group_id": str(submission_group.id),
@@ -405,9 +406,9 @@ async def upload_submission_artifact(
         raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
 
     # Create single SubmissionArtifact record representing this submission
-    # The object_key is just the version_identifier (the directory prefix in MinIO)
-    bucket_name = str(submission_group.id).lower()
-    object_key = manual_version_identifier  # Just the version identifier, no .zip
+    # The object_key is the full path prefix in MinIO
+    bucket_name = "submissions"
+    object_key = f"{submission_group.id}/{manual_version_identifier}"  # Full path to version directory
 
     artifact_repo = SubmissionArtifactRepository(db, cache)
     artifact = SubmissionArtifact(
@@ -841,7 +842,7 @@ def delete_review(
     logger.info(f"Deleted review {review_id}")
 
 
-def create_test_result(
+async def create_test_result(
     artifact_id: UUID | str,
     course_member_id: UUID | str,
     execution_backend_id: UUID | str,
@@ -850,7 +851,6 @@ def create_test_result(
     grade: Optional[float],
     result_json: Optional[dict],
     properties: Optional[dict],
-    log_text: Optional[str],
     version_identifier: Optional[str],
     reference_version_identifier: Optional[str],
     permissions: Principal,
@@ -928,6 +928,7 @@ def create_test_result(
 
     # Create the test result (use authenticated user's course member id)
     from computor_types.tasks import map_task_status_to_int
+    from computor_backend.services.result_storage import store_result_json
 
     result = Result(
         submission_artifact_id=artifact_id,
@@ -936,9 +937,7 @@ def create_test_result(
         test_system_id=test_system_id,
         status=map_task_status_to_int(status),
         grade=grade,
-        result_json=result_json,
         properties=properties,
-        log_text=log_text,
         version_identifier=version_identifier,
         reference_version_identifier=reference_version_identifier,
     )
@@ -947,18 +946,21 @@ def create_test_result(
     db.commit()
     db.refresh(result)
 
+    # Store result_json in MinIO if provided
+    if result_json is not None:
+        await store_result_json(result.id, result_json)
+
     logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
     return result
 
 
-def update_test_result(
+async def update_test_result(
     test_id: UUID | str,
     status: Optional[str],
     grade: Optional[float],
     result_json: Optional[dict],
     properties: Optional[dict],
-    log_text: Optional[str],
     finished_at: Optional[datetime],
     permissions: Principal,
     db: Session,
@@ -989,16 +991,17 @@ def update_test_result(
         result.status = map_task_status_to_int(status)
     if grade is not None:
         result.grade = grade
-    if result_json is not None:
-        result.result_json = result_json
     if properties is not None:
         result.properties = properties
-    if log_text is not None:
-        result.log_text = log_text
     if finished_at is not None:
         result.finished_at = finished_at
 
     db.commit()
     db.refresh(result)
+
+    # Store/update result_json in MinIO if provided
+    if result_json is not None:
+        from computor_backend.services.result_storage import store_result_json
+        await store_result_json(result.id, result_json)
 
     return result

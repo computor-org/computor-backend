@@ -75,27 +75,17 @@ class PythonTestingBackend(TestingBackend):
                 timeout=backend_properties.get("timeout", 300)  # 5 minutes default
             )
             
-            # Parse output
-            output = result.stdout
-            logger.info(f"Test output: {output}")
-            
-            # Try to parse JSON output if available
-            try:
-                test_results = json.loads(output)
-            except json.JSONDecodeError:
-                # If not JSON, create basic result structure
-                test_results = {
-                    "passed": 1 if result.returncode == 0 else 0,
-                    "failed": 0 if result.returncode == 0 else 1,
-                    "total": 1,
-                    "details": {
-                        "stdout": result.stdout,
-                        "stderr": result.stderr,
-                        "returncode": result.returncode
-                    }
-                }
-            
-            return test_results
+            # Log output for debugging
+            logger.info(f"Test command executed with return code: {result.returncode}")
+            if result.stdout:
+                logger.info(f"Test stdout: {result.stdout[:500]}...")
+            if result.stderr:
+                logger.warning(f"Test stderr: {result.stderr[:500]}...")
+
+            # Python test backend writes results to file (testSummary.json)
+            # The return value here is ignored - results are read from file
+            # Just return None to indicate execution completed
+            return None
             
         except subprocess.TimeoutExpired as e:
             logger.error(f"Test execution timed out: {e}")

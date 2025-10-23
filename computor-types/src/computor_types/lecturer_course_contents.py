@@ -1,10 +1,11 @@
 """Pydantic DTOs for lecturer course content operations."""
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList
 
-    
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from computor_types.deployments import GitLabConfigGet
 from computor_types.base import EntityInterface, ListQuery
@@ -40,6 +41,12 @@ class CourseContentLecturerGet(BaseModel):
     course_content_type: Optional[CourseContentTypeGet] = None
     repository: CourseContentRepositoryLecturerGet  # GitLab info from course.properties.gitlab
 
+    # Optional deployment summary (populated when requested)
+    deployment: Optional['CourseContentDeploymentGet'] = Field(
+        None,
+        description="Deployment information if requested via include=deployment"
+    )
+
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
@@ -66,6 +73,12 @@ class CourseContentLecturerList(BaseModel):
 
     course_content_type: Optional[CourseContentTypeList] = None
     repository: CourseContentRepositoryLecturerGet  # GitLab info from course.properties.gitlab
+
+    # Optional deployment summary (populated when requested)
+    deployment: Optional['CourseContentDeploymentList'] = Field(
+        None,
+        description="Deployment information if requested via include=deployment"
+    )
 
     @field_validator('path', mode='before')
     @classmethod
@@ -173,3 +186,9 @@ class CourseContentLecturerInterface(EntityInterface):
     # Note: This is a VIEW endpoint (read-only), not standard CRUD
     # Mounted at /lecturers/course-contents in backend
     # Only supports GET list and GET by id operations
+
+# Fix forward references
+from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList
+
+CourseContentLecturerGet.model_rebuild()
+CourseContentLecturerList.model_rebuild()

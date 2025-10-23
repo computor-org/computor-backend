@@ -9,12 +9,16 @@ from computor_backend.model.auth import User
 from computor_backend.model.execution import ExecutionBackend
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.api.auth import auth_router
+from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
 from computor_backend.database import get_db
@@ -61,6 +65,7 @@ from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
+from computor_backend.exceptions import register_exception_handlers
 import json
 import tempfile
 from pathlib import Path
@@ -174,14 +179,28 @@ async def lifespan(app: FastAPI):
     # else:
         # Initialize plugin registry in development mode
         # await initialize_plugin_registry_with_config()
-    
+
     yield
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Register custom exception handlers for structured error responses
+register_exception_handlers(app)
 
 origins = [
-    "*"
+    "http://localhost:3000",  # Next.js frontend
+    "http://localhost:3001",  # Alternative frontend port
+    "http://localhost:8000",  # Backend (for docs)
 ]
+
+# Add upload size limiter middleware (should be before CORS)
+from computor_backend.middleware import UploadSizeLimiterMiddleware
+app.add_middleware(UploadSizeLimiterMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -362,6 +381,12 @@ app.include_router(
     prefix="/messages",
     tags=["messages"],
     dependencies=[Depends(get_current_principal)]
+)
+
+# Session management router
+app.include_router(
+    session_router,
+    tags=["sessions"]
 )
 
 
