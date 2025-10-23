@@ -68,6 +68,8 @@ class SubmissionArtifactQuery(ListQuery):
     submission_group_id: Optional[str] = None
     uploaded_by_course_member_id: Optional[str] = None
     content_type: Optional[str] = None
+    version_identifier: Optional[str] = None  # Filter by version (e.g., "v1.0.0", "commit-abc123")
+    submit: Optional[bool] = None  # Filter by official submissions (True) or test runs (False)
 
 class SubmissionArtifactInterface(EntityInterface):
     """Entity interface for submission artifacts."""

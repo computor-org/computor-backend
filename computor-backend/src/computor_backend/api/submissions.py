@@ -39,6 +39,7 @@ from computor_types.artifacts import (
     SubmissionArtifactList,
     SubmissionArtifactGet,
     SubmissionArtifactUpdate,
+    SubmissionArtifactQuery,
     SubmissionGradeCreate,
     SubmissionGradeUpdate,
     SubmissionGradeListItem,
@@ -180,27 +181,28 @@ async def upload_submission(
 async def list_submission_artifacts(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    submission_group_id: Optional[str] = None,
+    params: SubmissionArtifactQuery = Depends(),
     course_content_id: Optional[str] = None,
-    version_identifier: Optional[str] = None,
     with_latest_result: bool = False,
-    limit: int = 100,
-    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     """List submission artifacts with optional filtering.
 
     Query parameters:
+    - submission_group_id: Filter by submission group
+    - uploaded_by_course_member_id: Filter by uploader
+    - content_type: Filter by content type
+    - submit: Filter by official submissions (True) or test runs (False)
     - with_latest_result: If True, include latest successful result (status=0) for each artifact
     """
 
     query = db.query(SubmissionArtifact)
 
     # Filter by submission group if provided
-    if submission_group_id:
+    if params.submission_group_id:
         # Check permissions for this submission group
         submission_group = db.query(SubmissionGroup).filter(
-            SubmissionGroup.id == submission_group_id
+            SubmissionGroup.id == params.submission_group_id
         ).first()
 
         if not submission_group:
@@ -212,7 +214,7 @@ async def list_submission_artifacts(
             is_group_member = db.query(SubmissionGroupMember).join(
                 CourseMember
             ).filter(
-                SubmissionGroupMember.submission_group_id == submission_group_id,
+                SubmissionGroupMember.submission_group_id == params.submission_group_id,
                 CourseMember.user_id == user_id
             ).first()
 
@@ -228,7 +230,7 @@ async def list_submission_artifacts(
                 if not has_elevated_perms:
                     raise ForbiddenException(detail="You don't have permission to view these artifacts")
 
-        query = query.filter(SubmissionArtifact.submission_group_id == submission_group_id)
+        query = query.filter(SubmissionArtifact.submission_group_id == params.submission_group_id)
 
     # Filter by course content if provided
     if course_content_id:
@@ -272,14 +274,26 @@ async def list_submission_artifacts(
             )
 
     # Filter by version identifier if provided
-    if version_identifier:
-        query = query.filter(SubmissionArtifact.version_identifier == version_identifier)
+    if params.version_identifier:
+        query = query.filter(SubmissionArtifact.version_identifier == params.version_identifier)
+
+    # Filter by submit flag if provided
+    if params.submit is not None:
+        query = query.filter(SubmissionArtifact.submit == params.submit)
+
+    # Filter by uploaded_by_course_member_id if provided
+    if params.uploaded_by_course_member_id:
+        query = query.filter(SubmissionArtifact.uploaded_by_course_member_id == params.uploaded_by_course_member_id)
+
+    # Filter by content_type if provided
+    if params.content_type:
+        query = query.filter(SubmissionArtifact.content_type == params.content_type)
 
     # Apply pagination
     total = query.count()
     artifacts = query.order_by(
         SubmissionArtifact.created_at.desc()
-    ).limit(limit).offset(offset).all()
+    ).limit(params.limit).offset(params.skip).all()
 
     response.headers["X-Total-Count"] = str(total)
 
