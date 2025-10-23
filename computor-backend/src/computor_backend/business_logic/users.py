@@ -322,16 +322,138 @@ def _fetch_gitlab_user_id(client: Gitlab, username: str) -> Optional[int]:
     return users[0].id
 
 
+def _get_user_gitlab_client(provider_url: str, user_access_token: str) -> Optional[Gitlab]:
+    """Get GitLab client authenticated with user's access token."""
+    try:
+        client = Gitlab(url=provider_url, private_token=user_access_token)
+        return client
+    except Exception as exc:
+        logger.warning("Unable to initialize user GitLab client: %s", exc)
+        return None
+
+
+def _check_user_has_project_access(
+    user_client: Gitlab,
+    project_path: str,
+    required_access_level: int,
+) -> bool:
+    """Check if user already has sufficient access to a project using their token."""
+    try:
+        print(f"🔍 Checking user's access to project: {project_path}")
+
+        import requests
+        provider_url = user_client.url.rstrip('/')
+        headers = {"PRIVATE-TOKEN": user_client.private_token}
+
+        # Use /api/v4/projects?min_access_level=X to get all projects user has access to
+        # with at least the required access level
+        projects_url = f"{provider_url}/api/v4/projects"
+        params = {'min_access_level': required_access_level, 'per_page': 100}
+
+        print(f"  → Fetching projects with min_access_level={required_access_level}")
+        response = requests.get(projects_url, headers=headers, params=params, timeout=10)
+
+        if response.status_code != 200:
+            print(f"  → ✗ Failed to get projects: HTTP {response.status_code}")
+            return False
+
+        projects = response.json()
+        print(f"  → Found {len(projects)} projects with access level >= {required_access_level}")
+
+        # Debug: print all projects
+        for p in projects[:10]:  # Limit to first 10 for readability
+            print(f"     - {p.get('path_with_namespace', 'N/A')}")
+
+        # Check if the required project is in the list
+        for project in projects:
+            if project.get('path_with_namespace') == project_path:
+                print(f"  → ✓ User has sufficient access to project: {project_path}")
+                return True
+
+        print(f"  → ✗ User does not have access level {required_access_level} to project: {project_path}")
+        return False
+
+    except (GitlabGetError, GitlabHttpError) as exc:
+        # User cannot access project or it doesn't exist
+        print(f"  → ✗ Failed to check project access: {exc}")
+        return False
+    except Exception as exc:
+        print(f"  → ✗ Unexpected error checking project access: {exc}")
+        return False
+
+
+def _check_user_has_group_access(
+    user_client: Gitlab,
+    group_full_path: str,
+    required_access_level: int,
+) -> bool:
+    """Check if user already has sufficient access to a group using their token."""
+    try:
+        print(f"🔍 Checking user's access to group: {group_full_path}")
+
+        import requests
+        provider_url = user_client.url.rstrip('/')
+        headers = {"PRIVATE-TOKEN": user_client.private_token}
+
+        # Use /api/v4/groups?min_access_level=X to get all groups user has access to
+        # with at least the required access level
+        groups_url = f"{provider_url}/api/v4/groups"
+        params = {'min_access_level': required_access_level, 'per_page': 100}
+
+        print(f"  → Fetching groups with min_access_level={required_access_level}")
+        response = requests.get(groups_url, headers=headers, params=params, timeout=10)
+
+        if response.status_code != 200:
+            print(f"  → ✗ Failed to get groups: HTTP {response.status_code}")
+            return False
+
+        groups = response.json()
+        print(f"  → Found {len(groups)} groups with access level >= {required_access_level}")
+
+        # Debug: print all groups
+        for g in groups[:10]:  # Limit to first 10 for readability
+            print(f"     - {g.get('full_path', 'N/A')}")
+
+        # Check if the required group is in the list
+        for group in groups:
+            if group.get('full_path') == group_full_path:
+                print(f"  → ✓ User has sufficient access to group: {group_full_path}")
+                return True
+
+        print(f"  → ✗ User does not have access level {required_access_level} to group: {group_full_path}")
+        return False
+
+    except (GitlabGetError, GitlabHttpError) as exc:
+        # User cannot access group or it doesn't exist
+        print(f"  → ✗ Failed to check group access: {exc}")
+        return False
+    except Exception as exc:
+        print(f"  → ✗ Unexpected error checking group access: {exc}")
+        return False
+
+
 def _ensure_project_access(
     client: Gitlab,
     project_path: Optional[str],
     gitlab_user_id: int,
     access_level: int,
     context: str,
+    user_client: Optional[Gitlab] = None,
 ):
     """Ensure user has access to a GitLab project."""
     if not project_path:
         return
+
+    # First check if user already has access using their token
+    if user_client:
+        if _check_user_has_project_access(user_client, project_path, access_level):
+            logger.info(
+                "✓ SKIPPED GitLab API call - User already has sufficient access to project %s (%s)",
+                project_path,
+                context,
+            )
+            print(f"✓ SKIPPED GitLab API call - User already has access to project: {project_path} ({context})")
+            return
 
     try:
         project = client.projects.get(project_path)
@@ -348,6 +470,7 @@ def _ensure_project_access(
             access_level,
             context,
         )
+        print(f"✅ GRANTED GitLab project access: {project_path} (level={access_level}, {context})")
     except GitlabCreateError as exc:
         if getattr(exc, "response_code", None) != 409:
             logger.warning(
@@ -385,10 +508,22 @@ def _ensure_group_access(
     gitlab_user_id: int,
     access_level: int,
     context: str,
+    user_client: Optional[Gitlab] = None,
 ):
     """Ensure user has access to a GitLab group."""
     if not group_full_path:
         return
+
+    # First check if user already has access using their token
+    if user_client:
+        if _check_user_has_group_access(user_client, group_full_path, access_level):
+            logger.info(
+                "✓ SKIPPED GitLab API call - User already has sufficient access to group %s (%s)",
+                group_full_path,
+                context,
+            )
+            print(f"✓ SKIPPED GitLab API call - User already has access to group: {group_full_path} ({context})")
+            return
 
     try:
         # Use groups.list() with search instead of groups.get() since we have full_path not ID
@@ -415,6 +550,7 @@ def _ensure_group_access(
             access_level,
             context,
         )
+        print(f"✅ GRANTED GitLab group access: {group.full_path} (level={access_level}, {context})")
     except GitlabCreateError as exc:
         if getattr(exc, "response_code", None) != 409:
             logger.warning(
@@ -452,11 +588,30 @@ def _sync_gitlab_memberships(
     org_props: OrganizationProperties,
     gitlab_username: str,
     db: Session,
+    user_access_token: Optional[str] = None,
 ):
-    """Sync GitLab memberships for course member."""
+    """Sync GitLab memberships for course member.
+
+    Args:
+        provider_url: GitLab instance URL
+        course_member: The course member to sync permissions for
+        course_props: Course properties
+        org_props: Organization properties
+        gitlab_username: GitLab username of the user
+        db: Database session
+        user_access_token: User's GitLab access token (optional, for checking existing access)
+    """
     client = _get_gitlab_client(provider_url, org_props, course_props)
     if not client:
         return
+
+    # Initialize user client if token provided (to check existing access and save API calls)
+    user_client = None
+    if user_access_token and provider_url:
+        user_client = _get_user_gitlab_client(provider_url, user_access_token)
+        if user_client:
+            logger.info("Using user's token to check existing GitLab access before granting permissions")
+            print(f"🔍 Using user's GitLab token to check existing access (saves system token API calls)")
 
     gitlab_user_id = _fetch_gitlab_user_id(client, gitlab_username)
     if gitlab_user_id is None:
@@ -498,6 +653,7 @@ def _sync_gitlab_memberships(
                 gitlab_user_id,
                 40,  # Maintainer
                 "student submission repository",
+                user_client=user_client,
             )
 
         # Also grant access to the student template repository
@@ -511,6 +667,7 @@ def _sync_gitlab_memberships(
             gitlab_user_id,
             20,  # Reporter
             "student template",
+            user_client=user_client,
         )
 
     elif role == "_tutor":
@@ -521,6 +678,7 @@ def _sync_gitlab_memberships(
                 gitlab_user_id,
                 30,  # Developer
                 "tutor course group membership",
+                user_client=user_client,
             )
 
         if member_props.gitlab and member_props.gitlab.full_path:
@@ -530,6 +688,7 @@ def _sync_gitlab_memberships(
                 gitlab_user_id,
                 40,  # Maintainer
                 "tutor repository",
+                user_client=user_client,
             )
 
     elif role in {"_lecturer", "_maintainer", "_owner"}:
@@ -546,6 +705,7 @@ def _sync_gitlab_memberships(
                 gitlab_user_id,
                 access_level,
                 "course group membership",
+                user_client=user_client,
             )
 
 
@@ -566,21 +726,23 @@ def validate_user_course(
     existing_account = _get_existing_account(db, course_member.user_id, provider_url)
 
     if provider_type == "gitlab" and provider_url:
+        if not provider_access_token:
+            raise UnauthorizedException(
+                error_code="GITLAB_005",
+                detail="GitLab access token is required to validate and register account."
+            )
+
+        # Fetch GitLab user profile from the token
+        current_user = _fetch_gitlab_user_profile(provider_url, provider_access_token)
+        current_username = (current_user or {}).get("username")
+        if not current_username:
+            raise BadRequestException(
+                error_code="GITLAB_006",
+                detail="Unable to determine GitLab user from provided token."
+            )
+
         if existing_account:
-            if not provider_access_token:
-                raise UnauthorizedException(
-                    error_code="GITLAB_005",
-                    detail="GitLab access token is required to validate account ownership."
-                )
-
-            current_user = _fetch_gitlab_user_profile(provider_url, provider_access_token)
-            current_username = (current_user or {}).get("username")
-            if not current_username:
-                raise BadRequestException(
-                    error_code="GITLAB_006",
-                    detail="Unable to determine GitLab user from provided token."
-                )
-
+            # Validate that token matches existing account
             if current_username.lower() != existing_account.provider_account_id.lower():
                 raise BadRequestException(
                     error_code="GITLAB_003",
@@ -591,8 +753,57 @@ def validate_user_course(
                     }
                 )
         else:
-            # No linked account yet; report readiness without forcing token checks.
-            provider_access_token = None
+            # No account exists - create it automatically
+            # Check if this GitLab username is already linked to another user
+            conflicting_account = (
+                db.query(Account)
+                .filter(
+                    Account.provider == provider_url,
+                    Account.type == "gitlab",
+                    Account.provider_account_id == current_username,
+                    Account.user_id != course_member.user_id,
+                )
+                .first()
+            )
+
+            if conflicting_account:
+                raise BadRequestException(
+                    error_code="GITLAB_004",
+                    detail="This GitLab account is already linked to another user.",
+                    context={"username": current_username}
+                )
+
+            # Create new account
+            account_payload = AccountCreate(
+                provider=provider_url,
+                type="gitlab",
+                provider_account_id=current_username,
+                user_id=str(course_member.user_id),
+            )
+            new_account = Account(**account_payload.model_dump())
+            db.add(new_account)
+            existing_account = new_account
+            db.commit()
+            db.refresh(existing_account)
+
+            print(f"✅ Created new GitLab account link: {current_username} → user {course_member.user_id}")
+            logger.info("Created GitLab account link for user %s: %s", course_member.user_id, current_username)
+
+        # Sync GitLab memberships
+        try:
+            _sync_gitlab_memberships(
+                provider_url,
+                course_member,
+                course_props,
+                org_props,
+                existing_account.provider_account_id,
+                db,
+                user_access_token=provider_access_token,
+            )
+        except BadRequestException:
+            raise
+        except Exception as exc:
+            logger.warning("GitLab access provisioning failed during validation: %s", exc)
 
     return _build_validation_status(
         course_member,
@@ -715,6 +926,7 @@ def register_user_course_account(
             org_props,
             provider_account_id,
             db,
+            user_access_token=provider_access_token,
         )
     except BadRequestException:
         raise
