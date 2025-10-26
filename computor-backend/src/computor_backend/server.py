@@ -18,6 +18,7 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.api.auth import auth_router
+from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -343,6 +344,12 @@ app.include_router(
 app.include_router(
     auth_router,
     tags=["authentication", "sso"]
+)
+
+app.include_router(
+    password_reset_router,
+    tags=["authentication", "password-management"],
+    dependencies=[Depends(get_redis_client)]  # Some endpoints require auth, handled individually
 )
 
 app.include_router(

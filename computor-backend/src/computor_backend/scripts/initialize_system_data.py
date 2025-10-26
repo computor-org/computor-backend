@@ -22,7 +22,8 @@ from computor_backend.database import get_db
 from computor_backend.model.role import Role, UserRole
 from computor_backend.model.course import CourseRole, CourseContentKind
 from computor_backend.model.execution import ExecutionBackend
-from computor_types.tokens import encrypt_api_key
+from computor_types.tokens import encrypt_api_key  # TODO: Remove after migration
+from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User, Account
 from computor_backend.model.example import ExampleRepository
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
@@ -197,13 +198,14 @@ def create_admin_user(db: Session):
     # Sync with Keycloak first
     provider_user_id = asyncio.run(sync_admin_with_keycloak(admin_username, admin_password, admin_email))
     
-    # Create admin user locally
+    # Create admin user locally with Argon2 hashed password
     admin_user = User(
         given_name='System',
         family_name='Administrator',
         email=admin_email,
         username=admin_username,
-        password=encrypt_api_key(admin_password),
+        password=create_password_hash(admin_password, validate=False),  # Skip validation for admin setup
+        password_reset_required=False,  # Admin can login immediately
         user_type='user'
     )
     
