@@ -485,31 +485,31 @@ def _deploy_course_content_types(course_id: str, content_types_config: list, aut
             # Check if content type already exists
             existing_types = run_async(content_type_client.list(CourseContentTypeQuery(
                 course_id=course_id,
-                slug=content_type_config.get("slug")
+                slug=content_type_config.slug
             )))
 
             if existing_types:
-                click.echo(f"    ℹ️  Content type already exists: {content_type_config.get('slug')}")
+                click.echo(f"    ℹ️  Content type already exists: {content_type_config.slug}")
                 existing_count += 1
                 continue
 
             # Create new content type
             content_type_create = CourseContentTypeCreate(
-                slug=content_type_config.get("slug"),
-                title=content_type_config.get("title"),
-                description=content_type_config.get("description"),
-                color=content_type_config.get("color", "green"),
-                properties=content_type_config.get("properties", {}),
+                slug=content_type_config.slug,
+                title=content_type_config.title,
+                description=content_type_config.description,
+                color=content_type_config.color or "green",
+                properties=content_type_config.properties or {},
                 course_id=course_id,
-                course_content_kind_id=content_type_config.get("kind", content_type_config.get("course_content_kind_id"))
+                course_content_kind_id=content_type_config.kind
             )
 
             run_async(content_type_client.create(content_type_create))
-            click.echo(f"    ✅ Created content type: {content_type_config.get('slug')}")
+            click.echo(f"    ✅ Created content type: {content_type_config.slug}")
             created_count += 1
 
         except Exception as e:
-            click.echo(f"    ❌ Failed to create content type {content_type_config.get('slug')}: {e}")
+            click.echo(f"    ❌ Failed to create content type {content_type_config.slug}: {e}")
 
     if created_count > 0 or existing_count > 0:
         click.echo(f"    📊 Content types: {created_count} created, {existing_count} existing")
