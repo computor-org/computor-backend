@@ -30,7 +30,13 @@ from computor_types.course_member_accounts import CourseMemberReadinessStatus
 from computor_types.course_members import CourseMemberProperties
 from computor_types.courses import CourseProperties
 from computor_types.organizations import OrganizationProperties
-from computor_types.tokens import decrypt_api_key, encrypt_api_key
+from computor_types.tokens import decrypt_api_key, encrypt_api_key  # TODO: Remove after migration
+from computor_types.password_utils import (
+    create_password_hash,
+    verify_password,
+    PasswordValidationError,
+    is_argon2_hash,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,32 +66,91 @@ def set_user_password(
     permissions: Principal,
     db: Session,
 ) -> None:
-    """Set or update user password."""
+    """
+    Set or update user password with Argon2 hashing.
 
-    if target_username is not None and permissions.is_admin is False:
-        raise ForbiddenException()
+    Args:
+        target_username: Username to set password for (admin only)
+        new_password: New password to set
+        old_password: Current password for verification (user changing own password)
+        permissions: Current user's permissions
+        db: Database session
 
-    if len(new_password) < 6:
-        raise BadRequestException()
+    Raises:
+        ForbiddenException: If user lacks permission
+        BadRequestException: If password validation fails
+        PasswordValidationError: If password doesn't meet complexity requirements
+    """
 
+    # Only admins can set passwords for other users
+    if target_username is not None and not permissions.is_admin:
+        raise ForbiddenException("Only administrators can set passwords for other users")
+
+    # Determine which user to update
     if target_username is not None:
+        # Admin setting password for another user
         user = db.query(User).filter(User.username == target_username).first()
-
-    elif target_username is None and old_password is not None:
-        if new_password == old_password:
-            raise BadRequestException()
-
+        if not user:
+            raise NotFoundException(f"User '{target_username}' not found")
+    elif old_password is not None:
+        # User changing their own password
         user = db.query(User).filter(User.id == permissions.get_user_id_or_throw()).first()
+        if not user:
+            raise NotFoundException("User not found")
 
-        if decrypt_api_key(user.password) != old_password:
-            raise BadRequestException()
+        # Verify old password
+        if user.password is None:
+            raise BadRequestException("No password set. Contact administrator to set initial password.")
 
+        # Support both Argon2 and legacy encrypted passwords during migration
+        password_correct = False
+        if is_argon2_hash(user.password):
+            password_correct = verify_password(old_password, user.password)
+        else:
+            # Legacy encrypted password
+            try:
+                password_correct = (old_password == decrypt_api_key(user.password))
+            except Exception as e:
+                logger.error(f"Error verifying old password: {e}")
+                password_correct = False
+
+        if not password_correct:
+            raise BadRequestException("Current password is incorrect")
+
+        # Ensure new password is different from old password
+        if is_argon2_hash(user.password):
+            if verify_password(new_password, user.password):
+                raise BadRequestException("New password must be different from current password")
+        else:
+            # Legacy comparison
+            try:
+                if new_password == decrypt_api_key(user.password):
+                    raise BadRequestException("New password must be different from current password")
+            except:
+                pass  # If decryption fails, allow new password
     else:
-        raise ForbiddenException()
+        raise ForbiddenException("Invalid password change request")
 
-    user.password = encrypt_api_key(new_password)
+    # Validate new password strength with complexity requirements
+    try:
+        user.password = create_password_hash(
+            new_password,
+            validate=True,
+            username=user.username,
+            email=user.email,
+            custom_forbidden_words=["computor", "university", "student", "tutor", "lecturer"]
+        )
+    except PasswordValidationError as e:
+        # Convert PasswordValidationError to BadRequestException for API
+        raise BadRequestException(str(e))
+
+    # Clear password reset flag
+    user.password_reset_required = False
+
     db.commit()
     db.refresh(user)
+
+    logger.info(f"Password updated for user {user.username} (ID: {user.id})")
 
 
 def get_course_views_for_user(user_id: str, db: Session) -> List[str]:

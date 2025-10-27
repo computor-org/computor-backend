@@ -40,7 +40,8 @@ from fastapi.security.utils import get_authorization_scheme_param
 from computor_backend.database import get_db
 from computor_backend.gitlab_utils import gitlab_current_user
 from computor_types.auth import GLPAuthConfig
-from computor_types.tokens import decrypt_api_key
+from computor_types.tokens import decrypt_api_key  # TODO: Remove after migration complete
+from computor_types.password_utils import verify_password, is_argon2_hash
 from computor_backend.model.auth import Account, User
 from computor_backend.model.role import UserRole
 from computor_backend.api.exceptions import NotFoundException, UnauthorizedException
@@ -98,22 +99,28 @@ class AuthenticationService:
             if token_expiration is None or token_expiration < now:
                 raise UnauthorizedException(error_code="AUTH_003", detail="Token expired")
         
-        # Verify password
-        try:
-            if user_password is None:
-                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+        # Verify password using Argon2 or fallback to old encryption (migration support)
+        if user_password is None:
+            raise UnauthorizedException(error_code="AUTH_002", detail="No password set. Please contact administrator or use password reset.")
 
-            if password != decrypt_api_key(user_password):
+        # Check if password is Argon2 hash (new format) or encrypted (old format)
+        if is_argon2_hash(user_password):
+            # New Argon2 verification
+            if not verify_password(password, user_password):
                 raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-        except UnauthorizedException:
-            # Re-raise our authentication exceptions
-            raise
-        except Exception as e:
-            # Catch decryption errors (wrong secret, corrupted data, NULL password, etc.)
-            # Log for debugging but return generic error to user
-            import logging
-            logging.error(f"Password verification failed for user '{username}': {str(e)}")
-            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+        else:
+            # Legacy encrypted password support (for migration period)
+            # TODO: Remove this branch after all passwords migrated
+            try:
+                if password != decrypt_api_key(user_password):
+                    raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+                logger.warning(f"User '{username}' still using old password encryption. Should upgrade on next password change.")
+            except UnauthorizedException:
+                raise
+            except Exception as e:
+                # Catch decryption errors
+                logger.error(f"Password verification failed for user '{username}': {str(e)}")
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
         # Collect roles
         role_ids = [res[4] for res in results if res[4] is not None]

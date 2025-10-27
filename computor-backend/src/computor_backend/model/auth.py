@@ -33,7 +33,8 @@ class User(Base):
     fs_number = Column(BigInteger, nullable=False, server_default=text("nextval('user_unique_fs_number_seq'::regclass)"))
     token_expiration = Column(DateTime(timezone=True))
     username = Column(String(255), unique=True)
-    password = Column(String(255))
+    password = Column(String(512))  # Increased for Argon2 hashes (was 255)
+    password_reset_required = Column(Boolean, nullable=False, server_default=text("false"))  # Track password reset status
     auth_token = Column(String(4096))  # Added from PostgreSQL migrations
 
     # Relationships

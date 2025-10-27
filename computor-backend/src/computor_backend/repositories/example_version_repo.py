@@ -120,8 +120,9 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
 
             if example and example.identifier:
                 # Find all deployments using this example's identifier
+                # Don't convert to str - use the Ltree object directly for proper comparison
                 deployments = self.db.query(CourseContentDeployment).filter(
-                    CourseContentDeployment.example_identifier == str(example.identifier)
+                    CourseContentDeployment.example_identifier == example.identifier
                 ).all()
 
                 if deployments:
@@ -172,8 +173,9 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
             example = self.db.query(Example).filter(Example.id == entity.example_id).first()
 
             if example and example.identifier:
+                # Don't convert to str - use the Ltree object directly for proper comparison
                 deployments = self.db.query(CourseContentDeployment).filter(
-                    CourseContentDeployment.example_identifier == str(example.identifier)
+                    CourseContentDeployment.example_identifier == example.identifier
                 ).all()
 
                 if deployments:

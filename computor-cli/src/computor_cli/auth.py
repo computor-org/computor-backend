@@ -210,17 +210,36 @@ def authenticate(func):
     
     return wrapper
 
-async def get_computor_client(auth: CLIAuthConfig):
+# Global cache for authenticated clients (keyed by API URL + auth type)
+_client_cache = {}
+
+async def get_computor_client(auth: CLIAuthConfig, force_new: bool = False):
     """
     Create and authenticate a ComputorClient instance (async).
 
+    Clients are cached per API URL and authentication credentials to avoid
+    repeated login requests that can trigger rate limiting.
+
     Args:
         auth: CLI authentication configuration
+        force_new: If True, bypass cache and create a new client
 
     Returns:
         Authenticated ComputorClient instance
     """
     from computor_client import ComputorClient
+
+    # Create a cache key based on API URL and auth credentials
+    if auth.basic is not None:
+        cache_key = f"{auth.api_url}:basic:{auth.basic.username}"
+    elif auth.gitlab is not None:
+        cache_key = f"{auth.api_url}:gitlab:{auth.gitlab.url}"
+    else:
+        cache_key = auth.api_url
+
+    # Return cached client if available and not forcing new
+    if not force_new and cache_key in _client_cache:
+        return _client_cache[cache_key]
 
     # Create client
     client = ComputorClient(base_url=auth.api_url)
@@ -238,4 +257,13 @@ async def get_computor_client(auth: CLIAuthConfig):
     else:
         raise NotImplementedError("No authentication method configured")
 
+    # Cache the authenticated client
+    _client_cache[cache_key] = client
+
     return client
+
+
+def clear_client_cache():
+    """Clear the cached clients. Useful when authentication credentials change."""
+    global _client_cache
+    _client_cache = {}
