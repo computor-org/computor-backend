@@ -63,7 +63,12 @@ class Ltree(str):
         return cls(value)
 
     @property
-    def path(self) -> List[str]:
+    def path(self) -> str:
+        """Get path as string."""
+        return str(self)
+    
+    @property
+    def segments(self) -> List[str]:
         """Get path segments as a list."""
         return str(self).split('.')
 
