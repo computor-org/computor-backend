@@ -51,7 +51,7 @@ from ..services.storage_service import get_storage_service
 from ..services.version_resolver import VersionResolver
 from ..services.dependency_sync import DependencySyncService
 from ..repositories import ExampleVersionRepository, ExampleDependencyRepository
-from computor_types.validation import SemanticVersion
+from computor_types.validation import SemanticVersion, normalize_version
 
 logger = logging.getLogger(__name__)
 
@@ -561,10 +561,11 @@ async def upload_example(
     description = meta_data.get('description', '')
     slug = meta_data.get('slug', request.directory.replace('-', '.').replace('_', '.'))
 
-    # Extract version from meta.yaml (use exactly as specified)
-    version_tag = meta_data.get('version', '1.0.0')  # Default to 1.0.0 for semantic versioning
+    # Extract version from meta.yaml and normalize to semver format
+    version_tag_raw = meta_data.get('version', '1.0.0')
+    version_tag = normalize_version(version_tag_raw)  # Normalize '1' -> '1.0.0', '1.0' -> '1.0.0'
 
-    # Validate version format (must follow semantic versioning)
+    # Validate normalized version format (must follow semantic versioning)
     try:
         SemanticVersion.from_string(version_tag)
     except ValueError as e:

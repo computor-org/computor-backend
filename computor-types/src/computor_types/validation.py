@@ -64,6 +64,56 @@ class SemanticVersion(BaseModel):
         return f"SemanticVersion('{str(self)}')"
 
 
+def normalize_version(version_str: str) -> str:
+    """
+    Normalize a version string to semantic versioning format.
+
+    Converts short versions to full semver format:
+    - '1' -> '1.0.0'
+    - '1.0' -> '1.0.0'
+    - '1.0.0' -> '1.0.0' (unchanged)
+    - '2.1.3-alpha' -> '2.1.3-alpha' (unchanged)
+
+    Args:
+        version_str: Version string to normalize
+
+    Returns:
+        Normalized version string in semver format
+    """
+    if not version_str:
+        return '1.0.0'
+
+    version_str = version_str.strip()
+
+    # Check if it has a prerelease suffix (e.g., '1.0.0-alpha')
+    prerelease = None
+    if '-' in version_str:
+        version_part, prerelease = version_str.split('-', 1)
+    else:
+        version_part = version_str
+
+    # Split version into components
+    parts = version_part.split('.')
+
+    # Pad with zeros to get exactly 3 parts
+    while len(parts) < 3:
+        parts.append('0')
+
+    # Validate that all parts are numeric
+    try:
+        parts = [str(int(p)) for p in parts[:3]]  # Take only first 3 parts
+    except ValueError:
+        # If conversion fails, return original string (will fail validation later)
+        return version_str
+
+    # Reconstruct normalized version
+    normalized = '.'.join(parts)
+    if prerelease:
+        normalized = f"{normalized}-{prerelease}"
+
+    return normalized
+
+
 def validate_version_format(version_str: str) -> bool:
     """
     Validate that a version string follows semantic versioning.

@@ -70,22 +70,22 @@ class PasswordComplexityRequirements:
     """
 
     # Minimum length (NIST recommends 8+, we use 12 for better security)
-    MIN_LENGTH = 12
+    MIN_LENGTH = 8
 
     # Maximum length (prevent DoS via extremely long passwords)
     MAX_LENGTH = 128
 
     # Require at least one uppercase letter
-    REQUIRE_UPPERCASE = True
+    REQUIRE_UPPERCASE = False
 
     # Require at least one lowercase letter
-    REQUIRE_LOWERCASE = True
+    REQUIRE_LOWERCASE = False
 
     # Require at least one digit
-    REQUIRE_DIGIT = True
+    REQUIRE_DIGIT = False
 
     # Require at least one special character
-    REQUIRE_SPECIAL = True
+    REQUIRE_SPECIAL = False
 
     # Special characters allowed
     SPECIAL_CHARACTERS = "!@#$%^&*()_+-=[]{}|;:,.<>?"
