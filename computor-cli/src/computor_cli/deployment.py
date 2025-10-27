@@ -68,15 +68,15 @@ class SyncHTTPWrapper:
             timeout=computor_client._client.timeout
         )
 
-    def get(self, path: str):
+    def get(self, path: str, params: dict = None):
         """GET request."""
-        response = self._client.get(path)
+        response = self._client.get(path, params=params)
         response.raise_for_status()
         return response.json() if response.content else None
 
-    def list(self, path: str):
-        """GET request (alias for get)."""
-        return self.get(path)
+    def list(self, path: str, params: dict = None):
+        """GET request (alias for get) with optional query parameters."""
+        return self.get(path, params=params)
 
     def create(self, path: str, data: dict = None):
         """POST request."""
@@ -578,13 +578,11 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                         ex_title = getattr(example, 'title', None)
                         version_tag = content_config.example_version_tag or "latest"
                         try:
-                            if version_tag == "latest":
-                                all_versions = custom_client.list(f"examples/{example.id}/versions") or []
-                            else:
-                                all_versions = custom_client.list(
-                                    f"examples/{example.id}/versions",
-                                    params={"version_tag": version_tag}
-                                ) or []
+                            # Backend now handles normalization and "latest" tag
+                            all_versions = custom_client.list(
+                                f"examples/{example.id}/versions",
+                                params={"version_tag": version_tag}
+                            ) or []
                         except Exception:
                             all_versions = []
                         if version_tag == "latest" and all_versions:
@@ -761,14 +759,13 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     else:
                         example = examples[0]
                         version_tag = content_config.example_version_tag or "latest"
+
                         try:
-                            if version_tag == "latest":
-                                all_versions = custom_client.list(f"examples/{example['id']}/versions") or []
-                            else:
-                                all_versions = custom_client.list(
-                                    f"examples/{example['id']}/versions",
-                                    params={"version_tag": version_tag}
-                                ) or []
+                            # Backend now handles normalization and "latest" tag
+                            all_versions = custom_client.list(
+                                f"examples/{example['id']}/versions",
+                                params={"version_tag": version_tag}
+                            ) or []
                         except Exception as e:
                             print(e)
                             all_versions = []

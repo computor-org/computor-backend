@@ -331,9 +331,15 @@ async def list_versions(
 
     # Get versions via repository
     if params and params.version_tag:
-        # Filter by version_tag
-        version = version_repo.find_by_version_tag(example_id, params.version_tag)
-        versions = [version] if version else []
+        # Handle special "latest" tag
+        if params.version_tag.lower() == "latest":
+            latest = version_repo.find_latest_version(example_id)
+            versions = [latest] if latest else []
+        else:
+            # Normalize version tag (1.0 -> 1.0.0) before querying
+            normalized_tag = normalize_version(params.version_tag)
+            version = version_repo.find_by_version_tag(example_id, normalized_tag)
+            versions = [version] if version else []
     else:
         # Get all versions for example
         versions = version_repo.find_by_example(example_id)

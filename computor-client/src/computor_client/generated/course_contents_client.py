@@ -40,7 +40,7 @@ class CourseContentsClient(BaseEndpointClient):
 
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
-        return await self.patch_course_content_by_id_archive(id, payload)
+        return await self.patch_course_content_by_id(id, payload)
 
     async def delete(self, id: str):
         """Delete entity (delegates to generated DELETE method)."""
