@@ -143,3 +143,53 @@ def validate_token_format(token: str) -> bool:
     random_part = token[len(TOKEN_PREFIX):]
     valid_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-')
     return all(c in valid_chars for c in random_part)
+
+
+def prepare_predefined_token(token: str) -> Tuple[str, str, bytes]:
+    """
+    Prepare a pre-defined API token for storage.
+
+    Use this when you want to set a specific token value (e.g., from configuration
+    or environment variables). This is useful for deployment scenarios where workers
+    need known token values that can be configured before the system starts.
+
+    SECURITY WARNING: Pre-defined tokens must be:
+    - Generated securely (e.g., using `secrets.token_urlsafe()`)
+    - Stored securely (e.g., in secrets management, encrypted env files)
+    - Never hardcoded in source code or committed to version control
+
+    Args:
+        token: The predefined token string (must start with 'ctp_' and be 36 chars total)
+
+    Returns:
+        tuple: (full_token, prefix, token_hash)
+            - full_token: The provided token (validated)
+            - token_prefix: First 12 characters for display
+            - token_hash: SHA-256 hash for database storage
+
+    Raises:
+        ValueError: If token format is invalid
+
+    Example:
+        >>> # In deployment config or secure env var:
+        >>> token = "ctp_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        >>> full_token, prefix, token_hash = prepare_predefined_token(token)
+        >>> print(f"Prefix: {prefix}")
+        Prefix: ctp_a1b2c3d4
+    """
+    if not validate_token_format(token):
+        raise ValueError(
+            f"Invalid token format. Token must:\n"
+            f"  - Start with '{TOKEN_PREFIX}'\n"
+            f"  - Be exactly {len(TOKEN_PREFIX) + TOKEN_RANDOM_LENGTH} characters long\n"
+            f"  - Contain only URL-safe base64 characters (A-Za-z0-9_-)\n"
+            f"  Example: ctp_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        )
+
+    # Extract prefix (first 12 chars for display/identification)
+    prefix = token[:12]
+
+    # Hash token for secure storage (SHA-256)
+    token_hash = hashlib.sha256(token.encode('utf-8')).digest()
+
+    return token, prefix, token_hash
