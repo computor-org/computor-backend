@@ -32,7 +32,7 @@ export POSTGRES_HOST=${POSTGRES_HOST:-localhost}
 export POSTGRES_PORT=${POSTGRES_PORT:-5432}
 export POSTGRES_USER=${POSTGRES_USER:-postgres}
 export POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secret}
-export POSTGRES_DB=${POSTGRES_DB:-codeability}
+export POSTGRES_DB=${POSTGRES_DB:-computor}
 
 echo -e "${GREEN}📋 Environment:${NC}"
 echo "  POSTGRES_HOST: $POSTGRES_HOST"

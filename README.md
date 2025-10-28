@@ -195,12 +195,12 @@ Run the test suite with:
 bash test.sh
 
 # Run specific test files
-python -m pytest src/ctutor_backend/tests/test_temporal_client.py -v
-python -m pytest src/ctutor_backend/tests/test_temporal_executor.py -v
-python -m pytest src/ctutor_backend/tests/test_temporal_workflows.py -v
+python -m pytest src/computor_backend/tests/test_temporal_client.py -v
+python -m pytest src/computor_backend/tests/test_temporal_executor.py -v
+python -m pytest src/computor_backend/tests/test_temporal_workflows.py -v
 
 # Run integration tests (requires Temporal server)
-SKIP_TEMPORAL_TESTS=false python -m pytest src/ctutor_backend/tests/test_temporal_integration.py -v
+SKIP_TEMPORAL_TESTS=false python -m pytest src/computor_backend/tests/test_temporal_integration.py -v
 ```
 
 ### Test Coverage

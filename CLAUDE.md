@@ -18,7 +18,7 @@ Computor is a university programming course management platform with automated G
 
 ## Architecture
 
-### Backend Structure (`/src/ctutor_backend/`)
+### Backend Structure (`/src/computor_backend/`)
 
 #### Core Components
 
@@ -103,13 +103,15 @@ docker-compose -f docker-compose-prod.yaml up -d  # Production environment
 ctutor worker start                               # Start Temporal worker
 ctutor worker start --queues=computor-tasks      # Specific queue
 ctutor worker status                              # Check worker status
-python -m ctutor_backend.tasks.temporal_worker   # Direct worker start
+python -m computor_backend.tasks.temporal_worker   # Direct worker start
 
 # Temporal UI
 # Access at http://localhost:8088 when Docker services are running
 ```
 
 ### Frontend Development
+
+#### Legacy Frontend (React + Material-UI)
 ```bash
 bash frontend.sh             # Start development server
 # Or directly:
@@ -118,6 +120,17 @@ yarn install                 # Install dependencies
 yarn start                   # Development server
 yarn build                   # Production build
 yarn test                    # Run tests
+```
+
+#### New Frontend (Next.js 15 + GitLab UI)
+```bash
+bash frontend-next.sh        # Start development server
+# Or directly:
+cd frontend-next
+npm install                  # Install dependencies
+npm run dev                  # Development server (with Turbopack)
+npm run build                # Production build
+npm start                    # Production server
 ```
 
 ### TypeScript Generation
@@ -175,7 +188,7 @@ ctutor generate-types --watch          # Watch mode
 bash test.sh                          # Run all tests
 bash test.sh --unit                   # Unit tests only
 bash test.sh --integration            # Integration tests only
-pytest src/ctutor_backend/tests/      # Direct pytest
+pytest src/computor_backend/tests/      # Direct pytest
 
 # Key test files:
 # - test_temporal_workflows.py         # Temporal workflow tests
@@ -196,10 +209,13 @@ pytest src/ctutor_backend/tests/      # Direct pytest
 
 ### Service URLs (Development)
 - FastAPI: http://localhost:8000
-- Frontend: http://localhost:3000
+- Frontend (Legacy): http://localhost:3000 - React + Material-UI
+- Frontend (New): http://localhost:3000 - Next.js 15 + GitLab UI
 - Temporal UI: http://localhost:8088
 - MinIO Console: http://localhost:9001
 - Keycloak: http://localhost:8080
+
+**Note**: Both frontends run on port 3000 - run only one at a time, or configure different ports.
 
 ## Development Principles
 
@@ -238,27 +254,5 @@ pytest src/ctutor_backend/tests/      # Direct pytest
 3. **Database migrations failing**: Ensure database is running and credentials are correct
 4. **Frontend type errors**: Regenerate TypeScript interfaces with `bash generate_types.sh`
 
-### Debug Commands
-```bash
-# Check service status
-docker-compose -f docker-compose-dev.yaml ps
-
-# View Temporal workflows
-# Open http://localhost:8088
-
-# Test GitLab connection
-python scripts/debug/debug_gitlab_auth.py
-
-# Check database connection
-ctutor worker status
-```
-
-## Documentation References
-
-Key documentation files in `/docs/`:
-- `TEMPORAL_TASK_SYSTEM.md` - Temporal workflow details
-- `GITLAB_REFACTORING_PROGRESS.md` - GitLab integration status
-- `SSO_KEYCLOAK.md` - Keycloak SSO setup
-- `MINIO_STORAGE.md` - MinIO configuration
-
 Note: Some documentation may be outdated. This CLAUDE.md file represents the current system state.
+- and what if the url has no port because it is a domain name like "https://gitlab.com"? is this also possible?
