@@ -26,6 +26,7 @@ from .example import Example, ExampleRepository, ExampleVersion, ExampleDependen
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
 from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
+from .service import Service, ApiToken
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -43,6 +44,7 @@ from . import (
     extension,
     deployment,
     artifact,
+    service,
 )
 
 __all__ = [
@@ -104,4 +106,7 @@ __all__ = [
     'ResultArtifact',
     'SubmissionGrade',
     'SubmissionReview',
+    # Service models
+    'Service',
+    'ApiToken',
 ]

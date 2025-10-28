@@ -37,6 +37,9 @@ class User(Base):
     password_reset_required = Column(Boolean, nullable=False, server_default=text("false"))  # Track password reset status
     auth_token = Column(String(4096))  # Added from PostgreSQL migrations
 
+    # Service user flag (added via migration 19266bf266e9)
+    is_service = Column(Boolean, nullable=False, server_default=text("false"))
+
     # Relationships
     course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
     student_profiles = relationship("StudentProfile", foreign_keys="StudentProfile.user_id", back_populates="user", uselist=True, lazy="select")
@@ -46,7 +49,11 @@ class User(Base):
     user_groups = relationship("UserGroup", back_populates="user", uselist=True, lazy="select")
     user_roles = relationship("UserRole", back_populates="user", uselist=True, lazy="select")
     organization = relationship("Organization", foreign_keys="Organization.user_id", uselist=False, lazy="select")
-    
+
+    # Service account relationships (added via migration 19266bf266e9)
+    service = relationship("Service", foreign_keys="Service.user_id", back_populates="user", uselist=False, lazy="select")
+    api_tokens = relationship("ApiToken", foreign_keys="ApiToken.user_id", back_populates="user", uselist=True, lazy="select")
+
     # Self-referential relationships
     created_users = relationship("User", foreign_keys="User.created_by", remote_side=[id])
     updated_users = relationship("User", foreign_keys="User.updated_by", remote_side=[id])
