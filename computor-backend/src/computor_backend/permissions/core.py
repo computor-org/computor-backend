@@ -54,6 +54,7 @@ from computor_backend.model.role import Role, RoleClaim, UserRole
 from computor_backend.model.group import Group, GroupClaim, UserGroup
 from computor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from computor_backend.model.language import Language
+from computor_backend.model.service import Service, ApiToken
 
 
 def initialize_permission_handlers():
@@ -102,6 +103,10 @@ def initialize_permission_handlers():
     permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
     permission_registry.register(Result, ResultPermissionHandler(Result))
     permission_registry.register(Message, MessagePermissionHandler(Message))
+
+    # Service accounts and API tokens - admin only
+    permission_registry.register(Service, UserPermissionHandler(Service))
+    permission_registry.register(ApiToken, UserPermissionHandler(ApiToken))
 
     # Artifact models - use CourseMemberPermissionHandler for course-scoped access
     permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))

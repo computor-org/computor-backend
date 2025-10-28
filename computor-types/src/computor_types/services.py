@@ -18,10 +18,11 @@ class ServiceCreate(BaseModel):
     description: Optional[str] = Field(None, description="Service description")
     service_type: str = Field(..., min_length=1, max_length=63,
                              description="Service type (e.g., 'temporal_worker', 'grading', 'notification')")
-    user_id: str = Field(..., description="Associated user ID (service account)")
+    username: Optional[str] = Field(None, description="Username for service user (defaults to slug)")
+    email: Optional[str] = Field(None, description="Email for service user")
+    password: Optional[str] = Field(None, description="Password for service user (optional - use API tokens instead)")
     config: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Service-specific configuration")
-    enabled: bool = Field(True, description="Whether the service is enabled")
-    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
+    enabled: Optional[bool] = Field(True, description="Whether the service is enabled")
 
 
 class ServiceUpdate(BaseModel):
