@@ -145,22 +145,16 @@ services:
       - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
   
   # Frontend service
-#  frontend:
-#    build:
-#      context: ./
-#      dockerfile: ./docker/frontend/Dockerfile
-#      args:
-#        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:8080/api}
-#    restart: unless-stopped
-#    ports:
-#      - 3000:80
-#    depends_on:
-#      - uvicorn
-#      - traefik
-#    labels:
-#    - "traefik.enable=true"
-#    - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-#    - "traefik.http.routers.frontend.entrypoints=web"
+  frontend:
+    image: computor-web:latest ${COMPUTOR_WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      - uvicorn
+      - traefik
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+    - "traefik.http.routers.frontend.entrypoints=web"
 
   # Simple static file server (replaces nginx)
   static-server:
@@ -241,9 +235,6 @@ services:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
-      - DEBUG_MODE=${DEBUG_MODE}
-      - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
-      - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
@@ -252,10 +243,6 @@ services:
       - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
       - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
       - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
-      - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
@@ -281,9 +268,6 @@ services:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
-      - DEBUG_MODE=${DEBUG_MODE}
-      - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
-      - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - PYTHONPATH=/home/matlab/computor-backend/src
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
@@ -292,10 +276,6 @@ services:
       - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
       - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
       - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
-      - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
