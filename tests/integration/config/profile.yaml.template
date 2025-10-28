@@ -22,4 +22,4 @@ basic:
 # Note: For GitLab SSO authentication, use this format instead:
 # gitlab:
 #   url: https://gitlab.example.com
-#   token: glpat-xxxxxxxxxxxxxxxxxxxx
+#   token: xxxxx-xxxxxxxxxxxxxxxxxxxx
