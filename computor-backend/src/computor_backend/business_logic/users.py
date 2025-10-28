@@ -182,6 +182,33 @@ def get_course_views_for_user(user_id: str, db: Session) -> List[str]:
     return sorted(list(views))
 
 
+def get_course_views_for_user_by_course(user_id: str, course_id: UUID | str, db: Session) -> List[str]:
+    """Get available views based on role for a specific course for the user."""
+
+    # Query course membership for the specific course
+    course_member = (
+        db.query(CourseMember)
+        .filter(
+            CourseMember.user_id == user_id,
+            CourseMember.course_id == course_id
+        )
+        .first()
+    )
+
+    if not course_member or not course_member.course_role_id:
+        return []
+
+    role = course_member.course_role_id.lower()
+    views = []
+
+    if role in COURSE_ROLE_VIEW_MAP:
+        views = COURSE_ROLE_VIEW_MAP[role]
+    elif role in ELEVATED_COURSE_ROLES:
+        views = ["student", "tutor", "lecturer"]
+
+    return sorted(views)
+
+
 def _load_member_with_provider_for_user(
     course_id: UUID | str,
     permissions: Principal,

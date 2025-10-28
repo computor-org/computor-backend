@@ -20,6 +20,7 @@ from computor_backend.business_logic.users import (
     get_current_user,
     set_user_password,
     get_course_views_for_user,
+    get_course_views_for_user_by_course,
     validate_user_course,
     register_user_course_account,
 )
@@ -65,6 +66,22 @@ async def get_course_views_for_current_user(
         return []
 
     return get_course_views_for_user(user_id, db)
+
+@user_router.get(
+    "/views/{course_id}",
+    response_model=List[str],
+)
+async def get_course_views_for_current_user_by_course(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Get available views based on role for a specific course for the current user."""
+    user_id = permissions.get_user_id()
+    if not user_id:
+        return []
+
+    return get_course_views_for_user_by_course(user_id, course_id, db)
 
 @user_router.post(
     "/courses/{course_id}/validate",
