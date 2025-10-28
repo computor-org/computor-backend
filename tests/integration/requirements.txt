@@ -1,0 +1,14 @@
+# Integration Test Requirements
+# Install with: pip install -r requirements.txt
+
+# HTTP client for API testing
+httpx>=0.27.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# These should already be installed if you installed the computor packages
+# But listing them here for completeness:
+# computor-types
+# computor-client
+# computor-cli

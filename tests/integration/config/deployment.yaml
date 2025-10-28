@@ -1,0 +1,158 @@
+# Integration Test Deployment Configuration
+# This file sets up a complete test environment for permission testing
+#
+# Test Hierarchy:
+# - Organization: Test University
+#   - Course Family: Computer Science
+#     - Course: Programming 101 (with various roles assigned)
+
+# Upload example assignments from the examples directory
+examples_upload:
+  repository: "Test Examples"
+  path: "../examples"
+
+organizations:
+  - slug: test-university
+    title: Test University
+    description: Test organization for integration testing
+    parent_group_id: ${GITLAB_PARENT_GROUP_ID:-}
+
+    course_families:
+      - slug: computer-science
+        title: Computer Science
+        description: Test course family
+
+        courses:
+          - slug: programming-101
+            title: Programming 101
+            description: Test course for permission testing
+
+            # Define content types for the course
+            content_types:
+              - slug: lecture
+                title: Lecture Material
+                kind: unit
+                color: blue
+
+              - slug: homework
+                title: Homework Assignment
+                kind: assignment
+                color: yellow
+
+              - slug: project
+                title: Final Project
+                kind: assignment
+                color: orange
+
+            # Define execution backends
+            execution_backends:
+              - slug: test.exec.python
+
+            # Course content structure with hierarchical assignments
+            contents:
+              # Week 1: Basics
+              - content_type: lecture
+                title: Week 1 - Basic Programming
+                path: week1
+                contents:
+                  - content_type: homework
+                    title: Basic Arithmetic Operations
+                    example_identifier: test.assignment.basic-math
+                    example_version_tag: latest
+                    max_submissions: 10
+                    max_test_runs: 20
+
+              # Week 2: Functions
+              - content_type: lecture
+                title: Week 2 - Mathematical Functions
+                path: week2
+                contents:
+                  - content_type: homework
+                    title: Mathematical Functions
+                    example_identifier: test.assignment.math-functions
+                    example_version_tag: latest
+                    max_submissions: 10
+                    max_test_runs: 20
+
+# Define execution backends
+execution_backends:
+  - slug: test.exec.python
+    type: temporal:python
+    properties:
+      task_queue: computor-tasks
+      namespace: default
+      timeout_minutes: 30
+      max_retries: 3
+
+# Define users with different roles
+users:
+  # Admin user
+  - username: admin
+    email: admin@test.edu
+    name: Admin User
+    password: ${ADMIN_PASSWORD:-admin123}
+    is_admin: true
+
+  # Lecturer user
+  - username: lecturer1
+    email: lecturer1@test.edu
+    name: Professor Smith
+    password: ${LECTURER_PASSWORD:-lecturer123}
+    is_admin: false
+
+  # Tutor users
+  - username: tutor1
+    email: tutor1@test.edu
+    name: Teaching Assistant One
+    password: ${TUTOR_PASSWORD:-tutor123}
+    is_admin: false
+
+  - username: tutor2
+    email: tutor2@test.edu
+    name: Teaching Assistant Two
+    password: ${TUTOR_PASSWORD:-tutor123}
+    is_admin: false
+
+  # Student users
+  - username: student1
+    email: student1@test.edu
+    name: Alice Student
+    password: ${STUDENT_PASSWORD:-student123}
+    is_admin: false
+
+  - username: student2
+    email: student2@test.edu
+    name: Bob Student
+    password: ${STUDENT_PASSWORD:-student123}
+    is_admin: false
+
+  - username: student3
+    email: student3@test.edu
+    name: Charlie Student
+    password: ${STUDENT_PASSWORD:-student123}
+    is_admin: false
+
+# Course membership assignments
+# Format: organization_slug.course_family_slug.course_slug -> user -> role
+course_members:
+  test-university.computer-science.programming-101:
+    # Lecturers have full course control
+    - username: lecturer1
+      role: _lecturer
+
+    # Tutors can grade and assist
+    - username: tutor1
+      role: _tutor
+
+    - username: tutor2
+      role: _tutor
+
+    # Students can submit and view their work
+    - username: student1
+      role: _student
+
+    - username: student2
+      role: _student
+
+    - username: student3
+      role: _student

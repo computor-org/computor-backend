@@ -1,0 +1,30 @@
+slug: test.assignment.math-functions
+version: '1.0'
+title: Mathematical Functions
+description: Work with mathematical functions and basic plotting
+language: en
+license: MIT
+authors:
+- name: Test Author
+  email: test@example.com
+  affiliation: Test University
+maintainers:
+- name: Test Maintainer
+  email: maintainer@example.com
+  affiliation: Test University
+links: []
+supportingMaterial: []
+keywords:
+- python
+- math
+- functions
+properties:
+  studentSubmissionFiles:
+  - solution.py
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: test.exec.python
+    settings: {}
+    version: latest

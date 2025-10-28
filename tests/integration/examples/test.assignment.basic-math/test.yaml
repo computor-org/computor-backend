@@ -1,0 +1,51 @@
+type: python
+name: Python Test Suite
+description: Checks subtests and graphics
+version: '1.0'
+properties:
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  qualification: verifyEqual
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  allowedOccuranceRange:
+  - 0
+  - 0
+  occuranceType: NAME
+  typeCheck: true
+  shapeCheck: true
+  timeout: 180.0
+  tests:
+  - type: variable
+    name: values
+    entryPoint: basis1.py
+    id: values
+    tests:
+    - name: a
+    - name: b
+  - type: variable
+    name: calculations
+    successDependency:
+    - values
+    entryPoint: basis1.py
+    tests:
+    - name: sum_ab
+    - name: diff
+    - name: prod
+    - name: quot
+    - name: pot
+    - name: wurzel
+    - name: root3
+    - name: expo
+    - name: trig1
+    - name: trig2
+    - name: trig3
+  - type: structural
+    name: structural 1
+    entryPoint: basis1.py
+    file: basis1.py
+    tests:
+    - allowedOccuranceRange:
+      - 1
+      - 1
+      name: exp

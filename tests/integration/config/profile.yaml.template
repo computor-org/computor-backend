@@ -1,0 +1,25 @@
+# Computor CLI Profile Configuration
+# This file is used to authenticate with the Computor API
+#
+# Copy this file to profile.yaml and fill in your credentials:
+#   cp profile.yaml.template profile.yaml
+#
+# Then use it with the CLI:
+#   computor --profile config/profile.yaml deployment apply config/deployment.yaml
+#
+# Or set the environment variable:
+#   export COMPUTOR_PROFILE=/path/to/profile.yaml
+#   computor deployment apply config/deployment.yaml
+
+# API URL - must include /api suffix
+api_url: http://localhost:8000/api
+
+# Basic authentication (username/password)
+basic:
+  username: admin
+  password: admin123
+
+# Note: For GitLab SSO authentication, use this format instead:
+# gitlab:
+#   url: https://gitlab.example.com
+#   token: glpat-xxxxxxxxxxxxxxxxxxxx

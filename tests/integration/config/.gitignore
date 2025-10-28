@@ -1,0 +1,12 @@
+# Ignore actual .env file (contains secrets)
+.env
+
+# Ignore actual profile file (contains credentials)
+profile.yaml
+
+# Ignore test data and logs
+../data/*
+!../data/.gitkeep
+
+# Ignore test results
+../results/

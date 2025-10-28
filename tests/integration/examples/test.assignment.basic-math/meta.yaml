@@ -1,0 +1,30 @@
+slug: test.assignment.basic-math
+version: '1.0'
+title: Basic Arithmetic Operations
+description: Simple assignment to practice basic mathematical operations in Python
+language: en
+license: MIT
+authors:
+- name: Test Author
+  email: test@example.com
+  affiliation: Test University
+maintainers:
+- name: Test Maintainer
+  email: maintainer@example.com
+  affiliation: Test University
+links: []
+supportingMaterial: []
+keywords:
+- python
+- arithmetic
+- basics
+properties:
+  studentSubmissionFiles:
+  - solution.py
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: test.exec.python
+    settings: {}
+    version: latest

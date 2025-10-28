@@ -1,0 +1,46 @@
+type: python
+name: Python Test Suite
+description: Checks subtests and graphics
+version: '1.0'
+properties:
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  qualification: verifyEqual
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  allowedOccuranceRange:
+  - 0
+  - 0
+  occuranceType: NAME
+  typeCheck: true
+  shapeCheck: true
+  timeout: 180.0
+  tests:
+  - type: variable
+    name: values
+    entryPoint: cos_exp.py
+    id: values
+    tests:
+    - name: x
+    - name: d
+  - storeGraphicsArtifacts: false
+    type: graphics
+    name: figure
+    entryPoint: cos_exp.py
+    tests:
+    - name: figure(1).axes[0].lines[0].properties()['xydata']
+    - name: figure(1).axes[0].lines[1].properties()['xydata']
+    - name: figure(1).axes[0].lines[2].properties()['xydata']
+    - name: figure(1).axes[0].get_xlim()
+    - name: figure(1).axes[0].get_ylim()
+    - name: figure(1).axes[0].get_xlabel()
+    - name: figure(1).axes[0].get_ylabel()
+    - name: figure(1).axes[0].get_title()
+  - type: exist
+    name: existance fun_exp
+    entryPoint: cos_exp.py
+    id: fun_exp
+    file: fun_exp.py
+    tests:
+    - name: '-'
+  
