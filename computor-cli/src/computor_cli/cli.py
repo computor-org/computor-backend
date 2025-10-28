@@ -19,8 +19,18 @@ from computor_cli.deployment import deployment
 # from computor_cli.test import run_test
 
 @click.group()
-def cli():
-    pass
+@click.option(
+    '--profile',
+    envvar='COMPUTOR_PROFILE',
+    type=click.Path(exists=True),
+    help='Path to custom profile YAML file (overrides ~/.computor/active_profile.yaml)'
+)
+@click.pass_context
+def cli(ctx, profile):
+    """Computor CLI - Manage courses, users, and deployments."""
+    # Store profile path in context for subcommands to access
+    ctx.ensure_object(dict)
+    ctx.obj['PROFILE_PATH'] = profile
 
 # Available commands (no backend dependency)
 cli.add_command(change_profile, "profiles")

@@ -190,24 +190,38 @@ def login(auth_method,base_url,username,password,gitlab_host,gitlab_token):
 def authenticate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-
-        file = os.path.join(COMPUTOR_DIR,AUTH_FILE)
-
         from click import get_current_context
         from computor_types.deployments import DeploymentFactory
 
+        ctx = get_current_context()
+
+        # Check if custom profile path is provided via --profile or COMPUTOR_PROFILE env var
+        custom_profile = None
+        if ctx.obj and 'PROFILE_PATH' in ctx.obj:
+            custom_profile = ctx.obj['PROFILE_PATH']
+
+        # Use custom profile if provided, otherwise use default
+        if custom_profile:
+            file = custom_profile
+        else:
+            file = os.path.join(COMPUTOR_DIR, AUTH_FILE)
+
         if not os.path.exists(file):
-            click.echo("You are not logged in. Please login")
-            auth_method = click.prompt("Auth method", type=click.Choice(['basic', 'gitlab', 'github']))
+            if custom_profile:
+                click.echo(f"Profile file not found: {custom_profile}")
+                click.echo("Please create the profile file or check the path.")
+                raise click.Abort()
+            else:
+                click.echo("You are not logged in. Please login")
+                auth_method = click.prompt("Auth method", type=click.Choice(['basic', 'gitlab', 'github']))
+                ctx.invoke(login, auth_method=auth_method)
 
-            get_current_context().invoke(login,auth_method=auth_method)
-
-        auth: CLIAuthConfig = DeploymentFactory.read_deployment_from_file(CLIAuthConfig,file)
+        auth: CLIAuthConfig = DeploymentFactory.read_deployment_from_file(CLIAuthConfig, file)
 
         kwargs["auth"] = auth
 
         return func(*args, **kwargs)
-    
+
     return wrapper
 
 # Global cache for authenticated clients (keyed by API URL + auth type)
