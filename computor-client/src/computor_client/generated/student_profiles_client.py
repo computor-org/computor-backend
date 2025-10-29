@@ -33,6 +33,10 @@ class StudentProfilesClient(BaseEndpointClient):
             return await self.get_student_profiles(**params)
         return await self.get_student_profiles()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_student_profile_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_student_profile_by_id(id, payload)
@@ -49,7 +53,7 @@ class StudentProfilesClient(BaseEndpointClient):
             return [StudentProfileList.model_validate(item) for item in data]
         return data
 
-    async def post_student_profiles(self, payload: StudentProfileCreate) -> StudentProfileGet:
+    async def post_student_profiles(self, payload: StudentProfileCreate, user_id: Optional[str] = None) -> StudentProfileGet:
         """Create Student Profile"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -57,14 +61,15 @@ class StudentProfilesClient(BaseEndpointClient):
             return StudentProfileGet.model_validate(data)
         return data
 
-    async def get_student_profile_by_id(self, id: str) -> StudentProfileGet:
+    async def get_student_profile_by_id(self, id: str, user_id: Optional[str] = None) -> StudentProfileGet:
         """Get Student Profile"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return StudentProfileGet.model_validate(data)
         return data
 
-    async def patch_student_profile_by_id(self, id: str, payload: StudentProfileUpdate) -> StudentProfileGet:
+    async def patch_student_profile_by_id(self, id: str, payload: StudentProfileUpdate, user_id: Optional[str] = None) -> StudentProfileGet:
         """Update Student Profile"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class StudentProfilesClient(BaseEndpointClient):
             return StudentProfileGet.model_validate(data)
         return data
 
-    async def delete_student_profile_by_id(self, id: str) -> Any:
+    async def delete_student_profile_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Student Profile"""
         data = await self._request("DELETE", f"/{id}")

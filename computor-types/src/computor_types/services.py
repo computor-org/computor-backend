@@ -12,8 +12,8 @@ from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, 
 
 class ServiceCreate(BaseModel):
     """DTO for creating a new service account."""
-    slug: str = Field(..., min_length=3, max_length=255, pattern=r'^[a-z0-9][a-z0-9-]*[a-z0-9]$',
-                      description="URL-safe slug identifier (lowercase, alphanumeric, hyphens)")
+    slug: str = Field(..., min_length=3, max_length=255, pattern=r'^[a-z0-9][a-z0-9.\-]*[a-z0-9]$',
+                      description="URL-safe slug identifier (lowercase, alphanumeric, dots, hyphens)")
     name: str = Field(..., min_length=1, max_length=255, description="Human-readable service name")
     description: Optional[str] = Field(None, description="Service description")
     service_type: str = Field(..., min_length=1, max_length=63,
@@ -37,10 +37,11 @@ class ServiceUpdate(BaseModel):
 
 class ServiceGet(BaseEntityGet):
     """DTO for retrieving a service account."""
+    id: str = Field(..., description="Service UUID")
     slug: str
     name: str
     description: Optional[str] = None
-    service_type: str
+    service_type_id: Optional[str] = Field(None, description="ServiceType UUID")
     user_id: str
     config: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool
@@ -54,8 +55,11 @@ class ServiceList(BaseEntityList):
 
 class ServiceQuery(ListQuery):
     """DTO for querying services."""
-    service_type: Optional[str] = Field(None, description="Filter by service type")
+    id: Optional[str] = Field(None, description="Filter by service UUID")
+    slug: Optional[str] = Field(None, description="Filter by service slug")
+    service_type_id: Optional[str] = Field(None, description="Filter by service type UUID")
     enabled: Optional[bool] = Field(None, description="Filter by enabled status")
+    user_id: Optional[str] = Field(None, description="Filter by user ID")
 
 
 class ServiceInterface(EntityInterface):

@@ -133,7 +133,7 @@ class Service(Base):
     __tablename__ = 'service'
     __table_args__ = (
         CheckConstraint(
-            "slug ~* '^[a-z0-9][a-z0-9-]*[a-z0-9]$'",
+            "slug ~* '^[a-z0-9][a-z0-9.\\-]*[a-z0-9]$'",
             name='ck_service_slug_format'
         ),
         Index('idx_service_enabled', 'enabled', postgresql_where=text("enabled = true AND archived_at IS NULL")),

@@ -21,6 +21,7 @@ from computor_types.services import (
     ServiceGet,
     ServiceList,
     ServiceUpdate,
+    ServiceQuery,
 )
 from computor_types.password_utils import create_password_hash
 
@@ -60,31 +61,60 @@ def create_service_account(
 
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == username).first()
+
     if existing_user:
-        raise BadRequestException(detail=f"User with username '{username}' already exists")
+        # If user exists and is a service user, link to it
+        if not existing_user.is_service:
+            raise BadRequestException(detail=f"User with username '{username}' already exists and is not a service account")
 
+        # Check if user is already linked to another service
+        existing_service_for_user = db.query(Service).filter(Service.user_id == existing_user.id, Service.archived_at.is_(None)).first()
+        if existing_service_for_user:
+            raise BadRequestException(detail=f"User '{username}' is already linked to service '{existing_service_for_user.slug}'")
+
+        user = existing_user
+        logger.info(f"Linking service to existing user: {username}")
+    else:
+        # Create new service user
+        try:
+            user = User(
+                username=username,
+                email=service_data.email,
+                given_name=service_data.name.split()[0] if service_data.name else service_data.slug,
+                family_name=" ".join(service_data.name.split()[1:]) if len(service_data.name.split()) > 1 else "",
+                is_service=True,
+                password=create_password_hash(service_data.password) if service_data.password else None,
+                created_by=permissions.user_id,
+                properties={"service_type": service_data.service_type, "auto_created": False},
+            )
+
+            db.add(user)
+            db.flush()  # Get user ID
+            logger.info(f"Created new service user: {username}")
+        except Exception as e:
+            raise BadRequestException(detail=f"Failed to create user: {str(e)}")
+
+    # Look up ServiceType by path to get UUID
+    service_type_id = None
+    if service_data.service_type:
+        from computor_backend.model.service import ServiceType
+        from sqlalchemy import cast, Text
+        # Cast Ltree to text for comparison to avoid Ltree type processing issues
+        service_type = db.query(ServiceType).filter(
+            cast(ServiceType.path, Text) == service_data.service_type
+        ).first()
+        if service_type:
+            service_type_id = service_type.id
+        else:
+            logger.warning(f"ServiceType not found for path: {service_data.service_type}")
+
+    # Create service record
     try:
-        # Create service user
-        user = User(
-            username=username,
-            email=service_data.email,
-            given_name=service_data.name.split()[0] if service_data.name else service_data.slug,
-            family_name=" ".join(service_data.name.split()[1:]) if len(service_data.name.split()) > 1 else "",
-            is_service=True,
-            password=create_password_hash(service_data.password) if service_data.password else None,
-            created_by=permissions.user_id,
-            properties={"service_type": service_data.service_type, "auto_created": False},
-        )
-
-        db.add(user)
-        db.flush()  # Get user ID
-
-        # Create service record
         service = Service(
             slug=service_data.slug,
             name=service_data.name,
             description=service_data.description,
-            service_type=service_data.service_type,
+            service_type_id=service_type_id,
             user_id=user.id,
             config=service_data.config or {},
             enabled=service_data.enabled if service_data.enabled is not None else True,
@@ -127,11 +157,19 @@ def get_service_account(
 def list_service_accounts(
     permissions: Principal,
     db: Session,
+    query_params: ServiceQuery = None,
 ) -> List[ServiceGet]:
-    """List all service accounts."""
-    query = check_permissions(permissions, Service, "read", db)
+    """List all service accounts with optional filtering."""
+    from computor_backend.interfaces.service import ServiceInterface
 
-    services = query.filter(Service.archived_at.is_(None)).all()
+    query = check_permissions(permissions, Service, "read", db)
+    query = query.filter(Service.archived_at.is_(None))
+
+    # Apply filters if provided
+    if query_params:
+        query = ServiceInterface.search(db, query, query_params)
+
+    services = query.all()
 
     return [ServiceGet.model_validate(s, from_attributes=True) for s in services]
 

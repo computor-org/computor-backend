@@ -41,8 +41,7 @@ from computor_types.course_members import CourseMemberCreate, CourseMemberQuery
 from computor_types.course_groups import CourseGroupQuery, CourseGroupCreate
 from computor_types.organizations import OrganizationQuery
 from computor_types.course_families import CourseFamilyQuery
-from computor_types.execution_backends import ExecutionBackendCreate, ExecutionBackendQuery, ExecutionBackendUpdate
-from computor_types.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendQuery
+# Execution backends removed - migrated to services architecture
 from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
 from computor_types.service_type import ServiceTypeQuery
 from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate
@@ -428,58 +427,6 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             click.echo(f"    - {user_dep.display_name}")
 
 
-def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
-    """
-    Deploy execution backends from configuration.
-
-    DEPRECATED: Use _deploy_services() instead for the new service-based architecture.
-    """
-
-    client = run_async(get_computor_client(auth))
-
-    if not config.execution_backends:
-        return
-
-    click.echo(f"\n⚙️  Deploying {len(config.execution_backends)} execution backends...")
-
-    # Get API client
-    backend_client = client.execution_backends
-
-    for backend_config in config.execution_backends:
-        click.echo(f"\n  Processing backend: {backend_config.slug}")
-
-        try:
-            # Check if backend already exists
-            existing_backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_config.slug)))
-
-            if existing_backends:
-                backend = existing_backends[0]
-                click.echo(f"    ℹ️  Backend already exists: {backend.slug}")
-
-                # Check if we need to update properties
-                if backend.type != backend_config.type or backend.properties != backend_config.properties:
-                    # Update backend
-                    backend_update = ExecutionBackendUpdate(
-                        type=backend_config.type,
-                        properties=backend_config.properties or {}
-                    )
-
-                    run_async(backend_client.update(str(backend.id), backend_update))
-                    click.echo(f"    ✅ Updated backend: {backend_config.slug}")
-            else:
-                # Create new backend
-                backend_create = ExecutionBackendCreate(
-                    slug=backend_config.slug,
-                    type=backend_config.type,
-                    properties=backend_config.properties or {}
-                )
-                backend = run_async(backend_client.create(backend_create))
-                click.echo(f"    ✅ Created backend: {backend_config.slug}")
-
-        except Exception as e:
-            click.echo(f"    ❌ Failed to deploy backend {backend_config.slug}: {e}")
-
-
 def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> dict:
     """
     Deploy services from configuration (Phase 1 of deployment).
@@ -531,26 +478,8 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 }
                 continue
 
-            # 1. Create or get user for the service
+            # 1. Get username for the service (API will create user if needed)
             user_username = service_config.user.username
-            existing_users = run_async(user_client.list(UserQuery(username=user_username)))
-
-            if existing_users and len(existing_users) > 0:
-                user = existing_users[0]
-                click.echo(f"    ℹ️  Using existing user: {user_username}")
-            else:
-                # Create new user
-                user_create = UserCreate(
-                    username=user_username,
-                    email=service_config.user.email or f"{user_username}@computor.service",
-                    given_name=service_config.user.given_name or service_config.slug.split('-')[0].title(),
-                    family_name=service_config.user.family_name or "Service",
-                    is_service=True,
-                    password=None,  # Services use API tokens, not passwords
-                    properties={"auto_created": True}
-                )
-                user = run_async(user_client.create(user_create))
-                click.echo(f"    ✅ Created service user: {user_username}")
 
             # 2. Look up ServiceType by path
             service_type = None
@@ -616,7 +545,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 token_create = ApiTokenCreate(
                     name=token_config.name or f"{service_config.slug} Token",
                     description=f"API token for {service_config.slug}",
-                    user_id=str(user.id),
+                    user_id=str(service.user_id),
                     scopes=token_config.scopes or [],
                     expires_at=expires_at
                 )
@@ -628,7 +557,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 deployed_services[service_config.slug] = {
                     "id": str(service.id),
-                    "user_id": str(user.id),
+                    "user_id": str(service.user_id),
                     "token_id": str(token_response.id),
                     "token": token_response.token
                 }
@@ -688,7 +617,7 @@ def _deploy_course_content_types(course_id: str, content_types_config: list, aut
         click.echo(f"    📊 Content types: {created_count} created, {existing_count} existing")
 
 
-def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseConfig, auth: CLIAuthConfig, parent_path: str = None, position_counter: list = None):
+def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseConfig, auth: CLIAuthConfig, parent_path: str = None, position_counter: list = None, deployed_services: dict = None):
     """Deploy course contents for a course."""
 
 
@@ -706,7 +635,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
     content_type_client = client.course_content_types
     content_kind_client = client.course_content_kinds
     example_client = client.examples
-    backend_client = client.execution_backends
+    # backend_client = client.execution_backends  # REMOVED: execution_backends deprecated
     custom_client = SyncHTTPWrapper(client)
     
     for content_config in course_config.contents:
@@ -822,7 +751,9 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             if existing_contents:
                 content = existing_contents[0]
                 click.echo(f"    ℹ️  Content already exists: {content.title} ({full_path})")
+
                 # Only update description if explicitly provided in deployment, otherwise if empty use meta_yaml.description
+                # NOTE: testing_service_id is NOT set here - it's set automatically when an example is assigned
                 to_update = {}
                 if content_config.description is not None:
                     if content_config.description != getattr(content, 'description', None):
@@ -837,25 +768,20 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 if (current_title is None) or (current_title == fallback_seg) or (current_title == friendly_fallback and better_title not in [None, friendly_fallback]):
                     if better_title and better_title != current_title:
                         to_update['title'] = better_title
+
                 if to_update:
                     try:
                         from computor_types.course_contents import CourseContentUpdate
                         run_async(content_client.update(str(content.id), CourseContentUpdate(**to_update)))
-                        click.echo(f"      ✏️  Updated content description")
+                        update_msg = ", ".join(to_update.keys())
+                        click.echo(f"      ✏️  Updated content: {update_msg}")
                     except Exception as e:
-                        click.echo(f"      ⚠️  Failed to update content description: {e}")
+                        click.echo(f"      ⚠️  Failed to update content: {e}")
             else:
                 # Determine position
                 position = content_config.position if content_config.position is not None else position_counter[0]
                 position_counter[0] += 1.0
-                
-                # Determine execution backend ID
-                execution_backend_id = None
-                if content_config.execution_backend:
-                    backends = run_async(backend_client.list(ExecutionBackendQuery(slug=content_config.execution_backend)))
-                    if backends:
-                        execution_backend_id = str(backends[0].id)
-                
+
                 # Derive title/description defaults: description only from meta_yaml when not given
                 fallback_seg = None
                 try:
@@ -864,8 +790,9 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     fallback_seg = full_path
                 effective_title = content_config.title or meta_title or ex_title or _humanize(fallback_seg)
                 effective_description = content_config.description if content_config.description is not None else meta_description
-                
+
                 # Create the content
+                # NOTE: testing_service_id is NOT set here - it's set automatically when an example is assigned
                 content_create = CourseContentCreate(
                     title=effective_title,
                     description=effective_description,
@@ -876,7 +803,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     max_group_size=content_config.max_group_size or 1,
                     max_test_runs=content_config.max_test_runs,
                     max_submissions=content_config.max_submissions,
-                    execution_backend_id=execution_backend_id,
+                    testing_service_id=None,  # Will be set when example is assigned
                     properties=content_config.properties
                 )
                 
@@ -979,8 +906,8 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             # Recursively deploy nested contents
             if content_config.contents:
                 # Create a temporary course config with just the nested contents
-                nested_config = type('obj', (object,), {'contents': content_config.contents})()
-                _deploy_course_contents(course_id, nested_config, auth, full_path, position_counter)
+                nested_config = type('obj', (object,), {'contents': content_config.contents, 'services': getattr(course_config, 'services', None)})()
+                _deploy_course_contents(course_id, nested_config, auth, full_path, position_counter, deployed_services)
                 
         except Exception as e:
             click.echo(f"    ❌ Failed to create content {content_config.title}: {e}")
@@ -1165,14 +1092,6 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                             service_course_mapping[service_id] = []
                         service_course_mapping[service_id].append(str(course.id))
 
-                # Link execution backends to this course (legacy)
-                if course_config.execution_backends:
-                    _link_execution_backends_to_course(
-                        str(course.id),
-                        course_config.execution_backends,
-                        auth
-                    )
-
                 # Deploy course content types first (must exist before creating contents)
                 if course_config.content_types:
                     click.echo(f"\n📋 Creating course content types for {course_config.name}...")
@@ -1181,71 +1100,14 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                 # Deploy course contents
                 if course_config.contents:
                     click.echo(f"\n📚 Creating course contents for {course_config.name}...")
-                    _deploy_course_contents(str(course.id), course_config, auth)
+                    # Pass service information so course contents can link to testing services
+                    _deploy_course_contents(str(course.id), course_config, auth, deployed_services=deployed_services)
 
     # Generate student templates if requested
     if generate_student_template:
         _generate_student_templates(config, auth)
 
     return service_course_mapping
-
-
-def _link_execution_backends_to_course(course_id: str, execution_backends: list, auth: CLIAuthConfig):
-    """
-    Link execution backends to a course.
-
-    DEPRECATED: Use _link_services_to_course() for the new service-based architecture.
-    """
-
-    if not execution_backends:
-        return
-
-    client = run_async(get_computor_client(auth))
-
-    # Get API clients
-    backend_client = client.execution_backends
-    course_backend_client = client.course_execution_backends
-
-    for backend_ref in execution_backends:
-        try:
-            # Find the backend by slug
-            backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_ref.slug)))
-
-            if not backends:
-                click.echo(f"      ⚠️  Backend not found: {backend_ref.slug}")
-                continue
-
-            backend = backends[0]
-
-            # Check if link already exists
-            existing_links = run_async(course_backend_client.list(CourseExecutionBackendQuery(
-                course_id=course_id,
-                execution_backend_id=str(backend.id)
-            )))
-
-            if existing_links:
-                click.echo(f"      ℹ️  Backend already linked: {backend_ref.slug}")
-
-                # Update properties if provided
-                if backend_ref.properties:
-                    link = existing_links[0]
-                    link_update = {
-                        'properties': backend_ref.properties
-                    }
-                    run_async(course_backend_client.update(str(link.id), link_update))
-                    click.echo(f"      ✅ Updated link properties for: {backend_ref.slug}")
-            else:
-                # Create new link
-                link_create = CourseExecutionBackendCreate(
-                    course_id=course_id,
-                    execution_backend_id=str(backend.id),
-                    properties=backend_ref.properties or {}
-                )
-                run_async(course_backend_client.create(link_create))
-                click.echo(f"      ✅ Linked backend: {backend_ref.slug}")
-
-        except Exception as e:
-            click.echo(f"      ❌ Failed to link backend {backend_ref.slug}: {e}")
 
 
 def _link_services_to_course(course_id: str, services: list, deployed_services: dict, auth: CLIAuthConfig) -> list:
@@ -1716,13 +1578,6 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"       {counts['users']} users, {counts['course_members']} course memberships")
             
             # Show execution backends to be created
-            if config.execution_backends:
-                click.echo(f"\nExecution Backends to create/update:")
-                for backend in config.execution_backends:
-                    click.echo(f"  - {backend.slug} (type: {backend.type})")
-                    if backend.properties:
-                        click.echo(f"    Properties: {backend.properties}")
-            
             # Show hierarchical structure
             for org_idx, org in enumerate(config.organizations):
                 click.echo(f"\nOrganization {org_idx + 1}: {org.name} ({org.path})")
@@ -1734,9 +1589,6 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                     
                     for course_idx, course in enumerate(family.courses):
                         click.echo(f"    Course {course_idx + 1}: {course.name} ({course.path})")
-                        if course.execution_backends:
-                            backend_refs = [ref.slug for ref in course.execution_backends]
-                            click.echo(f"      Backend references: {', '.join(backend_refs)}")
             
             # Show all paths that will be created
             paths = config.get_deployment_paths()
@@ -1781,10 +1633,6 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     deployed_services = {}
     if config.services:
         deployed_services = _deploy_services(config, auth)
-    elif config.execution_backends:
-        # Fallback to legacy execution_backends if no services defined
-        _deploy_execution_backends(config, auth)
-
     # Optionally upload VS Code extensions prior to starting hierarchy deployment
     if getattr(config, 'extensions_upload', None):
         cfg_dir = Path(config_file).parent
@@ -1930,17 +1778,8 @@ def validate(config_file: str):
         # Check for potential issues
         warnings = []
         gitlab_configured = any(org.gitlab for org in config.organizations)
-        execution_backends_configured = any(
-            course.execution_backends 
-            for org in config.organizations 
-            for family in org.course_families 
-            for course in family.courses
-        )
-        
         if not gitlab_configured:
             warnings.append("No GitLab configuration specified for any organization")
-        if not execution_backends_configured:
-            warnings.append("No execution backends configured for any course")
         
         if warnings:
             click.echo(f"\n⚠️  Warnings:")

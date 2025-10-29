@@ -187,7 +187,7 @@ class CrudRouter:
                     for task in self.on_archived:
                         background_tasks.add_task(task, entity_archived, db, permissions)
 
-                return archive_db(permissions, db, id, self.dto.model)
+                return await archive_db(permissions, db, id, self.dto.model)
             return route
         else:
             return None

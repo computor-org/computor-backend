@@ -33,6 +33,10 @@ class CourseMembersClient(BaseEndpointClient):
             return await self.get_course_members(**params)
         return await self.get_course_members()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_course_member_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_course_member_by_id(id, payload)
@@ -41,7 +45,7 @@ class CourseMembersClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_course_member_by_id(id)
 
-    async def post_course_members(self, payload: CourseMemberCreate) -> CourseMemberGet:
+    async def post_course_members(self, payload: CourseMemberCreate, user_id: Optional[str] = None) -> CourseMemberGet:
         """Create Course-Members"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -57,14 +61,15 @@ class CourseMembersClient(BaseEndpointClient):
             return [CourseMemberList.model_validate(item) for item in data]
         return data
 
-    async def get_course_member_by_id(self, id: str) -> CourseMemberGet:
+    async def get_course_member_by_id(self, id: str, user_id: Optional[str] = None) -> CourseMemberGet:
         """Get Course-Members"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return CourseMemberGet.model_validate(data)
         return data
 
-    async def patch_course_member_by_id(self, id: str, payload: CourseMemberUpdate) -> CourseMemberGet:
+    async def patch_course_member_by_id(self, id: str, payload: CourseMemberUpdate, user_id: Optional[str] = None) -> CourseMemberGet:
         """Update Course-Members"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class CourseMembersClient(BaseEndpointClient):
             return CourseMemberGet.model_validate(data)
         return data
 
-    async def delete_course_member_by_id(self, id: str) -> Any:
+    async def delete_course_member_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Course-Members"""
         data = await self._request("DELETE", f"/{id}")

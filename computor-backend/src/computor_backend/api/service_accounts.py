@@ -21,6 +21,7 @@ from computor_types.services import (
     ServiceGet,
     ServiceList,
     ServiceUpdate,
+    ServiceQuery,
 )
 
 service_accounts_router = APIRouter()
@@ -39,10 +40,11 @@ def create_service_endpoint(
 @service_accounts_router.get("", response_model=List[ServiceGet])
 def list_services_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    query: ServiceQuery = Depends(),
     db: Session = Depends(get_db),
 ):
-    """List all service accounts."""
-    return list_service_accounts(permissions, db)
+    """List all service accounts with optional filtering."""
+    return list_service_accounts(permissions, db, query)
 
 
 @service_accounts_router.get("/{service_id}", response_model=ServiceGet)

@@ -33,15 +33,19 @@ class UsersClient(BaseEndpointClient):
             return await self.get_users(**params)
         return await self.get_users()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_user_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
-        return await self.patch_user_by_id_archive(id, payload)
+        return await self.patch_user_by_id(id, payload)
 
     async def delete(self, id: str):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_user_by_id(id)
 
-    async def post_users(self, payload: UserCreate) -> UserGet:
+    async def post_users(self, payload: UserCreate, user_id: Optional[str] = None) -> UserGet:
         """Create Users"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -49,22 +53,23 @@ class UsersClient(BaseEndpointClient):
             return UserGet.model_validate(data)
         return data
 
-    async def get_users(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, given_name: Optional[str] = None, family_name: Optional[str] = None, email: Optional[str] = None, number: Optional[str] = None, user_type: Optional[str] = None, archived: Optional[str] = None, username: Optional[str] = None) -> List[UserList]:
+    async def get_users(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, given_name: Optional[str] = None, family_name: Optional[str] = None, email: Optional[str] = None, number: Optional[str] = None, user_type: Optional[str] = None, archived: Optional[str] = None, username: Optional[str] = None, user_id: Optional[str] = None) -> List[UserList]:
         """List Users"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'given_name', 'family_name', 'email', 'number', 'user_type', 'archived', 'username'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'given_name', 'family_name', 'email', 'number', 'user_type', 'archived', 'username', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [UserList.model_validate(item) for item in data]
         return data
 
-    async def get_user_by_id(self, id: str) -> UserGet:
+    async def get_user_by_id(self, id: str, user_id: Optional[str] = None) -> UserGet:
         """Get Users"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return UserGet.model_validate(data)
         return data
 
-    async def patch_user_by_id(self, id: str, payload: UserUpdate) -> UserGet:
+    async def patch_user_by_id(self, id: str, payload: UserUpdate, user_id: Optional[str] = None) -> UserGet:
         """Update Users"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,10 +77,10 @@ class UsersClient(BaseEndpointClient):
             return UserGet.model_validate(data)
         return data
 
-    async def delete_user_by_id(self, id: str) -> Any:
+    async def delete_user_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Users"""
         data = await self._request("DELETE", f"/{id}")
 
-    async def patch_user_by_id_archive(self, id: str) -> Any:
+    async def patch_user_by_id_archive(self, id: str, user_id: Optional[str] = None) -> Any:
         """Route Users"""
         data = await self._request("PATCH", f"/{id}/archive")

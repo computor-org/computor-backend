@@ -28,9 +28,13 @@ class TasksClient(TaskClient):
             return await self.get_tasks(**params)
         return await self.get_tasks()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_task_by_task_id(id)
+
     async def delete(self, id: str):
         """Delete entity (delegates to generated DELETE method)."""
-        return await self.delete_task_cancel(id)
+        return await self.delete_task_by_task_id(id)
 
     async def get_tasks(self, limit: Optional[str] = None, offset: Optional[str] = None, status: Optional[str] = None) -> Dict[str, Any]:
         """List Tasks"""

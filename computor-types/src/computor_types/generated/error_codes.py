@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-10-20T13:01:24.098646
+Generated at: 2025-10-29T23:13:51.371962
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -54,6 +54,14 @@ class ErrorCode(str, Enum):
     TASK_002 = "TASK_002"  # Task Submission Failed
     TASK_003 = "TASK_003"  # Unsupported Execution Backend
     TASK_004 = "TASK_004"  # Course Membership Not Found
+    GITLAB_001 = "GITLAB_001"  # GitLab Not Configured
+    GITLAB_002 = "GITLAB_002"  # GitLab Account Not Registered
+    GITLAB_003 = "GITLAB_003"  # GitLab Token Mismatch
+    GITLAB_004 = "GITLAB_004"  # GitLab Account Already Linked
+    GITLAB_005 = "GITLAB_005"  # GitLab Token Required
+    GITLAB_006 = "GITLAB_006"  # GitLab Token Invalid
+    GITLAB_007 = "GITLAB_007"  # GitLab API Unreachable
+    GITLAB_008 = "GITLAB_008"  # Invalid GitLab Username
     EXT_001 = "EXT_001"  # GitLab Service Unavailable
     EXT_002 = "EXT_002"  # GitLab Authentication Failed
     EXT_003 = "EXT_003"  # MinIO Service Unavailable
@@ -76,8 +84,8 @@ HTTP_STATUS_TO_ERROR_CODE = {
     429: ErrorCode.RATE_001,
     500: ErrorCode.TASK_002,
     501: ErrorCode.NIMPL_001,
-    502: ErrorCode.EXT_002,
-    503: ErrorCode.EXT_001,
+    502: ErrorCode.GITLAB_006,
+    503: ErrorCode.GITLAB_007,
 }
 
 # Mapping of error categories
@@ -124,6 +132,14 @@ ERROR_CATEGORIES = {
     ErrorCode.TASK_002: "internal",
     ErrorCode.TASK_003: "validation",
     ErrorCode.TASK_004: "not_found",
+    ErrorCode.GITLAB_001: "validation",
+    ErrorCode.GITLAB_002: "validation",
+    ErrorCode.GITLAB_003: "authentication",
+    ErrorCode.GITLAB_004: "conflict",
+    ErrorCode.GITLAB_005: "authentication",
+    ErrorCode.GITLAB_006: "external_service",
+    ErrorCode.GITLAB_007: "external_service",
+    ErrorCode.GITLAB_008: "validation",
     ErrorCode.EXT_001: "external_service",
     ErrorCode.EXT_002: "external_service",
     ErrorCode.EXT_003: "external_service",

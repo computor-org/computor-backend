@@ -5,8 +5,8 @@ Service types define the kinds of services available in the system using
 a UUID + Ltree hybrid approach for stable references and hierarchical organization.
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Any
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from datetime import datetime
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -107,6 +107,11 @@ class ServiceTypeUpdate(BaseModel):
 
 class ServiceTypeList(BaseEntityList):
     """DTO for listing service types (minimal fields)."""
+    model_config = ConfigDict(
+        from_attributes=True,
+        arbitrary_types_allowed=True
+    )
+
     id: str = Field(..., description="UUID")
     path: str = Field(..., description="Hierarchical path")
     name: str = Field(..., description="Display name")
@@ -115,9 +120,26 @@ class ServiceTypeList(BaseEntityList):
     icon: Optional[str] = Field(None, description="Icon identifier")
     color: Optional[str] = Field(None, description="Hex color")
 
+    @field_validator('path', mode='before')
+    @classmethod
+    def convert_ltree_to_str(cls, v: Any) -> str:
+        """Convert Ltree objects to strings."""
+        if v is None:
+            return ""
+        # If it's already a string, return it
+        if isinstance(v, str):
+            return v
+        # Otherwise convert to string (handles Ltree objects)
+        return str(v)
+
 
 class ServiceTypeGet(BaseEntityGet):
     """DTO for getting a single service type (full fields)."""
+    model_config = ConfigDict(
+        from_attributes=True,
+        arbitrary_types_allowed=True
+    )
+
     id: str = Field(..., description="UUID")
     path: str = Field(..., description="Hierarchical path")
     name: str = Field(..., description="Display name")
@@ -130,6 +152,16 @@ class ServiceTypeGet(BaseEntityGet):
     enabled: bool = Field(..., description="Enabled status")
     properties: dict = Field(default_factory=dict, description="Additional properties")
     version: int = Field(..., description="Version number")
+
+    @field_validator('path', mode='before')
+    @classmethod
+    def convert_ltree_to_str(cls, v: Any) -> str:
+        """Convert Ltree objects to strings."""
+        if v is None:
+            return ""
+        if isinstance(v, str):
+            return v
+        return str(v)
 
 
 class ServiceTypeQuery(ListQuery):

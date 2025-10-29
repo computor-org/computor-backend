@@ -31,6 +31,8 @@ from computor_backend.interfaces.result import ResultInterface
 # Minimal backend wrappers for lookup-type interfaces
 # Legacy execution_backend interfaces removed - replaced by ServiceType
 from computor_backend.interfaces.service_type import ServiceTypeInterface
+from computor_backend.interfaces.service import ServiceInterface
+from computor_backend.interfaces.api_token import ApiTokenInterface
 from computor_backend.interfaces.groups import GroupInterface
 from computor_backend.interfaces.sessions import SessionInterface
 from computor_backend.interfaces.submission_group_members import SubmissionGroupMemberInterface
@@ -60,6 +62,8 @@ __all__ = [
     "MessageInterface",
     "ResultInterface",
     "ServiceTypeInterface",
+    "ServiceInterface",
+    "ApiTokenInterface",
     "GroupInterface",
     "SessionInterface",
     "SubmissionGroupMemberInterface",

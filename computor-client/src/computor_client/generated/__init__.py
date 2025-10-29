@@ -3,11 +3,11 @@
 # This file is auto-generated from FastAPI OpenAPI spec
 
 from .accounts_client import AccountsClient
+from .api_tokens_client import ApiTokensClient
 from .auth_client import AuthClient
-from .course_content_kind_client import CourseContentKindClient
+from .course_content_kinds_client import CourseContentKindsClient
 from .course_content_types_client import CourseContentTypesClient
 from .course_contents_client import CourseContentsClient
-from .course_execution_backends_client import CourseExecutionBackendsClient
 from .course_families_client import CourseFamiliesClient
 from .course_groups_client import CourseGroupsClient
 from .course_member_comments_client import CourseMemberCommentsClient
@@ -16,17 +16,19 @@ from .course_roles_client import CourseRolesClient
 from .courses_client import CoursesClient
 from .example_repositories_client import ExampleRepositoriesClient
 from .examples_client import ExamplesClient
-from .execution_backends_client import ExecutionBackendsClient
 from .extensions_client import ExtensionsClient
 from .groups_client import GroupsClient
 from .languages_client import LanguagesClient
 from .lecturers_client import LecturersClient
 from .messages_client import MessagesClient
 from .organizations_client import OrganizationsClient
+from .password_client import PasswordClient
 from .profiles_client import ProfilesClient
 from .results_client import ResultsClient
 from .role_claims_client import RoleClaimsClient
 from .roles_client import RolesClient
+from .service_accounts_client import ServiceAccountsClient
+from .service_types_client import ServiceTypesClient
 from .sessions_client import SessionsClient
 from .storage_client import StorageClient
 from .student_profiles_client import StudentProfilesClient
@@ -44,11 +46,11 @@ from .users_client import UsersClient
 
 __all__ = [
     "AccountsClient",
+    "ApiTokensClient",
     "AuthClient",
-    "CourseContentKindClient",
+    "CourseContentKindsClient",
     "CourseContentTypesClient",
     "CourseContentsClient",
-    "CourseExecutionBackendsClient",
     "CourseFamiliesClient",
     "CourseGroupsClient",
     "CourseMemberCommentsClient",
@@ -57,17 +59,19 @@ __all__ = [
     "CoursesClient",
     "ExampleRepositoriesClient",
     "ExamplesClient",
-    "ExecutionBackendsClient",
     "ExtensionsClient",
     "GroupsClient",
     "LanguagesClient",
     "LecturersClient",
     "MessagesClient",
     "OrganizationsClient",
+    "PasswordClient",
     "ProfilesClient",
     "ResultsClient",
     "RoleClaimsClient",
     "RolesClient",
+    "ServiceAccountsClient",
+    "ServiceTypesClient",
     "SessionsClient",
     "StorageClient",
     "StudentProfilesClient",

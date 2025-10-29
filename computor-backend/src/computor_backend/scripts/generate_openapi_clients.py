@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict
 import re
+import importlib
+import inspect
+from pydantic import BaseModel
 
 
 class OpenAPIClientGenerator:
@@ -108,15 +111,33 @@ class OpenAPIClientGenerator:
             items = schema.get('items', {})
             ref = items.get('$ref', '')
             if ref:
-                return f"List[{ref.split('/')[-1]}]"
+                type_name = ref.split('/')[-1]
+                # Clean up FastAPI's fully qualified names (e.g., 'computor_types__module__TypeName' -> 'TypeName')
+                type_name = self._clean_type_name(type_name)
+                return f"List[{type_name}]"
             return "List[Dict[str, Any]]"
 
         # Handle object responses
         ref = schema.get('$ref', '')
         if ref:
-            return ref.split('/')[-1]
+            type_name = ref.split('/')[-1]
+            # Clean up FastAPI's fully qualified names
+            type_name = self._clean_type_name(type_name)
+            return type_name
 
         return "Dict[str, Any]"
+
+    def _clean_type_name(self, type_name: str) -> str:
+        """
+        Clean up type names from FastAPI's OpenAPI spec.
+        FastAPI sometimes uses fully qualified names like 'computor_types__module__TypeName'.
+        Extract just the actual type name.
+        """
+        # If it contains double underscores, take the last part
+        if '__' in type_name:
+            parts = type_name.split('__')
+            return parts[-1]
+        return type_name
 
     def _get_request_body_type(self, operation: Dict) -> Optional[str]:
         """Extract request body type from operation."""
@@ -127,7 +148,10 @@ class OpenAPIClientGenerator:
 
         ref = schema.get('$ref', '')
         if ref:
-            return ref.split('/')[-1]
+            type_name = ref.split('/')[-1]
+            # Clean up FastAPI's fully qualified names
+            type_name = self._clean_type_name(type_name)
+            return type_name
 
         return None
 
@@ -318,6 +342,10 @@ class OpenAPIClientGenerator:
             if endpoint['request_body_type']:
                 types_needed.add(endpoint['request_body_type'])
 
+        # Debug: Print types found for this base_path
+        if base_path in ['api-tokens', 'service-accounts', 'service-types', 'course-contents']:
+            print(f"  DEBUG [{base_path}]: types_needed = {types_needed}")
+
         # Build imports
         lines = [
             f'"""Auto-generated client for /{base_path} endpoints."""',
@@ -337,6 +365,8 @@ class OpenAPIClientGenerator:
                     if module not in module_types:
                         module_types[module] = []
                     module_types[module].append(type_name)
+                elif base_path in ['api-tokens', 'service-accounts', 'service-types', 'course-contents']:
+                    print(f"  DEBUG [{base_path}]: type '{type_name}' NOT FOUND in SCHEMA_TO_MODULE_MAP")
             
             # Generate grouped imports
             for module in sorted(module_types.keys()):
@@ -351,7 +381,7 @@ class OpenAPIClientGenerator:
             lines.append('')
 
         lines.extend([
-            f'from computor_client.advanced_base import {base_class}',
+            f'from computor_client.base import {base_class}',
             '',
             '',
             f'class {class_name}({base_class}):',
@@ -385,15 +415,21 @@ class OpenAPIClientGenerator:
             # GET to root = list
             elif http_method == 'GET' and path == base_path_normalized:
                 get_list_method = method_name
-            # GET to /{id} = get by id
-            elif http_method == 'GET' and '/{' in path and path.count('/') == path.count('{'):
-                get_by_id_method = method_name
-            # PATCH to /{id} = update
-            elif http_method == 'PATCH' and '/{' in path:
-                patch_method = method_name
-            # DELETE to /{id} = delete
-            elif http_method == 'DELETE' and '/{' in path:
-                delete_method = method_name
+            # GET to /{id} = get by id (path ends with /{param} and equals base_path/{param})
+            elif http_method == 'GET' and '/{' in path and path.endswith('}') and path.count('{') == 1:
+                # Ensure it's base_path/{id}, not base_path/something/{id}
+                if path == f"{base_path_normalized}/{{{path.split('{')[1].split('}')[0]}}}":
+                    get_by_id_method = method_name
+            # PATCH to /{id} = update (path ends with /{param}, not /{param}/archive or similar)
+            elif http_method == 'PATCH' and '/{' in path and path.endswith('}') and path.count('{') == 1:
+                # Ensure it's base_path/{id}, not base_path/something/{id}
+                if path == f"{base_path_normalized}/{{{path.split('{')[1].split('}')[0]}}}":
+                    patch_method = method_name
+            # DELETE to /{id} = delete (path ends with /{param}, not /{param}/something)
+            elif http_method == 'DELETE' and '/{' in path and path.endswith('}') and path.count('{') == 1:
+                # Ensure it's base_path/{id}, not base_path/something/{id}
+                if path == f"{base_path_normalized}/{{{path.split('{')[1].split('}')[0]}}}":
+                    delete_method = method_name
 
         # Generate CRUD override methods
         if post_method:
@@ -484,10 +520,18 @@ def main(
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Fetch OpenAPI spec
-    print("📥 Fetching OpenAPI specification...")
-    spec = fetch_openapi_spec(base_url)
-    print(f"✅ Fetched spec: {spec.get('info', {}).get('title', 'Unknown')} v{spec.get('info', {}).get('version', 'Unknown')}")
+    # Fetch or load OpenAPI spec
+    cached_spec_file = output_dir / "openapi_spec.json"
+    if cached_spec_file.exists():
+        print(f"📂 Found cached OpenAPI spec at {cached_spec_file}")
+        print("💡 Using cached spec (API doesn't need to be running)")
+        with open(cached_spec_file) as f:
+            spec = json.load(f)
+        print(f"✅ Loaded spec: {spec.get('info', {}).get('title', 'Unknown')} v{spec.get('info', {}).get('version', 'Unknown')}")
+    else:
+        print("📥 Fetching OpenAPI specification from API...")
+        spec = fetch_openapi_spec(base_url)
+        print(f"✅ Fetched spec: {spec.get('info', {}).get('title', 'Unknown')} v{spec.get('info', {}).get('version', 'Unknown')}")
     print()
 
     # Save spec for reference
@@ -575,9 +619,74 @@ def main(
     return generated_files
 
 
-# Valid SCHEMA_TO_MODULE_MAP - only types that exist in computor-types
-# Auto-generated from OpenAPI spec and computor-types index
-SCHEMA_TO_MODULE_MAP = {
+def build_schema_to_module_map() -> Dict[str, str]:
+    """
+    Automatically build SCHEMA_TO_MODULE_MAP by introspecting computor_types package.
+    This discovers all Pydantic models and maps them to their module names.
+    """
+    import computor_types
+    from pathlib import Path
+
+    schema_map = {}
+
+    # Get the computor_types package directory
+    types_dir = Path(computor_types.__file__).parent
+
+    # Iterate through all .py files in computor_types
+    for py_file in types_dir.glob('*.py'):
+        if py_file.name.startswith('_'):
+            continue
+
+        module_name = py_file.stem  # e.g., 'api_tokens'
+
+        try:
+            # Import the module
+            module = importlib.import_module(f'computor_types.{module_name}')
+
+            # Find all Pydantic models (BaseModel subclasses) and Enums in the module
+            from enum import Enum
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj):
+                    # Check if it's a BaseModel or Enum
+                    is_model = issubclass(obj, BaseModel) and obj is not BaseModel
+                    try:
+                        is_enum = issubclass(obj, Enum) and obj is not Enum
+                    except TypeError:
+                        is_enum = False
+
+                    # Only include classes defined in this module (not imported from elsewhere)
+                    if (is_model or is_enum) and obj.__module__ == f'computor_types.{module_name}':
+                        schema_map[name] = module_name
+
+        except Exception as e:
+            # Skip modules that can't be imported
+            print(f"Warning: Could not introspect {module_name}: {e}")
+            continue
+
+    return schema_map
+
+
+# Valid SCHEMA_TO_MODULE_MAP - automatically built from computor_types package
+# This is generated at runtime by introspecting all Pydantic models
+try:
+    SCHEMA_TO_MODULE_MAP = build_schema_to_module_map()
+
+    # Merge critical types that may have failed introspection
+    CRITICAL_TYPES = {
+        'CourseContentLecturerGet': 'lecturer_course_contents',
+        'CourseContentLecturerList': 'lecturer_course_contents',
+        'CourseContentRepositoryLecturerGet': 'lecturer_course_contents',
+    }
+    for type_name, module in CRITICAL_TYPES.items():
+        if type_name not in SCHEMA_TO_MODULE_MAP:
+            SCHEMA_TO_MODULE_MAP[type_name] = module
+
+    print(f"✅ Auto-generated SCHEMA_TO_MODULE_MAP with {len(SCHEMA_TO_MODULE_MAP)} types")
+except Exception as e:
+    print(f"⚠️  Failed to auto-generate SCHEMA_TO_MODULE_MAP: {e}")
+    print("⚠️  Falling back to manual map")
+    # Fallback to manual map if auto-generation fails
+    SCHEMA_TO_MODULE_MAP = {
     'AccountCreate': 'accounts',
     'AccountGet': 'accounts',
     'AccountList': 'accounts',
@@ -777,11 +886,19 @@ SCHEMA_TO_MODULE_MAP = {
     'TaskSubmission': 'tasks',
     'TaskInfo': 'tasks',
     'TestCreate': 'tests',
+    # Team Management
+    'AvailableTeam': 'team_management',
+    'LeaveTeamResponse': 'team_management',
+    'TeamCreate': 'team_management',
+    'TeamResponse': 'team_management',
+    # Tutor
     'TutorCourseMemberCourseContent': 'tutor_course_members',
     'TutorCourseMemberGet': 'tutor_course_members',
     'TutorCourseMemberList': 'tutor_course_members',
     'TutorGradeCreate': 'tutor_grading',
     'TutorGradeResponse': 'tutor_grading',
+    'TutorSubmissionGroupGet': 'tutor_submission_groups',
+    'TutorSubmissionGroupList': 'tutor_submission_groups',
     'UserCreate': 'users',
     'UserGet': 'users',
     'UserList': 'users',
@@ -791,6 +908,25 @@ SCHEMA_TO_MODULE_MAP = {
     'UserRoleList': 'user_roles',
     'UserTypeEnum': 'users',
     'UserUpdate': 'users',
+    # API Tokens
+    'ApiTokenCreate': 'api_tokens',
+    'ApiTokenCreateResponse': 'api_tokens',
+    'ApiTokenGet': 'api_tokens',
+    'ApiTokenList': 'api_tokens',
+    'ApiTokenQuery': 'api_tokens',
+    'ApiTokenUpdate': 'api_tokens',
+    # Services
+    'ServiceCreate': 'services',
+    'ServiceGet': 'services',
+    'ServiceList': 'services',
+    'ServiceQuery': 'services',
+    'ServiceUpdate': 'services',
+    # Service Types
+    'ServiceTypeCreate': 'service_type',
+    'ServiceTypeGet': 'service_type',
+    'ServiceTypeList': 'service_type',
+    'ServiceTypeQuery': 'service_type',
+    'ServiceTypeUpdate': 'service_type',
 }
 
 

@@ -34,15 +34,19 @@ class OrganizationsClient(BaseEndpointClient):
             return await self.get_organizations(**params)
         return await self.get_organizations()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_organization_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
-        return await self.patch_organization_by_id_archive(id, payload)
+        return await self.patch_organization_by_id(id, payload)
 
     async def delete(self, id: str):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_organization_by_id(id)
 
-    async def patch_organization_token(self, organization_id: str, payload: OrganizationUpdateTokenUpdate, type: str) -> Dict[str, Any]:
+    async def patch_organization_token(self, organization_id: str, payload: OrganizationUpdateTokenUpdate, type: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Patch Organizations Token"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{organization_id}/token", json=json_data)
@@ -50,7 +54,7 @@ class OrganizationsClient(BaseEndpointClient):
             return Dict[str, Any].model_validate(data)
         return data
 
-    async def post_organizations(self, payload: OrganizationCreate) -> OrganizationGet:
+    async def post_organizations(self, payload: OrganizationCreate, user_id: Optional[str] = None) -> OrganizationGet:
         """Create Organizations"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -66,14 +70,15 @@ class OrganizationsClient(BaseEndpointClient):
             return [OrganizationList.model_validate(item) for item in data]
         return data
 
-    async def get_organization_by_id(self, id: str) -> OrganizationGet:
+    async def get_organization_by_id(self, id: str, user_id: Optional[str] = None) -> OrganizationGet:
         """Get Organizations"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return OrganizationGet.model_validate(data)
         return data
 
-    async def patch_organization_by_id(self, id: str, payload: OrganizationUpdate) -> OrganizationGet:
+    async def patch_organization_by_id(self, id: str, payload: OrganizationUpdate, user_id: Optional[str] = None) -> OrganizationGet:
         """Update Organizations"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -81,10 +86,10 @@ class OrganizationsClient(BaseEndpointClient):
             return OrganizationGet.model_validate(data)
         return data
 
-    async def delete_organization_by_id(self, id: str) -> Any:
+    async def delete_organization_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Organizations"""
         data = await self._request("DELETE", f"/{id}")
 
-    async def patch_organization_by_id_archive(self, id: str) -> Any:
+    async def patch_organization_by_id_archive(self, id: str, user_id: Optional[str] = None) -> Any:
         """Route Organizations"""
         data = await self._request("PATCH", f"/{id}/archive")

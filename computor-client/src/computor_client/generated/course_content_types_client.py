@@ -33,6 +33,10 @@ class CourseContentTypesClient(BaseEndpointClient):
             return await self.get_course_content_types(**params)
         return await self.get_course_content_types()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_course_content_type_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_course_content_type_by_id(id, payload)
@@ -41,7 +45,7 @@ class CourseContentTypesClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_course_content_type_by_id(id)
 
-    async def post_course_content_types(self, payload: CourseContentTypeCreate) -> CourseContentTypeGet:
+    async def post_course_content_types(self, payload: CourseContentTypeCreate, user_id: Optional[str] = None) -> CourseContentTypeGet:
         """Create Course-Content-Types"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -49,22 +53,23 @@ class CourseContentTypesClient(BaseEndpointClient):
             return CourseContentTypeGet.model_validate(data)
         return data
 
-    async def get_course_content_types(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, slug: Optional[str] = None, title: Optional[str] = None, color: Optional[str] = None, description: Optional[str] = None, course_id: Optional[str] = None, course_content_kind_id: Optional[str] = None) -> List[CourseContentTypeList]:
+    async def get_course_content_types(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, slug: Optional[str] = None, title: Optional[str] = None, color: Optional[str] = None, description: Optional[str] = None, course_id: Optional[str] = None, course_content_kind_id: Optional[str] = None, user_id: Optional[str] = None) -> List[CourseContentTypeList]:
         """List Course-Content-Types"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'slug', 'title', 'color', 'description', 'course_id', 'course_content_kind_id'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'slug', 'title', 'color', 'description', 'course_id', 'course_content_kind_id', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [CourseContentTypeList.model_validate(item) for item in data]
         return data
 
-    async def get_course_content_type_by_id(self, id: str) -> CourseContentTypeGet:
+    async def get_course_content_type_by_id(self, id: str, user_id: Optional[str] = None) -> CourseContentTypeGet:
         """Get Course-Content-Types"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return CourseContentTypeGet.model_validate(data)
         return data
 
-    async def patch_course_content_type_by_id(self, id: str, payload: CourseContentTypeUpdate) -> CourseContentTypeGet:
+    async def patch_course_content_type_by_id(self, id: str, payload: CourseContentTypeUpdate, user_id: Optional[str] = None) -> CourseContentTypeGet:
         """Update Course-Content-Types"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class CourseContentTypesClient(BaseEndpointClient):
             return CourseContentTypeGet.model_validate(data)
         return data
 
-    async def delete_course_content_type_by_id(self, id: str) -> Any:
+    async def delete_course_content_type_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Course-Content-Types"""
         data = await self._request("DELETE", f"/{id}")

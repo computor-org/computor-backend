@@ -25,11 +25,7 @@ class StorageClient(FileOperationClient):
             base_path="/storage",
         )
 
-    async def delete(self, id: str):
-        """Delete entity (delegates to generated DELETE method)."""
-        return await self.delete_storage_bucket_by_bucket_name(id)
-
-    async def post_storage_upload(self, ) -> StorageObjectGet:
+    async def post_storage_upload(self, user_id: Optional[str] = None) -> StorageObjectGet:
         """Upload File"""
         data = await self._request("POST", "/upload")
         if data:

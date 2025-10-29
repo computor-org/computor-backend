@@ -40,15 +40,15 @@ class CourseMemberCommentsClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_course_member_comment_by_course_member_comment_id(id)
 
-    async def get_course_member_comments(self, course_member_id: str) -> List[CourseMemberCommentList]:
+    async def get_course_member_comments(self, course_member_id: str, user_id: Optional[str] = None) -> List[CourseMemberCommentList]:
         """List Comments"""
-        params = {k: v for k, v in locals().items() if k in ['course_member_id'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['course_member_id', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return data
 
-    async def post_course_member_comments(self, payload: CommentCreate) -> List[CourseMemberCommentList]:
+    async def post_course_member_comments(self, payload: CommentCreate, user_id: Optional[str] = None) -> List[CourseMemberCommentList]:
         """Create Comment"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -56,7 +56,7 @@ class CourseMemberCommentsClient(BaseEndpointClient):
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return data
 
-    async def patch_course_member_comment_by_course_member_comment_id(self, course_member_comment_id: str, payload: CommentUpdate) -> List[CourseMemberCommentList]:
+    async def patch_course_member_comment_by_course_member_comment_id(self, course_member_comment_id: str, payload: CommentUpdate, user_id: Optional[str] = None) -> List[CourseMemberCommentList]:
         """Update Comment"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{course_member_comment_id}", json=json_data)
@@ -64,7 +64,7 @@ class CourseMemberCommentsClient(BaseEndpointClient):
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return data
 
-    async def delete_course_member_comment_by_course_member_comment_id(self, course_member_comment_id: str) -> List[CourseMemberCommentList]:
+    async def delete_course_member_comment_by_course_member_comment_id(self, course_member_comment_id: str, user_id: Optional[str] = None) -> List[CourseMemberCommentList]:
         """Delete Comment"""
         data = await self._request("DELETE", f"/{course_member_comment_id}")
         if isinstance(data, list):

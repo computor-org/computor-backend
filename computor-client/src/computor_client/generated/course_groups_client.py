@@ -33,6 +33,10 @@ class CourseGroupsClient(BaseEndpointClient):
             return await self.get_course_groups(**params)
         return await self.get_course_groups()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_course_group_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_course_group_by_id(id, payload)
@@ -41,7 +45,7 @@ class CourseGroupsClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_course_group_by_id(id)
 
-    async def post_course_groups(self, payload: CourseGroupCreate) -> CourseGroupGet:
+    async def post_course_groups(self, payload: CourseGroupCreate, user_id: Optional[str] = None) -> CourseGroupGet:
         """Create Course-Groups"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -49,22 +53,23 @@ class CourseGroupsClient(BaseEndpointClient):
             return CourseGroupGet.model_validate(data)
         return data
 
-    async def get_course_groups(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, title: Optional[str] = None, course_id: Optional[str] = None) -> List[CourseGroupList]:
+    async def get_course_groups(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, title: Optional[str] = None, course_id: Optional[str] = None, user_id: Optional[str] = None) -> List[CourseGroupList]:
         """List Course-Groups"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'title', 'course_id'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'title', 'course_id', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [CourseGroupList.model_validate(item) for item in data]
         return data
 
-    async def get_course_group_by_id(self, id: str) -> CourseGroupGet:
+    async def get_course_group_by_id(self, id: str, user_id: Optional[str] = None) -> CourseGroupGet:
         """Get Course-Groups"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return CourseGroupGet.model_validate(data)
         return data
 
-    async def patch_course_group_by_id(self, id: str, payload: CourseGroupUpdate) -> CourseGroupGet:
+    async def patch_course_group_by_id(self, id: str, payload: CourseGroupUpdate, user_id: Optional[str] = None) -> CourseGroupGet:
         """Update Course-Groups"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class CourseGroupsClient(BaseEndpointClient):
             return CourseGroupGet.model_validate(data)
         return data
 
-    async def delete_course_group_by_id(self, id: str) -> Any:
+    async def delete_course_group_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Course-Groups"""
         data = await self._request("DELETE", f"/{id}")

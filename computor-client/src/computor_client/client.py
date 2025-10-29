@@ -5,10 +5,10 @@ import httpx
 
 from .generated import (
     AccountsClient,
+    ApiTokensClient,
     CourseContentsClient,
-    CourseContentKindClient,
+    CourseContentKindsClient,
     CourseContentTypesClient,
-    CourseExecutionBackendsClient,
     CourseFamiliesClient,
     CourseGroupsClient,
     CourseMembersClient,
@@ -16,7 +16,6 @@ from .generated import (
     CourseRolesClient,
     CoursesClient,
     ExampleRepositoriesClient,
-    ExecutionBackendsClient,
     ExtensionsClient,
     GroupsClient,
     LanguagesClient,
@@ -27,6 +26,8 @@ from .generated import (
     ResultsClient,
     RoleClaimsClient,
     RolesClient,
+    ServiceAccountsClient,
+    ServiceTypesClient,
     SessionsClient,
     StudentProfilesClient,
     StudentsClient,
@@ -107,18 +108,17 @@ class ComputorClient:
 
         # Initialize generated endpoint clients
         self.accounts = AccountsClient(self._client)
+        self.api_tokens = ApiTokensClient(self._client)
         self.courses = CoursesClient(self._client)
         self.course_contents = CourseContentsClient(self._client)
-        self.course_content_kinds = CourseContentKindClient(self._client)
+        self.course_content_kinds = CourseContentKindsClient(self._client)
         self.course_content_types = CourseContentTypesClient(self._client)
-        self.course_execution_backends = CourseExecutionBackendsClient(self._client)
         self.course_families = CourseFamiliesClient(self._client)
         self.course_groups = CourseGroupsClient(self._client)
         self.course_members = CourseMembersClient(self._client)
         self.course_member_comments = CourseMemberCommentsClient(self._client)
         self.course_roles = CourseRolesClient(self._client)
         self.example_repositories = ExampleRepositoriesClient(self._client)
-        self.execution_backends = ExecutionBackendsClient(self._client)
         self.extensions = ExtensionsClient(self._client)
         self.groups = GroupsClient(self._client)
         self.languages = LanguagesClient(self._client)
@@ -129,6 +129,8 @@ class ComputorClient:
         self.results = ResultsClient(self._client)
         self.roles = RolesClient(self._client)
         self.role_claims = RoleClaimsClient(self._client)
+        self.services = ServiceAccountsClient(self._client)
+        self.service_types = ServiceTypesClient(self._client)
         self.sessions = SessionsClient(self._client)
         self.student_profiles = StudentProfilesClient(self._client)
         self.students = StudentsClient(self._client)

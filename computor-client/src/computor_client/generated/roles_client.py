@@ -27,16 +27,21 @@ class RolesClient(BaseEndpointClient):
             return await self.get_roles(**params)
         return await self.get_roles()
 
-    async def get_role_by_id(self, id: str) -> RoleGet:
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_role_by_id(id)
+
+    async def get_role_by_id(self, id: str, user_id: Optional[str] = None) -> RoleGet:
         """Get Roles"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return RoleGet.model_validate(data)
         return data
 
-    async def get_roles(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, title: Optional[str] = None, description: Optional[str] = None, builtin: Optional[str] = None) -> List[RoleList]:
+    async def get_roles(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, title: Optional[str] = None, description: Optional[str] = None, builtin: Optional[str] = None, user_id: Optional[str] = None) -> List[RoleList]:
         """List Roles"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'title', 'description', 'builtin'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'title', 'description', 'builtin', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [RoleList.model_validate(item) for item in data]
