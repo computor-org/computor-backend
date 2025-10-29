@@ -122,6 +122,77 @@ INSERT INTO api_token (
 
 
 @token.command()
+@click.option('--count', '-n', default=1, type=int, help='Number of tokens to generate (default: 1)')
+@click.option('--quiet', '-q', is_flag=True, help='Output only the token (for scripts/env files)')
+def generate_token(count, quiet):
+    """
+    Generate API token(s) for environment variables.
+
+    This is a simple command that generates valid API tokens you can immediately
+    use in .env files, Docker Compose, or deployment.yaml.
+
+    Examples:
+        # Generate one token
+        computor token generate-token
+
+        # Generate two tokens (e.g., for Python and MATLAB workers)
+        computor token generate-token --count 2
+
+        # Generate token for scripting (quiet mode)
+        export MY_TOKEN=$(computor token generate-token --quiet)
+    """
+    if quiet:
+        for _ in range(count):
+            full_token, _, _ = generate_api_token()
+            click.echo(full_token)
+    else:
+        click.echo("\n" + "="*70)
+        click.echo("🔑 API Token Generator")
+        click.echo("="*70)
+        click.echo("\nGenerate valid API tokens for use in:")
+        click.echo("  • .env files")
+        click.echo("  • Docker Compose environment variables")
+        click.echo("  • deployment.yaml predefined tokens")
+        click.echo("\n" + "="*70)
+
+        tokens = []
+        for i in range(count):
+            full_token, token_prefix, _ = generate_api_token()
+            tokens.append(full_token)
+
+            if count > 1:
+                click.echo(f"\n🔐 Token {i+1}/{count}:")
+            else:
+                click.echo(f"\n🔐 Token:")
+            click.secho(f"   {full_token}", fg="green", bold=True)
+
+        if count > 1:
+            click.echo("\n" + "="*70)
+            click.echo("💾 Copy to .env file:")
+            click.echo("="*70)
+            for i, token in enumerate(tokens, 1):
+                click.echo(f"TOKEN_{i}={token}")
+
+        click.echo("\n" + "="*70)
+        click.echo("📋 Usage in deployment.yaml:")
+        click.echo("="*70)
+        click.echo("""
+services:
+  - slug: my-service
+    api_token:
+      token: "${MY_SERVICE_TOKEN}"
+""")
+
+        click.echo("="*70)
+        click.echo("⚠️  IMPORTANT:")
+        click.echo("="*70)
+        click.echo("  • Store tokens securely!")
+        click.echo("  • Never commit tokens to git")
+        click.echo("  • Tokens shown here are valid and ready to use")
+        click.echo("="*70 + "\n")
+
+
+@token.command()
 @click.argument('token')
 def verify(token):
     """
@@ -130,7 +201,7 @@ def verify(token):
     Useful for debugging - shows what the token_prefix and token_hash should be.
 
     Example:
-        ctutor token verify ctp_abc123def456ghi789jkl012mno345pq
+        computor token verify ctp_abc123def456ghi789jkl012mno345pq
     """
     if not token.startswith('ctp_'):
         click.secho("❌ Invalid token format! Token must start with 'ctp_'", fg="red", err=True)

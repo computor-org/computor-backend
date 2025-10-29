@@ -23,6 +23,10 @@ from computor_types.deployments_refactored import (
     GitLabConfig,
     ExecutionBackendConfig,
     ExecutionBackendReference,
+    ServiceConfig,
+    ServiceReference,
+    ServiceUserConfig,
+    ServiceApiTokenConfig,
     CourseProjects,
     CourseContentConfig,
     EXAMPLE_DEPLOYMENT,
@@ -39,6 +43,9 @@ from computor_types.organizations import OrganizationQuery
 from computor_types.course_families import CourseFamilyQuery
 from computor_types.execution_backends import ExecutionBackendCreate, ExecutionBackendQuery, ExecutionBackendUpdate
 from computor_types.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendQuery
+from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
+from computor_types.service_type import ServiceTypeQuery
+from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate
 from computor_types.roles import RoleQuery
 from computor_types.user_roles import UserRoleCreate, UserRoleQuery
 from computor_types.example import (
@@ -422,29 +429,33 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
 
 
 def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
-    """Deploy execution backends from configuration."""
+    """
+    Deploy execution backends from configuration.
+
+    DEPRECATED: Use _deploy_services() instead for the new service-based architecture.
+    """
 
     client = run_async(get_computor_client(auth))
 
     if not config.execution_backends:
         return
-    
+
     click.echo(f"\n⚙️  Deploying {len(config.execution_backends)} execution backends...")
-    
+
     # Get API client
     backend_client = client.execution_backends
-    
+
     for backend_config in config.execution_backends:
         click.echo(f"\n  Processing backend: {backend_config.slug}")
-        
+
         try:
             # Check if backend already exists
             existing_backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_config.slug)))
-            
+
             if existing_backends:
                 backend = existing_backends[0]
                 click.echo(f"    ℹ️  Backend already exists: {backend.slug}")
-                
+
                 # Check if we need to update properties
                 if backend.type != backend_config.type or backend.properties != backend_config.properties:
                     # Update backend
@@ -464,9 +475,171 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
                 )
                 backend = run_async(backend_client.create(backend_create))
                 click.echo(f"    ✅ Created backend: {backend_config.slug}")
-                
+
         except Exception as e:
             click.echo(f"    ❌ Failed to deploy backend {backend_config.slug}: {e}")
+
+
+def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> dict:
+    """
+    Deploy services from configuration (Phase 1 of deployment).
+
+    Creates services with users and API tokens. Returns mapping of service slugs to IDs
+    for use in Phase 2 (course creation and token scope updates).
+
+    Args:
+        config: Deployment configuration
+        auth: Authentication configuration
+
+    Returns:
+        dict: Mapping of service slug to service details (id, token_id, user_id)
+    """
+    from computor_types.services import ServiceCreate, ServiceQuery
+    from computor_types.api_tokens import ApiTokenCreate, ApiTokenCreateResponse
+    from computor_types.service_type import ServiceTypeQuery
+    from datetime import datetime, timedelta
+    import os
+
+    if not config.services:
+        return {}
+
+    click.echo(f"\n🔧 Phase 1: Deploying {len(config.services)} services...")
+
+    client = run_async(get_computor_client(auth))
+    service_client = client.services
+    user_client = client.users
+    api_token_client = client.api_tokens
+    service_type_client = client.service_types
+
+    # Track deployed services for later use
+    deployed_services = {}
+
+    for service_config in config.services:
+        click.echo(f"\n  Processing service: {service_config.slug}")
+
+        try:
+            # Check if service already exists
+            existing_services = run_async(service_client.list(ServiceQuery(slug=service_config.slug)))
+
+            if existing_services and len(existing_services) > 0:
+                service = existing_services[0]
+                click.echo(f"    ℹ️  Service already exists: {service.slug}")
+                deployed_services[service_config.slug] = {
+                    "id": str(service.id),
+                    "user_id": str(service.user_id),
+                    "token_id": None  # Token already exists, we don't know the ID
+                }
+                continue
+
+            # 1. Create or get user for the service
+            user_username = service_config.user.username
+            existing_users = run_async(user_client.list(UserQuery(username=user_username)))
+
+            if existing_users and len(existing_users) > 0:
+                user = existing_users[0]
+                click.echo(f"    ℹ️  Using existing user: {user_username}")
+            else:
+                # Create new user
+                user_create = UserCreate(
+                    username=user_username,
+                    email=service_config.user.email or f"{user_username}@computor.service",
+                    given_name=service_config.user.given_name or service_config.slug.split('-')[0].title(),
+                    family_name=service_config.user.family_name or "Service",
+                    is_service=True,
+                    password=None,  # Services use API tokens, not passwords
+                    properties={"auto_created": True}
+                )
+                user = run_async(user_client.create(user_create))
+                click.echo(f"    ✅ Created service user: {user_username}")
+
+            # 2. Look up ServiceType by path
+            service_type = None
+            if service_config.service_type_path:
+                service_types = run_async(service_type_client.list(
+                    ServiceTypeQuery(path=service_config.service_type_path)
+                ))
+                if service_types and len(service_types) > 0:
+                    service_type = service_types[0]
+                    click.echo(f"    ✅ Found ServiceType: {service_config.service_type_path}")
+                else:
+                    click.echo(f"    ⚠️  ServiceType not found: {service_config.service_type_path}")
+
+            # 3. Create Service
+            service_properties = {}
+            if service_config.language:
+                service_properties["language"] = service_config.language
+
+            service_create = ServiceCreate(
+                slug=service_config.slug,
+                name=service_config.user.given_name or service_config.slug.replace('-', ' ').title(),
+                description=service_config.description or f"Service for {service_config.slug}",
+                service_type=service_config.service_type_path if service_type else "custom",
+                username=user_username,
+                email=service_config.user.email,
+                config=service_config.config or {},
+                enabled=True
+            )
+
+            service = run_async(service_client.create(service_create))
+            click.echo(f"    ✅ Created service: {service_config.slug}")
+
+            # 4. Create API Token
+            token_config = service_config.api_token
+
+            # Check for predefined token
+            predefined_token = token_config.token
+            if predefined_token:
+                # Expand environment variables
+                predefined_token = os.path.expandvars(predefined_token)
+
+                # Check if token is empty after expansion
+                if not predefined_token or predefined_token.strip() == "":
+                    predefined_token = None
+                    click.echo(f"    ℹ️  No predefined token provided, generating new token...")
+
+            if predefined_token:
+                # TODO: Validate that current user is admin before allowing predefined token
+                # For now, we'll assume the deploying user has permission
+                click.echo(f"    ⚠️  Using predefined token (admin only)")
+                # Note: Predefined token API endpoint needs to be implemented
+                # For now, create a regular token
+                click.echo(f"    ⚠️  Predefined token API not yet implemented, generating new token instead")
+                predefined_token = None
+
+            if not predefined_token:
+                # Calculate expiration date
+                expires_at = None
+                if token_config.expires_days:
+                    expires_at = datetime.utcnow() + timedelta(days=token_config.expires_days)
+
+                # Create token
+                token_create = ApiTokenCreate(
+                    name=token_config.name or f"{service_config.slug} Token",
+                    description=f"API token for {service_config.slug}",
+                    user_id=str(user.id),
+                    scopes=token_config.scopes or [],
+                    expires_at=expires_at
+                )
+
+                token_response = run_async(api_token_client.create(token_create))
+                click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
+                click.echo(f"    🔑 Token: {token_response.token}")
+                click.echo(f"    ⚠️  IMPORTANT: Store this token securely! It cannot be retrieved later.")
+
+                deployed_services[service_config.slug] = {
+                    "id": str(service.id),
+                    "user_id": str(user.id),
+                    "token_id": str(token_response.id),
+                    "token": token_response.token
+                }
+
+        except Exception as e:
+            click.echo(f"    ❌ Failed to deploy service {service_config.slug}: {e}")
+            import traceback
+            click.echo(f"    {traceback.format_exc()}")
+
+    click.echo(f"\n✅ Phase 1 complete: {len(deployed_services)} services deployed")
+    return deployed_services
 
 
 def _deploy_course_content_types(course_id: str, content_types_config: list, auth: CLIAuthConfig):
@@ -914,19 +1087,35 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
             click.echo(f"  ❌ Failed: {failed_count} templates")
 
 
-def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig, generate_student_template: bool = False):
-    """Link execution backends to all deployed courses and create course contents."""
-    
+def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig, deployed_services: dict = None, generate_student_template: bool = False) -> dict:
+    """
+    Link execution backends and services to all deployed courses and create course contents.
+
+    Args:
+        config: Deployment configuration
+        auth: Authentication config
+        deployed_services: Dict mapping service slug to service details from Phase 1
+        generate_student_template: Whether to generate student templates
+
+    Returns:
+        dict: Mapping of service_id to list of course_ids for scope updates
+    """
 
     client = run_async(get_computor_client(auth))
 
-    click.echo(f"\n🔗 Linking execution backends to courses...")
-    
+    if deployed_services is None:
+        deployed_services = {}
+
+    # Track which services are used by which courses for scope updates
+    service_course_mapping = {}  # {service_id: [course_id1, course_id2, ...]}
+
+    click.echo(f"\n🔗 Phase 2: Linking services and backends to courses...")
+
     # Get API clients
     org_client = client.organizations
     family_client = client.course_families
     course_client = client.courses
-    
+
     # Process each organization
     for org_config in config.organizations:
         # Find the organization
@@ -935,7 +1124,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
             click.echo(f"  ⚠️  Organization not found: {org_config.path}")
             continue
         org = orgs[0]
-        
+
         # Process each course family
         for family_config in org_config.course_families:
             # Find the course family
@@ -947,7 +1136,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                 click.echo(f"  ⚠️  Course family not found: {family_config.path}")
                 continue
             family = families[0]
-            
+
             # Process each course
             for course_config in family_config.courses:
                 # Find the course
@@ -959,10 +1148,24 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                     click.echo(f"  ⚠️  Course not found: {course_config.path}")
                     continue
                 course = courses[0]
-                
+
                 click.echo(f"  Course: {course_config.name} ({course_config.path})")
 
-                # Link execution backends to this course
+                # Link services to this course (new architecture)
+                if course_config.services:
+                    course_service_ids = _link_services_to_course(
+                        str(course.id),
+                        course_config.services,
+                        deployed_services,
+                        auth
+                    )
+                    # Track service-course mappings
+                    for service_id in course_service_ids:
+                        if service_id not in service_course_mapping:
+                            service_course_mapping[service_id] = []
+                        service_course_mapping[service_id].append(str(course.id))
+
+                # Link execution backends to this course (legacy)
                 if course_config.execution_backends:
                     _link_execution_backends_to_course(
                         str(course.id),
@@ -979,14 +1182,20 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                 if course_config.contents:
                     click.echo(f"\n📚 Creating course contents for {course_config.name}...")
                     _deploy_course_contents(str(course.id), course_config, auth)
-    
+
     # Generate student templates if requested
     if generate_student_template:
         _generate_student_templates(config, auth)
 
+    return service_course_mapping
+
 
 def _link_execution_backends_to_course(course_id: str, execution_backends: list, auth: CLIAuthConfig):
-    """Link execution backends to a course."""
+    """
+    Link execution backends to a course.
+
+    DEPRECATED: Use _link_services_to_course() for the new service-based architecture.
+    """
 
     if not execution_backends:
         return
@@ -996,27 +1205,27 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
     # Get API clients
     backend_client = client.execution_backends
     course_backend_client = client.course_execution_backends
-    
+
     for backend_ref in execution_backends:
         try:
             # Find the backend by slug
             backends = run_async(backend_client.list(ExecutionBackendQuery(slug=backend_ref.slug)))
-            
+
             if not backends:
                 click.echo(f"      ⚠️  Backend not found: {backend_ref.slug}")
                 continue
-            
+
             backend = backends[0]
-            
+
             # Check if link already exists
             existing_links = run_async(course_backend_client.list(CourseExecutionBackendQuery(
                 course_id=course_id,
                 execution_backend_id=str(backend.id)
             )))
-            
+
             if existing_links:
                 click.echo(f"      ℹ️  Backend already linked: {backend_ref.slug}")
-                
+
                 # Update properties if provided
                 if backend_ref.properties:
                     link = existing_links[0]
@@ -1034,9 +1243,140 @@ def _link_execution_backends_to_course(course_id: str, execution_backends: list,
                 )
                 run_async(course_backend_client.create(link_create))
                 click.echo(f"      ✅ Linked backend: {backend_ref.slug}")
-                
+
         except Exception as e:
             click.echo(f"      ❌ Failed to link backend {backend_ref.slug}: {e}")
+
+
+def _link_services_to_course(course_id: str, services: list, deployed_services: dict, auth: CLIAuthConfig) -> list:
+    """
+    Link services to a course (new architecture).
+
+    Services are referenced by course contents, not through a join table.
+    This function validates that the services exist and returns a list of service IDs
+    used by this course for scope updates.
+
+    Args:
+        course_id: Course ID
+        services: List of ServiceReference objects
+        deployed_services: Dict mapping service slug to service details
+        auth: Authentication config
+
+    Returns:
+        list: List of service IDs used by this course
+    """
+
+    if not services:
+        return []
+
+    client = run_async(get_computor_client(auth))
+    service_client = client.services
+
+    course_service_ids = []
+
+    for service_ref in services:
+        try:
+            # Check if service exists in deployed_services first
+            if service_ref.slug in deployed_services:
+                service_id = deployed_services[service_ref.slug]["id"]
+                course_service_ids.append(service_id)
+                click.echo(f"      ✅ Service registered for course: {service_ref.slug}")
+                continue
+
+            # Otherwise, look up by slug
+            existing_services = run_async(service_client.list(ServiceQuery(slug=service_ref.slug)))
+
+            if not existing_services or len(existing_services) == 0:
+                click.echo(f"      ⚠️  Service not found: {service_ref.slug}")
+                continue
+
+            service = existing_services[0]
+            course_service_ids.append(str(service.id))
+            click.echo(f"      ✅ Service registered for course: {service_ref.slug}")
+
+        except Exception as e:
+            click.echo(f"      ❌ Failed to process service {service_ref.slug}: {e}")
+
+    return course_service_ids
+
+
+def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, auth: CLIAuthConfig):
+    """
+    Update API token scopes with course-specific permissions (Phase 3).
+
+    Takes the initial token scopes and adds course-specific permissions like:
+    - execute:tests:course:<course_id>
+    - read:courses:course:<course_id>
+    - write:results:course:<course_id>
+
+    Args:
+        service_course_mapping: Dict mapping service_id to list of course_ids
+        deployed_services: Dict mapping service slug to service details (including token_id)
+        auth: Authentication config
+    """
+
+    if not service_course_mapping:
+        click.echo("\n⚠️  No service-course mappings found, skipping token scope updates")
+        return
+
+    click.echo(f"\n🔐 Phase 3: Updating API token scopes with course-specific permissions...")
+
+    client = run_async(get_computor_client(auth))
+    api_token_client = client.api_tokens
+
+    # Create reverse mapping: service_id -> service_slug
+    service_id_to_slug = {}
+    for slug, details in deployed_services.items():
+        service_id_to_slug[details["id"]] = slug
+
+    updated_count = 0
+    failed_count = 0
+
+    for service_id, course_ids in service_course_mapping.items():
+        try:
+            service_slug = service_id_to_slug.get(service_id)
+            if not service_slug:
+                click.echo(f"    ⚠️  Service ID {service_id} not found in deployed services")
+                continue
+
+            service_details = deployed_services.get(service_slug)
+            if not service_details:
+                continue
+
+            token_id = service_details.get("token_id")
+            if not token_id:
+                click.echo(f"    ⚠️  No token ID found for service: {service_slug}")
+                continue
+
+            # Get current token
+            token = run_async(api_token_client.get(token_id))
+            current_scopes = token.scopes or []
+
+            # Build new scopes with course-specific permissions
+            new_scopes = set(current_scopes)
+
+            for course_id in course_ids:
+                # Add course-specific scopes
+                new_scopes.add(f"execute:tests:course:{course_id}")
+                new_scopes.add(f"read:courses:course:{course_id}")
+                new_scopes.add(f"write:results:course:{course_id}")
+                new_scopes.add(f"read:course_contents:course:{course_id}")
+                new_scopes.add(f"read:submissions:course:{course_id}")
+
+            # Update token scopes
+            token_update = ApiTokenUpdate(scopes=list(new_scopes))
+            run_async(api_token_client.update(token_id, token_update))
+
+            click.echo(f"    ✅ Updated token scopes for {service_slug} ({len(course_ids)} courses)")
+            updated_count += 1
+
+        except Exception as e:
+            click.echo(f"    ❌ Failed to update token for service {service_id}: {e}")
+            failed_count += 1
+            import traceback
+            click.echo(f"    {traceback.format_exc()}")
+
+    click.echo(f"\n✅ Phase 3 complete: {updated_count} tokens updated, {failed_count} failed")
 
 
 def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
@@ -1436,11 +1776,15 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     
     # Setup client with authentication
     custom_client = SyncHTTPWrapper(client)
-    
-    # Deploy execution backends first (before hierarchy)
-    if config.execution_backends:
+
+    # Phase 1: Deploy services first (before hierarchy)
+    deployed_services = {}
+    if config.services:
+        deployed_services = _deploy_services(config, auth)
+    elif config.execution_backends:
+        # Fallback to legacy execution_backends if no services defined
         _deploy_execution_backends(config, auth)
-    
+
     # Optionally upload VS Code extensions prior to starting hierarchy deployment
     if getattr(config, 'extensions_upload', None):
         cfg_dir = Path(config_file).parent
@@ -1493,8 +1837,14 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                             if status_data.get('status') == 'completed':
                                 click.echo("\n✅ Deployment completed successfully!")
 
-                                # Link execution backends to courses and create contents
-                                _link_backends_to_deployed_courses(config, auth, True)
+                                # Phase 2: Link services/backends to courses and create contents
+                                service_course_mapping = _link_backends_to_deployed_courses(
+                                    config, auth, deployed_services, True
+                                )
+
+                                # Phase 3: Update token scopes with course-specific permissions
+                                if service_course_mapping and deployed_services:
+                                    _update_token_scopes(service_course_mapping, deployed_services, auth)
 
                                 # Deploy users if configured
                                 if config.users:
@@ -1515,7 +1865,13 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 if not wait:
                     click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
                     # Try to link backends and create contents (might fail if hierarchy not ready)
-                    _link_backends_to_deployed_courses(config, auth, True)
+                    service_course_mapping = _link_backends_to_deployed_courses(
+                        config, auth, deployed_services, True
+                    )
+
+                    # Phase 3: Update token scopes
+                    if service_course_mapping and deployed_services:
+                        _update_token_scopes(service_course_mapping, deployed_services, auth)
 
                     if config.users:
                         click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")

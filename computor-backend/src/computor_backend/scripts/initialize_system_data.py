@@ -21,7 +21,6 @@ load_dotenv(env_path)
 from computor_backend.database import get_db
 from computor_backend.model.role import Role, UserRole
 from computor_backend.model.course import CourseRole, CourseContentKind
-from computor_types.tokens import encrypt_api_key  # TODO: Remove after migration
 from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User, Account
 from computor_backend.model.example import ExampleRepository
@@ -155,8 +154,8 @@ def create_admin_user(db: Session):
     print("👤 Creating admin user...")
     
     # Get credentials from environment variables
-    admin_username = os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')
-    admin_password = os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')
+    admin_username = os.environ.get('API_ADMIN_USER', 'admin')
+    admin_password = os.environ.get('API_ADMIN_PASSWORD', 'admin')
     admin_email = 'admin@system.local'
     
     # Check if admin user already exists

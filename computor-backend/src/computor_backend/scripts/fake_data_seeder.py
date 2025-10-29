@@ -485,7 +485,7 @@ def clear_fake_data(session):
     session.query(Organization).delete(synchronize_session=False)
     
     # Delete users except admin
-    admin_username = os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')
+    admin_username = os.environ.get('API_ADMIN_USER', 'admin')
     session.query(User).filter(User.username != admin_username).delete(synchronize_session=False)
     
     session.commit()

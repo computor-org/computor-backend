@@ -262,10 +262,14 @@ async def commit_test_results_activity(
         base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
         async with ComputorClient(base_url=base_url) as client:
-            # Authenticate
-            username = api_config.get("username", "admin")
-            password = api_config.get("password", "admin")
-            await client.authenticate(username=username, password=password)
+            # Authenticate with API token (preferred) or username/password (fallback)
+            api_token = api_config.get("token")
+            if api_token:
+                await client.set_token(api_token)
+            else:
+                username = api_config.get("username", "admin")
+                password = api_config.get("password", "admin")
+                await client.authenticate(username=username, password=password)
 
             # Create result update
             result_update = ResultUpdate(
@@ -379,11 +383,12 @@ class StudentTestingWorkflow(BaseWorkflow):
         started_at = datetime.utcnow()
 
         try:
-            # API configuration
+            # API configuration - prefer API_TOKEN, fallback to username/password
             api_config = {
-                "url": os.environ.get("EXECUTION_BACKEND_API_URL", "http://localhost:8000"),
-                "username": os.environ.get("EXECUTION_BACKEND_API_USER", "admin"),
-                "password": os.environ.get("EXECUTION_BACKEND_API_PASSWORD", "admin")
+                "url": os.environ.get("API_URL", "http://localhost:8000"),
+                "token": os.environ.get("API_TOKEN"),
+                "username": os.environ.get("API_ADMIN_USER", "admin"),
+                "password": os.environ.get("API_ADMIN_PASSWORD", "admin")
             }
 
             # Run complete test in single activity (ensures all operations on one worker)

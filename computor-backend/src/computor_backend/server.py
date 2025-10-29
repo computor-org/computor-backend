@@ -123,8 +123,8 @@ async def initialize_plugin_registry_with_config():
 
 async def init_admin_user(db: Session):
 
-    username = os.environ.get("EXECUTION_BACKEND_API_USER")
-    password = os.environ.get("EXECUTION_BACKEND_API_PASSWORD")
+    username = os.environ.get("API_ADMIN_USER")
+    password = os.environ.get("API_ADMIN_PASSWORD")
 
     admin = db.query(User).filter(User.username == username).first()
 
