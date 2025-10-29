@@ -83,10 +83,10 @@ async def execute_tests_activity(
     student_path: str,
     reference_path: str,
     test_config: Dict[str, Any],
-    backend_properties: Dict[str, Any]
+    service_type_config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Execute tests comparing student and reference implementations."""
-    
+
     import logging
     import yaml
     import json
@@ -94,16 +94,17 @@ async def execute_tests_activity(
     logger = logging.getLogger(__name__)
 
     logging.basicConfig(level=logging.INFO)
-    
+
     # Import the testing backend system
     from computor_backend.testing import execute_tests_with_backend
     from computor_types.tests import TestJob
-    
+
     # Parse the test job configuration
     test_job = TestJob(**test_config)
-    
-    # Determine backend type from properties or test job
-    backend_type = test_config.get("execution_backend_type")
+
+    # Determine backend type from service type path (e.g., "testing.python" -> "python")
+    service_type_path = test_config.get("testing_service_type_path", "")
+    backend_type = service_type_path.split(".")[-1] if service_type_path else "python"
     
     # Create work directory structure within the temp directory
     work_dir = os.path.dirname(student_path)  # Get parent temp directory
@@ -174,14 +175,14 @@ async def execute_tests_activity(
         "user_id": test_job.user_id,
         "course_member_id": test_job.course_member_id,
         "course_content_id": test_job.course_content_id,
-        "execution_backend_id": test_job.execution_backend_id,
+        "testing_service_id": test_job.testing_service_id,
         "test_number": test_job.test_number,
         "submission_number": test_job.submission_number,
         "submit": test_config.get("submit", False),
         "student_path": student_path,
         "reference_path": reference_path
     }
-    
+
     # Execute tests using the appropriate backend
     try:
         await execute_tests_with_backend(
@@ -189,7 +190,7 @@ async def execute_tests_activity(
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
-            backend_properties=backend_properties
+            service_type_properties=service_type_config
         )
 
         # Test backends write results to file - always read from file
@@ -285,7 +286,7 @@ async def commit_test_results_activity(
 @activity.defn(name="run_complete_student_test")
 async def run_complete_student_test_activity(
     test_job: Dict[str, Any],
-    execution_backend_properties: Dict[str, Any],
+    service_type_config: Dict[str, Any],
     result_id: str,
     api_config: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -327,7 +328,7 @@ async def run_complete_student_test_activity(
                 student_path,
                 reference_path,
                 test_job,
-                execution_backend_properties
+                service_type_config
             )
 
             # Commit results
@@ -359,16 +360,16 @@ class StudentTestingWorkflow(BaseWorkflow):
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Execute student testing workflow.
-        
+
         Args:
-            parameters: Dict containing test_job and execution_backend_properties
-            
+            parameters: Dict containing test_job and service_type_config
+
         Returns:
             WorkflowResult with test results
         """
         # Extract parameters
         test_job = parameters.get("test_job", {})
-        execution_backend_properties = parameters.get("execution_backend_properties", {})
+        service_type_config = parameters.get("service_type_config", {})
         result_id = parameters.get("result_id")  # Get the database result ID
 
         # Generate a unique job ID for this test run
@@ -389,7 +390,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             workflow.logger.info("Running complete student test")
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
-                args=[test_job, execution_backend_properties, result_id, api_config],
+                args=[test_job, service_type_config, result_id, api_config],
                 start_to_close_timeout=timedelta(minutes=30),
                 retry_policy=RetryPolicy(maximum_attempts=1)
             )

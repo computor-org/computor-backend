@@ -25,11 +25,11 @@ from computor_types.organizations import OrganizationProperties
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_backend.model.course import (
-    Course, CourseContent, CourseContentType, CourseExecutionBackend,
+    Course, CourseContent, CourseContentType,
     CourseMember, SubmissionGroup, SubmissionGroupMember, CourseFamily
 )
 from computor_backend.model.organization import Organization
-from computor_backend.model.execution import ExecutionBackend
+from computor_backend.model.service import Service, ServiceType
 from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.example import Example, ExampleVersion
 from computor_backend.custom_types import Ltree
@@ -236,21 +236,32 @@ async def create_test_run(
         CourseContent.id == submission_group.course_content_id
     ).first()
 
-    if not course_content or not course_content.execution_backend_id:
+    if not course_content or not course_content.testing_service_id:
         raise BadRequestException(
             error_code="SUBMIT_005",
-            detail="Assignment or execution backend not configured"
+            detail="Assignment or testing service not configured"
         )
 
-    # Get execution backend
-    execution_backend = db.query(ExecutionBackend).filter(
-        ExecutionBackend.id == course_content.execution_backend_id
+    # Get testing service (e.g., itp-worker-python)
+    service = db.query(Service).filter(
+        Service.id == course_content.testing_service_id
     ).first()
 
-    if not execution_backend:
+    if not service:
         raise BadRequestException(
             error_code="SUBMIT_005",
-            detail="Execution backend not found"
+            detail="Testing service not found"
+        )
+
+    # Get the service type to understand what kind of testing this is
+    service_type = db.query(ServiceType).filter(
+        ServiceType.id == service.service_type_id
+    ).first()
+
+    if not service_type:
+        raise BadRequestException(
+            error_code="SUBMIT_005",
+            detail="Service type not found for service"
         )
 
     # Get course and organization for GitLab configuration
@@ -319,8 +330,9 @@ async def create_test_run(
         user_id=str(user_id),
         course_member_id=str(course_member.id),
         course_content_id=str(course_content.id),
-        execution_backend_id=str(execution_backend.id),
-        execution_backend_type=execution_backend.type,
+        testing_service_id=str(service.id),
+        testing_service_slug=service.slug,
+        testing_service_type_path=str(service_type.path),
         module=student_repository,
         reference=reference_repository
     )
@@ -386,7 +398,7 @@ async def create_test_run(
         course_member_id=course_member.id,
         course_content_id=course_content.id,
         course_content_type_id=course_content.course_content_type_id,
-        execution_backend_id=execution_backend.id,
+        testing_service_id=service.id,
         test_system_id=workflow_id,
         status=map_task_status_to_int(TaskStatus.QUEUED),
         grade=0.0,
@@ -402,19 +414,38 @@ async def create_test_run(
 
     # Start Temporal workflow for testing
     try:
-        if str(execution_backend.type).startswith("temporal:"):
+        # Check if this is a testing service type (testing.*)
+        if str(service_type.path).startswith("testing."):
             task_executor = get_task_executor()
+
+            # Get task queue from service config (service-specific) or service type properties (default)
+            task_queue = "computor-tasks"  # Default
+            if service.config and isinstance(service.config, dict):
+                task_queue = service.config.get("task_queue", task_queue)
+            elif service_type.properties and isinstance(service_type.properties, dict):
+                task_queue = service_type.properties.get("task_queue", task_queue)
 
             task_submission = TaskSubmission(
                 task_name="student_testing",
                 workflow_id=workflow_id,
                 parameters={
                     "test_job": job.model_dump(),
-                    "execution_backend_properties": execution_backend.properties,
+                    "service_config": {
+                        "id": str(service.id),
+                        "slug": service.slug,
+                        "name": service.name,
+                        "config": service.config or {},
+                    },
+                    "service_type_config": {
+                        "id": str(service_type.id),
+                        "path": str(service_type.path),
+                        "schema": service_type.schema or {},
+                        "properties": service_type.properties or {},
+                    },
                     "result_id": str(result.id),
                     "artifact_id": str(artifact.id),
                 },
-                queue=execution_backend.properties.get("task_queue", "computor-tasks")
+                queue=task_queue
             )
 
             submitted_id = await task_executor.submit_task(task_submission)
@@ -424,7 +455,7 @@ async def create_test_run(
         else:
             raise BadRequestException(
                 error_code="TASK_003",
-                detail=f"Execution backend type '{execution_backend.type}' not supported. Expected type starting with 'temporal:', got '{execution_backend.type}'"
+                detail=f"Service type '{service_type.path}' is not a testing service. Expected path starting with 'testing.', got '{service_type.path}'"
             )
 
     except Exception as e:

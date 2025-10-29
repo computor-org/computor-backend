@@ -499,7 +499,7 @@ async def generate_student_template_activity_v2(
     from ..model.course import Course, CourseContent
     from ..model.example import Example, ExampleVersion, ExampleRepository
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
-    from ..model.execution import ExecutionBackend
+    from ..model.service import ServiceType
     from ..services.storage_service import StorageService
     
     db_gen = next(get_db())
@@ -803,26 +803,72 @@ async def generate_student_template_activity_v2(
                         logger.warning(f"Failed to resolve commit for {content.path}: {e}")
                         commit_to_use = None
 
-                    # Extract execution backend slug from meta.yaml (if needed) and link to course_content
-                    if not content.execution_backend_id:
+                    # Extract service type from meta.yaml and link to appropriate service
+                    if not content.testing_service_id:
                         try:
                             commit_obj = assignments_repo.commit(commit_to_use)
                             meta_blob = commit_obj.tree / directory_name / 'meta.yaml'
                             meta_yaml_bytes = meta_blob.data_stream.read()
                             import yaml
                             meta_data = yaml.safe_load(meta_yaml_bytes) if meta_yaml_bytes else None
-                            backend_slug = None
+                            language = None
+
                             if meta_data:
                                 props = (meta_data.get('properties') or {})
-                                eb = props.get('executionBackend') or {}
-                                backend_slug = eb.get('slug')
-                            if backend_slug:
-                                exec_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_slug).first()
-                                if exec_backend:
-                                    content.execution_backend_id = exec_backend.id
-                                    logger.info(f"Linked execution backend '{backend_slug}' to course content {content.path}")
-                        except Exception:
-                            pass
+                                # Check for new service_type path or legacy executionBackend slug
+                                service_type_spec = props.get('serviceType') or props.get('service_type')
+
+                                if service_type_spec:
+                                    # Extract language from service type spec
+                                    # e.g., "testing.python" -> "python", "testing.matlab" -> "matlab"
+                                    if service_type_spec.startswith('testing.'):
+                                        language = service_type_spec.split('.')[-1]
+
+                                if not language:
+                                    # Legacy support: map old backend slugs to languages
+                                    eb = props.get('executionBackend') or {}
+                                    backend_slug = eb.get('slug')
+                                    if backend_slug:
+                                        # Extract language from legacy slug
+                                        # e.g., 'python' -> 'python', 'itpcp.exec.py' -> 'py' -> 'python'
+                                        slug_parts = backend_slug.split('.')
+                                        backend_type = slug_parts[-1] if slug_parts else backend_slug
+                                        # Map legacy backend types to languages
+                                        legacy_mapping = {
+                                            'py': 'python',
+                                            'python': 'python',
+                                            'matlab': 'matlab',
+                                            'mat': 'matlab',
+                                        }
+                                        language = legacy_mapping.get(backend_type)
+
+                            if language:
+                                from sqlalchemy_utils import Ltree
+                                from ..model.service import Service
+
+                                # Find the testing.temporal ServiceType
+                                service_type = db.query(ServiceType).filter(
+                                    ServiceType.path == Ltree('testing.temporal')
+                                ).first()
+
+                                if service_type:
+                                    # Find a Service with this service_type_id AND matching language
+                                    # Prefer enabled services
+                                    service = db.query(Service).filter(
+                                        Service.service_type_id == service_type.id,
+                                        Service.enabled == True,
+                                        Service.properties['language'].astext == language
+                                    ).first()
+
+                                    if service:
+                                        content.testing_service_id = service.id
+                                        logger.info(f"Linked service '{service.slug}' (language: {language}) to course content {content.path}")
+                                    else:
+                                        logger.warning(f"No enabled Service found for language '{language}' with ServiceType 'testing.temporal'")
+                                else:
+                                    logger.warning(f"ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
+                        except Exception as e:
+                            logger.warning(f"Failed to link service: {e}")
 
                     # Build files map from assignments repo at the selected commit under deployment path
                     files: Dict[str, bytes] = {}

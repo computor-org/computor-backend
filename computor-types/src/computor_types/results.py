@@ -13,7 +13,7 @@ class ResultCreate(BaseModel):
     course_content_id: str
     submission_group_id: str = None
     submission_artifact_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     grade: Optional[float] = None
@@ -39,7 +39,7 @@ class ResultGet(BaseEntityGet):
     course_content_type_id: str
     submission_group_id: Optional[str] = None
     submission_artifact_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     grade: Optional[float] = None
@@ -67,7 +67,7 @@ class ResultList(BaseEntityList):
     course_content_type_id: str
     submission_group_id: Optional[str] = None
     submission_artifact_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     result: float
     grade: Optional[float] = None
@@ -109,7 +109,7 @@ class ResultQuery(ListQuery):
     course_content_type_id: Optional[str] = None
     submission_group_id: Optional[str] = None
     submission_artifact_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str ] = None
     version_identifier: Optional[str] = None
     status: Optional[TaskStatus] = None

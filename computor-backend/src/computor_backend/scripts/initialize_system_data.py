@@ -21,7 +21,6 @@ load_dotenv(env_path)
 from computor_backend.database import get_db
 from computor_backend.model.role import Role, UserRole
 from computor_backend.model.course import CourseRole, CourseContentKind
-from computor_backend.model.execution import ExecutionBackend
 from computor_types.tokens import encrypt_api_key  # TODO: Remove after migration
 from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User, Account

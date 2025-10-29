@@ -11,14 +11,12 @@ from .base import Base
 if TYPE_CHECKING:
     from .artifact import SubmissionArtifact, ResultArtifact
     from .course import CourseContent, CourseContentType, CourseMember, SubmissionGroup, SubmissionGroupGrading
-    from .execution import ExecutionBackend
     from .auth import User
 
 
 class Result(Base):
     __tablename__ = 'result'
     __table_args__ = (
-        Index('result_commit_test_system_key', 'test_system_id', 'execution_backend_id', unique=True),
         # Partial unique indexes - allow multiple results with same version_identifier when status is FAILED(1), CANCELLED(2), or CRASHED(6)
         # Include course_content_id to allow same version for different assignments
         Index('result_version_identifier_member_content_partial_key', 'course_member_id', 'version_identifier', 'course_content_id',
@@ -47,10 +45,15 @@ class Result(Base):
     submission_group_id = Column(ForeignKey('submission_group.id', ondelete='SET NULL', onupdate='RESTRICT'), index=True)
     course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    execution_backend_id = Column(
-        ForeignKey('execution_backend.id', ondelete='RESTRICT', onupdate='RESTRICT'),
+
+    # Testing service - which service executed this test
+    testing_service_id = Column(
+        UUID,
+        ForeignKey('service.id', ondelete='RESTRICT'),
         nullable=True,
+        index=True
     )
+
     test_system_id = Column(String(255), nullable=True)
     # Test execution data
     grade = Column(Float(53), nullable=True)  # Grade as percentage (0.0 to 1.0)
@@ -71,7 +74,7 @@ class Result(Base):
     submission_group = relationship('SubmissionGroup', back_populates='results')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
-    execution_backend = relationship('ExecutionBackend', back_populates='results')
+    testing_service = relationship('Service', foreign_keys=[testing_service_id])
     # Gradings moved to SubmissionGrade tied to artifacts
 
     # New artifact relationships

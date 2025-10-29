@@ -162,8 +162,8 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
             query = query.filter(CourseContent.course_id == params.course_id)
         if params.course_content_type_id is not None:
             query = query.filter(CourseContent.course_content_type_id == params.course_content_type_id)
-        if params.execution_backend_id is not None:
-            query = query.filter(CourseContent.execution_backend_id == params.execution_backend_id)
+        if params.testing_service_id is not None:
+            query = query.filter(CourseContent.testing_service_id == params.testing_service_id)
         if params.example_version_id is not None:
             query = query.filter(CourseContent.example_version_id == params.example_version_id)
 

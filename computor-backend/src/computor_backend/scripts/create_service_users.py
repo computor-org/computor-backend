@@ -33,9 +33,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy_utils import Ltree
 from database import get_db
 from model.auth import User
-from model.service import Service, ApiToken
+from model.service import Service, ApiToken, ServiceType
 from utils.api_token import generate_api_token, prepare_predefined_token
 from computor_types.password_utils import create_password_hash
 import secrets
@@ -46,7 +47,8 @@ SERVICE_DEFINITIONS = [
     {
         "slug": "temporal-worker-python",
         "name": "Python Testing Worker",
-        "service_type": "temporal_worker",
+        "service_type_path": "testing.temporal",  # ServiceType path
+        "language": "python",  # Language for service matching
         "username": "temporal-worker-python",
         "email": "worker-python@computor.service",
         "description": "Temporal worker for Python test execution",
@@ -66,7 +68,8 @@ SERVICE_DEFINITIONS = [
     {
         "slug": "temporal-worker-matlab",
         "name": "MATLAB Testing Worker",
-        "service_type": "temporal_worker",
+        "service_type_path": "testing.temporal",  # ServiceType path
+        "language": "matlab",  # Language for service matching
         "username": "temporal-worker-matlab",
         "email": "worker-matlab@computor.service",
         "description": "Temporal worker for MATLAB test execution",
@@ -86,7 +89,8 @@ SERVICE_DEFINITIONS = [
     {
         "slug": "temporal-worker-general",
         "name": "General Temporal Worker",
-        "service_type": "temporal_worker",
+        "service_type_path": None,  # General workers don't have a specific type
+        "language": None,
         "username": "temporal-worker-general",
         "email": "worker-general@computor.service",
         "description": "General Temporal worker for workflow orchestration",
@@ -148,6 +152,12 @@ def create_service_user_with_token(
             }
 
     # Create service user (no password - will use API token)
+    user_properties = {"auto_created": True}
+    if service_def.get("service_type_path"):
+        user_properties["service_type_path"] = service_def["service_type_path"]
+    if service_def.get("language"):
+        user_properties["language"] = service_def["language"]
+
     user = User(
         username=service_def["username"],
         email=service_def["email"],
@@ -156,10 +166,7 @@ def create_service_user_with_token(
         is_service=True,
         password=None,  # Service users authenticate via API tokens
         created_by=admin_user_id,
-        properties={
-            "service_type": service_def["service_type"],
-            "auto_created": True
-        }
+        properties=user_properties
     )
 
     db.add(user)
@@ -168,15 +175,34 @@ def create_service_user_with_token(
     print(f"  ✅ Created service user: {user.username} (ID: {user.id})")
 
     # Create service record
+    # Look up ServiceType if specified
+    service_type_id = None
+    if service_def.get("service_type_path"):
+        service_type = db.query(ServiceType).filter(
+            ServiceType.path == Ltree(service_def["service_type_path"])
+        ).first()
+
+        if service_type:
+            service_type_id = service_type.id
+            print(f"  ✅ Linked to ServiceType: {service_type.path}")
+        else:
+            print(f"  ⚠️  ServiceType '{service_def['service_type_path']}' not found - run seed_testing_temporal_service_type.py first")
+
+    # Build properties
+    properties = {}
+    if service_def.get("language"):
+        properties["language"] = service_def["language"]
+
     service = Service(
         slug=slug,
         name=service_def["name"],
         description=service_def["description"],
-        service_type=service_def["service_type"],
+        service_type_id=service_type_id,
         user_id=user.id,
         config=service_def["config"],
         enabled=True,
-        created_by=admin_user_id
+        created_by=admin_user_id,
+        properties=properties
     )
 
     db.add(service)

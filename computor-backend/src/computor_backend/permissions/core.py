@@ -39,13 +39,12 @@ from computor_backend.model.auth import User, Account, Profile, StudentProfile, 
 from computor_backend.model.course import (
     Course, CourseFamily, CourseMember, CourseContent,
     CourseContentType, CourseContentKind, CourseRole, CourseGroup,
-    CourseExecutionBackend, CourseMemberComment,
+    CourseMemberComment,
     SubmissionGroup, SubmissionGroupMember
 )
 from computor_backend.model.organization import Organization
 from computor_backend.model.result import Result
 from computor_backend.model.message import Message
-from computor_backend.model.execution import ExecutionBackend
 from computor_backend.model.artifact import (
     SubmissionArtifact, ResultArtifact,
     SubmissionGrade, SubmissionReview
@@ -54,7 +53,7 @@ from computor_backend.model.role import Role, RoleClaim, UserRole
 from computor_backend.model.group import Group, GroupClaim, UserGroup
 from computor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 from computor_backend.model.language import Language
-from computor_backend.model.service import Service, ApiToken
+from computor_backend.model.service import Service, ServiceType, ApiToken
 
 
 def initialize_permission_handlers():
@@ -77,7 +76,6 @@ def initialize_permission_handlers():
     permission_registry.register(CourseContent, CourseContentPermissionHandler(CourseContent))
     permission_registry.register(CourseMember, CourseMemberPermissionHandler(CourseMember))
     permission_registry.register(CourseGroup, CourseMemberPermissionHandler(CourseGroup))
-    permission_registry.register(CourseExecutionBackend, CourseContentPermissionHandler(CourseExecutionBackend))
     permission_registry.register(CourseMemberComment, CourseMemberPermissionHandler(CourseMemberComment))
     permission_registry.register(SubmissionGroup, CourseMemberPermissionHandler(SubmissionGroup))
     permission_registry.register(SubmissionGroupMember, CourseMemberPermissionHandler(SubmissionGroupMember))
@@ -100,12 +98,12 @@ def initialize_permission_handlers():
     permission_registry.register(Group, UserPermissionHandler(Group))
     permission_registry.register(GroupClaim, UserPermissionHandler(GroupClaim))
     permission_registry.register(UserGroup, UserPermissionHandler(UserGroup))
-    permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
     permission_registry.register(Result, ResultPermissionHandler(Result))
     permission_registry.register(Message, MessagePermissionHandler(Message))
 
-    # Service accounts and API tokens - admin only
+    # Service accounts, service types, and API tokens - admin only
     permission_registry.register(Service, UserPermissionHandler(Service))
+    permission_registry.register(ServiceType, ReadOnlyPermissionHandler(ServiceType))
     permission_registry.register(ApiToken, UserPermissionHandler(ApiToken))
 
     # Artifact models - use CourseMemberPermissionHandler for course-scoped access
