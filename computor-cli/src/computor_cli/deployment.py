@@ -44,7 +44,7 @@ from computor_types.course_families import CourseFamilyQuery
 # Execution backends removed - migrated to services architecture
 from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
 from computor_types.service_type import ServiceTypeQuery
-from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate
+from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate, ApiTokenQuery
 from computor_types.roles import RoleQuery
 from computor_types.user_roles import UserRoleCreate, UserRoleQuery
 from computor_types.example import (
@@ -87,6 +87,12 @@ class SyncHTTPWrapper:
     def create(self, path: str, data: dict = None):
         """POST request."""
         response = self._client.post(path, json=data or {})
+        response.raise_for_status()
+        return response.json() if response.content else None
+
+    def update(self, path: str, data: dict = None):
+        """PATCH request."""
+        response = self._client.patch(path, json=data or {})
         response.raise_for_status()
         return response.json() if response.content else None
 
@@ -457,6 +463,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     user_client = client.users
     api_token_client = client.api_tokens
     service_type_client = client.service_types
+    custom_client = SyncHTTPWrapper(client)
 
     # Track deployed services for later use
     deployed_services = {}
@@ -471,10 +478,22 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
             if existing_services and len(existing_services) > 0:
                 service = existing_services[0]
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
+
+                # Look up the service's token by user_id (defaults to active tokens only)
+                existing_tokens = run_async(api_token_client.get_api_tokens(
+                    user_id=str(service.user_id)
+                ))
+                token_id = None
+                if existing_tokens and len(existing_tokens) > 0:
+                    # Use the first token (only active tokens are returned by default)
+                    token = existing_tokens[0]
+                    token_id = str(token.id)
+                    click.echo(f"    ℹ️  Found existing token: {token.token_prefix}...")
+
                 deployed_services[service_config.slug] = {
                     "id": str(service.id),
                     "user_id": str(service.user_id),
-                    "token_id": None  # Token already exists, we don't know the ID
+                    "token_id": token_id
                 }
                 continue
 
@@ -517,31 +536,65 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
             # Check for predefined token
             predefined_token = token_config.token
+            predefined_token_specified = bool(predefined_token)  # Remember if token was specified
+
             if predefined_token:
+                # Store original value for error messages
+                original_token_value = predefined_token
+
                 # Expand environment variables
                 predefined_token = os.path.expandvars(predefined_token)
 
-                # Check if token is empty after expansion
+                # Validate expanded token
+                validation_errors = []
                 if not predefined_token or predefined_token.strip() == "":
-                    predefined_token = None
-                    click.echo(f"    ℹ️  No predefined token provided, generating new token...")
+                    validation_errors.append("token is empty after environment variable expansion")
+                elif predefined_token.startswith("${"):
+                    validation_errors.append(f"environment variable not set or not exported (got: '{predefined_token}')")
+                elif len(predefined_token) < 32:
+                    validation_errors.append(f"token is too short (got {len(predefined_token)} chars, need at least 32)")
+                elif not predefined_token.startswith("ctp_"):
+                    validation_errors.append("token must start with 'ctp_' prefix")
+
+                if validation_errors:
+                    error_msg = f"Invalid predefined token for service '{service_config.slug}': {'; '.join(validation_errors)}"
+                    click.echo(f"    ❌ {error_msg}")
+                    click.echo(f"       Original value in deployment.yaml: {original_token_value}")
+                    click.echo(f"       Expanded value: {predefined_token if predefined_token else '(empty)'}")
+                    raise ValueError(error_msg)
+
+            # Calculate expiration date
+            expires_at = None
+            if token_config.expires_days:
+                expires_at = datetime.utcnow() + timedelta(days=token_config.expires_days)
 
             if predefined_token:
-                # TODO: Validate that current user is admin before allowing predefined token
-                # For now, we'll assume the deploying user has permission
-                click.echo(f"    ⚠️  Using predefined token (admin only)")
-                # Note: Predefined token API endpoint needs to be implemented
-                # For now, create a regular token
-                click.echo(f"    ⚠️  Predefined token API not yet implemented, generating new token instead")
-                predefined_token = None
+                # Use admin endpoint to create token with predefined value
+                click.echo(f"    ✅ Using predefined token (admin only)")
+                from computor_types.api_tokens import ApiTokenAdminCreate
 
-            if not predefined_token:
-                # Calculate expiration date
-                expires_at = None
-                if token_config.expires_days:
-                    expires_at = datetime.utcnow() + timedelta(days=token_config.expires_days)
+                token_create = ApiTokenAdminCreate(
+                    name=token_config.name or f"{service_config.slug} Token",
+                    description=f"API token for {service_config.slug}",
+                    user_id=str(service.user_id),
+                    predefined_token=predefined_token,
+                    scopes=token_config.scopes or [],
+                    expires_at=expires_at
+                )
 
-                # Create token
+                # Call admin endpoint (use mode='json' to serialize datetime objects)
+                token_response = custom_client.create("api-tokens/admin/create", token_create.model_dump(mode='json'))
+                click.echo(f"    ✅ Created API token with predefined value: {token_response['token_prefix']}...")
+
+                deployed_services[service_config.slug] = {
+                    "id": str(service.id),
+                    "user_id": str(service.user_id),
+                    "token_id": str(token_response['id']),
+                    "token": predefined_token
+                }
+            else:
+                # Generate random token
+                click.echo(f"    ℹ️  Generating new random token...")
                 token_create = ApiTokenCreate(
                     name=token_config.name or f"{service_config.slug} Token",
                     description=f"API token for {service_config.slug}",
@@ -1184,6 +1237,7 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
     click.echo(f"\n🔐 Phase 3: Updating API token scopes with course-specific permissions...")
 
     client = run_async(get_computor_client(auth))
+    custom_client = SyncHTTPWrapper(client)
     api_token_client = client.api_tokens
 
     # Create reverse mapping: service_id -> service_slug
@@ -1225,9 +1279,9 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
                 new_scopes.add(f"read:course_contents:course:{course_id}")
                 new_scopes.add(f"read:submissions:course:{course_id}")
 
-            # Update token scopes
+            # Update token scopes using admin endpoint
             token_update = ApiTokenUpdate(scopes=list(new_scopes))
-            run_async(api_token_client.update(token_id, token_update))
+            custom_client.update(f"api-tokens/admin/{token_id}", token_update.model_dump(mode='json'))
 
             click.echo(f"    ✅ Updated token scopes for {service_slug} ({len(course_ids)} courses)")
             updated_count += 1

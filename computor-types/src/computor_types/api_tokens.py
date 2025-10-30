@@ -4,7 +4,7 @@ API Token DTOs for token-based authentication.
 
 from __future__ import annotations
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -20,6 +20,22 @@ class ApiTokenCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Human-readable token name")
     description: Optional[str] = Field(None, description="Token description/purpose")
     user_id: str = Field(..., description="User ID that owns this token")
+    scopes: List[str] = Field(default_factory=list, description="Token scopes (e.g., ['read:courses', 'write:results'])")
+    expires_at: Optional[datetime] = Field(None, description="Token expiration date (null = never expires)")
+    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
+
+
+class ApiTokenAdminCreate(BaseModel):
+    """
+    Admin-only DTO for creating API tokens with predefined values.
+
+    Used for initial deployment where tokens need to be known in advance.
+    Regular users should use ApiTokenCreate instead.
+    """
+    name: str = Field(..., min_length=1, max_length=255, description="Human-readable token name")
+    description: Optional[str] = Field(None, description="Token description/purpose")
+    user_id: str = Field(..., description="User ID that owns this token")
+    predefined_token: str = Field(..., min_length=32, description="Predefined token value (must start with 'ctp_')")
     scopes: List[str] = Field(default_factory=list, description="Token scopes (e.g., ['read:courses', 'write:results'])")
     expires_at: Optional[datetime] = Field(None, description="Token expiration date (null = never expires)")
     properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
@@ -64,6 +80,9 @@ class ApiTokenGet(BaseEntityGet):
     Note: The actual token value is NEVER returned after creation.
     Only metadata and the prefix are available.
     """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str = Field(..., description="Token UUID")
     name: str
     description: Optional[str] = None
     user_id: str

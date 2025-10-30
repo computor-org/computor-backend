@@ -14258,6 +14258,22 @@
             }
           },
           {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          },
+          {
             "name": "slug",
             "in": "query",
             "required": false,
@@ -14695,6 +14711,138 @@
                     "$ref": "#/components/schemas/ApiTokenGet"
                   },
                   "title": "Response List Tokens Endpoint Api Tokens Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-tokens/admin/create": {
+      "post": {
+        "tags": [
+          "tokens",
+          "authentication"
+        ],
+        "summary": "Create Token Admin Endpoint",
+        "description": "Create an API token with a predefined value (admin-only).\n\nThis endpoint is for initial deployment where tokens need to be known in advance.\nRequires admin permissions. Regular users should use the standard token creation endpoint.",
+        "operationId": "create_token_admin_endpoint_api_tokens_admin_create_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiTokenAdminCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-tokens/admin/{token_id}": {
+      "patch": {
+        "tags": [
+          "tokens",
+          "authentication"
+        ],
+        "summary": "Update Token Admin Endpoint",
+        "description": "Update an API token (admin-only).\n\nThis endpoint is primarily for updating token scopes after course creation during deployment.\nRequires admin permissions.",
+        "operationId": "update_token_admin_endpoint_api_tokens_admin__token_id__patch",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Token Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiTokenUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenGet"
                 }
               }
             }
@@ -21692,6 +21840,82 @@
         "title": "AdminSetPasswordRequest",
         "description": "Admin request to set another user's password."
       },
+      "ApiTokenAdminCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Human-readable token name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Token description/purpose"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User ID that owns this token"
+          },
+          "predefined_token": {
+            "type": "string",
+            "minLength": 32,
+            "title": "Predefined Token",
+            "description": "Predefined token value (must start with 'ctp_')"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes",
+            "description": "Token scopes (e.g., ['read:courses', 'write:results'])"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "Token expiration date (null = never expires)"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties",
+            "description": "Additional properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "user_id",
+          "predefined_token"
+        ],
+        "title": "ApiTokenAdminCreate",
+        "description": "Admin-only DTO for creating API tokens with predefined values.\n\nUsed for initial deployment where tokens need to be known in advance.\nRegular users should use ApiTokenCreate instead."
+      },
       "ApiTokenCreate": {
         "properties": {
           "name": {
@@ -21979,6 +22203,75 @@
         ],
         "title": "ApiTokenGet",
         "description": "DTO for retrieving an API token.\n\nNote: The actual token value is NEVER returned after creation.\nOnly metadata and the prefix are available."
+      },
+      "ApiTokenUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties"
+          }
+        },
+        "type": "object",
+        "title": "ApiTokenUpdate",
+        "description": "DTO for updating an API token."
       },
       "AssignExampleResponse": {
         "properties": {
@@ -32814,6 +33107,11 @@
             ],
             "title": "Updated By"
           },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Service UUID"
+          },
           "slug": {
             "type": "string",
             "title": "Slug"
@@ -32873,6 +33171,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "slug",
           "name",
           "user_id",

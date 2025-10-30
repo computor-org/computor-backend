@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-10-29T23:13:51.371962
+Generated at: 2025-10-30T14:00:18.046354
 
 To regenerate: bash generate_error_codes.sh
 """

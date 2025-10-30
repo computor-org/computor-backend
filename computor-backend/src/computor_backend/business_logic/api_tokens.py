@@ -19,8 +19,10 @@ from computor_backend.model.auth import User
 from computor_backend.utils.api_token import generate_api_token
 from computor_types.api_tokens import (
     ApiTokenCreate,
+    ApiTokenAdminCreate,
     ApiTokenCreateResponse,
     ApiTokenGet,
+    ApiTokenUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,7 +134,7 @@ def get_api_token(
     Users can only view their own tokens unless they have admin permissions.
     The actual token value is never returned.
     """
-    token = db.query(ApiToken).filter(ApiToken.id == token_id).first()
+    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
 
@@ -162,7 +164,7 @@ def list_api_tokens(
     if user_id:
         # Admin filtering by specific user
         check_permissions(permissions, ApiToken, "read", db)
-        query = query.filter(ApiToken.user_id == user_id)
+        query = query.filter(ApiToken.user_id == str(user_id))
     else:
         # Check if user can list all tokens or only their own
         try:
@@ -181,6 +183,70 @@ def list_api_tokens(
     return [ApiTokenGet.model_validate(t, from_attributes=True) for t in tokens]
 
 
+def update_api_token_admin(
+    token_id: UUID,
+    token_data: "ApiTokenUpdate",
+    permissions: Principal,
+    db: Session,
+) -> ApiTokenGet:
+    """
+    Update an API token (admin-only).
+
+    This endpoint is for updating token metadata, particularly scopes after
+    course creation during deployment.
+
+    Args:
+        token_id: Token ID to update
+        token_data: Token update data
+        permissions: Current user permissions (must be admin)
+        db: Database session
+
+    Returns:
+        Updated token details
+
+    Raises:
+        ForbiddenException: If user is not admin
+        NotFoundException: If token not found
+    """
+    # Require admin permissions
+    check_permissions(permissions, ApiToken, "update", db)
+
+    # Get token
+    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
+    if not token:
+        raise NotFoundException(detail="API token not found")
+
+    try:
+        # Update fields if provided
+        if token_data.name is not None:
+            token.name = token_data.name
+        if token_data.description is not None:
+            token.description = token_data.description
+        if token_data.scopes is not None:
+            token.scopes = token_data.scopes
+        if token_data.expires_at is not None:
+            token.expires_at = token_data.expires_at
+        if token_data.properties is not None:
+            token.properties = token_data.properties
+
+        token.updated_by = permissions.user_id
+        token.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        db.refresh(token)
+
+        logger.info(
+            f"Updated API token '{token.name}' (prefix: {token.token_prefix})"
+        )
+
+        return ApiTokenGet.model_validate(token, from_attributes=True)
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating API token: {e}")
+        raise
+
+
 def revoke_api_token(
     token_id: UUID,
     reason: Optional[str],
@@ -193,7 +259,7 @@ def revoke_api_token(
     Users can revoke their own tokens.
     Admins can revoke any token.
     """
-    token = db.query(ApiToken).filter(ApiToken.id == token_id).first()
+    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
 
@@ -220,4 +286,97 @@ def revoke_api_token(
     except Exception as e:
         db.rollback()
         logger.error(f"Error revoking API token: {e}")
+        raise
+
+
+def create_api_token_admin(
+    token_data: ApiTokenAdminCreate,
+    permissions: Principal,
+    db: Session,
+) -> ApiTokenCreateResponse:
+    """
+    Create an API token with a predefined value (admin-only).
+
+    This endpoint is intended for initial deployment where tokens need to be
+    known in advance. Regular token creation should use create_api_token().
+
+    Args:
+        token_data: Token creation data with predefined token
+        permissions: Current user permissions (must be admin)
+        db: Database session
+
+    Returns:
+        Created token with the predefined token value
+
+    Raises:
+        ForbiddenException: If user is not admin
+        BadRequestException: If user not found or token format invalid
+    """
+    # Require admin permissions
+    check_permissions(permissions, ApiToken, "create", db)
+
+    # Verify user exists
+    user = db.query(User).filter(User.id == token_data.user_id).first()
+    if not user:
+        raise BadRequestException(detail="User not found")
+
+    # Validate token format
+    predefined_token = token_data.predefined_token
+    if not predefined_token.startswith("ctp_"):
+        raise BadRequestException(
+            detail="Predefined token must start with 'ctp_' prefix"
+        )
+
+    if len(predefined_token) < 32:
+        raise BadRequestException(
+            detail="Predefined token must be at least 32 characters long"
+        )
+
+    # Extract prefix (first 12 characters) and hash the token
+    from computor_backend.utils.api_token import hash_api_token
+    token_prefix = predefined_token[:12]
+    token_hash = hash_api_token(predefined_token)
+
+    try:
+        api_token = ApiToken(
+            name=token_data.name,
+            description=token_data.description,
+            user_id=token_data.user_id,
+            token_hash=token_hash,
+            token_prefix=token_prefix,
+            scopes=token_data.scopes or [],
+            expires_at=token_data.expires_at,
+            created_by=permissions.user_id,
+        )
+
+        db.add(api_token)
+        db.commit()
+        db.refresh(api_token)
+
+        logger.info(
+            f"Created API token (admin-predefined) '{api_token.name}' for user {user.username} "
+            f"(prefix: {token_prefix})"
+        )
+
+        return ApiTokenCreateResponse(
+            id=api_token.id,
+            name=api_token.name,
+            description=api_token.description,
+            user_id=api_token.user_id,
+            token=predefined_token,  # Return the predefined token
+            token_prefix=api_token.token_prefix,
+            scopes=api_token.scopes,
+            expires_at=api_token.expires_at,
+            created_at=api_token.created_at,
+        )
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Failed to create admin token (likely duplicate): {e}")
+        raise BadRequestException(
+            detail="Failed to create token - token hash may already exist"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating admin API token: {e}")
         raise
