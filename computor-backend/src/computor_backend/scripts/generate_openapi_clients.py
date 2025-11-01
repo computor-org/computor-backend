@@ -906,7 +906,6 @@ except Exception as e:
     'UserRoleCreate': 'user_roles',
     'UserRoleGet': 'user_roles',
     'UserRoleList': 'user_roles',
-    'UserTypeEnum': 'users',
     'UserUpdate': 'users',
     # API Tokens
     'ApiTokenCreate': 'api_tokens',

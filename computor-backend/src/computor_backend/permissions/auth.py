@@ -81,26 +81,18 @@ class AuthenticationService:
             db.query(
                 User.id,
                 User.password,
-                User.user_type,
-                User.token_expiration,
                 UserRole.role_id
             )
             .outerjoin(UserRole, UserRole.user_id == User.id)
             .filter(or_(User.username == username, User.email == username))
             .all()
         )
-        
+
         if not results:
             raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-        
-        user_id, user_password, user_type, token_expiration = results[0][:4]
-        
-        # Check token expiration for token users
-        if user_type == 'token':
-            now = datetime.datetime.now(datetime.timezone.utc)
-            if token_expiration is None or token_expiration < now:
-                raise UnauthorizedException(error_code="AUTH_003", detail="Token expired")
-        
+
+        user_id, user_password = results[0][:2]
+
         # Verify password using Argon2 or fallback to old encryption (migration support)
         if user_password is None:
             raise UnauthorizedException(error_code="AUTH_002", detail="No password set. Please contact administrator or use password reset.")
@@ -124,9 +116,9 @@ class AuthenticationService:
                 logger.error(f"Password verification failed for user '{username}': {str(e)}")
                 raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
-        # Collect roles
-        role_ids = [res[4] for res in results if res[4] is not None]
-        
+        # Collect roles (role_id is now at index 2 after removing user_type and token_expiration)
+        role_ids = [res[2] for res in results if res[2] is not None]
+
         return AuthenticationResult(user_id, role_ids, "basic")
     
     @staticmethod
