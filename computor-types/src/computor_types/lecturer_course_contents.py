@@ -33,7 +33,7 @@ class CourseContentLecturerGet(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     is_submittable: bool = False
     has_deployment: Optional[bool] = None
     deployment_status: Optional[str] = None
@@ -66,7 +66,7 @@ class CourseContentLecturerList(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     is_submittable: bool = False
     has_deployment: Optional[bool] = None
     deployment_status: Optional[str] = None
@@ -99,7 +99,7 @@ class CourseContentLecturerQuery(ListQuery):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     has_deployment: Optional[bool] = Field(
         None,
         description="Filter by whether content has a deployment"

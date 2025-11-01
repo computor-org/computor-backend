@@ -190,7 +190,7 @@ async def execute_tests_activity(
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
-            service_type_properties=service_type_config
+            backend_properties=service_type_config
         )
 
         # Test backends write results to file - always read from file

@@ -186,9 +186,18 @@ class ComputorClient:
         Set authentication token directly.
 
         Args:
-            token: Bearer token for API authentication
+            token: API token for authentication (uses X-API-Token header for API tokens starting with 'ctp_', Bearer for JWT)
         """
-        self._client.headers["Authorization"] = f"Bearer {token}"
+        # API tokens start with 'ctp_' and use X-API-Token header
+        if token.startswith("ctp_"):
+            self._client.headers["X-API-Token"] = token
+            # Remove Authorization header if present
+            self._client.headers.pop("Authorization", None)
+        else:
+            # JWT tokens use Authorization Bearer
+            self._client.headers["Authorization"] = f"Bearer {token}"
+            # Remove X-API-Token header if present
+            self._client.headers.pop("X-API-Token", None)
 
     async def close(self):
         """Close the underlying HTTP client."""

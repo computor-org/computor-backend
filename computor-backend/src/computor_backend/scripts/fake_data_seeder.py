@@ -24,8 +24,7 @@ load_dotenv(env_path)
 from database import get_db
 from model.auth import User, Account, StudentProfile
 from model.organization import Organization
-from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseExecutionBackend, CourseContent, CourseContentType, CourseContentKind
-from model.execution import ExecutionBackend
+from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseContent, CourseContentType, CourseContentKind
 from model.role import Role, UserRole
 from ..custom_types import Ltree
 from sqlalchemy.orm import Session
@@ -160,37 +159,13 @@ def create_organizations(session, users):
     return organizations
 
 def create_execution_backends(session, users):
-    """Create execution backends."""
-    backends_data = [
-        {'type': 'python', 'slug': 'python-3-11'},
-        {'type': 'java', 'slug': 'java-17'},
-        {'type': 'cpp', 'slug': 'gcc-11'},
-        {'type': 'matlab', 'slug': 'matlab-2023a'}
-    ]
-    
-    execution_backends = []
-    for backend_data in backends_data:
-        # Check if backend already exists
-        existing_backend = session.query(ExecutionBackend).filter(
-            ExecutionBackend.slug == backend_data['slug']
-        ).first()
-        
-        if existing_backend:
-            print(f"ℹ️  Execution backend '{backend_data['slug']}' already exists")
-            execution_backends.append(existing_backend)
-        else:
-            backend = ExecutionBackend(
-                type=backend_data['type'],
-                slug=backend_data['slug'],
-                created_by=random.choice(users).id
-            )
-            session.add(backend)
-            session.flush()
-            execution_backends.append(backend)
-            print(f"✅ Created execution backend: {backend_data['slug']}")
-    
-    print(f"✅ Using {len(execution_backends)} execution backends")
-    return execution_backends
+    """
+    DEPRECATED: ExecutionBackend model has been replaced by ServiceType.
+    This function is kept for backward compatibility but does nothing.
+    To create testing services, use ServiceType and Service models instead.
+    """
+    print("ℹ️  ExecutionBackend creation skipped (deprecated - use ServiceType instead)")
+    return []
 
 def create_course_families(session, organizations, users):
     """Create course families."""
@@ -246,15 +221,9 @@ def create_courses(session, course_families, organizations, users, execution_bac
             session.add(course)
             session.flush()  # Flush to get course ID
             courses.append(course)
-            
-            # Add execution backends to course
-            for backend in random.sample(execution_backends, random.randint(1, 2)):
-                course_backend = CourseExecutionBackend(
-                    course_id=course.id,
-                    execution_backend_id=backend.id
-                )
-                session.add(course_backend)
-    
+
+            # NOTE: Execution backend assignment removed - use ServiceType/Service instead
+
     session.flush()
     print(f"✅ Created {len(courses)} courses")
     return courses
@@ -473,13 +442,12 @@ def clear_fake_data(session):
     
     # Delete in reverse dependency order
     session.query(CourseMember).delete(synchronize_session=False)
-    session.query(CourseExecutionBackend).delete(synchronize_session=False)
+    # NOTE: CourseExecutionBackend table removed - use CourseService instead
     session.query(CourseGroup).delete(synchronize_session=False)
     session.query(Course).delete(synchronize_session=False)
     session.query(CourseFamily).delete(synchronize_session=False)
-    
-    # Delete execution backends except system ones
-    session.query(ExecutionBackend).filter(ExecutionBackend.slug != 'temporal.builtin').delete(synchronize_session=False)
+
+    # NOTE: ExecutionBackend table removed - use ServiceType/Service instead
     
     # Delete all organizations - we'll recreate them
     session.query(Organization).delete(synchronize_session=False)
@@ -527,8 +495,7 @@ def main():
             print("🎉 Fake data seeding completed successfully!")
             print(f"Created:")
             print(f"  - {len(users)} users")
-            print(f"  - {len(organizations)} organizations") 
-            print(f"  - {len(execution_backends)} execution backends")
+            print(f"  - {len(organizations)} organizations")
             print(f"  - {len(course_families)} course families")
             print(f"  - {len(courses)} courses")
             print(f"  - {len(course_groups)} course groups")

@@ -101,7 +101,7 @@ async def course_member_course_content_result_mapper(
             result_json_data = await retrieve_result_json(result.id)
             from computor_types.student_course_contents import ResultStudentGet
             result_payload = ResultStudentGet(
-                execution_backend_id=result.execution_backend_id,
+                testing_service_id=result.testing_service_id,
                 test_system_id=result.test_system_id,
                 version_identifier=result.version_identifier,
                 status=map_int_to_task_status(result.status),
@@ -112,7 +112,7 @@ async def course_member_course_content_result_mapper(
         else:
             # For list views, don't fetch result_json from MinIO
             result_payload = ResultStudentList(
-                execution_backend_id=result.execution_backend_id,
+                testing_service_id=result.testing_service_id,
                 test_system_id=result.test_system_id,
                 version_identifier=result.version_identifier,
                 status=map_int_to_task_status(result.status),
