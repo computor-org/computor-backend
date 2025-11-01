@@ -102,9 +102,8 @@ async def execute_tests_activity(
     # Parse the test job configuration
     test_job = TestJob(**test_config)
 
-    # Determine backend type from service type path (e.g., "testing.python" -> "python")
-    service_type_path = test_config.get("testing_service_type_path", "")
-    backend_type = service_type_path.split(".")[-1] if service_type_path else "python"
+    # Use service slug directly as backend identifier
+    service_slug = test_job.testing_service_slug
     
     # Create work directory structure within the temp directory
     work_dir = os.path.dirname(student_path)  # Get parent temp directory
@@ -166,7 +165,7 @@ async def execute_tests_activity(
     # Test file path is always from reference repository
     test_file_path = os.path.join(reference_path, TEST_FILE_NAME)
     
-    logger.info(f"Executing tests with backend: {backend_type}")
+    logger.info(f"Executing tests with service: {service_slug}")
     logger.info(f"Test file: {test_file_path}")
     logger.info(f"Spec file: {spec_file_path}")
     
@@ -186,7 +185,7 @@ async def execute_tests_activity(
     # Execute tests using the appropriate backend
     try:
         await execute_tests_with_backend(
-            backend_type=backend_type,
+            service_slug=service_slug,
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
