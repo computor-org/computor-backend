@@ -219,8 +219,8 @@ async def upload_submission_artifact(
     if not course_content.is_submittable:
         raise BadRequestException(detail="This course content does not accept submissions")
 
-    if not course_content.execution_backend_id:
-        raise BadRequestException(detail="Course content is missing an execution backend to link submissions")
+    if not course_content.testing_service_id:
+        raise BadRequestException(detail="Course content is missing a testing service to link submissions")
 
     # Determine submitting course member
     submitting_member: Optional[CourseMember] = None
@@ -849,7 +849,7 @@ def delete_review(
 async def create_test_result(
     artifact_id: UUID | str,
     course_member_id: UUID | str,
-    execution_backend_id: UUID | str,
+    testing_service_id: UUID | str,
     test_system_id: Optional[UUID | str],
     status: str,
     grade: Optional[float],
@@ -937,7 +937,7 @@ async def create_test_result(
     result = Result(
         submission_artifact_id=artifact_id,
         course_member_id=course_member.id,  # Use authenticated user's course member ID
-        execution_backend_id=execution_backend_id,
+        testing_service_id=testing_service_id,
         test_system_id=test_system_id,
         status=map_task_status_to_int(status),
         grade=grade,

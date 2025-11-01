@@ -980,7 +980,7 @@ async def create_test_result(
     result = Result(
         submission_artifact_id=artifact_id,
         course_member_id=course_member.id,  # Use authenticated user's course member ID
-        execution_backend_id=test_data.execution_backend_id,
+        testing_service_id=test_data.testing_service_id,
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
         grade=test_data.grade,
