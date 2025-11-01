@@ -43,6 +43,22 @@ import secrets
 
 
 # Service definitions
+DEFAULT_TOKEN_SCOPES = [
+    "course:get",
+    "course:list",
+    "course_content:get",
+    "course_content:list",
+    "course_content_type:get",
+    "course_content_type:list",
+    "submission_artifact:get",
+    "submission_artifact:list",
+    "result:get",
+    "result:list",
+    "result:create",
+    "result:update",
+]
+
+
 SERVICE_DEFINITIONS = [
     {
         "slug": "temporal-worker-python",
@@ -56,14 +72,7 @@ SERVICE_DEFINITIONS = [
             "worker_queue": "testing-python",
             "capabilities": ["python_testing", "code_execution"]
         },
-        "token_scopes": [
-            "read:courses",
-            "read:course_contents",
-            "read:submissions",
-            "read:results",
-            "write:results",
-            "execute:tests"
-        ]
+        "token_scopes": DEFAULT_TOKEN_SCOPES.copy(),
     },
     {
         "slug": "temporal-worker-matlab",
@@ -77,14 +86,7 @@ SERVICE_DEFINITIONS = [
             "worker_queue": "testing-matlab",
             "capabilities": ["matlab_testing", "code_execution"]
         },
-        "token_scopes": [
-            "read:courses",
-            "read:course_contents",
-            "read:submissions",
-            "read:results",
-            "write:results",
-            "execute:tests"
-        ]
+        "token_scopes": DEFAULT_TOKEN_SCOPES.copy(),
     },
     {
         "slug": "temporal-worker-general",
@@ -104,13 +106,14 @@ SERVICE_DEFINITIONS = [
             ]
         },
         "token_scopes": [
-            "read:courses",
-            "read:course_contents",
-            "read:organizations",
-            "read:repositories",
-            "write:repositories",
-            "write:gitlab",
-            "execute:workflows"
+            "course:get",
+            "course:list",
+            "course:create",
+            "course:update",
+            "course_content:get",
+            "course_content:list",
+            "organization:get",
+            "organization:list",
         ]
     }
 ]

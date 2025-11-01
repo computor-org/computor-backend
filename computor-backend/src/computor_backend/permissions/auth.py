@@ -281,17 +281,25 @@ class PrincipalBuilder:
     @staticmethod
     def build(auth_result: AuthenticationResult, db: Session) -> Principal:
         """Build a Principal from authentication result"""
-        
+
         # Get user claims from database
         claim_values = db_get_claims(auth_result.user_id, db)
-        
+
         # Get course-specific claims
         course_claims = db_get_course_claims(auth_result.user_id, db)
         claim_values.extend(course_claims)
-        
+
+        # Convert API token scopes to claims (if present)
+        # API token scopes use the same format as claims: "resource:action" or "resource:action:resource_id"
+        if hasattr(auth_result, 'scopes') and auth_result.scopes:
+            for scope in auth_result.scopes:
+                # Convert scope to claim format: ("permissions", scope)
+                claim_values.append(("permissions", scope))
+            logger.debug(f"Added {len(auth_result.scopes)} API token scopes as claims for user {auth_result.user_id}")
+
         # Build structured claims
         claims = build_claims(claim_values)
-        
+
         # Create Principal
         return Principal(
             user_id=auth_result.user_id,

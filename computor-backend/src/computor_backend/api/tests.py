@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 tests_router = APIRouter()
 
 
+def _has_result_permission(
+    principal: Principal,
+    action: str | list[str],
+) -> bool:
+    """Return True when principal has global permission on results."""
+    return principal.is_admin or principal.permitted("result", action)
+
 async def check_user_rate_limit(user_id: str, cache) -> bool:
     """
     Check user_id-based rate limiting using Redis.
@@ -505,8 +512,9 @@ async def get_test_status(
         )
 
     # Check permissions
+    can_view_all = _has_result_permission(permissions, "get")
     user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
+    if user_id and not can_view_all:
         # Check if user is a member of the submission group (for students)
         is_group_member = db.query(SubmissionGroupMember).join(
             CourseMember
@@ -529,6 +537,11 @@ async def get_test_status(
                     error_code="AUTHZ_003",
                     detail="You don't have permission to view this test result"
                 )
+    elif not can_view_all:
+        raise ForbiddenException(
+            error_code="AUTHZ_003",
+            detail="You don't have permission to view this test result"
+        )
 
     # If test has a workflow ID, check Temporal status for running tests
     status = result_data.status

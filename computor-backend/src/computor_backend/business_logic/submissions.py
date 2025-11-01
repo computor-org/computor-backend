@@ -518,6 +518,7 @@ def check_artifact_access(
     artifact_id: UUID | str,
     permissions: Principal,
     db: Session,
+    action: str | list[str] = "get",
     require_tutor: bool = False,
 ) -> SubmissionArtifact:
     """Check if user has access to a submission artifact."""
@@ -529,6 +530,9 @@ def check_artifact_access(
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
+
+    if permissions.is_admin or permissions.permitted("submission_artifact", action):
+        return artifact
 
     # Check permissions
     user_id = permissions.get_user_id()
@@ -583,7 +587,7 @@ def update_artifact(
     db: Session,
 ) -> SubmissionArtifact:
     """Update a submission artifact."""
-    artifact = check_artifact_access(artifact_id, permissions, db, require_tutor=False)
+    artifact = check_artifact_access(artifact_id, permissions, db, action="update", require_tutor=False)
 
     # Apply updates
     if submit is not None:

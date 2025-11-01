@@ -37,7 +37,7 @@ class TestSimplePermissions:
         )
         assert student.user_id == 'student-123'
         assert student.is_admin == False
-        assert not student.permitted('courses', 'create')  # Student can't create courses
+        assert not student.permitted('course', 'create')  # Student can't create courses
     
     def test_course_roles(self):
         """Test course role permissions."""
@@ -128,14 +128,14 @@ class TestPermissionHelpers:
 
     def test_general_and_dependent_permissions(self):
         """Test that general and dependent claims are respected."""
-        # Build claims: organizations:list and course_content:update on cc-1
+        # Build claims: organization:list and course_content:update on cc-1
         claim_values = [
-            ("permissions", "organizations:list"),
+            ("permissions", "organization:list"),
             ("permissions", "course_content:update:cc-1"),
         ]
         principal = Principal(user_id='u1', roles=['user'], claims=build_claims(claim_values))
         
-        assert principal.permitted('organizations', 'list') is True
+        assert principal.permitted('organization', 'list') is True
         assert principal.permitted('course_content', 'update', 'cc-1') is True
         assert principal.permitted('course_content', 'update', 'cc-2') is False
 

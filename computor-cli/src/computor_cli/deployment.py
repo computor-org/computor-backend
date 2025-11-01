@@ -108,6 +108,20 @@ def deployment():
     pass
 
 
+DEFAULT_SERVICE_TOKEN_SCOPES = [
+    "course:get",
+    "course:list",
+    "course_content:get",
+    "course_content:list",
+    "course_content_type:get",
+    "course_content_type:list",
+    "result:get",
+    "result:list",
+    "result:create",
+    "result:update",
+]
+
+
 @deployment.command()
 @click.option(
     '--output', '-o',
@@ -578,7 +592,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     description=f"API token for {service_config.slug}",
                     user_id=str(service.user_id),
                     predefined_token=predefined_token,
-                    scopes=token_config.scopes or [],
+                    scopes=token_config.scopes or DEFAULT_SERVICE_TOKEN_SCOPES,
                     expires_at=expires_at
                 )
 
@@ -599,7 +613,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     name=token_config.name or f"{service_config.slug} Token",
                     description=f"API token for {service_config.slug}",
                     user_id=str(service.user_id),
-                    scopes=token_config.scopes or [],
+                    scopes=token_config.scopes or DEFAULT_SERVICE_TOKEN_SCOPES,
                     expires_at=expires_at
                 )
 
@@ -1217,12 +1231,10 @@ def _link_services_to_course(course_id: str, services: list, deployed_services: 
 
 def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, auth: CLIAuthConfig):
     """
-    Update API token scopes with course-specific permissions (Phase 3).
+    Update API token scopes with standardized permissions (Phase 3).
 
-    Takes the initial token scopes and adds course-specific permissions like:
-    - execute:tests:course:<course_id>
-    - read:courses:course:<course_id>
-    - write:results:course:<course_id>
+    Ensures each token contains the baseline scope set required by the workers
+    while preserving any custom scopes that were already assigned.
 
     Args:
         service_course_mapping: Dict mapping service_id to list of course_ids
@@ -1234,7 +1246,7 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
         click.echo("\n⚠️  No service-course mappings found, skipping token scope updates")
         return
 
-    click.echo(f"\n🔐 Phase 3: Updating API token scopes with course-specific permissions...")
+    click.echo(f"\n🔐 Phase 3: Updating API token scopes with standardized permissions...")
 
     client = run_async(get_computor_client(auth))
     custom_client = SyncHTTPWrapper(client)
@@ -1267,23 +1279,15 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
             # Get current token
             token = run_async(api_token_client.get(token_id))
             current_scopes = token.scopes or []
-
-            # Build new scopes with course-specific permissions
+            # Build new scopes with standardized permissions
             new_scopes = set(current_scopes)
-
-            for course_id in course_ids:
-                # Add course-specific scopes
-                new_scopes.add(f"execute:tests:course:{course_id}")
-                new_scopes.add(f"read:courses:course:{course_id}")
-                new_scopes.add(f"write:results:course:{course_id}")
-                new_scopes.add(f"read:course_contents:course:{course_id}")
-                new_scopes.add(f"read:submissions:course:{course_id}")
+            new_scopes.update(DEFAULT_SERVICE_TOKEN_SCOPES)
 
             # Update token scopes using admin endpoint
             token_update = ApiTokenUpdate(scopes=list(new_scopes))
             custom_client.update(f"api-tokens/admin/{token_id}", token_update.model_dump(mode='json'))
 
-            click.echo(f"    ✅ Updated token scopes for {service_slug} ({len(course_ids)} courses)")
+            click.echo(f"    ✅ Updated token scopes for {service_slug}")
             updated_count += 1
 
         except Exception as e:
@@ -1744,7 +1748,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                                     config, auth, deployed_services, True
                                 )
 
-                                # Phase 3: Update token scopes with course-specific permissions
+                                # Phase 3: Update token scopes with standardized permissions
                                 if service_course_mapping and deployed_services:
                                     _update_token_scopes(service_course_mapping, deployed_services, auth)
 
