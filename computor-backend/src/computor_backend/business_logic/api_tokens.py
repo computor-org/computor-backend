@@ -14,7 +14,7 @@ from computor_backend.api.exceptions import (
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.service import ApiToken
+from computor_backend.model.service import ApiToken, Service, ServiceType
 from computor_backend.model.auth import User
 from computor_backend.utils.api_token import generate_api_token
 from computor_types.api_tokens import (
@@ -29,6 +29,92 @@ logger = logging.getLogger(__name__)
 
 # Maximum retry attempts for token generation (collision handling)
 MAX_TOKEN_GENERATION_RETRIES = 5
+
+# Default scopes for service accounts based on service type category
+# These scopes use the claim format: "resource:action"
+DEFAULT_SERVICE_SCOPES = {
+    "testing": [
+        # Testing services need to read course data and create/update test results
+        "course:get",
+        "course:list",
+        "course_content:get",
+        "course_content:list",
+        "course_content_type:get",
+        "course_content_type:list",
+        "submission_artifact:get",
+        "submission_artifact:list",
+        "result:get",
+        "result:list",
+        "result:create",
+        "result:update",
+    ],
+    "worker": [
+        # General workers need broader access for orchestration
+        "course:get",
+        "course:list",
+        "course:create",
+        "course:update",
+        "course_content:get",
+        "course_content:list",
+        "organization:get",
+        "organization:list",
+    ],
+    "review": [
+        # Review services need to read content and create feedback
+        "course_content:get",
+        "course_content:list",
+        "submission_artifact:get",
+        "submission_artifact:list",
+        "result:create",
+    ],
+    "integration": [
+        # Integration services typically need read access
+        "course:get",
+        "course:list",
+        "course_content:get",
+        "course_content:list",
+    ],
+    "metrics": [
+        # Metrics services need read-only access
+        "course:get",
+        "course:list",
+        "result:get",
+        "result:list",
+    ],
+}
+
+
+def get_default_scopes_for_service(user_id: str, db: Session) -> List[str]:
+    """
+    Get default scopes for a service account based on its service type.
+
+    Args:
+        user_id: Service user ID
+        db: Database session
+
+    Returns:
+        List of default scope strings, or empty list if not a service or no defaults
+    """
+    # Check if user is a service account
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_service:
+        return []
+
+    # Get the service record
+    service = db.query(Service).filter(
+        Service.user_id == user_id,
+        Service.archived_at.is_(None)
+    ).first()
+    if not service or not service.service_type_id:
+        return []
+
+    # Get the service type to determine category
+    service_type = db.query(ServiceType).filter(ServiceType.id == service.service_type_id).first()
+    if not service_type:
+        return []
+
+    # Return default scopes based on category
+    return DEFAULT_SERVICE_SCOPES.get(service_type.category, [])
 
 
 def create_api_token(
@@ -69,6 +155,16 @@ def create_api_token(
     if token_data.user_id and token_data.user_id != permissions.user_id:
         check_permissions(permissions, ApiToken, "create", db)
 
+    # Determine scopes: use provided scopes, or get defaults for service accounts
+    scopes = token_data.scopes
+    if not scopes:
+        default_scopes = get_default_scopes_for_service(target_user_id, db)
+        if default_scopes:
+            scopes = default_scopes
+            logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
+        else:
+            scopes = []
+
     # Generate token with retry logic for collision handling
     for attempt in range(MAX_TOKEN_GENERATION_RETRIES):
         try:
@@ -80,7 +176,7 @@ def create_api_token(
                 user_id=target_user_id,
                 token_hash=token_hash,
                 token_prefix=token_prefix,
-                scopes=token_data.scopes or [],
+                scopes=scopes,
                 expires_at=token_data.expires_at,
                 created_by=permissions.user_id,
             )
@@ -337,6 +433,16 @@ def create_api_token_admin(
     token_prefix = predefined_token[:12]
     token_hash = hash_api_token(predefined_token)
 
+    # Determine scopes: use provided scopes, or get defaults for service accounts
+    scopes = token_data.scopes
+    if not scopes:
+        default_scopes = get_default_scopes_for_service(token_data.user_id, db)
+        if default_scopes:
+            scopes = default_scopes
+            logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
+        else:
+            scopes = []
+
     try:
         api_token = ApiToken(
             name=token_data.name,
@@ -344,7 +450,7 @@ def create_api_token_admin(
             user_id=token_data.user_id,
             token_hash=token_hash,
             token_prefix=token_prefix,
-            scopes=token_data.scopes or [],
+            scopes=scopes,
             expires_at=token_data.expires_at,
             created_by=permissions.user_id,
         )
