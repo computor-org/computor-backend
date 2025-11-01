@@ -97,10 +97,23 @@ class ComputorException(HTTPException):
                 additional_context=self.context,
             )
 
+        # Determine message - use detail if it's a string, otherwise use default message
+        message = error_def.message.plain
+        details = self.context if self.context else None
+
+        if self.detail:
+            if isinstance(self.detail, str):
+                message = self.detail
+            elif isinstance(self.detail, dict):
+                # If detail is a dict, use it as details and extract message if present
+                details = self.detail
+                if "message" in self.detail and isinstance(self.detail["message"], str):
+                    message = self.detail["message"]
+
         return ErrorResponse(
             error_code=self.error_code,
-            message=self.detail or error_def.message.plain,
-            details=self.context if self.context else None,
+            message=message,
+            details=details,
             severity=error_def.severity,
             category=error_def.category,
             retry_after=error_def.retry_after,
