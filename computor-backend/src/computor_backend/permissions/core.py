@@ -92,9 +92,9 @@ def initialize_permission_handlers():
     permission_registry.register(ExampleDependency, ExamplePermissionHandler(ExampleDependency))
     
     # System entities - admin only by default
-    permission_registry.register(Role, UserPermissionHandler(Role))  # Can be customized
-    permission_registry.register(RoleClaim, UserPermissionHandler(RoleClaim))
-    permission_registry.register(UserRole, UserPermissionHandler(UserRole))
+    permission_registry.register(Role, ReadOnlyPermissionHandler(Role))  # Roles are read-only lookup tables
+    permission_registry.register(RoleClaim, ReadOnlyPermissionHandler(RoleClaim))  # Role claims are read-only
+    permission_registry.register(UserRole, UserPermissionHandler(UserRole))  # UserRole can be managed
     permission_registry.register(Group, UserPermissionHandler(Group))
     permission_registry.register(GroupClaim, UserPermissionHandler(GroupClaim))
     permission_registry.register(UserGroup, UserPermissionHandler(UserGroup))
