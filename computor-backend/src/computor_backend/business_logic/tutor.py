@@ -66,7 +66,7 @@ async def list_tutor_course_contents(
     return await repo.list_course_contents(course_member_id, permissions, params)
 
 
-def update_tutor_course_content_grade(
+async def update_tutor_course_content_grade(
     course_member_id: UUID | str,
     course_content_id: UUID | str,
     grade_value: Optional[float],
@@ -182,12 +182,20 @@ def update_tutor_course_content_grade(
         course_member_id, course_content_id, db, reader_user_id=reader_user_id
     )
 
-    response = course_member_course_content_result_mapper(course_contents_result, db)
+    response = await course_member_course_content_result_mapper(course_contents_result, db)
 
     # Build typed artifact info
+    # Handle created_at - it might be a datetime or already a string (from cache)
+    created_at_str = None
+    if artifact_to_grade.created_at:
+        if isinstance(artifact_to_grade.created_at, str):
+            created_at_str = artifact_to_grade.created_at
+        else:
+            created_at_str = artifact_to_grade.created_at.isoformat()
+
     artifact_info = GradedArtifactInfo(
         id=str(artifact_to_grade.id),
-        created_at=artifact_to_grade.created_at.isoformat() if artifact_to_grade.created_at else None,
+        created_at=created_at_str,
         properties=artifact_to_grade.properties,
     )
 
