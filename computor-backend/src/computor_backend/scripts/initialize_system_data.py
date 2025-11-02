@@ -204,7 +204,6 @@ def create_admin_user(db: Session):
         username=admin_username,
         password=create_password_hash(admin_password, validate=False),  # Skip validation for admin setup
         password_reset_required=False,  # Admin can login immediately
-        user_type='user'
     )
     
     db.add(admin_user)
