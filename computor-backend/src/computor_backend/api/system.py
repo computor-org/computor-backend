@@ -27,7 +27,7 @@ from computor_types.deployments import ComputorDeploymentConfig, CourseConfig, C
 from computor_types.organizations import OrganizationProperties
 from computor_types.student_profile import StudentProfileCreate
 from computor_types.tokens import decrypt_api_key
-from computor_types.users import UserCreate, UserGet, UserTypeEnum
+from computor_types.users import UserCreate, UserGet
 from computor_types.system import (
     StudentCreate, ReleaseStudentsCreate, TUGStudentExport, ReleaseCourseCreate,
     ReleaseCourseContentCreate, StatusQuery, CourseReleaseUpdate, GitLabCredentials,

@@ -126,7 +126,6 @@ class Course(Base):
     course_members = relationship("CourseMember", back_populates="course", uselist=True, lazy="select")
     course_content_types = relationship("CourseContentType", back_populates="course", uselist=True, lazy="select")
     course_groups = relationship("CourseGroup", back_populates="course", uselist=True, lazy="select")
-    course_execution_backends = relationship("CourseExecutionBackend", back_populates="course", uselist=True)
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     submission_groups = relationship("SubmissionGroup", back_populates="course", uselist=True)
 
@@ -160,23 +159,6 @@ class CourseContentType(Base):
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     results = relationship('Result', back_populates='course_content_type')
-
-
-class CourseExecutionBackend(Base):
-    __tablename__ = 'course_execution_backend'
-
-    execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'), primary_key=True, nullable=False)
-    course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), primary_key=True, nullable=False)
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(UUID)
-    updated_by = Column(UUID)
-    properties = Column(JSONB)
-
-    # Relationships
-    course = relationship('Course', back_populates='course_execution_backends')
-    execution_backend = relationship('ExecutionBackend', back_populates='course_execution_backends')
 
 
 class CourseGroup(Base):
@@ -236,7 +218,14 @@ class CourseContent(Base):
     max_group_size = Column(Integer, nullable=True)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
-    execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
+
+    # Testing service - which service should test this assignment
+    testing_service_id = Column(
+        UUID,
+        ForeignKey('service.id', ondelete='RESTRICT'),
+        nullable=True,
+        index=True
+    )
 
     # Team formation overrides (override course defaults for this specific assignment)
     team_mode = Column(String(50), nullable=True)  # Override course default
@@ -255,7 +244,7 @@ class CourseContent(Base):
     course = relationship('Course', foreign_keys=[course_id], back_populates='course_contents')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
-    execution_backend = relationship('ExecutionBackend', back_populates='course_contents')
+    testing_service = relationship('Service', foreign_keys=[testing_service_id])
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     submission_groups = relationship('SubmissionGroup', back_populates='course_content')
     # Removed: submission_group_members - relationship removed as course_content_id was removed from SubmissionGroupMember

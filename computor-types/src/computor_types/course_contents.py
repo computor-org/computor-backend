@@ -42,7 +42,7 @@ class CourseContentCreate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     # Note: Example assignments are now handled through the deployment API
     # Use POST /course-contents/{id}/assign-example instead
 
@@ -63,7 +63,7 @@ class CourseContentGet(BaseEntityGet):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     is_submittable: bool = False  # From model's column_property
     has_deployment: Optional[bool] = None  # From model's @property
     deployment_status: Optional[str] = None  # From model's @property
@@ -104,7 +104,7 @@ class CourseContentList(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     is_submittable: bool = False  # Add this field to list view
     
     course_content_type: Optional['CourseContentTypeList'] = None
@@ -144,7 +144,7 @@ class CourseContentUpdate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     # Note: Example assignments cannot be updated here
     # Use the deployment API endpoints instead
 
@@ -161,7 +161,7 @@ class CourseContentQuery(ListQuery):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     example_version_id: Optional[str] = Field(
         None,
         deprecated=True,

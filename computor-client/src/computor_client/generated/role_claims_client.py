@@ -24,9 +24,9 @@ class RoleClaimsClient(BaseEndpointClient):
             return await self.get_role_claims(**params)
         return await self.get_role_claims()
 
-    async def get_role_claims(self, skip: Optional[str] = None, limit: Optional[str] = None, role_id: Optional[str] = None, claim_type: Optional[str] = None, claim_value: Optional[str] = None) -> List[RoleClaimList]:
+    async def get_role_claims(self, skip: Optional[str] = None, limit: Optional[str] = None, role_id: Optional[str] = None, claim_type: Optional[str] = None, claim_value: Optional[str] = None, user_id: Optional[str] = None) -> List[RoleClaimList]:
         """List Role Claim"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'role_id', 'claim_type', 'claim_value'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'role_id', 'claim_type', 'claim_value', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [RoleClaimList.model_validate(item) for item in data]

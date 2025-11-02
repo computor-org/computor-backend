@@ -201,6 +201,58 @@ class ExecutionBackendReference(BaseDeployment):
         description="Course-specific overrides for this backend (optional)"
     )
 
+
+# Service Configuration Classes (New Architecture)
+
+class ServiceUserConfig(BaseDeployment):
+    """User configuration for a service."""
+    username: str = Field(description="Username for the service user")
+    email: Optional[str] = Field(None, description="Email for the service user")
+    given_name: Optional[str] = Field(None, description="Given name")
+    family_name: Optional[str] = Field(None, description="Family name")
+
+
+class ServiceApiTokenConfig(BaseDeployment):
+    """API token configuration for a service."""
+    token: Optional[str] = Field(
+        None,
+        description="Predefined API token (admin only). If not provided, a new token will be generated."
+    )
+    name: Optional[str] = Field("Service API Token", description="Token name")
+    scopes: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Initial scopes. Will be updated with course-specific scopes after deployment."
+    )
+    expires_days: Optional[int] = Field(
+        None,
+        description="Number of days until token expires. None means no expiration."
+    )
+
+
+class ServiceConfig(BaseDeployment):
+    """Full service configuration for defining services at root level."""
+    slug: str = Field(description="Unique identifier for the service")
+    service_type_path: str = Field(
+        description="ServiceType Ltree path (e.g., 'testing.temporal')"
+    )
+    language: Optional[str] = Field(
+        None,
+        description="Programming language for testing services (e.g., 'python', 'matlab')"
+    )
+    user: ServiceUserConfig = Field(description="User configuration for this service")
+    api_token: ServiceApiTokenConfig = Field(description="API token configuration")
+    config: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Service-specific configuration (task_queue, timeouts, etc.)"
+    )
+    description: Optional[str] = Field(None, description="Service description")
+
+
+class ServiceReference(BaseDeployment):
+    """Reference to a service by slug for linking to courses."""
+    slug: str = Field(description="Slug of the service to link")
+
+
 class CourseContentTypeConfig(BaseDeployment):
     """Course content type configuration for deployment."""
     slug: str = Field(description="Unique identifier for the content type")
@@ -278,10 +330,19 @@ class CourseConfig(BaseDeployment):
     path: str = Field(description="Course path/slug")
     description: Optional[str] = Field(None, description="Course description")
     projects: Optional[CourseProjects] = Field(None, description="Course project structure")
-    execution_backends: Optional[List[ExecutionBackendReference]] = Field(
-        None,  # Changed from default_factory=list to None to make it truly optional
-        description="References to execution backends to link to this course (by slug)"
+
+    # New service-based architecture
+    services: Optional[List[ServiceReference]] = Field(
+        None,
+        description="References to services to use for this course (by slug)"
     )
+
+    # Deprecated: Use 'services' instead
+    execution_backends: Optional[List[ExecutionBackendReference]] = Field(
+        None,
+        description="DEPRECATED: Use 'services' instead. References to execution backends to link to this course (by slug)"
+    )
+
     content_types: Optional[List[CourseContentTypeConfig]] = Field(
         default_factory=list,
         description="Course content types to be created (assignments, units, etc.)"
@@ -316,15 +377,21 @@ class HierarchicalOrganizationConfig(OrganizationConfig):
 class ComputorDeploymentConfig(BaseDeployment):
     """
     Hierarchical deployment configuration for creating organization -> course family -> course structures.
-    
+
     Supports deploying multiple organizations, each with multiple course families and courses.
     """
-    # Execution backends to be created/ensured exist (root level definition)
-    execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
-        None,  # Made optional to prevent validation errors when not provided
-        description="List of execution backends to create or ensure exist in the system"
+    # Services to be created (new architecture)
+    services: Optional[List[ServiceConfig]] = Field(
+        None,
+        description="List of services to create or ensure exist in the system (deployed in Phase 1)"
     )
-    
+
+    # Deprecated: Use 'services' instead
+    execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
+        None,
+        description="DEPRECATED: Use 'services' instead. List of execution backends to create or ensure exist in the system"
+    )
+
     # Hierarchical structure - list of organizations with nested course families and courses
     organizations: List[HierarchicalOrganizationConfig] = Field(
         default_factory=list,
@@ -599,8 +666,7 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 family_name="Doe",
                 email="john.doe@university.edu",
                 username="jdoe",
-                number="12345678",
-                password="Bv7#nM2$kL9@"
+                password="<password>"
             ),
             accounts=[
                 AccountDeployment(
@@ -620,13 +686,12 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 family_name="Smith",
                 email="jane.smith@university.edu",
                 username="jsmith",
-                number="87654321",
-                password="Wz4#pT6$mH8@"
+                password="<password>"
             ),
             accounts=[
                 AccountDeployment(
                     provider="gitlab",
-                    type="oauth", 
+                    type="oauth",
                     provider_account_id="jsmith",
                     gitlab_username="jsmith",
                     gitlab_email="jane.smith@university.edu",
@@ -642,7 +707,7 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 email="course.manager@university.edu",
                 username="course_manager",
                 user_type="user",
-                password="Xk9#mZ8$qR7@"
+                password="<password>"
             ),
             accounts=[
                 AccountDeployment(
@@ -656,12 +721,7 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 )
             ]
         )
-    ],
-    default_password="DefaultPass123!",
-    send_welcome_email=True,
-    auto_activate=True,
-    gitlab_create_users=True,
-    gitlab_admin_token="<leave_empty_for_now>"
+    ]
 )
 
 # Update forward references for nested CourseContentConfig

@@ -128,6 +128,7 @@ class ProfileQuery(ListQuery):
     id: Optional[str] = Field(None, description="Filter by profile ID")
     user_id: Optional[str] = Field(None, description="Filter by user ID")
     nickname: Optional[str] = Field(None, description="Filter by nickname")
+    language_code: Optional[str] = Field(None, description="Filter by language code")
 
 
 class ProfileInterface(EntityInterface):

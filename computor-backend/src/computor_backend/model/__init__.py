@@ -8,7 +8,6 @@ from .course import (
     CourseFamily,
     Course,
     CourseContentType,
-    CourseExecutionBackend,
     CourseGroup,
     CourseContent,
     CourseMember,
@@ -16,7 +15,6 @@ from .course import (
     SubmissionGroupMember,
     CourseMemberComment
 )
-from .execution import ExecutionBackend
 from .result import Result
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
@@ -26,6 +24,7 @@ from .example import Example, ExampleRepository, ExampleVersion, ExampleDependen
 from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
 from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
+from .service import Service, ServiceType, ApiToken
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -34,7 +33,6 @@ from . import (
     organization,
     role,
     group,
-    execution,
     course,
     result,
     message,
@@ -43,6 +41,7 @@ from . import (
     extension,
     deployment,
     artifact,
+    service,
 )
 
 __all__ = [
@@ -64,15 +63,12 @@ __all__ = [
     'CourseFamily',
     'Course',
     'CourseContentType',
-    'CourseExecutionBackend',
     'CourseGroup',
     'CourseContent',
     'CourseMember',
     'SubmissionGroup',
     'SubmissionGroupMember',
     'CourseMemberComment',
-    # Execution
-    'ExecutionBackend',
     # Result
     'Result',
     # Role/Permission models
@@ -104,4 +100,8 @@ __all__ = [
     'ResultArtifact',
     'SubmissionGrade',
     'SubmissionReview',
+    # Service models
+    'Service',
+    'ServiceType',
+    'ApiToken',
 ]

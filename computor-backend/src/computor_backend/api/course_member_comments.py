@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from computor_backend.database import get_db
 from computor_types.course_member_comments import (
     CourseMemberCommentList,
+    CourseMemberCommentQuery,
     CommentCreate,
     CommentUpdate,
 )
@@ -16,6 +17,7 @@ from computor_backend.permissions.auth import get_current_principal
 # Import business logic
 from computor_backend.business_logic.course_member_comments import (
     list_comments_for_course_member,
+    list_all_accessible_comments,
     create_course_member_comment,
     update_course_member_comment,
     delete_course_member_comment,
@@ -25,12 +27,15 @@ router = APIRouter()
 
 @router.get("", response_model=list[CourseMemberCommentList])
 async def list_comments(
-    course_member_id: UUID | str,
+    params: Annotated[CourseMemberCommentQuery, Depends()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """List comments for a course member."""
-    return list_comments_for_course_member(course_member_id, permissions, db)
+    """List comments accessible to the user (optionally filtered by course_member_id)."""
+    if params.course_member_id:
+        return list_comments_for_course_member(params.course_member_id, permissions, db)
+    else:
+        return list_all_accessible_comments(permissions, db)
 
 @router.post("", response_model=list[CourseMemberCommentList])
 async def create_comment(

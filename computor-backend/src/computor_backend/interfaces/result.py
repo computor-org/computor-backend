@@ -38,8 +38,8 @@ class ResultInterface(ResultInterfaceBase, BackendEntityInterface):
             query = query.filter(Result.submission_group_id == params.submission_group_id)
         if params.submission_artifact_id is not None:
             query = query.filter(Result.submission_artifact_id == params.submission_artifact_id)
-        if params.execution_backend_id is not None:
-            query = query.filter(Result.execution_backend_id == params.execution_backend_id)
+        if params.testing_service_id is not None:
+            query = query.filter(Result.testing_service_id == params.testing_service_id)
         if params.test_system_id is not None:
             query = query.filter(Result.test_system_id == params.test_system_id)
         if params.version_identifier is not None:

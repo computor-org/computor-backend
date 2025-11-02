@@ -60,6 +60,72 @@ def get_current_transmitter(
     return transmitter
 
 
+def list_all_accessible_comments(
+    permissions: Principal,
+    db: Session,
+) -> List[CourseMemberCommentList]:
+    """List all comments accessible to the user (tutor+ in their courses).
+
+    Args:
+        permissions: Current user permissions
+        db: Database session
+
+    Returns:
+        List of all accessible comments
+
+    Raises:
+        ForbiddenException: If user has no tutor+ permissions in any course
+    """
+    # Admin: return all comments
+    if permissions.is_admin:
+        comments = db.query(CourseMemberComment).all()
+        return [
+            CourseMemberCommentList(
+                id=c.id,
+                message=c.message,
+                transmitter_id=c.transmitter_id,
+                transmitter=c.transmitter,
+                course_member_id=c.course_member_id,
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+            )
+            for c in comments
+        ]
+
+    # Get all course members where user is tutor+
+    accessible_course_members = (
+        check_course_permissions(permissions, CourseMember, "_tutor", db)
+        .all()
+    )
+
+    if not accessible_course_members:
+        # User has no tutor+ permissions in any course
+        raise ForbiddenException(detail="Insufficient permissions to view comments")
+
+    # Get course member IDs from accessible courses
+    accessible_course_member_ids = [cm.id for cm in accessible_course_members]
+
+    # Query comments for all accessible course members
+    comments = (
+        db.query(CourseMemberComment)
+        .filter(CourseMemberComment.course_member_id.in_(accessible_course_member_ids))
+        .all()
+    )
+
+    return [
+        CourseMemberCommentList(
+            id=c.id,
+            message=c.message,
+            transmitter_id=c.transmitter_id,
+            transmitter=c.transmitter,
+            course_member_id=c.course_member_id,
+            created_at=c.created_at,
+            updated_at=c.updated_at,
+        )
+        for c in comments
+    ]
+
+
 def list_comments_for_course_member(
     course_member_id: UUID | str,
     permissions: Principal,

@@ -44,8 +44,10 @@ from computor_types.tokens import decrypt_api_key  # TODO: Remove after migratio
 from computor_types.password_utils import verify_password, is_argon2_hash
 from computor_backend.model.auth import Account, User
 from computor_backend.model.role import UserRole
+from computor_backend.model.service import ApiToken
 from computor_backend.api.exceptions import NotFoundException, UnauthorizedException
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.utils.api_token import hash_api_token, validate_token_format
 import logging
 
 # Import refactored permission components
@@ -79,26 +81,18 @@ class AuthenticationService:
             db.query(
                 User.id,
                 User.password,
-                User.user_type,
-                User.token_expiration,
                 UserRole.role_id
             )
             .outerjoin(UserRole, UserRole.user_id == User.id)
             .filter(or_(User.username == username, User.email == username))
             .all()
         )
-        
+
         if not results:
             raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-        
-        user_id, user_password, user_type, token_expiration = results[0][:4]
-        
-        # Check token expiration for token users
-        if user_type == 'token':
-            now = datetime.datetime.now(datetime.timezone.utc)
-            if token_expiration is None or token_expiration < now:
-                raise UnauthorizedException(error_code="AUTH_003", detail="Token expired")
-        
+
+        user_id, user_password = results[0][:2]
+
         # Verify password using Argon2 or fallback to old encryption (migration support)
         if user_password is None:
             raise UnauthorizedException(error_code="AUTH_002", detail="No password set. Please contact administrator or use password reset.")
@@ -122,9 +116,9 @@ class AuthenticationService:
                 logger.error(f"Password verification failed for user '{username}': {str(e)}")
                 raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
         
-        # Collect roles
-        role_ids = [res[4] for res in results if res[4] is not None]
-        
+        # Collect roles (role_id is now at index 2 after removing user_type and token_expiration)
+        role_ids = [res[2] for res in results if res[2] is not None]
+
         return AuthenticationResult(user_id, role_ids, "basic")
     
     @staticmethod
@@ -204,6 +198,74 @@ class AuthenticationService:
             logger.error(f"Error during SSO authentication: {e}")
             raise UnauthorizedException("SSO authentication failed")
 
+    @staticmethod
+    def authenticate_api_token(token: str, db: Session) -> AuthenticationResult:
+        """
+        Authenticate using API token.
+
+        API tokens provide scoped authentication for services and automation.
+        Token format: ctp_<random_32_chars>
+
+        Args:
+            token: The full API token string
+            db: Database session
+
+        Returns:
+            AuthenticationResult with user_id, roles, and scopes
+
+        Raises:
+            UnauthorizedException: If token is invalid, revoked, or expired
+        """
+        # Validate token format
+        if not validate_token_format(token):
+            raise UnauthorizedException(error_code="AUTH_004", detail="Invalid API token format")
+
+        # Hash token for lookup
+        token_hash = hash_api_token(token)
+
+        # Find token in database
+        api_token = (
+            db.query(ApiToken)
+            .filter(
+                ApiToken.token_hash == token_hash,
+                ApiToken.revoked_at.is_(None)
+            )
+            .first()
+        )
+
+        if not api_token:
+            logger.warning(f"API token authentication failed: token not found or revoked")
+            raise UnauthorizedException(error_code="AUTH_004", detail="Invalid or revoked API token")
+
+        # Check expiration
+        if api_token.expires_at:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if api_token.expires_at < now:
+                logger.warning(f"API token {api_token.id} has expired")
+                raise UnauthorizedException(error_code="AUTH_005", detail="API token expired")
+
+        # Update usage stats
+        api_token.last_used_at = datetime.datetime.now(datetime.timezone.utc)
+        api_token.usage_count += 1
+        db.commit()
+
+        # Get user roles
+        role_ids = (
+            db.query(UserRole.role_id)
+            .filter(UserRole.user_id == api_token.user_id)
+            .all()
+        )
+        role_ids = [r[0] for r in role_ids if r[0] is not None]
+
+        logger.info(f"API token authentication successful for user {api_token.user_id} (token: {api_token.token_prefix}...)")
+
+        # Create authentication result with scopes
+        auth_result = AuthenticationResult(api_token.user_id, role_ids, "api_token")
+        # Store scopes in the result for later use
+        auth_result.scopes = api_token.scopes
+
+        return auth_result
+
 
 class PrincipalBuilder:
     """Builder for creating Principal objects with proper claims"""
@@ -211,17 +273,25 @@ class PrincipalBuilder:
     @staticmethod
     def build(auth_result: AuthenticationResult, db: Session) -> Principal:
         """Build a Principal from authentication result"""
-        
+
         # Get user claims from database
         claim_values = db_get_claims(auth_result.user_id, db)
-        
+
         # Get course-specific claims
         course_claims = db_get_course_claims(auth_result.user_id, db)
         claim_values.extend(course_claims)
-        
+
+        # Convert API token scopes to claims (if present)
+        # API token scopes use the same format as claims: "resource:action" or "resource:action:resource_id"
+        if hasattr(auth_result, 'scopes') and auth_result.scopes:
+            for scope in auth_result.scopes:
+                # Convert scope to claim format: ("permissions", scope)
+                claim_values.append(("permissions", scope))
+            logger.debug(f"Added {len(auth_result.scopes)} API token scopes as claims for user {auth_result.user_id}")
+
         # Build structured claims
         claims = build_claims(claim_values)
-        
+
         # Create Principal
         return Principal(
             user_id=auth_result.user_id,
@@ -264,8 +334,20 @@ class SSOAuthCredentials(BaseModel):
     scheme: str = "Bearer"
 
 
-def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
+class ApiTokenCredentials(BaseModel):
+    """API Token credentials (X-API-Token header)"""
+    token: str
+    scheme: str = "ApiToken"
+
+
+def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials]:
     """Parse authorization header to determine auth type"""
+
+    # Check for API Token header (X-API-Token) - highest priority for services
+    api_token = request.headers.get("X-API-Token")
+    if api_token:
+        logger.debug("Using API token from X-API-Token header")
+        return ApiTokenCredentials(token=api_token)
 
     # Check for GitLab credentials
     header_creds = request.headers.get("GLP-CREDS")
@@ -293,7 +375,7 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
     if not param:
         raise UnauthorizedException("Invalid authorization format")
 
-    # Handle Bearer token (SSO)
+    # Handle Bearer token (SSO only - API tokens use X-API-Token header)
     if scheme.lower() == "bearer":
         return SSOAuthCredentials(token=param, scheme="Bearer")
 
@@ -314,18 +396,36 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
 
 async def get_current_principal(
     credentials: Annotated[
-        GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials,
+        GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
     ]
 ) -> Principal:
     """
     Main dependency for getting the current authenticated principal.
-    This replaces get_current_principal from the old system.
+
+    Supports multiple authentication methods:
+    - API Token (X-API-Token header)
+    - Basic Auth (Authorization: Basic)
+    - GitLab (GLP-CREDS header)
+    - SSO (Authorization: Bearer)
     """
 
     with next(get_db()) as db:
         # Route to appropriate authentication method
-        if isinstance(credentials, HTTPBasicCredentials):
+        if isinstance(credentials, ApiTokenCredentials):
+            # API Token authentication (X-API-Token header)
+            auth_result = AuthenticationService.authenticate_api_token(
+                credentials.token, db
+            )
+
+            # Build Principal with caching for API tokens
+            cache_key = hashlib.sha256(
+                f"api_token_permissions:{credentials.token}".encode()
+            ).hexdigest()
+
+            return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+
+        elif isinstance(credentials, HTTPBasicCredentials):
             auth_result = AuthenticationService.authenticate_basic(
                 credentials.username, credentials.password, db
             )
@@ -344,6 +444,7 @@ async def get_current_principal(
             return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
 
         elif isinstance(credentials, SSOAuthCredentials):
+            # SSO Token authentication (Authorization: Bearer)
             auth_result = await AuthenticationService.authenticate_sso(
                 credentials.token, db
             )
@@ -359,7 +460,7 @@ async def get_current_principal(
             raise UnauthorizedException("Unknown authentication type")
 
 
-def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials]:
+def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials]:
     """
     Parse authorization header but return None instead of raising exception.
     Used for endpoints that accept but don't require authentication (like token refresh).

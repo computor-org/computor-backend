@@ -47,7 +47,7 @@ class SubmissionListItem(BaseEntityList):
     course_member_id: str
     course_content_id: str
     submission_group_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: str
     reference_version_identifier: Optional[str] = None
@@ -73,7 +73,7 @@ class SubmissionQuery(ListQuery):
     course_member_id: Optional[str] = None
     submission_group_id: Optional[str] = None
     course_content_id: Optional[str] = None
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: Optional[str] = None
     reference_version_identifier: Optional[str] = None

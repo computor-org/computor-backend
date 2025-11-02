@@ -64,7 +64,7 @@ class SubmissionGroupStudentGet(SubmissionGroupStudentList):
     gradings: List[SubmissionGroupGradingList] = Field(default_factory=list)
 
 class ResultStudentList(BaseModel):
-    execution_backend_id: Optional[str] = None
+    testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: Optional[str] = None
     status: Optional[TaskStatus] = None

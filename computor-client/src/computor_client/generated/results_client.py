@@ -34,6 +34,10 @@ class ResultsClient(BaseEndpointClient):
             return await self.get_results(**params)
         return await self.get_results()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_result_by_result_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_result_by_result_id(id, payload)
@@ -42,15 +46,15 @@ class ResultsClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_result_by_result_id(id)
 
-    async def get_results(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, submitter_id: Optional[str] = None, course_member_id: Optional[str] = None, course_content_id: Optional[str] = None, course_content_type_id: Optional[str] = None, submission_group_id: Optional[str] = None, submission_artifact_id: Optional[str] = None, execution_backend_id: Optional[str] = None, test_system_id: Optional[str] = None, version_identifier: Optional[str] = None, status: Optional[str] = None, latest: Optional[str] = None, result: Optional[str] = None, grade: Optional[str] = None, result_json: Optional[str] = None) -> List[ResultList]:
+    async def get_results(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, submitter_id: Optional[str] = None, course_member_id: Optional[str] = None, course_content_id: Optional[str] = None, course_content_type_id: Optional[str] = None, submission_group_id: Optional[str] = None, submission_artifact_id: Optional[str] = None, testing_service_id: Optional[str] = None, test_system_id: Optional[str] = None, version_identifier: Optional[str] = None, status: Optional[str] = None, latest: Optional[str] = None, result: Optional[str] = None, grade: Optional[str] = None, user_id: Optional[str] = None) -> List[ResultList]:
         """List Results"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'submitter_id', 'course_member_id', 'course_content_id', 'course_content_type_id', 'submission_group_id', 'submission_artifact_id', 'execution_backend_id', 'test_system_id', 'version_identifier', 'status', 'latest', 'result', 'grade', 'result_json'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'submitter_id', 'course_member_id', 'course_content_id', 'course_content_type_id', 'submission_group_id', 'submission_artifact_id', 'testing_service_id', 'test_system_id', 'version_identifier', 'status', 'latest', 'result', 'grade', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [ResultList.model_validate(item) for item in data]
         return data
 
-    async def post_results(self, payload: ResultCreate) -> ResultGet:
+    async def post_results(self, payload: ResultCreate, user_id: Optional[str] = None) -> ResultGet:
         """Create Result"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -58,14 +62,15 @@ class ResultsClient(BaseEndpointClient):
             return ResultGet.model_validate(data)
         return data
 
-    async def get_result_by_result_id(self, result_id: str) -> ResultGet:
+    async def get_result_by_result_id(self, result_id: str, user_id: Optional[str] = None) -> ResultGet:
         """Get Result"""
-        data = await self._request("GET", f"/{result_id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{result_id}", params=params)
         if data:
             return ResultGet.model_validate(data)
         return data
 
-    async def patch_result_by_result_id(self, result_id: str, payload: ResultUpdate) -> ResultGet:
+    async def patch_result_by_result_id(self, result_id: str, payload: ResultUpdate, user_id: Optional[str] = None) -> ResultGet:
         """Update Result"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{result_id}", json=json_data)
@@ -73,13 +78,14 @@ class ResultsClient(BaseEndpointClient):
             return ResultGet.model_validate(data)
         return data
 
-    async def delete_result_by_result_id(self, result_id: str) -> Any:
+    async def delete_result_by_result_id(self, result_id: str, user_id: Optional[str] = None) -> Any:
         """Delete Result"""
         data = await self._request("DELETE", f"/{result_id}")
 
-    async def get_result_statu(self, result_id: str) -> TaskStatus:
+    async def get_result_statu(self, result_id: str, user_id: Optional[str] = None) -> TaskStatus:
         """Result Status"""
-        data = await self._request("GET", f"/{result_id}/status")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{result_id}/status", params=params)
         if data:
             return TaskStatus.model_validate(data)
         return data

@@ -51,8 +51,8 @@ class UserPermissionHandler(PermissionHandler):
         # For list/get, users can see themselves and users in their courses (as tutor+)
         if action in ["list", "get"]:
             return UserPermissionQueryBuilder.filter_visible_users(principal.user_id, db)
-        
-        raise ForbiddenException(detail={"entity": self.resource_name})
+
+        raise ForbiddenException(detail=f"Insufficient permissions to {action} {self.resource_name}")
 
 
 class AccountPermissionHandler(PermissionHandler):

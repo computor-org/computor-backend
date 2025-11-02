@@ -34,6 +34,10 @@ class GroupInterface(GroupInterfaceBase, BackendEntityInterface):
         if params.id is not None:
             query = query.filter(Group.id == params.id)
         if params.title is not None:
-            query = query.filter(Group.title == params.title)
+            query = query.filter(Group.title.ilike(f"%{params.title}%"))
+        if params.slug is not None:
+            query = query.filter(Group.slug.ilike(f"%{params.slug}%"))
+        if params.type is not None:
+            query = query.filter(Group.type == params.type)
 
         return query

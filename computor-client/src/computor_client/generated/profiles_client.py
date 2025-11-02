@@ -33,6 +33,10 @@ class ProfilesClient(BaseEndpointClient):
             return await self.get_profiles(**params)
         return await self.get_profiles()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_profile_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_profile_by_id(id, payload)
@@ -49,7 +53,7 @@ class ProfilesClient(BaseEndpointClient):
             return [ProfileList.model_validate(item) for item in data]
         return data
 
-    async def post_profiles(self, payload: ProfileCreate) -> ProfileGet:
+    async def post_profiles(self, payload: ProfileCreate, user_id: Optional[str] = None) -> ProfileGet:
         """Create Profile Endpoint"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -57,14 +61,15 @@ class ProfilesClient(BaseEndpointClient):
             return ProfileGet.model_validate(data)
         return data
 
-    async def get_profile_by_id(self, id: str) -> ProfileGet:
+    async def get_profile_by_id(self, id: str, user_id: Optional[str] = None) -> ProfileGet:
         """Get Profile Endpoint"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return ProfileGet.model_validate(data)
         return data
 
-    async def patch_profile_by_id(self, id: str, payload: ProfileUpdate) -> ProfileGet:
+    async def patch_profile_by_id(self, id: str, payload: ProfileUpdate, user_id: Optional[str] = None) -> ProfileGet:
         """Update Profile Endpoint"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class ProfilesClient(BaseEndpointClient):
             return ProfileGet.model_validate(data)
         return data
 
-    async def delete_profile_by_id(self, id: str) -> Any:
+    async def delete_profile_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Profile Endpoint"""
         data = await self._request("DELETE", f"/{id}")

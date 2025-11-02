@@ -33,6 +33,10 @@ class AccountsClient(BaseEndpointClient):
             return await self.get_accounts(**params)
         return await self.get_accounts()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_account_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_account_by_id(id, payload)
@@ -41,7 +45,7 @@ class AccountsClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_account_by_id(id)
 
-    async def post_accounts(self, payload: AccountCreate) -> AccountGet:
+    async def post_accounts(self, payload: AccountCreate, user_id: Optional[str] = None) -> AccountGet:
         """Create Accounts"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -57,14 +61,15 @@ class AccountsClient(BaseEndpointClient):
             return [AccountList.model_validate(item) for item in data]
         return data
 
-    async def get_account_by_id(self, id: str) -> AccountGet:
+    async def get_account_by_id(self, id: str, user_id: Optional[str] = None) -> AccountGet:
         """Get Accounts"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return AccountGet.model_validate(data)
         return data
 
-    async def patch_account_by_id(self, id: str, payload: AccountUpdate) -> AccountGet:
+    async def patch_account_by_id(self, id: str, payload: AccountUpdate, user_id: Optional[str] = None) -> AccountGet:
         """Update Accounts"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class AccountsClient(BaseEndpointClient):
             return AccountGet.model_validate(data)
         return data
 
-    async def delete_account_by_id(self, id: str) -> Any:
+    async def delete_account_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Accounts"""
         data = await self._request("DELETE", f"/{id}")

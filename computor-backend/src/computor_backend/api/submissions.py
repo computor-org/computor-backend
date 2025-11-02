@@ -88,6 +88,14 @@ logger = logging.getLogger(__name__)
 submissions_router = APIRouter(prefix="/submissions", tags=["submissions"])
 _DIR_ALLOWED_PATTERN = re.compile(r"[^A-Za-z0-9_.-]")
 
+
+def _has_submission_artifact_permission(
+    principal: Principal,
+    action: str | list[str],
+) -> bool:
+    """Return True when principal has global permission for submission artifacts."""
+    return principal.is_admin or principal.permitted("submission_artifact", action)
+
 def _sanitize_path_segment(segment: str, *, is_file: bool = False) -> str:
     """Sanitize a path segment (directory or filename)."""
     segment = segment.strip()
@@ -196,6 +204,9 @@ async def list_submission_artifacts(
     - with_latest_result: If True, include latest successful result (status=0) for each artifact
     """
 
+    can_list_all = _has_submission_artifact_permission(permissions, "list")
+    user_id = permissions.get_user_id()
+
     query = db.query(SubmissionArtifact)
 
     # Filter by submission group if provided
@@ -209,8 +220,7 @@ async def list_submission_artifacts(
             raise NotFoundException(detail="Submission group not found")
 
         # Check if user is a member of the submission group or has elevated permissions
-        user_id = permissions.get_user_id()
-        if user_id and not permissions.is_admin:
+        if user_id and not can_list_all:
             is_group_member = db.query(SubmissionGroupMember).join(
                 CourseMember
             ).filter(
@@ -229,7 +239,6 @@ async def list_submission_artifacts(
 
                 if not has_elevated_perms:
                     raise ForbiddenException(detail="You don't have permission to view these artifacts")
-
         query = query.filter(SubmissionArtifact.submission_group_id == params.submission_group_id)
 
     # Filter by course content if provided
@@ -242,8 +251,7 @@ async def list_submission_artifacts(
         if not course_content:
             raise NotFoundException(detail="Course content not found")
 
-        user_id = permissions.get_user_id()
-        if user_id and not permissions.is_admin:
+        if user_id and not can_list_all:
             # Check for tutor/instructor permissions in the course
             has_elevated_perms = check_course_permissions(
                 permissions, CourseMember, "_tutor", db
@@ -268,7 +276,7 @@ async def list_submission_artifacts(
                     CourseMember.user_id == user_id
                 )
         else:
-            # Admin: can see all artifacts
+            # Admin or scoped tokens: can see all artifacts for this course content
             query = query.join(SubmissionGroup).filter(
                 SubmissionGroup.course_content_id == course_content_id
             )
@@ -340,6 +348,7 @@ async def update_submission_artifact(
 ):
     """Update a submission artifact (e.g., change submit status)."""
 
+    can_update = _has_submission_artifact_permission(permissions, "update")
     # Initialize repository with cache for automatic invalidation
     artifact_repo = SubmissionArtifactRepository(db, cache)
 
@@ -354,7 +363,7 @@ async def update_submission_artifact(
 
     # Check permissions - only group members or tutors/instructors can update
     user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
+    if user_id and not can_update:
         is_group_member = db.query(SubmissionGroupMember).join(
             CourseMember
         ).filter(
@@ -373,6 +382,8 @@ async def update_submission_artifact(
 
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to update this artifact")
+    elif not can_update:
+        raise ForbiddenException(detail="You don't have permission to update this artifact")
 
     # Build updates dict
     updates = {}
@@ -458,8 +469,9 @@ async def download_latest_submission(
         )
 
     # Check permissions
+    can_download = _has_submission_artifact_permission(permissions, ["get", "list"])
     user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
+    if user_id and not can_download:
         # Check if user is a member of the submission group
         is_group_member = db.query(SubmissionGroupMember).join(
             CourseMember
@@ -479,6 +491,8 @@ async def download_latest_submission(
 
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to download this submission")
+    elif not can_download:
+        raise ForbiddenException(detail="You don't have permission to download this submission")
 
     # Build query for artifacts
     query = db.query(SubmissionArtifact).filter(
@@ -966,7 +980,7 @@ async def create_test_result(
     result = Result(
         submission_artifact_id=artifact_id,
         course_member_id=course_member.id,  # Use authenticated user's course member ID
-        execution_backend_id=test_data.execution_backend_id,
+        testing_service_id=test_data.testing_service_id,
         test_system_id=test_data.test_system_id,
         status=map_task_status_to_int(test_data.status),
         grade=test_data.grade,

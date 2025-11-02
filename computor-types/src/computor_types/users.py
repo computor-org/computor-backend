@@ -12,17 +12,11 @@ from computor_types.student_profile import StudentProfileGet
 if TYPE_CHECKING:
         from computor_types.profiles import ProfileGet
 
-class UserTypeEnum(str, Enum):
-    user = "user"
-    token = "token"
-
 class UserCreate(BaseModel):
     id: Optional[str] = Field(None, description="User ID (UUID will be generated if not provided)")
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    number: Optional[str] = Field(None, min_length=1, max_length=255, description="User number/identifier")
-    user_type: Optional[UserTypeEnum] = Field(UserTypeEnum.user, description="Type of user account")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
 
@@ -67,19 +61,16 @@ class UserCreate(BaseModel):
         if v is not None and not v.strip():
             raise ValueError('Name cannot be empty or only whitespace')
         return v.strip() if v else v
-    
-    model_config = ConfigDict(use_enum_values=True)
 
 class UserGet(BaseEntityGet):
     id: str = Field(description="User unique identifier")
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    number: Optional[str] = Field(None, description="User number/identifier")
-    user_type: Optional[UserTypeEnum] = Field(None, description="Type of user account")
     username: Optional[str] = Field(None, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     archived_at: Optional[datetime] = Field(None, description="Timestamp when user was archived")
+    is_service: bool = Field(description="Whether this is a service account")
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
     profile: Optional['ProfileGet'] = Field(None, description="User profile")
     
@@ -99,17 +90,17 @@ class UserGet(BaseEntityGet):
         """Get the user's display name (full name or username)"""
         full_name = self.full_name
         return full_name if full_name else (self.username or f"User {self.id[:8]}")
-    
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+    model_config = ConfigDict(from_attributes=True)
 
 class UserList(BaseEntityList):
     id: str = Field(description="User unique identifier")
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    user_type: Optional[UserTypeEnum] = Field(None, description="Type of user account")
     username: Optional[str] = Field(None, description="Unique username")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
+    is_service: bool = Field(description="Whether this is a service account")
     
     
     @property
@@ -122,14 +113,13 @@ class UserList(BaseEntityList):
         elif self.username:
             return self.username
         return f"User {self.id[:8]}"
-    
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+    model_config = ConfigDict(from_attributes=True)
 
 class UserUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    number: Optional[str] = Field(None, min_length=1, max_length=255, description="User number/identifier")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     
@@ -180,10 +170,9 @@ class UserQuery(ListQuery):
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     email: Optional[str] = None
-    number: Optional[str] = None
-    user_type: Optional[UserTypeEnum] = None
     archived: Optional[bool] = None
     username: Optional[str] = None
+    is_service: Optional[bool] = None
 
 
 # Additional user-related DTOs

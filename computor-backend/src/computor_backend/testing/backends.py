@@ -239,25 +239,30 @@ class JavaTestingBackend(TestingBackend):
 
 
 class TestingBackendFactory:
-    """Factory for creating testing backend instances based on type."""
-    
+    """Factory for creating testing backend instances based on service slug."""
+
     _backends: Dict[str, type[TestingBackend]] = {
+        # Register backends by service slug
+        "itpcp.exec.py": PythonTestingBackend,
+        "itpcp.exec.mat": MatlabTestingBackend,
+        "itpcp.exec.java": JavaTestingBackend,
+        # Legacy support (deprecated, use service slugs)
         "temporal:python": PythonTestingBackend,
         "temporal:matlab": MatlabTestingBackend,
         "temporal:java": JavaTestingBackend,
     }
     
     @classmethod
-    def register_backend(cls, backend_type: str, backend_class: type[TestingBackend]):
-        """Register a new testing backend type."""
-        cls._backends[backend_type] = backend_class
-    
+    def register_backend(cls, service_slug: str, backend_class: type[TestingBackend]):
+        """Register a new testing backend for a service slug."""
+        cls._backends[service_slug] = backend_class
+
     @classmethod
-    def create_backend(cls, backend_type: str) -> TestingBackend:
-        """Create a testing backend instance based on type."""
-        backend_class = cls._backends.get(backend_type.lower())
+    def create_backend(cls, service_slug: str) -> TestingBackend:
+        """Create a testing backend instance based on service slug."""
+        backend_class = cls._backends.get(service_slug.lower())
         if not backend_class:
-            raise ValueError(f"Unknown testing backend type: {backend_type}")
+            raise ValueError(f"Unknown testing backend for service: {service_slug}. Available: {list(cls._backends.keys())}")
         return backend_class()
     
     @classmethod
@@ -267,17 +272,17 @@ class TestingBackendFactory:
 
 
 async def execute_tests_with_backend(
-    backend_type: str,
+    service_slug: str,
     test_file_path: str,
     spec_file_path: str,
     test_job_config: Dict[str, Any],
     backend_properties: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Execute tests using the appropriate backend based on type.
+    Execute tests using the appropriate backend based on service slug.
     
     Args:
-        backend_type: Type of testing backend (python, matlab, java, etc.)
+        service_slug: Service slug identifying the backend (e.g., "itpcp.exec.py")
         test_file_path: Path to test file
         spec_file_path: Path to specification file
         test_job_config: Test job configuration
@@ -287,7 +292,7 @@ async def execute_tests_with_backend(
         Test results dictionary
     """
     try:
-        backend = TestingBackendFactory.create_backend(backend_type)
+        backend = TestingBackendFactory.create_backend(service_slug)
         return await backend.execute_tests(
             test_file_path,
             spec_file_path,

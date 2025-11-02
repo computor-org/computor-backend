@@ -6,8 +6,9 @@ class TestJob(BaseModel):
     user_id: str
     course_member_id: str
     course_content_id: str
-    execution_backend_id: str
-    execution_backend_type: str
+    testing_service_id: str  # UUID of the Service (e.g., itp-worker-python)
+    testing_service_slug: str  # Service slug
+    testing_service_type_path: str  # ServiceType path (e.g., testing.python)
     module: Repository
     reference: Optional[Repository] = None
     test_number: int = -1

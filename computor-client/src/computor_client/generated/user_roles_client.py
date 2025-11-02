@@ -32,19 +32,15 @@ class UserRolesClient(BaseEndpointClient):
             return await self.get_user_roles(**params)
         return await self.get_user_roles()
 
-    async def delete(self, id: str):
-        """Delete entity (delegates to generated DELETE method)."""
-        return await self.delete_user_role_user_role_by_role_id(id)
-
-    async def get_user_roles(self, skip: Optional[str] = None, limit: Optional[str] = None, user_id: Optional[str] = None, role_id: Optional[str] = None) -> List[UserRoleList]:
+    async def get_user_roles(self, user_id: Optional[str] = None, skip: Optional[str] = None, limit: Optional[str] = None, role_id: Optional[str] = None) -> List[UserRoleList]:
         """List User Roles"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'user_id', 'role_id'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['user_id', 'skip', 'limit', 'role_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [UserRoleList.model_validate(item) for item in data]
         return data
 
-    async def post_user_roles(self, payload: UserRoleCreate) -> UserRoleGet:
+    async def post_user_roles(self, payload: UserRoleCreate, user_id: Optional[str] = None) -> UserRoleGet:
         """Create User Role"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)

@@ -33,6 +33,10 @@ class ExampleRepositoriesClient(BaseEndpointClient):
             return await self.get_example_repositories(**params)
         return await self.get_example_repositories()
 
+    async def get(self, id: str):
+        """Get entity by ID (delegates to generated GET method)."""
+        return await self.get_example_repository_by_id(id)
+
     async def update(self, id: str, payload):
         """Update entity (delegates to generated PATCH method)."""
         return await self.patch_example_repository_by_id(id, payload)
@@ -41,7 +45,7 @@ class ExampleRepositoriesClient(BaseEndpointClient):
         """Delete entity (delegates to generated DELETE method)."""
         return await self.delete_example_repository_by_id(id)
 
-    async def post_example_repositories(self, payload: ExampleRepositoryCreate) -> ExampleRepositoryGet:
+    async def post_example_repositories(self, payload: ExampleRepositoryCreate, user_id: Optional[str] = None) -> ExampleRepositoryGet:
         """Create Example-Repositories"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -49,22 +53,23 @@ class ExampleRepositoriesClient(BaseEndpointClient):
             return ExampleRepositoryGet.model_validate(data)
         return data
 
-    async def get_example_repositories(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, name: Optional[str] = None, source_type: Optional[str] = None, organization_id: Optional[str] = None) -> List[ExampleRepositoryList]:
+    async def get_example_repositories(self, skip: Optional[str] = None, limit: Optional[str] = None, id: Optional[str] = None, name: Optional[str] = None, source_type: Optional[str] = None, organization_id: Optional[str] = None, user_id: Optional[str] = None) -> List[ExampleRepositoryList]:
         """List Example-Repositories"""
-        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'name', 'source_type', 'organization_id'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['skip', 'limit', 'id', 'name', 'source_type', 'organization_id', 'user_id'] and v is not None}
         data = await self._request("GET", "", params=params)
         if isinstance(data, list):
             return [ExampleRepositoryList.model_validate(item) for item in data]
         return data
 
-    async def get_example_repository_by_id(self, id: str) -> ExampleRepositoryGet:
+    async def get_example_repository_by_id(self, id: str, user_id: Optional[str] = None) -> ExampleRepositoryGet:
         """Get Example-Repositories"""
-        data = await self._request("GET", f"/{id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/{id}", params=params)
         if data:
             return ExampleRepositoryGet.model_validate(data)
         return data
 
-    async def patch_example_repository_by_id(self, id: str, payload: ExampleRepositoryUpdate) -> ExampleRepositoryGet:
+    async def patch_example_repository_by_id(self, id: str, payload: ExampleRepositoryUpdate, user_id: Optional[str] = None) -> ExampleRepositoryGet:
         """Update Example-Repositories"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("PATCH", f"/{id}", json=json_data)
@@ -72,6 +77,6 @@ class ExampleRepositoriesClient(BaseEndpointClient):
             return ExampleRepositoryGet.model_validate(data)
         return data
 
-    async def delete_example_repository_by_id(self, id: str) -> Any:
+    async def delete_example_repository_by_id(self, id: str, user_id: Optional[str] = None) -> Any:
         """Delete Example-Repositories"""
         data = await self._request("DELETE", f"/{id}")

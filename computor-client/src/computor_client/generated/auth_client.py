@@ -28,7 +28,7 @@ class AuthClient(AuthenticationClient):
             base_path="/auth",
         )
 
-    async def post_auth_login(self, payload: LocalLoginRequest) -> LocalLoginResponse:
+    async def post_auth_login(self, payload: LocalLoginRequest, user_id: Optional[str] = None) -> LocalLoginResponse:
         """Login With Credentials"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "/login", json=json_data)
@@ -51,9 +51,9 @@ class AuthClient(AuthenticationClient):
             return Dict[str, Any].model_validate(data)
         return data
 
-    async def get_auth_callback(self, provider: str, code: str, state: Optional[str] = None) -> Dict[str, Any]:
+    async def get_auth_callback(self, provider: str, code: str, state: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Handle Callback"""
-        params = {k: v for k, v in locals().items() if k in ['code', 'state'] and v is not None}
+        params = {k: v for k, v in locals().items() if k in ['code', 'state', 'user_id'] and v is not None}
         data = await self._request("GET", f"/{provider}/callback", params=params)
         if data:
             return Dict[str, Any].model_validate(data)
@@ -66,7 +66,7 @@ class AuthClient(AuthenticationClient):
             return Dict[str, Any].model_validate(data)
         return data
 
-    async def post_auth_logout(self, ) -> LogoutResponse:
+    async def post_auth_logout(self, user_id: Optional[str] = None) -> LogoutResponse:
         """Logout"""
         data = await self._request("POST", "/logout")
         if data:
@@ -101,7 +101,7 @@ class AuthClient(AuthenticationClient):
             return Dict[str, Any].model_validate(data)
         return data
 
-    async def post_auth_register(self, payload: UserRegistrationRequest) -> UserRegistrationResponse:
+    async def post_auth_register(self, payload: UserRegistrationRequest, user_id: Optional[str] = None) -> UserRegistrationResponse:
         """Register User"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "/register", json=json_data)
@@ -109,7 +109,7 @@ class AuthClient(AuthenticationClient):
             return UserRegistrationResponse.model_validate(data)
         return data
 
-    async def post_auth_refresh_local(self, payload: LocalTokenRefreshRequest) -> LocalTokenRefreshResponse:
+    async def post_auth_refresh_local(self, payload: LocalTokenRefreshRequest, user_id: Optional[str] = None) -> LocalTokenRefreshResponse:
         """Refresh Local Token"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "/refresh/local", json=json_data)
@@ -117,7 +117,7 @@ class AuthClient(AuthenticationClient):
             return LocalTokenRefreshResponse.model_validate(data)
         return data
 
-    async def post_auth_refresh(self, payload: TokenRefreshRequest) -> TokenRefreshResponse:
+    async def post_auth_refresh(self, payload: TokenRefreshRequest, user_id: Optional[str] = None) -> TokenRefreshResponse:
         """Refresh Token"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "/refresh", json=json_data)

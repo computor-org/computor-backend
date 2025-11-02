@@ -6,7 +6,6 @@ from computor_backend.permissions.role_setup import claims_organization_manager,
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.tokens import encrypt_api_key
 from computor_backend.model.auth import User
-from computor_backend.model.execution import ExecutionBackend
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
 from fastapi import Depends, FastAPI, Response, Request
@@ -31,7 +30,7 @@ from computor_backend.interfaces import (
     CourseMemberInterface,
     RoleInterface,
     ExampleRepositoryInterface,
-    ExecutionBackendInterface,
+    ServiceTypeInterface,
     GroupInterface,
     SessionInterface,
     SubmissionGroupMemberInterface,
@@ -43,7 +42,7 @@ from computor_backend.interfaces import (
     LanguageInterface,
 )
 
-from computor_backend.api.course_execution_backend import course_execution_backend_router
+from computor_backend.api.service_type import service_type_router
 from computor_backend.api.courses import course_router
 from computor_backend.api.system import system_router
 from computor_backend.api.course_contents import course_content_router
@@ -66,6 +65,8 @@ from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
+from computor_backend.api.service_accounts import service_accounts_router
+from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.exceptions import register_exception_handlers
 import json
 import tempfile
@@ -122,8 +123,8 @@ async def initialize_plugin_registry_with_config():
 
 async def init_admin_user(db: Session):
 
-    username = os.environ.get("EXECUTION_BACKEND_API_USER")
-    password = os.environ.get("EXECUTION_BACKEND_API_PASSWORD")
+    username = os.environ.get("API_ADMIN_USER")
+    password = os.environ.get("API_ADMIN_PASSWORD")
 
     admin = db.query(User).filter(User.username == username).first()
 
@@ -225,17 +226,17 @@ CrudRouter(CourseMemberInterface).register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
 LookUpRouter(LanguageInterface).register_routes(app)
-CrudRouter(ExecutionBackendInterface).register_routes(app)
 CrudRouter(ExampleRepositoryInterface).register_routes(app)
 # CrudRouter(ExampleInterface).register_routes(app) # Examples should only be created via upload
 
 CrudRouter(SubmissionGroupInterface).register_routes(app)
 CrudRouter(SubmissionGroupMemberInterface).register_routes(app)
 
+# Service Types - replaced ExecutionBackend
 app.include_router(
-    course_execution_backend_router,
-    prefix="/course-execution-backends",
-    tags=["course execution backends"],
+    service_type_router,
+    prefix="/service-types",
+    tags=["service types"],
     dependencies=[Depends(get_current_principal)]
 )
 
@@ -321,6 +322,20 @@ app.include_router(
     user_router,
     prefix="/user",
     tags=["user", "me"]
+)
+
+app.include_router(
+    service_accounts_router,
+    prefix="/service-accounts",
+    tags=["services", "admin"],
+    dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    api_tokens_router,
+    prefix="/api-tokens",
+    tags=["tokens", "authentication"],
+    dependencies=[Depends(get_current_principal)]
 )
 
 # app.include_router(

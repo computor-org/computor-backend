@@ -424,11 +424,38 @@ async def assign_example_to_content(
         )
         db.add(history_entry)
         db.commit()
-    
+
+    # Update course content's testing_service_id based on example's execution_backend
+    if example_version:
+        execution_backend_slug = example_version.get_execution_backend_slug()
+        if execution_backend_slug:
+            # Look up service by slug
+            from computor_backend.model.service import Service
+            service = db.query(Service).filter(
+                Service.slug == execution_backend_slug,
+                Service.enabled == True
+            ).first()
+
+            if service:
+                # Get the course content from the db session (not from repository)
+                content_db = db.query(CourseContent).filter(
+                    CourseContent.id == content_id
+                ).first()
+
+                if content_db and content_db.testing_service_id != service.id:
+                    # Update course content's testing_service_id
+                    content_db.testing_service_id = service.id
+                    content_db.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
+                    content_db.updated_at = datetime.utcnow()
+                    db.commit()
+                    logger.info(f"Updated testing_service_id for content {content_id} to service {execution_backend_slug}")
+            else:
+                logger.warning(f"Service not found for execution_backend slug: {execution_backend_slug}")
+
     # Clear cache
     if cache:
         await cache.delete(f"course:{content.course_id}:deployments")
-    
+
     return _build_deployment_with_history(deployment, db)
 
 @course_content_router.router.delete(

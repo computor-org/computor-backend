@@ -22,7 +22,7 @@ class TestsClient(BaseEndpointClient):
         """Create a new entity (delegates to generated POST method)."""
         return await self.post_tests(payload)
 
-    async def post_tests(self, payload: TestCreate) -> ResultList:
+    async def post_tests(self, payload: TestCreate, user_id: Optional[str] = None) -> ResultList:
         """Create Test Run"""
         json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
         data = await self._request("POST", "", json=json_data)
@@ -30,9 +30,10 @@ class TestsClient(BaseEndpointClient):
             return ResultList.model_validate(data)
         return data
 
-    async def get_test_statu_by_result_id(self, result_id: str) -> Dict[str, Any]:
+    async def get_test_statu_by_result_id(self, result_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Get Test Status"""
-        data = await self._request("GET", f"/status/{result_id}")
+        params = {k: v for k, v in locals().items() if k in ['user_id'] and v is not None}
+        data = await self._request("GET", f"/status/{result_id}", params=params)
         if data:
             return Dict[str, Any].model_validate(data)
         return data

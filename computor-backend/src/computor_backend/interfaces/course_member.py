@@ -25,9 +25,9 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
         course_member: The newly created course member
         db: Database session
     """
-    # Only process for actual users (not system accounts)
-    if course_member.user.user_type != "user":
-        logger.info(f"Skipping post_create for non-user course member {course_member.id}")
+    # Only process for actual users (not service accounts)
+    if course_member.user.is_service:
+        logger.info(f"Skipping post_create for service account course member {course_member.id}")
         return
 
     logger.info(f"Running post_create for course member {course_member.id} (user: {course_member.user_id}, course: {course_member.course_id})")

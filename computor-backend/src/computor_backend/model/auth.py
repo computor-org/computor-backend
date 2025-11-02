@@ -10,14 +10,7 @@ from .base import Base
 
 class User(Base):
     __tablename__ = 'user'
-    __table_args__ = (
-        CheckConstraint(
-            "(user_type <> 'token') OR (token_expiration IS NOT NULL)",
-            name='ck_user_token_expiration'
-        ),
-    )
 
-    number = Column(String(255), unique=True)
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -29,13 +22,12 @@ class User(Base):
     given_name = Column(String(255))
     family_name = Column(String(255))
     email = Column(String(320), unique=True)
-    user_type = Column(Enum('user', 'token', name='user_type'), nullable=False, server_default=text("'user'::user_type"))
-    fs_number = Column(BigInteger, nullable=False, server_default=text("nextval('user_unique_fs_number_seq'::regclass)"))
-    token_expiration = Column(DateTime(timezone=True))
     username = Column(String(255), unique=True)
     password = Column(String(512))  # Increased for Argon2 hashes (was 255)
     password_reset_required = Column(Boolean, nullable=False, server_default=text("false"))  # Track password reset status
-    auth_token = Column(String(4096))  # Added from PostgreSQL migrations
+
+    # Service user flag (added via migration 19266bf266e9)
+    is_service = Column(Boolean, nullable=False, server_default=text("false"))
 
     # Relationships
     course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
@@ -46,7 +38,11 @@ class User(Base):
     user_groups = relationship("UserGroup", back_populates="user", uselist=True, lazy="select")
     user_roles = relationship("UserRole", back_populates="user", uselist=True, lazy="select")
     organization = relationship("Organization", foreign_keys="Organization.user_id", uselist=False, lazy="select")
-    
+
+    # Service account relationships (added via migration 19266bf266e9)
+    service = relationship("Service", foreign_keys="Service.user_id", back_populates="user", uselist=False, lazy="select")
+    api_tokens = relationship("ApiToken", foreign_keys="ApiToken.user_id", back_populates="user", uselist=True, lazy="select")
+
     # Self-referential relationships
     created_users = relationship("User", foreign_keys="User.created_by", remote_side=[id])
     updated_users = relationship("User", foreign_keys="User.updated_by", remote_side=[id])
