@@ -1,7 +1,7 @@
 """Business logic for bulk course member import."""
 import logging
 from typing import List, Optional, Dict, Tuple
-from uuid import UUID, uuid4
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -28,7 +28,6 @@ def import_course_members(
     default_course_role_id: str,
     update_existing: bool,
     create_missing_groups: bool,
-    organization_id: Optional[str | UUID],
     permissions: Principal,
     db: Session,
 ) -> CourseMemberImportResponse:
@@ -40,7 +39,6 @@ def import_course_members(
         default_course_role_id: Default role for members (e.g., "_student")
         update_existing: Whether to update existing users
         create_missing_groups: Whether to auto-create missing course groups
-        organization_id: Organization ID for student profiles
         permissions: Current user's permissions
         db: Database session
 
@@ -63,9 +61,8 @@ def import_course_members(
             "Lecturer role or higher is required."
         )
 
-    # Use course's organization if not specified
-    if not organization_id:
-        organization_id = course.organization_id
+    # Get organization from course
+    organization_id = course.organization_id
 
     # Track results
     results: List[CourseMemberImportResult] = []
@@ -253,7 +250,6 @@ def _import_single_member(
 
         # Create new course member
         new_member = CourseMember(
-            id=uuid4(),
             user_id=user.id,
             course_id=course.id,
             course_role_id=course_role_id,
@@ -262,7 +258,7 @@ def _import_single_member(
             updated_by=permissions.user_id,
         )
         db.add(new_member)
-        db.flush()
+        db.flush()  # Flush to get the auto-generated ID from database
 
         logger.info(f"Created course member for {email} in course {course.id}")
 
@@ -321,14 +317,13 @@ def _find_or_create_user(
     username = _generate_username_from_email(email, db)
 
     new_user = User(
-        id=uuid4(),
         email=email,
         username=username,
         given_name=given_name.strip() if given_name else None,
         family_name=family_name.strip() if family_name else None,
     )
     db.add(new_user)
-    db.flush()
+    db.flush()  # Flush to get the auto-generated ID from database
 
     logger.info(f"Created new user: {email} with username {username}")
     return new_user, True
@@ -393,14 +388,13 @@ def _create_or_update_student_profile(
 
     # Create new student profile
     student_profile = StudentProfile(
-        id=uuid4(),
         user_id=user.id,
         student_id=student_id,
         student_email=student_email,
         organization_id=organization_id,
     )
     db.add(student_profile)
-    db.flush()
+    db.flush()  # Flush to get the auto-generated ID from database
 
     logger.info(f"Created student profile for user {user.id}")
     return student_profile
@@ -454,7 +448,6 @@ def _get_or_create_course_group(
         return None
 
     new_group = CourseGroup(
-        id=uuid4(),
         course_id=course.id,
         title=group_title,
         description=f"Auto-created group during import",
@@ -462,7 +455,7 @@ def _get_or_create_course_group(
         updated_by=permissions.user_id,
     )
     db.add(new_group)
-    db.flush()
+    db.flush()  # Flush to get the auto-generated ID from database
 
     group_cache[group_title_lower] = new_group
     created_groups.append(group_title)

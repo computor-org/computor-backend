@@ -35,7 +35,6 @@ async def upload_course_member_file(
     default_role: str = Form("_student", description="Default course role ID"),
     update_existing: bool = Form(False, description="Update existing users"),
     create_missing_groups: bool = Form(True, description="Auto-create missing groups"),
-    organization_id: str = Form(None, description="Organization ID (optional)"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db),
 ) -> CourseMemberImportResponse:
@@ -59,7 +58,6 @@ async def upload_course_member_file(
         default_role: Default course role (default: "_student")
         update_existing: Whether to update existing users (default: False)
         create_missing_groups: Auto-create missing course groups (default: True)
-        organization_id: Organization ID for student profiles (optional)
         permissions: Current user's permissions
         db: Database session
 
@@ -127,7 +125,6 @@ async def upload_course_member_file(
             default_course_role_id=default_role,
             update_existing=update_existing,
             create_missing_groups=create_missing_groups,
-            organization_id=organization_id,
             permissions=permissions,
             db=db,
         )
@@ -185,7 +182,6 @@ async def import_course_members_json(
             default_course_role_id=request.default_course_role_id,
             update_existing=request.update_existing,
             create_missing_groups=request.create_missing_groups,
-            organization_id=request.organization_id,
             permissions=permissions,
             db=db,
         )
