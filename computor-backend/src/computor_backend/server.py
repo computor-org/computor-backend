@@ -1,14 +1,12 @@
 from contextlib import asynccontextmanager
 import os
-import shutil
-from computor_backend.api.filesystem import mirror_db_to_filesystem
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.tokens import encrypt_api_key
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
-from fastapi import Depends, FastAPI, Response, Request
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -26,11 +24,12 @@ from computor_backend.database import get_db
 from computor_backend.interfaces import (
     AccountInterface,
     UserInterface,
+    CourseInterface,
     CourseFamilyInterface,
     CourseMemberInterface,
     RoleInterface,
     ExampleRepositoryInterface,
-    ServiceTypeInterface,
+    # ServiceTypeInterface,
     GroupInterface,
     SessionInterface,
     SubmissionGroupMemberInterface,
@@ -43,7 +42,6 @@ from computor_backend.interfaces import (
 )
 
 from computor_backend.api.service_type import service_type_router
-from computor_backend.api.courses import course_router
 from computor_backend.api.system import system_router
 from computor_backend.api.course_contents import course_content_router
 from computor_backend.settings import settings 
@@ -161,12 +159,7 @@ async def startup_logic():
         db_apply_roles("_user_manager",claims_user_manager(),db)
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
 
-        repo_dirs = os.path.join(settings.API_LOCAL_STORAGE_DIR,"repositories")
-        if os.path.exists(repo_dirs):
-            shutil.rmtree(repo_dirs)
-
         await init_admin_user(db)
-        await mirror_db_to_filesystem(db)
     
     # Initialize plugin registry with configuration
     # await initialize_plugin_registry_with_config()
@@ -218,7 +211,7 @@ CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
 CrudRouter(SessionInterface).register_routes(app)
-course_router.register_routes(app)
+CrudRouter(CourseInterface).register_routes(app)
 organization_router.register_routes(app)
 CrudRouter(CourseFamilyInterface).register_routes(app)
 CrudRouter(CourseGroupInterface).register_routes(app)

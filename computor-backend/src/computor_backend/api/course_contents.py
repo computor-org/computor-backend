@@ -7,19 +7,15 @@ between content hierarchy and example deployments.
 
 import json
 import logging
-import os
-from typing import Annotated, Optional, List, Dict, Any
-from uuid import UUID
+from typing import Annotated, Optional, Dict, Any
 from datetime import datetime
 
-import yaml
-from fastapi import Depends, status
+from fastapi import Depends
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 logger = logging.getLogger(__name__)
 
-from pydantic import BaseModel, Field
 
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
@@ -32,7 +28,6 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException
 )
-from computor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from computor_backend.database import get_db
 from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
@@ -42,12 +37,9 @@ from computor_types.deployment import (
     DeploymentHistoryGet,
     DeploymentWithHistory,
     DeploymentSummary,
-    CourseContentDeploymentCreate,
-    DeploymentHistoryCreate,
 )
 from computor_backend.api.api_builder import CrudRouter
 from computor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
-from computor_backend.model.example import Example, ExampleVersion
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.repositories import (
@@ -118,55 +110,12 @@ def _build_deployment_with_history(
         history=history_dtos,
     )
 
-# # File operations (unchanged)
-# class CourseContentFileQuery(BaseModel):
-#     filename: Optional[str] = None
-
-# @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
-# async def get_course_content_meta(
-#     permissions: Annotated[Principal, Depends(get_current_principal)],
-#     course_content_id: UUID | str,
-#     file_query: CourseContentFileQuery = Depends(),
-#     db: Session = Depends(get_db)
-# ):
-#     """Get file content from course content directory."""
-#     if check_course_permissions(permissions, CourseContent, "_tutor", db).filter(
-#         CourseContent.id == course_content_id
-#     ).first() is None:
-#         raise NotFoundException()
-
-#     course_content_dir = await get_path_course_content(course_content_id, db)
-
-#     if file_query.filename is None:
-#         raise BadRequestException()
-
-#     with open(os.path.join(course_content_dir, file_query.filename), 'r') as file:
-#         content = file.read()
-
-#         if file_query.filename.endswith(".yaml") or file_query.filename.endswith(".yml"):
-#             try:
-#                 data = yaml.safe_load(content)
-#                 if isinstance(data, dict):
-#                     return data
-#             except Exception:
-#                 raise BadRequestException()
-
-#         elif file_query.filename.endswith(".json"):
-#             try:
-#                 data = json.loads(content)
-#                 if isinstance(data, dict):
-#                     return data
-#             except Exception:
-#                 raise BadRequestException()
-#         else:
-#             return {"content": content}
-
-# Event handlers for filesystem mirroring
-async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
-    try:
-        await mirror_entity_to_filesystem(str(entity.id), CourseContentInterface, db)
-    except Exception as e:
-        print(e)
+# # Event handlers for filesystem mirroring
+# async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
+#     try:
+#         await mirror_entity_to_filesystem(str(entity.id), CourseContentInterface, db)
+#     except Exception as e:
+#         print(e)
 
 # Event handler for submission group provisioning
 async def provision_submission_groups_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
@@ -198,9 +147,9 @@ async def provision_submission_groups_wrapper(entity: CourseContentGet, db: Sess
             exc_info=True
         )
 
-course_content_router.on_created.append(event_wrapper)
+# course_content_router.on_created.append(event_wrapper)
 course_content_router.on_created.append(provision_submission_groups_wrapper)
-course_content_router.on_updated.append(event_wrapper)
+# course_content_router.on_updated.append(event_wrapper)
 
 # New deployment endpoints
 

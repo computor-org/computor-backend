@@ -15,25 +15,15 @@ from computor_backend.exceptions import (
     ForbiddenException,
     InternalServerException
 )
-from computor_backend.api.filesystem import mirror_entity_to_filesystem
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.permissions.core import check_admin, check_course_permissions, get_permitted_course_ids
+from computor_backend.permissions.core import check_admin, check_course_permissions
 from computor_backend.permissions.principal import Principal
 
-from computor_backend.api.utils import get_course_id_from_url, sync_dependent_items
 from computor_backend.database import get_db
-from computor_types.course_groups import CourseGroupCreate
-from computor_types.deployments import ComputorDeploymentConfig, CourseConfig, CourseFamilyConfig, GitLabConfig, OrganizationConfig
-from computor_types.organizations import OrganizationProperties
-from computor_types.student_profile import StudentProfileCreate
-from computor_types.tokens import decrypt_api_key
-from computor_types.users import UserCreate, UserGet
 from computor_types.system import (
-    StudentCreate, ReleaseStudentsCreate, TUGStudentExport, ReleaseCourseCreate,
-    ReleaseCourseContentCreate, StatusQuery, CourseReleaseUpdate, GitLabCredentials,
+    GitLabCredentials,
     OrganizationTaskRequest, CourseFamilyTaskRequest, CourseTaskRequest, TaskResponse,
-    PendingChange, PendingChangesResponse, GenerateTemplateRequest, GenerateTemplateResponse,
-    BulkAssignExamplesRequest,
+    GenerateTemplateRequest, GenerateTemplateResponse,
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
 from computor_types.lecturer_deployments import ReleaseValidationError
