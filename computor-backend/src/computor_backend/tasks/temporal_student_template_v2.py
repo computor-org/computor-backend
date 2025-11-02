@@ -658,56 +658,10 @@ async def generate_student_template_activity_v2(
             git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
             template_repo.git.config('user.email', git_email)
             template_repo.git.config('user.name', git_name)
-            
-            # Clone assignments repository for reading released content
-            # Derive assignments_url if not provided
-            if not assignments_url:
-                course_props = course.properties or {}
-                course_gitlab = course_props.get('gitlab', {})
-                provider = (organization.properties or {}).get('gitlab', {}).get('url')
-                full_path_course = course_gitlab.get('full_path')
-                if provider and full_path_course:
-                    assignments_url = f"{provider}/{full_path_course}/assignments.git"
-            if not assignments_url:
-                raise ValueError("assignments_url is required or must be derivable from course properties")
 
-            # Transform localhost URL for Docker environment
-            assignments_url = transform_localhost_url(assignments_url)
-
-            # Prepare local path for assignments repo and authenticated URL
-            assignments_repo_path = os.path.join(temp_dir, 'assignments')
-            assignments_auth_url = assignments_url
-            if gitlab_token and 'http' in assignments_url:
-                from urllib.parse import urlparse, urlunparse
-                parsed = urlparse(assignments_url)
-                auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
-                if parsed.port:
-                    auth_netloc += f":{parsed.port}"
-                assignments_auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-
-            try:
-                if gitlab_token and 'http' in assignments_url:
-                    assignments_repo = git.Repo.clone_from(assignments_auth_url, assignments_repo_path)
-                else:
-                    assignments_repo = git.Repo.clone_from(assignments_url, assignments_repo_path)
-            except Exception as e:
-                logger.error(f"Failed to clone assignments repository: {e}")
-                # Mark all selected deployments as failed and record history
-                for deployment in deployments_to_process:
-                    if deployment.deployment_status == "deploying":
-                        deployment.deployment_status = "failed"
-                        deployment.deployment_message = f"Failed to clone assignments: {str(e)[:200]}"
-                        history = DeploymentHistory(
-                            deployment_id=deployment.id,
-                            action="failed",
-                            example_version_id=deployment.example_version_id,
-                            workflow_id=workflow_id,
-                        )
-                        db.add(history)
-                db.commit()
-                return {"success": False, "error": f"Failed to clone assignments: {str(e)}"}
-
-            # Do not clean the whole repository; only update selected directories
+            # NOTE: We do NOT use the assignments repository here!
+            # All example content comes directly from MinIO via download_example_files()
+            # The assignments repository is managed separately by temporal_assignments_repository.py
             
             # Determine course contents to deploy (selected or by status)
             if selected_course_content_ids:
@@ -773,123 +727,91 @@ async def generate_student_template_activity_v2(
                                 db.add(history)
                             continue
 
-                    # Resolve commit to use for this content
-                    overrides_list = []
-                    if release:
-                        try:
-                            raw_ovr = release.get('overrides')
-                            if isinstance(raw_ovr, list):
-                                overrides_list = raw_ovr
-                        except Exception:
-                            overrides_list = []
-                    commit_override_map = {}
-                    for ov in overrides_list:
-                        if not ov:
-                            continue
-                        cid = ov.get('course_content_id')
-                        vid = ov.get('version_identifier')
-                        if cid and vid:
-                            commit_override_map[str(cid)] = vid
-                    desired_commit = commit_override_map.get(str(content.id)) if release else None
-                    global_commit = release.get('global_commit') if release else None
+                    # Download files from example repository (MinIO or Git based on source_type)
+                    # NOTE: We download directly from MinIO/ExampleRepository, NOT from assignments repo!
+                    files: Dict[str, bytes] = {}
                     try:
-                        if desired_commit:
-                            commit_to_use = str(assignments_repo.commit(desired_commit).hexsha)
-                        elif global_commit:
-                            commit_to_use = str(assignments_repo.commit(global_commit).hexsha)
-                        else:
-                            commit_to_use = content.deployment.version_identifier
+                        if content.deployment.example_version:
+                            example_repo = content.deployment.example_version.example.repository
+                            # download_example_files returns files already scoped to the example version
+                            # No filtering needed - the storage_path in MinIO already isolates this example
+                            files = await download_example_files(example_repo, content.deployment.example_version)
                     except Exception as e:
-                        logger.warning(f"Failed to resolve commit for {content.path}: {e}")
-                        commit_to_use = None
+                        logger.warning(f"Failed to load files from example repository for {content.path}: {e}")
+                        files = {}
 
                     # Extract service type from meta.yaml and link to appropriate service
-                    if not content.testing_service_id:
+                    if not content.testing_service_id and files:
                         try:
-                            commit_obj = assignments_repo.commit(commit_to_use)
-                            meta_blob = commit_obj.tree / directory_name / 'meta.yaml'
-                            meta_yaml_bytes = meta_blob.data_stream.read()
-                            import yaml
-                            meta_data = yaml.safe_load(meta_yaml_bytes) if meta_yaml_bytes else None
-                            language = None
+                            meta_yaml_bytes = files.get('meta.yaml')
+                            if meta_yaml_bytes:
+                                import yaml
+                                meta_data = yaml.safe_load(meta_yaml_bytes)
+                                language = None
 
-                            if meta_data:
-                                props = (meta_data.get('properties') or {})
-                                # Check for new service_type path or legacy executionBackend slug
-                                service_type_spec = props.get('serviceType') or props.get('service_type')
+                                if meta_data:
+                                    props = (meta_data.get('properties') or {})
+                                    # Check for new service_type path or legacy executionBackend slug
+                                    service_type_spec = props.get('serviceType') or props.get('service_type')
 
-                                if service_type_spec:
-                                    # Extract language from service type spec
-                                    # e.g., "testing.python" -> "python", "testing.matlab" -> "matlab"
-                                    if service_type_spec.startswith('testing.'):
-                                        language = service_type_spec.split('.')[-1]
+                                    if service_type_spec:
+                                        # Extract language from service type spec
+                                        # e.g., "testing.python" -> "python", "testing.matlab" -> "matlab"
+                                        if service_type_spec.startswith('testing.'):
+                                            language = service_type_spec.split('.')[-1]
 
-                                if not language:
-                                    # Legacy support: map old backend slugs to languages
-                                    eb = props.get('executionBackend') or {}
-                                    backend_slug = eb.get('slug')
-                                    if backend_slug:
-                                        # Extract language from legacy slug
-                                        # e.g., 'python' -> 'python', 'itpcp.exec.py' -> 'py' -> 'python'
-                                        slug_parts = backend_slug.split('.')
-                                        backend_type = slug_parts[-1] if slug_parts else backend_slug
-                                        # Map legacy backend types to languages
-                                        legacy_mapping = {
-                                            'py': 'python',
-                                            'python': 'python',
-                                            'matlab': 'matlab',
-                                            'mat': 'matlab',
-                                        }
-                                        language = legacy_mapping.get(backend_type)
+                                    if not language:
+                                        # Legacy support: map old backend slugs to languages
+                                        eb = props.get('executionBackend') or {}
+                                        backend_slug = eb.get('slug')
+                                        if backend_slug:
+                                            # Extract language from legacy slug
+                                            # e.g., 'python' -> 'python', 'itpcp.exec.py' -> 'py' -> 'python'
+                                            slug_parts = backend_slug.split('.')
+                                            backend_type = slug_parts[-1] if slug_parts else backend_slug
+                                            # Map legacy backend types to languages
+                                            legacy_mapping = {
+                                                'py': 'python',
+                                                'python': 'python',
+                                                'matlab': 'matlab',
+                                                'mat': 'matlab',
+                                            }
+                                            language = legacy_mapping.get(backend_type)
 
-                            if language:
-                                from sqlalchemy_utils import Ltree
-                                from ..model.service import Service
+                                if language:
+                                    from sqlalchemy_utils import Ltree
+                                    from ..model.service import Service
 
-                                # Find the testing.temporal ServiceType
-                                service_type = db.query(ServiceType).filter(
-                                    ServiceType.path == Ltree('testing.temporal')
-                                ).first()
-
-                                if service_type:
-                                    # Find a Service with this service_type_id AND matching language
-                                    # Prefer enabled services
-                                    service = db.query(Service).filter(
-                                        Service.service_type_id == service_type.id,
-                                        Service.enabled == True,
-                                        Service.properties['language'].astext == language
+                                    # Find the testing.temporal ServiceType
+                                    service_type = db.query(ServiceType).filter(
+                                        ServiceType.path == Ltree('testing.temporal')
                                     ).first()
 
-                                    if service:
-                                        content.testing_service_id = service.id
-                                        logger.info(f"Linked service '{service.slug}' (language: {language}) to course content {content.path}")
+                                    if service_type:
+                                        # Find a Service with this service_type_id AND matching language
+                                        # Prefer enabled services
+                                        service = db.query(Service).filter(
+                                            Service.service_type_id == service_type.id,
+                                            Service.enabled == True,
+                                            Service.properties['language'].astext == language
+                                        ).first()
+
+                                        if service:
+                                            content.testing_service_id = service.id
+                                            logger.info(f"Linked service '{service.slug}' (language: {language}) to course content {content.path}")
+                                        else:
+                                            logger.warning(f"No enabled Service found for language '{language}' with ServiceType 'testing.temporal'")
                                     else:
-                                        logger.warning(f"No enabled Service found for language '{language}' with ServiceType 'testing.temporal'")
-                                else:
-                                    logger.warning(f"ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
+                                        logger.warning(f"ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
                         except Exception as e:
                             logger.warning(f"Failed to link service: {e}")
 
-                    # Build files map from assignments repo at the selected commit under deployment path
-                    files: Dict[str, bytes] = {}
-                    if commit_to_use:
-                        try:
-                            commit_obj = assignments_repo.commit(commit_to_use)
-                            sub_tree = commit_obj.tree / directory_name
-                            for item in sub_tree.traverse():
-                                if item.type == 'blob':
-                                    rel_path = os.path.relpath(item.path, directory_name)
-                                    files[rel_path] = item.data_stream.read()
-                        except Exception as e:
-                            logger.warning(f"Failed to load files from assignments for {content.path}: {e}")
-                            files = {}
-                    
                     if not files:
-                        # Strict mode: fail when assignments does not provide files
-                        reason = "no files in assignments at commit" if commit_to_use else "no commit resolved"
+                        # Strict mode: fail when example repository does not provide files
+                        reason = "no files in example repository" if content.deployment.example_version else "no example version configured"
                         logger.error(f"Release failed for {content.path}: {reason}")
                         content.deployment.deployment_status = "failed"
-                        content.deployment.deployment_message = f"Assignments {reason}"
+                        content.deployment.deployment_message = f"Example repository: {reason}"
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
                             action="failed",
@@ -925,10 +847,7 @@ async def generate_student_template_activity_v2(
                     
                     processed_count += 1
                     logger.info(f"Successfully processed {content.path}")
-                    
-                    # Update deployment version to the commit used for this content (only if from assignments)
-                    if commit_to_use:
-                        content.deployment.version_identifier = commit_to_use
+
                     # Track that we processed it successfully
                     successfully_processed.append(content)
                     
