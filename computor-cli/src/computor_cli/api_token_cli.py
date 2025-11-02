@@ -7,6 +7,7 @@ Provides CLI commands for generating and managing API tokens for service account
 import click
 import secrets
 import hashlib
+import base64
 from datetime import datetime, timedelta
 
 
@@ -330,6 +331,77 @@ INSERT INTO api_token (
     click.echo(f"3. The service authenticates with:")
     click.secho(f"   X-API-Token: {full_token}", fg="cyan")
     click.echo("="*70 + "\n")
+
+
+@token.command()
+@click.option('--count', '-n', default=1, type=int, help='Number of secrets to generate (default: 1)')
+@click.option('--quiet', '-q', is_flag=True, help='Output only the secret (for scripts/env files)')
+def generate_secret(count, quiet):
+    """
+    Generate TOKEN_SECRET for environment variables.
+
+    Generates Fernet-compatible secret keys (base64-encoded 32 bytes) for use
+    in TOKEN_SECRET environment variable.
+
+    Note: TOKEN_SECRET is used for deprecated password encryption. New systems
+    should use Argon2 hashing instead. However, this is still needed for
+    backward compatibility.
+
+    Examples:
+        # Generate one secret
+        computor token generate-secret
+
+        # Generate multiple secrets
+        computor token generate-secret --count 3
+
+        # Generate secret for scripting (quiet mode)
+        export TOKEN_SECRET=$(computor token generate-secret --quiet)
+    """
+    if quiet:
+        for _ in range(count):
+            secret = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+            click.echo(secret)
+    else:
+        click.echo("\n" + "="*70)
+        click.echo("🔒 TOKEN_SECRET Generator")
+        click.echo("="*70)
+        click.echo("\nGenerate Fernet-compatible secret keys for:")
+        click.echo("  • TOKEN_SECRET environment variable")
+        click.echo("  • Password encryption (deprecated - use Argon2 instead)")
+        click.echo("  • .env files and Docker Compose")
+        click.echo("\n" + "="*70)
+
+        secrets_list = []
+        for i in range(count):
+            secret = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+            secrets_list.append(secret)
+
+            if count > 1:
+                click.echo(f"\n🔑 Secret {i+1}/{count}:")
+            else:
+                click.echo(f"\n🔑 Secret:")
+            click.secho(f"   {secret}", fg="yellow", bold=True)
+
+        if count > 1:
+            click.echo("\n" + "="*70)
+            click.echo("💾 Copy to .env file:")
+            click.echo("="*70)
+            for i, secret in enumerate(secrets_list, 1):
+                click.echo(f"TOKEN_SECRET_{i}={secret}")
+
+        click.echo("\n" + "="*70)
+        click.echo("📋 Usage in .env file:")
+        click.echo("="*70)
+        click.echo('TOKEN_SECRET="<your_secret_here>"')
+
+        click.echo("\n" + "="*70)
+        click.echo("⚠️  SECURITY NOTES:")
+        click.echo("="*70)
+        click.echo("  • Store secrets securely!")
+        click.echo("  • Never commit secrets to git")
+        click.echo("  • TOKEN_SECRET is for legacy password encryption")
+        click.echo("  • New systems should use Argon2 hashing instead")
+        click.echo("="*70 + "\n")
 
 
 if __name__ == '__main__':
