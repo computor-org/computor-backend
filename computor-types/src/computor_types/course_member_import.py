@@ -52,6 +52,14 @@ class CourseMemberImportRequest(BaseModel):
         "name",
         description="Username generation strategy: 'name' (from given/family name) or 'email' (from email prefix)"
     )
+    batch_size: int = Field(
+        5,
+        description="Number of members to process per batch for GitLab operations (to avoid rate limits)"
+    )
+    batch_delay_seconds: int = Field(
+        10,
+        description="Delay in seconds between batches to respect GitLab API rate limits"
+    )
 
 
 class CourseMemberImportResponse(BaseModel):

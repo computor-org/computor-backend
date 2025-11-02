@@ -36,6 +36,8 @@ async def upload_course_member_file(
     update_existing: bool = Form(False, description="Update existing users"),
     create_missing_groups: bool = Form(True, description="Auto-create missing groups"),
     username_strategy: str = Form("name", description="Username generation strategy: 'name' or 'email'"),
+    batch_size: int = Form(5, description="Batch size for GitLab operations"),
+    batch_delay_seconds: int = Form(10, description="Delay between batches (seconds)"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db),
 ) -> CourseMemberImportResponse:
@@ -129,6 +131,8 @@ async def upload_course_member_file(
             permissions=permissions,
             db=db,
             username_strategy=username_strategy,
+            batch_size=batch_size,
+            batch_delay_seconds=batch_delay_seconds,
         )
 
         # Commit transaction if successful
@@ -187,6 +191,8 @@ async def import_course_members_json(
             permissions=permissions,
             db=db,
             username_strategy=request.username_strategy,
+            batch_size=request.batch_size,
+            batch_delay_seconds=request.batch_delay_seconds,
         )
 
         # Commit transaction if successful

@@ -24,13 +24,16 @@ logger = logging.getLogger(__name__)
 
 async def trigger_post_create_for_members(
     course_members: List[CourseMember],
-    db: Session
+    db: Session,
+    batch_size: int = 5,
+    batch_delay_seconds: int = 10
 ) -> None:
     """
     Trigger post-create hook for bulk-imported course members.
 
-    This reuses the existing post_create_course_member logic from CourseMemberInterface,
-    which provisions submission groups and triggers StudentRepositoryCreationWorkflow.
+    Uses BulkStudentRepositoryCreationWorkflow to avoid overwhelming GitLab API
+    with concurrent requests. Provisions submission groups synchronously, then
+    triggers a single bulk workflow for repository creation with rate limiting.
 
     All course members (students, tutors, lecturers) get their own student repository
     forked from student-template. Access to the assignments repository (reference with
@@ -45,27 +48,79 @@ async def trigger_post_create_for_members(
     Args:
         course_members: List of newly created course members
         db: Database session
+        batch_size: Number of members to process per batch (default: 5)
+        batch_delay_seconds: Delay between batches in seconds (default: 10)
     """
-    from computor_backend.interfaces.course_member import post_create_course_member
+    from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
+    from computor_backend.tasks import get_task_executor
+    from computor_types.tasks import TaskSubmission
 
-    for course_member in course_members:
-        # Skip service accounts only
-        if course_member.user and course_member.user.is_service:
-            logger.info(f"Skipping post_create for service account: {course_member.id}")
-            continue
+    # Filter out service accounts
+    non_service_members = [
+        cm for cm in course_members
+        if not (cm.user and cm.user.is_service)
+    ]
 
+    if not non_service_members:
+        logger.info("No non-service members to process")
+        return
+
+    logger.info(
+        f"Processing {len(non_service_members)} course members "
+        f"(skipped {len(course_members) - len(non_service_members)} service accounts)"
+    )
+
+    # Step 1: Provision submission groups for all members (fast, synchronous)
+    for course_member in non_service_members:
         try:
-            logger.info(
-                f"Triggering post_create for course member {course_member.id} "
-                f"(role: {course_member.course_role_id})"
+            provision_submission_groups_for_user(
+                user_id=course_member.user_id,
+                course_id=course_member.course_id,
+                db=db
             )
-            await post_create_course_member(course_member, db)
+            logger.info(f"Provisioned submission groups for course member {course_member.id}")
         except Exception as e:
             logger.error(
-                f"Failed to trigger post_create for course member {course_member.id}: {e}",
-                exc_info=True
+                f"Failed to provision submission groups for course member {course_member.id}: {e}"
             )
-            # Don't fail the entire import if post-create fails for one member
+            # Don't fail the entire import if provisioning fails for one member
+
+    # Step 2: Trigger single bulk workflow for repository creation (asynchronous with rate limiting)
+    if not non_service_members:
+        return
+
+    try:
+        task_executor = get_task_executor()
+
+        # Get unique course ID (should be same for all members)
+        course_id = str(non_service_members[0].course_id)
+
+        # Collect all course member IDs
+        course_member_ids = [str(cm.id) for cm in non_service_members]
+
+        task_submission = TaskSubmission(
+            task_name="BulkStudentRepositoryCreationWorkflow",
+            parameters={
+                "course_member_ids": course_member_ids,
+                "course_id": course_id,
+                "batch_size": batch_size,
+                "batch_delay_seconds": batch_delay_seconds
+            },
+            queue="computor-tasks"
+        )
+
+        workflow_id = await task_executor.submit_task(task_submission)
+        logger.info(
+            f"Triggered BulkStudentRepositoryCreationWorkflow: {workflow_id} "
+            f"for {len(course_member_ids)} course members "
+            f"(batch_size={batch_size}, batch_delay={batch_delay_seconds}s)"
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to trigger BulkStudentRepositoryCreationWorkflow: {e}",
+            exc_info=True
+        )
+        # Don't fail the entire import if workflow submission fails
 
 
 async def import_course_members(
@@ -77,6 +132,8 @@ async def import_course_members(
     permissions: Principal,
     db: Session,
     username_strategy: str = "name",
+    batch_size: int = 5,
+    batch_delay_seconds: int = 10,
 ) -> CourseMemberImportResponse:
     """Import course members in bulk.
 
@@ -91,6 +148,8 @@ async def import_course_members(
         username_strategy: Strategy for username generation ("name" or "email")
             - "name": Generate from given/family name (e.g., "Max Mustermann" → "mmusterm")
             - "email": Generate from email prefix (default fallback)
+        batch_size: Number of members to process per batch for GitLab operations (default: 5)
+        batch_delay_seconds: Delay between batches to respect GitLab rate limits (default: 10)
 
     Returns:
         Import response with detailed results
@@ -164,11 +223,16 @@ async def import_course_members(
     )
 
     # Trigger post-create hooks for newly created members
-    # This provisions submission groups and triggers repository creation workflows
+    # This provisions submission groups and triggers bulk repository creation workflow
     if newly_created_members:
         logger.info(f"Triggering post-create hooks for {len(newly_created_members)} new members")
         try:
-            await trigger_post_create_for_members(newly_created_members, db)
+            await trigger_post_create_for_members(
+                newly_created_members,
+                db,
+                batch_size=batch_size,
+                batch_delay_seconds=batch_delay_seconds
+            )
         except Exception as e:
             logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
             # Don't fail the import if post-create hooks fail
