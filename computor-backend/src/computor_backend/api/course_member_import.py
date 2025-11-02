@@ -35,6 +35,7 @@ async def upload_course_member_file(
     default_role: str = Form("_student", description="Default course role ID"),
     update_existing: bool = Form(False, description="Update existing users"),
     create_missing_groups: bool = Form(True, description="Auto-create missing groups"),
+    username_strategy: str = Form("name", description="Username generation strategy: 'name' or 'email'"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db),
 ) -> CourseMemberImportResponse:
@@ -119,7 +120,7 @@ async def upload_course_member_file(
 
     # Import members
     try:
-        result = import_course_members(
+        result = await import_course_members(
             course_id=course_id,
             members=import_rows,
             default_course_role_id=default_role,
@@ -127,6 +128,7 @@ async def upload_course_member_file(
             create_missing_groups=create_missing_groups,
             permissions=permissions,
             db=db,
+            username_strategy=username_strategy,
         )
 
         # Commit transaction if successful
@@ -176,7 +178,7 @@ async def import_course_members_json(
     logger.info(f"Importing {len(request.members)} members to course {course_id}")
 
     try:
-        result = import_course_members(
+        result = await import_course_members(
             course_id=course_id,
             members=request.members,
             default_course_role_id=request.default_course_role_id,
@@ -184,6 +186,7 @@ async def import_course_members_json(
             create_missing_groups=request.create_missing_groups,
             permissions=permissions,
             db=db,
+            username_strategy=request.username_strategy,
         )
 
         # Commit transaction if successful

@@ -22,7 +22,53 @@ from computor_types.course_member_import import (
 logger = logging.getLogger(__name__)
 
 
-def import_course_members(
+async def trigger_post_create_for_members(
+    course_members: List[CourseMember],
+    db: Session
+) -> None:
+    """
+    Trigger post-create hook for bulk-imported course members.
+
+    This reuses the existing post_create_course_member logic from CourseMemberInterface,
+    which provisions submission groups and triggers StudentRepositoryCreationWorkflow.
+
+    All course members (students, tutors, lecturers) get their own student repository
+    forked from student-template. Access to the assignments repository (reference with
+    solutions) is controlled separately via GitLab group memberships in _sync_gitlab_memberships:
+    - Students: NO access to assignments
+    - Tutors: READ access (inherited via course group)
+    - Lecturers: FULL access (Maintainer)
+
+    Only skips:
+    - Service accounts (is_service=True)
+
+    Args:
+        course_members: List of newly created course members
+        db: Database session
+    """
+    from computor_backend.interfaces.course_member import post_create_course_member
+
+    for course_member in course_members:
+        # Skip service accounts only
+        if course_member.user and course_member.user.is_service:
+            logger.info(f"Skipping post_create for service account: {course_member.id}")
+            continue
+
+        try:
+            logger.info(
+                f"Triggering post_create for course member {course_member.id} "
+                f"(role: {course_member.course_role_id})"
+            )
+            await post_create_course_member(course_member, db)
+        except Exception as e:
+            logger.error(
+                f"Failed to trigger post_create for course member {course_member.id}: {e}",
+                exc_info=True
+            )
+            # Don't fail the entire import if post-create fails for one member
+
+
+async def import_course_members(
     course_id: str | UUID,
     members: List[CourseMemberImportRow],
     default_course_role_id: str,
@@ -30,6 +76,7 @@ def import_course_members(
     create_missing_groups: bool,
     permissions: Principal,
     db: Session,
+    username_strategy: str = "name",
 ) -> CourseMemberImportResponse:
     """Import course members in bulk.
 
@@ -41,6 +88,9 @@ def import_course_members(
         create_missing_groups: Whether to auto-create missing course groups
         permissions: Current user's permissions
         db: Database session
+        username_strategy: Strategy for username generation ("name" or "email")
+            - "name": Generate from given/family name (e.g., "Max Mustermann" → "mmusterm")
+            - "email": Generate from email prefix (default fallback)
 
     Returns:
         Import response with detailed results
@@ -64,10 +114,11 @@ def import_course_members(
     # Get organization from course
     organization_id = course.organization_id
 
-    # Track results
+    # Track results and newly created members
     results: List[CourseMemberImportResult] = []
     created_groups: List[str] = []
     group_cache: Dict[str, CourseGroup] = {}
+    newly_created_members: List[CourseMember] = []  # Track for post-create hooks
 
     # Cache existing groups
     existing_groups = db.query(CourseGroup).filter(CourseGroup.course_id == course_id).all()
@@ -88,8 +139,17 @@ def import_course_members(
             row_number=row_number,
             permissions=permissions,
             db=db,
+            username_strategy=username_strategy,
         )
         results.append(result)
+
+        # Track newly created members for post-create hooks
+        if result.status == ImportStatus.SUCCESS and result.course_member_id:
+            course_member = db.query(CourseMember).filter(
+                CourseMember.id == result.course_member_id
+            ).first()
+            if course_member:
+                newly_created_members.append(course_member)
 
     # Calculate summary statistics
     total = len(results)
@@ -102,6 +162,16 @@ def import_course_members(
         f"Import completed: {total} total, {success} success, "
         f"{errors} errors, {skipped} skipped, {updated} updated"
     )
+
+    # Trigger post-create hooks for newly created members
+    # This provisions submission groups and triggers repository creation workflows
+    if newly_created_members:
+        logger.info(f"Triggering post-create hooks for {len(newly_created_members)} new members")
+        try:
+            await trigger_post_create_for_members(newly_created_members, db)
+        except Exception as e:
+            logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
+            # Don't fail the import if post-create hooks fail
 
     return CourseMemberImportResponse(
         total=total,
@@ -126,6 +196,7 @@ def _import_single_member(
     row_number: int,
     permissions: Principal,
     db: Session,
+    username_strategy: str = "name",
 ) -> CourseMemberImportResult:
     """Import a single course member.
 
@@ -141,6 +212,7 @@ def _import_single_member(
         row_number: Row number in import file
         permissions: Current user's permissions
         db: Database session
+        username_strategy: Strategy for username generation ("name" or "email")
 
     Returns:
         Import result for this member
@@ -166,6 +238,7 @@ def _import_single_member(
             family_name=member_data.family_name,
             update_existing=update_existing,
             db=db,
+            username_strategy=username_strategy,
         )
 
         if user_created:
@@ -289,6 +362,7 @@ def _find_or_create_user(
     family_name: Optional[str],
     update_existing: bool,
     db: Session,
+    username_strategy: str = "name",
 ) -> Tuple[User, bool]:
     """Find existing user by email or create a new one.
 
@@ -298,10 +372,15 @@ def _find_or_create_user(
         family_name: User's family name
         update_existing: Whether to update existing user
         db: Database session
+        username_strategy: Strategy for username generation ("name" or "email")
+            - "name": Generate from given/family name (e.g., "Max Mustermann" → "mmusterm")
+            - "email": Generate from email prefix (e.g., "john.doe@example.com" → "john.doe")
 
     Returns:
         Tuple of (User, was_created)
     """
+    from computor_backend.utils.username_generation import generate_username_from_names
+
     # Try to find by email
     user = db.query(User).filter(User.email == email).first()
 
@@ -313,8 +392,12 @@ def _find_or_create_user(
     if student_profile:
         return student_profile.user, False
 
-    # Create new user
-    username = _generate_username_from_email(email, db)
+    # Create new user with generated username based on strategy
+    if username_strategy == "name":
+        username = generate_username_from_names(given_name, family_name, db)
+    else:
+        # Fallback to email-based generation
+        username = _generate_username_from_email(email, db)
 
     new_user = User(
         email=email,
@@ -325,7 +408,7 @@ def _find_or_create_user(
     db.add(new_user)
     db.flush()  # Flush to get the auto-generated ID from database
 
-    logger.info(f"Created new user: {email} with username {username}")
+    logger.info(f"Created new user: {email} with username {username} (strategy: {username_strategy})")
     return new_user, True
 
 

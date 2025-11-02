@@ -48,6 +48,10 @@ class CourseMemberImportRequest(BaseModel):
     default_course_role_id: str = Field("_student", description="Default role for imported members")
     update_existing: bool = Field(False, description="Update existing users if found")
     create_missing_groups: bool = Field(True, description="Auto-create missing course groups")
+    username_strategy: str = Field(
+        "name",
+        description="Username generation strategy: 'name' (from given/family name) or 'email' (from email prefix)"
+    )
 
 
 class CourseMemberImportResponse(BaseModel):
