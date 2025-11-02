@@ -202,8 +202,9 @@ async def import_course_members(
         )
         results.append(result)
 
-        # Track newly created members for post-create hooks
-        if result.status == ImportStatus.SUCCESS and result.course_member_id:
+        # Track newly created and updated members for post-create hooks
+        # Include UPDATED members because they might not have repositories yet
+        if result.status in [ImportStatus.SUCCESS, ImportStatus.UPDATED] and result.course_member_id:
             course_member = db.query(CourseMember).filter(
                 CourseMember.id == result.course_member_id
             ).first()

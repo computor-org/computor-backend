@@ -50,7 +50,7 @@ async def bulk_create_student_repositories_activity(
     Returns:
         Dict with success/failure counts and details
     """
-    from .temporal_student_repository import create_student_repository_activity
+    from .temporal_student_repository import create_student_repository
 
     logger.info(
         f"Starting bulk repository creation for {len(course_member_ids)} members "
@@ -107,11 +107,10 @@ async def bulk_create_student_repositories_activity(
                 )
 
                 # Call the existing activity (this already handles retries)
-                await create_student_repository_activity(
+                await create_student_repository(
                     course_member_id=course_member_id,
                     course_id=course_id,
-                    submission_group_ids=submission_group_ids,
-                    is_team=False
+                    submission_group_ids=submission_group_ids
                 )
 
                 results["success"] += 1
@@ -143,7 +142,8 @@ async def bulk_create_student_repositories_activity(
     return results
 
 
-@workflow.defn
+@register_task
+@workflow.defn(name="BulkStudentRepositoryCreationWorkflow", sandboxed=False)
 class BulkStudentRepositoryCreationWorkflow(BaseWorkflow):
     """
     Workflow for creating student repositories in bulk with rate limiting.
@@ -191,16 +191,16 @@ class BulkStudentRepositoryCreationWorkflow(BaseWorkflow):
 
         if not course_member_ids:
             return WorkflowResult(
-                success=False,
-                message="No course member IDs provided",
-                data={"total": 0, "success": 0, "failed": 0}
+                status="failed",
+                result={"total": 0, "success": 0, "failed": 0},
+                error="No course member IDs provided"
             )
 
         if not course_id:
             return WorkflowResult(
-                success=False,
-                message="No course ID provided",
-                data={"total": 0, "success": 0, "failed": 0}
+                status="failed",
+                result={"total": 0, "success": 0, "failed": 0},
+                error="No course ID provided"
             )
 
         try:
@@ -220,12 +220,14 @@ class BulkStudentRepositoryCreationWorkflow(BaseWorkflow):
             success = results["failed"] == 0
 
             return WorkflowResult(
-                success=success,
-                message=(
-                    f"Bulk repository creation completed: "
-                    f"{results['success']}/{results['total']} successful"
-                ),
-                data=results
+                status="completed" if success else "failed",
+                result=results,
+                metadata={
+                    "message": (
+                        f"Bulk repository creation completed: "
+                        f"{results['success']}/{results['total']} successful"
+                    )
+                }
             )
 
         except Exception as e:
@@ -234,11 +236,8 @@ class BulkStudentRepositoryCreationWorkflow(BaseWorkflow):
                 exc_info=True
             )
             return WorkflowResult(
-                success=False,
-                message=f"Bulk repository creation failed: {str(e)}",
-                data={"total": len(course_member_ids), "success": 0, "failed": len(course_member_ids)}
+                status="failed",
+                result={"total": len(course_member_ids), "success": 0, "failed": len(course_member_ids)},
+                error=f"Bulk repository creation failed: {str(e)}"
             )
 
-
-# Register the workflow using decorator pattern
-BulkStudentRepositoryCreationWorkflow = register_task(BulkStudentRepositoryCreationWorkflow)
