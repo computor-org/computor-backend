@@ -137,43 +137,71 @@ async def generate_assignments_repository_activity(
                     auth_netloc += f":{parsed.port}"
                 auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
 
-            # Clone
+            # Clone or initialize repository
             try:
                 if gitlab_token and 'http' in assignments_url:
                     repo = git.Repo.clone_from(auth_url, repo_path)
                 else:
                     repo = git.Repo.clone_from(assignments_url, repo_path)
+                logger.info(f"Successfully cloned assignments repository")
             except Exception as e:
-                return {"success": False, "error": f"Clone failed: {str(e)}"}
+                logger.info(f"Could not clone assignments repo, creating new: {e}")
+                os.makedirs(repo_path, exist_ok=True)
+                repo = git.Repo.init(repo_path)
+
+                # Set default branch to main
+                repo.git.checkout('-b', 'main')
+
+                # Add remote with auth URL if we have a token
+                if 'http' in assignments_url:
+                    if gitlab_token:
+                        repo.create_remote('origin', auth_url)
+                    else:
+                        repo.create_remote('origin', assignments_url)
+
+            # Configure git for commits (required in worker container)
+            git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
+            git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
+            repo.git.config('user.email', git_email)
+            repo.git.config('user.name', git_name)
 
             processed = 0
             errors: List[str] = []
 
+            logger.info(f"Processing {len(contents)} course contents for assignments repository")
+
             # Write each content
             for content in contents:
                 try:
-                    if not content.deployment or not content.deployment.example_version:
+                    logger.info(f"Processing content: {content.path} (id: {content.id})")
+
+                    if not content.deployment:
+                        logger.warning(f"Skipping {content.path}: no deployment")
                         continue
-                    ev = content.deployment.example_version
-                    example = ev.example
-                    if not example or not example.repository:
+                    if not content.deployment.example_version:
+                        logger.warning(f"Skipping {content.path}: no example_version in deployment")
                         continue
 
-                    # Get deployment path - use deployment_path if set, otherwise fall back to example_identifier
-                    directory_name = content.deployment.deployment_path
-                    if not directory_name:
-                        if content.deployment.example_identifier:
-                            # Use example_identifier as-is for the directory name
-                            directory_name = str(content.deployment.example_identifier)
-                            # Save it to deployment_path so it's persisted in the database
-                            content.deployment.deployment_path = directory_name
-                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
-                        else:
-                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
-                            logger.error(error_msg)
-                            errors.append(error_msg)
-                            continue
+                    ev = content.deployment.example_version
+                    example = ev.example
+
+                    if not example:
+                        logger.warning(f"Skipping {content.path}: example is None")
+                        continue
+                    if not example.repository:
+                        logger.warning(f"Skipping {content.path}: example has no repository")
+                        continue
+
+                    logger.info(f"Content {content.path} has example: {example.identifier} (version: {ev.version_tag})")
+
+                    # Get deployment path - use deployment_path if set, otherwise use example identifier
+                    directory_name = content.deployment.deployment_path or str(example.identifier)
                     target_dir = Path(repo_path) / directory_name
+
+                    # Update deployment_path if it wasn't set
+                    if not content.deployment.deployment_path:
+                        content.deployment.deployment_path = directory_name
+                        logger.info(f"Set deployment_path to {directory_name} for {content.path}")
 
                     if target_dir.exists() and overwrite_strategy != 'force_update':
                         # Skip existing
@@ -185,12 +213,22 @@ async def generate_assignments_repository_activity(
                     target_dir.mkdir(parents=True, exist_ok=True)
 
                     # Download full example content
+                    logger.info(f"Downloading files for {content.path} from repository {example.repository.name}")
                     files = await download_example_files(example.repository, ev)
+                    logger.info(f"Downloaded {len(files)} files for {content.path}")
+
+                    if not files:
+                        logger.error(f"No files downloaded for {content.path}!")
+                        errors.append(f"{content.path}: no files downloaded from repository")
+                        continue
+
                     for rel_path, data in files.items():
                         file_path = target_dir / rel_path
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_bytes(data)
+                        logger.debug(f"Wrote file: {rel_path} ({len(data)} bytes)")
 
+                    logger.info(f"Successfully wrote {len(files)} files for {content.path} to {directory_name}/")
                     processed += 1
                 except Exception as e:
                     errors.append(f"{str(content.path)}: {str(e)}")
@@ -203,8 +241,19 @@ async def generate_assignments_repository_activity(
                 if repo.is_dirty() or repo.untracked_files:
                     message = commit_message or f"Initialize/update assignments ({processed} items)"
                     repo.index.commit(message)
-                    repo.git.push('origin', 'main')
-                    pushed = True
+
+                    # Push to remote - use -u flag to set upstream on first push
+                    if 'origin' in [remote.name for remote in repo.remotes]:
+                        try:
+                            repo.git.push('origin', 'main')
+                        except Exception as push_error:
+                            # If normal push fails, try with -u flag (for first push)
+                            logger.info(f"Normal push failed, trying with -u flag: {push_error}")
+                            repo.git.push('-u', 'origin', 'main')
+                        pushed = True
+                    else:
+                        logger.warning("No remote 'origin' found, skipping push")
+                        pushed = False
                 else:
                     pushed = True  # Nothing to do counts as success
             except Exception as e:
@@ -248,11 +297,14 @@ async def generate_assignments_repository_activity(
                 except Exception:
                     pass
 
-            return {
+            result = {
                 "success": processed > 0 and pushed,
                 "processed_count": processed,
+                "total_contents": len(contents),
                 "errors": errors,
             }
+            logger.info(f"Assignments repository generation completed: {result}")
+            return result
     finally:
         try:
             db_gen.close()

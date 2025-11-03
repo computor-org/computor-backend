@@ -35,6 +35,9 @@ from . import temporal_student_template_v2
 # Import Temporal student repository tasks to auto-register
 from . import temporal_student_repository
 
+# Import Temporal bulk student repository tasks to auto-register
+from . import temporal_bulk_student_repository
+
 # Import Assignments repository tasks to auto-register
 from . import temporal_assignments_repository
 

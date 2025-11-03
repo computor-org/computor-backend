@@ -57,6 +57,10 @@ from .temporal_student_repository import (
     create_student_repository,
     create_team_repository
 )
+from .temporal_bulk_student_repository import (
+    BulkStudentRepositoryCreationWorkflow,
+    bulk_create_student_repositories_activity
+)
 
 
 class TemporalWorker:
@@ -97,6 +101,7 @@ class TemporalWorker:
             GenerateStudentTemplateWorkflowV2,
             GenerateAssignmentsRepositoryWorkflow,
             StudentRepositoryCreationWorkflow,  # Student repository forking
+            BulkStudentRepositoryCreationWorkflow,  # Bulk student repository creation
         ]
         
         activities = [
@@ -115,6 +120,7 @@ class TemporalWorker:
             generate_assignments_repository_activity,  # Assignments init/populate
             create_student_repository,  # Fork student-template for individual student
             create_team_repository,  # Fork student-template for team
+            bulk_create_student_repositories_activity,  # Bulk student repository creation
         ]
         
         # Create a worker for each task queue
