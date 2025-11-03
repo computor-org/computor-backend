@@ -147,7 +147,7 @@ services:
   
   # Frontend service
   frontend:
-    image: computor-web:latest ${COMPUTOR_WEB_IMAGE}
+    image: ${COMPUTOR_WEB_IMAGE}
     restart: unless-stopped
     depends_on:
       - uvicorn
