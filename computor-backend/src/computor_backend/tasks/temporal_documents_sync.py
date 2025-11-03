@@ -250,7 +250,8 @@ async def sync_documents_repository_activity(
             pass
 
 
-@workflow.defn(name="SyncDocumentsRepositoryWorkflow")
+@register_task
+@workflow.defn(name="sync_documents_repository", sandboxed=False)
 class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
     """Workflow to sync documents repository from GitLab to filesystem."""
 
@@ -309,11 +310,3 @@ class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
                 message=f"Workflow error: {str(e)}",
                 data={"error": str(e)}
             )
-
-
-# Register the task
-register_task(
-    "sync_documents_repository",
-    SyncDocumentsRepositoryWorkflow,
-    "Sync documents repository from GitLab to filesystem"
-)
