@@ -964,95 +964,102 @@ async def generate_student_template_activity_v2(
                         db.add(history)
             
             # Don't commit yet - wait until after git operations
-            
+
             # Generate main README.md with assignment structure
             # IMPORTANT: Show ALL deployed assignments in the repository, not just newly released ones
-            if processed_count > 0 or True:  # Always generate README, even if no new assignments
-                main_readme_path = os.path.join(template_repo_path, "README.md")
 
-                # Fetch ALL course contents with DEPLOYED status to show current repository state
-                all_deployed_contents = db.query(CourseContent).options(
+            # Fetch ALL course contents that are deployed OR being deployed in this run
+            # We include "deploying" status because README is generated BEFORE status update
+            all_deployed_contents = db.query(CourseContent).options(
                     joinedload(CourseContent.deployment)
                         .joinedload(CourseContentDeployment.example_version)
                         .joinedload(ExampleVersion.example)
                 ).filter(
-                    CourseContent.course_id == course_id,
-                    CourseContent.archived_at.is_(None),
-                    CourseContent.deployment.has(CourseContentDeployment.deployment_status == 'deployed')
-                ).order_by(CourseContent.path).all()
+                CourseContent.course_id == course_id,
+                CourseContent.archived_at.is_(None),
+                CourseContent.deployment.has(
+                    CourseContentDeployment.deployment_status.in_(['deployed', 'deploying'])
+                )
+            ).order_by(CourseContent.path).all()
 
-                logger.info(f"Found {len(all_deployed_contents)} deployed assignments for README generation")
+            logger.info(f"Found {len(all_deployed_contents)} deployed/deploying assignments for README generation")
 
-                with open(main_readme_path, 'w') as f:
-                    f.write(f"# {course.title} - Student Template\n\n")
-                    f.write(f"This repository contains {len(all_deployed_contents)} assignments for {course.title}.\n\n")
+            # Always generate README to reflect current state
+            main_readme_path = os.path.join(template_repo_path, "README.md")
+            with open(main_readme_path, 'w') as f:
+                f.write(f"# {course.title} - Student Template\n\n")
+                f.write(f"This repository contains {len(all_deployed_contents)} assignments for {course.title}.\n\n")
 
-                    # Generate assignment structure table
-                    if all_deployed_contents:
-                        f.write(f"## Assignment Structure\n\n")
-                        f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
-                        f.write(f"|-------------|---------------------|-------|----------|\n")
+                # Generate assignment structure table
+                if all_deployed_contents:
+                    f.write(f"## Assignment Structure\n\n")
+                    f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
+                    f.write(f"|-------------|---------------------|-------|----------|\n")
 
-                        # Fetch all course contents to build complete path hierarchy
-                        all_contents = db.query(CourseContent).filter(
-                            CourseContent.course_id == course_id,
-                            CourseContent.archived_at.is_(None)
-                        ).all()
+                    # Fetch all course contents to build complete path hierarchy
+                    all_contents = db.query(CourseContent).filter(
+                        CourseContent.course_id == course_id,
+                        CourseContent.archived_at.is_(None)
+                    ).all()
 
-                        # Build a complete map of paths to titles
-                        path_to_title = {}
-                        for content in all_contents:
-                            path_to_title[str(content.path)] = content.title
+                    # Build a complete map of paths to titles
+                    path_to_title = {}
+                    for content in all_contents:
+                        path_to_title[str(content.path)] = content.title
 
-                        for content in all_deployed_contents:
-                            if content.deployment and content.deployment.example_version:
-                                example = content.deployment.example_version.example
-                                version = content.deployment.example_version.version_tag
+                    for content in all_deployed_contents:
+                        if content.deployment and content.deployment.example_version:
+                            example = content.deployment.example_version.example
+                            version = content.deployment.example_version.version_tag
 
-                                # Build title path with "/" separation
-                                path_parts = str(content.path).split('.')
-                                title_parts = []
+                            # Build title path with "/" separation
+                            path_parts = str(content.path).split('.')
+                            title_parts = []
 
-                                # Build up the path progressively to find each part's title
-                                for i, part in enumerate(path_parts):
-                                    # Reconstruct path up to this part
-                                    current_path = '.'.join(path_parts[:i+1])
+                            # Build up the path progressively to find each part's title
+                            for i, part in enumerate(path_parts):
+                                # Reconstruct path up to this part
+                                current_path = '.'.join(path_parts[:i+1])
 
-                                    # Try to find title for this path segment
-                                    if current_path in path_to_title:
-                                        title_parts.append(path_to_title[current_path])
-                                    else:
-                                        # If we can't find the title, use the path segment as fallback
-                                        title_parts.append(part)
+                                # Try to find title for this path segment
+                                if current_path in path_to_title:
+                                    title_parts.append(path_to_title[current_path])
+                                else:
+                                    # If we can't find the title, use the path segment as fallback
+                                    title_parts.append(part)
 
-                                # Join with " / " as requested
-                                title_path = " / ".join(title_parts)
+                            # Join with " / " as requested
+                            title_path = " / ".join(title_parts)
 
-                                f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
-                    else:
-                        f.write(f"*No assignments deployed yet.*\n\n")
+                            f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
+                else:
+                    f.write(f"*No assignments deployed yet.*\n\n")
 
-                    f.write(f"\n## Instructions\n\n")
-                    f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
-                    f.write(f"## Submission\n\n")
-                    f.write(f"Follow your course submission guidelines for each assignment.\n\n")
-                    f.write(f"---\n")
-                    f.write(f"*Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*\n")
-                    f.write(f"*Generated by Computor Example Library*\n")
+                f.write(f"\n## Instructions\n\n")
+                f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
+                f.write(f"## Submission\n\n")
+                f.write(f"Follow your course submission guidelines for each assignment.\n\n")
+                f.write(f"---\n")
+                f.write(f"*Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*\n")
+                f.write(f"*Generated by Computor Example Library*\n")
 
-                logger.info(f"Generated main README.md with {len(all_deployed_contents)} deployed assignments (current state)")
-            
-            # If we processed any content, commit and push to Git
+            logger.info(f"Generated main README.md with {len(all_deployed_contents)} deployed assignments (current state)")
+
+            # Commit and push to Git if we processed content OR if README changed
+            # This ensures README is always up-to-date even if no new deployments occurred
             git_push_successful = False
-            if processed_count > 0:
+            if processed_count > 0 or (len(all_deployed_contents) > 0 and os.path.exists(os.path.join(template_repo_path, "README.md"))):
                 try:
                     # Stage all changes
                     template_repo.git.add(A=True)
                     
                     # Check if there are changes to commit
                     if template_repo.is_dirty() or template_repo.untracked_files:
-                        # Commit changes - selective release
-                        commit_message = f"Release {processed_count} assignments to student template"
+                        # Commit changes
+                        if processed_count > 0:
+                            commit_message = f"Release {processed_count} assignment(s) to student template"
+                        else:
+                            commit_message = f"Update student template README (no new assignments)"
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
