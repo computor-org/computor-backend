@@ -144,14 +144,38 @@ def get_permitted_course_ids(permissions: Principal, minimum_role: str, db: Sess
 def check_course_permissions(permissions: Principal, entity: Any, course_role_id: str, db: Session):
     """Check permissions for course-related entities"""
     from computor_backend.permissions.query_builders import CoursePermissionQueryBuilder
-    
+
     if permissions.is_admin:
         return db.query(entity)
-    
+
     # Filter by course membership
     return CoursePermissionQueryBuilder.filter_by_course_membership(
         db.query(entity), entity, permissions.user_id, course_role_id, db
     )
+
+
+def check_course_family_permissions(permissions: Principal, course_family_id: str, course_role_id: str, db: Session):
+    """Check permissions for course family-related operations"""
+    if permissions.is_admin:
+        return
+
+    # Get allowed roles based on course_role_id using hierarchy
+    allowed_roles = course_role_hierarchy.get_allowed_roles(course_role_id)
+
+    # Check if user has the required role in any course of this course family
+    has_permission = db.query(CourseMember).join(
+        Course, Course.id == CourseMember.course_id
+    ).filter(
+        Course.course_family_id == course_family_id,
+        CourseMember.user_id == permissions.user_id,
+        CourseMember.course_role_id.in_(allowed_roles)
+    ).first() is not None
+
+    if not has_permission:
+        raise ForbiddenException(
+            detail=f"User does not have required permissions for course family",
+            context={"course_family_id": course_family_id, "required_role": course_role_id}
+        )
 
 
 # General helpers
