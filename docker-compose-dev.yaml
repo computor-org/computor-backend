@@ -195,6 +195,9 @@ services:
       - API_URL=${API_URL}
       - API_ADMIN_USER=${API_ADMIN_USER}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
     depends_on:
       - temporal
       - postgres

@@ -41,6 +41,9 @@ from . import temporal_bulk_student_repository
 # Import Assignments repository tasks to auto-register
 from . import temporal_assignments_repository
 
+# Import Documents sync tasks to auto-register
+from . import temporal_documents_sync
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

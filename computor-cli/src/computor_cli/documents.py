@@ -137,7 +137,7 @@ def sync(course_family_identifier: str, force: bool, auth: CLIAuthConfig):
 
         try:
             response = sync_wrapper.post(
-                f"/api/system/course-families/{course_family_id}/sync-documents",
+                f"/system/course-families/{course_family_id}/sync-documents",
                 params={"force_update": force}
             )
 

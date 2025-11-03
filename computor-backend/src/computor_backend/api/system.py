@@ -1097,7 +1097,6 @@ async def sync_documents_repository(
         Dict with workflow_id and status
     """
     from ..model.course import CourseFamily
-    from ..business_logic.task_executor import get_task_executor, TaskSubmission
 
     # Check if user has permissions (lecturer or admin)
     course_family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()

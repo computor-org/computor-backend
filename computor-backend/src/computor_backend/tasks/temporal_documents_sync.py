@@ -38,11 +38,10 @@ async def sync_documents_repository_activity(
     """
     import git
     from ..database import get_db
-    from ..model.course import CourseFamily, Organization
-    from ..settings import Settings
+    from ..model.course import CourseFamily
+    from ..model.organization import Organization
+    from ..settings import settings
     from ..utils.docker_utils import transform_localhost_url
-
-    settings = Settings()
     db_gen = next(get_db())
     db = db_gen
 
@@ -244,10 +243,7 @@ async def sync_documents_repository_activity(
         return result
 
     finally:
-        try:
-            next(db_gen)
-        except StopIteration:
-            pass
+        db_gen.close()
 
 
 @register_task
@@ -255,18 +251,27 @@ async def sync_documents_repository_activity(
 class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
     """Workflow to sync documents repository from GitLab to filesystem."""
 
+    @classmethod
+    def get_name(cls) -> str:
+        """Get the workflow name for task registry."""
+        return "sync_documents_repository"
+
     @workflow.run
-    async def run(self, course_family_id: str, force_update: bool = False) -> WorkflowResult:
+    async def run(self, params: Dict[str, Any]) -> WorkflowResult:
         """
         Execute the documents sync workflow.
 
         Args:
-            course_family_id: CourseFamily ID
-            force_update: If True, delete and re-clone; if False, just update
+            params: Dictionary with:
+                - course_family_id: CourseFamily ID
+                - force_update: If True, delete and re-clone; if False, just update
 
         Returns:
             WorkflowResult with sync status
         """
+        course_family_id = params.get('course_family_id')
+        force_update = params.get('force_update', False)
+
         workflow_id = workflow.info().workflow_id
 
         logger.info(f"Starting documents sync workflow for CourseFamily {course_family_id}")
@@ -287,26 +292,27 @@ class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
 
             if result["success"]:
                 return WorkflowResult(
-                    success=True,
-                    message=f"Synced {result['synced_files']} files from documents repository",
-                    data={
+                    status="completed",
+                    result={
                         "course_family_id": course_family_id,
                         "synced_files": result["synced_files"],
                         "documents_url": result["documents_url"],
-                        "target_path": result["target_path"]
-                    }
+                        "target_path": result["target_path"],
+                        "message": f"Synced {result['synced_files']} files from documents repository"
+                    },
+                    error=None
                 )
             else:
                 return WorkflowResult(
-                    success=False,
-                    message=f"Failed to sync documents: {result.get('error', 'Unknown error')}",
-                    data=result
+                    status="failed",
+                    result=result,
+                    error=f"Failed to sync documents: {result.get('error', 'Unknown error')}"
                 )
 
         except Exception as e:
             logger.exception(f"Documents sync workflow failed: {e}")
             return WorkflowResult(
-                success=False,
-                message=f"Workflow error: {str(e)}",
-                data={"error": str(e)}
+                status="failed",
+                result=None,
+                error=f"Workflow error: {str(e)}"
             )
