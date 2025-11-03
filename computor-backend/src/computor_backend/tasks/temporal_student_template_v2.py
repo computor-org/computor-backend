@@ -1031,7 +1031,10 @@ async def generate_student_template_activity_v2(
                             # Join with " / " as requested
                             title_path = " / ".join(title_parts)
 
-                            f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
+                            # Create clickable link to the directory
+                            directory_link = f"[`{example.identifier}/`](./{example.identifier})"
+
+                            f.write(f"| {title_path} | {directory_link} | {content.title} | {version} |\n")
                 else:
                     f.write(f"*No assignments deployed yet.*\n\n")
 
