@@ -1054,11 +1054,8 @@ async def generate_student_template_activity_v2(
                     
                     # Check if there are changes to commit
                     if template_repo.is_dirty() or template_repo.untracked_files:
-                        # Commit changes
-                        if processed_count > 0:
-                            commit_message = f"Release {processed_count} assignment(s) to student template"
-                        else:
-                            commit_message = f"Update student template README (no new assignments)"
+                        # Commit changes with simple message
+                        commit_message = "System Release"
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
