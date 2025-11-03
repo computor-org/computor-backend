@@ -102,7 +102,7 @@ services:
     command:
       ["sh", "startup.bash"]
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}
     ports:
       - 8000:8000
     environment:
@@ -165,7 +165,7 @@ services:
     image: halverneus/static-file-server:latest
     restart: unless-stopped
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/web:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared/documents:/web:ro
     environment:
       - FOLDER=/web
       - PORT=8080
@@ -215,7 +215,7 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - MINIO_SECURE=false
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}
     depends_on:
       - temporal
       - postgres
@@ -247,7 +247,7 @@ services:
       - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
       - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}
     depends_on:
       - temporal
       - minio
@@ -279,7 +279,7 @@ services:
       - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
       - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}
     depends_on:
       - temporal
       - postgres
