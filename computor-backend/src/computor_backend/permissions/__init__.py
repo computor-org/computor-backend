@@ -31,6 +31,7 @@ from .core import (
     check_admin,
     get_permitted_course_ids,
     check_course_permissions,
+    check_course_family_permissions,
     can_perform_on_resource,
     can_perform_with_parents,
     db_get_claims,
@@ -70,38 +71,39 @@ __all__ = [
     "CourseRoleHierarchy",
     "course_role_hierarchy",
     "build_claims",
-    
+
     # Core permission functions
     "check_permissions",
     "check_admin",
     "get_permitted_course_ids",
     "check_course_permissions",
+    "check_course_family_permissions",
     "can_perform_on_resource",
     "can_perform_with_parents",
-    
+
     # Database functions
     "db_get_claims",
     "db_get_course_claims",
     "db_get_roles_claims",
     "db_apply_roles",
-    
+
     # Authentication
     "get_current_principal",
     "get_current_principal",
     "AuthenticationService",
     "PrincipalBuilder",
     "get_auth_credentials",
-    
+
     # Caching
     "permission_cache",
     "course_permission_cache",
     "cached_permission_check",
-    
+
     # Handlers
     "PermissionHandler",
     "PermissionRegistry",
     "permission_registry",
-    
+
     # Initialization
     "initialize_permission_handlers",
 ]
