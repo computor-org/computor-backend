@@ -662,28 +662,102 @@ async def generate_student_template_activity_v2(
             # NOTE: We do NOT use the assignments repository here!
             # All example content comes directly from MinIO via download_example_files()
             # The assignments repository is managed separately by temporal_assignments_repository.py
-            
-            # Determine course contents to deploy (selected or by status)
-            if selected_course_content_ids:
-                course_contents = db.query(CourseContent).options(
-                    joinedload(CourseContent.deployment)
-                        .joinedload(CourseContentDeployment.example_version)
-                        .joinedload(ExampleVersion.example)
-                ).filter(
-                    CourseContent.id.in_(selected_course_content_ids),
-                    CourseContent.archived_at.is_(None)
-                ).order_by(CourseContent.path).all()
-            else:
-                course_contents = db.query(CourseContent).options(
-                    joinedload(CourseContent.deployment)
-                        .joinedload(CourseContentDeployment.example_version)
-                        .joinedload(ExampleVersion.example)
-                ).filter(
-                    CourseContent.course_id == course_id,
-                    CourseContent.archived_at.is_(None)
-                ).order_by(CourseContent.path).all()
-            
-            logger.info(f"Selected {len(course_contents)} course contents to deploy")
+
+            # REPOSITORY STATE VERIFICATION
+            # Scan what's actually present in the cloned repository to detect state mismatches
+            existing_directories = set()
+            current_repo_sha = None
+
+            try:
+                for item in os.listdir(template_repo_path):
+                    item_path = os.path.join(template_repo_path, item)
+                    if os.path.isdir(item_path) and item != '.git':
+                        existing_directories.add(item)
+
+                # Get current repository HEAD commit SHA if it exists
+                if template_repo.head.is_valid():
+                    current_repo_sha = template_repo.head.commit.hexsha
+                    logger.info(f"Repository scan: Found {len(existing_directories)} existing directories, HEAD={current_repo_sha[:8]}")
+                else:
+                    logger.info(f"Repository scan: Found {len(existing_directories)} existing directories (no commits yet)")
+            except Exception as e:
+                logger.warning(f"Failed to scan repository state: {e}. Proceeding without verification.")
+
+            # Query ALL course contents that have deployments (not just those being deployed)
+            # This allows us to detect state mismatches where DB says "deployed" but repo is missing content
+            all_course_contents = db.query(CourseContent).options(
+                joinedload(CourseContent.deployment)
+                    .joinedload(CourseContentDeployment.example_version)
+                    .joinedload(ExampleVersion.example)
+            ).filter(
+                CourseContent.course_id == course_id,
+                CourseContent.archived_at.is_(None),
+                CourseContent.deployment.has()  # Has a deployment record
+            ).order_by(CourseContent.path).all()
+
+            logger.info(f"Found {len(all_course_contents)} course contents with deployments")
+
+            # Determine which contents need to be processed
+            course_contents = []
+            state_mismatches = 0
+
+            for content in all_course_contents:
+                # Get deployment path using same fallback logic as processing loop
+                deployment_path = content.deployment.deployment_path
+                if not deployment_path and content.deployment.example_identifier:
+                    deployment_path = str(content.deployment.example_identifier)
+                if not deployment_path and content.deployment.example_version:
+                    try:
+                        example = content.deployment.example_version.example
+                        if example and example.identifier:
+                            deployment_path = str(example.identifier)
+                    except Exception:
+                        pass
+
+                exists_in_repo = deployment_path in existing_directories if deployment_path else False
+
+                # Determine if this content needs processing
+                should_process = False
+                reason = None
+
+                # If specific contents were selected, only process those
+                if selected_course_content_ids:
+                    if str(content.id) in selected_course_content_ids:
+                        should_process = True
+                        reason = "selected for deployment"
+                else:
+                    # Check various conditions for processing
+                    if content.deployment.deployment_status in ["pending", "failed", "deploying"]:
+                        should_process = True
+                        reason = f"status={content.deployment.deployment_status}"
+                    elif force_redeploy:
+                        should_process = True
+                        reason = "force_redeploy=True"
+                    elif content.deployment.deployment_status == "deployed" and not exists_in_repo:
+                        # STATE MISMATCH: DB says deployed but missing from repository
+                        should_process = True
+                        reason = "STATE MISMATCH: marked deployed but missing from repository"
+                        state_mismatches += 1
+                        logger.warning(
+                            f"🔄 STATE MISMATCH DETECTED: {content.path} ({deployment_path}) "
+                            f"is marked as 'deployed' in database but MISSING from repository. "
+                            f"Will re-deploy to fix inconsistency."
+                        )
+                        # Mark for reprocessing
+                        content.deployment.deployment_status = "deploying"
+                        content.deployment.deployment_message = "Re-deploying due to repository state mismatch"
+
+                if should_process:
+                    course_contents.append(content)
+                    logger.info(f"  → Will process {content.path}: {reason}")
+
+            if state_mismatches > 0:
+                logger.warning(
+                    f"⚠️  Detected {state_mismatches} state mismatch(es) between database and repository. "
+                    f"These will be automatically fixed by re-deploying the missing content."
+                )
+
+            logger.info(f"Selected {len(course_contents)} course contents to process")
             
             if len(course_contents) == 0:
                 logger.warning(f"No course contents to deploy for course {course_id}. This will result in an empty student template.")
@@ -708,16 +782,35 @@ async def generate_student_template_activity_v2(
                             directory_name = str(content.deployment.example_identifier)
                             # Save it to deployment_path so it's persisted in the database
                             content.deployment.deployment_path = directory_name
-                            logger.info(f"Set deployment_path from example_identifier for {content.path}: {directory_name}")
-                        else:
-                            error_msg = f"Neither deployment_path nor example_identifier set for {content.path}"
+                            logger.info(f"Auto-set deployment_path from example_identifier for {content.path}: {directory_name}")
+                        elif content.deployment.example_version:
+                            # Try to get identifier from the example_version relationship
+                            try:
+                                example = content.deployment.example_version.example
+                                if example and example.identifier:
+                                    directory_name = str(example.identifier)
+                                    content.deployment.deployment_path = directory_name
+                                    logger.info(f"Auto-set deployment_path from example.identifier for {content.path}: {directory_name}")
+                            except Exception as e:
+                                logger.warning(f"Could not get identifier from example_version: {e}")
+
+                        # If still no directory_name, this is a critical error
+                        if not directory_name:
+                            error_msg = (
+                                f"❌ CRITICAL: Cannot deploy {content.path} - no deployment_path, no example_identifier, "
+                                f"and no example.identifier available. This CourseContentDeployment record is invalid. "
+                                f"Deployment ID: {content.deployment.id}"
+                            )
                             logger.error(error_msg)
                             errors.append(error_msg)
 
-                            # Mark deployment as failed
+                            # Mark deployment as failed with detailed message
                             if content.deployment.deployment_status == "deploying":
                                 content.deployment.deployment_status = "failed"
-                                content.deployment.deployment_message = "deployment_path not set"
+                                content.deployment.deployment_message = (
+                                    "Cannot determine deployment directory: deployment_path, example_identifier, "
+                                    "and example.identifier are all NULL"
+                                )
                                 history = DeploymentHistory(
                                     deployment_id=content.deployment.id,
                                     action="failed",
@@ -871,95 +964,101 @@ async def generate_student_template_activity_v2(
                         db.add(history)
             
             # Don't commit yet - wait until after git operations
-            
+
             # Generate main README.md with assignment structure
             # IMPORTANT: Show ALL deployed assignments in the repository, not just newly released ones
-            if processed_count > 0 or True:  # Always generate README, even if no new assignments
-                main_readme_path = os.path.join(template_repo_path, "README.md")
 
-                # Fetch ALL course contents with DEPLOYED status to show current repository state
-                all_deployed_contents = db.query(CourseContent).options(
+            # Fetch ALL course contents that are deployed OR being deployed in this run
+            # We include "deploying" status because README is generated BEFORE status update
+            all_deployed_contents = db.query(CourseContent).options(
                     joinedload(CourseContent.deployment)
                         .joinedload(CourseContentDeployment.example_version)
                         .joinedload(ExampleVersion.example)
                 ).filter(
-                    CourseContent.course_id == course_id,
-                    CourseContent.archived_at.is_(None),
-                    CourseContent.deployment.has(CourseContentDeployment.deployment_status == 'deployed')
-                ).order_by(CourseContent.path).all()
+                CourseContent.course_id == course_id,
+                CourseContent.archived_at.is_(None),
+                CourseContent.deployment.has(
+                    CourseContentDeployment.deployment_status.in_(['deployed', 'deploying'])
+                )
+            ).order_by(CourseContent.path).all()
 
-                logger.info(f"Found {len(all_deployed_contents)} deployed assignments for README generation")
+            logger.info(f"Found {len(all_deployed_contents)} deployed/deploying assignments for README generation")
 
-                with open(main_readme_path, 'w') as f:
-                    f.write(f"# {course.title} - Student Template\n\n")
-                    f.write(f"This repository contains {len(all_deployed_contents)} assignments for {course.title}.\n\n")
+            # Always generate README to reflect current state
+            main_readme_path = os.path.join(template_repo_path, "README.md")
+            with open(main_readme_path, 'w') as f:
+                f.write(f"# {course.title} - Student Template\n\n")
+                f.write(f"This repository contains {len(all_deployed_contents)} assignments for {course.title}.\n\n")
 
-                    # Generate assignment structure table
-                    if all_deployed_contents:
-                        f.write(f"## Assignment Structure\n\n")
-                        f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
-                        f.write(f"|-------------|---------------------|-------|----------|\n")
+                # Generate assignment structure table
+                if all_deployed_contents:
+                    f.write(f"## Assignment Structure\n\n")
+                    f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
+                    f.write(f"|-------------|---------------------|-------|----------|\n")
 
-                        # Fetch all course contents to build complete path hierarchy
-                        all_contents = db.query(CourseContent).filter(
-                            CourseContent.course_id == course_id,
-                            CourseContent.archived_at.is_(None)
-                        ).all()
+                    # Fetch all course contents to build complete path hierarchy
+                    all_contents = db.query(CourseContent).filter(
+                        CourseContent.course_id == course_id,
+                        CourseContent.archived_at.is_(None)
+                    ).all()
 
-                        # Build a complete map of paths to titles
-                        path_to_title = {}
-                        for content in all_contents:
-                            path_to_title[str(content.path)] = content.title
+                    # Build a complete map of paths to titles
+                    path_to_title = {}
+                    for content in all_contents:
+                        path_to_title[str(content.path)] = content.title
 
-                        for content in all_deployed_contents:
-                            if content.deployment and content.deployment.example_version:
-                                example = content.deployment.example_version.example
-                                version = content.deployment.example_version.version_tag
+                    for content in all_deployed_contents:
+                        if content.deployment and content.deployment.example_version:
+                            example = content.deployment.example_version.example
+                            version = content.deployment.example_version.version_tag
 
-                                # Build title path with "/" separation
-                                path_parts = str(content.path).split('.')
-                                title_parts = []
+                            # Build title path with "/" separation
+                            path_parts = str(content.path).split('.')
+                            title_parts = []
 
-                                # Build up the path progressively to find each part's title
-                                for i, part in enumerate(path_parts):
-                                    # Reconstruct path up to this part
-                                    current_path = '.'.join(path_parts[:i+1])
+                            # Build up the path progressively to find each part's title
+                            for i, part in enumerate(path_parts):
+                                # Reconstruct path up to this part
+                                current_path = '.'.join(path_parts[:i+1])
 
-                                    # Try to find title for this path segment
-                                    if current_path in path_to_title:
-                                        title_parts.append(path_to_title[current_path])
-                                    else:
-                                        # If we can't find the title, use the path segment as fallback
-                                        title_parts.append(part)
+                                # Try to find title for this path segment
+                                if current_path in path_to_title:
+                                    title_parts.append(path_to_title[current_path])
+                                else:
+                                    # If we can't find the title, use the path segment as fallback
+                                    title_parts.append(part)
 
-                                # Join with " / " as requested
-                                title_path = " / ".join(title_parts)
+                            # Join with " / " as requested
+                            title_path = " / ".join(title_parts)
 
-                                f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
-                    else:
-                        f.write(f"*No assignments deployed yet.*\n\n")
+                            # Create clickable link to the directory
+                            directory_link = f"[`{example.identifier}/`](./{example.identifier})"
 
-                    f.write(f"\n## Instructions\n\n")
-                    f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
-                    f.write(f"## Submission\n\n")
-                    f.write(f"Follow your course submission guidelines for each assignment.\n\n")
-                    f.write(f"---\n")
-                    f.write(f"*Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*\n")
-                    f.write(f"*Generated by Computor Example Library*\n")
+                            f.write(f"| {title_path} | {directory_link} | {content.title} | {version} |\n")
+                else:
+                    f.write(f"*No assignments deployed yet.*\n\n")
 
-                logger.info(f"Generated main README.md with {len(all_deployed_contents)} deployed assignments (current state)")
-            
-            # If we processed any content, commit and push to Git
+                f.write(f"\n## Instructions\n\n")
+                f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
+                f.write(f"## Submission\n\n")
+                f.write(f"Follow your course submission guidelines for each assignment.\n\n")
+                f.write(f"---\n")
+                f.write(f"*Generated by Computor*\n")
+
+            logger.info(f"Generated main README.md with {len(all_deployed_contents)} deployed assignments (current state)")
+
+            # Commit and push to Git if we processed content OR if README changed
+            # This ensures README is always up-to-date even if no new deployments occurred
             git_push_successful = False
-            if processed_count > 0:
+            if processed_count > 0 or (len(all_deployed_contents) > 0 and os.path.exists(os.path.join(template_repo_path, "README.md"))):
                 try:
                     # Stage all changes
                     template_repo.git.add(A=True)
                     
                     # Check if there are changes to commit
                     if template_repo.is_dirty() or template_repo.untracked_files:
-                        # Commit changes - selective release
-                        commit_message = f"Release {processed_count} assignments to student template"
+                        # Commit changes with simple message
+                        commit_message = "System Release"
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
@@ -986,12 +1085,35 @@ async def generate_student_template_activity_v2(
             # Now update deployment statuses based on git push result
             # Only update deployments that were marked as "deploying" at the start
             if git_push_successful and processed_count > 0:
+                # Get the final commit SHA from student-template repository
+                try:
+                    final_template_sha = template_repo.head.commit.hexsha
+                    logger.info(f"Student-template repository now at commit: {final_template_sha[:8]}")
+                except Exception as e:
+                    logger.warning(f"Could not get repository commit SHA: {e}")
+                    final_template_sha = None
+
                 # Mark successfully processed content as deployed (only if currently deploying)
                 for content in successfully_processed:
                     if content.deployment and content.deployment.deployment_status == "deploying":
                         content.deployment.deployment_status = "deployed"
                         content.deployment.deployed_at = datetime.now(timezone.utc)
-                        
+                        content.deployment.deployment_message = None  # Clear any error messages
+
+                        # Store the student-template git commit SHA for audit trail
+                        # This allows tracking exactly which commit contains this deployment
+                        if final_template_sha:
+                            content.deployment.version_identifier = final_template_sha
+
+                        # Ensure version_tag is populated from example_version (if not already set)
+                        # This tracks which example version (from MinIO) was deployed
+                        if not content.deployment.version_tag and content.deployment.example_version:
+                            try:
+                                content.deployment.version_tag = content.deployment.example_version.version_tag
+                                logger.info(f"Set version_tag={content.deployment.version_tag} for {content.path}")
+                            except Exception as e:
+                                logger.warning(f"Could not set version_tag for {content.path}: {e}")
+
                         # Add success history entry
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,

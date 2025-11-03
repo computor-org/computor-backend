@@ -69,11 +69,11 @@ class CourseContentDeployment(Base):
         comment="Version tag of the example source; may be null for custom assignments"
     )
     
-    # Reference commit used for release from assignments repository
+    # Git commit tracking for deployment audit trail
     version_identifier = Column(
         String(64),
         nullable=True,
-        comment="Commit SHA in assignments repository used for this release"
+        comment="Git commit SHA in student-template repository where this content was deployed"
     )
     
     # Deployment status tracking

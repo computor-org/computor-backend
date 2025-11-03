@@ -260,14 +260,14 @@ async def generate_assignments_repository_activity(
                 errors.append(f"Push failed: {str(e)}")
                 pushed = False
 
-            # Record commit in deployments if pushed
+            # Update deployment records with source identity if pushed
+            # NOTE: We do NOT set version_identifier here - that's only for student-template deployments
+            # The assignments repository is just a reference/mirror, not the deployed student repository
             if pushed:
                 try:
-                    head_sha = repo.head.commit.hexsha
                     for content in contents:
                         if content.deployment:
-                            content.deployment.version_identifier = head_sha
-                            # Ensure source identity is stored
+                            # Ensure source identity is stored (example_identifier and version_tag)
                             try:
                                 ev = content.deployment.example_version
                                 if ev and ev.example and not content.deployment.example_identifier:
