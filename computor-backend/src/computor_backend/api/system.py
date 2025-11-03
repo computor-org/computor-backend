@@ -1073,6 +1073,83 @@ async def generate_assignments(
         contents_to_process=count_estimate or 0
     )
 
+@system_router.post("/course-families/{course_family_id}/sync-documents", response_model=Dict[str, Any])
+async def sync_documents_repository(
+    course_family_id: str,
+    force_update: bool = False,
+    permissions: Annotated[Principal, Depends(get_current_principal)] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Sync the documents repository from GitLab to shared filesystem.
+
+    This endpoint triggers a Temporal workflow that:
+    1. Clones the documents repository from the course family's GitLab group
+    2. Removes the .git directory
+    3. Syncs files to ${SYSTEM_DEPLOYMENT_PATH}/shared/documents/{org}/{family}/
+    4. Files become accessible via the static-server at /docs/{org}/{family}/
+
+    Args:
+        course_family_id: The CourseFamily ID
+        force_update: If True, delete existing files and re-clone; if False, update incrementally
+
+    Returns:
+        Dict with workflow_id and status
+    """
+    from ..model.course import CourseFamily
+
+    # Check if user has permissions (lecturer or admin)
+    course_family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()
+    if not course_family:
+        raise NotFoundException(
+            detail=f"CourseFamily with id {course_family_id} not found",
+            context={"course_family_id": course_family_id}
+        )
+
+    # Check permissions - user must be lecturer in any course of this family or admin
+    if not check_admin(permissions):
+        from ..model.course import Course
+        from ..model.user_course import UserCourse
+
+        # Check if user is lecturer in any course of this course family
+        is_lecturer = db.query(UserCourse).join(
+            Course, Course.id == UserCourse.course_id
+        ).filter(
+            Course.course_family_id == course_family_id,
+            UserCourse.user_id == permissions.user_id,
+            UserCourse.role_id == "_lecturer"
+        ).first()
+
+        if not is_lecturer:
+            raise ForbiddenException(
+                detail="Only lecturers or administrators can sync documents",
+                context={"course_family_id": course_family_id}
+            )
+
+    logger.info(f"Syncing documents repository for CourseFamily {course_family_id} (force_update={force_update})")
+
+    # Submit Temporal workflow
+    task_executor = get_task_executor()
+
+    task_submission = TaskSubmission(
+        task_name="sync_documents_repository",
+        parameters={
+            "course_family_id": course_family_id,
+            "force_update": force_update
+        },
+        queue="computor-tasks"
+    )
+
+    workflow_id = await task_executor.submit_task(task_submission)
+
+    return {
+        "workflow_id": workflow_id,
+        "status": "started",
+        "course_family_id": course_family_id,
+        "force_update": force_update,
+        "message": f"Documents sync started for course family {course_family.title}"
+    }
+
 # @system_router.post(
 #     "/courses/{course_id}/assign-examples",
 #     response_model=Dict[str, Any]

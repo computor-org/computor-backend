@@ -5,6 +5,7 @@ from computor_cli.auth import change_profile, login
 from computor_cli.crud import rest
 from computor_cli.deployment import deployment
 from computor_cli.api_token_cli import token
+from computor_cli.documents import documents
 
 # Commands that require computor_backend (DISABLED - use backend directly for these)
 # from computor_cli.admin import admin
@@ -39,6 +40,7 @@ cli.add_command(login, "login")
 cli.add_command(rest, "rest")
 cli.add_command(deployment, "deployment")
 cli.add_command(token, "token")
+cli.add_command(documents, "documents")
 
 # Backend-dependent commands (commented out - use from backend package instead)
 # cli.add_command(admin, "admin")

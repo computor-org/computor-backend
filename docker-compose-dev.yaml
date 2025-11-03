@@ -94,7 +94,7 @@ services:
     image: halverneus/static-file-server:latest
     restart: unless-stopped
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/web:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared/documents:/web:ro
     environment:
       - FOLDER=/web
       - PORT=8080
@@ -195,8 +195,9 @@ services:
       - API_URL=${API_URL}
       - API_ADMIN_USER=${API_ADMIN_USER}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
     depends_on:
       - temporal
       - postgres
@@ -205,68 +206,64 @@ services:
       - traefik.enable=false
 
   # Python Testing Worker (for testing-python queue)
-  temporal-worker-python:
-    build:
-      context: ./
-      dockerfile: ./docker/temporal-worker-python/Dockerfile
-    restart: unless-stopped
-    command: ["--queues=testing-python"]
-    deploy:
-      replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-1}
-    environment:
-      - TZ=UTC
-      - RUNNING_IN_DOCKER=true
-      - TEMPORAL_HOST=temporal
-      - TEMPORAL_PORT=7233
-      - TEMPORAL_NAMESPACE=default
-      - API_URL=${API_URL}
-      - API_TOKEN=${PYTHON_WORKER_TOKEN}
-      - TESTING_EXECUTABLE=/tmp/engine/catester/testing.py run
-      - RUNTIME_ENVIRONMENT=/tmp/engine/venv/bin/python
-      - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
-      - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
-      - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-    depends_on:
-      - temporal
-      - postgres
-      - redis
-    labels:
-      - traefik.enable=false
+  # temporal-worker-python:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./docker/temporal-worker-python/Dockerfile
+  #   restart: unless-stopped
+  #   command: ["--queues=testing-python"]
+  #   deploy:
+  #     replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-1}
+  #   environment:
+  #     - TZ=UTC
+  #     - RUNNING_IN_DOCKER=true
+  #     - TEMPORAL_HOST=temporal
+  #     - TEMPORAL_PORT=7233
+  #     - TEMPORAL_NAMESPACE=default
+  #     - API_URL=${API_URL}
+  #     - API_TOKEN=${PYTHON_WORKER_TOKEN}
+  #     - TESTING_EXECUTABLE=/tmp/engine/catester/testing.py run
+  #     - RUNTIME_ENVIRONMENT=/tmp/engine/venv/bin/python
+  #     - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
+  #     - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
+  #     - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
+  #   depends_on:
+  #     - temporal
+  #     - postgres
+  #     - redis
+  #   labels:
+  #     - traefik.enable=false
 
-  # MATLAB Testing Worker (for testing-matlab queue)
-  temporal-worker-matlab:
-    build:
-      context: ./
-      dockerfile: ./docker/temporal-worker-matlab/Dockerfile
-      args:
-        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
-    restart: unless-stopped
-    command: ["--queues=testing-matlab"]
-    deploy:
-      replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
-    environment:
-      - TZ=UTC
-      - RUNNING_IN_DOCKER=true
-      - TEMPORAL_HOST=temporal
-      - TEMPORAL_PORT=7233
-      - TEMPORAL_NAMESPACE=default
-      - PYTHONPATH=/home/matlab/src
-      - API_URL=${API_URL}
-      - API_TOKEN=${MATLAB_WORKER_TOKEN}
-      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
-      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
-      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
-      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-    depends_on:
-      - temporal
-      - postgres
-      - redis
-    labels:
-      - traefik.enable=false
+  # # MATLAB Testing Worker (for testing-matlab queue)
+  # temporal-worker-matlab:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./docker/temporal-worker-matlab/Dockerfile
+  #     args:
+  #       MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
+  #   restart: unless-stopped
+  #   command: ["--queues=testing-matlab"]
+  #   deploy:
+  #     replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
+  #   environment:
+  #     - TZ=UTC
+  #     - RUNNING_IN_DOCKER=true
+  #     - TEMPORAL_HOST=temporal
+  #     - TEMPORAL_PORT=7233
+  #     - TEMPORAL_NAMESPACE=default
+  #     - PYTHONPATH=/home/matlab/src
+  #     - API_URL=${API_URL}
+  #     - API_TOKEN=${MATLAB_WORKER_TOKEN}
+  #     - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
+  #     - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
+  #     - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
+  #     - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+  #   depends_on:
+  #     - temporal
+  #     - postgres
+  #     - redis
+  #   labels:
+  #     - traefik.enable=false
 
   # MinIO Object Storage Service
   minio:

@@ -52,6 +52,10 @@ from .temporal_assignments_repository import (
     GenerateAssignmentsRepositoryWorkflow,
     generate_assignments_repository_activity
 )
+from .temporal_documents_sync import (
+    SyncDocumentsRepositoryWorkflow,
+    sync_documents_repository_activity
+)
 from .temporal_student_repository import (
     StudentRepositoryCreationWorkflow,
     create_student_repository,
@@ -100,6 +104,7 @@ class TemporalWorker:
             # DeployExamplesToCourseWorkflow,  # Deprecated - removed
             GenerateStudentTemplateWorkflowV2,
             GenerateAssignmentsRepositoryWorkflow,
+            SyncDocumentsRepositoryWorkflow,  # Documents repository sync
             StudentRepositoryCreationWorkflow,  # Student repository forking
             BulkStudentRepositoryCreationWorkflow,  # Bulk student repository creation
         ]
@@ -118,6 +123,7 @@ class TemporalWorker:
             create_course_activity,
             generate_student_template_activity_v2,  # Student template generation
             generate_assignments_repository_activity,  # Assignments init/populate
+            sync_documents_repository_activity,  # Documents repository sync from GitLab
             create_student_repository,  # Fork student-template for individual student
             create_team_repository,  # Fork student-template for team
             bulk_create_student_repositories_activity,  # Bulk student repository creation

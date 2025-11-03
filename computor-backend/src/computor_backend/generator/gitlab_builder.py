@@ -439,10 +439,14 @@ class GitLabBuilder:
                         )
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
-                        
+
+                        # Create documents repository if group was just created
+                        logger.info(f"Creating documents repository for course family group {gitlab_group.id}")
+                        self._create_documents_repository(gitlab_group.id)
+
                         # Create child-specific config WITHOUT token
                         gitlab_config = self._create_child_gitlab_config(gitlab_group)
-                        
+
                         # Update properties
                         self._update_course_family_gitlab_properties(
                             existing_family,
@@ -460,16 +464,26 @@ class GitLabBuilder:
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
-                    
+
+                    # Create documents repository if group was just created
+                    logger.info(f"Creating documents repository for course family group {gitlab_group.id}")
+                    self._create_documents_repository(gitlab_group.id)
+
                     # Create child-specific config WITHOUT token
                     gitlab_config = self._create_child_gitlab_config(gitlab_group)
-                    
+
                     # Update properties
                     self._update_course_family_gitlab_properties(
                         existing_family,
                         gitlab_group,
                         gitlab_config
                     )
+
+                # Ensure documents repository exists (even if group already existed)
+                if result.get("gitlab_group"):
+                    group_id = result["gitlab_group"].id
+                    logger.info(f"Ensuring documents repository exists for group {group_id}")
+                    self._create_documents_repository(group_id)
                 
                 result["success"] = True
                 return result
@@ -499,10 +513,18 @@ class GitLabBuilder:
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
-            
+
+            # Create documents repository in the course family group
+            logger.info(f"Creating documents repository for course family group {gitlab_group.id}")
+            docs_created = self._create_documents_repository(gitlab_group.id)
+            if docs_created:
+                logger.info("Documents repository created successfully")
+            else:
+                logger.warning("Failed to create documents repository, but continuing...")
+
             # Create child-specific config WITHOUT token
             gitlab_config = self._create_child_gitlab_config(gitlab_group)
-            
+
             # Create course family in database
             family_data = CourseFamilyCreate(
                 title=deployment.courseFamily.name,
@@ -930,6 +952,122 @@ class GitLabBuilder:
             return False
         except Exception as e:
             logger.warning(f"Error validating GitLab group {group_id}: {e}")
+            return False
+
+    def _create_documents_repository(self, course_family_group_id: int) -> bool:
+        """
+        Create a documents repository in the course family's GitLab group.
+
+        Args:
+            course_family_group_id: GitLab group ID of the course family
+
+        Returns:
+            True if repository was created or already exists, False on error
+        """
+        try:
+            # Get the course family group
+            try:
+                group = self.gitlab.groups.get(course_family_group_id)
+            except GitlabGetError as e:
+                logger.error(f"Failed to get GitLab group {course_family_group_id}: {e}")
+                return False
+
+            # Check if documents repository already exists
+            repo_path = f"{group.full_path}/documents"
+            project = None
+            repo_already_exists = False
+
+            try:
+                # Try to get the repository
+                project = self.gitlab.projects.get(repo_path.replace('/', '%2F'))
+                logger.info(f"Documents repository already exists: {repo_path}")
+                repo_already_exists = True
+            except GitlabGetError:
+                # Repository doesn't exist, create it
+                pass
+
+            # If repository already exists, check if README exists before creating
+            if repo_already_exists and project:
+                try:
+                    # Try to get README.md
+                    project.files.get(file_path='README.md', ref='main')
+                    logger.info(f"README.md already exists in documents repository")
+                    return True  # Repository and README both exist, nothing to do
+                except Exception:
+                    # README doesn't exist, we'll create it below
+                    logger.info(f"README.md does not exist, will create it")
+                    pass
+
+            # Create documents repository only if it doesn't exist
+            if not repo_already_exists:
+                logger.info(f"Creating documents repository in group: {group.full_path}")
+            else:
+                logger.info(f"Repository exists, will add README if missing")
+
+            readme_content = """# Documents Repository
+
+This repository contains course materials and lecture documents for students.
+
+## Purpose
+
+This is the central location for:
+- Lecture slides and notes
+- Course syllabus and schedules
+- Reading materials and references
+- Assignment descriptions
+- Additional learning resources
+
+## Organization
+
+Organize your materials in subdirectories by topic, week, or module as needed.
+
+## Access
+
+Documents are automatically synchronized and made available to students through the course platform.
+
+---
+*This repository is automatically managed by the Computor platform.*
+"""
+
+            # Only create repository if it doesn't exist
+            if not repo_already_exists:
+                project_data = {
+                    'name': 'Documents',
+                    'path': 'documents',
+                    'namespace_id': course_family_group_id,
+                    'description': 'Course materials and lecture documents',
+                    'visibility': 'private',
+                    'initialize_with_readme': False,  # We'll add our own README
+                }
+
+                project = self.gitlab.projects.create(project_data)
+                logger.info(f"Created documents repository: {project.path_with_namespace}")
+
+            # Create and commit README.md only if repository was just created or README is missing
+            if project:
+                try:
+                    file_data = {
+                        'file_path': 'README.md',
+                        'branch': 'main',
+                        'content': readme_content,
+                        'commit_message': 'Initial commit: Add README' if not repo_already_exists else 'Add README.md'
+                    }
+                    project.files.create(file_data)
+                    logger.info(f"Added README.md to documents repository")
+                except Exception as e:
+                    # This will fail if README already exists, which is fine
+                    logger.debug(f"README.md creation skipped or failed (may already exist): {e}")
+
+            return True
+
+        except GitlabCreateError as e:
+            if "has already been taken" in str(e):
+                logger.info(f"Documents repository already exists (conflict during creation)")
+                return True
+            logger.error(f"GitLab error creating documents repository: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error creating documents repository: {e}")
             return False
     
     def _update_organization_gitlab_properties(

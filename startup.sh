@@ -48,12 +48,11 @@ echo "=== Pre-creating Docker volume directories ==="
 # # MinIO storage
 # create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/minio/data"
 
-# CRITICAL: Create execution-backend BEFORE Docker mounts it
-create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/execution-backend"
-create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+# CRITICAL: Create shared directory BEFORE Docker mounts it
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/shared"
 
 # Now create the application subdirectories
-destination="${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+destination="${SYSTEM_DEPLOYMENT_PATH}/shared"
 
 directories=(
     "documents"
@@ -72,7 +71,7 @@ done
 # Copy defaults if source exists
 if [ -d "computor-backend/src/defaults" ]; then
     echo "Copying defaults..."
-    cp -r computor-backend/src/defaults "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+    cp -r computor-backend/src/defaults "${SYSTEM_DEPLOYMENT_PATH}/shared"
 fi
 
 # Create Keycloak directories if they don't exist
