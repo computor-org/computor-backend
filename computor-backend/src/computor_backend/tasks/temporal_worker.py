@@ -29,12 +29,6 @@ from .temporal_student_testing import (
     commit_test_results_activity,
     run_complete_student_test_activity
 )
-from .temporal_system import (
-    ReleaseStudentsWorkflow,
-    ReleaseCourseWorkflow,
-    release_students_activity,
-    release_course_activity
-)
 from .temporal_hierarchy_management import (
     CreateOrganizationWorkflow,
     CreateCourseFamilyWorkflow,
@@ -95,8 +89,6 @@ class TemporalWorker:
             ExampleDataProcessingWorkflow,
             ExampleErrorHandlingWorkflow,
             StudentTestingWorkflow,
-            ReleaseStudentsWorkflow,
-            ReleaseCourseWorkflow,
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
@@ -116,8 +108,6 @@ class TemporalWorker:
             execute_tests_activity,
             commit_test_results_activity,
             run_complete_student_test_activity,  # Complete test run (all steps on one worker)
-            release_students_activity,
-            release_course_activity,
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
