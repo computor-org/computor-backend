@@ -8,12 +8,11 @@ Computor is a university programming course management platform with automated G
 
 ### Tech Stack
 - **Backend**: Python/FastAPI with SQLAlchemy ORM and Pydantic DTOs
-- **Frontend**: React 19 + TypeScript with Material-UI
 - **Database**: PostgreSQL 16 with Alembic migrations
 - **Task Orchestration**: Temporal.io for asynchronous workflows
 - **Storage**: MinIO (S3-compatible object storage)
 - **Caching**: Redis (implementation in progress)
-- **Authentication**: Keycloak SSO with OpenID Connect
+- **Authentication**: Built-in local authentication with plugin support for SSO providers
 - **Infrastructure**: Docker Compose orchestration
 
 ## Architecture
@@ -28,19 +27,25 @@ Computor is a university programming course management platform with automated G
    - Alembic migrations generated from model changes
    - Key entities: Organization, CourseFamilies, Courses, Users, Roles
 
-2. **Interface Layer** (`interface/`)
-   - Pydantic DTOs for request/response validation
-   - EntityInterface base classes for consistent DTO patterns
-   - Type-safe data transfer objects
-   - Automatic TypeScript generation support
-
-3. **API Layer** (`api/`)
-   - FastAPI endpoints organized by resource
+2. **API Layer** (`api/`)
+   - Thin FastAPI endpoints organized by resource
    - RESTful design with consistent patterns
    - Permission-based access control
-   - Endpoints work with Interface DTOs and Model entities
+   - Delegates to business logic layer
 
-4. **Temporal Tasks** (`tasks/`) **[HOT AREA - ACTIVE DEVELOPMENT]**
+3. **Business Logic Layer** (`business_logic/`)
+   - Fat business logic functions with explicit parameters
+   - Reusable, testable, and cacheable
+   - Orchestrates data access via repositories
+   - Contains core application logic
+
+4. **Repository Layer** (`repositories/`)
+   - Data access abstraction layer
+   - Gathers data from multiple sources: PostgreSQL database, MinIO object storage, Redis cache, filesystem
+   - Encapsulates complex queries and data operations
+   - Provides clean interface for business logic to access data
+
+5. **Temporal Tasks** (`tasks/`) **[HOT AREA - ACTIVE DEVELOPMENT]**
    - Asynchronous workflow orchestration
    - GitLab API integration for group/repository creation
    - Key workflows:
@@ -59,13 +64,6 @@ Computor is a university programming course management platform with automated G
 - **gitlab_utils.py** - GitLab API utilities
 - **settings.py** - Configuration management
 
-### Frontend Structure (`/frontend/`)
-
-- **React 19 + TypeScript** application
-- **Material-UI** component library
-- **Pages**: Organizations, CourseFamilies, Courses, Users, Tasks
-- **Services**: API client, authentication (SSO + basic auth)
-- **Generated Types**: Auto-generated from backend Pydantic models
 
 ## Development Commands
 
@@ -109,35 +107,22 @@ python -m computor_backend.tasks.temporal_worker   # Direct worker start
 # Access at http://localhost:8088 when Docker services are running
 ```
 
-### Frontend Development
-
-#### Legacy Frontend (React + Material-UI)
+### Code Generation
 ```bash
-bash frontend.sh             # Start development server
-# Or directly:
-cd frontend
-yarn install                 # Install dependencies
-yarn start                   # Development server
-yarn build                   # Production build
-yarn test                    # Run tests
-```
+# Unified generator (recommended)
+bash generate.sh                       # Generate all artifacts
+bash generate.sh types                 # Generate TypeScript interfaces
+bash generate.sh clients               # Generate TypeScript clients
+bash generate.sh python-client         # Generate Python client
+bash generate.sh validators            # Generate TypeScript validators
+bash generate.sh schema                # Generate JSON schema
+bash generate.sh error-codes           # Generate error code definitions
+bash generate.sh types --watch         # Watch mode for types
 
-#### New Frontend (Next.js 15 + GitLab UI)
-```bash
-bash frontend-next.sh        # Start development server
-# Or directly:
-cd frontend-next
-npm install                  # Install dependencies
-npm run dev                  # Development server (with Turbopack)
-npm run build                # Production build
-npm start                    # Production server
-```
+# Or via CLI:
+computor generate-types                # Via CLI
+computor generate-types --watch        # Watch mode
 
-### TypeScript Generation
-```bash
-bash generate_types.sh                # Generate TypeScript interfaces
-ctutor generate-types                  # Via CLI
-ctutor generate-types --watch          # Watch mode
 ```
 
 ## Current Implementation Status
@@ -148,10 +133,11 @@ ctutor generate-types --watch          # Watch mode
 - FastAPI REST endpoints
 - Temporal workflow framework
 - GitLab API integration for group/repo creation
-- Keycloak SSO authentication
+- Built-in local authentication with Bearer tokens
+- Plugin-based authentication system
 - MinIO object storage
 - TypeScript interface generation
-- Basic frontend with React + Material-UI
+- Python client auto-generation
 
 ### 🚧 In Progress
 - GitLab repository content initialization
@@ -159,10 +145,10 @@ ctutor generate-types --watch          # Watch mode
 - Comprehensive Redis caching strategy
 
 ### 📋 Planned
+- Additional SSO provider plugins (Keycloak, GitLab, etc.)
 - Advanced course content management
 - Student submission testing workflows
 - Performance monitoring and metrics
-- Enhanced frontend features
 
 ## Key Workflows
 
@@ -204,18 +190,12 @@ pytest src/computor_backend/tests/      # Direct pytest
 - Redis: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - Temporal: `TEMPORAL_HOST`, `TEMPORAL_PORT`, `TEMPORAL_NAMESPACE`
 - MinIO: `MINIO_HOST`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`
-- GitLab: `GITLAB_URL`, `GITLAB_TOKEN`
-- Keycloak: `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`
+- GitLab: `GITLAB_URL`, `GITLAB_TOKEN` (URL can be domain name like "https://gitlab.com" or with port like "http://localhost:8080")
 
 ### Service URLs (Development)
 - FastAPI: http://localhost:8000
-- Frontend (Legacy): http://localhost:3000 - React + Material-UI
-- Frontend (New): http://localhost:3000 - Next.js 15 + GitLab UI
 - Temporal UI: http://localhost:8088
 - MinIO Console: http://localhost:9001
-- Keycloak: http://localhost:8080
-
-**Note**: Both frontends run on port 3000 - run only one at a time, or configure different ports.
 
 ## Development Principles
 
@@ -242,17 +222,16 @@ pytest src/computor_backend/tests/      # Direct pytest
 
 - Temporal workers must be running for async operations
 - GitLab token must have appropriate permissions for group/repo creation
+- GitLab URL can be with or without port (e.g., "https://gitlab.com" or "http://localhost:8080")
 - Redis is configured but not heavily utilized yet
-- Frontend is functional but under active development
 - Database migrations should only be generated from model changes
+- Authentication uses built-in local auth by default; SSO providers available as plugins
 
 ## Troubleshooting
 
 ### Common Issues
 1. **Temporal worker not connecting**: Check TEMPORAL_HOST and ensure Temporal server is running
-2. **GitLab operations failing**: Verify GitLab token permissions and URL configuration
+2. **GitLab operations failing**: Verify GitLab token permissions and URL configuration (URL can be domain or with port)
 3. **Database migrations failing**: Ensure database is running and credentials are correct
-4. **Frontend type errors**: Regenerate TypeScript interfaces with `bash generate_types.sh`
 
 Note: Some documentation may be outdated. This CLAUDE.md file represents the current system state.
-- and what if the url has no port because it is a domain name like "https://gitlab.com"? is this also possible?
