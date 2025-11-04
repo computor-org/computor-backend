@@ -43,10 +43,14 @@ DEFAULT_SERVICE_SCOPES = {
         "course_content_type:list",
         "submission_artifact:get",
         "submission_artifact:list",
+        "submission_artifact:download",
         "result:get",
         "result:list",
         "result:create",
         "result:update",
+        # Testing services need to download reference examples and their dependencies
+        "example:get",
+        "example:download",
     ],
     "worker": [
         # General workers need broader access for orchestration

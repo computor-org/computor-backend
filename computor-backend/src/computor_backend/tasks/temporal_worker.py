@@ -24,7 +24,8 @@ from .temporal_examples import (
 )
 from .temporal_student_testing import (
     StudentTestingWorkflow,
-    clone_repository_activity,
+    fetch_example_version_with_dependencies,
+    fetch_submission_artifact,
     execute_tests_activity,
     commit_test_results_activity,
     run_complete_student_test_activity
@@ -104,7 +105,8 @@ class TemporalWorker:
         activities = [
             simulate_processing_activity,
             process_data_chunk_activity,
-            clone_repository_activity,
+            fetch_example_version_with_dependencies,  # Fetch and cache reference examples
+            fetch_submission_artifact,  # Fetch student submissions
             execute_tests_activity,
             commit_test_results_activity,
             run_complete_student_test_activity,  # Complete test run (all steps on one worker)

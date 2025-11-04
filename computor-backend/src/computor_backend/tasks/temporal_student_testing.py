@@ -1,5 +1,12 @@
 """
 Student testing workflows and activities for Temporal.
+
+This module handles testing of student submissions against reference examples.
+Key improvements over deprecated version:
+- Uses ExampleVersion from database instead of git repositories
+- Caches reference examples to avoid repeated downloads
+- Properly handles dependencies for both reference and student submissions
+- Downloads from MinIO storage instead of cloning git repositories
 """
 
 import os
@@ -9,117 +16,302 @@ import subprocess
 import asyncio
 import uuid
 import shutil
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from computor_types.tests import TestJob
-from computor_types.repositories import Repository
-from computor_types.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate
 from computor_types.tasks import TaskStatus, map_task_status_to_int
+from computor_types.results import ResultUpdate
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
+logger = logging.getLogger(__name__)
 
-# Activities
-@activity.defn(name="clone_repository")
-async def clone_repository_activity(repo_data: Dict[str, Any], target_path: str) -> bool:
-    """Clone a git repository to target path."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    repo = Repository(**repo_data)
-    
-    # Transform localhost URLs for Docker environment
-    original_url = repo.url
-    transformed_url = transform_localhost_url(repo.url)
-    
-    if original_url != transformed_url:
-        logger.info(f"Transformed URL from {original_url} to {transformed_url}")
-    
-    # Construct git clone command
-    clone_cmd = ["git", "clone"]
-    
-    if repo.token:
-        # Add token authentication to URL
-        url_parts = transformed_url.split("://")
-        if len(url_parts) == 2:
-            clone_url = f"{url_parts[0]}://oauth2:{repo.token}@{url_parts[1]}"
-        else:
-            clone_url = transformed_url
-    else:
-        clone_url = transformed_url
-    
-    # Clean up target directory if it exists (for retry scenarios)
-    if os.path.exists(target_path):
-        logger.warning(f"Target path {target_path} already exists, removing it for retry")
-        shutil.rmtree(target_path)
-    
-    clone_cmd.extend([clone_url, target_path])
-    
-    # Execute clone
-    result = subprocess.run(clone_cmd, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        raise Exception(f"Failed to clone repository: {result.stderr}")
-    
-    # Checkout specific commit if provided
-    if repo.commit:
-        checkout_cmd = ["git", "-C", target_path, "checkout", repo.commit]
-        result = subprocess.run(checkout_cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            raise Exception(f"Failed to checkout commit {repo.commit}: {result.stderr}")
-    
-    return True
+# Cache directory for reference examples (persists across test runs)
+EXAMPLE_CACHE_DIR = os.environ.get("EXAMPLE_CACHE_DIR", "/tmp/examples")
 
 
-@activity.defn(name="execute_tests")
-async def execute_tests_activity(
-    student_path: str,
-    reference_path: str,
-    test_config: Dict[str, Any],
-    service_type_config: Dict[str, Any]
+# ============================================================================
+# Storage and Caching Activities
+# ============================================================================
+
+@activity.defn(name="fetch_example_version_with_dependencies")
+async def fetch_example_version_with_dependencies(
+    example_version_id: str,
+    api_config: Dict[str, Any],
+    target_base_dir: str,
 ) -> Dict[str, Any]:
-    """Execute tests comparing student and reference implementations."""
+    """
+    Fetch an example version and all its dependencies from the API/MinIO.
 
+    Uses local caching to avoid re-downloading the same example version.
+
+    Args:
+        example_version_id: UUID of the ExampleVersion to fetch
+        api_config: API connection configuration
+        target_base_dir: Base directory for caching (e.g., /tmp/examples)
+
+    Returns:
+        Dict with:
+            - main_path: Path to the main example
+            - dependencies: List of dicts with dep info and paths
+            - example_version: ExampleVersion data
+    """
+    logger.info(f"Fetching example version {example_version_id}")
+
+    # Check cache first
+    cache_path = os.path.join(target_base_dir, example_version_id)
+    if os.path.exists(cache_path):
+        logger.info(f"Example version {example_version_id} found in cache at {cache_path}")
+        # Load cached metadata
+        meta_file = os.path.join(cache_path, ".metadata.json")
+        if os.path.exists(meta_file):
+            with open(meta_file, 'r') as f:
+                return json.load(f)
+
+    # Not cached - fetch from API
+    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+
+    async with ComputorClient(base_url=base_url) as client:
+        # Authenticate
+        api_token = api_config.get("token")
+        if api_token:
+            await client.set_token(api_token)
+        else:
+            username = api_config.get("username", "admin")
+            password = api_config.get("password", "admin")
+            await client.authenticate(username=username, password=password)
+
+        # Download example version with dependencies
+        logger.info(f"Downloading example version {example_version_id} with dependencies")
+        response = await client._client.get(
+            f"/examples/download/{example_version_id}?with_dependencies=true"
+        )
+
+        if response.status_code != 200:
+            raise ApplicationError(
+                f"Failed to download example version {example_version_id}: "
+                f"{response.status_code} - {response.text}"
+            )
+
+        download_data = response.json()
+
+        # Create cache directory
+        os.makedirs(cache_path, exist_ok=True)
+        main_example_path = os.path.join(cache_path, "main")
+        os.makedirs(main_example_path, exist_ok=True)
+
+        # Save main example files
+        logger.info(f"Saving main example files to {main_example_path}")
+        files = download_data.get("files", {})
+        for filename, content in files.items():
+            file_path = os.path.join(main_example_path, filename)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # Handle base64-encoded content if present
+            if isinstance(content, dict) and "base64" in content:
+                import base64
+                file_content = base64.b64decode(content["base64"])
+                with open(file_path, 'wb') as f:
+                    f.write(file_content)
+            elif isinstance(content, str):
+                with open(file_path, 'w') as f:
+                    f.write(content)
+            else:
+                with open(file_path, 'wb') as f:
+                    f.write(content)
+
+        # Save dependencies
+        dependencies_info = []
+        dependencies_data = download_data.get("dependencies", [])
+
+        for dep in dependencies_data:
+            dep_id = dep.get("example_id")
+            dep_version_id = dep.get("version_id")
+            dep_directory = dep.get("directory")
+
+            logger.info(f"Saving dependency {dep_directory} (version {dep_version_id})")
+
+            dep_path = os.path.join(cache_path, "dependencies", dep_directory)
+            os.makedirs(dep_path, exist_ok=True)
+
+            # Save dependency files
+            dep_files = dep.get("files", {})
+            for filename, content in dep_files.items():
+                file_path = os.path.join(dep_path, filename)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+                if isinstance(content, dict) and "base64" in content:
+                    import base64
+                    file_content = base64.b64decode(content["base64"])
+                    with open(file_path, 'wb') as f:
+                        f.write(file_content)
+                elif isinstance(content, str):
+                    with open(file_path, 'w') as f:
+                        f.write(content)
+                else:
+                    with open(file_path, 'wb') as f:
+                        f.write(content)
+
+            dependencies_info.append({
+                "example_id": dep_id,
+                "version_id": dep_version_id,
+                "directory": dep_directory,
+                "path": dep_path,
+                "identifier": dep.get("identifier"),
+                "title": dep.get("title"),
+            })
+
+        # Build result metadata
+        result = {
+            "main_path": main_example_path,
+            "dependencies": dependencies_info,
+            "example_version_id": example_version_id,
+            "version_tag": download_data.get("version_tag"),
+            "meta_yaml": download_data.get("meta_yaml"),
+            "test_yaml": download_data.get("test_yaml"),
+        }
+
+        # Cache metadata for future use
+        meta_file = os.path.join(cache_path, ".metadata.json")
+        with open(meta_file, 'w') as f:
+            json.dump(result, f, indent=2)
+
+        logger.info(f"Cached example version {example_version_id} at {cache_path}")
+
+        return result
+
+
+@activity.defn(name="fetch_submission_artifact")
+async def fetch_submission_artifact(
+    artifact_id: str,
+    api_config: Dict[str, Any],
+    target_dir: str,
+) -> Dict[str, Any]:
+    """
+    Fetch a submission artifact from MinIO storage.
+
+    Args:
+        artifact_id: UUID of the SubmissionArtifact
+        api_config: API connection configuration
+        target_dir: Directory to extract submission files
+
+    Returns:
+        Dict with:
+            - submission_path: Path to extracted submission
+            - artifact_id: Submission artifact ID
+            - version_identifier: Git commit or version tag
+    """
+    logger.info(f"Fetching submission artifact {artifact_id}")
+
+    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+
+    async with ComputorClient(base_url=base_url) as client:
+        # Authenticate
+        api_token = api_config.get("token")
+        if api_token:
+            await client.set_token(api_token)
+        else:
+            username = api_config.get("username", "admin")
+            password = api_config.get("password", "admin")
+            await client.authenticate(username=username, password=password)
+
+        # Download artifact as ZIP
+        logger.info(f"Downloading submission artifact {artifact_id}")
+        response = await client._client.get(
+            f"/submissions/artifacts/{artifact_id}/download",
+            follow_redirects=True,
+        )
+
+        if response.status_code != 200:
+            raise ApplicationError(
+                f"Failed to download submission artifact {artifact_id}: "
+                f"{response.status_code} - {response.text}"
+            )
+
+        # Save and extract ZIP
+        import zipfile
+        import io
+
+        zip_data = io.BytesIO(response.content)
+        os.makedirs(target_dir, exist_ok=True)
+
+        with zipfile.ZipFile(zip_data, 'r') as zip_file:
+            zip_file.extractall(target_dir)
+
+        logger.info(f"Extracted submission to {target_dir}")
+
+        # Get artifact metadata
+        artifact_response = await client._client.get(
+            f"/submissions/artifacts/{artifact_id}"
+        )
+
+        if artifact_response.status_code != 200:
+            logger.warning(f"Could not fetch artifact metadata: {artifact_response.status_code}")
+            artifact_data = {}
+        else:
+            artifact_data = artifact_response.json()
+
+        return {
+            "submission_path": target_dir,
+            "artifact_id": artifact_id,
+            "version_identifier": artifact_data.get("version_identifier"),
+            "properties": artifact_data.get("properties", {}),
+        }
+
+
+@activity.defn(name="execute_tests_with_backend")
+async def execute_tests_activity(
+    reference_path: str,
+    student_path: str,
+    test_config: Dict[str, Any],
+    service_type_config: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Execute tests comparing student and reference implementations.
+
+    Args:
+        reference_path: Path to reference example
+        student_path: Path to student submission
+        test_config: Test configuration
+        service_type_config: Service type configuration
+
+    Returns:
+        Test results dictionary
+    """
     import logging
     import yaml
-    import json
-    import shutil
-    logger = logging.getLogger(__name__)
 
+    logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
     # Import the testing backend system
     from computor_backend.testing import execute_tests_with_backend
-    from computor_types.tests import TestJob
 
-    # Parse the test job configuration
-    test_job = TestJob(**test_config)
+    # Extract service slug
+    service_slug = test_config.get("testing_service_slug")
 
-    # Use service slug directly as backend identifier
-    service_slug = test_job.testing_service_slug
-    
-    # Create work directory structure within the temp directory
-    work_dir = os.path.dirname(student_path)  # Get parent temp directory
+    # Create work directory structure
+    work_dir = os.path.dirname(reference_path)
     artifacts_path = os.path.join(work_dir, "artifacts")
     test_files_path = os.path.join(work_dir, "test_files")
     output_path = os.path.join(work_dir, "output")
 
-    reference_path = os.path.join(reference_path,test_config["reference"]["path"])
-    student_path = os.path.join(student_path,test_config["module"]["path"])
-    
-    # Constants from old system
+    os.makedirs(artifacts_path, exist_ok=True)
+    os.makedirs(test_files_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
+
+    # Constants
     TEST_FILE_NAME = "test.yaml"
     SPEC_FILE_NAME = "specification.yaml"
     REPORT_FILE_NAME = "testSummary.json"
-    
-    # Create spec file with directory information
+
+    # Create spec file
     spec_file_path = os.path.join(work_dir, SPEC_FILE_NAME)
     specfile_json = {
         "executionDirectory": student_path,
@@ -130,14 +322,14 @@ async def execute_tests_activity(
         "artifactDirectory": artifacts_path,
         "studentTestCounter": 2,
     }
-    
+
     with open(spec_file_path, 'w') as yaml_file:
         yaml.dump(specfile_json, yaml_file)
-    
+
     logger.info(f"Created specification file: {spec_file_path}")
     logger.info(f"Specification: {json.dumps(specfile_json, indent=2)}")
-    
-    # Read meta.yaml from reference repository if it exists
+
+    # Read meta.yaml from reference if it exists
     meta_info = {}
     meta_filepath = os.path.join(reference_path, "meta.yaml")
     if os.path.exists(meta_filepath):
@@ -147,96 +339,79 @@ async def execute_tests_activity(
                 logger.info(f"Loaded meta.yaml: {json.dumps(meta_info, indent=2)}")
         except Exception as e:
             logger.warning(f"Could not read meta.yaml: {e}")
-    
-    # Copy test files if specified in meta.yaml
+
+    # Copy test files if specified
     mi_properties = meta_info.get("properties", {})
     mi_test_files = mi_properties.get("testFiles", [])
     if mi_test_files:
-        os.makedirs(test_files_path, exist_ok=True)
         for test_file in mi_test_files:
             try:
                 src = os.path.join(reference_path, test_file)
                 dst = os.path.join(test_files_path, test_file)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copyfile(src, dst)
                 logger.info(f"Copied test file: {test_file}")
             except Exception as e:
                 logger.warning(f"Could not copy test file {test_file}: {e}")
-    
-    # Test file path is always from reference repository
+
+    # Test file is in reference directory
     test_file_path = os.path.join(reference_path, TEST_FILE_NAME)
-    
+
+    if not os.path.exists(test_file_path):
+        raise ApplicationError(f"Test file not found: {test_file_path}")
+
     logger.info(f"Executing tests with service: {service_slug}")
     logger.info(f"Test file: {test_file_path}")
     logger.info(f"Spec file: {spec_file_path}")
-    
-    # Prepare job configuration for the backend
+
+    # Prepare job configuration
     job_config = {
-        "user_id": test_job.user_id,
-        "course_member_id": test_job.course_member_id,
-        "course_content_id": test_job.course_content_id,
-        "testing_service_id": test_job.testing_service_id,
-        "test_number": test_job.test_number,
-        "submission_number": test_job.submission_number,
-        "submit": test_config.get("submit", False),
+        "user_id": test_config.get("user_id"),
+        "course_member_id": test_config.get("course_member_id"),
+        "course_content_id": test_config.get("course_content_id"),
+        "testing_service_id": test_config.get("testing_service_id"),
         "student_path": student_path,
-        "reference_path": reference_path
+        "reference_path": reference_path,
     }
 
-    # Execute tests using the appropriate backend
+    # Execute tests
     try:
         await execute_tests_with_backend(
             service_slug=service_slug,
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
-            backend_properties=service_type_config
+            backend_properties=service_type_config.get("properties", {}),
         )
 
-        # Test backends write results to file - always read from file
-        test_results = None
+        # Read results from output file
+        report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
+        if os.path.exists(report_file_path):
+            logger.info(f"Reading results from file: {report_file_path}")
+            with open(report_file_path, "r") as report_file:
+                test_results = json.load(report_file)
+            logger.info(f"Test results: {json.dumps(test_results, indent=2)}")
+        else:
+            test_results = {
+                "passed": 0,
+                "failed": 1,
+                "total": 1,
+                "error": "No test results file found",
+            }
 
-        # Read results from output file (test backends write to file)
-        if test_results is None:
-            report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
-            if os.path.exists(report_file_path):
-                logger.info(f"Reading results from file: {report_file_path}")
-                try:
-                    with open(report_file_path, "r") as report_file:
-                        test_results = json.load(report_file)
-                    logger.info(f"Loaded test results from file: {json.dumps(test_results, indent=2)}")
-                except Exception as e:
-                    logger.error(f"Failed to read report file: {e}")
-                    test_results = {
-                        "passed": 0,
-                        "failed": 1,
-                        "total": 1,
-                        "error": f"Failed to read report file: {e}"
-                    }
-            else:
-                test_results = {
-                    "passed": 0,
-                    "failed": 1,
-                    "total": 1,
-                    "error": "No test results returned and no report file found"
-                }
-        
-        logger.info(f"Test execution completed. Results: {test_results}")
-        
-        # Calculate result value for compatibility
+        # Calculate result value
         try:
             if "summary" in test_results:
-                # Old format with summary
                 result_value = test_results["summary"]["passed"] / test_results["summary"]["total"]
             else:
-                # New format
                 result_value = test_results.get("passed", 0) / max(test_results.get("total", 1), 1)
             test_results["result_value"] = result_value
         except Exception as e:
             logger.warning(f"Could not calculate result value: {e}")
             test_results["result_value"] = 0.0
-        
+
         return test_results
-        
+
     except Exception as e:
         logger.error(f"Error executing tests: {e}")
         return {
@@ -245,7 +420,7 @@ async def execute_tests_activity(
             "total": 1,
             "error": str(e),
             "details": {"exception": str(e)},
-            "result_value": 0.0
+            "result_value": 0.0,
         }
 
 
@@ -253,15 +428,16 @@ async def execute_tests_activity(
 async def commit_test_results_activity(
     result_id: str,
     test_results: Dict[str, Any],
-    api_config: Dict[str, Any]
+    api_config: Dict[str, Any],
 ) -> bool:
     """Commit test results to the API."""
+    logger.info(f"Committing test results for result {result_id}")
+
     try:
-        # Initialize API client with ComputorClient
         base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
         async with ComputorClient(base_url=base_url) as client:
-            # Authenticate with API token (preferred) or username/password (fallback)
+            # Authenticate
             api_token = api_config.get("token")
             if api_token:
                 await client.set_token(api_token)
@@ -270,19 +446,20 @@ async def commit_test_results_activity(
                 password = api_config.get("password", "admin")
                 await client.authenticate(username=username, password=password)
 
-            # Create result update
+            # Update result
             result_update = ResultUpdate(
                 status=TaskStatus.FINISHED,
-                result=test_results["result_value"],
-                result_json=test_results
+                result=test_results.get("result_value", 0.0),
+                result_json=test_results,
             )
 
-            # Update the result directly using the ID
             response = await client.results.update(result_id, result_update)
+            logger.info(f"Successfully updated result {result_id}")
 
-            return isinstance(response, ResultGet)
+            return True
 
     except Exception as e:
+        logger.error(f"Failed to commit test results: {e}")
         raise ApplicationError(message=str(e))
 
 
@@ -291,50 +468,70 @@ async def run_complete_student_test_activity(
     test_job: Dict[str, Any],
     service_type_config: Dict[str, Any],
     result_id: str,
-    api_config: Dict[str, Any]
+    api_config: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
-    Run complete student test in a single activity on one worker.
-    This ensures all file operations happen on the same machine.
+    Run complete student test in a single activity.
 
-    Combines:
-    1. Clone student repository
-    2. Clone reference repository
+    This ensures all operations happen on the same worker with proper caching.
+
+    Steps:
+    1. Fetch and cache reference example with dependencies
+    2. Fetch student submission artifact
     3. Execute tests
-    4. Commit results to API
+    4. Commit results
 
-    Returns test results dict
+    Returns:
+        Test results dictionary
     """
-    import logging
-    logger = logging.getLogger(__name__)
+    logger.info(f"Starting complete student test for result {result_id}")
 
-    # Create a temp directory for this entire test run
+    # Create temporary work directory for this test run
     with tempfile.TemporaryDirectory() as work_dir:
         try:
-            # Parse test job
-            job_config = TestJob(**test_job)
+            # Step 1: Fetch reference example with dependencies (cached)
+            example_version_id = test_job.get("example_version_id")
+            if not example_version_id:
+                raise ApplicationError("Missing example_version_id in test_job")
 
-            # Setup paths
-            student_path = os.path.join(work_dir, "student")
-            reference_path = os.path.join(work_dir, "reference")
-
-            # Clone repositories
-            logger.info("Cloning student repository")
-            await clone_repository_activity(job_config.module.model_dump(), student_path)
-
-            logger.info("Cloning reference repository")
-            await clone_repository_activity(job_config.reference.model_dump(), reference_path)
-
-            # Execute tests
-            logger.info("Executing tests")
-            test_results = await execute_tests_activity(
-                student_path,
-                reference_path,
-                test_job,
-                service_type_config
+            logger.info(f"Fetching reference example version {example_version_id}")
+            reference_data = await fetch_example_version_with_dependencies(
+                example_version_id=example_version_id,
+                api_config=api_config,
+                target_base_dir=EXAMPLE_CACHE_DIR,
             )
 
-            # Commit results
+            reference_path = reference_data["main_path"]
+            logger.info(f"Reference example at: {reference_path}")
+
+            # Step 2: Fetch student submission
+            artifact_id = test_job.get("artifact_id")
+            if not artifact_id:
+                raise ApplicationError("Missing artifact_id in test_job")
+
+            student_dir = os.path.join(work_dir, "student")
+            logger.info(f"Fetching student submission {artifact_id}")
+            submission_data = await fetch_submission_artifact(
+                artifact_id=artifact_id,
+                api_config=api_config,
+                target_dir=student_dir,
+            )
+
+            student_path = submission_data["submission_path"]
+            logger.info(f"Student submission at: {student_path}")
+
+            # Step 3: Execute tests
+            logger.info("Executing tests")
+            test_results = await execute_tests_activity(
+                reference_path=reference_path,
+                student_path=student_path,
+                test_config=test_job,
+                service_type_config=service_type_config,
+            )
+
+            logger.info(f"Test execution completed: {test_results}")
+
+            # Step 4: Commit results
             logger.info("Committing results to API")
             await commit_test_results_activity(result_id, test_results, api_config)
 
@@ -342,66 +539,86 @@ async def run_complete_student_test_activity(
 
         except Exception as e:
             logger.error(f"Complete student test failed: {e}")
+
+            # Try to update result status to FAILED
+            try:
+                await commit_test_results_activity(
+                    result_id,
+                    {
+                        "passed": 0,
+                        "failed": 1,
+                        "total": 1,
+                        "error": str(e),
+                        "result_value": 0.0,
+                    },
+                    api_config,
+                )
+            except:
+                pass  # Best effort
+
             raise ApplicationError(message=str(e))
 
 
-# Workflows
+# ============================================================================
+# Workflow
+# ============================================================================
+
 @register_task
 @workflow.defn(name="student_testing", sandboxed=False)
 class StudentTestingWorkflow(BaseWorkflow):
-    """Execute student testing workflow."""
-    
+    """Execute student testing workflow with example caching."""
+
     @classmethod
     def get_name(cls) -> str:
         return "student_testing"
-    
+
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=30)
-    
+
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Execute student testing workflow.
 
         Args:
-            parameters: Dict containing test_job and service_type_config
+            parameters: Dict containing:
+                - test_job: Test job configuration
+                - service_type_config: Service type configuration
+                - result_id: Database result ID
 
         Returns:
             WorkflowResult with test results
         """
-        # Extract parameters
         test_job = parameters.get("test_job", {})
         service_type_config = parameters.get("service_type_config", {})
-        result_id = parameters.get("result_id")  # Get the database result ID
+        result_id = parameters.get("result_id")
 
-        # Generate a unique job ID for this test run
         job_id = str(uuid.uuid4())
-
         workflow.logger.info(f"Starting student testing for job {job_id}")
         started_at = datetime.utcnow()
 
         try:
-            # API configuration - prefer API_TOKEN, fallback to username/password
+            # API configuration
             api_config = {
                 "url": os.environ.get("API_URL", "http://localhost:8000"),
                 "token": os.environ.get("API_TOKEN"),
                 "username": os.environ.get("API_ADMIN_USER", "admin"),
-                "password": os.environ.get("API_ADMIN_PASSWORD", "admin")
+                "password": os.environ.get("API_ADMIN_PASSWORD", "admin"),
             }
 
-            # Run complete test in single activity (ensures all operations on one worker)
+            # Run complete test in single activity
             workflow.logger.info("Running complete student test")
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
                 args=[test_job, service_type_config, result_id, api_config],
                 start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=RetryPolicy(maximum_attempts=1)
+                retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
             completed_at = datetime.utcnow()
 
-            # Handle both old format (with "summary") and new format (direct keys)
+            # Extract results
             if "summary" in test_results:
                 passed = test_results["summary"]["passed"]
                 failed = test_results["summary"]["failed"]
@@ -417,14 +634,14 @@ class StudentTestingWorkflow(BaseWorkflow):
                     "test_job_id": job_id,
                     "started_at": started_at.isoformat(),
                     "completed_at": completed_at.isoformat(),
-                    "duration_seconds": (completed_at - started_at).total_seconds()
+                    "duration_seconds": (completed_at - started_at).total_seconds(),
                 },
                 metadata={
                     "workflow_type": "student_testing",
                     "passed": passed,
                     "failed": failed,
-                    "total": total
-                }
+                    "total": total,
+                },
             )
 
         except Exception as e:
@@ -435,7 +652,6 @@ class StudentTestingWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={
                     "workflow_type": "student_testing",
-                    "test_job_id": job_id
-                }
+                    "test_job_id": job_id,
+                },
             )
-
