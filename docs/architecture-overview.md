@@ -10,9 +10,7 @@ The Computor platform is structured as a **monorepo with 4 independent packages*
 ├── computor-types/          # 📦 Pure Pydantic DTOs
 ├── computor-client/         # 📦 Auto-generated HTTP client
 ├── computor-cli/            # 📦 Command-line interface
-├── src/computor_backend/    # 📦 FastAPI server
-├── frontend/                # 🎨 React frontend (Material-UI)
-└── frontend-next/           # 🎨 Next.js frontend (GitLab UI)
+└── src/computor_backend/    # 📦 FastAPI server
 ```
 
 ---
@@ -221,10 +219,10 @@ async def get_artifact_endpoint(
 - Git helpers, deployment sync
 - Version resolution
 
-#### 8. **Authentication** (`auth/`)
-- Authentication plugins
-- Keycloak SSO provider (OpenID Connect)
-- Basic auth fallback
+#### 8. **Authentication** (`auth/` and `plugins/`)
+- Built-in local authentication (username/password with Bearer tokens)
+- Plugin-based authentication system for external providers
+- SSO providers (Keycloak, GitLab) available as plugins (coming soon)
 
 ### Runtime Configuration
 - **`settings.py`**: Environment-based configuration
@@ -256,52 +254,6 @@ dependencies = [
 
 ---
 
-## 🎨 Frontend (frontend/)
-
-**Legacy React application** with Material-UI.
-
-### Tech Stack
-- React 19 + TypeScript
-- React Router, MUI 6
-- React Query, TanStack Table
-- React Hook Form, Redux Toolkit
-
-### Structure
-- **`App.tsx`**: Routing, layout, authentication
-- **`pages/`**: Dashboards, admin views
-- **`components/`**: Navigation, modals, tables, forms
-- **`hooks/`**: Auth, sidebar, data fetching
-- **`services/`**: HTTP clients for backend API
-- **`api/`**: API client, type definitions
-
-### Service URLs (Development)
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-
----
-
-## 🎨 Frontend (frontend-next/)
-
-**New Next.js 15 application** with GitLab UI.
-
-### Tech Stack
-- Next.js 15 + TypeScript
-- GitLab UI components
-- Turbopack for fast dev server
-
-### Structure
-- Modern Next.js App Router
-- Server and client components
-- GitLab design system
-
-### Service URLs (Development)
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-
-**Note**: Both frontends run on port 3000 - only run one at a time.
-
----
-
 ## 🗄️ Infrastructure Services
 
 ### PostgreSQL Database
@@ -325,11 +277,6 @@ dependencies = [
 - Async task execution
 - GitLab API integration
 - UI: http://localhost:8088
-
-### Keycloak SSO
-- OpenID Connect authentication
-- Multi-tenant support
-- UI: http://localhost:8080
 
 ---
 
@@ -415,7 +362,6 @@ pip install -e src/
 # Start services
 bash startup.sh        # Docker services
 bash api.sh            # Backend API
-bash frontend.sh       # React frontend
 ```
 
 ### Production Considerations
@@ -428,13 +374,13 @@ bash frontend.sh       # React frontend
 
 ## 🔍 Notable Behaviors
 
-- **Startup**: Seeds admin accounts, applies roles, initializes auth plugins
+- **Startup**: Seeds admin accounts, applies roles, initializes authentication system
 - **Migrations**: Generated from SQLAlchemy model changes
 - **Permissions**: Role-based with course-level granularity
 - **Temporal Integration**: First-class async task support
 - **GitLab Integration**: Automated group/repository management
 - **Caching**: Redis configured but minimally used (future expansion)
-- **Authentication**: Multiple strategies (SSO, Basic, mock)
+- **Authentication**: Built-in local authentication with plugin support for external providers
 
 ---
 
@@ -449,8 +395,9 @@ bash frontend.sh       # React frontend
 
 ## 🎯 Next Steps
 
-- Migrate remaining 4 CLI commands to use `computor_client`
+- Migrate remaining CLI commands to use `computor_client`
 - Expand Redis caching in business logic layer
 - Complete repository mirroring implementation
-- Enhance frontend with Next.js application
+- Implement additional SSO providers as plugins
 - Add comprehensive API documentation
+- Enhance testing coverage
