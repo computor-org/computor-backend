@@ -32,7 +32,8 @@ from computor_backend.utils.docker_utils import transform_localhost_url
 
 logger = logging.getLogger(__name__)
 
-# Cache directory for reference examples (persists across test runs)
+# Cache directory for examples (persist across test runs)
+# Student submissions are not cached - they use temporary directories
 EXAMPLE_CACHE_DIR = os.environ.get("EXAMPLE_CACHE_DIR", "/tmp/examples")
 
 
@@ -53,7 +54,7 @@ async def fetch_example_version_with_dependencies(
 
     Args:
         example_version_id: UUID of the ExampleVersion to fetch
-        api_config: API connection configuration
+        api_config: API connection configuration (requires 'token' and 'url')
         target_base_dir: Base directory for caching (e.g., /tmp/examples)
 
     Returns:
@@ -65,27 +66,26 @@ async def fetch_example_version_with_dependencies(
     logger.info(f"Fetching example version {example_version_id}")
 
     # Check cache first
+    # Cache path: /tmp/examples/{example_version_id}/
     cache_path = os.path.join(target_base_dir, example_version_id)
     if os.path.exists(cache_path):
         logger.info(f"Example version {example_version_id} found in cache at {cache_path}")
-        # Load cached metadata
-        meta_file = os.path.join(cache_path, ".metadata.json")
-        if os.path.exists(meta_file):
-            with open(meta_file, 'r') as f:
-                return json.load(f)
+        # Return the cache path directly - files are already there
+        return {
+            "main_path": cache_path,
+            "dependencies": [],  # Dependencies already cached in subdirs
+            "example_version_id": example_version_id,
+        }
 
     # Not cached - fetch from API
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
     async with ComputorClient(base_url=base_url) as client:
-        # Authenticate
+        # Authenticate with API token
         api_token = api_config.get("token")
-        if api_token:
-            await client.set_token(api_token)
-        else:
-            username = api_config.get("username", "admin")
-            password = api_config.get("password", "admin")
-            await client.authenticate(username=username, password=password)
+        if not api_token:
+            raise ApplicationError("API token is required but not provided in api_config")
+        await client.set_token(api_token)
 
         # Download example version with dependencies
         logger.info(f"Downloading example version {example_version_id} with dependencies")
@@ -101,16 +101,16 @@ async def fetch_example_version_with_dependencies(
 
         download_data = response.json()
 
-        # Create cache directory
+        # Create cache directory - files go directly here, no "main" subdirectory
+        # Structure: /tmp/examples/{example_version_id}/
+        #            /tmp/examples/{example_version_id}/dependencies/{dep_directory}/
         os.makedirs(cache_path, exist_ok=True)
-        main_example_path = os.path.join(cache_path, "main")
-        os.makedirs(main_example_path, exist_ok=True)
 
-        # Save main example files
-        logger.info(f"Saving main example files to {main_example_path}")
+        # Save main example files directly in cache_path
+        logger.info(f"Saving main example files to {cache_path}")
         files = download_data.get("files", {})
         for filename, content in files.items():
-            file_path = os.path.join(main_example_path, filename)
+            file_path = os.path.join(cache_path, filename)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
             # Handle base64-encoded content if present
@@ -120,13 +120,23 @@ async def fetch_example_version_with_dependencies(
                 with open(file_path, 'wb') as f:
                     f.write(file_content)
             elif isinstance(content, str):
-                with open(file_path, 'w') as f:
-                    f.write(content)
+                # Check if string is a data URI with base64 encoding
+                if content.startswith('data:') and ';base64,' in content:
+                    import base64
+                    # Extract base64 part after the comma
+                    base64_data = content.split(';base64,', 1)[1]
+                    file_content = base64.b64decode(base64_data)
+                    with open(file_path, 'wb') as f:
+                        f.write(file_content)
+                else:
+                    # Regular string content
+                    with open(file_path, 'w') as f:
+                        f.write(content)
             else:
                 with open(file_path, 'wb') as f:
                     f.write(content)
 
-        # Save dependencies
+        # Save dependencies in subdirectories
         dependencies_info = []
         dependencies_data = download_data.get("dependencies", [])
 
@@ -152,8 +162,18 @@ async def fetch_example_version_with_dependencies(
                     with open(file_path, 'wb') as f:
                         f.write(file_content)
                 elif isinstance(content, str):
-                    with open(file_path, 'w') as f:
-                        f.write(content)
+                    # Check if string is a data URI with base64 encoding
+                    if content.startswith('data:') and ';base64,' in content:
+                        import base64
+                        # Extract base64 part after the comma
+                        base64_data = content.split(';base64,', 1)[1]
+                        file_content = base64.b64decode(base64_data)
+                        with open(file_path, 'wb') as f:
+                            f.write(file_content)
+                    else:
+                        # Regular string content
+                        with open(file_path, 'w') as f:
+                            f.write(content)
                 else:
                     with open(file_path, 'wb') as f:
                         f.write(content)
@@ -167,24 +187,17 @@ async def fetch_example_version_with_dependencies(
                 "title": dep.get("title"),
             })
 
-        # Build result metadata
-        result = {
-            "main_path": main_example_path,
+        logger.info(f"Cached example version {example_version_id} at {cache_path}")
+
+        # Return the path - simple, just like git clone
+        return {
+            "main_path": cache_path,
             "dependencies": dependencies_info,
             "example_version_id": example_version_id,
             "version_tag": download_data.get("version_tag"),
             "meta_yaml": download_data.get("meta_yaml"),
             "test_yaml": download_data.get("test_yaml"),
         }
-
-        # Cache metadata for future use
-        meta_file = os.path.join(cache_path, ".metadata.json")
-        with open(meta_file, 'w') as f:
-            json.dump(result, f, indent=2)
-
-        logger.info(f"Cached example version {example_version_id} at {cache_path}")
-
-        return result
 
 
 @activity.defn(name="fetch_submission_artifact")
@@ -198,7 +211,7 @@ async def fetch_submission_artifact(
 
     Args:
         artifact_id: UUID of the SubmissionArtifact
-        api_config: API connection configuration
+        api_config: API connection configuration (requires 'token' and 'url')
         target_dir: Directory to extract submission files
 
     Returns:
@@ -212,14 +225,11 @@ async def fetch_submission_artifact(
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
     async with ComputorClient(base_url=base_url) as client:
-        # Authenticate
+        # Authenticate with API token
         api_token = api_config.get("token")
-        if api_token:
-            await client.set_token(api_token)
-        else:
-            username = api_config.get("username", "admin")
-            password = api_config.get("password", "admin")
-            await client.authenticate(username=username, password=password)
+        if not api_token:
+            raise ApplicationError("API token is required but not provided in api_config")
+        await client.set_token(api_token)
 
         # Download artifact as ZIP
         logger.info(f"Downloading submission artifact {artifact_id}")
@@ -246,6 +256,23 @@ async def fetch_submission_artifact(
 
         logger.info(f"Extracted submission to {target_dir}")
 
+        # Check if ZIP contained a single top-level directory
+        # (like old git clone structure: student-repo/example1/solution.py)
+        extracted_items = os.listdir(target_dir)
+        actual_submission_path = target_dir
+
+        if len(extracted_items) == 1 and os.path.isdir(os.path.join(target_dir, extracted_items[0])):
+            # ZIP had a single directory - use that as the submission path
+            # This matches the old git clone behavior where we'd use student-repo/example1/
+            actual_submission_path = os.path.join(target_dir, extracted_items[0])
+            logger.info(f"ZIP contained single directory '{extracted_items[0]}', using as submission path")
+        else:
+            # ZIP had multiple files/dirs at root - use extraction dir
+            logger.info(f"ZIP contained {len(extracted_items)} items at root, using extraction dir")
+
+        logger.info(f"Final submission path: {actual_submission_path}")
+        logger.info(f"  Contents: {os.listdir(actual_submission_path)}")
+
         # Get artifact metadata
         artifact_response = await client._client.get(
             f"/submissions/artifacts/{artifact_id}"
@@ -258,7 +285,7 @@ async def fetch_submission_artifact(
             artifact_data = artifact_response.json()
 
         return {
-            "submission_path": target_dir,
+            "submission_path": actual_submission_path,
             "artifact_id": artifact_id,
             "version_identifier": artifact_data.get("version_identifier"),
             "properties": artifact_data.get("properties", {}),
@@ -271,15 +298,17 @@ async def execute_tests_activity(
     student_path: str,
     test_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
+    work_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute tests comparing student and reference implementations.
 
     Args:
-        reference_path: Path to reference example
+        reference_path: Path to reference example (from cache)
         student_path: Path to student submission
         test_config: Test configuration
         service_type_config: Service type configuration
+        work_dir: Working directory for test execution (creates temp if not provided)
 
     Returns:
         Test results dictionary
@@ -296,8 +325,11 @@ async def execute_tests_activity(
     # Extract service slug
     service_slug = test_config.get("testing_service_slug")
 
-    # Create work directory structure
-    work_dir = os.path.dirname(reference_path)
+    # Use provided work_dir or create a temporary one
+    # NOTE: work_dir should be the directory containing student_path
+    if work_dir is None:
+        # Extract work_dir from student_path (parent directory)
+        work_dir = os.path.dirname(student_path)
     artifacts_path = os.path.join(work_dir, "artifacts")
     test_files_path = os.path.join(work_dir, "test_files")
     output_path = os.path.join(work_dir, "output")
@@ -328,6 +360,24 @@ async def execute_tests_activity(
 
     logger.info(f"Created specification file: {spec_file_path}")
     logger.info(f"Specification: {json.dumps(specfile_json, indent=2)}")
+
+    # Debug: Log what files exist in each directory
+    logger.info(f"=== DEBUG: Directory contents ===")
+    logger.info(f"Reference path: {reference_path}")
+    if os.path.exists(reference_path):
+        logger.info(f"  Files: {os.listdir(reference_path)}")
+    else:
+        logger.error(f"  ERROR: Directory does not exist!")
+
+    logger.info(f"Student path: {student_path}")
+    if os.path.exists(student_path):
+        logger.info(f"  Files: {os.listdir(student_path)}")
+    else:
+        logger.error(f"  ERROR: Directory does not exist!")
+
+    logger.info(f"Work dir: {work_dir}")
+    logger.info(f"  Files: {os.listdir(work_dir)}")
+    logger.info(f"=== END DEBUG ===")
 
     # Read meta.yaml from reference if it exists
     meta_info = {}
@@ -430,21 +480,28 @@ async def commit_test_results_activity(
     test_results: Dict[str, Any],
     api_config: Dict[str, Any],
 ) -> bool:
-    """Commit test results to the API."""
+    """
+    Commit test results to the API.
+
+    Args:
+        result_id: UUID of the Result record
+        test_results: Test results dictionary
+        api_config: API connection configuration (requires 'token' and 'url')
+
+    Returns:
+        True if successful
+    """
     logger.info(f"Committing test results for result {result_id}")
 
     try:
         base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
 
         async with ComputorClient(base_url=base_url) as client:
-            # Authenticate
+            # Authenticate with API token
             api_token = api_config.get("token")
-            if api_token:
-                await client.set_token(api_token)
-            else:
-                username = api_config.get("username", "admin")
-                password = api_config.get("password", "admin")
-                await client.authenticate(username=username, password=password)
+            if not api_token:
+                raise ApplicationError("API token is required but not provided in api_config")
+            await client.set_token(api_token)
 
             # Update result
             result_update = ResultUpdate(
@@ -487,7 +544,8 @@ async def run_complete_student_test_activity(
     logger.info(f"Starting complete student test for result {result_id}")
 
     # Create temporary work directory for this test run
-    with tempfile.TemporaryDirectory() as work_dir:
+    # Use TemporaryDirectory for automatic cleanup - submissions don't need to be cached
+    with tempfile.TemporaryDirectory(prefix=f"test_{result_id}_") as work_dir:
         try:
             # Step 1: Fetch reference example with dependencies (cached)
             example_version_id = test_job.get("example_version_id")
@@ -527,6 +585,7 @@ async def run_complete_student_test_activity(
                 student_path=student_path,
                 test_config=test_job,
                 service_type_config=service_type_config,
+                work_dir=work_dir,  # Pass the temporary work directory
             )
 
             logger.info(f"Test execution completed: {test_results}")
@@ -603,8 +662,6 @@ class StudentTestingWorkflow(BaseWorkflow):
             api_config = {
                 "url": os.environ.get("API_URL", "http://localhost:8000"),
                 "token": os.environ.get("API_TOKEN"),
-                "username": os.environ.get("API_ADMIN_USER", "admin"),
-                "password": os.environ.get("API_ADMIN_PASSWORD", "admin"),
             }
 
             # Run complete test in single activity
