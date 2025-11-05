@@ -108,18 +108,10 @@ def deployment():
     pass
 
 
-DEFAULT_SERVICE_TOKEN_SCOPES = [
-    "course:get",
-    "course:list",
-    "course_content:get",
-    "course_content:list",
-    "course_content_type:get",
-    "course_content_type:list",
-    "result:get",
-    "result:list",
-    "result:create",
-    "result:update",
-]
+# Note: Default service token scopes are now managed by the backend in:
+# computor_backend/business_logic/api_tokens.py - DEFAULT_SERVICE_SCOPES
+# The backend automatically assigns appropriate scopes based on service type (testing, worker, review, etc.)
+# when scopes=None is passed to token creation endpoints.
 
 
 @deployment.command()
@@ -497,53 +489,59 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 existing_tokens = run_async(api_token_client.get_api_tokens(
                     user_id=str(service.user_id)
                 ))
-                token_id = None
+
                 if existing_tokens and len(existing_tokens) > 0:
                     # Use the first token (only active tokens are returned by default)
                     token = existing_tokens[0]
                     token_id = str(token.id)
                     click.echo(f"    ℹ️  Found existing token: {token.token_prefix}...")
 
-                deployed_services[service_config.slug] = {
-                    "id": str(service.id),
-                    "user_id": str(service.user_id),
-                    "token_id": token_id
-                }
-                continue
-
-            # 1. Get username for the service (API will create user if needed)
-            user_username = service_config.user.username
-
-            # 2. Look up ServiceType by path
-            service_type = None
-            if service_config.service_type_path:
-                service_types = run_async(service_type_client.list(
-                    ServiceTypeQuery(path=service_config.service_type_path)
-                ))
-                if service_types and len(service_types) > 0:
-                    service_type = service_types[0]
-                    click.echo(f"    ✅ Found ServiceType: {service_config.service_type_path}")
+                    deployed_services[service_config.slug] = {
+                        "id": str(service.id),
+                        "user_id": str(service.user_id),
+                        "token_id": token_id
+                    }
+                    continue
                 else:
-                    click.echo(f"    ⚠️  ServiceType not found: {service_config.service_type_path}")
+                    # Service exists but no token - create one
+                    click.echo(f"    ⚠️  No token found for service, creating new token...")
+                    # Fall through to token creation logic below
 
-            # 3. Create Service
-            service_properties = {}
-            if service_config.language:
-                service_properties["language"] = service_config.language
+            # Only create service if it doesn't exist yet
+            if not existing_services or len(existing_services) == 0:
+                # 1. Get username for the service (API will create user if needed)
+                user_username = service_config.user.username
 
-            service_create = ServiceCreate(
-                slug=service_config.slug,
-                name=service_config.user.given_name or service_config.slug.replace('-', ' ').title(),
-                description=service_config.description or f"Service for {service_config.slug}",
-                service_type=service_config.service_type_path if service_type else "custom",
-                username=user_username,
-                email=service_config.user.email,
-                config=service_config.config or {},
-                enabled=True
-            )
+                # 2. Look up ServiceType by path
+                service_type = None
+                if service_config.service_type_path:
+                    service_types = run_async(service_type_client.list(
+                        ServiceTypeQuery(path=service_config.service_type_path)
+                    ))
+                    if service_types and len(service_types) > 0:
+                        service_type = service_types[0]
+                        click.echo(f"    ✅ Found ServiceType: {service_config.service_type_path}")
+                    else:
+                        click.echo(f"    ⚠️  ServiceType not found: {service_config.service_type_path}")
 
-            service = run_async(service_client.create(service_create))
-            click.echo(f"    ✅ Created service: {service_config.slug}")
+                # 3. Create Service
+                service_properties = {}
+                if service_config.language:
+                    service_properties["language"] = service_config.language
+
+                service_create = ServiceCreate(
+                    slug=service_config.slug,
+                    name=service_config.user.given_name or service_config.slug.replace('-', ' ').title(),
+                    description=service_config.description or f"Service for {service_config.slug}",
+                    service_type=service_config.service_type_path if service_type else "custom",
+                    username=user_username,
+                    email=service_config.user.email,
+                    config=service_config.config or {},
+                    enabled=True
+                )
+
+                service = run_async(service_client.create(service_create))
+                click.echo(f"    ✅ Created service: {service_config.slug}")
 
             # 4. Create API Token
             token_config = service_config.api_token
@@ -587,14 +585,18 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 click.echo(f"    ✅ Using predefined token (admin only)")
                 from computor_types.api_tokens import ApiTokenAdminCreate
 
-                token_create = ApiTokenAdminCreate(
-                    name=token_config.name or f"{service_config.slug} Token",
-                    description=f"API token for {service_config.slug}",
-                    user_id=str(service.user_id),
-                    predefined_token=predefined_token,
-                    scopes=token_config.scopes or DEFAULT_SERVICE_TOKEN_SCOPES,
-                    expires_at=expires_at
-                )
+                # Build token creation params - only include scopes if explicitly provided
+                token_create_params = {
+                    "name": token_config.name or f"{service_config.slug} Token",
+                    "description": f"API token for {service_config.slug}",
+                    "user_id": str(service.user_id),
+                    "predefined_token": predefined_token,
+                    "expires_at": expires_at
+                }
+                if token_config.scopes:  # Only add scopes if explicitly provided
+                    token_create_params["scopes"] = token_config.scopes
+
+                token_create = ApiTokenAdminCreate(**token_create_params)
 
                 # Call admin endpoint (use mode='json' to serialize datetime objects)
                 token_response = custom_client.create("api-tokens/admin/create", token_create.model_dump(mode='json'))
@@ -609,13 +611,18 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
             else:
                 # Generate random token
                 click.echo(f"    ℹ️  Generating new random token...")
-                token_create = ApiTokenCreate(
-                    name=token_config.name or f"{service_config.slug} Token",
-                    description=f"API token for {service_config.slug}",
-                    user_id=str(service.user_id),
-                    scopes=token_config.scopes or DEFAULT_SERVICE_TOKEN_SCOPES,
-                    expires_at=expires_at
-                )
+
+                # Build token creation params - only include scopes if explicitly provided
+                token_create_params = {
+                    "name": token_config.name or f"{service_config.slug} Token",
+                    "description": f"API token for {service_config.slug}",
+                    "user_id": str(service.user_id),
+                    "expires_at": expires_at
+                }
+                if token_config.scopes:  # Only add scopes if explicitly provided
+                    token_create_params["scopes"] = token_config.scopes
+
+                token_create = ApiTokenCreate(**token_create_params)
 
                 token_response = run_async(api_token_client.create(token_create))
                 click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
@@ -1231,10 +1238,11 @@ def _link_services_to_course(course_id: str, services: list, deployed_services: 
 
 def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, auth: CLIAuthConfig):
     """
-    Update API token scopes with standardized permissions (Phase 3).
+    Verify API token scopes (Phase 3).
 
-    Ensures each token contains the baseline scope set required by the workers
-    while preserving any custom scopes that were already assigned.
+    NOTE: As of the latest changes, token scopes are automatically assigned by the backend
+    based on service type when tokens are created in Phase 1. This function now just verifies
+    the scopes are correctly set and reports them.
 
     Args:
         service_course_mapping: Dict mapping service_id to list of course_ids
@@ -1243,13 +1251,12 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
     """
 
     if not service_course_mapping:
-        click.echo("\n⚠️  No service-course mappings found, skipping token scope updates")
+        click.echo("\n⚠️  No service-course mappings found, skipping token scope verification")
         return
 
-    click.echo(f"\n🔐 Phase 3: Updating API token scopes with standardized permissions...")
+    click.echo(f"\n🔐 Phase 3: Verifying API token scopes...")
 
     client = run_async(get_computor_client(auth))
-    custom_client = SyncHTTPWrapper(client)
     api_token_client = client.api_tokens
 
     # Create reverse mapping: service_id -> service_slug
@@ -1257,8 +1264,7 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
     for slug, details in deployed_services.items():
         service_id_to_slug[details["id"]] = slug
 
-    updated_count = 0
-    failed_count = 0
+    verified_count = 0
 
     for service_id, course_ids in service_course_mapping.items():
         try:
@@ -1276,27 +1282,17 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
                 click.echo(f"    ⚠️  No token ID found for service: {service_slug}")
                 continue
 
-            # Get current token
+            # Get current token and display scopes
             token = run_async(api_token_client.get(token_id))
             current_scopes = token.scopes or []
-            # Build new scopes with standardized permissions
-            new_scopes = set(current_scopes)
-            new_scopes.update(DEFAULT_SERVICE_TOKEN_SCOPES)
 
-            # Update token scopes using admin endpoint
-            token_update = ApiTokenUpdate(scopes=list(new_scopes))
-            custom_client.update(f"api-tokens/admin/{token_id}", token_update.model_dump(mode='json'))
-
-            click.echo(f"    ✅ Updated token scopes for {service_slug}")
-            updated_count += 1
+            click.echo(f"    ✅ {service_slug}: {len(current_scopes)} scopes")
+            verified_count += 1
 
         except Exception as e:
-            click.echo(f"    ❌ Failed to update token for service {service_id}: {e}")
-            failed_count += 1
-            import traceback
-            click.echo(f"    {traceback.format_exc()}")
+            click.echo(f"    ❌ Failed to verify token for service {service_id}: {e}")
 
-    click.echo(f"\n✅ Phase 3 complete: {updated_count} tokens updated, {failed_count} failed")
+    click.echo(f"\n✅ Phase 3 complete: {verified_count} tokens verified")
 
 
 def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
