@@ -279,28 +279,18 @@ async def create_test_run(
     organization_properties = OrganizationProperties(**organization.properties)
     course_properties = CourseProperties(**course.properties)
 
-    # Get deployment info for reference repository
+    # Get deployment info for reference example
     deployment = db.query(CourseContentDeployment).filter(
         CourseContentDeployment.course_content_id == course_content.id
     ).first()
 
-    if not deployment or not deployment.deployment_path or not deployment.version_identifier:
+    if not deployment or not deployment.example_version_id:
         raise BadRequestException(
             error_code="DEPLOY_001",
-            detail="Assignment not released: missing deployment information"
+            detail="Assignment not released: missing deployment or example version"
         )
 
-    # Build repository configurations
-    submission_group_properties = submission_group.properties or {}
-    gitlab_config = submission_group_properties.get('gitlab')
-
-    if not gitlab_config or not gitlab_config.get('full_path'):
-        raise BadRequestException(
-            error_code="DEPLOY_003",
-            detail="Student repository not configured. Please ensure repository has been created."
-        )
-
-    # Use version identifier from artifact column, test request, or properties fallback
+    # Use version identifier from artifact
     artifact_properties = artifact.properties or {}
     version_identifier = (
         test_create.version_identifier or
@@ -314,35 +304,18 @@ async def create_test_run(
             detail="Version identifier (commit) is required"
         )
 
-    # Build GitLab repository configurations
-    provider = organization_properties.gitlab.url
-    token = decrypt_api_key(organization_properties.gitlab.token)
-
-    student_repository = Repository(
-        url=f"{provider}/{gitlab_config['full_path']}.git",
-        path=deployment.deployment_path,
-        token=token,
-        commit=version_identifier
-    )
-
-    reference_repository = Repository(
-        url=f"{provider}/{course_properties.gitlab.full_path}/assignments.git",
-        path=deployment.deployment_path,
-        token=token,
-        commit=deployment.version_identifier
-    )
-
-    # Create test job
-    job = TestJob(
-        user_id=str(user_id),
-        course_member_id=str(course_member.id),
-        course_content_id=str(course_content.id),
-        testing_service_id=str(service.id),
-        testing_service_slug=service.slug,
-        testing_service_type_path=str(service_type.path),
-        module=student_repository,
-        reference=reference_repository
-    )
+    # Create test job with new structure (using example_version_id and artifact_id)
+    job = {
+        "user_id": str(user_id),
+        "course_member_id": str(course_member.id),
+        "course_content_id": str(course_content.id),
+        "testing_service_id": str(service.id),
+        "testing_service_slug": service.slug,
+        "testing_service_type_path": str(service_type.path),
+        "example_version_id": str(deployment.example_version_id),
+        "artifact_id": str(artifact.id),
+        "version_identifier": version_identifier,
+    }
 
     # Generate workflow ID
     workflow_id = f"student-testing-{str(uuid.uuid4())}"
@@ -436,7 +409,7 @@ async def create_test_run(
                 task_name="student_testing",
                 workflow_id=workflow_id,
                 parameters={
-                    "test_job": job.model_dump(),
+                    "test_job": job,  # Already a dict, no need for model_dump()
                     "service_config": {
                         "id": str(service.id),
                         "slug": service.slug,
@@ -450,7 +423,6 @@ async def create_test_run(
                         "properties": service_type.properties or {},
                     },
                     "result_id": str(result.id),
-                    "artifact_id": str(artifact.id),
                 },
                 queue=task_queue
             )
