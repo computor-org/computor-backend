@@ -28,26 +28,59 @@ class UserPermissionHandler(PermissionHandler):
         # Admin can do anything
         if self.check_admin(principal):
             return True
-        
-        # Check general permission
+
+        # Check general permission (e.g., _user_manager)
         if self.check_general_permission(principal, action):
-            return True
-        
+            # User managers can list/get any user
+            if action in ["list", "get", "create"]:
+                return True
+
+            # For update/delete, user managers cannot modify admins or service accounts
+            if action in ["update", "delete"] and resource_id:
+                from computor_backend.model.auth import User
+                from computor_backend.model.role import UserRole
+                from computor_backend.database import SessionLocal
+
+                # Need to check the target user in the database
+                # This requires a database query, which is handled in build_query
+                # For can_perform_action with resource_id, we return True here
+                # and do the actual check in build_query
+                return True
+
         # Users can view themselves
         if action in ["list", "get"] and resource_id == principal.user_id:
             return True
-        
+
         return False
     
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        from computor_backend.model.role import UserRole
+        from sqlalchemy import and_, not_, exists
+
         # Admin gets everything
         if self.check_admin(principal):
             return db.query(self.entity)
-        
-        # Check general permission
+
+        # Check general permission (e.g., _user_manager)
         if self.check_general_permission(principal, action):
-            return db.query(self.entity)
-        
+            base_query = db.query(self.entity)
+
+            # For update/delete actions, user managers cannot modify admins or service accounts
+            if action in ["update", "delete"]:
+                # Exclude service accounts
+                base_query = base_query.filter(self.entity.is_service == False)
+
+                # Exclude users with admin role
+                admin_subquery = exists().where(
+                    and_(
+                        UserRole.user_id == self.entity.id,
+                        UserRole.role_id == "_admin"
+                    )
+                )
+                base_query = base_query.filter(not_(admin_subquery))
+
+            return base_query
+
         # For list/get, users can see themselves and users in their courses (as tutor+)
         if action in ["list", "get"]:
             return UserPermissionQueryBuilder.filter_visible_users(principal.user_id, db)

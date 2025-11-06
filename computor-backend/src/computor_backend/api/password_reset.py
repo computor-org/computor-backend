@@ -409,8 +409,15 @@ async def user_manager_reset_password(
             "Use /password/change instead."
         )
 
-    # 5. Prevent user managers from resetting admin passwords (only admins can reset admin passwords)
+    # 5. Prevent user managers from resetting protected accounts (admins and service accounts)
     if is_user_manager:
+        # Check if target user is a service account
+        if target_user.is_service:
+            raise ForbiddenException(
+                "User managers cannot reset service account passwords. "
+                "Only administrators can modify service accounts."
+            )
+
         # Check if target user has admin role
         target_is_admin = db.query(UserRole).filter(
             UserRole.user_id == target_user.id,
