@@ -119,6 +119,7 @@ class ServiceTypeList(BaseEntityList):
     enabled: bool = Field(..., description="Enabled status")
     icon: Optional[str] = Field(None, description="Icon identifier")
     color: Optional[str] = Field(None, description="Hex color")
+    version: int = Field(..., description="Version number")
 
     @field_validator('path', mode='before')
     @classmethod

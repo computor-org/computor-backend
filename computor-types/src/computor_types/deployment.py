@@ -65,14 +65,14 @@ class CourseContentDeploymentGet(BaseEntityGet):
     example_identifier: Optional[str] = None
     version_tag: Optional[str] = None
     deployment_status: str
-    deployment_message: Optional[str]
+    deployment_message: Optional[str] = None
     assigned_at: datetime
-    deployed_at: Optional[datetime]
-    last_attempt_at: Optional[datetime]
-    deployment_path: Optional[str]
-    version_identifier: Optional[str]
-    deployment_metadata: Optional[Dict[str, Any]]
-    workflow_id: Optional[str]  # Current/last Temporal workflow ID
+    deployed_at: Optional[datetime] = None
+    last_attempt_at: Optional[datetime] = None
+    deployment_path: Optional[str] = None
+    version_identifier: Optional[str] = None
+    deployment_metadata: Optional[Dict[str, Any]] = None
+    workflow_id: Optional[str] = None  # Current/last Temporal workflow ID
     
     # Relationships (optionally loaded)
     example_version: Optional['ExampleVersionGet'] = None

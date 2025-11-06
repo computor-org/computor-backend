@@ -421,7 +421,8 @@ async def download_example_from_object_storage(
     storage_service = StorageService()
     
     storage_path = version.storage_path
-    bucket_name = repository.source_url  # Use repository's source_url as bucket name
+    # Extract bucket name from source_url (format: "bucket-name" or "bucket-name/prefix")
+    bucket_name = repository.source_url.split('/')[0]
     prefix = storage_path.strip('/')
     
     logger.info(f"Downloading from {repository.source_type} bucket: {bucket_name}, path: {storage_path}")

@@ -14,6 +14,7 @@ from .generated import (
     CourseMemberClient,
     CourseRoleClient,
     CourseClient,
+    ExampleClient as GeneratedExampleClient,
     ExampleRepositoryClient,
     ExtensionClient,
     GroupClient,
@@ -24,6 +25,7 @@ from .generated import (
     ResultClient,
     RoleClaimClient,
     RoleClient,
+    ServiceClient,
     ServiceTypeClient,
     SessionClient,
     StudentProfileClient,
@@ -122,6 +124,7 @@ class ComputorClient:
         self.results = ResultClient(self._client)
         self.roles = RoleClient(self._client)
         self.role_claims = RoleClaimClient(self._client)
+        self.services = ServiceClient(self._client)
         self.service_types = ServiceTypeClient(self._client)
         self.sessions = SessionClient(self._client)
         self.student_profiles = StudentProfileClient(self._client)

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import os
+from computor_backend.exceptions.exceptions import NotFoundException
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.tokens import encrypt_api_key
@@ -381,8 +382,7 @@ app.include_router(
 
 app.include_router(
     extensions_router,
-    tags=["extensions"],
-    dependencies=[Depends(get_current_principal)]
+    tags=["extensions"]
 )
 
 app.include_router(
@@ -415,3 +415,18 @@ app.include_router(
 @app.head("/", status_code=204)
 def get_status_head():
     return
+
+@app.get(
+    "extension-public",
+    response_model=str,
+)
+async def get_public_extension_url():
+    """Public endpoint to get extension download URL.
+
+    This endpoint requires no authentication and returns the URL
+    specified in the EXTENSION_PUBLIC_DOWNLOAD_URL environment variable.
+    """
+    if not settings.EXTENSION_PUBLIC_DOWNLOAD_URL:
+        raise NotFoundException("Public extension download URL not configured")
+
+    return settings.EXTENSION_PUBLIC_DOWNLOAD_URL

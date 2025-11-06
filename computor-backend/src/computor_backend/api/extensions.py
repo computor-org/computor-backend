@@ -40,6 +40,7 @@ from ..model.extension import Extension, ExtensionVersion
 from ..permissions.auth import get_current_principal
 from ..permissions.principal import Principal
 from ..services.storage_service import get_storage_service
+from ..settings import settings
 
 extensions_router = APIRouter(prefix="/extensions", tags=["extensions"])
 

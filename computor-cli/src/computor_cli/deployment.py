@@ -200,7 +200,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     client = run_async(get_computor_client(auth))
 
     # Get API clients
-    user_client = client.users
+    user_client = client.user
     account_client = client.accounts
     course_client = client.courses
     course_member_client = client.course_members
@@ -466,7 +466,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
     client = run_async(get_computor_client(auth))
     service_client = client.services
-    user_client = client.users
+    user_client = client.user
     api_token_client = client.api_tokens
     service_type_client = client.service_types
     custom_client = SyncHTTPWrapper(client)
