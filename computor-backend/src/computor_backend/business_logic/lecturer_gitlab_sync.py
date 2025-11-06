@@ -32,7 +32,7 @@ def sync_course_member_gitlab_permissions(
     course_member_id: UUID | str,
     permissions: Principal,
     db: Session,
-    force: bool = False,
+    access_token: Optional[str] = None,
 ) -> GitLabSyncResult:
     """
     Sync GitLab permissions for a specific course member.
@@ -48,7 +48,8 @@ def sync_course_member_gitlab_permissions(
         course_member_id: CourseMember UUID
         permissions: Current principal (must be _lecturer or higher)
         db: Database session
-        force: Force sync even if recently synced
+        access_token: Optional GitLab access token to check existing permissions
+                     before syncing (reduces organization token API calls)
 
     Returns:
         GitLabSyncResult with sync details
@@ -126,14 +127,8 @@ def sync_course_member_gitlab_permissions(
     if not account:
         return GitLabSyncResult(
             course_member_id=str(course_member.id),
-            user_id=str(course_member.user_id),
-            username=course_member.user.username,
-            course_role_id=course_member.course_role_id,
             sync_status="skipped",
             message="User has not linked their GitLab account yet",
-            permissions_granted=[],
-            permissions_updated=[],
-            api_calls_made=0,
         )
 
     gitlab_username = account.provider_account_id
@@ -149,20 +144,12 @@ def sync_course_member_gitlab_permissions(
     if gitlab_user_id is None:
         return GitLabSyncResult(
             course_member_id=str(course_member.id),
-            user_id=str(course_member.user_id),
-            username=course_member.user.username,
-            course_role_id=course_member.course_role_id,
             sync_status="failed",
             message=f"GitLab user '{gitlab_username}' not found on GitLab instance",
-            permissions_granted=[],
-            permissions_updated=[],
-            api_calls_made=1,
         )
 
     # Perform sync
     try:
-        start_time = datetime.now(timezone.utc)
-
         _sync_gitlab_memberships(
             provider_url=provider_url,
             course_member=course_member,
@@ -170,34 +157,19 @@ def sync_course_member_gitlab_permissions(
             org_props=org_props,
             gitlab_username=gitlab_username,
             db=db,
-            user_access_token=None,  # Lecturer-initiated, no user token available
+            user_access_token=access_token,  # Use lecturer's token if provided to check permissions first
         )
-
-        end_time = datetime.now(timezone.utc)
 
         return GitLabSyncResult(
             course_member_id=str(course_member.id),
-            user_id=str(course_member.user_id),
-            username=course_member.user.username,
-            course_role_id=course_member.course_role_id,
             sync_status="success",
             message="GitLab permissions synchronized successfully",
-            permissions_granted=[],  # TODO: Track what was granted
-            permissions_updated=[],  # TODO: Track what was updated
-            api_calls_made=0,  # TODO: Count API calls
-            synced_at=end_time,
         )
 
     except Exception as exc:
         logger.error(f"Failed to sync GitLab permissions for course member {course_member.id}: {exc}")
         return GitLabSyncResult(
             course_member_id=str(course_member.id),
-            user_id=str(course_member.user_id),
-            username=course_member.user.username,
-            course_role_id=course_member.course_role_id,
             sync_status="failed",
             message=f"Sync failed: {str(exc)}",
-            permissions_granted=[],
-            permissions_updated=[],
-            api_calls_made=0,
         )

@@ -390,11 +390,18 @@ async def sync_member_gitlab_permissions_endpoint(
     - When GitLab configuration is updated
     - To fix permission issues
 
-    **Note:** This uses the organization's GitLab token, not the user's token.
+    **Optimization:**
+    Provide an `access_token` in the request body to check existing permissions
+    before granting new ones. This significantly reduces API calls with the
+    organization token:
+    - With token: Checks permissions first, only grants if needed
+    - Without token: Always attempts to grant/update permissions
+
+    **Note:** Uses the organization's GitLab token for granting permissions.
 
     Args:
         course_member_id: UUID of the course member
-        request: Sync request with force flag
+        request: Sync request with optional access_token
         permissions: Current user permissions
         db: Database session
 
@@ -410,5 +417,5 @@ async def sync_member_gitlab_permissions_endpoint(
         course_member_id=course_member_id,
         permissions=permissions,
         db=db,
-        force=request.force,
+        access_token=request.access_token,
     )
