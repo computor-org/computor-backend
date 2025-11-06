@@ -170,15 +170,18 @@ async def set_initial_password(
         else:
             temp_principal = principal
 
-        # Ensure old password check is skipped
-        user.password = None
-        set_user_password(
-            target_username=user.username,
-            new_password=request.new_password,
-            old_password=None,
-            permissions=temp_principal,
-            db=db,
+        # Set password directly without using set_user_password business logic
+        # (to avoid admin check when user is setting their own initial password)
+        from computor_types.password_utils import create_password_hash
+
+        user.password = create_password_hash(
+            request.new_password,
+            validate=True,
+            username=user.username,
+            email=user.email,
         )
+        user.password_reset_required = False
+        db.commit()
     except PasswordValidationError as e:
         raise BadRequestException(str(e))
 
