@@ -974,13 +974,16 @@ async def find_or_create_gitlab_account(
         Account object (existing or newly created)
     """
     def _find_or_create():
-        # Try to find existing account
+        # Try to find existing account using CORRECT schema pattern:
+        # - provider = GitLab URL
+        # - type = "gitlab"
+        # - provider_account_id = GitLab username
         account = (
             db.query(Account)
             .filter(
-                Account.provider == "gitlab",
-                Account.type == "oauth",
-                Account.provider_account_id == str(gitlab_user_data['id']),
+                Account.provider == gitlab_url,
+                Account.type == "gitlab",
+                Account.provider_account_id == gitlab_user_data['username'],
                 Account.user_id == user.id,
             )
             .first()
@@ -989,23 +992,21 @@ async def find_or_create_gitlab_account(
         if account:
             # Update account properties with latest info
             account.properties = {
-                "gitlab_url": gitlab_url,
-                "username": gitlab_user_data['username'],
+                "gitlab_user_id": str(gitlab_user_data['id']),
                 "email": gitlab_user_data['email'],
                 "name": gitlab_user_data['name'],
                 "last_verified": str(datetime.now(timezone.utc)),
             }
             logger.info(f"Updated existing GitLab account for user {user.username}")
         else:
-            # Create new account
+            # Create new account using CORRECT schema pattern
             account = Account(
-                provider="gitlab",
-                type="oauth",
-                provider_account_id=str(gitlab_user_data['id']),
+                provider=gitlab_url,
+                type="gitlab",
+                provider_account_id=gitlab_user_data['username'],
                 user_id=user.id,
                 properties={
-                    "gitlab_url": gitlab_url,
-                    "username": gitlab_user_data['username'],
+                    "gitlab_user_id": str(gitlab_user_data['id']),
                     "email": gitlab_user_data['email'],
                     "name": gitlab_user_data['name'],
                     "created_via": "gitlab_pat_verification",
