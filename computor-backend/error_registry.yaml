@@ -636,6 +636,33 @@ errors:
     documentation_url: "/docs/api/examples#versions"
 
   # ============================================================================
+  # VERSION MANAGEMENT ERRORS (400, 409)
+  # ============================================================================
+
+  - code: VERSION_001
+    http_status: 409
+    category: conflict
+    severity: warning
+    title: "Example Version Already Exists"
+    message:
+      plain: "This version already exists for this example."
+      markdown: "**Example Version Already Exists**\n\nVersion `{version_tag}` already exists for this example. To update it, set `update_existing: true` in meta.yaml or use a different version tag."
+      html: "<strong>Example Version Already Exists</strong><p>Version <code>{version_tag}</code> already exists for this example. To update it, set <code>update_existing: true</code> in meta.yaml or use a different version tag.</p>"
+    internal_description: "User attempted to create an example version that already exists without setting update_existing flag"
+    affected_functions:
+      - "create_example_version"
+      - "upload_example"
+    common_causes:
+      - "Version tag already used"
+      - "Attempting to recreate existing version"
+      - "Missing update_existing flag in meta.yaml"
+    resolution_steps:
+      - "Set 'update_existing: true' in meta.yaml to update the existing version"
+      - "Use a different version tag (e.g., increment version number)"
+      - "Check existing versions before creating new ones"
+    documentation_url: "/docs/api/examples#version-management"
+
+  # ============================================================================
   # DEPLOYMENT ERRORS (400, 404)
   # ============================================================================
 

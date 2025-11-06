@@ -623,8 +623,14 @@ async def upload_example(
     
     if existing_version and not should_update:
         raise BadRequestException(
-            f"Version '{version_tag}' already exists for this example. "
-            f"To update it, add 'update_existing: true' to meta.yaml or use a different version tag."
+            error_code="VERSION_001",
+            detail=f"Version '{version_tag}' already exists for this example. "
+                   f"To update it, add 'update_existing: true' to meta.yaml or use a different version tag.",
+            context={
+                "example_id": str(example.id),
+                "version_tag": version_tag,
+                "existing_version_id": str(existing_version.id)
+            }
         )
     
     # Determine version number and storage path

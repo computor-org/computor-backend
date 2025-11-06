@@ -7,13 +7,40 @@ Request and response models for password operations including:
 - Admin password management
 """
 
-from pydantic import BaseModel, Field
+from typing import Optional, Literal, Dict, Any
+from pydantic import BaseModel, Field, EmailStr
+
+
+class GitLabPATCredentials(BaseModel):
+    """Credentials for GitLab Personal Access Token authentication."""
+    access_token: str = Field(..., description="GitLab Personal Access Token (glpat-...)")
+    gitlab_url: Optional[str] = Field(
+        None,
+        description="GitLab instance URL (optional - will auto-detect from user's organizations if not provided)"
+    )
+
+
+class ProviderAuthCredentials(BaseModel):
+    """Alternative authentication via external provider for password initialization."""
+    method: Literal["gitlab_pat"] = Field(..., description="Authentication method")
+    email: EmailStr = Field(..., description="User's email address in the system")
+    credentials: GitLabPATCredentials = Field(..., description="Provider-specific credentials")
 
 
 class SetPasswordRequest(BaseModel):
-    """Request to set password for first time or after reset."""
+    """
+    Request to set password for first time or after reset.
+
+    Can authenticate either via:
+    1. Bearer token (user already authenticated)
+    2. Provider credentials (e.g., GitLab PAT for users without password)
+    """
     new_password: str = Field(..., min_length=12, description="New password (min 12 chars)")
     confirm_password: str = Field(..., min_length=12, description="Confirm new password")
+    provider_auth: Optional[ProviderAuthCredentials] = Field(
+        None,
+        description="Alternative authentication via external provider (for users without password)"
+    )
 
 
 class ChangePasswordRequest(BaseModel):

@@ -126,20 +126,25 @@ def assign_example_to_course_content(
     deployment = assign_example_to_content(
         course_content_id=course_content_id,
         example_id=request.example_id,
+        example_identifier=request.example_identifier,
         version_tag=request.version_tag,
         permissions=permissions,
         db=db
     )
 
+    # Get the actual example_id for the response (might have been resolved from identifier)
+    response_example_id = request.example_id if request.example_id else str(deployment.example_version.example_id)
+    example_display = request.example_id or request.example_identifier
+
     return AssignExampleResponse(
         deployment_id=str(deployment.id),
         course_content_id=str(deployment.course_content_id),
-        example_id=request.example_id,
+        example_id=response_example_id,
         example_version_id=str(deployment.example_version_id),
         version_tag=deployment.version_tag,
         deployment_status=deployment.deployment_status,
         assigned_at=deployment.assigned_at,
-        message=f"Example '{request.example_id}' (v{request.version_tag}) successfully assigned to course content"
+        message=f"Example '{example_display}' (v{request.version_tag}) successfully assigned to course content"
     )
 
 

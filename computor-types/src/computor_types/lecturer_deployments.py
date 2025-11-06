@@ -12,10 +12,18 @@ from typing import Optional
 
 class AssignExampleRequest(BaseModel):
     """Request to assign an example to a course content (assignment)."""
-    example_id: str = Field(description="ID of the example to assign")
+    example_id: Optional[str] = Field(None, description="ID of the example to assign (UUID)")
+    example_identifier: Optional[str] = Field(None, description="Identifier path of the example (e.g., 'itpcp.pgph.mat.function_time_formatter')")
     version_tag: str = Field(
         description="Specific version tag using semantic versioning (e.g., '1.0.0', '2.1.3-beta')"
     )
+
+    def model_post_init(self, __context):
+        """Validate that either example_id or example_identifier is provided."""
+        if not self.example_id and not self.example_identifier:
+            raise ValueError("Either example_id or example_identifier must be provided")
+        if self.example_id and self.example_identifier:
+            raise ValueError("Provide either example_id or example_identifier, not both")
 
 
 class AssignExampleResponse(BaseModel):

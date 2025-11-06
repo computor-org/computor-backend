@@ -9,10 +9,10 @@ from computor_types.results import (
     ResultQuery,
     ResultUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class ResultClient(BaseEndpointClient):
+class ResultClient(TypedEndpointClient):
     """Client for results endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

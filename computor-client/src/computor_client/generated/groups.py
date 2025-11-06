@@ -9,10 +9,10 @@ from computor_types.groups import (
     GroupQuery,
     GroupUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class GroupClient(BaseEndpointClient):
+class GroupClient(TypedEndpointClient):
     """Client for groups endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

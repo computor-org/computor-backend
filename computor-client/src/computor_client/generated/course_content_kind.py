@@ -9,10 +9,10 @@ from computor_types.course_content_kind import (
     CourseContentKindQuery,
     CourseContentKindUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class CourseContentKindClient(BaseEndpointClient):
+class CourseContentKindClient(TypedEndpointClient):
     """Client for course-content-kinds endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

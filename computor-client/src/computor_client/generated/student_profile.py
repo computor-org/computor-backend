@@ -9,10 +9,10 @@ from computor_types.student_profile import (
     StudentProfileQuery,
     StudentProfileUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class StudentProfileClient(BaseEndpointClient):
+class StudentProfileClient(TypedEndpointClient):
     """Client for student-profiles endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

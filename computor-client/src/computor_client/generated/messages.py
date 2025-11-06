@@ -9,10 +9,10 @@ from computor_types.messages import (
     MessageQuery,
     MessageUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class MessageClient(BaseEndpointClient):
+class MessageClient(TypedEndpointClient):
     """Client for messages endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

@@ -9,10 +9,10 @@ from computor_types.example import (
     ExampleQuery,
     ExampleUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class ExampleClient(BaseEndpointClient):
+class ExampleClient(TypedEndpointClient):
     """Client for examples endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):
@@ -36,10 +36,10 @@ from computor_types.example import (
     ExampleRepositoryQuery,
     ExampleRepositoryUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class ExampleRepositoryClient(BaseEndpointClient):
+class ExampleRepositoryClient(TypedEndpointClient):
     """Client for example-repositories endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

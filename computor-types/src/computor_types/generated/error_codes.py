@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-10-30T14:00:18.046354
+Generated at: 2025-11-06T13:17:55.411490
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -38,6 +38,7 @@ class ErrorCode(str, Enum):
     CONTENT_003 = "CONTENT_003"  # Invalid Content Type Operation
     CONTENT_004 = "CONTENT_004"  # Example Not Found
     CONTENT_005 = "CONTENT_005"  # Example Version Not Found
+    VERSION_001 = "VERSION_001"  # Example Version Already Exists
     DEPLOY_001 = "DEPLOY_001"  # Assignment Not Released
     DEPLOY_002 = "DEPLOY_002"  # Deployment Not Found
     DEPLOY_003 = "DEPLOY_003"  # Repository Not Configured
@@ -116,6 +117,7 @@ ERROR_CATEGORIES = {
     ErrorCode.CONTENT_003: "validation",
     ErrorCode.CONTENT_004: "not_found",
     ErrorCode.CONTENT_005: "not_found",
+    ErrorCode.VERSION_001: "conflict",
     ErrorCode.DEPLOY_001: "not_found",
     ErrorCode.DEPLOY_002: "not_found",
     ErrorCode.DEPLOY_003: "validation",

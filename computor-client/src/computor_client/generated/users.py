@@ -9,10 +9,10 @@ from computor_types.users import (
     UserQuery,
     UserUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class UserClient(BaseEndpointClient):
+class UserClient(TypedEndpointClient):
     """Client for users endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

@@ -9,10 +9,10 @@ from computor_types.languages import (
     LanguageQuery,
     LanguageUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class LanguageClient(BaseEndpointClient):
+class LanguageClient(TypedEndpointClient):
     """Client for languages endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

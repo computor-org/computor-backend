@@ -9,10 +9,10 @@ from computor_types.sessions import (
     SessionQuery,
     SessionUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class SessionClient(BaseEndpointClient):
+class SessionClient(TypedEndpointClient):
     """Client for sessions endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

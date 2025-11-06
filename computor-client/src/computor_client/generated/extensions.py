@@ -8,10 +8,10 @@ from computor_types.extensions import (
     ExtensionPublishRequest,
     ExtensionVersionYankRequest,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class ExtensionClient(BaseEndpointClient):
+class ExtensionClient(TypedEndpointClient):
     """Client for extensions endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):
@@ -21,4 +21,5 @@ class ExtensionClient(BaseEndpointClient):
             response_model=ExtensionMetadata,
             create_model=ExtensionPublishRequest,
             update_model=ExtensionVersionYankRequest,
+            query_model=None,
         )

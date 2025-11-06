@@ -9,10 +9,10 @@ from computor_types.submission_groups import (
     SubmissionGroupQuery,
     SubmissionGroupUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class SubmissionGroupClient(BaseEndpointClient):
+class SubmissionGroupClient(TypedEndpointClient):
     """Client for submission-groups endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

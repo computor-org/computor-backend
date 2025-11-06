@@ -186,9 +186,9 @@ def validate_course_for_release(
             continue
 
         # Check 3: Deployment status is valid for release
-        valid_statuses = ['pending', 'failed']
-        if force_redeploy:
-            valid_statuses.append('deployed')
+        # Valid statuses: 'pending' (will be deployed), 'deployed' (already deployed)
+        # Invalid statuses: 'failed' (deployment failed), 'unassigned' (already handled above)
+        valid_statuses = ['pending', 'deployed']
 
         if deployment.deployment_status not in valid_statuses:
             error = ValidationError(

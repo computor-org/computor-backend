@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 from computor_backend.database import get_db
 from computor_backend.model.auth import User
-from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.permissions.principal import Principal
 from computor_backend.api.exceptions import (
     NotFoundException,
@@ -81,11 +81,15 @@ async def get_password_status(
 @password_reset_router.post("/set", response_model=PasswordOperationResponse)
 async def set_initial_password(
     request: SetPasswordRequest,
-    principal: Annotated[Principal, Depends(get_current_principal)],
+    principal: Annotated[Optional[Principal], Depends(get_current_principal_optional)] = None,
     db: Session = Depends(get_db),
 ) -> PasswordOperationResponse:
     """
     Set password for first time or after admin reset.
+
+    Authentication Methods:
+    1. Bearer token (user already authenticated)
+    2. Provider authentication (e.g., GitLab PAT for users without password)
 
     Use this endpoint when:
     - User logging in for first time (password_reset_required = true)
@@ -93,10 +97,64 @@ async def set_initial_password(
     - User has no password set
 
     This endpoint does NOT require old password.
+
+    Security Note:
+    - GitLab PAT is only used for verification, NEVER stored (GDPR/DSGVO compliant)
     """
-    user = db.query(User).filter(User.id == principal.user_id).first()
-    if not user:
-        raise NotFoundException("User not found")
+    # Determine authentication method and get user
+    user = None
+    gitlab_account_created = False
+
+    if principal:
+        # Method 1: User is authenticated via Bearer token
+        user = db.query(User).filter(User.id == principal.user_id).first()
+        if not user:
+            raise NotFoundException("User not found")
+        auth_method = "bearer_token"
+
+    elif request.provider_auth:
+        # Method 2: User authenticating via provider (e.g., GitLab PAT)
+        if request.provider_auth.method == "gitlab_pat":
+            from computor_backend.business_logic.auth import (
+                verify_user_with_gitlab_pat,
+                find_or_create_gitlab_account,
+            )
+
+            # Verify user via GitLab PAT
+            user, gitlab_url, gitlab_user_data = await verify_user_with_gitlab_pat(
+                email=request.provider_auth.email,
+                access_token=request.provider_auth.credentials.access_token,
+                gitlab_url=request.provider_auth.credentials.gitlab_url,
+                db=db,
+            )
+
+            # IMPORTANT: Only allow password initialization if user has NO password
+            if user.password is not None:
+                raise ForbiddenException(
+                    "This authentication method can only be used for initial password setup. "
+                    "Use /password/change to change an existing password."
+                )
+
+            # Create/update GitLab account entry (reusing existing code pattern)
+            await find_or_create_gitlab_account(
+                user=user,
+                gitlab_url=gitlab_url,
+                gitlab_user_data=gitlab_user_data,
+                db=db,
+            )
+            gitlab_account_created = True
+            auth_method = "gitlab_pat"
+
+        else:
+            raise BadRequestException(
+                f"Unsupported authentication method: {request.provider_auth.method}"
+            )
+
+    else:
+        # No authentication provided
+        raise UnauthorizedException(
+            "Authentication required. Provide either Bearer token or provider_auth credentials."
+        )
 
     # Validate passwords match
     if request.new_password != request.confirm_password:
@@ -105,22 +163,34 @@ async def set_initial_password(
     # Use the business logic function (it will validate complexity)
     try:
         # For initial password set, we don't need old password
-        # Pass None for both target_username and old_password, but use the user_id
-        user.password = None  # Ensure old password check is skipped
+        # Create a temporary principal for the user if not authenticated
+        if not principal:
+            from computor_backend.permissions.principal import Principal as PrincipalClass
+            temp_principal = PrincipalClass(user_id=str(user.id))
+        else:
+            temp_principal = principal
+
+        # Ensure old password check is skipped
+        user.password = None
         set_user_password(
-            target_username=user.username,  # Admin setting password (but for self in this case)
+            target_username=user.username,
             new_password=request.new_password,
             old_password=None,
-            permissions=principal,
+            permissions=temp_principal,
             db=db,
         )
     except PasswordValidationError as e:
         raise BadRequestException(str(e))
 
-    logger.info(f"Initial password set for user {user.username} (ID: {user.id})")
+    logger.info(
+        f"Initial password set for user {user.username} (ID: {user.id}) "
+        f"via {auth_method}" +
+        (" with GitLab account linking" if gitlab_account_created else "")
+    )
 
     return PasswordOperationResponse(
-        message="Password set successfully",
+        message="Password set successfully" +
+                (" and GitLab account linked" if gitlab_account_created else ""),
         user_id=str(user.id),
         username=user.username,
     )

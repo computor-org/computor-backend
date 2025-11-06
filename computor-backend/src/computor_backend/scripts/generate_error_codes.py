@@ -510,20 +510,22 @@ def main():
     """Main generator function."""
     # Paths
     script_dir = Path(__file__).parent
-    registry_path = script_dir / "computor-backend" / "error_registry.yaml"
+    # Navigate up to project root: scripts -> computor_backend -> src -> computor-backend -> root
+    project_root = script_dir.parent.parent.parent.parent
+    registry_path = project_root / "computor-backend" / "error_registry.yaml"
 
     # Output paths - following project structure conventions
     # TypeScript goes to generated/types/ (shared by frontend projects)
-    ts_output = script_dir / "generated" / "types" / "error-codes.ts"
+    ts_output = project_root / "generated" / "types" / "error-codes.ts"
 
     # JSON catalog and docs go to generated/errors/
-    errors_dir = script_dir / "generated" / "errors"
+    errors_dir = project_root / "generated" / "errors"
     json_output = errors_dir / "error-catalog.json"
     json_vscode_output = errors_dir / "error-catalog.vscode.json"
     md_output = errors_dir / "ERROR_CODES.md"
 
     # Python constants for computor-types
-    py_output = script_dir / "computor-types" / "src" / "computor_types" / "generated" / "error_codes.py"
+    py_output = project_root / "computor-types" / "src" / "computor_types" / "generated" / "error_codes.py"
 
     # Load registry
     print(f"Loading error registry from: {registry_path}")

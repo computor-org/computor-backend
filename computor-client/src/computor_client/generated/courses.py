@@ -9,10 +9,10 @@ from computor_types.courses import (
     CourseQuery,
     CourseUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class CourseClient(BaseEndpointClient):
+class CourseClient(TypedEndpointClient):
     """Client for courses endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

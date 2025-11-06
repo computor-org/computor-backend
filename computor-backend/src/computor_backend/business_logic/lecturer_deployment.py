@@ -22,9 +22,62 @@ from computor_backend.exceptions import (
     BadRequestException
 )
 from computor_backend.custom_types.ltree import Ltree
-from computor_types.validation import SemanticVersion
+from computor_types.validation import SemanticVersion, normalize_version
 
 logger = logging.getLogger(__name__)
+
+
+def validate_reassignment_allowed(
+    existing_deployment: CourseContentDeployment,
+    new_example_identifier: str,
+    course_content_id: str
+) -> tuple[bool, str]:
+    """
+    Validate if reassignment is allowed based on deployment status and example identity.
+
+    Rules:
+    - If not deployed: Allow any reassignment
+    - If deployed + same example: Allow (version update)
+    - If deployed + different example: Reject
+
+    Args:
+        existing_deployment: Current deployment record
+        new_example_identifier: Identifier of new example being assigned
+        course_content_id: ID of the course content (for error context)
+
+    Returns:
+        Tuple of (is_same_example, action_type)
+        - is_same_example: Whether this is updating the same example
+        - action_type: 'updated', 'reassigned', or 'assigned'
+
+    Raises:
+        BadRequestException: If deployed and trying to assign different example
+    """
+    current_identifier = existing_deployment.example_identifier
+    is_same_example = str(current_identifier) == str(new_example_identifier)
+
+    # If deployed, only allow reassignment if it's the same example (version update)
+    if existing_deployment.deployment_status == 'deployed' and not is_same_example:
+        raise BadRequestException(
+            error_code="DEPLOY_001",
+            detail="Cannot reassign to different example: Current example is already deployed. "
+                   "Reassignment to a different version of the same example is allowed.",
+            context={
+                "course_content_id": str(course_content_id),
+                "current_status": existing_deployment.deployment_status,
+                "current_example": str(current_identifier) if current_identifier else None,
+                "new_example": str(new_example_identifier),
+                "is_same_example": is_same_example
+            }
+        )
+
+    # Determine action type for history
+    if is_same_example:
+        action = 'updated' if existing_deployment.deployment_status == 'deployed' else 'reassigned'
+    else:
+        action = 'reassigned'
+
+    return is_same_example, action
 
 
 def validate_semantic_version(version_str: str) -> SemanticVersion:
@@ -52,10 +105,11 @@ def validate_semantic_version(version_str: str) -> SemanticVersion:
 
 def assign_example_to_content(
     course_content_id: str | UUID,
-    example_id: str | UUID,
-    version_tag: str,
-    permissions: Principal,
-    db: Session
+    example_id: str | UUID | None = None,
+    version_tag: str = "",
+    permissions: Principal = None,
+    db: Session = None,
+    example_identifier: str | None = None
 ) -> CourseContentDeployment:
     """
     Assign an example version to a course content (assignment).
@@ -64,7 +118,8 @@ def assign_example_to_content(
 
     Args:
         course_content_id: ID of the course content (must be submittable)
-        example_id: ID of the example to assign
+        example_id: ID of the example to assign (UUID) - optional if example_identifier provided
+        example_identifier: Identifier path of the example (e.g., 'itpcp.pgph.mat.example') - optional if example_id provided
         version_tag: Semantic version tag (e.g., "1.0.0", "2.1.3-beta")
         permissions: Current user's permissions
         db: Database session
@@ -78,7 +133,17 @@ def assign_example_to_content(
         BadRequestException: If validation fails
     """
 
-    # 1. Validate version format
+    # 0. Validate that either example_id or example_identifier is provided
+    if not example_id and not example_identifier:
+        raise BadRequestException(
+            error_code="VAL_002",
+            detail="Either example_id or example_identifier must be provided",
+            context={}
+        )
+
+    # 1. Normalize and validate version format
+    # Normalize short versions like '1.2' to '1.2.0'
+    version_tag = normalize_version(version_tag)
     validate_semantic_version(version_tag)
 
     # 2. Get and validate course content with relationships
@@ -133,14 +198,26 @@ def assign_example_to_content(
             }
         )
 
-    # 5. Validate example exists
-    example = db.query(Example).filter(Example.id == example_id).first()
-    if not example:
-        raise NotFoundException(
-            error_code="CONTENT_004",
-            detail="Example not found",
-            context={"example_id": str(example_id)}
-        )
+    # 5. Resolve example by ID or identifier
+    if example_identifier:
+        # Look up by identifier (ltree path)
+        example = db.query(Example).filter(Example.identifier == Ltree(example_identifier)).first()
+        if not example:
+            raise NotFoundException(
+                error_code="CONTENT_004",
+                detail="Example not found by identifier",
+                context={"example_identifier": example_identifier}
+            )
+        example_id = example.id
+    else:
+        # Look up by ID
+        example = db.query(Example).filter(Example.id == example_id).first()
+        if not example:
+            raise NotFoundException(
+                error_code="CONTENT_004",
+                detail="Example not found",
+                context={"example_id": str(example_id)}
+            )
 
     # 6. Find specific version
     example_version = db.query(ExampleVersion).filter(
@@ -166,26 +243,28 @@ def assign_example_to_content(
     ).first()
 
     if existing_deployment:
-        # Update existing deployment (only if not already deployed)
-        if existing_deployment.deployment_status == 'deployed':
-            raise BadRequestException(
-                error_code="DEPLOY_001",
-                detail="Cannot reassign: Example already deployed",
-                context={
-                    "course_content_id": str(course_content_id),
-                    "current_status": existing_deployment.deployment_status
-                }
-            )
+        # Validate reassignment using shared helper function
+        is_same_example, action = validate_reassignment_allowed(
+            existing_deployment=existing_deployment,
+            new_example_identifier=str(example.identifier),
+            course_content_id=str(course_content_id)
+        )
 
         # Track previous version for history
         previous_version_id = existing_deployment.example_version_id
+
+        # Set appropriate log message
+        if is_same_example:
+            log_message = f"Updated example {example_id} from v{existing_deployment.version_tag} to v{version_tag}"
+        else:
+            log_message = f"Reassigned from {existing_deployment.example_identifier} to {example.identifier} (v{version_tag})"
 
         # Update deployment
         existing_deployment.example_version_id = example_version.id
         existing_deployment.example_identifier = example.identifier
         existing_deployment.version_tag = version_tag
         existing_deployment.deployment_path = str(example.identifier)  # Set deployment path to example identifier
-        existing_deployment.deployment_status = 'pending'
+        existing_deployment.deployment_status = 'pending'  # Reset to pending for redeployment
         existing_deployment.assigned_at = datetime.now(timezone.utc)
         existing_deployment.deployment_message = None
         existing_deployment.updated_by = permissions.user_id
@@ -193,7 +272,7 @@ def assign_example_to_content(
         # Create history entry
         history = DeploymentHistory(
             deployment_id=existing_deployment.id,
-            action='reassigned',
+            action=action,
             example_version_id=example_version.id,
             previous_example_version_id=previous_version_id,
             example_identifier=example.identifier,
@@ -206,7 +285,8 @@ def assign_example_to_content(
         db.refresh(existing_deployment)
 
         logger.info(
-            f"Reassigned example {example_id} (v{version_tag}) to content {course_content_id}"
+            f"{log_message} for content {course_content_id} "
+            f"(status reset to pending for redeployment)"
         )
 
         return existing_deployment

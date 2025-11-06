@@ -7,10 +7,10 @@ from computor_types.roles import (
     RoleGet,
     RoleQuery,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class RoleClient(BaseEndpointClient):
+class RoleClient(TypedEndpointClient):
     """Client for roles endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):

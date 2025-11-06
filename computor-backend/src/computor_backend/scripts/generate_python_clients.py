@@ -35,12 +35,26 @@ def discover_interfaces() -> List[tuple[str, Type]]:
                 name not in seen_names
             ):
                 # Map back to types module for DTO imports
-                # e.g., UserInterface -> computor_types.users
-                interface_base_name = name.replace("Interface", "").lower()
-                # Convert CamelCase to snake_case
+                # Use the actual module where the DTOs are defined
+                # Get the module from one of the DTO classes (e.g., create, get, etc.)
                 import re
-                snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', interface_base_name).lower()
-                module_name = f"computor_types.{snake_case}s" if not snake_case.endswith('s') else f"computor_types.{snake_case}"
+
+                # Try to get the actual module from the DTO classes
+                dto_module = None
+                for dto_attr in ['create', 'get', 'update', 'list', 'query']:
+                    dto_class = getattr(obj, dto_attr, None)
+                    if dto_class is not None and hasattr(dto_class, '__module__'):
+                        dto_module = dto_class.__module__
+                        break
+
+                if dto_module and dto_module.startswith('computor_types.'):
+                    # Use the actual module name from the DTO
+                    module_name = dto_module
+                else:
+                    # Fallback: convert CamelCase to snake_case BEFORE lowercasing
+                    interface_base_name = name.replace("Interface", "")
+                    snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', interface_base_name).lower()
+                    module_name = f"computor_types.{snake_case}s" if not snake_case.endswith('s') else f"computor_types.{snake_case}"
 
                 interfaces.append((module_name, obj))
                 seen_names.add(name)
@@ -68,15 +82,15 @@ def generate_client_class(module_name: str, interface: Type) -> str:
     has_update = interface.update is not None
     has_query = interface.query is not None
 
-    # Collect imports
+    # Collect imports - only import DTOs from computor_types
     imports = set()
-    if has_get:
+    if has_get and hasattr(interface.get, '__module__') and interface.get.__module__.startswith('computor_types'):
         imports.add(interface.get.__name__)
-    if has_create:
+    if has_create and hasattr(interface.create, '__module__') and interface.create.__module__.startswith('computor_types'):
         imports.add(interface.create.__name__)
-    if has_update:
+    if has_update and hasattr(interface.update, '__module__') and interface.update.__module__.startswith('computor_types'):
         imports.add(interface.update.__name__)
-    if has_query:
+    if has_query and hasattr(interface.query, '__module__') and interface.query.__module__.startswith('computor_types'):
         imports.add(interface.query.__name__)
 
     # Build the client class code
@@ -94,26 +108,32 @@ def generate_client_class(module_name: str, interface: Type) -> str:
         lines.append(f'    {imp},')
     lines.append(')')
 
+    # Determine which models are from computor_types (and thus were imported)
+    get_model_name = interface.get.__name__ if (has_get and hasattr(interface.get, '__module__') and interface.get.__module__.startswith('computor_types')) else "None"
+    create_model_name = interface.create.__name__ if (has_create and hasattr(interface.create, '__module__') and interface.create.__module__.startswith('computor_types')) else "None"
+    update_model_name = interface.update.__name__ if (has_update and hasattr(interface.update, '__module__') and interface.update.__module__.startswith('computor_types')) else "None"
+    query_model_name = interface.query.__name__ if (has_query and hasattr(interface.query, '__module__') and interface.query.__module__.startswith('computor_types')) else "None"
+
     lines.extend([
-        'from computor_client.base import BaseEndpointClient',
+        'from computor_client.base import TypedEndpointClient',
         '',
         '',
-        f'class {class_name}(BaseEndpointClient):',
+        f'class {class_name}(TypedEndpointClient):',
         f'    """Client for {endpoint} endpoint."""',
         '',
         '    def __init__(self, client: httpx.AsyncClient):',
         '        super().__init__(',
         '            client=client,',
         f'            base_path="/{endpoint}",',
-        f'            response_model={interface.get.__name__ if has_get else "None"},',
+        f'            response_model={get_model_name},',
     ])
 
     if has_create:
-        lines.append(f'            create_model={interface.create.__name__},')
+        lines.append(f'            create_model={create_model_name},')
     if has_update:
-        lines.append(f'            update_model={interface.update.__name__},')
+        lines.append(f'            update_model={update_model_name},')
     if has_query:
-        lines.append(f'            query_model={interface.query.__name__},')
+        lines.append(f'            query_model={query_model_name},')
 
     lines.append('        )')
 

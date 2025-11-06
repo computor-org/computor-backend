@@ -441,7 +441,7 @@ def main(
     """Main entry point."""
     backend_dir = Path(__file__).parent.parent
     src_dir = backend_dir.parent
-    project_root = src_dir.parent
+    project_root = src_dir.parent.parent  # project root (up from computor-backend/src)
 
     if schema_dir is None:
         schema_dir = project_root / "frontend" / "src" / "types" / "schemas"

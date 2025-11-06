@@ -47,6 +47,8 @@ from computor_backend.repositories import (
     CourseContentDeploymentRepository,
     ExampleVersionRepository,
 )
+from computor_backend.business_logic.lecturer_deployment import validate_reassignment_allowed
+from computor_types.validation import normalize_version
 from aiocache import BaseCache
 
 # Create the router
@@ -252,6 +254,10 @@ async def assign_example_to_content(
         src_identifier = request.example_identifier
         requested_tag = (request.version_tag or '').strip() if request.version_tag else None
 
+        # Normalize version tag if provided (e.g., '1.2' -> '1.2.0')
+        if requested_tag and requested_tag.lower() != 'latest':
+            requested_tag = normalize_version(requested_tag)
+
         # Try to resolve to Example/ExampleVersion from DB
         example_row = db.query(ExampleModel).filter(ExampleModel.identifier == Ltree(src_identifier)).first()
         if example_row:
@@ -321,6 +327,13 @@ async def assign_example_to_content(
             db.refresh(deployment)
             return _build_deployment_with_history(deployment, db)
 
+        # Validate reassignment using shared helper function
+        is_same_example, action = validate_reassignment_allowed(
+            existing_deployment=deployment,
+            new_example_identifier=src_identifier,
+            course_content_id=str(content_id)
+        )
+
         # Update via repository
         deployment = deployment_repo.update(
             deployment.id,
@@ -328,7 +341,7 @@ async def assign_example_to_content(
                 "example_version_id": new_example_version_id,
                 "example_identifier": Ltree(src_identifier) if src_identifier else None,
                 "version_tag": src_version_tag,
-                "deployment_status": "pending",
+                "deployment_status": "pending",  # Reset to pending for redeployment
                 "deployment_message": request.deployment_message,
                 "updated_by": permissions.user_id if hasattr(permissions, 'user_id') else None,
                 "updated_at": datetime.utcnow()
@@ -337,7 +350,7 @@ async def assign_example_to_content(
 
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
-            action="reassigned" if previous_version_id else "assigned",
+            action=action,
             example_version_id=new_example_version_id,
             example_identifier=Ltree(src_identifier) if src_identifier else None,
             version_tag=src_version_tag,

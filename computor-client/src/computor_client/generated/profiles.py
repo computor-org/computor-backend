@@ -9,10 +9,10 @@ from computor_types.profiles import (
     ProfileQuery,
     ProfileUpdate,
 )
-from computor_client.base import BaseEndpointClient
+from computor_client.base import TypedEndpointClient
 
 
-class ProfileClient(BaseEndpointClient):
+class ProfileClient(TypedEndpointClient):
     """Client for profiles endpoint."""
 
     def __init__(self, client: httpx.AsyncClient):
