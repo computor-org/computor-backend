@@ -22,6 +22,7 @@ from computor_backend.api.exceptions import (
     NotFoundException,
     BadRequestException,
     ForbiddenException,
+    UnauthorizedException,
 )
 from computor_backend.business_logic.users import set_user_password
 from computor_types.password_utils import PasswordValidationError
@@ -120,9 +121,8 @@ async def set_initial_password(
                 find_or_create_gitlab_account,
             )
 
-            # Verify user via GitLab PAT
+            # Verify user via GitLab PAT (email is fetched from GitLab)
             user, gitlab_url, gitlab_user_data = await verify_user_with_gitlab_pat(
-                email=request.provider_auth.email,
                 access_token=request.provider_auth.credentials.access_token,
                 gitlab_url=request.provider_auth.credentials.gitlab_url,
                 db=db,
