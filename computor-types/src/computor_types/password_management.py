@@ -8,7 +8,7 @@ Request and response models for password operations including:
 """
 
 from typing import Optional, Literal, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 class GitLabPATCredentials(BaseModel):
@@ -57,6 +57,12 @@ class AdminSetPasswordRequest(BaseModel):
 class AdminResetPasswordRequest(BaseModel):
     """Admin request to reset a user's password (marks for reset)."""
     username: str = Field(..., description="Target username")
+
+
+class UserManagerResetPasswordRequest(BaseModel):
+    """User manager request to reset a user's password (sets to NULL)."""
+    user_id: str = Field(..., description="Target user ID to reset")
+    manager_password: str = Field(..., description="User manager's own password for verification")
 
 
 class PasswordStatusResponse(BaseModel):

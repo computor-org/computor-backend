@@ -31,6 +31,7 @@ from computor_types.password_management import (
     ChangePasswordRequest,
     AdminSetPasswordRequest,
     AdminResetPasswordRequest,
+    UserManagerResetPasswordRequest,
     PasswordStatusResponse,
     PasswordOperationResponse,
 )
@@ -325,6 +326,117 @@ async def admin_reset_password(
     return PasswordOperationResponse(
         message=f"Password reset required for user '{request.username}'. "
                 "User must contact administrator or use password reset link.",
+        user_id=str(target_user.id),
+        username=target_user.username,
+    )
+
+
+@password_reset_router.post("/reset", response_model=PasswordOperationResponse)
+async def user_manager_reset_password(
+    request: UserManagerResetPasswordRequest,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+) -> PasswordOperationResponse:
+    """
+    User manager endpoint to reset a user's password to NULL.
+
+    This endpoint:
+    1. Sets the user's password to NULL (no password)
+    2. Sets password_reset_required to True
+    3. User must then set a new password via /password/set (with GitLab PAT or other method)
+
+    Security requirements:
+    - User must have _user_manager role OR be an admin
+    - User manager must provide their own password for verification
+    - Critical operation - requires password confirmation
+
+    Requires _user_manager role or admin privileges.
+    """
+    from computor_backend.model.role import UserRole
+    from computor_types.password_utils import verify_password, is_argon2_hash
+    from computor_types.tokens import decrypt_api_key
+
+    # 1. Check if user has _user_manager role or is admin
+    is_user_manager = False
+    if not principal.is_admin:
+        user_role = db.query(UserRole).filter(
+            UserRole.user_id == principal.user_id,
+            UserRole.role_id == "_user_manager"
+        ).first()
+
+        if not user_role:
+            raise ForbiddenException(
+                "Only user managers or administrators can reset user passwords"
+            )
+        is_user_manager = True
+
+    # 2. Verify the manager's own password
+    manager_user = db.query(User).filter(User.id == principal.user_id).first()
+    if not manager_user:
+        raise NotFoundException("Manager user not found")
+
+    if not manager_user.password:
+        raise BadRequestException("Manager account has no password set")
+
+    # Verify manager password (supports both Argon2 and legacy)
+    password_correct = False
+    if is_argon2_hash(manager_user.password):
+        password_correct = verify_password(request.manager_password, manager_user.password)
+    else:
+        # Legacy encrypted password
+        try:
+            password_correct = (request.manager_password == decrypt_api_key(manager_user.password))
+        except Exception as e:
+            logger.error(f"Error verifying manager password: {e}")
+            password_correct = False
+
+    if not password_correct:
+        logger.warning(
+            f"Failed password reset attempt by {manager_user.username} (ID: {principal.user_id}) "
+            f"- incorrect password"
+        )
+        raise BadRequestException("Manager password is incorrect")
+
+    # 3. Find the target user
+    target_user = db.query(User).filter(User.id == request.user_id).first()
+    if not target_user:
+        raise NotFoundException(f"User with ID '{request.user_id}' not found")
+
+    # 4. Prevent user from resetting their own password via this endpoint
+    if str(target_user.id) == str(principal.user_id):
+        raise BadRequestException(
+            "Cannot reset your own password using this endpoint. "
+            "Use /password/change instead."
+        )
+
+    # 5. Prevent user managers from resetting admin passwords (only admins can reset admin passwords)
+    if is_user_manager:
+        # Check if target user has admin role
+        target_is_admin = db.query(UserRole).filter(
+            UserRole.user_id == target_user.id,
+            UserRole.role_id == "_admin"
+        ).first() is not None
+
+        if target_is_admin:
+            raise ForbiddenException(
+                "User managers cannot reset administrator passwords. "
+                "Only administrators can reset other administrator passwords."
+            )
+
+    # 6. Reset the password to NULL
+    target_user.password = None
+    target_user.password_reset_required = True
+    db.commit()
+
+    role_type = "admin" if principal.is_admin else "user manager"
+    logger.info(
+        f"{role_type.capitalize()} {manager_user.username} (ID: {principal.user_id}) "
+        f"reset password for user {target_user.username} (ID: {target_user.id})"
+    )
+
+    return PasswordOperationResponse(
+        message=f"Password reset to NULL for user '{target_user.username}'. "
+                "User can now set a new password via GitLab PAT or other authentication method.",
         user_id=str(target_user.id),
         username=target_user.username,
     )
