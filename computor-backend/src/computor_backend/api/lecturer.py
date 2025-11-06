@@ -359,12 +359,11 @@ def validate_course_content_batch(
 # ============================================================================
 
 @lecturer_router.post(
-    "/courses/{course_id}/members/{course_member_id}/sync-gitlab",
+    "/course-members/{course_member_id}/sync-gitlab",
     response_model=GitLabSyncResult,
     status_code=status.HTTP_200_OK,
 )
 async def sync_member_gitlab_permissions_endpoint(
-    course_id: UUID,
     course_member_id: UUID,
     request: GitLabSyncRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -394,7 +393,6 @@ async def sync_member_gitlab_permissions_endpoint(
     **Note:** This uses the organization's GitLab token, not the user's token.
 
     Args:
-        course_id: UUID of the course
         course_member_id: UUID of the course member
         request: Sync request with force flag
         permissions: Current user permissions
@@ -405,11 +403,10 @@ async def sync_member_gitlab_permissions_endpoint(
 
     Raises:
         403: Insufficient permissions (requires _lecturer role)
-        404: Course or course member not found
+        404: Course member not found
         400: GitLab not configured for course
     """
     return sync_course_member_gitlab_permissions(
-        course_id=course_id,
         course_member_id=course_member_id,
         permissions=permissions,
         db=db,

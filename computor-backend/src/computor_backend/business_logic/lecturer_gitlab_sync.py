@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 def sync_course_member_gitlab_permissions(
-    course_id: UUID | str,
     course_member_id: UUID | str,
     permissions: Principal,
     db: Session,
@@ -46,7 +45,6 @@ def sync_course_member_gitlab_permissions(
     - Initial setup issues
 
     Args:
-        course_id: Course UUID
         course_member_id: CourseMember UUID
         permissions: Current principal (must be _lecturer or higher)
         db: Database session
@@ -57,19 +55,9 @@ def sync_course_member_gitlab_permissions(
 
     Raises:
         ForbiddenException: If user lacks _lecturer permissions
-        NotFoundException: If course or member not found
+        NotFoundException: If course member not found
         BadRequestException: If GitLab not configured
     """
-    # Verify lecturer permissions on course
-    course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
-        Course.id == course_id
-    ).first()
-
-    if not course:
-        raise ForbiddenException(
-            detail="You must be a lecturer or higher to sync GitLab permissions"
-        )
-
     # Fetch course member with relationships
     course_member = (
         db.query(CourseMember)
@@ -77,15 +65,22 @@ def sync_course_member_gitlab_permissions(
             joinedload(CourseMember.course).joinedload(Course.organization),
             joinedload(CourseMember.user),
         )
-        .filter(
-            CourseMember.id == course_member_id,
-            CourseMember.course_id == course_id,
-        )
+        .filter(CourseMember.id == course_member_id)
         .first()
     )
 
     if not course_member:
         raise NotFoundException(detail="Course member not found")
+
+    # Verify lecturer permissions on the course
+    course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
+        Course.id == course_member.course_id
+    ).first()
+
+    if not course:
+        raise ForbiddenException(
+            detail="You must be a lecturer or higher to sync GitLab permissions"
+        )
 
     # Get organization and course properties
     organization = course.organization
