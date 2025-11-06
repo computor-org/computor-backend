@@ -23,6 +23,10 @@ from computor_types.lecturer_content_validation import (
     ContentValidationCreate,
     ContentValidationGet,
 )
+from computor_types.lecturer_gitlab_sync import (
+    GitLabSyncRequest,
+    GitLabSyncResult,
+)
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 
@@ -38,6 +42,9 @@ from computor_backend.business_logic.lecturer_deployment import (
     get_deployment_for_content,
     unassign_example_from_content,
     batch_validate_content,
+)
+from computor_backend.business_logic.lecturer_gitlab_sync import (
+    sync_course_member_gitlab_permissions,
 )
 
 lecturer_router = APIRouter()
@@ -345,3 +352,66 @@ def validate_course_content_batch(
     )
 
     return ContentValidationGet(**result)
+
+
+# ============================================================================
+# GitLab Permission Sync Endpoints
+# ============================================================================
+
+@lecturer_router.post(
+    "/courses/{course_id}/members/{course_member_id}/sync-gitlab",
+    response_model=GitLabSyncResult,
+    status_code=status.HTTP_200_OK,
+)
+async def sync_member_gitlab_permissions_endpoint(
+    course_id: UUID,
+    course_member_id: UUID,
+    request: GitLabSyncRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """
+    Sync GitLab permissions for a specific course member.
+
+    **Permission Required:** `_lecturer` or higher
+
+    This endpoint allows lecturers to manually trigger GitLab permission
+    synchronization for a course member. The system will:
+
+    1. Verify the member has a linked GitLab account
+    2. Check their current role in the course
+    3. Grant/update appropriate GitLab permissions based on role:
+       - **Students**: Access to submission repositories + template (read)
+       - **Tutors**: Course group access + tutor repository
+       - **Lecturers/Maintainers/Owners**: Full course group access
+
+    **When to use:**
+    - After adding new assignments/repositories
+    - After changing a member's role
+    - When GitLab configuration is updated
+    - To fix permission issues
+
+    **Note:** This uses the organization's GitLab token, not the user's token.
+
+    Args:
+        course_id: UUID of the course
+        course_member_id: UUID of the course member
+        request: Sync request with force flag
+        permissions: Current user permissions
+        db: Database session
+
+    Returns:
+        GitLabSyncResult with sync status and details
+
+    Raises:
+        403: Insufficient permissions (requires _lecturer role)
+        404: Course or course member not found
+        400: GitLab not configured for course
+    """
+    return sync_course_member_gitlab_permissions(
+        course_id=course_id,
+        course_member_id=course_member_id,
+        permissions=permissions,
+        db=db,
+        force=request.force,
+    )
