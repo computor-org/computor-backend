@@ -1298,29 +1298,57 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
 def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
     """Find or create an example repository with MinIO backend."""
 
-    client = run_async(get_computor_client(auth))
+    # Use direct HTTP client to avoid pydantic validation issues
+    # The generated client tries to validate list responses as ExampleRepositoryGet
+    # but the API returns ExampleRepositoryList which doesn't have created_at/updated_at
+    import httpx
 
-    repo_client = client.example_repositories
+    async def _find_or_create_repo():
+        async with httpx.AsyncClient(base_url=auth.api_url) as http_client:
+            # Authenticate first
+            if auth.basic:
+                auth_response = await http_client.post(
+                    "/auth/login",
+                    json={"username": auth.basic.username, "password": auth.basic.password}
+                )
+                auth_response.raise_for_status()
+                token = auth_response.json()["access_token"]
+                http_client.headers.update({"Authorization": f"Bearer {token}"})
+            else:
+                raise RuntimeError("Only basic auth is supported for repository lookup")
 
-    # Try find by name
-    try:
-        existing = run_async(repo_client.list(ExampleRepositoryQuery(name=repo_name)))
-        if existing:
-            return existing[0]
-    except Exception:
-        pass
+            # Search for existing repository
+            click.echo(f"    🔍 Searching for repository: {repo_name}")
+            response = await http_client.get("/example-repositories", params={"name": repo_name})
+            response.raise_for_status()
 
-    # Create default MinIO-backed repository
-    try:
-        repo_create = ExampleRepositoryCreate(
-            name=repo_name,
-            description=f"Repository for {repo_name} examples",
-            source_type="minio",
-            source_url="examples-bucket/local",
-        )
-        return run_async(repo_client.create(repo_create))
-    except Exception as e:
-        raise RuntimeError(f"Failed to create example repository '{repo_name}': {e}")
+            repos = response.json()
+            click.echo(f"    🔍 Found {len(repos)} matching repositories")
+
+            if repos:
+                repo = repos[0]
+                click.echo(f"    ✅ Using existing repository: {repo['name']} (ID: {repo['id']}, source_url: {repo['source_url']})")
+                # Convert to ExampleRepositoryGet-like object
+                from types import SimpleNamespace
+                return SimpleNamespace(**repo)
+
+            # Create new repository
+            click.echo(f"    📦 Creating new repository: {repo_name}")
+            create_data = {
+                "name": repo_name,
+                "description": f"Repository for {repo_name} examples",
+                "source_type": "minio",
+                "source_url": "examples-bucket",
+            }
+
+            response = await http_client.post("/example-repositories", json=create_data)
+            response.raise_for_status()
+
+            repo = response.json()
+            click.echo(f"    ✅ Created repository: {repo['name']} (ID: {repo['id']})")
+            return SimpleNamespace(**repo)
+
+    return run_async(_find_or_create_repo())
 
 
 def _create_zip_bytes_from_directory(directory_path: Path) -> bytes:
