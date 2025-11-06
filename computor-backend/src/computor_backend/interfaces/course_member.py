@@ -18,8 +18,9 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
     """
     Post-create hook for CourseMember.
 
-    Creates submission groups for all submittable course contents with max_group_size=1 or None,
-    and triggers the StudentRepositoryCreationWorkflow to create GitLab repository.
+    1. Creates StudentProfile if this is the first course membership in this organization
+    2. Creates submission groups for all submittable course contents with max_group_size=1 or None
+    3. Triggers the StudentRepositoryCreationWorkflow to create GitLab repository
 
     Args:
         course_member: The newly created course member
@@ -31,6 +32,47 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
         return
 
     logger.info(f"Running post_create for course member {course_member.id} (user: {course_member.user_id}, course: {course_member.course_id})")
+
+    # Step 1: Create StudentProfile if this is the first course membership in this organization
+    from computor_backend.model.auth import StudentProfile
+    from computor_backend.model.course import Course
+
+    try:
+        # Get the course to find the organization_id
+        course = db.query(Course).filter(Course.id == course_member.course_id).first()
+        if course and course.organization_id:
+            # Check if user already has a student profile for this organization
+            existing_profile = db.query(StudentProfile).filter(
+                StudentProfile.user_id == course_member.user_id,
+                StudentProfile.organization_id == course.organization_id
+            ).first()
+
+            if not existing_profile:
+                # Create new student profile with user's email
+                student_profile = StudentProfile(
+                    user_id=course_member.user_id,
+                    student_email=course_member.user.email,
+                    organization_id=course.organization_id,
+                    # student_id can be set later via course import or manual update
+                    student_id=None,
+                )
+                db.add(student_profile)
+                db.flush()
+                logger.info(
+                    f"Created StudentProfile for user {course_member.user_id} "
+                    f"in organization {course.organization_id} (first course membership)"
+                )
+            else:
+                logger.debug(
+                    f"StudentProfile already exists for user {course_member.user_id} "
+                    f"in organization {course.organization_id}"
+                )
+    except Exception as e:
+        logger.error(
+            f"Failed to create StudentProfile for course member {course_member.id}: {e}",
+            exc_info=True
+        )
+        # Don't fail the entire course member creation if StudentProfile creation fails
 
     # Provision submission groups for individual assignments (max_group_size=1 or None)
     from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user

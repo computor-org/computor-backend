@@ -868,11 +868,30 @@ async def verify_user_with_gitlab_pat(
         raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}")
 
     # 3. Find user in our system by email (case-insensitive)
+    # First try User.email
     user = await run_in_threadpool(
         lambda: db.query(User)
         .filter(func.lower(User.email) == gitlab_email.lower())
         .first()
     )
+
+    # If not found, also check StudentProfile.student_email
+    # (handles cases where User.email was changed but student_email wasn't)
+    if not user:
+        from computor_backend.model.auth import StudentProfile
+
+        student_profile = await run_in_threadpool(
+            lambda: db.query(StudentProfile)
+            .filter(func.lower(StudentProfile.student_email) == gitlab_email.lower())
+            .first()
+        )
+
+        if student_profile:
+            user = student_profile.user
+            logger.info(
+                f"Found user {user.username} (ID: {user.id}) via StudentProfile.student_email "
+                f"(GitLab email: {gitlab_email}, User.email: {user.email})"
+            )
 
     if not user:
         raise NotFoundException(
