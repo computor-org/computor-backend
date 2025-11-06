@@ -155,19 +155,31 @@ def set_user_password(
 
 def get_course_views_for_user(user_id: str, db: Session) -> List[str]:
     """Get available views based on roles across all courses for the user."""
+    from computor_backend.model.role import UserRole
 
-    # Query all course memberships for the current user
+    # Collect all unique views
+    views = set()
+
+    # 1. Check global user roles (e.g., _user_manager)
+    user_roles = (
+        db.query(UserRole)
+        .filter(UserRole.user_id == user_id)
+        .all()
+    )
+
+    for user_role in user_roles:
+        if user_role.role_id == "_user_manager":
+            views.add("user_manager")
+        # Add more global role mappings here if needed
+
+    # 2. Query all course memberships for the current user
     course_members = (
         db.query(CourseMember)
         .filter(CourseMember.user_id == user_id)
         .all()
     )
 
-    if not course_members:
-        return []
-
-    # Collect all unique views from all course roles
-    views = set()
+    # 3. Collect views from course roles
     for course_member in course_members:
         if not course_member.course_role_id:
             continue

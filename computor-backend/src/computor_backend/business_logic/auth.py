@@ -794,24 +794,22 @@ async def refresh_sso_token(
 
 
 async def verify_user_with_gitlab_pat(
-    email: str,
     access_token: str,
-    gitlab_url: Optional[str],
+    gitlab_url: str,
     db: Session,
 ) -> Tuple[User, str, Dict[str, Any]]:
     """
     Verify user identity via GitLab Personal Access Token.
 
     This function verifies that:
-    1. User exists in our system with the given email
-    2. User belongs to an organization that uses GitLab
-    3. The provided token is a valid Personal Access Token (not bot/project/group token)
-    4. The GitLab user's email matches our system's email
+    1. The provided token is a valid Personal Access Token (not bot/project/group token)
+    2. Fetches the email from GitLab user profile
+    3. Finds user in our system with matching email
+    4. Verifies user belongs to an organization that uses the specified GitLab instance
 
     Args:
-        email: User's email address in our system
         access_token: GitLab Personal Access Token (glpat-...)
-        gitlab_url: Optional GitLab instance URL (will auto-detect if not provided)
+        gitlab_url: GitLab instance URL (e.g., https://gitlab.com)
         db: Database session
 
     Returns:
@@ -819,7 +817,7 @@ async def verify_user_with_gitlab_pat(
 
     Raises:
         NotFoundException: If user not found
-        ForbiddenException: If user not in GitLab-enabled org, or email mismatch
+        ForbiddenException: If user not in GitLab-enabled org
         BadRequestException: If token is not a personal access token
         UnauthorizedException: If GitLab authentication fails
 
@@ -831,21 +829,81 @@ async def verify_user_with_gitlab_pat(
     from gitlab import Gitlab
     from gitlab.exceptions import GitlabAuthenticationError, GitlabGetError
 
-    # 1. Find user in our system by email (case-insensitive)
+    # 1. Authenticate with GitLab and fetch user info
+    try:
+        logger.info(f"Attempting GitLab authentication at {gitlab_url}")
+
+        # Create GitLab client
+        gl = Gitlab(gitlab_url, private_token=access_token)
+        gl.auth()
+
+        # Get current user info from GitLab
+        gitlab_user = gl.user
+
+        # 2. Verify it's a personal access token (not bot/project/group token)
+        if not hasattr(gitlab_user, 'email') or not gitlab_user.email:
+            raise BadRequestException(
+                "This token does not appear to be a Personal Access Token. "
+                "Project and group access tokens are not allowed. "
+                "Please create a Personal Access Token in your GitLab user settings."
+            )
+
+        if hasattr(gitlab_user, 'bot') and gitlab_user.bot:
+            raise BadRequestException(
+                "Bot tokens are not allowed. Please use a Personal Access Token."
+            )
+
+        gitlab_email = gitlab_user.email
+        logger.info(f"Successfully authenticated with GitLab. User email: {gitlab_email}")
+
+    except GitlabAuthenticationError as e:
+        raise UnauthorizedException(f"GitLab authentication failed: {str(e)}")
+    except GitlabGetError as e:
+        raise UnauthorizedException(f"GitLab API error: {str(e)}")
+    except (BadRequestException,):
+        # Re-raise our own validation errors
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error with GitLab: {str(e)}", exc_info=True)
+        raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}")
+
+    # 3. Find user in our system by email (case-insensitive)
+    # First try User.email
     user = await run_in_threadpool(
         lambda: db.query(User)
-        .filter(func.lower(User.email) == email.lower())
+        .filter(func.lower(User.email) == gitlab_email.lower())
         .first()
     )
 
+    # If not found, also check StudentProfile.student_email
+    # (handles cases where User.email was changed but student_email wasn't)
     if not user:
-        raise NotFoundException(f"User with email '{email}' not found in system")
+        from computor_backend.model.auth import StudentProfile
 
-    logger.info(f"Found user {user.username} (ID: {user.id}) with email {email}")
+        student_profile = await run_in_threadpool(
+            lambda: db.query(StudentProfile)
+            .filter(func.lower(StudentProfile.student_email) == gitlab_email.lower())
+            .first()
+        )
 
-    # 2. Get all GitLab URLs from organizations the user belongs to
-    def _get_user_gitlab_urls() -> List[str]:
-        """Get all GitLab instance URLs from user's organizations."""
+        if student_profile:
+            user = student_profile.user
+            logger.info(
+                f"Found user {user.username} (ID: {user.id}) via StudentProfile.student_email "
+                f"(GitLab email: {gitlab_email}, User.email: {user.email})"
+            )
+
+    if not user:
+        raise NotFoundException(
+            f"No user found in system with email '{gitlab_email}'. "
+            "Please contact your administrator to create an account."
+        )
+
+    logger.info(f"Found user {user.username} (ID: {user.id}) with email {gitlab_email}")
+
+    # 4. Verify user belongs to an organization using this GitLab instance
+    def _verify_user_gitlab_access() -> bool:
+        """Verify user has access to this GitLab instance via their organizations."""
         orgs = (
             db.query(Organization)
             .join(Course, Course.organization_id == Organization.id)
@@ -857,109 +915,41 @@ async def verify_user_with_gitlab_pat(
             .all()
         )
 
-        gitlab_urls = []
+        # Check if any organization uses this GitLab instance
         for org in orgs:
             if org.properties and isinstance(org.properties, dict):
                 gitlab_info = org.properties.get('gitlab', {})
                 if isinstance(gitlab_info, dict):
-                    url = gitlab_info.get('url')
-                    if url:
-                        gitlab_urls.append(url)
+                    org_gitlab_url = gitlab_info.get('url')
+                    # Normalize URLs for comparison (remove trailing slash)
+                    if org_gitlab_url and org_gitlab_url.rstrip('/') == gitlab_url.rstrip('/'):
+                        return True
 
-        return list(set(gitlab_urls))  # Remove duplicates
+        return False
 
-    user_gitlab_urls = await run_in_threadpool(_get_user_gitlab_urls)
+    has_access = await run_in_threadpool(_verify_user_gitlab_access)
 
-    if not user_gitlab_urls:
+    if not has_access:
         raise ForbiddenException(
-            "User is not a member of any organization with GitLab integration"
+            f"User {user.username} is not a member of any organization using GitLab instance {gitlab_url}"
         )
 
-    logger.info(f"User belongs to organizations with GitLab instances: {user_gitlab_urls}")
+    logger.info(f"User {user.username} has access to GitLab instance {gitlab_url}")
 
-    # 3. Determine which GitLab URL(s) to try
-    urls_to_try = []
-    if gitlab_url:
-        # User provided explicit URL - use it first, then try others as fallback
-        urls_to_try = [gitlab_url] + [url for url in user_gitlab_urls if url != gitlab_url]
-    else:
-        # Auto-detect: try all user's GitLab URLs
-        urls_to_try = user_gitlab_urls
+    # 5. Return user and GitLab info
+    gitlab_user_data = {
+        'id': gitlab_user.id,
+        'username': gitlab_user.username,
+        'email': gitlab_user.email,
+        'name': gitlab_user.name,
+    }
 
-    # 4. Try to authenticate with GitLab and verify token
-    last_error = None
-    for url in urls_to_try:
-        try:
-            logger.info(f"Attempting GitLab authentication at {url}")
+    logger.info(
+        f"Successfully verified user {user.username} via GitLab PAT "
+        f"(GitLab user: {gitlab_user.username}, instance: {gitlab_url})"
+    )
 
-            # Create GitLab client
-            gl = Gitlab(url, private_token=access_token)
-            gl.auth()
-
-            # Get current user info from GitLab
-            gitlab_user = gl.user
-
-            # 5. Verify it's a personal access token (not bot/project/group token)
-            if not hasattr(gitlab_user, 'email') or not gitlab_user.email:
-                raise BadRequestException(
-                    "This token does not appear to be a Personal Access Token. "
-                    "Project and group access tokens are not allowed. "
-                    "Please create a Personal Access Token in your GitLab user settings."
-                )
-
-            if hasattr(gitlab_user, 'bot') and gitlab_user.bot:
-                raise BadRequestException(
-                    "Bot tokens are not allowed. Please use a Personal Access Token."
-                )
-
-            # 6. Verify email matches (case-insensitive)
-            if gitlab_user.email.lower() != email.lower():
-                raise ForbiddenException(
-                    f"Email mismatch: GitLab account email ({gitlab_user.email}) "
-                    f"does not match system email ({email})"
-                )
-
-            # Success! Return user and GitLab info
-            gitlab_user_data = {
-                'id': gitlab_user.id,
-                'username': gitlab_user.username,
-                'email': gitlab_user.email,
-                'name': gitlab_user.name,
-            }
-
-            logger.info(
-                f"Successfully verified user {user.username} via GitLab PAT "
-                f"(GitLab user: {gitlab_user.username}, instance: {url})"
-            )
-
-            return user, url, gitlab_user_data
-
-        except GitlabAuthenticationError as e:
-            last_error = f"GitLab authentication failed at {url}: {str(e)}"
-            logger.warning(last_error)
-            continue  # Try next URL
-
-        except GitlabGetError as e:
-            last_error = f"GitLab API error at {url}: {str(e)}"
-            logger.warning(last_error)
-            continue  # Try next URL
-
-        except (BadRequestException, ForbiddenException):
-            # These are our own validation errors - re-raise immediately
-            raise
-
-        except Exception as e:
-            last_error = f"Unexpected error with GitLab at {url}: {str(e)}"
-            logger.error(last_error, exc_info=True)
-            continue  # Try next URL
-
-    # If we get here, all URLs failed
-    if last_error:
-        raise UnauthorizedException(
-            f"Failed to verify GitLab token with any configured instance. Last error: {last_error}"
-        )
-    else:
-        raise UnauthorizedException("Failed to verify GitLab token")
+    return user, gitlab_url, gitlab_user_data
 
 
 async def find_or_create_gitlab_account(

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, List, Optional
 from text_unidecode import unidecode
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from computor_types.student_profile import StudentProfileGet
+from computor_types.user_roles import UserRoleGet
 
 # Forward reference for ProfileGet to avoid circular import
 if TYPE_CHECKING:
@@ -73,6 +74,7 @@ class UserGet(BaseEntityGet):
     is_service: bool = Field(description="Whether this is a service account")
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
     profile: Optional['ProfileGet'] = Field(None, description="User profile")
+    user_roles: List[UserRoleGet] = Field(default=[], description="User's global roles")
     
     
     @property
