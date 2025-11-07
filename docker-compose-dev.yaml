@@ -191,7 +191,7 @@ services:
       - TOKEN_SECRET=${TOKEN_SECRET}
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
-      - PYTHONPATH=/home/worker/src
+      - PYTHONPATH=/home/worker/computor-backend/src
       - API_URL=${API_URL}
       - API_ADMIN_USER=${API_ADMIN_USER}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
