@@ -209,6 +209,16 @@ if __name__ == '__main__':
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-matlab
     args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
-    cmd = f"python -m computor_backend.tasks.temporal_worker {args}"
+    cmd = f"python3.10 -m computor_backend.tasks.temporal_worker {args}"
     print(f"Starting temporal worker with command: {cmd}", flush=True)
-    subprocess.run(cmd, cwd=os.path.abspath(os.path.expanduser("~")), shell=True)
+
+    # Use Popen instead of run() to allow logs to flow through
+    # This way we can see worker startup and activity logs
+    import sys as pysys
+    subprocess.Popen(
+        cmd,
+        cwd=os.path.abspath(os.path.expanduser("~")),
+        shell=True,
+        stdout=pysys.stdout,  # Forward stdout to container logs
+        stderr=pysys.stderr,  # Forward stderr to container logs
+    ).wait()  # Wait for worker to finish (blocks forever)
