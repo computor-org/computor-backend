@@ -842,13 +842,16 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     return seg
 
             # Check if content already exists
-            existing_contents = run_async(content_client.list(CourseContentQuery(
-                course_id=course_id,
-                path=full_path
-            )))
-            
+            # Use custom_client to bypass Pydantic validation issues
+            existing_contents = custom_client.list("course-contents", params={
+                "course_id": course_id,
+                "path": full_path
+            })
+
             if existing_contents:
-                content = existing_contents[0]
+                # Convert to object for easier access
+                from types import SimpleNamespace
+                content = SimpleNamespace(**existing_contents[0])
                 click.echo(f"    ℹ️  Content already exists: {content.title} ({full_path})")
 
                 # Only update description if explicitly provided in deployment, otherwise if empty use meta_yaml.description
@@ -870,8 +873,8 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
 
                 if to_update:
                     try:
-                        from computor_types.course_contents import CourseContentUpdate
-                        run_async(content_client.update(str(content.id), CourseContentUpdate(**to_update)))
+                        # Use custom_client to bypass Pydantic validation issues
+                        custom_client.update(f"course-contents/{content.id}", to_update)
                         update_msg = ", ".join(to_update.keys())
                         click.echo(f"      ✏️  Updated content: {update_msg}")
                     except Exception as e:
@@ -892,21 +895,25 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
 
                 # Create the content
                 # NOTE: testing_service_id is NOT set here - it's set automatically when an example is assigned
-                content_create = CourseContentCreate(
-                    title=effective_title,
-                    description=effective_description,
-                    path=full_path,
-                    course_id=course_id,
-                    course_content_type_id=str(content_type.id),
-                    position=position,
-                    max_group_size=content_config.max_group_size or 1,
-                    max_test_runs=content_config.max_test_runs,
-                    max_submissions=content_config.max_submissions,
-                    testing_service_id=None,  # Will be set when example is assigned
-                    properties=content_config.properties
-                )
-                
-                content = run_async(content_client.create(content_create))
+                content_create_data = {
+                    "title": effective_title,
+                    "description": effective_description,
+                    "path": full_path,
+                    "course_id": course_id,
+                    "course_content_type_id": str(content_type.id),
+                    "position": position,
+                    "max_group_size": content_config.max_group_size or 1,
+                    "max_test_runs": content_config.max_test_runs,
+                    "max_submissions": content_config.max_submissions,
+                    "testing_service_id": None,  # Will be set when example is assigned
+                    "properties": content_config.properties.model_dump() if content_config.properties else None
+                }
+
+                # Use custom_client to bypass Pydantic validation issues with deployment field
+                content = custom_client.create("course-contents", content_create_data)
+                # Convert to object for easier access
+                from types import SimpleNamespace
+                content = SimpleNamespace(**content)
                 click.echo(f"    ✅ Created content: {effective_title} ({full_path})")
             
             # Handle example deployment for submittable content
