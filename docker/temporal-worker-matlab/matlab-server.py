@@ -52,7 +52,8 @@ class MatlabServer(object):
               self.engine = matlab.engine.connect_matlab(engine_name)
               print(f"-- setup: connected to '{engine_name}'", flush=True)
             elif len(engines) > 0:
-              name = engines.pop(0)
+              # engines is a tuple, not a list, so convert to list or use indexing
+              name = engines[0]
               print(f"-- setup: connecting to existing engine '{name}'", flush=True)
               self.engine = matlab.engine.connect_matlab(name)
               print(f"-- setup: connected to '{name}'", flush=True)
