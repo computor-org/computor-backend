@@ -481,31 +481,52 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
             # Check if service already exists
             existing_services = run_async(service_client.list(ServiceQuery(slug=service_config.slug)))
 
+            # Track whether we need to create a token
+            need_to_create_token = False
+
             if existing_services and len(existing_services) > 0:
                 service = existing_services[0]
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
 
                 # Look up the service's token by user_id (defaults to active tokens only)
-                existing_tokens = run_async(api_token_client.get_api_tokens(
-                    user_id=str(service.user_id)
+                from computor_types.api_tokens import ApiTokenQuery
+                existing_tokens = run_async(api_token_client.list(
+                    ApiTokenQuery(user_id=str(service.user_id))
                 ))
 
                 if existing_tokens and len(existing_tokens) > 0:
-                    # Use the first token (only active tokens are returned by default)
-                    token = existing_tokens[0]
-                    token_id = str(token.id)
-                    click.echo(f"    ℹ️  Found existing token: {token.token_prefix}...")
+                    # Check if force_recreate is enabled
+                    if service_config.api_token.force_recreate:
+                        if not service_config.api_token.token:
+                            click.echo(f"    ❌ force_recreate=True requires a predefined token to be set")
+                            raise ValueError(f"force_recreate=True requires a predefined token for service '{service_config.slug}'")
 
-                    deployed_services[service_config.slug] = {
-                        "id": str(service.id),
-                        "user_id": str(service.user_id),
-                        "token_id": token_id
-                    }
-                    continue
+                        # Delete existing token(s) and recreate
+                        click.echo(f"    🔄 force_recreate=True: Deleting existing token(s)...")
+                        for token in existing_tokens:
+                            try:
+                                run_async(api_token_client.revoke(str(token.id)))
+                                click.echo(f"    ✅ Deleted token: {token.token_prefix}...")
+                            except Exception as e:
+                                click.echo(f"    ⚠️  Failed to delete token {token.id}: {e}")
+
+                        need_to_create_token = True
+                    else:
+                        # Use the first token (only active tokens are returned by default)
+                        token = existing_tokens[0]
+                        token_id = str(token.id)
+                        click.echo(f"    ℹ️  Found existing token: {token.token_prefix}...")
+
+                        deployed_services[service_config.slug] = {
+                            "id": str(service.id),
+                            "user_id": str(service.user_id),
+                            "token_id": token_id
+                        }
+                        continue
                 else:
-                    # Service exists but no token - create one
+                    # Service exists but no token - need to create one
                     click.echo(f"    ⚠️  No token found for service, creating new token...")
-                    # Fall through to token creation logic below
+                    need_to_create_token = True
 
             # Only create service if it doesn't exist yet
             if not existing_services or len(existing_services) == 0:
@@ -542,8 +563,12 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 service = run_async(service_client.create(service_create))
                 click.echo(f"    ✅ Created service: {service_config.slug}")
+                need_to_create_token = True  # New service always needs a token
 
-            # 4. Create API Token
+            # 4. Create API Token (if needed)
+            if not need_to_create_token:
+                # Service exists and has a token - already handled above
+                continue
             token_config = service_config.api_token
 
             # Check for predefined token

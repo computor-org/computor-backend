@@ -227,6 +227,10 @@ class ServiceApiTokenConfig(BaseDeployment):
         None,
         description="Number of days until token expires. None means no expiration."
     )
+    force_recreate: bool = Field(
+        False,
+        description="If True, delete existing token and recreate with predefined value. Requires 'token' to be set."
+    )
 
 
 class ServiceConfig(BaseDeployment):
