@@ -417,7 +417,7 @@ def get_status_head():
     return
 
 @app.get(
-    "extension-public",
+    "/extensions-public",
     response_model=str,
 )
 async def get_public_extension_url():
@@ -426,7 +426,8 @@ async def get_public_extension_url():
     This endpoint requires no authentication and returns the URL
     specified in the EXTENSION_PUBLIC_DOWNLOAD_URL environment variable.
     """
-    if not settings.EXTENSION_PUBLIC_DOWNLOAD_URL:
+    download_link = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
+    if not download_link:
         raise NotFoundException("Public extension download URL not configured")
 
-    return settings.EXTENSION_PUBLIC_DOWNLOAD_URL
+    return download_link

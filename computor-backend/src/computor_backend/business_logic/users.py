@@ -441,40 +441,55 @@ def _check_user_has_project_access(
     project_path: str,
     required_access_level: int,
 ) -> bool:
-    """Check if user already has sufficient access to a project using their token."""
+    """Check if user already has sufficient DIRECT access to a project using their token.
+
+    Note: This checks for direct project membership, not inherited group access.
+    This is important because we want to grant explicit Reporter access to student-template
+    for students, even if they might have inherited Developer access via a parent group
+    (e.g., as a tutor in another course in the same organization).
+    """
     try:
-        print(f"🔍 Checking user's access to project: {project_path}")
+        print(f"🔍 Checking user's DIRECT access to project: {project_path}")
 
         import requests
         provider_url = user_client.url.rstrip('/')
         headers = {"PRIVATE-TOKEN": user_client.private_token}
 
-        # Use /api/v4/projects?min_access_level=X to get all projects user has access to
-        # with at least the required access level
-        projects_url = f"{provider_url}/api/v4/projects"
-        params = {'min_access_level': required_access_level, 'per_page': 100}
+        # Get the specific project and check direct membership
+        # URL encode the project path
+        from urllib.parse import quote
+        encoded_path = quote(project_path, safe='')
+        project_url = f"{provider_url}/api/v4/projects/{encoded_path}"
 
-        print(f"  → Fetching projects with min_access_level={required_access_level}")
-        response = requests.get(projects_url, headers=headers, params=params, timeout=10)
+        print(f"  → Fetching project details for: {project_path}")
+        response = requests.get(project_url, headers=headers, timeout=10)
 
-        if response.status_code != 200:
-            print(f"  → ✗ Failed to get projects: HTTP {response.status_code}")
+        if response.status_code == 404:
+            print(f"  → ✗ Project not found: {project_path}")
+            return False
+        elif response.status_code != 200:
+            print(f"  → ✗ Failed to get project: HTTP {response.status_code}")
             return False
 
-        projects = response.json()
-        print(f"  → Found {len(projects)} projects with access level >= {required_access_level}")
+        project_data = response.json()
 
-        # Debug: print all projects
-        for p in projects[:10]:  # Limit to first 10 for readability
-            print(f"     - {p.get('path_with_namespace', 'N/A')}")
+        # Check if user has direct membership with sufficient access level
+        # The 'permissions' field shows the user's effective permissions
+        permissions = project_data.get('permissions', {})
+        project_access = permissions.get('project_access')
 
-        # Check if the required project is in the list
-        for project in projects:
-            if project.get('path_with_namespace') == project_path:
-                print(f"  → ✓ User has sufficient access to project: {project_path}")
-                return True
+        if project_access and project_access.get('access_level', 0) >= required_access_level:
+            print(f"  → ✓ User has DIRECT access level {project_access.get('access_level')} (>= {required_access_level}) to project: {project_path}")
+            return True
 
-        print(f"  → ✗ User does not have access level {required_access_level} to project: {project_path}")
+        # Check group_access as fallback (inherited from parent group)
+        group_access = permissions.get('group_access')
+        if group_access and group_access.get('access_level', 0) >= required_access_level:
+            print(f"  → ℹ️ User has INHERITED group access level {group_access.get('access_level')} (>= {required_access_level})")
+            print(f"  → ⚠️  But we need DIRECT project membership - will grant it explicitly")
+            return False  # Return False to force direct membership grant
+
+        print(f"  → ✗ User does not have direct access level {required_access_level} to project: {project_path}")
         return False
 
     except (GitlabGetError, GitlabHttpError) as exc:
@@ -491,40 +506,69 @@ def _check_user_has_group_access(
     group_full_path: str,
     required_access_level: int,
 ) -> bool:
-    """Check if user already has sufficient access to a group using their token."""
+    """Check if user already has sufficient DIRECT access to a group using their token.
+
+    Note: This checks for direct group membership, not inherited access from parent groups.
+    This ensures we grant explicit membership at the correct level for each role.
+    """
     try:
-        print(f"🔍 Checking user's access to group: {group_full_path}")
+        print(f"🔍 Checking user's DIRECT access to group: {group_full_path}")
 
         import requests
         provider_url = user_client.url.rstrip('/')
         headers = {"PRIVATE-TOKEN": user_client.private_token}
 
-        # Use /api/v4/groups?min_access_level=X to get all groups user has access to
-        # with at least the required access level
-        groups_url = f"{provider_url}/api/v4/groups"
-        params = {'min_access_level': required_access_level, 'per_page': 100}
+        # Get the specific group and check direct membership
+        # URL encode the group path
+        from urllib.parse import quote
+        encoded_path = quote(group_full_path, safe='')
+        group_url = f"{provider_url}/api/v4/groups/{encoded_path}"
 
-        print(f"  → Fetching groups with min_access_level={required_access_level}")
-        response = requests.get(groups_url, headers=headers, params=params, timeout=10)
+        print(f"  → Fetching group details for: {group_full_path}")
+        response = requests.get(group_url, headers=headers, timeout=10)
 
-        if response.status_code != 200:
-            print(f"  → ✗ Failed to get groups: HTTP {response.status_code}")
+        if response.status_code == 404:
+            print(f"  → ✗ Group not found: {group_full_path}")
+            return False
+        elif response.status_code != 200:
+            print(f"  → ✗ Failed to get group: HTTP {response.status_code}")
             return False
 
-        groups = response.json()
-        print(f"  → Found {len(groups)} groups with access level >= {required_access_level}")
+        group_data = response.json()
 
-        # Debug: print all groups
-        for g in groups[:10]:  # Limit to first 10 for readability
-            print(f"     - {g.get('full_path', 'N/A')}")
+        # Get the user's membership in this specific group
+        # The 'members' endpoint shows direct members only
+        members_url = f"{group_url}/members/all"
+        members_response = requests.get(members_url, headers=headers, timeout=10)
 
-        # Check if the required group is in the list
-        for group in groups:
-            if group.get('full_path') == group_full_path:
-                print(f"  → ✓ User has sufficient access to group: {group_full_path}")
-                return True
+        if members_response.status_code != 200:
+            print(f"  → ✗ Failed to get group members: HTTP {members_response.status_code}")
+            return False
 
-        print(f"  → ✗ User does not have access level {required_access_level} to group: {group_full_path}")
+        # Get current user info to find their user ID
+        user_url = f"{provider_url}/api/v4/user"
+        user_response = requests.get(user_url, headers=headers, timeout=10)
+
+        if user_response.status_code != 200:
+            print(f"  → ✗ Failed to get current user: HTTP {user_response.status_code}")
+            return False
+
+        current_user = user_response.json()
+        current_user_id = current_user.get('id')
+
+        # Check if user is a direct member with sufficient access
+        all_members = members_response.json()
+        for member in all_members:
+            if member.get('id') == current_user_id:
+                access_level = member.get('access_level', 0)
+                if access_level >= required_access_level:
+                    print(f"  → ✓ User has DIRECT access level {access_level} (>= {required_access_level}) to group: {group_full_path}")
+                    return True
+                else:
+                    print(f"  → ⚠️  User has DIRECT access level {access_level} but needs {required_access_level}")
+                    return False
+
+        print(f"  → ✗ User does not have direct membership in group: {group_full_path}")
         return False
 
     except (GitlabGetError, GitlabHttpError) as exc:
