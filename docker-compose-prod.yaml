@@ -151,7 +151,7 @@ services:
       context: https://github.com/computor-org/computor-web.git#${COMPUTOR_WEB_VERSION:-main}
       dockerfile: docker/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     depends_on:
       - uvicorn
@@ -207,7 +207,7 @@ services:
       - TOKEN_SECRET=${TOKEN_SECRET}
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
-      - PYTHONPATH=/home/worker/src
+      - PYTHONPATH=/home/worker/computor-backend/src
       - API_URL=${API_URL}
       - API_ADMIN_USER=${API_ADMIN_USER}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
@@ -263,6 +263,7 @@ services:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
     command: ["--queues=testing-matlab"]
+    init: true  # Use tini as PID 1 to properly reap zombie processes
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:
@@ -283,6 +284,12 @@ services:
       - postgres
       - redis
       - minio
+    ulimits:
+      nproc: 2048       # Limit number of processes (MATLAB needs more)
+      nofile:
+        soft: 8192      # Limit file descriptors
+        hard: 16384
+    pids_limit: 2048    # Limit total PIDs (MATLAB spawns many subprocesses)
     labels:
       - traefik.enable=false
 

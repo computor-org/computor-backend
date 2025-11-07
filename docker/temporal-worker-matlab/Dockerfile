@@ -8,7 +8,7 @@ FROM registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing
 
 USER root
 
-# Install Python and system dependencies
+# Install Python and system dependencies including tini for proper PID 1 handling
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install --no-install-recommends --yes \
@@ -20,6 +20,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         git \
         nano \
         curl \
+        tini \
     && apt-get clean \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
@@ -65,5 +66,8 @@ ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
 # Add src to PYTHONPATH so imports work
 ENV PYTHONPATH=/home/matlab/computor-backend/src:$PYTHONPATH
 
-# Default entrypoint - matlab-server.py will start the temporal worker internally
-ENTRYPOINT ["python3.10", "/home/matlab/matlab-server.py"]
+# Default entrypoint - use tini with -s flag to register as subreaper
+# This handles zombie reaping even when not PID 1 (when docker-compose init: true is used)
+# -u flag for unbuffered Python output (real-time logs)
+# matlab-server.py will start the temporal worker internally
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "python3.10", "-u", "/home/matlab/matlab-server.py"]
