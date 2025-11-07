@@ -66,7 +66,7 @@ def sync_course_member_gitlab_permissions(
             joinedload(CourseMember.course).joinedload(Course.organization),
             joinedload(CourseMember.user),
         )
-        .filter(CourseMember.id == course_member_id)
+        .filter(CourseMember.id == str(course_member_id))
         .first()
     )
 
