@@ -263,6 +263,7 @@ services:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
     command: ["--queues=testing-matlab"]
+    init: true  # Use tini as PID 1 to properly reap zombie processes
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:
@@ -283,6 +284,12 @@ services:
       - postgres
       - redis
       - minio
+    ulimits:
+      nproc: 2048       # Limit number of processes (MATLAB needs more)
+      nofile:
+        soft: 8192      # Limit file descriptors
+        hard: 16384
+    pids_limit: 2048    # Limit total PIDs (MATLAB spawns many subprocesses)
     labels:
       - traefik.enable=false
 
