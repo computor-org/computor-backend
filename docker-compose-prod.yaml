@@ -151,7 +151,7 @@ services:
       context: https://github.com/computor-org/computor-web.git#${COMPUTOR_WEB_VERSION:-main}
       dockerfile: docker/Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     depends_on:
       - uvicorn
