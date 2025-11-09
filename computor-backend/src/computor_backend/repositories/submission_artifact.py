@@ -48,27 +48,24 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
 
     def _get_course_id_from_artifact(self, entity: SubmissionArtifact) -> Optional[str]:
         """
-        Get the course_id for an artifact by querying submission_group and course_content.
+        Get the course_id for an artifact by querying submission_group.
 
         This is needed to invalidate tutor/lecturer/student view caches.
+
+        Note: SubmissionGroup has course_id as a direct column, so we only need one query.
         """
         if not entity.submission_group_id:
             return None
 
-        # Query submission_group to get course_content_id
+        # Query submission_group to get course_id (direct column on SubmissionGroup)
         submission_group = self.db.query(SubmissionGroup).filter(
             SubmissionGroup.id == entity.submission_group_id
         ).first()
 
-        if not submission_group or not submission_group.course_content_id:
+        if not submission_group or not submission_group.course_id:
             return None
 
-        # Query course_content to get course_id
-        course_content = self.db.query(CourseContent).filter(
-            CourseContent.id == submission_group.course_content_id
-        ).first()
-
-        return str(course_content.course_id) if course_content else None
+        return str(submission_group.course_id)
 
     def get_entity_tags(self, entity: SubmissionArtifact) -> Set[str]:
         """
