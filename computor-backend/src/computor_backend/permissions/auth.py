@@ -57,8 +57,10 @@ from computor_backend.permissions.core import db_get_claims, db_get_course_claim
 logger = logging.getLogger(__name__)
 
 # Configuration
-AUTH_CACHE_TTL = 300  # 5 minutes - Principal contains user permissions that change infrequently
+AUTH_CACHE_TTL = 900  # 15 minutes - balanced performance vs permission freshness
 SSO_SESSION_TTL = 3600  # 1 hour for SSO sessions
+# Note: Can increase AUTH_CACHE_TTL to 3600s (1 hour) when implementing cache invalidation
+# on role/permission PATCH endpoints for even better performance
 
 
 class AuthenticationResult:
