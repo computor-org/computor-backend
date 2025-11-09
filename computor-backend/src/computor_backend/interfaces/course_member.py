@@ -41,13 +41,15 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
         # Get the course to find the organization_id
         course = db.query(Course).filter(Course.id == course_member.course_id).first()
         if course and course.organization_id:
-            # Check if user already has a student profile (user_id is globally unique)
+            # Check if user already has a student profile for THIS organization
+            # Note: Users can have multiple student profiles (one per organization)
             existing_profile = db.query(StudentProfile).filter(
-                StudentProfile.user_id == course_member.user_id
+                StudentProfile.user_id == course_member.user_id,
+                StudentProfile.organization_id == course.organization_id
             ).first()
 
             if not existing_profile:
-                # Create new student profile with user's email
+                # Create new student profile with user's email for this organization
                 student_profile = StudentProfile(
                     user_id=course_member.user_id,
                     student_email=course_member.user.email,
@@ -59,12 +61,12 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
                 db.flush()
                 logger.info(
                     f"Created StudentProfile for user {course_member.user_id} "
-                    f"in organization {course.organization_id} (first course membership)"
+                    f"in organization {course.organization_id} (first course membership in this org)"
                 )
             else:
                 logger.debug(
                     f"StudentProfile already exists for user {course_member.user_id} "
-                    f"(organization: {existing_profile.organization_id})"
+                    f"in organization {course.organization_id}"
                 )
     except Exception as e:
         logger.error(

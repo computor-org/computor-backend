@@ -868,21 +868,53 @@ async def verify_user_with_gitlab_pat(
         raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}")
 
     # 3. Find user in our system by email (case-insensitive)
-    # First try User.email
+    # Try User.email first - if found, user can link any GitLab instance
+    from computor_backend.model.auth import StudentProfile
+
     user = await run_in_threadpool(
         lambda: db.query(User)
         .filter(func.lower(User.email) == gitlab_email.lower())
         .first()
     )
 
-    # If not found, also check StudentProfile.student_email
-    # (handles cases where User.email was changed but student_email wasn't)
-    if not user:
-        from computor_backend.model.auth import StudentProfile
+    if user:
+        logger.info(f"Found user {user.username} (ID: {user.id}) by User.email")
+    else:
+        # If not found by User.email, try StudentProfile.student_email
+        # Need to find which organization uses this GitLab instance first
+        from computor_backend.model.organization import Organization
 
+        def _find_org_by_gitlab_url():
+            """Find organization that uses the specified GitLab instance."""
+            orgs = db.query(Organization).filter(
+                Organization.properties.isnot(None),
+                Organization.properties.contains({'gitlab': {}})
+            ).all()
+
+            for org in orgs:
+                if org.properties and isinstance(org.properties, dict):
+                    gitlab_info = org.properties.get('gitlab', {})
+                    if isinstance(gitlab_info, dict):
+                        org_gitlab_url = gitlab_info.get('url')
+                        # Normalize URLs for comparison (remove trailing slash)
+                        if org_gitlab_url and org_gitlab_url.rstrip('/') == gitlab_url.rstrip('/'):
+                            return org
+            return None
+
+        target_org = await run_in_threadpool(_find_org_by_gitlab_url)
+
+        if not target_org:
+            raise BadRequestException(
+                f"No organization found using GitLab instance {gitlab_url}"
+            )
+
+        # Look for student_profile with this email in the organization
         student_profile = await run_in_threadpool(
             lambda: db.query(StudentProfile)
-            .filter(func.lower(StudentProfile.student_email) == gitlab_email.lower())
+            .filter(
+                func.lower(StudentProfile.student_email) == gitlab_email.lower(),
+                StudentProfile.organization_id == target_org.id
+            )
             .first()
         )
 
@@ -890,51 +922,14 @@ async def verify_user_with_gitlab_pat(
             user = student_profile.user
             logger.info(
                 f"Found user {user.username} (ID: {user.id}) via StudentProfile.student_email "
-                f"(GitLab email: {gitlab_email}, User.email: {user.email})"
+                f"in organization {target_org.id}"
+            )
+        else:
+            raise NotFoundException(
+                f"No user found with email '{gitlab_email}' in organization using {gitlab_url}"
             )
 
-    if not user:
-        raise NotFoundException(
-            f"No user found in system with email '{gitlab_email}'. "
-            "Please contact your administrator to create an account."
-        )
-
-    logger.info(f"Found user {user.username} (ID: {user.id}) with email {gitlab_email}")
-
-    # 4. Verify user belongs to an organization using this GitLab instance
-    def _verify_user_gitlab_access() -> bool:
-        """Verify user has access to this GitLab instance via their organizations."""
-        orgs = (
-            db.query(Organization)
-            .join(Course, Course.organization_id == Organization.id)
-            .join(CourseMember, CourseMember.course_id == Course.id)
-            .filter(CourseMember.user_id == user.id)
-            .filter(Organization.properties.isnot(None))
-            .filter(Organization.properties.contains({'gitlab': {}}))
-            .distinct()
-            .all()
-        )
-
-        # Check if any organization uses this GitLab instance
-        for org in orgs:
-            if org.properties and isinstance(org.properties, dict):
-                gitlab_info = org.properties.get('gitlab', {})
-                if isinstance(gitlab_info, dict):
-                    org_gitlab_url = gitlab_info.get('url')
-                    # Normalize URLs for comparison (remove trailing slash)
-                    if org_gitlab_url and org_gitlab_url.rstrip('/') == gitlab_url.rstrip('/'):
-                        return True
-
-        return False
-
-    has_access = await run_in_threadpool(_verify_user_gitlab_access)
-
-    if not has_access:
-        raise ForbiddenException(
-            f"User {user.username} is not a member of any organization using GitLab instance {gitlab_url}"
-        )
-
-    logger.info(f"User {user.username} has access to GitLab instance {gitlab_url}")
+    logger.info(f"Successfully verified user {user.username} (ID: {user.id}) with GitLab email {gitlab_email}")
 
     # 5. Return user and GitLab info
     gitlab_user_data = {

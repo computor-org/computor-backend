@@ -31,6 +31,7 @@ class User(Base):
 
     # Relationships
     course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
+    # user can have multiple student_profiles (one per organization)
     student_profiles = relationship("StudentProfile", foreign_keys="StudentProfile.user_id", back_populates="user", uselist=True, lazy="select")
     accounts = relationship("Account", back_populates="user", uselist=True, lazy="select")
     sessions = relationship("Session", back_populates="user", uselist=True, lazy="select")
@@ -94,6 +95,10 @@ class Profile(Base):
 
 class StudentProfile(Base):
     __tablename__ = 'student_profile'
+    __table_args__ = (
+        # Composite unique constraint: one profile per user per organization
+        Index('uq_student_profile_user_org', 'user_id', 'organization_id', unique=True),
+    )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, server_default=text("0"))
@@ -103,8 +108,10 @@ class StudentProfile(Base):
     updated_by = Column(UUID)
     properties = Column(JSONB)
     student_id = Column(String(255), unique=True)
-    student_email = Column(String(320), unique=True)
-    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, unique=True)
+    # student_email no longer has unique=True - uniqueness enforced by trigger
+    student_email = Column(String(320))
+    # user_id no longer has unique=True - users can have multiple profiles
+    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     user = relationship('User', foreign_keys=[user_id], back_populates="student_profiles", uselist=False)
