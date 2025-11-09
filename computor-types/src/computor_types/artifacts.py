@@ -70,6 +70,7 @@ class SubmissionArtifactQuery(ListQuery):
     content_type: Optional[str] = None
     version_identifier: Optional[str] = None  # Filter by version (e.g., "v1.0.0", "commit-abc123")
     submit: Optional[bool] = None  # Filter by official submissions (True) or test runs (False)
+    latest: Optional[bool] = None  # If True, return only the most recent artifact (by uploaded_at)
 
 class SubmissionArtifactInterface(EntityInterface):
     """Entity interface for submission artifacts."""
