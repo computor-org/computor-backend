@@ -57,7 +57,7 @@ from computor_backend.permissions.core import db_get_claims, db_get_course_claim
 logger = logging.getLogger(__name__)
 
 # Configuration
-AUTH_CACHE_TTL = 10  # seconds
+AUTH_CACHE_TTL = 300  # 5 minutes - Principal contains user permissions that change infrequently
 SSO_SESSION_TTL = 3600  # 1 hour for SSO sessions
 
 
@@ -410,54 +410,76 @@ async def get_current_principal(
     - SSO (Authorization: Bearer)
     """
 
+    # For cacheable auth methods, check cache FIRST before creating DB connection
+    cache_key = None
+    if isinstance(credentials, ApiTokenCredentials):
+        cache_key = hashlib.sha256(
+            f"api_token_permissions:{credentials.token}".encode()
+        ).hexdigest()
+    elif isinstance(credentials, GLPAuthConfig):
+        cache_key = hashlib.sha256(
+            f"{credentials.url}::{credentials.token}".encode()
+        ).hexdigest()
+    elif isinstance(credentials, SSOAuthCredentials):
+        cache_key = hashlib.sha256(
+            f"sso_permissions:{credentials.token}".encode()
+        ).hexdigest()
+
+    # Try cache first (no DB connection!)
+    if cache_key:
+        print(f"🟢 Checking Principal cache for key: {cache_key[:16]}...")
+        cache = await get_redis_client()
+        try:
+            cached_data = await cache.get(cache_key)
+            if cached_data:
+                print(f"✅ Principal cache HIT! (no DB connection)")
+                logger.debug(f"Principal cache HIT for {cache_key[:16]}... (no DB connection)")
+                return Principal.model_validate(json.loads(cached_data), from_attributes=True)
+            else:
+                print(f"❌ Principal cache MISS")
+        except Exception as e:
+            print(f"❌ Cache error: {e}")
+            logger.warning(f"Cache retrieval error: {e}")
+
+    # Cache miss or non-cacheable auth - create DB connection
+    logger.debug(f"Principal cache MISS, creating DB connection")
     with next(get_db()) as db:
         # Route to appropriate authentication method
         if isinstance(credentials, ApiTokenCredentials):
-            # API Token authentication (X-API-Token header)
             auth_result = AuthenticationService.authenticate_api_token(
                 credentials.token, db
             )
-
-            # Build Principal with caching for API tokens
-            cache_key = hashlib.sha256(
-                f"api_token_permissions:{credentials.token}".encode()
-            ).hexdigest()
-
-            return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+            principal = PrincipalBuilder.build(auth_result, db)
 
         elif isinstance(credentials, HTTPBasicCredentials):
             auth_result = AuthenticationService.authenticate_basic(
                 credentials.username, credentials.password, db
             )
-
-            # Build Principal without caching for basic auth
-            return PrincipalBuilder.build(auth_result, db)
+            principal = PrincipalBuilder.build(auth_result, db)
 
         elif isinstance(credentials, GLPAuthConfig):
             auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
-
-            # Build Principal with caching for GitLab auth
-            cache_key = hashlib.sha256(
-                f"{credentials.url}::{credentials.token}".encode()
-            ).hexdigest()
-
-            return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+            principal = PrincipalBuilder.build(auth_result, db)
 
         elif isinstance(credentials, SSOAuthCredentials):
-            # SSO Token authentication (Authorization: Bearer)
             auth_result = await AuthenticationService.authenticate_sso(
                 credentials.token, db
             )
-
-            # Build Principal with caching for SSO
-            cache_key = hashlib.sha256(
-                f"sso_permissions:{credentials.token}".encode()
-            ).hexdigest()
-
-            return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+            principal = PrincipalBuilder.build(auth_result, db)
 
         else:
             raise UnauthorizedException("Unknown authentication type")
+
+        # Cache the result (if cacheable)
+        if cache_key:
+            try:
+                cache = await get_redis_client()
+                await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
+                logger.debug(f"Cached Principal for {cache_key[:16]}...")
+            except Exception as e:
+                logger.warning(f"Cache storage error: {e}")
+
+        return principal
 
 
 def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials]:

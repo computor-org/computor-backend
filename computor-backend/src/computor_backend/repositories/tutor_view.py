@@ -58,17 +58,9 @@ class TutorViewRepository(ViewRepository):
         Returns:
             Course content with submission/grading data
         """
-        # Permission check
-        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
-            CourseMember.id == course_member_id
-        ).first()
-
-        if course_member is None:
-            raise ForbiddenException()
-
         reader_user_id = permissions.get_user_id_or_throw()
 
-        # Try cache - tutor view of specific student's course content
+        # Try cache FIRST (before any DB access)
         cache_key = f"tutor:member:{course_member_id}:content:{course_content_id}"
 
         cached = self._get_cached_view(
@@ -77,6 +69,14 @@ class TutorViewRepository(ViewRepository):
         )
         if cached is not None:
             return cached
+
+        # Cache miss - now do permission check (requires DB)
+        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+            CourseMember.id == course_member_id
+        ).first()
+
+        if course_member is None:
+            raise ForbiddenException()
 
         # Query from DB
         course_contents_result = course_member_course_content_query(
@@ -127,24 +127,27 @@ class TutorViewRepository(ViewRepository):
         Returns:
             List of course contents with submission data
         """
-        # Permission check
-        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
-            CourseMember.id == course_member_id
-        ).first()
-
-        if course_member is None:
-            raise ForbiddenException()
-
         reader_user_id = permissions.get_user_id_or_throw()
 
-        # Try cache with query-aware key (include course_member_id in view_type)
+        # Try cache FIRST (before any DB access)
+        print(f"🔵 TutorView: Checking cache for user={reader_user_id}, member={course_member_id}, params={params}")
         cached = self._get_cached_query_view(
             user_id=str(reader_user_id),
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params
         )
         if cached is not None:
+            print(f"✅ TutorView: Cache HIT! Returning cached data without DB connection")
             return cached
+        print(f"❌ TutorView: Cache MISS, need to query DB")
+
+        # Cache miss - now do permission check (requires DB)
+        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+            CourseMember.id == course_member_id
+        ).first()
+
+        if course_member is None:
+            raise ForbiddenException()
 
         # Query from DB
         query = course_member_course_content_list_query(course_member_id, self.db, reader_user_id=reader_user_id)
