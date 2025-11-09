@@ -133,10 +133,19 @@ def create_profile(
     # If no user_id provided, default to current user
     target_user_id = data.user_id if data.user_id else str(permissions.user_id)
 
-    # Check if profile already exists for this user
-    existing = db.query(StudentProfile).filter(StudentProfile.user_id == target_user_id).first()
+    # Check if profile already exists for this user in this organization
+    # Note: Users can have multiple student profiles (one per organization)
+    if not data.organization_id:
+        raise BadRequestException(detail="organization_id is required to create a student profile")
+
+    existing = db.query(StudentProfile).filter(
+        StudentProfile.user_id == target_user_id,
+        StudentProfile.organization_id == data.organization_id
+    ).first()
     if existing:
-        raise BadRequestException(detail="Student profile already exists for this user")
+        raise BadRequestException(
+            detail=f"Student profile already exists for this user in organization {data.organization_id}"
+        )
 
     try:
         profile_data = data.model_dump(exclude_unset=True)

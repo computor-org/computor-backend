@@ -509,7 +509,7 @@ def _create_or_update_student_profile(
     organization_id: UUID,
     db: Session,
 ) -> StudentProfile:
-    """Create or update student profile.
+    """Create or update student profile for a specific organization.
 
     Args:
         user: User entity
@@ -521,20 +521,24 @@ def _create_or_update_student_profile(
     Returns:
         StudentProfile entity
     """
-    # Check if student profile exists for this user
-    student_profile = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    # Check if student profile exists for this user IN THIS ORGANIZATION
+    # Note: Users can have multiple student profiles (one per organization)
+    student_profile = db.query(StudentProfile).filter(
+        StudentProfile.user_id == user.id,
+        StudentProfile.organization_id == organization_id
+    ).first()
 
     if student_profile:
-        # Update existing profile
+        # Update existing profile for this organization
         if student_id:
             student_profile.student_id = student_id
         if student_email:
             student_profile.student_email = student_email
         db.flush()
-        logger.info(f"Updated student profile for user {user.id}")
+        logger.info(f"Updated student profile for user {user.id} in organization {organization_id}")
         return student_profile
 
-    # Create new student profile
+    # Create new student profile for this organization
     student_profile = StudentProfile(
         user_id=user.id,
         student_id=student_id,
@@ -544,7 +548,7 @@ def _create_or_update_student_profile(
     db.add(student_profile)
     db.flush()  # Flush to get the auto-generated ID from database
 
-    logger.info(f"Created student profile for user {user.id}")
+    logger.info(f"Created student profile for user {user.id} in organization {organization_id}")
     return student_profile
 
 
