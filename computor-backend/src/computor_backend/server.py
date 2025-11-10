@@ -431,3 +431,19 @@ async def get_public_extension_url():
         raise NotFoundException("Public extension download URL not configured")
 
     return download_link
+
+@app.get(
+    "/extensions-getting-started",
+    response_model=str,
+)
+async def get_getting_started_url():
+    """Public endpoint to get extension getting started guide URL.
+
+    This endpoint requires no authentication and returns the URL
+    specified in the EXTENSION_GETTING_STARTED_URL environment variable.
+    """
+    getting_started_link = os.environ.get("EXTENSION_GETTING_STARTED_URL", None)
+    if not getting_started_link:
+        raise NotFoundException("Extension getting started guide URL not configured")
+
+    return getting_started_link
