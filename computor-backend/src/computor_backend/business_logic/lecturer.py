@@ -22,42 +22,50 @@ logger = logging.getLogger(__name__)
 def get_lecturer_course(
     course_id: UUID | str,
     permissions: Principal,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> Course:
     """Get a specific course for lecturers with caching via repository."""
-    repo = LecturerViewRepository(db, cache)
-    return repo.get_course(course_id, permissions)
+    repo = LecturerViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.get_course(course_id, permissions)
+    finally:
+        repo.close()
 
 
 def list_lecturer_courses(
     permissions: Principal,
     params: CourseQuery,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> List[CourseList]:
     """List courses accessible to lecturers with caching via repository."""
-    repo = LecturerViewRepository(db, cache)
-    return repo.list_courses(permissions, params)
+    repo = LecturerViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.list_courses(permissions, params)
+    finally:
+        repo.close()
 
 
 def get_lecturer_course_content(
     course_content_id: UUID | str,
     permissions: Principal,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> CourseContentLecturerGet:
     """Get a specific course content with course repository information and caching via repository."""
-    repo = LecturerViewRepository(db, cache)
-    return repo.get_course_content(course_content_id, permissions)
+    repo = LecturerViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.get_course_content(course_content_id, permissions)
+    finally:
+        repo.close()
 
 
 def list_lecturer_course_contents(
     permissions: Principal,
     params: CourseContentLecturerQuery,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> List[CourseContentLecturerList]:
     """List course contents with course repository information and caching via repository."""
-    repo = LecturerViewRepository(db, cache)
-    return repo.list_course_contents(permissions, params)
+    repo = LecturerViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.list_course_contents(permissions, params)
+    finally:
+        repo.close()

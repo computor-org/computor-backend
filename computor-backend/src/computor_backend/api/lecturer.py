@@ -53,41 +53,37 @@ lecturer_router = APIRouter()
 def lecturer_get_courses_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """Get a specific course for lecturers."""
-    return get_lecturer_course(course_id, permissions, db, cache)
+    return get_lecturer_course(course_id, permissions, cache)
 
 @lecturer_router.get("/courses", response_model=list[CourseList])
 def lecturer_list_courses_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseQuery = Depends(),
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """List courses accessible to lecturers."""
-    return list_lecturer_courses(permissions, params, db, cache)
+    return list_lecturer_courses(permissions, params, cache)
 
 @lecturer_router.get("/course-contents/{course_content_id}", response_model=CourseContentLecturerGet)
 def lecturer_get_course_contents_endpoint(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """Get a specific course content with course repository information."""
-    return get_lecturer_course_content(course_content_id, permissions, db, cache)
+    return get_lecturer_course_content(course_content_id, permissions, cache)
 
 @lecturer_router.get("/course-contents", response_model=list[CourseContentLecturerList])
 def lecturer_list_course_contents_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentLecturerQuery = Depends(),
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """List course contents with course repository information."""
-    return list_lecturer_course_contents(permissions, params, db, cache)
+    return list_lecturer_course_contents(permissions, params, cache)
 
 
 # ============================================================================

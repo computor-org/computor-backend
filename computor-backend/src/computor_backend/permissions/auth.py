@@ -429,18 +429,13 @@ async def get_current_principal(
 
     # Try cache first (no DB connection!)
     if cache_key:
-        print(f"🟢 Checking Principal cache for key: {cache_key[:16]}...")
         cache = await get_redis_client()
         try:
             cached_data = await cache.get(cache_key)
             if cached_data:
-                print(f"✅ Principal cache HIT! (no DB connection)")
                 logger.debug(f"Principal cache HIT for {cache_key[:16]}... (no DB connection)")
                 return Principal.model_validate(json.loads(cached_data), from_attributes=True)
-            else:
-                print(f"❌ Principal cache MISS")
         except Exception as e:
-            print(f"❌ Cache error: {e}")
             logger.warning(f"Cache retrieval error: {e}")
 
     # Cache miss or non-cacheable auth - create DB connection

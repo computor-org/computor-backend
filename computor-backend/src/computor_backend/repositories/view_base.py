@@ -59,7 +59,6 @@ class ViewRepository(ABC):
         """
         if self._db is None:
             from ..database import get_db
-            print(f"🔴 ViewRepository: Creating DB connection on-demand (user_id={self._user_id})")
             logger.debug(f"ViewRepository: Creating DB connection on-demand (user_id={self._user_id})")
             self._db = next(get_db(self._user_id))
             self._owns_db = True

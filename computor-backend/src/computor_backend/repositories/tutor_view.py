@@ -130,16 +130,13 @@ class TutorViewRepository(ViewRepository):
         reader_user_id = permissions.get_user_id_or_throw()
 
         # Try cache FIRST (before any DB access)
-        print(f"🔵 TutorView: Checking cache for user={reader_user_id}, member={course_member_id}, params={params}")
         cached = self._get_cached_query_view(
             user_id=str(reader_user_id),
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params
         )
         if cached is not None:
-            print(f"✅ TutorView: Cache HIT! Returning cached data without DB connection")
             return cached
-        print(f"❌ TutorView: Cache MISS, need to query DB")
 
         # Cache miss - now do permission check (requires DB)
         course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
