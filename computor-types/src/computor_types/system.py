@@ -170,7 +170,7 @@ class GenerateAssignmentsRequest(BaseModel):
     parent_id: Optional[str] = None
     include_descendants: bool = True
     all: bool = False
-    overwrite_strategy: str = Field(default="skip_if_exists", description="skip_if_exists|force_update")
+    overwrite_strategy: str = Field(default="force_update", description="skip_if_exists|force_update")
     commit_message: Optional[str] = None
 
 class GenerateAssignmentsResponse(BaseModel):
