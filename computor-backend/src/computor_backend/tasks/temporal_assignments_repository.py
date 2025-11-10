@@ -28,7 +28,7 @@ async def generate_assignments_repository_activity(
     course_id: str,
     assignments_url: Optional[str] = None,
     selection: Optional[Dict[str, Any]] = None,
-    overwrite_strategy: str = "skip_if_exists",
+    overwrite_strategy: str = "force_update",
     commit_message: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -38,7 +38,7 @@ async def generate_assignments_repository_activity(
         course_id: Course ID
         assignments_url: Git URL for assignments repo (derived from course if None)
         selection: {course_content_ids|parent_id+include_descendants|all}
-        overwrite_strategy: 'skip_if_exists' or 'force_update'
+        overwrite_strategy: 'skip_if_exists' or 'force_update' (default: 'force_update')
         commit_message: optional commit message
     """
     import git
@@ -332,7 +332,7 @@ class GenerateAssignmentsRepositoryWorkflow(BaseWorkflow):
         course_id = params.get('course_id')
         assignments_url = params.get('assignments_url')
         selection = params.get('selection')
-        overwrite = params.get('overwrite_strategy', 'skip_if_exists')
+        overwrite = params.get('overwrite_strategy', 'force_update')
         commit_message = params.get('commit_message')
 
         if not course_id:
