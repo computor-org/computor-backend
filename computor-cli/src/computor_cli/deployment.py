@@ -1077,7 +1077,7 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
                         f"system/courses/{course.id}/generate-assignments",
                         {
                             "all": True,
-                            "overwrite_strategy": "skip_if_exists"
+                            "overwrite_strategy": "force_update"
                         }
                     )
                 except Exception as e:
