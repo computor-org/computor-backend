@@ -40,6 +40,37 @@ ACCESS_TOKEN_TTL = 60 * 60 # 1 hour
 REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 # 14 days
 
 
+async def invalidate_principal_cache_for_token(token: str, cache):
+    """
+    Invalidate all Principal cache entries for a given token.
+
+    This removes cached Principal objects to force re-authentication on next request.
+    Useful when logging out or when user permissions change.
+
+    Args:
+        token: Access token (Bearer token)
+        cache: Redis cache client
+    """
+    import hashlib
+
+    try:
+        # Invalidate all possible Principal cache keys for this token
+        # These match the patterns in permissions/auth.py get_current_principal
+
+        # Pattern 1: API token permissions
+        api_key = hashlib.sha256(f"api_token_permissions:{token}".encode()).hexdigest()
+        await cache.delete(api_key)
+        logger.debug(f"Invalidated API token Principal cache: {api_key[:16]}...")
+
+        # Pattern 2: SSO permissions
+        sso_key = hashlib.sha256(f"sso_permissions:{token}".encode()).hexdigest()
+        await cache.delete(sso_key)
+        logger.debug(f"Invalidated SSO Principal cache: {sso_key[:16]}...")
+
+    except Exception as e:
+        logger.warning(f"Error invalidating Principal cache: {e}")
+
+
 async def login_with_local_credentials(
     username: str,
     password: str,
@@ -327,6 +358,11 @@ async def logout_session(
 
     redis_client = await get_redis_client()
     provider_name = None
+
+    # Invalidate Principal cache for this token
+    if access_token:
+        await invalidate_principal_cache_for_token(access_token, redis_client)
+        logger.info(f"Invalidated Principal cache for user {principal.user_id} on logout")
 
     if access_token:
         # Hash token for lookup

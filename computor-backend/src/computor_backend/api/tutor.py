@@ -49,22 +49,20 @@ async def tutor_get_course_contents_endpoint(
     course_content_id: UUID | str,
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """Get course content for a course member as a tutor."""
-    return await get_tutor_course_content(course_member_id, course_content_id, permissions, db, cache)
+    return await get_tutor_course_content(course_member_id, course_content_id, permissions, cache)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 async def tutor_list_course_contents_endpoint(
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """List course contents for a course member as a tutor."""
-    return await list_tutor_course_contents(course_member_id, permissions, params, db, cache)
+    return await list_tutor_course_contents(course_member_id, permissions, params, cache)
 
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
 async def tutor_update_course_contents_endpoint(
@@ -92,21 +90,19 @@ async def tutor_update_course_contents_endpoint(
 def tutor_get_courses_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """Get a course for tutors."""
-    return get_tutor_course(course_id, permissions, db, cache)
+    return get_tutor_course(course_id, permissions, cache)
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
 def tutor_list_courses_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseStudentQuery = Depends(),
-    db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
 ):
     """List courses for tutors."""
-    return list_tutor_courses(permissions, params, db, cache)
+    return list_tutor_courses(permissions, params, cache)
 
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members_endpoint(

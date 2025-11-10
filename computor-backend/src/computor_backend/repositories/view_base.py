@@ -33,16 +33,44 @@ class ViewRepository(ABC):
     - Tag-based cache invalidation
     """
 
-    def __init__(self, db: Session, cache: Optional[Cache] = None):
+    def __init__(self, cache: Optional[Cache] = None, user_id: Optional[str] = None):
         """
         Initialize view repository.
 
         Args:
-            db: SQLAlchemy session
             cache: Optional Cache instance (enables caching)
+            user_id: Optional user ID for audit tracking in DB sessions
         """
-        self.db = db
+        self._db: Optional[Session] = None
+        self._owns_db: bool = False
+        self._user_id = user_id
         self.cache = cache
+
+    @property
+    def db(self) -> Session:
+        """
+        Get or create database session on-demand.
+
+        The connection is only created when this property is accessed,
+        enabling cache-first patterns where no DB connection is needed on cache hits.
+
+        Returns:
+            Database session
+        """
+        if self._db is None:
+            from ..database import get_db
+            logger.debug(f"ViewRepository: Creating DB connection on-demand (user_id={self._user_id})")
+            self._db = next(get_db(self._user_id))
+            self._owns_db = True
+        return self._db
+
+    def close(self):
+        """Close the database session if we created it."""
+        if self._owns_db and self._db is not None:
+            self._db.close()
+            self._db = None
+            self._owns_db = False
+            logger.debug("ViewRepository: Closed DB connection")
 
     def _use_cache(self) -> bool:
         """Check if caching is enabled."""

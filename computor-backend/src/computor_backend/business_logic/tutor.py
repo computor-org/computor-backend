@@ -46,24 +46,28 @@ async def get_tutor_course_content(
     course_member_id: UUID | str,
     course_content_id: UUID | str,
     permissions: Principal,
-    db: Session,
     cache: Optional[Cache] = None,
 ):
     """Get course content for a course member as a tutor with caching via repository."""
-    repo = TutorViewRepository(db, cache)
-    return await repo.get_course_content(course_member_id, course_content_id, permissions)
+    repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return await repo.get_course_content(course_member_id, course_content_id, permissions)
+    finally:
+        repo.close()
 
 
 async def list_tutor_course_contents(
     course_member_id: UUID | str,
     permissions: Principal,
     params: CourseContentStudentQuery,
-    db: Session,
     cache: Optional[Cache] = None,
 ):
     """List course contents for a course member as a tutor with caching via repository."""
-    repo = TutorViewRepository(db, cache)
-    return await repo.list_course_contents(course_member_id, permissions, params)
+    repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return await repo.list_course_contents(course_member_id, permissions, params)
+    finally:
+        repo.close()
 
 
 async def update_tutor_course_content_grade(
@@ -210,23 +214,27 @@ async def update_tutor_course_content_grade(
 def get_tutor_course(
     course_id: UUID | str,
     permissions: Principal,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> CourseTutorGet:
     """Get a course for tutors with caching via repository."""
-    repo = TutorViewRepository(db, cache)
-    return repo.get_course(course_id, permissions)
+    repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.get_course(course_id, permissions)
+    finally:
+        repo.close()
 
 
 def list_tutor_courses(
     permissions: Principal,
     params: CourseStudentQuery,
-    db: Session,
     cache: Optional[Cache] = None,
 ) -> List[CourseTutorList]:
     """List courses for tutors with caching via repository."""
-    repo = TutorViewRepository(db, cache)
-    return repo.list_courses(permissions, params)
+    repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
+    try:
+        return repo.list_courses(permissions, params)
+    finally:
+        repo.close()
 
 
 def get_tutor_course_member(
