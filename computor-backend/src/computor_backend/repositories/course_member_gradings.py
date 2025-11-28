@@ -294,6 +294,286 @@ class CourseMemberGradingsRepository:
             for r in results
         ]
 
+    def get_hierarchical_stats_for_member(
+        self,
+        course_member_id: UUID | str,
+        course_id: UUID | str,
+        path_prefix: Optional[str] = None,
+        course_content_type_id: Optional[str] = None,
+        max_depth: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get hierarchical grading statistics using database-level aggregation.
+
+        Uses PostgreSQL ltree functions (nlevel, subpath) to calculate statistics
+        at each path level in the database, avoiding Python-side iteration.
+
+        Args:
+            course_member_id: The course member ID
+            course_id: The course ID
+            path_prefix: Optional filter to specific subtree
+            course_content_type_id: Optional filter by content type
+            max_depth: Optional maximum depth for aggregation
+
+        Returns:
+            List of dicts with path-level aggregated statistics
+        """
+        # Build path prefix filter clause
+        path_filter = ""
+        if path_prefix:
+            path_filter = "AND cc.path <@ :path_prefix::ltree"
+
+        # Build content type filter clause
+        content_type_filter = ""
+        if course_content_type_id:
+            content_type_filter = "AND cct.id = :course_content_type_id"
+
+        # Build depth filter clause
+        depth_filter = ""
+        if max_depth:
+            depth_filter = "AND path_depth <= :max_depth"
+
+        # SQL query that uses PostgreSQL ltree functions for hierarchical aggregation
+        sql = text(f"""
+        WITH submittable_contents AS (
+            -- Get all submittable course contents with their path levels
+            SELECT
+                cc.id as content_id,
+                cc.path,
+                cct.id as content_type_id,
+                cct.slug as content_type_slug,
+                cct.title as content_type_title,
+                cct.color as content_type_color
+            FROM course_content cc
+            JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+            JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+            WHERE cc.course_id = :course_id
+              AND cck.submittable = true
+              AND cc.archived_at IS NULL
+              {path_filter}
+              {content_type_filter}
+        ),
+        submitted_contents AS (
+            -- Get submitted contents for this member
+            SELECT DISTINCT
+                cc.id as content_id,
+                MAX(sa.created_at) as latest_submission_at
+            FROM submission_artifact sa
+            JOIN submission_group sg ON sg.id = sa.submission_group_id
+            JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+            JOIN course_content cc ON cc.id = sg.course_content_id
+            JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+            JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+            WHERE sgm.course_member_id = :course_member_id
+              AND cc.course_id = :course_id
+              AND sa.submit = true
+              AND cck.submittable = true
+              AND cc.archived_at IS NULL
+              {path_filter}
+              {content_type_filter}
+            GROUP BY cc.id
+        ),
+        path_levels AS (
+            -- Generate all path prefixes at each level
+            SELECT DISTINCT
+                subpath(sc.path, 0, n) as path_prefix,
+                n as path_depth
+            FROM submittable_contents sc,
+                 generate_series(1, nlevel(sc.path)) as n
+            WHERE 1=1
+              {depth_filter}
+        ),
+        aggregated AS (
+            -- Aggregate statistics per path level and content type
+            SELECT
+                pl.path_prefix::text as path,
+                pl.path_depth,
+                sc.content_type_id,
+                sc.content_type_slug,
+                sc.content_type_title,
+                sc.content_type_color,
+                COUNT(sc.content_id) as max_assignments,
+                COUNT(sub.content_id) as submitted_assignments,
+                MAX(sub.latest_submission_at) as latest_submission_at
+            FROM path_levels pl
+            JOIN submittable_contents sc ON sc.path <@ pl.path_prefix
+            LEFT JOIN submitted_contents sub ON sub.content_id = sc.content_id
+            GROUP BY pl.path_prefix, pl.path_depth, sc.content_type_id,
+                     sc.content_type_slug, sc.content_type_title, sc.content_type_color
+            ORDER BY pl.path_depth, pl.path_prefix::text, sc.content_type_slug
+        )
+        SELECT * FROM aggregated
+        """)
+
+        params = {
+            "course_member_id": str(course_member_id),
+            "course_id": str(course_id),
+        }
+        if path_prefix:
+            params["path_prefix"] = path_prefix
+        if course_content_type_id:
+            params["course_content_type_id"] = str(course_content_type_id)
+        if max_depth:
+            params["max_depth"] = max_depth
+
+        results = self.db.execute(sql, params).fetchall()
+
+        return [
+            {
+                "path": r.path,
+                "path_depth": r.path_depth,
+                "content_type_id": str(r.content_type_id),
+                "content_type_slug": r.content_type_slug,
+                "content_type_title": r.content_type_title,
+                "content_type_color": r.content_type_color,
+                "max_assignments": r.max_assignments,
+                "submitted_assignments": r.submitted_assignments,
+                "latest_submission_at": r.latest_submission_at,
+            }
+            for r in results
+        ]
+
+    def get_course_level_stats_for_all_members(
+        self,
+        course_id: UUID | str,
+        path_prefix: Optional[str] = None,
+        course_content_type_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get course-level grading statistics for ALL members using database aggregation.
+
+        This is highly optimized - a single query calculates stats for all members.
+
+        Args:
+            course_id: The course ID
+            path_prefix: Optional filter to specific subtree
+            course_content_type_id: Optional filter by content type
+
+        Returns:
+            List of dicts with member info and their course-level statistics by content type
+        """
+        # Build path prefix filter clause
+        path_filter = ""
+        if path_prefix:
+            path_filter = "AND cc.path <@ :path_prefix::ltree"
+
+        # Build content type filter clause
+        content_type_filter = ""
+        if course_content_type_id:
+            content_type_filter = "AND cct.id = :course_content_type_id"
+
+        sql = text(f"""
+        WITH submittable_contents AS (
+            -- Get all submittable course contents
+            SELECT
+                cc.id as content_id,
+                cc.path,
+                cct.id as content_type_id,
+                cct.slug as content_type_slug,
+                cct.title as content_type_title,
+                cct.color as content_type_color
+            FROM course_content cc
+            JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+            JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+            WHERE cc.course_id = :course_id
+              AND cck.submittable = true
+              AND cc.archived_at IS NULL
+              {path_filter}
+              {content_type_filter}
+        ),
+        content_type_counts AS (
+            -- Pre-calculate max counts per content type
+            SELECT
+                content_type_id,
+                content_type_slug,
+                content_type_title,
+                content_type_color,
+                COUNT(*) as max_assignments
+            FROM submittable_contents
+            GROUP BY content_type_id, content_type_slug, content_type_title, content_type_color
+        ),
+        all_students AS (
+            -- Get all students in the course
+            SELECT
+                cm.id as course_member_id,
+                cm.user_id,
+                u.username,
+                u.given_name,
+                u.family_name
+            FROM course_member cm
+            JOIN "user" u ON u.id = cm.user_id
+            WHERE cm.course_id = :course_id
+              AND cm.course_role_id = '_student'
+            ORDER BY u.family_name, u.given_name
+        ),
+        submitted_by_member_and_type AS (
+            -- Get submitted counts per member and content type
+            SELECT
+                sgm.course_member_id,
+                cct.id as content_type_id,
+                COUNT(DISTINCT cc.id) as submitted_assignments,
+                MAX(sa.created_at) as latest_submission_at
+            FROM submission_artifact sa
+            JOIN submission_group sg ON sg.id = sa.submission_group_id
+            JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+            JOIN course_content cc ON cc.id = sg.course_content_id
+            JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+            JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+            WHERE cc.course_id = :course_id
+              AND sa.submit = true
+              AND cck.submittable = true
+              AND cc.archived_at IS NULL
+              {path_filter}
+              {content_type_filter}
+            GROUP BY sgm.course_member_id, cct.id
+        )
+        SELECT
+            s.course_member_id,
+            s.user_id,
+            s.username,
+            s.given_name,
+            s.family_name,
+            ctc.content_type_id,
+            ctc.content_type_slug,
+            ctc.content_type_title,
+            ctc.content_type_color,
+            ctc.max_assignments,
+            COALESCE(sbmt.submitted_assignments, 0) as submitted_assignments,
+            sbmt.latest_submission_at
+        FROM all_students s
+        CROSS JOIN content_type_counts ctc
+        LEFT JOIN submitted_by_member_and_type sbmt
+            ON sbmt.course_member_id = s.course_member_id
+            AND sbmt.content_type_id = ctc.content_type_id
+        ORDER BY s.family_name, s.given_name, ctc.content_type_slug
+        """)
+
+        params = {"course_id": str(course_id)}
+        if path_prefix:
+            params["path_prefix"] = path_prefix
+        if course_content_type_id:
+            params["course_content_type_id"] = str(course_content_type_id)
+
+        results = self.db.execute(sql, params).fetchall()
+
+        return [
+            {
+                "course_member_id": str(r.course_member_id),
+                "user_id": str(r.user_id) if r.user_id else None,
+                "username": r.username,
+                "given_name": r.given_name,
+                "family_name": r.family_name,
+                "content_type_id": str(r.content_type_id),
+                "content_type_slug": r.content_type_slug,
+                "content_type_title": r.content_type_title,
+                "content_type_color": r.content_type_color,
+                "max_assignments": r.max_assignments,
+                "submitted_assignments": r.submitted_assignments,
+                "latest_submission_at": r.latest_submission_at,
+            }
+            for r in results
+        ]
+
 
 def calculate_grading_stats(
     submittable_contents: List[Dict[str, Any]],

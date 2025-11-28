@@ -42,6 +42,7 @@ from computor_backend.interfaces.course_roles import CourseRoleInterface
 from computor_backend.interfaces.course_content_types import CourseContentTypeInterface
 from computor_backend.interfaces.course_content_kind import CourseContentKindInterface
 from computor_backend.interfaces.languages import LanguageInterface
+from computor_backend.interfaces.course_member_gradings import CourseMemberGradingsInterface
 
 __all__ = [
     "UserInterface",
@@ -73,4 +74,5 @@ __all__ = [
     "CourseContentTypeInterface",
     "CourseContentKindInterface",
     "LanguageInterface",
+    "CourseMemberGradingsInterface",
 ]
