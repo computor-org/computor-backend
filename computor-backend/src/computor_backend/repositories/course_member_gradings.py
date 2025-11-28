@@ -19,10 +19,12 @@ from computor_backend.model.course import (
     CourseContentKind,
     CourseContentType,
     CourseMember,
+    CourseRole,
     SubmissionGroup,
     SubmissionGroupMember,
 )
 from computor_backend.model.artifact import SubmissionArtifact
+from computor_backend.model.auth import User
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +181,117 @@ class CourseMemberGradingsRepository:
             .all()
         )
         return {str(r.path): r.title for r in results}
+
+    def get_all_course_members_with_students_role(
+        self,
+        course_id: UUID | str,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all course members with student role in a course.
+
+        Args:
+            course_id: The course ID
+
+        Returns:
+            List of dicts with course_member and user info
+        """
+        results = (
+            self.db.query(
+                CourseMember.id.label("course_member_id"),
+                CourseMember.user_id.label("user_id"),
+                User.username.label("username"),
+                User.given_name.label("given_name"),
+                User.family_name.label("family_name"),
+            )
+            .join(User, User.id == CourseMember.user_id)
+            .filter(
+                CourseMember.course_id == course_id,
+                CourseMember.course_role_id == "_student",
+            )
+            .order_by(User.family_name, User.given_name)
+            .all()
+        )
+        return [
+            {
+                "course_member_id": str(r.course_member_id),
+                "user_id": str(r.user_id) if r.user_id else None,
+                "username": r.username,
+                "given_name": r.given_name,
+                "family_name": r.family_name,
+            }
+            for r in results
+        ]
+
+    def get_all_submitted_contents_for_course(
+        self,
+        course_id: UUID | str,
+        path_prefix: Optional[str] = None,
+        course_content_type_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all submitted contents for ALL course members in a course.
+
+        This is an optimized batch query that gets submission data for all
+        members at once, avoiding N+1 queries.
+
+        Args:
+            course_id: The course ID
+            path_prefix: Optional filter to specific subtree
+            course_content_type_id: Optional filter by content type
+
+        Returns:
+            List of dicts with course_member_id, course_content_id, and latest_submission_at
+        """
+        query = (
+            self.db.query(
+                SubmissionGroupMember.course_member_id.label("course_member_id"),
+                CourseContent.id.label("course_content_id"),
+                CourseContent.path.label("path"),
+                CourseContentType.id.label("course_content_type_id"),
+                CourseContentType.slug.label("course_content_type_slug"),
+                func.max(SubmissionArtifact.created_at).label("latest_submission_at"),
+            )
+            .select_from(SubmissionArtifact)
+            .join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id)
+            .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+            .join(CourseContent, CourseContent.id == SubmissionGroup.course_content_id)
+            .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id)
+            .join(CourseContentKind, CourseContentKind.id == CourseContentType.course_content_kind_id)
+            .filter(
+                CourseContent.course_id == course_id,
+                SubmissionArtifact.submit == True,
+                CourseContentKind.submittable == True,
+                CourseContent.archived_at.is_(None),
+            )
+            .group_by(
+                SubmissionGroupMember.course_member_id,
+                CourseContent.id,
+                CourseContent.path,
+                CourseContentType.id,
+                CourseContentType.slug,
+            )
+        )
+
+        if path_prefix:
+            query = query.filter(
+                text("course_content.path <@ :path_prefix::ltree OR course_content.path::text = :path_prefix_str")
+            ).params(path_prefix=path_prefix, path_prefix_str=path_prefix)
+
+        if course_content_type_id:
+            query = query.filter(CourseContentType.id == course_content_type_id)
+
+        results = query.all()
+        return [
+            {
+                "course_member_id": str(r.course_member_id),
+                "course_content_id": str(r.course_content_id),
+                "path": str(r.path),
+                "course_content_type_id": str(r.course_content_type_id),
+                "course_content_type_slug": r.course_content_type_slug,
+                "latest_submission_at": r.latest_submission_at,
+            }
+            for r in results
+        ]
 
 
 def calculate_grading_stats(
@@ -352,3 +465,107 @@ def calculate_grading_stats(
         "by_content_type": overall_by_content_type,
         "nodes": nodes,
     }
+
+
+def calculate_grading_stats_for_all_members(
+    submittable_contents: List[Dict[str, Any]],
+    all_submitted_contents: List[Dict[str, Any]],
+    course_members: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Calculate grading statistics for all course members at once.
+
+    This is an optimized batch calculation that processes all members in one pass.
+    Returns only course-level totals (no hierarchical nodes) for efficiency.
+
+    Args:
+        submittable_contents: List of all submittable course_contents in the course
+        all_submitted_contents: List of all submitted contents for all members
+        course_members: List of course members with user info
+
+    Returns:
+        List of dicts with grading stats per course member
+    """
+    # Get all unique content types from submittable contents
+    content_types = {}
+    for content in submittable_contents:
+        ct_id = content["course_content_type_id"]
+        if ct_id not in content_types:
+            content_types[ct_id] = {
+                "course_content_type_id": ct_id,
+                "course_content_type_slug": content["course_content_type_slug"],
+                "course_content_type_title": content["course_content_type_title"],
+                "course_content_type_color": content["course_content_type_color"],
+            }
+
+    # Total max assignments (same for all members)
+    total_max = len(submittable_contents)
+
+    # Group submitted contents by course_member_id
+    submitted_by_member: Dict[str, List[Dict[str, Any]]] = {}
+    for sub in all_submitted_contents:
+        member_id = sub["course_member_id"]
+        if member_id not in submitted_by_member:
+            submitted_by_member[member_id] = []
+        submitted_by_member[member_id].append(sub)
+
+    # Calculate stats per member
+    results = []
+    for member in course_members:
+        member_id = member["course_member_id"]
+        member_submissions = submitted_by_member.get(member_id, [])
+
+        # Build set of submitted content IDs for this member
+        submitted_content_ids = {s["course_content_id"] for s in member_submissions}
+
+        # Count submitted assignments
+        total_submitted = len(submitted_content_ids & {c["course_content_id"] for c in submittable_contents})
+
+        # Find latest submission
+        latest_submission_at = None
+        for sub in member_submissions:
+            sub_date = sub["latest_submission_at"]
+            if sub_date and (latest_submission_at is None or sub_date > latest_submission_at):
+                latest_submission_at = sub_date
+
+        # Calculate by content type
+        by_content_type = []
+        for ct_id, ct_info in content_types.items():
+            ct_contents = [c for c in submittable_contents if c["course_content_type_id"] == ct_id]
+            if not ct_contents:
+                continue
+
+            ct_max = len(ct_contents)
+            ct_content_ids = {c["course_content_id"] for c in ct_contents}
+            ct_submitted = len(submitted_content_ids & ct_content_ids)
+
+            # Latest submission for this content type
+            ct_latest = None
+            for sub in member_submissions:
+                if sub["course_content_id"] in ct_content_ids:
+                    sub_date = sub["latest_submission_at"]
+                    if sub_date and (ct_latest is None or sub_date > ct_latest):
+                        ct_latest = sub_date
+
+            by_content_type.append({
+                **ct_info,
+                "max_assignments": ct_max,
+                "submitted_assignments": ct_submitted,
+                "progress_percentage": (ct_submitted / ct_max * 100) if ct_max > 0 else 0.0,
+                "latest_submission_at": ct_latest,
+            })
+
+        results.append({
+            "course_member_id": member_id,
+            "user_id": member.get("user_id"),
+            "username": member.get("username"),
+            "given_name": member.get("given_name"),
+            "family_name": member.get("family_name"),
+            "total_max_assignments": total_max,
+            "total_submitted_assignments": total_submitted,
+            "overall_progress_percentage": (total_submitted / total_max * 100) if total_max > 0 else 0.0,
+            "latest_submission_at": latest_submission_at,
+            "by_content_type": by_content_type,
+        })
+
+    return results

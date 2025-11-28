@@ -130,12 +130,54 @@ class CourseMemberGradingsGet(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CourseMemberGradingsList(BaseModel):
+    """List item for course member gradings (without hierarchical nodes for efficiency).
+
+    Used when listing all course members' gradings for a course.
+    Contains only course-level totals, not the full hierarchical breakdown.
+    """
+
+    course_member_id: str
+    course_id: str
+
+    # User info for display
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+
+    # Root level stats (whole course)
+    total_max_assignments: int = Field(
+        description="Total number of submittable course_contents in the course"
+    )
+    total_submitted_assignments: int = Field(
+        description="Total course_contents with at least one submitted artifact"
+    )
+    overall_progress_percentage: float = Field(
+        ge=0.0,
+        le=100.0,
+        description="Overall progress percentage for the course"
+    )
+    latest_submission_at: Optional[datetime] = Field(
+        None,
+        description="Most recent submission across all content"
+    )
+
+    # Per content type totals at course level
+    by_content_type: List[ContentTypeGradingStats] = Field(
+        default_factory=list,
+        description="Course-level breakdown by content type"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CourseMemberGradingsQuery(ListQuery):
     """Query parameters for course member gradings endpoint."""
 
     course_id: Optional[str] = Field(
         None,
-        description="Filter by course ID (required if member belongs to multiple courses)"
+        description="Filter by course ID (required for list endpoint, optional for get)"
     )
     course_content_type_id: Optional[str] = Field(
         None,
