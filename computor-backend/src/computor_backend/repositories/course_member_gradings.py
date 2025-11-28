@@ -25,6 +25,7 @@ from computor_backend.model.course import (
 )
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.auth import User
+from computor_backend.custom_types import Ltree
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +305,7 @@ def calculate_grading_stats(
     Calculate hierarchical grading statistics from raw content data.
 
     This is a pure function that aggregates the data from the repository queries.
+    Uses Ltree for path operations.
 
     Args:
         submittable_contents: List of all submittable course_contents
@@ -332,29 +334,33 @@ def calculate_grading_stats(
                 "course_content_type_color": content["course_content_type_color"],
             }
 
-    # Get all unique path prefixes at all levels
+    # Get all unique path prefixes at all levels using Ltree
     all_paths = set()
     for content in submittable_contents:
-        path = content["path"]
-        segments = path.split(".")
+        ltree_path = Ltree(content["path"])
+        segments = ltree_path.path.split(".")
         for i in range(1, len(segments) + 1):
             prefix = ".".join(segments[:i])
             all_paths.add(prefix)
 
     # Calculate depth and filter if needed
+    # Depth is number of segments (nlevel in PostgreSQL)
     if max_depth is not None:
-        all_paths = {p for p in all_paths if p.count(".") + 1 <= max_depth}
+        all_paths = {p for p in all_paths if len(p.split(".")) <= max_depth}
 
     # Sort paths by depth then alphabetically
-    sorted_paths = sorted(all_paths, key=lambda p: (p.count("."), p))
+    sorted_paths = sorted(all_paths, key=lambda p: (len(p.split(".")), p))
 
     # Build aggregation for each path level
     nodes = []
-    for path in sorted_paths:
-        # Find all submittable contents at or under this path
+    for path_str in sorted_paths:
+        path_ltree = Ltree(path_str)
+
+        # Find all submittable contents at or under this path using Ltree.descendant_of
+        # Note: descendant_of returns True for same path and all child paths
         contents_under_path = [
             c for c in submittable_contents
-            if c["path"] == path or c["path"].startswith(path + ".")
+            if Ltree(c["path"]).descendant_of(path_ltree)
         ]
 
         if not contents_under_path:
@@ -407,8 +413,8 @@ def calculate_grading_stats(
             })
 
         nodes.append({
-            "path": path,
-            "title": path_titles.get(path),
+            "path": path_str,
+            "title": path_titles.get(path_str),
             "max_assignments": max_assignments,
             "submitted_assignments": submitted_assignments,
             "progress_percentage": (submitted_assignments / max_assignments * 100) if max_assignments > 0 else 0.0,
