@@ -10,7 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
-from computor_types.base import ListQuery
+from computor_types.base import EntityInterface, ListQuery
 
 
 class ContentTypeGradingStats(BaseModel):
@@ -194,3 +194,20 @@ class CourseMemberGradingsQuery(ListQuery):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CourseMemberGradingsInterface(EntityInterface):
+    """Interface for course member gradings.
+
+    This is a read-only interface (no create/update operations) that provides
+    aggregated progress statistics for course members.
+    """
+
+    # No create/update - this is a read-only aggregation endpoint
+    create = None
+    update = None
+
+    # Read operations
+    get = CourseMemberGradingsGet
+    list = CourseMemberGradingsList
+    query = CourseMemberGradingsQuery
