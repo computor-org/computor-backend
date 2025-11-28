@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from computor_backend.api.exceptions import NotFoundException, ForbiddenException
-from computor_backend.permissions.principal import Principal, allowed_course_role_ids
+from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.cache import Cache
 from computor_backend.repositories.course_member_gradings import (
@@ -79,32 +79,26 @@ async def get_course_member_gradings(
         )
 
     # Permission check:
-    # - Admin can access any member
-    # - User can access their own course member
-    # - Tutor/Lecturer/Maintainer/Owner can access members in their courses
+    # - Lecturer or higher role (_lecturer, _maintainer, _owner) can access members in their courses
+    # - Admin can access any member (handled by check_course_permissions)
+    #
+    # Use check_course_permissions with "_lecturer" role - this uses the role hierarchy
+    # which automatically includes _maintainer, _owner, and admins
     user_id = permissions.get_user_id()
 
-    if not permissions.is_admin:
-        # Check if self-access
-        is_self_access = (
-            course_member.user_id is not None
-            and user_id is not None
-            and str(course_member.user_id) == str(user_id)
+    # Check if user has lecturer or higher permissions for this course
+    has_course_perms = check_course_permissions(
+        permissions, CourseMember, "_lecturer", db
+    ).filter(
+        CourseMember.course_id == course_id,
+        CourseMember.user_id == user_id
+    ).first()
+
+    if not has_course_perms:
+        raise ForbiddenException(
+            detail="You don't have permission to view this course member's grading statistics. "
+                   "Lecturer role or higher is required."
         )
-
-        if not is_self_access:
-            # Check if user has tutor or higher permissions for this course
-            has_course_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_course_perms:
-                raise ForbiddenException(
-                    detail="You don't have permission to view this course member's grading statistics"
-                )
 
     # Initialize repository
     repo = CourseMemberGradingsRepository(db)
