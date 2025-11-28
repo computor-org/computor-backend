@@ -155,6 +155,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         status.HTTP_401_UNAUTHORIZED: UnauthorizedException,
         status.HTTP_403_FORBIDDEN: ForbiddenException,
         status.HTTP_404_NOT_FOUND: NotFoundException,
+        status.HTTP_405_METHOD_NOT_ALLOWED: BadRequestException,
         status.HTTP_500_INTERNAL_SERVER_ERROR: InternalServerException,
         status.HTTP_501_NOT_IMPLEMENTED: NotImplementedException,
     }
