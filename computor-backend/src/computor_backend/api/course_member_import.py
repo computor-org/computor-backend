@@ -9,12 +9,17 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.api.exceptions import BadRequestException
 from computor_backend.utils.excel_xml_parser import parse_course_member_xml
-from computor_backend.business_logic.course_member_import import import_course_members
+from computor_backend.business_logic.course_member_import import (
+    import_course_members,
+    import_single_course_member,
+)
 
 from computor_types.course_member_import import (
     CourseMemberImportRequest,
     CourseMemberImportResponse,
     CourseMemberImportRow,
+    SingleCourseMemberImportRequest,
+    SingleCourseMemberImportResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -207,4 +212,60 @@ async def import_course_members_json(
     except Exception as e:
         db.rollback()
         logger.error(f"Import failed: {e}", exc_info=True)
+        raise
+
+@course_member_import_router.post(
+    "/import-single/{course_id}",
+    response_model=SingleCourseMemberImportResponse,
+)
+async def import_single_member(
+    course_id: str,
+    request: SingleCourseMemberImportRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)] = None,
+    db: Session = Depends(get_db),
+) -> SingleCourseMemberImportResponse:
+    """Import a single course member.
+
+    This endpoint accepts a single member's data and imports them into the specified course.
+    If the member already exists, they will be updated.
+
+    **Required Permissions**: Lecturer role or higher (_lecturer, _maintainer, _owner)
+
+    Args:
+        course_id: ID of the course to import member into
+        request: Member data including email, name, group, and role
+        permissions: Current user's permissions
+        db: Database session
+
+    Returns:
+        Import response with created/updated course member and created group (if any)
+
+    Raises:
+        ForbiddenException: If user lacks lecturer role or higher
+        BadRequestException: If validation fails
+    """
+    logger.info(f"Importing single member {request.email} to course {course_id}")
+
+    try:
+        result = await import_single_course_member(
+            course_id=course_id,
+            member_request=request,
+            permissions=permissions,
+            db=db,
+            username_strategy="name",  # Use name-based username generation by default
+        )
+
+        # Commit transaction if successful
+        if result.success:
+            db.commit()
+            logger.info(f"Single member import successful: {request.email}")
+        else:
+            db.rollback()
+            logger.warning(f"Single member import failed: {result.message}")
+
+        return result
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Single member import failed: {e}", exc_info=True)
         raise

@@ -1,7 +1,11 @@
 """DTOs for course member bulk import functionality."""
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from computor_types.course_members import CourseMemberGet
+    from computor_types.course_groups import CourseGroupGet
 
 
 class ImportStatus(str, Enum):
@@ -81,3 +85,21 @@ class CourseMemberImportPreview(BaseModel):
     existing_users: int = Field(..., description="Estimated existing users to update")
     issues: List[str] = Field(default_factory=list, description="Validation issues found")
     sample_records: List[CourseMemberImportRow] = Field(..., description="Sample of parsed records")
+
+
+class SingleCourseMemberImportRequest(BaseModel):
+    """Request for importing a single course member."""
+    email: str = Field(..., description="Email address (required)")
+    given_name: Optional[str] = Field(None, description="First name")
+    family_name: Optional[str] = Field(None, description="Last name")
+    course_group_title: Optional[str] = Field(None, description="Course group name")
+    course_role_id: str = Field("_student", description="Course role ID (e.g., _student)")
+    create_missing_group: bool = Field(True, description="Auto-create missing course group")
+
+
+class SingleCourseMemberImportResponse(BaseModel):
+    """Response from single course member import."""
+    success: bool = Field(..., description="Whether the import was successful")
+    message: Optional[str] = Field(None, description="Success or error message")
+    course_member: Optional[dict] = Field(None, description="Created/updated course member")
+    created_group: Optional[dict] = Field(None, description="Created course group if new")

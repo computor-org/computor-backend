@@ -17,7 +17,11 @@ from computor_types.course_member_import import (
     CourseMemberImportResult,
     CourseMemberImportResponse,
     ImportStatus,
+    SingleCourseMemberImportRequest,
+    SingleCourseMemberImportResponse,
 )
+from computor_types.course_members import CourseMemberGet
+from computor_types.course_groups import CourseGroupGet
 
 logger = logging.getLogger(__name__)
 
@@ -614,3 +618,133 @@ def _get_or_create_course_group(
     logger.info(f"Created course group: {group_title}")
 
     return new_group
+
+
+async def import_single_course_member(
+    course_id: str | UUID,
+    member_request: SingleCourseMemberImportRequest,
+    permissions: Principal,
+    db: Session,
+    username_strategy: str = "name",
+) -> SingleCourseMemberImportResponse:
+    """Import a single course member.
+
+    Args:
+        course_id: ID of the course to import member into
+        member_request: Member data to import
+        permissions: Current user's permissions
+        db: Database session
+        username_strategy: Strategy for username generation ("name" or "email")
+
+    Returns:
+        Import response with course member and created group (if any)
+
+    Raises:
+        NotFoundException: If course not found
+        ForbiddenException: If user lacks permissions
+        BadRequestException: If validation fails
+    """
+    # Validate course exists and user has permissions (lecturer role or higher)
+    course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
+        Course.id == course_id
+    ).first()
+
+    if not course:
+        raise ForbiddenException(
+            "You don't have permission to import course members. "
+            "Lecturer role or higher is required."
+        )
+
+    # Get organization from course
+    organization_id = course.organization_id
+
+    # Initialize tracking variables
+    group_cache: Dict[str, CourseGroup] = {}
+    created_groups: List[str] = []
+    created_group: Optional[CourseGroup] = None
+
+    # Cache existing groups
+    existing_groups = db.query(CourseGroup).filter(CourseGroup.course_id == course_id).all()
+    for group in existing_groups:
+        group_cache[group.title.lower()] = group
+
+    # Convert request to import row format
+    import_row = CourseMemberImportRow(
+        email=member_request.email,
+        given_name=member_request.given_name,
+        family_name=member_request.family_name,
+        course_group_title=member_request.course_group_title,
+        course_role_id=member_request.course_role_id,
+    )
+
+    # Import the member
+    result = _import_single_member(
+        course=course,
+        member_data=import_row,
+        default_course_role_id=member_request.course_role_id,
+        update_existing=True,  # Always update for single import
+        create_missing_groups=member_request.create_missing_group,
+        organization_id=organization_id,
+        group_cache=group_cache,
+        created_groups=created_groups,
+        row_number=1,
+        permissions=permissions,
+        db=db,
+        username_strategy=username_strategy,
+    )
+
+    # Check if we created a new group
+    if created_groups and member_request.course_group_title:
+        created_group = group_cache.get(member_request.course_group_title.lower())
+
+    # Handle result
+    if result.status == ImportStatus.ERROR:
+        return SingleCourseMemberImportResponse(
+            success=False,
+            message=result.message,
+            course_member=None,
+            created_group=None,
+        )
+
+    # Get the course member for response
+    course_member_dict = None
+    if result.course_member_id:
+        course_member_model = db.query(CourseMember).filter(
+            CourseMember.id == result.course_member_id
+        ).first()
+        if course_member_model:
+            course_member_dto = CourseMemberGet.model_validate(course_member_model)
+            course_member_dict = course_member_dto.model_dump()
+
+            # Trigger post-create hooks if needed
+            if result.status in [ImportStatus.SUCCESS, ImportStatus.UPDATED]:
+                try:
+                    await trigger_post_create_for_members(
+                        [course_member_model],
+                        db,
+                        batch_size=1,  # Single member, no batching needed
+                        batch_delay_seconds=0,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
+                    # Don't fail the import if post-create hooks fail
+
+    # Prepare created group response
+    created_group_dict = None
+    if created_group:
+        created_group_dto = CourseGroupGet.model_validate(created_group)
+        created_group_dict = created_group_dto.model_dump()
+
+    # Success message
+    message = result.message
+    if result.status == ImportStatus.UPDATED:
+        message = "Course member updated successfully"
+    elif result.status == ImportStatus.SUCCESS:
+        message = "Course member created successfully"
+
+    return SingleCourseMemberImportResponse(
+        success=True,
+        message=message,
+        course_member=course_member_dict,
+        created_group=created_group_dict,
+    )
