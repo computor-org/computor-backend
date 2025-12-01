@@ -1,24 +1,18 @@
-"""Business logic for bulk course member import."""
+"""Business logic for course member import."""
 import logging
-from typing import List, Optional, Dict, Tuple
+from typing import Optional, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
 from computor_backend.model.auth import User, StudentProfile
 from computor_backend.model.course import Course, CourseMember, CourseGroup
-from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.api.exceptions import ForbiddenException
 
 from computor_types.course_member_import import (
-    CourseMemberImportRow,
-    CourseMemberImportResult,
+    CourseMemberImportRequest,
     CourseMemberImportResponse,
-    ImportStatus,
-    SingleCourseMemberImportRequest,
-    SingleCourseMemberImportResponse,
 )
 from computor_types.course_members import CourseMemberGet
 from computor_types.course_groups import CourseGroupGet
@@ -26,144 +20,93 @@ from computor_types.course_groups import CourseGroupGet
 logger = logging.getLogger(__name__)
 
 
-async def trigger_post_create_for_members(
-    course_members: List[CourseMember],
+async def trigger_post_create_for_member(
+    course_member: CourseMember,
     db: Session,
-    batch_size: int = 5,
-    batch_delay_seconds: int = 10
 ) -> None:
     """
-    Trigger post-create hook for bulk-imported course members.
+    Trigger post-create hook for a single imported course member.
 
-    Uses BulkStudentRepositoryCreationWorkflow to avoid overwhelming GitLab API
-    with concurrent requests. Provisions submission groups synchronously, then
-    triggers a single bulk workflow for repository creation with rate limiting.
-
-    All course members (students, tutors, lecturers) get their own student repository
-    forked from student-template. Access to the assignments repository (reference with
-    solutions) is controlled separately via GitLab group memberships in _sync_gitlab_memberships:
-    - Students: NO access to assignments
-    - Tutors: READ access (inherited via course group)
-    - Lecturers: FULL access (Maintainer)
-
-    Only skips:
-    - Service accounts (is_service=True)
+    Provisions submission groups and triggers repository creation workflow.
+    Skips service accounts (is_service=True).
 
     Args:
-        course_members: List of newly created course members
+        course_member: Newly created course member
         db: Database session
-        batch_size: Number of members to process per batch (default: 5)
-        batch_delay_seconds: Delay between batches in seconds (default: 10)
     """
     from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
     from computor_backend.tasks import get_task_executor
     from computor_types.tasks import TaskSubmission
 
-    # Filter out service accounts
-    non_service_members = [
-        cm for cm in course_members
-        if not (cm.user and cm.user.is_service)
-    ]
-
-    if not non_service_members:
-        logger.info("No non-service members to process")
+    # Skip service accounts
+    if course_member.user and course_member.user.is_service:
+        logger.info(f"Skipping post-create hooks for service account {course_member.user_id}")
         return
 
-    logger.info(
-        f"Processing {len(non_service_members)} course members "
-        f"(skipped {len(course_members) - len(non_service_members)} service accounts)"
-    )
+    # Step 1: Provision submission groups (fast, synchronous)
+    try:
+        provision_submission_groups_for_user(
+            user_id=course_member.user_id,
+            course_id=course_member.course_id,
+            db=db
+        )
+        logger.info(f"Provisioned submission groups for course member {course_member.id}")
+    except Exception as e:
+        logger.error(
+            f"Failed to provision submission groups for course member {course_member.id}: {e}"
+        )
+        # Don't fail the entire import if provisioning fails
 
-    # Step 1: Provision submission groups for all members (fast, synchronous)
-    for course_member in non_service_members:
-        try:
-            provision_submission_groups_for_user(
-                user_id=course_member.user_id,
-                course_id=course_member.course_id,
-                db=db
-            )
-            logger.info(f"Provisioned submission groups for course member {course_member.id}")
-        except Exception as e:
-            logger.error(
-                f"Failed to provision submission groups for course member {course_member.id}: {e}"
-            )
-            # Don't fail the entire import if provisioning fails for one member
-
-    # Step 2: Trigger single bulk workflow for repository creation (asynchronous with rate limiting)
-    if not non_service_members:
-        return
-
+    # Step 2: Trigger repository creation workflow (asynchronous)
     try:
         task_executor = get_task_executor()
-
-        # Get unique course ID (should be same for all members)
-        course_id = str(non_service_members[0].course_id)
-
-        # Collect all course member IDs
-        course_member_ids = [str(cm.id) for cm in non_service_members]
 
         task_submission = TaskSubmission(
             task_name="BulkStudentRepositoryCreationWorkflow",
             parameters={
-                "course_member_ids": course_member_ids,
-                "course_id": course_id,
-                "batch_size": batch_size,
-                "batch_delay_seconds": batch_delay_seconds
+                "course_member_ids": [str(course_member.id)],
+                "course_id": str(course_member.course_id),
+                "batch_size": 1,
+                "batch_delay_seconds": 0
             },
             queue="computor-tasks"
         )
 
         workflow_id = await task_executor.submit_task(task_submission)
         logger.info(
-            f"Triggered BulkStudentRepositoryCreationWorkflow: {workflow_id} "
-            f"for {len(course_member_ids)} course members "
-            f"(batch_size={batch_size}, batch_delay={batch_delay_seconds}s)"
+            f"Triggered repository creation workflow: {workflow_id} for course member {course_member.id}"
         )
     except Exception as e:
         logger.error(
-            f"Failed to trigger BulkStudentRepositoryCreationWorkflow: {e}",
+            f"Failed to trigger repository creation workflow: {e}",
             exc_info=True
         )
         # Don't fail the entire import if workflow submission fails
 
 
-async def import_course_members(
+async def import_course_member(
     course_id: str | UUID,
-    members: List[CourseMemberImportRow],
-    default_course_role_id: str,
-    update_existing: bool,
-    create_missing_groups: bool,
+    member_request: CourseMemberImportRequest,
     permissions: Principal,
     db: Session,
     username_strategy: str = "name",
-    batch_size: int = 5,
-    batch_delay_seconds: int = 10,
 ) -> CourseMemberImportResponse:
-    """Import course members in bulk.
+    """Import a course member.
 
     Args:
-        course_id: ID of the course to import members into
-        members: List of member data to import
-        default_course_role_id: Default role for members (e.g., "_student")
-        update_existing: Whether to update existing users
-        create_missing_groups: Whether to auto-create missing course groups
+        course_id: ID of the course to import member into
+        member_request: Member data to import
         permissions: Current user's permissions
         db: Database session
         username_strategy: Strategy for username generation ("name" or "email")
-            - "name": Generate from given/family name (e.g., "Max Mustermann" → "mmusterm")
-            - "email": Generate from email prefix (default fallback)
-        batch_size: Number of members to process per batch for GitLab operations (default: 5)
-        batch_delay_seconds: Delay between batches to respect GitLab rate limits (default: 10)
 
     Returns:
-        Import response with detailed results
+        Import response with course member and created group (if any)
 
     Raises:
-        NotFoundException: If course not found
         ForbiddenException: If user lacks permissions
     """
     # Validate course exists and user has permissions (lecturer role or higher)
-    # This uses the standard permission check pattern from the codebase
     course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
         Course.id == course_id
     ).first()
@@ -174,182 +117,52 @@ async def import_course_members(
             "Lecturer role or higher is required."
         )
 
-    # Get organization from course
-    organization_id = course.organization_id
-
-    # Track results and newly created members
-    results: List[CourseMemberImportResult] = []
-    created_groups: List[str] = []
-    group_cache: Dict[str, CourseGroup] = {}
-    newly_created_members: List[CourseMember] = []  # Track for post-create hooks
-
-    # Cache existing groups
-    existing_groups = db.query(CourseGroup).filter(CourseGroup.course_id == course_id).all()
-    for group in existing_groups:
-        group_cache[group.title.lower()] = group
-
-    # Process each member
-    for row_number, member_data in enumerate(members, start=1):
-        result = _import_single_member(
-            course=course,
-            member_data=member_data,
-            default_course_role_id=default_course_role_id,
-            update_existing=update_existing,
-            create_missing_groups=create_missing_groups,
-            organization_id=organization_id,
-            group_cache=group_cache,
-            created_groups=created_groups,
-            row_number=row_number,
-            permissions=permissions,
-            db=db,
-            username_strategy=username_strategy,
-        )
-        results.append(result)
-
-        # Track newly created and updated members for post-create hooks
-        # Include UPDATED members because they might not have repositories yet
-        if result.status in [ImportStatus.SUCCESS, ImportStatus.UPDATED] and result.course_member_id:
-            course_member = db.query(CourseMember).filter(
-                CourseMember.id == result.course_member_id
-            ).first()
-            if course_member:
-                newly_created_members.append(course_member)
-
-    # Calculate summary statistics
-    total = len(results)
-    success = sum(1 for r in results if r.status == ImportStatus.SUCCESS)
-    errors = sum(1 for r in results if r.status == ImportStatus.ERROR)
-    skipped = sum(1 for r in results if r.status == ImportStatus.SKIPPED)
-    updated = sum(1 for r in results if r.status == ImportStatus.UPDATED)
-
-    logger.info(
-        f"Import completed: {total} total, {success} success, "
-        f"{errors} errors, {skipped} skipped, {updated} updated"
-    )
-
-    # Trigger post-create hooks for newly created members
-    # This provisions submission groups and triggers bulk repository creation workflow
-    if newly_created_members:
-        logger.info(f"Triggering post-create hooks for {len(newly_created_members)} new members")
-        try:
-            await trigger_post_create_for_members(
-                newly_created_members,
-                db,
-                batch_size=batch_size,
-                batch_delay_seconds=batch_delay_seconds
-            )
-        except Exception as e:
-            logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
-            # Don't fail the import if post-create hooks fail
-
-    return CourseMemberImportResponse(
-        total=total,
-        success=success,
-        errors=errors,
-        skipped=skipped,
-        updated=updated,
-        results=results,
-        missing_groups=created_groups,
-    )
-
-
-def _import_single_member(
-    course: Course,
-    member_data: CourseMemberImportRow,
-    default_course_role_id: str,
-    update_existing: bool,
-    create_missing_groups: bool,
-    organization_id: UUID,
-    group_cache: Dict[str, CourseGroup],
-    created_groups: List[str],
-    row_number: int,
-    permissions: Principal,
-    db: Session,
-    username_strategy: str = "name",
-) -> CourseMemberImportResult:
-    """Import a single course member.
-
-    Args:
-        course: Course entity
-        member_data: Member data to import
-        default_course_role_id: Default role ID
-        update_existing: Whether to update existing users
-        create_missing_groups: Whether to create missing groups
-        organization_id: Organization ID
-        group_cache: Cache of existing groups
-        created_groups: List to track created groups
-        row_number: Row number in import file
-        permissions: Current user's permissions
-        db: Database session
-        username_strategy: Strategy for username generation ("name" or "email")
-
-    Returns:
-        Import result for this member
-    """
-    warnings = []
+    # Initialize tracking variables
+    created_group: Optional[CourseGroup] = None
+    is_new_member = False
 
     try:
-        # Validate email
-        if not member_data.email:
-            return CourseMemberImportResult(
-                row_number=row_number,
-                status=ImportStatus.ERROR,
-                email="",
-                message="Email is required",
-            )
-
-        email = member_data.email.strip().lower()
-
         # Find or create user by email
         user, user_created = _find_or_create_user(
-            email=email,
-            given_name=member_data.given_name,
-            family_name=member_data.family_name,
-            update_existing=update_existing,
+            email=member_request.email.strip().lower(),
+            given_name=member_request.given_name,
+            family_name=member_request.family_name,
             db=db,
             username_strategy=username_strategy,
         )
 
         if user_created:
-            logger.info(f"Created new user: {email}")
-        elif update_existing and (member_data.given_name or member_data.family_name):
+            logger.info(f"Created new user: {member_request.email}")
+        elif member_request.given_name or member_request.family_name:
             # Update user names if provided
-            if member_data.given_name:
-                user.given_name = member_data.given_name
-            if member_data.family_name:
-                user.family_name = member_data.family_name
+            if member_request.given_name:
+                user.given_name = member_request.given_name
+            if member_request.family_name:
+                user.family_name = member_request.family_name
             db.flush()
-            logger.info(f"Updated user: {email}")
-
-        # Create or update student profile if student_id provided
-        if member_data.student_id:
-            _create_or_update_student_profile(
-                user=user,
-                student_id=member_data.student_id,
-                student_email=email,
-                organization_id=organization_id,
-                db=db,
-            )
-
-        # Determine course role
-        course_role_id = member_data.course_role_id or default_course_role_id
+            logger.info(f"Updated user: {member_request.email}")
 
         # Handle course group
         course_group_id = None
-        if member_data.course_group_title:
+        if member_request.course_group_title:
             course_group = _get_or_create_course_group(
                 course=course,
-                group_title=member_data.course_group_title,
-                create_missing=create_missing_groups,
-                group_cache=group_cache,
-                created_groups=created_groups,
+                group_title=member_request.course_group_title,
+                create_missing=member_request.create_missing_group,
                 permissions=permissions,
                 db=db,
             )
             if course_group:
                 course_group_id = course_group.id
-            else:
-                warnings.append(f"Course group '{member_data.course_group_title}' not found")
+                # Track if we created a new group
+                existing_group = db.query(CourseGroup).filter(
+                    CourseGroup.id == course_group.id
+                ).first()
+                if not existing_group.created_at or (
+                    existing_group.created_at and
+                    existing_group.created_by == permissions.user_id
+                ):
+                    created_group = course_group
 
         # Check if course member already exists
         existing_member = (
@@ -362,66 +175,64 @@ def _import_single_member(
         )
 
         if existing_member:
-            if update_existing:
-                # Update existing member
-                existing_member.course_role_id = course_role_id
-                if course_group_id:
-                    existing_member.course_group_id = course_group_id
-                existing_member.updated_by = permissions.user_id
-                db.flush()
+            # Update existing member
+            existing_member.course_role_id = member_request.course_role_id
+            if course_group_id:
+                existing_member.course_group_id = course_group_id
+            existing_member.updated_by = permissions.user_id
+            db.flush()
 
-                return CourseMemberImportResult(
-                    row_number=row_number,
-                    status=ImportStatus.UPDATED,
-                    email=email,
-                    user_id=str(user.id),
-                    course_member_id=str(existing_member.id),
-                    message="Course member updated",
-                    warnings=warnings,
-                )
-            else:
-                return CourseMemberImportResult(
-                    row_number=row_number,
-                    status=ImportStatus.SKIPPED,
-                    email=email,
-                    user_id=str(user.id),
-                    course_member_id=str(existing_member.id),
-                    message="User already a course member (skipped)",
-                    warnings=warnings,
-                )
+            course_member = existing_member
+            message = "Course member updated successfully"
+        else:
+            # Create new course member
+            new_member = CourseMember(
+                user_id=user.id,
+                course_id=course.id,
+                course_role_id=member_request.course_role_id,
+                course_group_id=course_group_id,
+                created_by=permissions.user_id,
+                updated_by=permissions.user_id,
+            )
+            db.add(new_member)
+            db.flush()  # Flush to get the auto-generated ID
 
-        # Create new course member
-        new_member = CourseMember(
-            user_id=user.id,
-            course_id=course.id,
-            course_role_id=course_role_id,
-            course_group_id=course_group_id,
-            created_by=permissions.user_id,
-            updated_by=permissions.user_id,
-        )
-        db.add(new_member)
-        db.flush()  # Flush to get the auto-generated ID from database
+            course_member = new_member
+            is_new_member = True
+            message = "Course member created successfully"
+            logger.info(f"Created course member for {member_request.email} in course {course.id}")
 
-        logger.info(f"Created course member for {email} in course {course.id}")
+        # Convert to DTOs
+        course_member_dto = CourseMemberGet.model_validate(course_member)
+        course_member_dict = course_member_dto.model_dump()
 
-        return CourseMemberImportResult(
-            row_number=row_number,
-            status=ImportStatus.SUCCESS,
-            email=email,
-            user_id=str(user.id),
-            course_member_id=str(new_member.id),
-            message="Course member created successfully",
-            warnings=warnings,
+        created_group_dict = None
+        if created_group:
+            created_group_dto = CourseGroupGet.model_validate(created_group)
+            created_group_dict = created_group_dto.model_dump()
+
+        # Trigger post-create hooks if new member
+        if is_new_member:
+            try:
+                await trigger_post_create_for_member(course_member, db)
+            except Exception as e:
+                logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
+                # Don't fail the import if post-create hooks fail
+
+        return CourseMemberImportResponse(
+            success=True,
+            message=message,
+            course_member=course_member_dict,
+            created_group=created_group_dict,
         )
 
     except Exception as e:
-        logger.error(f"Error importing member at row {row_number}: {e}", exc_info=True)
-        db.rollback()  # Rollback this member's changes
-        return CourseMemberImportResult(
-            row_number=row_number,
-            status=ImportStatus.ERROR,
-            email=member_data.email if member_data.email else "",
+        logger.error(f"Error importing member: {e}", exc_info=True)
+        return CourseMemberImportResponse(
+            success=False,
             message=f"Error: {str(e)}",
+            course_member=None,
+            created_group=None,
         )
 
 
@@ -429,7 +240,6 @@ def _find_or_create_user(
     email: str,
     given_name: Optional[str],
     family_name: Optional[str],
-    update_existing: bool,
     db: Session,
     username_strategy: str = "name",
 ) -> Tuple[User, bool]:
@@ -439,11 +249,8 @@ def _find_or_create_user(
         email: User email
         given_name: User's given name
         family_name: User's family name
-        update_existing: Whether to update existing user
         db: Database session
         username_strategy: Strategy for username generation ("name" or "email")
-            - "name": Generate from given/family name (e.g., "Max Mustermann" → "mmusterm")
-            - "email": Generate from email prefix (e.g., "john.doe@example.com" → "john.doe")
 
     Returns:
         Tuple of (User, was_created)
@@ -475,7 +282,7 @@ def _find_or_create_user(
         family_name=family_name.strip() if family_name else None,
     )
     db.add(new_user)
-    db.flush()  # Flush to get the auto-generated ID from database
+    db.flush()  # Flush to get the auto-generated ID
 
     logger.info(f"Created new user: {email} with username {username} (strategy: {username_strategy})")
     return new_user, True
@@ -506,62 +313,10 @@ def _generate_username_from_email(email: str, db: Session) -> str:
     return username
 
 
-def _create_or_update_student_profile(
-    user: User,
-    student_id: str,
-    student_email: str,
-    organization_id: UUID,
-    db: Session,
-) -> StudentProfile:
-    """Create or update student profile for a specific organization.
-
-    Args:
-        user: User entity
-        student_id: Student ID (Matrikelnummer)
-        student_email: Student email
-        organization_id: Organization ID
-        db: Database session
-
-    Returns:
-        StudentProfile entity
-    """
-    # Check if student profile exists for this user IN THIS ORGANIZATION
-    # Note: Users can have multiple student profiles (one per organization)
-    student_profile = db.query(StudentProfile).filter(
-        StudentProfile.user_id == user.id,
-        StudentProfile.organization_id == organization_id
-    ).first()
-
-    if student_profile:
-        # Update existing profile for this organization
-        if student_id:
-            student_profile.student_id = student_id
-        if student_email:
-            student_profile.student_email = student_email
-        db.flush()
-        logger.info(f"Updated student profile for user {user.id} in organization {organization_id}")
-        return student_profile
-
-    # Create new student profile for this organization
-    student_profile = StudentProfile(
-        user_id=user.id,
-        student_id=student_id,
-        student_email=student_email,
-        organization_id=organization_id,
-    )
-    db.add(student_profile)
-    db.flush()  # Flush to get the auto-generated ID from database
-
-    logger.info(f"Created student profile for user {user.id} in organization {organization_id}")
-    return student_profile
-
-
 def _get_or_create_course_group(
     course: Course,
     group_title: str,
     create_missing: bool,
-    group_cache: Dict[str, CourseGroup],
-    created_groups: List[str],
     permissions: Principal,
     db: Session,
 ) -> Optional[CourseGroup]:
@@ -571,20 +326,12 @@ def _get_or_create_course_group(
         course: Course entity
         group_title: Group title
         create_missing: Whether to create if missing
-        group_cache: Cache of groups
-        created_groups: List to track created groups
         permissions: Current user's permissions
         db: Database session
 
     Returns:
         CourseGroup entity or None if not found and not created
     """
-    group_title_lower = group_title.strip().lower()
-
-    # Check cache first
-    if group_title_lower in group_cache:
-        return group_cache[group_title_lower]
-
     # Check database
     course_group = (
         db.query(CourseGroup)
@@ -596,7 +343,6 @@ def _get_or_create_course_group(
     )
 
     if course_group:
-        group_cache[group_title_lower] = course_group
         return course_group
 
     # Create if allowed
@@ -611,140 +357,8 @@ def _get_or_create_course_group(
         updated_by=permissions.user_id,
     )
     db.add(new_group)
-    db.flush()  # Flush to get the auto-generated ID from database
+    db.flush()  # Flush to get the auto-generated ID
 
-    group_cache[group_title_lower] = new_group
-    created_groups.append(group_title)
     logger.info(f"Created course group: {group_title}")
 
     return new_group
-
-
-async def import_single_course_member(
-    course_id: str | UUID,
-    member_request: SingleCourseMemberImportRequest,
-    permissions: Principal,
-    db: Session,
-    username_strategy: str = "name",
-) -> SingleCourseMemberImportResponse:
-    """Import a single course member.
-
-    Args:
-        course_id: ID of the course to import member into
-        member_request: Member data to import
-        permissions: Current user's permissions
-        db: Database session
-        username_strategy: Strategy for username generation ("name" or "email")
-
-    Returns:
-        Import response with course member and created group (if any)
-
-    Raises:
-        NotFoundException: If course not found
-        ForbiddenException: If user lacks permissions
-        BadRequestException: If validation fails
-    """
-    # Validate course exists and user has permissions (lecturer role or higher)
-    course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
-        Course.id == course_id
-    ).first()
-
-    if not course:
-        raise ForbiddenException(
-            "You don't have permission to import course members. "
-            "Lecturer role or higher is required."
-        )
-
-    # Get organization from course
-    organization_id = course.organization_id
-
-    # Initialize tracking variables
-    group_cache: Dict[str, CourseGroup] = {}
-    created_groups: List[str] = []
-    created_group: Optional[CourseGroup] = None
-
-    # Cache existing groups
-    existing_groups = db.query(CourseGroup).filter(CourseGroup.course_id == course_id).all()
-    for group in existing_groups:
-        group_cache[group.title.lower()] = group
-
-    # Convert request to import row format
-    import_row = CourseMemberImportRow(
-        email=member_request.email,
-        given_name=member_request.given_name,
-        family_name=member_request.family_name,
-        course_group_title=member_request.course_group_title,
-        course_role_id=member_request.course_role_id,
-    )
-
-    # Import the member
-    result = _import_single_member(
-        course=course,
-        member_data=import_row,
-        default_course_role_id=member_request.course_role_id,
-        update_existing=True,  # Always update for single import
-        create_missing_groups=member_request.create_missing_group,
-        organization_id=organization_id,
-        group_cache=group_cache,
-        created_groups=created_groups,
-        row_number=1,
-        permissions=permissions,
-        db=db,
-        username_strategy=username_strategy,
-    )
-
-    # Check if we created a new group
-    if created_groups and member_request.course_group_title:
-        created_group = group_cache.get(member_request.course_group_title.lower())
-
-    # Handle result
-    if result.status == ImportStatus.ERROR:
-        return SingleCourseMemberImportResponse(
-            success=False,
-            message=result.message,
-            course_member=None,
-            created_group=None,
-        )
-
-    # Get the course member for response
-    course_member_dict = None
-    if result.course_member_id:
-        course_member_model = db.query(CourseMember).filter(
-            CourseMember.id == result.course_member_id
-        ).first()
-        if course_member_model:
-            course_member_dto = CourseMemberGet.model_validate(course_member_model)
-            course_member_dict = course_member_dto.model_dump()
-
-            # Trigger post-create hooks if needed
-            if result.status in [ImportStatus.SUCCESS, ImportStatus.UPDATED]:
-                try:
-                    await trigger_post_create_for_members(
-                        [course_member_model],
-                        db,
-                        batch_size=1,  # Single member, no batching needed
-                        batch_delay_seconds=0,
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
-                    # Don't fail the import if post-create hooks fail
-
-    # Prepare created group response
-    created_group_dict = None
-    if created_group:
-        created_group_dto = CourseGroupGet.model_validate(created_group)
-        created_group_dict = created_group_dto.model_dump()
-
-    # Success message
-    message = result.message
-    if result.status == ImportStatus.UPDATED:
-        message = "Course member updated successfully"
-    elif result.status == ImportStatus.SUCCESS:
-        message = "Course member created successfully"
-
-    return SingleCourseMemberImportResponse(
-        success=True,
-        message=message,
-        course_member=course_member_dict,
-        created_group=created_group_dict,
-    )
