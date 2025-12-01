@@ -67,6 +67,23 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
 
         return str(submission_group.course_id)
 
+    def _get_course_member_ids_from_artifact(self, entity: SubmissionArtifact) -> Set[str]:
+        """
+        Get all course_member_ids for members of this artifact's submission group.
+
+        This is needed to invalidate course member grading caches.
+        """
+        from ..model.course import SubmissionGroupMember
+
+        if not entity.submission_group_id:
+            return set()
+
+        members = self.db.query(SubmissionGroupMember.course_member_id).filter(
+            SubmissionGroupMember.submission_group_id == entity.submission_group_id
+        ).all()
+
+        return {str(m.course_member_id) for m in members}
+
     def get_entity_tags(self, entity: SubmissionArtifact) -> Set[str]:
         """
         Get cache tags for a submission artifact.
@@ -82,6 +99,8 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
         - tutor_view:{course_id} - Tutor views for this course (CRITICAL)
         - lecturer_view:{course_id} - Lecturer views for this course (CRITICAL)
         - student_view:{course_id} - Student views for this course
+        - cm_grading:{member_id} - Course member grading stats (CRITICAL)
+        - course:{course_id} - General course-level invalidation
         """
         tags = {
             f"submission_artifact:{entity.id}",
@@ -99,6 +118,14 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
                 tags.add(f"tutor_view:{course_id}")      # Tutors see submissions
                 tags.add(f"lecturer_view:{course_id}")   # Lecturers see submissions
                 tags.add(f"student_view:{course_id}")    # Students see their own submissions
+                tags.add(f"course:{course_id}")          # General course tag
+
+                # CRITICAL: Invalidate course member grading stats
+                # Get all members in this submission group
+                member_ids = self._get_course_member_ids_from_artifact(entity)
+                for member_id in member_ids:
+                    tags.add(f"cm_grading:{member_id}")
+                    tags.add(f"course_member:{member_id}")
 
         if entity.uploaded_by_course_member_id:
             tags.add(f"course_member:{entity.uploaded_by_course_member_id}")

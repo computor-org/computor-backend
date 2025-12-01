@@ -177,20 +177,7 @@ class CourseMemberGradingsQuery(ListQuery):
 
     course_id: Optional[str] = Field(
         None,
-        description="Filter by course ID (required for list endpoint, optional for get)"
-    )
-    course_content_type_id: Optional[str] = Field(
-        None,
-        description="Optional filter by specific course_content_type"
-    )
-    path_prefix: Optional[str] = Field(
-        None,
-        description="Filter to specific subtree (e.g., 'module1' to only get module1 stats)"
-    )
-    depth: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Limit depth of hierarchical aggregation (None = all levels)"
+        description="Filter by course ID (required for list endpoint)"
     )
 
     model_config = ConfigDict(from_attributes=True)

@@ -38,18 +38,24 @@ course_member_gradings_router = APIRouter()
     description="""
 Get aggregated grading and progress statistics for all course members (students) in a course.
 
-This is an optimized batch endpoint that calculates stats for all members at once.
+Returns full course content hierarchy with submission progress for each student.
 
 **Required Parameter:**
 - `course_id`: The course ID (required)
 
-**Optional Parameters:**
-- `course_content_type_id`: Filter by specific content type
-- `path_prefix`: Filter to specific subtree (e.g., 'module1')
+**Returns:**
+- Full hierarchical grading stats for each student
+- Breakdown by content type (mandatory, optional, etc.)
+- Progress percentages at all levels
+- Latest submission dates
 
 **Access Control:**
 - Admins: Can access any course
 - Lecturers and higher: Can access courses they manage
+
+**Caching:**
+- Results are cached for 30 minutes per student
+- Cache automatically invalidates on submissions and grading changes
 """,
 )
 async def list_course_member_gradings_endpoint(
@@ -88,15 +94,22 @@ async def list_course_member_gradings_endpoint(
     description="""
 Get aggregated grading and progress statistics for a specific course member.
 
-This endpoint calculates:
-- **Per ltree layer**: Maximum assignments available vs. submitted assignments
-- **Per course_content_type**: Separate aggregation for different content types
-- **Percentage calculations**: Progress percentage at each hierarchical level
-- **Latest submission date**: Most recent submitted artifact's created_at
+Returns full course content hierarchy with detailed submission progress.
+
+**Calculations:**
+- **Full hierarchy**: All course content levels (no filtering)
+- **Per ltree layer**: Maximum assignments vs. submitted assignments at each level
+- **Per content_type**: Breakdown by mandatory, optional, etc.
+- **Progress percentages**: Calculated at every hierarchical level
+- **Latest submissions**: Most recent submission date per level
 
 **Access Control:**
 - Admins: Can access any course member
 - Lecturers and higher: Can access members in courses they manage
+
+**Caching:**
+- Results are cached for 30 minutes
+- Cache automatically invalidates on submissions and grading changes
 """,
 )
 async def get_course_member_gradings_endpoint(
