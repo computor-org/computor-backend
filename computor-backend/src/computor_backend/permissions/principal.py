@@ -8,7 +8,7 @@ from functools import lru_cache
 
 class CourseRoleHierarchy:
     """Manages course role hierarchy and inheritance"""
-    
+
     # Default hierarchy - can be made configurable later
     DEFAULT_HIERARCHY = {
         "_owner": ["_owner"],
@@ -17,18 +17,37 @@ class CourseRoleHierarchy:
         "_tutor": ["_tutor", "_lecturer", "_maintainer", "_owner"],
         "_student": ["_student", "_tutor", "_lecturer", "_maintainer", "_owner"],
     }
-    
+
+    # Numeric levels for role comparison (higher = more privilege)
+    ROLE_LEVELS = {
+        "_owner": 5,
+        "_maintainer": 4,
+        "_lecturer": 3,
+        "_tutor": 2,
+        "_student": 1,
+    }
+
     def __init__(self, hierarchy: Optional[Dict[str, List[str]]] = None):
         self.hierarchy = hierarchy or self.DEFAULT_HIERARCHY
-    
+
     @lru_cache(maxsize=128)
     def get_allowed_roles(self, role: str) -> List[str]:
         """Get all roles that meet or exceed the given role"""
         return self.hierarchy.get(role, [])
-    
+
     def has_role_permission(self, user_role: str, required_role: str) -> bool:
         """Check if user_role has permission for required_role"""
         return user_role in self.get_allowed_roles(required_role)
+
+    def get_role_level(self, role: str) -> int:
+        """Get numeric level for a role (higher = more privilege)."""
+        return self.ROLE_LEVELS.get(role, 0)
+
+    def can_assign_role(self, assigner_role: str, target_role: str) -> bool:
+        """Check if assigner can assign target role (must have equal or higher level)."""
+        assigner_level = self.get_role_level(assigner_role)
+        target_level = self.get_role_level(target_role)
+        return assigner_level >= target_level
 
 
 # Global instance - can be configured at startup
@@ -164,21 +183,52 @@ class Principal(BaseModel):
         """Check if user has required role in a course"""
         if self.is_admin:
             return True
-        
+
         if "course" not in self.claims.dependent:
             return False
-        
+
         if course_id not in self.claims.dependent["course"]:
             return False
-        
+
         user_roles = self.claims.dependent["course"][course_id]
-        
+
         # Check if any of the user's roles in this course meet the requirement
         for user_role in user_roles:
             if user_role.startswith("_") and course_role_hierarchy.has_role_permission(user_role, required_role):
                 return True
-        
+
         return False
+
+    def get_highest_course_role(self, course_id: str) -> Optional[str]:
+        """Get the user's highest privilege role in a course.
+
+        Args:
+            course_id: The course ID to check
+
+        Returns:
+            The highest role (e.g., "_owner", "_lecturer") or None if no role
+        """
+        if self.is_admin:
+            return "_owner"  # Admin has equivalent of owner access
+
+        if "course" not in self.claims.dependent:
+            return None
+
+        if course_id not in self.claims.dependent["course"]:
+            return None
+
+        user_roles = self.claims.dependent["course"][course_id]
+        highest_role = None
+        highest_level = 0
+
+        for user_role in user_roles:
+            if user_role.startswith("_"):
+                level = course_role_hierarchy.get_role_level(user_role)
+                if level > highest_level:
+                    highest_level = level
+                    highest_role = user_role
+
+        return highest_role
     
     def get_courses_with_role(self, minimum_role: str) -> Set[str]:
         """Get all course IDs where user has at least the minimum role"""

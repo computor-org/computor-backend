@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 
 from computor_backend.model.auth import User, StudentProfile
 from computor_backend.model.course import Course, CourseMember, CourseGroup
-from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.api.exceptions import ForbiddenException, BadRequestException
 
 from computor_types.course_member_import import (
     CourseMemberImportRequest,
@@ -117,6 +117,21 @@ async def import_course_member(
             "Lecturer role or higher is required."
         )
 
+    # Validate role assignment - user can only assign roles at or below their own level
+    user_role = permissions.get_highest_course_role(str(course_id))
+    target_role = member_request.course_role_id
+
+    if not user_role:
+        raise ForbiddenException(
+            "You don't have a role in this course."
+        )
+
+    if not course_role_hierarchy.can_assign_role(user_role, target_role):
+        raise ForbiddenException(
+            f"You cannot assign the role '{target_role}'. "
+            f"Your role '{user_role}' can only assign roles at or below your privilege level."
+        )
+
     # Initialize tracking variables
     created_group: Optional[CourseGroup] = None
     is_new_member = False
@@ -141,6 +156,12 @@ async def import_course_member(
                 user.family_name = member_request.family_name
             db.flush()
             logger.info(f"Updated user: {member_request.email}")
+
+        # Prevent users from modifying their own course role (unless admin)
+        if str(user.id) == permissions.user_id and not permissions.is_admin:
+            raise ForbiddenException(
+                "You cannot modify your own course role. Please contact an administrator."
+            )
 
         # Handle course group
         course_group_id = None
@@ -226,6 +247,9 @@ async def import_course_member(
             created_group=created_group_dict,
         )
 
+    except ForbiddenException:
+        # Re-raise permission errors - don't swallow them
+        raise
     except Exception as e:
         logger.error(f"Error importing member: {e}", exc_info=True)
         return CourseMemberImportResponse(

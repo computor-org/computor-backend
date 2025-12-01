@@ -8,6 +8,7 @@ from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.business_logic.course_member_import import import_course_member
+from computor_backend.api.exceptions import ForbiddenException
 
 from computor_types.course_member_import import (
     CourseMemberImportRequest,
@@ -73,6 +74,9 @@ async def import_member(
 
         return result
 
+    except ForbiddenException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Member import failed: {e}", exc_info=True)
