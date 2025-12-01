@@ -58,7 +58,7 @@ services:
     container_name: temporal
     restart: unless-stopped
     ports:
-      - 7233:7233
+      - "127.0.0.1:7233:7233"  # ← Localhost only - safe for development
     environment:
       - DB=postgres12
       - DB_PORT=5433
@@ -234,7 +234,7 @@ services:
   #   labels:
   #     - traefik.enable=false
 
-  # # MATLAB Testing Worker (for testing-matlab queue)
+  # MATLAB Testing Worker (for testing-matlab queue)
   # temporal-worker-matlab:
   #   build:
   #     context: ./
