@@ -1,15 +1,19 @@
 """Backend CourseMember interface with SQLAlchemy model."""
 
-from typing import Optional
+from typing import Optional, Any
+from uuid import UUID
 from sqlalchemy.orm import Session
 import logging
 
 from computor_types.course_members import (
     CourseMemberInterface as CourseMemberInterfaceBase,
     CourseMemberQuery,
+    CourseMemberUpdate,
 )
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
+from computor_backend.permissions.principal import Principal, course_role_hierarchy
+from computor_backend.api.exceptions import ForbiddenException
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +129,83 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
         # Don't fail the course member creation if workflow submission fails
 
 
+def custom_permissions_course_member(
+    permissions: Principal,
+    db: Session,
+    id: UUID,
+    entity: CourseMemberUpdate
+):
+    """
+    Custom permission check for CourseMember updates.
+    Replaces generic check_permissions to enforce course-role-based authorization.
+
+    Validates:
+    1. User has at least _lecturer role in the course
+    2. User can only assign roles <= their own level
+    3. User cannot modify their own role (unless admin)
+
+    Args:
+        permissions: Current user's permission context
+        db: Database session
+        id: CourseMember ID being updated
+        entity: Update data
+
+    Returns:
+        SQLAlchemy query filtered to the target course member
+
+    Raises:
+        ForbiddenException: If permission denied
+    """
+    # Admin bypasses all checks
+    if permissions.is_admin:
+        return db.query(CourseMember)
+
+    # Get the course member being updated
+    course_member = db.query(CourseMember).filter(CourseMember.id == id).first()
+    if not course_member:
+        # Return query that will find nothing - let crud.py handle NotFoundException
+        return db.query(CourseMember).filter(CourseMember.id == id)
+
+    course_id = str(course_member.course_id)
+
+    # Check user has at least _lecturer role in this course
+    user_role = permissions.get_highest_course_role(course_id)
+    if not user_role or course_role_hierarchy.get_role_level(user_role) < course_role_hierarchy.get_role_level("_lecturer"):
+        raise ForbiddenException(
+            "You don't have permission to update course members. "
+            "Lecturer role or higher is required."
+        )
+
+    # Check if trying to modify their own course role
+    if str(course_member.user_id) == permissions.user_id:
+        raise ForbiddenException(
+            "You cannot modify your own course membership. Please contact an administrator."
+        )
+
+    # Check if target course member has equal or higher role - cannot modify peers or superiors
+    target_current_role = course_member.course_role_id
+    if target_current_role:
+        target_current_level = course_role_hierarchy.get_role_level(target_current_role)
+        user_level = course_role_hierarchy.get_role_level(user_role)
+        if target_current_level >= user_level:
+            raise ForbiddenException(
+                f"You cannot modify a course member with role '{target_current_role}'. "
+                f"Your role '{user_role}' can only modify members with lower privilege levels."
+            )
+
+    # If updating course_role_id, validate role escalation
+    if hasattr(entity, 'course_role_id') and entity.course_role_id is not None:
+        target_role = entity.course_role_id
+        if not course_role_hierarchy.can_assign_role(user_role, target_role):
+            raise ForbiddenException(
+                f"You cannot assign the role '{target_role}'. "
+                f"Your role '{user_role}' can only assign roles at or below your privilege level."
+            )
+
+    # Return query for the specific course member
+    return db.query(CourseMember)
+
+
 class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
     """Backend-specific CourseMember interface with model attached."""
 
@@ -132,6 +213,7 @@ class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
     endpoint = "course-members"
     cache_ttl = 300
     post_create = post_create_course_member
+    custom_permissions = custom_permissions_course_member
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseMemberQuery]):

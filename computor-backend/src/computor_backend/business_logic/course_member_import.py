@@ -196,6 +196,17 @@ async def import_course_member(
         )
 
         if existing_member:
+            # Check if target course member has equal or higher role - cannot modify peers or superiors
+            target_current_role = existing_member.course_role_id
+            if target_current_role and not permissions.is_admin:
+                target_current_level = course_role_hierarchy.get_role_level(target_current_role)
+                user_level = course_role_hierarchy.get_role_level(user_role)
+                if target_current_level >= user_level:
+                    raise ForbiddenException(
+                        f"You cannot modify a course member with role '{target_current_role}'. "
+                        f"Your role '{user_role}' can only modify members with lower privilege levels."
+                    )
+
             # Update existing member
             existing_member.course_role_id = member_request.course_role_id
             if course_group_id:
