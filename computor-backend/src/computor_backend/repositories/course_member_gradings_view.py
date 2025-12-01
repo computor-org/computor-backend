@@ -270,13 +270,14 @@ class CourseMemberGradingsViewRepository(ViewRepository):
 
             if cached_data:
                 # Convert cached full data to list format (without nodes)
+                # IMPORTANT: Use member dict for user info (always fresh from DB query above)
                 list_item = CourseMemberGradingsList(
                     course_member_id=cached_data["course_member_id"],
                     course_id=cached_data["course_id"],
-                    user_id=member.get("user_id"),
-                    username=member.get("username"),
-                    given_name=member.get("given_name"),
-                    family_name=member.get("family_name"),
+                    user_id=member["user_id"],
+                    username=member["username"],
+                    given_name=member["given_name"],
+                    family_name=member["family_name"],
                     total_max_assignments=cached_data["total_max_assignments"],
                     total_submitted_assignments=cached_data["total_submitted_assignments"],
                     overall_progress_percentage=cached_data["overall_progress_percentage"],
