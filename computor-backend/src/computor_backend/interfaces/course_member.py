@@ -104,12 +104,12 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
     submission_group_ids = [str(sg.id) for sg in submission_groups]
     logger.info(f"Found {len(submission_group_ids)} submission groups for course member {course_member.id}")
 
-    # Trigger StudentRepositoryCreationWorkflow
+    # Trigger StudentRepositoryCreationWorkflow with task tracking
     try:
-        from computor_backend.tasks import get_task_executor
+        from computor_backend.task_tracker import get_task_tracker
         from computor_types.tasks import TaskSubmission
 
-        task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
 
         task_submission = TaskSubmission(
             task_name="StudentRepositoryCreationWorkflow",
@@ -122,7 +122,19 @@ async def post_create_course_member(course_member: CourseMember, db: Session):
             queue="computor-tasks"
         )
 
-        workflow_id = await task_executor.submit_task(task_submission)
+        # Get organization_id from course for permission tracking
+        org_id = str(course.organization_id) if course and course.organization_id else None
+
+        workflow_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=str(course_member.created_by) if course_member.created_by else str(course_member.user_id),
+            user_id=str(course_member.user_id),
+            course_id=str(course_member.course_id),
+            organization_id=org_id,
+            entity_type="course_member",
+            entity_id=str(course_member.id),
+            description=f"Creating repository for course member {course_member.user.email}"
+        )
         logger.info(f"Triggered StudentRepositoryCreationWorkflow: {workflow_id} for course member {course_member.id}")
     except Exception as e:
         logger.error(f"Failed to trigger StudentRepositoryCreationWorkflow for course member {course_member.id}: {e}")

@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 async def trigger_post_create_for_member(
     course_member: CourseMember,
     db: Session,
-) -> None:
+    permissions: Optional[Principal] = None,
+) -> Optional[str]:
     """
     Trigger post-create hook for a single imported course member.
 
@@ -33,15 +34,19 @@ async def trigger_post_create_for_member(
     Args:
         course_member: Newly created course member
         db: Database session
+        permissions: Optional principal for task tracking
+
+    Returns:
+        workflow_id if task was submitted successfully, None otherwise
     """
     from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
-    from computor_backend.tasks import get_task_executor
+    from computor_backend.task_tracker import get_task_tracker
     from computor_types.tasks import TaskSubmission
 
     # Skip service accounts
     if course_member.user and course_member.user.is_service:
         logger.info(f"Skipping post-create hooks for service account {course_member.user_id}")
-        return
+        return None
 
     # Step 1: Provision submission groups (fast, synchronous)
     try:
@@ -57,9 +62,9 @@ async def trigger_post_create_for_member(
         )
         # Don't fail the entire import if provisioning fails
 
-    # Step 2: Trigger repository creation workflow (asynchronous)
+    # Step 2: Trigger repository creation workflow (asynchronous) with task tracking
     try:
-        task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
 
         task_submission = TaskSubmission(
             task_name="BulkStudentRepositoryCreationWorkflow",
@@ -72,16 +77,34 @@ async def trigger_post_create_for_member(
             queue="computor-tasks"
         )
 
-        workflow_id = await task_executor.submit_task(task_submission)
+        # Get organization_id from course for permission tracking
+        course = db.query(Course).filter(Course.id == course_member.course_id).first()
+        org_id = str(course.organization_id) if course and course.organization_id else None
+
+        # Determine created_by for task tracking
+        created_by = permissions.user_id if permissions else str(course_member.created_by or course_member.user_id)
+
+        workflow_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=created_by,
+            user_id=str(course_member.user_id),
+            course_id=str(course_member.course_id),
+            organization_id=org_id,
+            entity_type="course_member",
+            entity_id=str(course_member.id),
+            description=f"Creating repository for {course_member.user.email if course_member.user else 'course member'}"
+        )
         logger.info(
             f"Triggered repository creation workflow: {workflow_id} for course member {course_member.id}"
         )
+        return workflow_id
     except Exception as e:
         logger.error(
             f"Failed to trigger repository creation workflow: {e}",
             exc_info=True
         )
         # Don't fail the entire import if workflow submission fails
+        return None
 
 
 async def import_course_member(
@@ -244,9 +267,10 @@ async def import_course_member(
             created_group_dict = created_group_dto.model_dump()
 
         # Trigger post-create hooks if new member
+        workflow_id = None
         if is_new_member:
             try:
-                await trigger_post_create_for_member(course_member, db)
+                workflow_id = await trigger_post_create_for_member(course_member, db, permissions)
             except Exception as e:
                 logger.error(f"Failed to trigger post-create hooks: {e}", exc_info=True)
                 # Don't fail the import if post-create hooks fail
@@ -256,6 +280,7 @@ async def import_course_member(
             message=message,
             course_member=course_member_dict,
             created_group=created_group_dict,
+            workflow_id=workflow_id,
         )
 
     except ForbiddenException:

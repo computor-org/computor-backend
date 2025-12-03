@@ -19,3 +19,4 @@ class CourseMemberImportResponse(BaseModel):
     message: Optional[str] = Field(None, description="Success or error message")
     course_member: Optional[dict] = Field(None, description="Created/updated course member")
     created_group: Optional[dict] = Field(None, description="Created course group if new")
+    workflow_id: Optional[str] = Field(None, description="Workflow ID for repository creation task (use GET /tasks/{workflow_id}/status to check progress)")
