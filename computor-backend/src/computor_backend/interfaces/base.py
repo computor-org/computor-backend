@@ -30,6 +30,11 @@ class BackendEntityInterface(EntityInterfaceBase):
     post_create: Any = None
     post_update: Any = None
 
+    # Custom permission check - when set, replaces generic check_permissions for updates
+    # Signature: (permissions: Principal, db: Session, id: UUID, entity: BaseModel) -> Query
+    # Should raise ForbiddenException if permission denied, return filtered query otherwise
+    custom_permissions: Any = None
+
     @classmethod
     def claim_values(cls) -> List[Tuple[str, str]]:
         """

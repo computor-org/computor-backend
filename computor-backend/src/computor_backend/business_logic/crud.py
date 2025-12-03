@@ -22,7 +22,8 @@ from starlette.concurrency import run_in_threadpool
 from computor_backend.api.exceptions import (
     BadRequestException,
     NotFoundException,
-    InternalServerException
+    InternalServerException,
+    ForbiddenException
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.handlers import permission_registry
@@ -244,7 +245,8 @@ async def update_entity(
     entity: Any,
     db_type: Any,
     response_type: BaseModel,
-    post_update: Optional[Callable] = None
+    post_update: Optional[Callable] = None,
+    custom_permissions: Optional[Callable] = None
 ) -> BaseModel:
     """
     Update an existing entity with permission checks.
@@ -257,6 +259,9 @@ async def update_entity(
         db_type: SQLAlchemy model class
         response_type: Pydantic response model class
         post_update: Optional async callback after update
+        custom_permissions: Optional custom permission check that replaces generic check_permissions.
+                           Signature: (permissions, db, id, entity) -> Query
+                           Should raise ForbiddenException if denied.
 
     Returns:
         Updated entity as response_type instance
@@ -264,6 +269,7 @@ async def update_entity(
     Raises:
         NotFoundException: If entity not found or user lacks permission
         BadRequestException: If update fails validation
+        ForbiddenException: If custom_permissions denies permission
     """
     # Set user context for audit tracking (updated_by)
     set_db_user(db, permissions.user_id)
@@ -271,7 +277,11 @@ async def update_entity(
     # Wrap blocking database operations in threadpool
     def _update_entity():
         if id is not None:
-            query = check_permissions(permissions, db_type, "update", db)
+            # Use custom permission check if provided, otherwise fall back to generic
+            if custom_permissions is not None:
+                query = custom_permissions(permissions, db, id, entity)
+            else:
+                query = check_permissions(permissions, db_type, "update", db)
 
             if query is None:
                 raise NotFoundException()
@@ -309,6 +319,9 @@ async def update_entity(
 
             return db_item, old_db_item
 
+        except (ForbiddenException, NotFoundException):
+            db.rollback()
+            raise
         except Exception as e:
             db.rollback()
             print(f"Exception in update_entity: {e}")

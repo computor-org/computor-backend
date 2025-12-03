@@ -1,5 +1,10 @@
 """
 FastAPI endpoints for task management.
+
+Task access is permission-aware:
+- Admins can see all tasks
+- Users can see their own tasks
+- Course lecturers+ can see tasks related to their courses
 """
 
 from fastapi import APIRouter, BackgroundTasks, Query, Depends
@@ -21,6 +26,8 @@ from computor_backend.tasks import (
     TaskResult,
     task_registry
 )
+from computor_backend.task_tracker import get_task_tracker
+from computor_types.tasks import TaskTrackerEntry
 
 tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -34,7 +41,10 @@ async def list_tasks(
     """
     List tasks with optional filtering and pagination.
 
-    Admin only endpoint.
+    Permission-aware: Returns only tasks the user has access to.
+    - Admins see all tasks
+    - Users see their own tasks
+    - Course lecturers+ see tasks related to their courses
 
     Args:
         permissions: Current user permissions
@@ -53,12 +63,36 @@ async def list_tasks(
     Example:
         GET /tasks?limit=10&offset=0&status=SUCCESS
     """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
     try:
         task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
+
+        # Get workflow IDs the user can access
+        accessible_ids = await task_tracker.get_accessible_task_ids(permissions)
+
+        if not accessible_ids:
+            return {
+                "tasks": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False
+            }
+
+        # Get full task info from Temporal for accessible tasks
         result = await task_executor.list_tasks(limit=limit, offset=offset, status=status)
+
+        # Filter to only accessible tasks
+        if not permissions.is_admin:
+            accessible_tasks = [
+                task for task in result.get("tasks", [])
+                if task.get("task_id") in accessible_ids or task.get("workflow_id") in accessible_ids
+            ]
+            total_accessible = len(accessible_tasks)
+            result["tasks"] = accessible_tasks[offset:offset + limit]
+            result["total"] = total_accessible
+            result["has_more"] = (offset + limit) < total_accessible
+
         return result
 
     except Exception as e:
@@ -122,7 +156,7 @@ async def get_task(
     """
     Get task information by ID.
 
-    Admin only endpoint.
+    Permission-aware: User must have access to the task.
 
     Args:
         permissions: Current user permissions
@@ -132,12 +166,10 @@ async def get_task(
         Task information including status, timestamps, and metadata
 
     Raises:
-        HTTPException: If task is not found
+        HTTPException: If task is not found or user lacks permission
     """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
     return await get_task_status(permissions, task_id)
+
 
 @tasks_router.get("/{task_id}/status", response_model=TaskInfo)
 async def get_task_status(
@@ -147,7 +179,7 @@ async def get_task_status(
     """
     Get task execution status and information.
 
-    Admin only endpoint.
+    Permission-aware: User must have access to the task.
 
     Args:
         permissions: Current user permissions
@@ -157,16 +189,25 @@ async def get_task_status(
         Task information including status and progress
 
     Raises:
-        HTTPException: If task is not found
+        HTTPException: If task is not found or user lacks permission
     """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
     try:
+        # Check permission via task tracker
+        task_tracker = await get_task_tracker()
+        can_access = await task_tracker.can_access_task(task_id, permissions)
+
+        if not can_access:
+            raise ForbiddenException(
+                error_code="AUTHZ_001",
+                detail="You don't have permission to view this task"
+            )
+
         task_executor = get_task_executor()
         task_info = await task_executor.get_task_status(task_id)
         return task_info
 
+    except ForbiddenException:
+        raise
     except KeyError:
         raise NotFoundException(
             error_code="TASK_001",
@@ -188,7 +229,7 @@ async def get_task_result(
     """
     Get task execution result.
 
-    Admin only endpoint.
+    Permission-aware: User must have access to the task.
 
     Args:
         permissions: Current user permissions
@@ -198,16 +239,25 @@ async def get_task_result(
         Task result including output data and any errors
 
     Raises:
-        HTTPException: If task is not found
+        HTTPException: If task is not found or user lacks permission
     """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
     try:
+        # Check permission via task tracker
+        task_tracker = await get_task_tracker()
+        can_access = await task_tracker.can_access_task(task_id, permissions)
+
+        if not can_access:
+            raise ForbiddenException(
+                error_code="AUTHZ_001",
+                detail="You don't have permission to view this task result"
+            )
+
         task_executor = get_task_executor()
         task_result = await task_executor.get_task_result(task_id)
         return task_result
 
+    except ForbiddenException:
+        raise
     except KeyError:
         raise NotFoundException(
             error_code="TASK_001",

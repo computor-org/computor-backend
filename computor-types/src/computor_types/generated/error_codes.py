@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2025-11-06T15:05:53.858105
+Generated at: 2025-12-01T18:40:52.896803
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -20,6 +20,7 @@ class ErrorCode(str, Enum):
     AUTHZ_002 = "AUTHZ_002"  # Admin Access Required
     AUTHZ_003 = "AUTHZ_003"  # Course Access Denied
     AUTHZ_004 = "AUTHZ_004"  # Insufficient Course Role
+    AUTHZ_005 = "AUTHZ_005"  # Role Escalation Denied
     VAL_001 = "VAL_001"  # Invalid Request Data
     VAL_002 = "VAL_002"  # Missing Required Field
     VAL_003 = "VAL_003"  # Invalid Field Format
@@ -99,6 +100,7 @@ ERROR_CATEGORIES = {
     ErrorCode.AUTHZ_002: "authorization",
     ErrorCode.AUTHZ_003: "authorization",
     ErrorCode.AUTHZ_004: "authorization",
+    ErrorCode.AUTHZ_005: "authorization",
     ErrorCode.VAL_001: "validation",
     ErrorCode.VAL_002: "validation",
     ErrorCode.VAL_003: "validation",
