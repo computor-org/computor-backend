@@ -99,7 +99,7 @@ generate_types() {
     fi
 
     cd "${ROOT_DIR}" && \
-        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_interfaces.py" "${args[@]}"
+        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_interfaces.py" ${args[@]+"${args[@]}"}
 
     echo -e "${GREEN}✅ TypeScript interfaces generated successfully!${NC}"
     echo -e "📁 Check frontend/src/types/generated/ for the generated files\n"

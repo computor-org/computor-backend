@@ -204,6 +204,28 @@ errors:
       - "Verify operation requirements"
     documentation_url: "/docs/permissions#course-roles"
 
+  - code: AUTHZ_005
+    http_status: 403
+    category: authorization
+    severity: error
+    title: "Role Escalation Denied"
+    message:
+      plain: "You cannot assign a role higher than your own."
+      markdown: "**Role Escalation Denied**\n\nYou cannot assign the role '{target_role}'. Your role '{user_role}' can only assign roles at or below your privilege level."
+      html: "<strong>Role Escalation Denied</strong><p>You cannot assign the role <code>{target_role}</code>. Your role <code>{user_role}</code> can only assign roles at or below your privilege level.</p>"
+    internal_description: "User attempted to assign a course role higher than their own privilege level"
+    affected_functions:
+      - "import_course_member"
+      - "update_course_member"
+    common_causes:
+      - "Lecturer trying to assign maintainer or owner role"
+      - "Tutor trying to assign lecturer role"
+      - "Privilege escalation attempt"
+    resolution_steps:
+      - "Request a user with higher privileges to perform this action"
+      - "Assign a role at or below your own privilege level"
+    documentation_url: "/docs/permissions#role-assignment"
+
   # ============================================================================
   # VALIDATION ERRORS (400)
   # ============================================================================

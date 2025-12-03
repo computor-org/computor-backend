@@ -126,7 +126,7 @@ class CrudRouter:
                 cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ) -> self.dto.get:
-            entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update)
+            entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update, self.dto.custom_permissions)
 
             # Clear related cache entries (old async Redis cache)
             await self._clear_entity_cache(cache, self.dto.model.__tablename__)

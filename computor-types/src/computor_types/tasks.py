@@ -112,3 +112,28 @@ class TaskInfo(BaseModel):
     history_length: Optional[int] = None
 
     model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
+
+
+class TaskTrackerEntry(BaseModel):
+    """
+    Task tracking entry stored in Redis for permission-aware task access.
+
+    This model stores permission-relevant metadata about tasks, allowing
+    non-admin users to query tasks they have access to.
+    """
+    workflow_id: str
+    task_name: str
+    created_at: datetime
+    created_by: str  # user_id of who submitted the task
+
+    # Permission context tags - used to determine access
+    user_id: Optional[str] = None  # User context (can see own tasks)
+    course_id: Optional[str] = None  # Course context (lecturers+ can see)
+    organization_id: Optional[str] = None  # Org context (org admins can see)
+
+    # Additional context
+    entity_type: Optional[str] = None  # e.g., "course_member", "deployment"
+    entity_id: Optional[str] = None  # Specific entity ID
+    description: Optional[str] = None  # Human-readable description
+
+    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
