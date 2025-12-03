@@ -67,12 +67,10 @@ async def trigger_post_create_for_member(
         task_tracker = await get_task_tracker()
 
         task_submission = TaskSubmission(
-            task_name="BulkStudentRepositoryCreationWorkflow",
+            task_name="StudentRepositoryCreationWorkflow",
             parameters={
-                "course_member_ids": [str(course_member.id)],
+                "course_member_id": str(course_member.id),
                 "course_id": str(course_member.course_id),
-                "batch_size": 1,
-                "batch_delay_seconds": 0
             },
             queue="computor-tasks"
         )
