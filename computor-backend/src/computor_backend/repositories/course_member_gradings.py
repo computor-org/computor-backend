@@ -183,6 +183,44 @@ class CourseMemberGradingsRepository:
         )
         return {str(r.path): r.title for r in results}
 
+    def get_path_info(self, course_id: UUID | str) -> Dict[str, Dict[str, Any]]:
+        """
+        Get extended info for all course_content paths in a course.
+
+        Includes title, course_content_kind_id, and submittable status.
+
+        Args:
+            course_id: The course ID
+
+        Returns:
+            Dict mapping path string to info dict with title, course_content_kind_id, submittable
+        """
+        results = (
+            self.db.query(
+                CourseContent.path,
+                CourseContent.title,
+                CourseContent.position,
+                CourseContentKind.submittable,
+                CourseContentType.color.label("course_content_type_color"),
+            )
+            .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id)
+            .join(CourseContentKind, CourseContentKind.id == CourseContentType.course_content_kind_id)
+            .filter(
+                CourseContent.course_id == course_id,
+                CourseContent.archived_at.is_(None),
+            )
+            .all()
+        )
+        return {
+            str(r.path): {
+                "title": r.title,
+                "submittable": r.submittable,
+                "position": r.position,
+                "course_content_type_color": r.course_content_type_color,
+            }
+            for r in results
+        }
+
     def get_all_course_members_with_students_role(
         self,
         course_id: UUID | str,

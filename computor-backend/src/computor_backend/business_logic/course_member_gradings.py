@@ -104,7 +104,7 @@ async def list_course_member_gradings(
 
 def _process_hierarchical_stats(
     db_stats: List[Dict[str, Any]],
-    path_titles: Dict[str, str],
+    path_info: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Process raw database statistics into hierarchical structure.
@@ -114,7 +114,8 @@ def _process_hierarchical_stats(
 
     Args:
         db_stats: Raw database query results
-        path_titles: Mapping of ltree paths to display titles
+        path_info: Mapping of ltree paths to info dict (title, course_content_kind_id, submittable)
+                   Can also be a simple Dict[str, str] for backwards compatibility (just titles)
 
     Returns:
         Dictionary with:
@@ -146,7 +147,9 @@ def _process_hierarchical_stats(
     for row in db_stats:
         path = row["path"]
         content_type_id = row.get("content_type_id")
-        content_type_title = row.get("content_type_title", "Unknown")
+        content_type_slug = row.get("content_type_slug", "")
+        content_type_title = row.get("content_type_title")
+        content_type_color = row.get("content_type_color")
         max_assignments = row["max_assignments"]
         submitted_assignments = row["submitted_assignments"]
         latest_at = row.get("latest_submission_at")
@@ -155,14 +158,40 @@ def _process_hierarchical_stats(
         if content_type_id:
             by_content_type[content_type_id]["max"] += max_assignments
             by_content_type[content_type_id]["submitted"] += submitted_assignments
-            by_content_type[content_type_id]["title"] = content_type_title
             by_content_type[content_type_id]["id"] = content_type_id
+            by_content_type[content_type_id]["slug"] = content_type_slug
+            by_content_type[content_type_id]["title"] = content_type_title
+            by_content_type[content_type_id]["color"] = content_type_color
 
         # Aggregate by node (path)
         if path not in by_node:
+            # Handle both old format (just titles) and new format (full info dict)
+            if path in path_info:
+                info = path_info[path]
+                if isinstance(info, dict):
+                    # New format with full info
+                    title = info.get("title", path)
+                    submittable = info.get("submittable")
+                    position = info.get("position")
+                    course_content_type_color = info.get("course_content_type_color")
+                else:
+                    # Old format (just title string)
+                    title = info
+                    submittable = None
+                    position = None
+                    course_content_type_color = None
+            else:
+                title = path
+                submittable = None
+                position = None
+                course_content_type_color = None
+
             by_node[path] = {
                 "path": path,
-                "title": path_titles.get(path, path),
+                "title": title,
+                "submittable": submittable,
+                "position": position,
+                "course_content_type_color": course_content_type_color,
                 "max_assignments": 0,
                 "submitted_assignments": 0,
                 "latest_submission_at": None,
@@ -180,8 +209,10 @@ def _process_hierarchical_stats(
         if content_type_id:
             by_node[path]["by_content_type"][content_type_id]["max"] += max_assignments
             by_node[path]["by_content_type"][content_type_id]["submitted"] += submitted_assignments
-            by_node[path]["by_content_type"][content_type_id]["title"] = content_type_title
             by_node[path]["by_content_type"][content_type_id]["id"] = content_type_id
+            by_node[path]["by_content_type"][content_type_id]["slug"] = content_type_slug
+            by_node[path]["by_content_type"][content_type_id]["title"] = content_type_title
+            by_node[path]["by_content_type"][content_type_id]["color"] = content_type_color
 
         # Track overall totals
         total_max += max_assignments
@@ -191,17 +222,20 @@ def _process_hierarchical_stats(
             if latest_submission is None or latest_at > latest_submission:
                 latest_submission = latest_at
 
-    # Convert content type aggregations to list format
+    # Convert content type aggregations to list format (use course_content_type_* field names for DTO)
     content_type_list = [
         {
-            "content_type_id": ct_id,
-            "content_type_title": ct_data["title"],
+            "course_content_type_id": ct_id,
+            "course_content_type_slug": ct_data.get("slug", ""),
+            "course_content_type_title": ct_data.get("title"),
+            "course_content_type_color": ct_data.get("color"),
             "max_assignments": ct_data["max"],
             "submitted_assignments": ct_data["submitted"],
             "progress_percentage": round(
                 (ct_data["submitted"] / ct_data["max"] * 100) if ct_data["max"] > 0 else 0.0,
                 2
             ),
+            "latest_submission_at": None,  # Not tracked at this level
         }
         for ct_id, ct_data in by_content_type.items()
     ]
@@ -209,17 +243,20 @@ def _process_hierarchical_stats(
     # Convert node aggregations to list format
     node_list = []
     for path, node_data in by_node.items():
-        # Convert node's content type breakdown
+        # Convert node's content type breakdown (use course_content_type_* field names for DTO)
         node_ct_list = [
             {
-                "content_type_id": ct_id,
-                "content_type_title": ct_data["title"],
+                "course_content_type_id": ct_id,
+                "course_content_type_slug": ct_data.get("slug", ""),
+                "course_content_type_title": ct_data.get("title"),
+                "course_content_type_color": ct_data.get("color"),
                 "max_assignments": ct_data["max"],
                 "submitted_assignments": ct_data["submitted"],
                 "progress_percentage": round(
                     (ct_data["submitted"] / ct_data["max"] * 100) if ct_data["max"] > 0 else 0.0,
                     2
                 ),
+                "latest_submission_at": None,  # Not tracked per content type per node
             }
             for ct_id, ct_data in node_data["by_content_type"].items()
         ]
@@ -227,6 +264,9 @@ def _process_hierarchical_stats(
         node_list.append({
             "path": path,
             "title": node_data["title"],
+            "submittable": node_data.get("submittable"),
+            "position": node_data.get("position"),
+            "course_content_type_color": node_data.get("course_content_type_color"),
             "max_assignments": node_data["max_assignments"],
             "submitted_assignments": node_data["submitted_assignments"],
             "progress_percentage": round(

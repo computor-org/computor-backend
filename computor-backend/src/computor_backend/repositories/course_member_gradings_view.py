@@ -123,11 +123,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             max_depth=None,  # All depths
         )
 
-        # Get path titles for display
-        path_titles = data_repo.get_path_titles(course_id)
+        # Get path info for display (includes title, course_content_kind_id, submittable)
+        path_info = data_repo.get_path_info(course_id)
 
         # Process database results into the expected structure
-        stats = self._process_hierarchical_stats(db_stats, path_titles)
+        stats = self._process_hierarchical_stats(db_stats, path_info)
 
         # Convert to DTOs
         by_content_type = [
@@ -139,6 +139,9 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             CourseMemberGradingNode(
                 path=node["path"],
                 title=node["title"],
+                submittable=node.get("submittable"),
+                position=node.get("position"),
+                course_content_type_color=node.get("course_content_type_color"),
                 max_assignments=node["max_assignments"],
                 submitted_assignments=node["submitted_assignments"],
                 progress_percentage=node["progress_percentage"],

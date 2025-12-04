@@ -58,6 +58,20 @@ class CourseMemberGradingNode(BaseModel):
         description="CourseContent title if a course_content exists at this exact path"
     )
 
+    # Whether this node is submittable (True for assignments, False for units/containers)
+    submittable: Optional[bool] = Field(
+        None,
+        description="Whether this node itself is submittable (True for assignments, False for units)"
+    )
+    position: Optional[int] = Field(
+        None,
+        description="Position/order of this content within its parent"
+    )
+    course_content_type_color: Optional[str] = Field(
+        None,
+        description="Color of the course content type (hex)"
+    )
+
     # Per course_content_type aggregation
     by_content_type: List[ContentTypeGradingStats] = Field(
         default_factory=list,
