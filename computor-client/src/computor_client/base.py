@@ -1,618 +1,521 @@
-"""Base client classes for Computor API.
+"""
+Base classes for typed endpoint clients.
 
-This module provides a unified hierarchy of client base classes:
-
-1. SimpleEndpointClient - Minimal untyped base for auto-generated clients
-2. TypedEndpointClient - Strongly-typed generic CRUD client with Pydantic validation
-3. CustomActionClient - Base for endpoints with custom actions beyond CRUD
-4. Specialized clients - Role-based, file operations, tasks, authentication
-
-The hierarchy allows flexibility (simple/untyped) while providing type safety when needed.
+This module provides abstract base classes and mixins for building
+type-safe endpoint clients with standardized CRUD operations.
 """
 
-from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
-from typing import TypeVar, Generic, Optional, Type, Dict, Any, List, Union
-from pathlib import Path
-import httpx
 from pydantic import BaseModel
 
-from .exceptions import raise_for_status
+from computor_client.http import AsyncHTTPClient
+
+# Type variables for generic typing
+TCreate = TypeVar("TCreate", bound=BaseModel)
+TGet = TypeVar("TGet", bound=BaseModel)
+TList = TypeVar("TList", bound=BaseModel)
+TUpdate = TypeVar("TUpdate", bound=BaseModel)
+TQuery = TypeVar("TQuery", bound=BaseModel)
 
 
-# Type variables for generic typed clients
-T = TypeVar('T', bound=BaseModel)
-CreateT = TypeVar('CreateT', bound=BaseModel)
-UpdateT = TypeVar('UpdateT', bound=BaseModel)
-QueryT = TypeVar('QueryT', bound=BaseModel)
-
-
-# ============================================================================
-# Base Client Classes
-# ============================================================================
-
-
-class SimpleEndpointClient:
-    """Minimal base class for auto-generated endpoint clients (untyped).
-
-    This class provides basic HTTP request functionality without type validation.
-    It's used by auto-generated clients that need flexibility and don't require
-    strict Pydantic model validation.
-
-    For type-safe clients with automatic validation, use TypedEndpointClient instead.
+class BaseEndpointClient(ABC):
     """
+    Abstract base class for all endpoint clients.
 
-    def __init__(self, client: httpx.AsyncClient, base_path: str):
-        self.client = client
-        self.base_path = base_path.rstrip('/')
-
-    def _build_path(self, *segments: Any) -> str:
-        """Build URL path from base path and segments."""
-        if not segments:
-            return self.base_path
-
-        encoded_segments = [str(seg) for seg in segments]
-        joined = '/'.join(encoded_segments)
-
-        if self.base_path == '/':
-            return f"/{joined}"
-
-        return f"{self.base_path}/{joined}"
-
-    async def _request(
-        self,
-        method: str,
-        path: str,
-        json: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        files: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ) -> Any:
-        """Make an HTTP request and return the response data."""
-        # Build full URL
-        url = self.base_path + (f"/{path}" if path and not path.startswith('/') else path)
-
-        response = await self.client.request(
-            method=method,
-            url=url,
-            json=json,
-            params=params,
-            files=files,
-            **kwargs
-        )
-
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
-
-        response.raise_for_status()
-
-        # Return response data
-        if response.content:
-            return response.json()
-        return None
-
-    # Generic CRUD method aliases for backward compatibility
-    async def create(self, payload: BaseModel) -> Any:
-        """Create a new entity (generic wrapper for POST)."""
-        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
-        return await self._request("POST", "", json=json_data)
-
-    async def list(self, query: Optional[BaseModel] = None) -> List[Any]:
-        """List entities (generic wrapper for GET with params)."""
-        params = {}
-        if query:
-            params = query.model_dump(mode="json", exclude_unset=True) if hasattr(query, "model_dump") else query
-        return await self._request("GET", "", params=params)
-
-    async def get(self, id: str) -> Any:
-        """Get entity by ID (generic wrapper for GET /{id})."""
-        return await self._request("GET", f"/{id}")
-
-    async def update(self, id: str, payload: BaseModel) -> Any:
-        """Update an entity (generic wrapper for PATCH /{id})."""
-        json_data = payload.model_dump(mode="json", exclude_unset=True) if hasattr(payload, "model_dump") else payload
-        return await self._request("PATCH", f"/{id}", json=json_data)
-
-    async def delete(self, id: str) -> Any:
-        """Delete an entity (generic wrapper for DELETE /{id})."""
-        return await self._request("DELETE", f"/{id}")
-
-
-class TypedEndpointClient(Generic[T, CreateT, UpdateT, QueryT]):
-    """Strongly-typed base class for CRUD endpoint clients.
-
-    This class provides type-safe CRUD operations with automatic Pydantic validation.
-    All operations return properly validated Pydantic models with full type hints.
-
-    Type Parameters:
-        T: Response model type (e.g., OrganizationGet)
-        CreateT: Create payload model type (e.g., OrganizationCreate)
-        UpdateT: Update payload model type (e.g., OrganizationUpdate)
-        QueryT: Query parameters model type (e.g., OrganizationQuery)
-
-    Example:
-        ```python
-        client = TypedEndpointClient(
-            client=http_client,
-            base_path="/organizations",
-            response_model=OrganizationGet,
-            create_model=OrganizationCreate,
-            update_model=OrganizationUpdate,
-            query_model=OrganizationQuery,
-        )
-
-        # Returns validated OrganizationGet instance
-        org = await client.get("123")
-        ```
+    Provides common functionality for HTTP operations and response parsing.
     """
 
     def __init__(
         self,
-        client: httpx.AsyncClient,
+        http_client: AsyncHTTPClient,
         base_path: str,
-        response_model: Type[T],
-        create_model: Optional[Type[CreateT]] = None,
-        update_model: Optional[Type[UpdateT]] = None,
-        query_model: Optional[Type[QueryT]] = None,
     ):
-        self.client = client
-        self.base_path = base_path.rstrip('/')
-        self.response_model = response_model
-        self.create_model = create_model
-        self.update_model = update_model
-        self.query_model = query_model
+        """
+        Initialize the endpoint client.
 
-    def _build_path(self, *segments: Any) -> str:
-        """Build URL path from base path and segments."""
-        if not segments:
-            return self.base_path
+        Args:
+            http_client: The underlying HTTP client
+            base_path: Base path for this endpoint (e.g., "/organizations")
+        """
+        self._http = http_client
+        self._base_path = base_path.rstrip("/")
 
-        encoded_segments = [str(seg) for seg in segments]
-        joined = '/'.join(encoded_segments)
+    @property
+    def base_path(self) -> str:
+        """Get the base path for this endpoint."""
+        return self._base_path
 
-        if self.base_path == '/':
-            return f"/{joined}"
+    def _build_path(self, *parts: str) -> str:
+        """Build a path from the base path and additional parts."""
+        clean_parts = [p.strip("/") for p in parts if p]
+        if clean_parts:
+            return f"{self._base_path}/{'/'.join(clean_parts)}"
+        return self._base_path
 
-        return f"{self.base_path}/{joined}"
+    def _query_to_params(self, query: Optional[BaseModel]) -> Optional[Dict[str, Any]]:
+        """Convert a query model to request parameters."""
+        if query is None:
+            return None
+        return query.model_dump(mode="json", exclude_none=True)
 
-    async def create(self, payload: CreateT) -> T:
-        """Create a new entity."""
-        if not self.create_model:
-            raise NotImplementedError("Create operation not supported")
 
-        response = await self.client.post(
-            self.base_path,
-            json=payload.model_dump(mode='json', exclude_unset=True)
+class ReadOnlyEndpointClient(BaseEndpointClient, Generic[TGet, TList, TQuery]):
+    """
+    Base class for read-only endpoint clients.
+
+    Provides get, list, and query operations without create/update/delete.
+    """
+
+    def __init__(
+        self,
+        http_client: AsyncHTTPClient,
+        base_path: str,
+        response_model: Type[TGet],
+        list_model: Optional[Type[TList]] = None,
+        query_model: Optional[Type[TQuery]] = None,
+    ):
+        super().__init__(http_client, base_path)
+        self._response_model = response_model
+        self._list_model = list_model or response_model
+        self._query_model = query_model
+
+    async def get(self, id: str) -> TGet:
+        """
+        Get a single resource by ID.
+
+        Args:
+            id: Resource identifier
+
+        Returns:
+            The resource instance
+
+        Raises:
+            NotFoundError: If the resource doesn't exist
+        """
+        response = await self._http.get(self._build_path(id))
+        return self._response_model.model_validate(response.json())
+
+    async def list(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[TQuery] = None,
+        **kwargs: Any,
+    ) -> List[TList]:
+        """
+        List resources with optional filtering.
+
+        Args:
+            skip: Number of items to skip (pagination)
+            limit: Maximum number of items to return
+            query: Query parameters for filtering
+            **kwargs: Additional query parameters
+
+        Returns:
+            List of resources
+        """
+        params = {"skip": skip, "limit": limit}
+
+        if query:
+            params.update(self._query_to_params(query))
+        if kwargs:
+            params.update({k: v for k, v in kwargs.items() if v is not None})
+
+        response = await self._http.get(self._base_path, params=params)
+        data = response.json()
+
+        # Handle both list and paginated responses
+        if isinstance(data, list):
+            return [self._list_model.model_validate(item) for item in data]
+        elif isinstance(data, dict) and "items" in data:
+            return [self._list_model.model_validate(item) for item in data["items"]]
+        else:
+            return [self._list_model.model_validate(data)]
+
+    async def exists(self, id: str) -> bool:
+        """
+        Check if a resource exists.
+
+        Args:
+            id: Resource identifier
+
+        Returns:
+            True if the resource exists, False otherwise
+        """
+        from computor_client.exceptions import NotFoundError
+
+        try:
+            await self.get(id)
+            return True
+        except NotFoundError:
+            return False
+
+
+class CRUDEndpointClient(
+    ReadOnlyEndpointClient[TGet, TList, TQuery],
+    Generic[TCreate, TGet, TList, TUpdate, TQuery],
+):
+    """
+    Base class for full CRUD endpoint clients.
+
+    Provides create, read, update, and delete operations.
+    """
+
+    def __init__(
+        self,
+        http_client: AsyncHTTPClient,
+        base_path: str,
+        response_model: Type[TGet],
+        create_model: Optional[Type[TCreate]] = None,
+        update_model: Optional[Type[TUpdate]] = None,
+        list_model: Optional[Type[TList]] = None,
+        query_model: Optional[Type[TQuery]] = None,
+    ):
+        super().__init__(
+            http_client,
+            base_path,
+            response_model=response_model,
+            list_model=list_model,
+            query_model=query_model,
         )
+        self._create_model = create_model
+        self._update_model = update_model
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
+    async def create(self, data: Union[TCreate, Dict[str, Any]]) -> TGet:
+        """
+        Create a new resource.
 
-        response.raise_for_status()
-        return self.response_model.model_validate(response.json())
+        Args:
+            data: Resource data (can be a Pydantic model or dict)
 
-    async def get(self, id: str) -> T:
-        """Get entity by ID."""
-        response = await self.client.get(self._build_path(id))
+        Returns:
+            The created resource
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
+        Raises:
+            ValidationError: If the data is invalid
+            ConflictError: If a resource with the same identifier exists
+        """
+        response = await self._http.post(self._base_path, json_data=data)
+        return self._response_model.model_validate(response.json())
 
-        response.raise_for_status()
-        return self.response_model.model_validate(response.json())
+    async def update(
+        self,
+        id: str,
+        data: Union[TUpdate, Dict[str, Any]],
+    ) -> TGet:
+        """
+        Update an existing resource.
 
-    async def list(self, params: Optional[QueryT] = None) -> List[T]:
-        """List entities with optional query parameters."""
-        query_params = {}
-        if params:
-            query_params = params.model_dump(mode='json', exclude_unset=True)
+        Args:
+            id: Resource identifier
+            data: Updated resource data
 
-        response = await self.client.get(self.base_path, params=query_params)
+        Returns:
+            The updated resource
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
-
-        response.raise_for_status()
-        return [self.response_model.model_validate(item) for item in response.json()]
-
-    async def update(self, id: str, payload: UpdateT) -> T:
-        """Update an existing entity."""
-        if not self.update_model:
-            raise NotImplementedError("Update operation not supported")
-
-        response = await self.client.patch(
-            self._build_path(id),
-            json=payload.model_dump(mode='json', exclude_unset=True)
-        )
-
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
-
-        response.raise_for_status()
-        return self.response_model.model_validate(response.json())
+        Raises:
+            NotFoundError: If the resource doesn't exist
+            ValidationError: If the data is invalid
+        """
+        response = await self._http.patch(self._build_path(id), json_data=data)
+        return self._response_model.model_validate(response.json())
 
     async def delete(self, id: str) -> None:
-        """Delete an entity."""
-        response = await self.client.delete(self._build_path(id))
+        """
+        Delete a resource.
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
+        Args:
+            id: Resource identifier
 
-        response.raise_for_status()
+        Raises:
+            NotFoundError: If the resource doesn't exist
+        """
+        await self._http.delete(self._build_path(id))
 
-    async def archive(self, id: str) -> None:
-        """Archive an entity (if supported)."""
-        response = await self.client.patch(self._build_path(id, 'archive'))
+    async def create_or_update(
+        self,
+        id: str,
+        data: Union[TCreate, TUpdate, Dict[str, Any]],
+    ) -> TGet:
+        """
+        Create or update a resource (upsert).
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
+        If the resource exists, it will be updated. Otherwise, a new
+        resource will be created.
 
-        response.raise_for_status()
+        Args:
+            id: Resource identifier
+            data: Resource data
+
+        Returns:
+            The created or updated resource
+        """
+        if await self.exists(id):
+            return await self.update(id, data)
+        else:
+            # For create, we might need to add the ID to the data
+            if isinstance(data, dict):
+                data["id"] = id
+            return await self.create(data)
 
 
-# ============================================================================
-# Specialized Client Classes
-# ============================================================================
+class TypedEndpointClient(BaseEndpointClient):
+    """
+    Flexible typed endpoint client that auto-configures based on available models.
 
-
-class CustomActionClient(Generic[T]):
-    """Base class for clients with custom actions beyond CRUD.
-
-    This class extends SimpleEndpointClient with support for custom action methods
-    and optional Pydantic model validation. It's ideal for endpoints that don't
-    follow standard CRUD patterns.
-
-    Features:
-    - Custom HTTP methods (custom_get, custom_post, custom_patch, custom_delete)
-    - Optional response model validation
-    - Flexible payload handling (BaseModel or Dict)
-
-    Example:
-        ```python
-        class MyCustomClient(CustomActionClient):
-            async def special_action(self, id: str):
-                return await self.custom_post(
-                    f"{id}/special",
-                    {"param": "value"},
-                    response_model=MyResponseModel
-                )
-        ```
+    This is the primary base class used by generated clients. It provides
+    type-safe operations based on which models are configured.
     """
 
     def __init__(
         self,
-        client: httpx.AsyncClient,
+        http_client: AsyncHTTPClient,
         base_path: str,
-        response_model: Optional[Type[T]] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        create_model: Optional[Type[BaseModel]] = None,
+        update_model: Optional[Type[BaseModel]] = None,
+        list_model: Optional[Type[BaseModel]] = None,
+        query_model: Optional[Type[BaseModel]] = None,
     ):
-        self.client = client
-        self.base_path = base_path.rstrip('/')
-        self.response_model = response_model
+        super().__init__(http_client, base_path)
+        self._response_model = response_model
+        self._create_model = create_model
+        self._update_model = update_model
+        self._list_model = list_model or response_model
+        self._query_model = query_model
 
-    def _build_path(self, *segments: Any) -> str:
-        """Build URL path from base path and segments."""
-        if not segments:
-            return self.base_path
+    # =========================================================================
+    # Read Operations
+    # =========================================================================
 
-        encoded_segments = [str(seg) for seg in segments]
-        joined = '/'.join(encoded_segments)
+    async def get(self, id: str) -> BaseModel:
+        """
+        Get a single resource by ID.
 
-        if self.base_path == '/':
-            return f"/{joined}"
+        Args:
+            id: Resource identifier
 
-        return f"{self.base_path}/{joined}"
+        Returns:
+            The resource instance
 
-    async def _request(
+        Raises:
+            NotFoundError: If the resource doesn't exist
+            RuntimeError: If no response model is configured
+        """
+        if not self._response_model:
+            raise RuntimeError(f"No response model configured for {self._base_path}")
+
+        response = await self._http.get(self._build_path(id))
+        return self._response_model.model_validate(response.json())
+
+    async def get_raw(self, id: str) -> Dict[str, Any]:
+        """Get a resource as a raw dictionary."""
+        response = await self._http.get(self._build_path(id))
+        return response.json()
+
+    async def list(
         self,
-        method: str,
-        path: str = "",
-        response_model: Optional[Type[BaseModel]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        files: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ) -> Any:
-        """Generic request method with error handling."""
-        url = self._build_path(path) if path else self.base_path
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[BaseModel]:
+        """
+        List resources with optional filtering.
 
-        response = await self.client.request(
-            method=method,
-            url=url,
-            json=json,
-            params=params,
-            files=files,
-            **kwargs
-        )
+        Args:
+            skip: Number of items to skip (pagination)
+            limit: Maximum number of items to return
+            query: Query parameters for filtering
+            **kwargs: Additional query parameters
 
-        # Handle errors
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
+        Returns:
+            List of resources
+        """
+        if not self._list_model:
+            raise RuntimeError(f"No list model configured for {self._base_path}")
 
-        response.raise_for_status()
+        params = {"skip": skip, "limit": limit}
 
-        # Parse response if model provided
-        if response.content:
-            data = response.json()
-            model = response_model or self.response_model
-            if model:
-                if isinstance(data, list):
-                    return [model.model_validate(item) for item in data]
-                return model.model_validate(data)
+        if query:
+            params.update(self._query_to_params(query))
+        if kwargs:
+            params.update({k: v for k, v in kwargs.items() if v is not None})
+
+        response = await self._http.get(self._base_path, params=params)
+        data = response.json()
+
+        if isinstance(data, list):
+            return [self._list_model.model_validate(item) for item in data]
+        elif isinstance(data, dict) and "items" in data:
+            return [self._list_model.model_validate(item) for item in data["items"]]
+        else:
+            return [self._list_model.model_validate(data)]
+
+    async def list_raw(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        **kwargs: Any,
+    ) -> List[Dict[str, Any]]:
+        """List resources as raw dictionaries."""
+        params = {"skip": skip, "limit": limit, **kwargs}
+        params = {k: v for k, v in params.items() if v is not None}
+
+        response = await self._http.get(self._base_path, params=params)
+        data = response.json()
+
+        if isinstance(data, list):
             return data
-        return None
+        elif isinstance(data, dict) and "items" in data:
+            return data["items"]
+        else:
+            return [data]
 
-    async def custom_get(
+    async def exists(self, id: str) -> bool:
+        """Check if a resource exists."""
+        from computor_client.exceptions import NotFoundError
+
+        try:
+            await self.get_raw(id)
+            return True
+        except NotFoundError:
+            return False
+
+    # =========================================================================
+    # Write Operations
+    # =========================================================================
+
+    async def create(self, data: Union[BaseModel, Dict[str, Any]]) -> BaseModel:
+        """
+        Create a new resource.
+
+        Args:
+            data: Resource data (can be a Pydantic model or dict)
+
+        Returns:
+            The created resource
+
+        Raises:
+            RuntimeError: If no create or response model is configured
+        """
+        if not self._response_model:
+            raise RuntimeError(f"No response model configured for {self._base_path}")
+
+        response = await self._http.post(self._base_path, json_data=data)
+        return self._response_model.model_validate(response.json())
+
+    async def create_raw(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a resource and return raw dictionary."""
+        response = await self._http.post(self._base_path, json_data=data)
+        return response.json()
+
+    async def update(
         self,
-        action: str,
-        response_model: Optional[Type[BaseModel]] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Any:
-        """GET request to a custom action endpoint."""
-        return await self._request("GET", action, response_model, params=params)
+        id: str,
+        data: Union[BaseModel, Dict[str, Any]],
+    ) -> BaseModel:
+        """
+        Update an existing resource.
 
-    async def custom_post(
+        Args:
+            id: Resource identifier
+            data: Updated resource data
+
+        Returns:
+            The updated resource
+        """
+        if not self._response_model:
+            raise RuntimeError(f"No response model configured for {self._base_path}")
+
+        response = await self._http.patch(self._build_path(id), json_data=data)
+        return self._response_model.model_validate(response.json())
+
+    async def update_raw(
         self,
-        action: str,
-        payload: Optional[Union[BaseModel, Dict[str, Any]]] = None,
-        response_model: Optional[Type[BaseModel]] = None,
-        **kwargs
-    ) -> Any:
-        """POST request to a custom action endpoint."""
-        json_data = None
-        if payload:
-            if isinstance(payload, BaseModel):
-                json_data = payload.model_dump(mode='json', exclude_unset=True)
-            else:
-                json_data = payload
+        id: str,
+        data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update a resource and return raw dictionary."""
+        response = await self._http.patch(self._build_path(id), json_data=data)
+        return response.json()
 
-        return await self._request("POST", action, response_model, json=json_data, **kwargs)
+    async def delete(self, id: str) -> None:
+        """
+        Delete a resource.
 
-    async def custom_patch(
+        Args:
+            id: Resource identifier
+        """
+        await self._http.delete(self._build_path(id))
+
+    # =========================================================================
+    # Convenience Methods
+    # =========================================================================
+
+    async def count(self, query: Optional[BaseModel] = None, **kwargs: Any) -> int:
+        """
+        Get the count of resources matching the query.
+
+        Note: This makes a list request with limit=0 to get the count.
+        The actual implementation depends on the API returning a total count.
+        """
+        params = {"skip": 0, "limit": 0}
+        if query:
+            params.update(self._query_to_params(query))
+        if kwargs:
+            params.update({k: v for k, v in kwargs.items() if v is not None})
+
+        response = await self._http.get(self._base_path, params=params)
+        data = response.json()
+
+        if isinstance(data, dict) and "total" in data:
+            return data["total"]
+        elif isinstance(data, list):
+            return len(data)
+        return 0
+
+    async def get_all(
         self,
-        action: str,
-        payload: Optional[Union[BaseModel, Dict[str, Any]]] = None,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """PATCH request to a custom action endpoint."""
-        json_data = None
-        if payload:
-            if isinstance(payload, BaseModel):
-                json_data = payload.model_dump(mode='json', exclude_unset=True)
-            else:
-                json_data = payload
+        *,
+        query: Optional[BaseModel] = None,
+        batch_size: int = 100,
+        **kwargs: Any,
+    ) -> List[BaseModel]:
+        """
+        Get all resources matching the query (with pagination).
 
-        return await self._request("PATCH", action, response_model, json=json_data)
+        This method automatically handles pagination to retrieve all
+        matching resources.
 
-    async def custom_delete(
-        self,
-        action: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """DELETE request to a custom action endpoint."""
-        return await self._request("DELETE", action, response_model)
+        Args:
+            query: Query parameters for filtering
+            batch_size: Number of items to fetch per request
+            **kwargs: Additional query parameters
 
+        Returns:
+            List of all matching resources
+        """
+        all_items = []
+        skip = 0
 
-class RoleBasedViewClient(CustomActionClient[T]):
-    """Base class for role-based view endpoints (students, tutors, lecturers).
-
-    Provides common methods for role-specific course and course content access.
-    """
-
-    async def get_course(self, course_id: str, response_model: Optional[Type[BaseModel]] = None) -> Any:
-        """Get course view for this role."""
-        return await self.custom_get(f"courses/{course_id}", response_model)
-
-    async def list_courses(
-        self,
-        response_model: Optional[Type[BaseModel]] = None,
-        params: Optional[Dict[str, Any]] = None
-    ) -> List[Any]:
-        """List courses for this role."""
-        return await self.custom_get("courses", response_model, params=params)
-
-    async def get_course_content(
-        self,
-        course_content_id: str,
-        response_model: Optional[Type[BaseModel]] = None
-    ) -> Any:
-        """Get course content view for this role."""
-        return await self.custom_get(f"course-contents/{course_content_id}", response_model)
-
-    async def list_course_contents(
-        self,
-        response_model: Optional[Type[BaseModel]] = None,
-        params: Optional[Dict[str, Any]] = None
-    ) -> List[Any]:
-        """List course contents for this role."""
-        return await self.custom_get("course-contents", response_model, params=params)
-
-
-class FileOperationClient(CustomActionClient[T]):
-    """Base class for file upload/download operations.
-
-    Provides methods for file handling including uploads, downloads, and streaming.
-    """
-
-    async def upload_file(
-        self,
-        file_path: Union[str, Path],
-        endpoint: str = "upload",
-        additional_data: Optional[Dict[str, Any]] = None,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Upload a file to the endpoint."""
-        file_path = Path(file_path)
-
-        with open(file_path, 'rb') as f:
-            files = {'file': (file_path.name, f, 'application/octet-stream')}
-
-            # Add additional form data if provided
-            data = additional_data or {}
-
-            response = await self.client.post(
-                self._build_path(endpoint),
-                files=files,
-                data=data
+        while True:
+            items = await self.list(
+                skip=skip,
+                limit=batch_size,
+                query=query,
+                **kwargs,
             )
+            if not items:
+                break
+            all_items.extend(items)
+            if len(items) < batch_size:
+                break
+            skip += batch_size
 
-            if response.status_code >= 400:
-                raise_for_status(response.status_code, response.json())
-
-            response.raise_for_status()
-
-            if response.content:
-                data = response.json()
-                model = response_model or self.response_model
-                if model:
-                    return model.model_validate(data)
-                return data
-            return None
-
-    async def download_file(
-        self,
-        endpoint: str,
-        output_path: Optional[Union[str, Path]] = None,
-    ) -> bytes:
-        """Download a file from the endpoint."""
-        response = await self.client.get(self._build_path(endpoint))
-
-        if response.status_code >= 400:
-            raise_for_status(response.status_code, response.json())
-
-        response.raise_for_status()
-
-        content = response.content
-
-        if output_path:
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(content)
-
-        return content
-
-    async def stream_download(
-        self,
-        endpoint: str,
-        output_path: Union[str, Path],
-        chunk_size: int = 8192,
-    ) -> None:
-        """Stream download a large file."""
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        async with self.client.stream("GET", self._build_path(endpoint)) as response:
-            if response.status_code >= 400:
-                data = await response.aread()
-                raise_for_status(response.status_code, data)
-
-            response.raise_for_status()
-
-            with open(output_path, 'wb') as f:
-                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                    f.write(chunk)
-
-
-class TaskClient(CustomActionClient[T]):
-    """Base class for task/workflow management endpoints.
-
-    Provides methods for submitting tasks, checking status, and retrieving results.
-    """
-
-    async def submit_task(
-        self,
-        payload: Union[BaseModel, Dict[str, Any]],
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Submit a task for execution."""
-        return await self.custom_post("submit", payload, response_model)
-
-    async def get_status(
-        self,
-        task_id: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Get task execution status."""
-        return await self.custom_get(f"{task_id}/status", response_model)
-
-    async def get_result(
-        self,
-        task_id: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Get task execution result."""
-        return await self.custom_get(f"{task_id}/result", response_model)
-
-    async def cancel_task(
-        self,
-        task_id: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Cancel a running task."""
-        return await self.custom_delete(f"{task_id}/cancel", response_model)
-
-    async def list_tasks(
-        self,
-        params: Optional[Dict[str, Any]] = None,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> List[Any]:
-        """List tasks with optional filtering."""
-        return await self.custom_get("", response_model, params=params)
-
-
-class AuthenticationClient(CustomActionClient[T]):
-    """Base class for authentication endpoints.
-
-    Provides methods for login, logout, token refresh, and SSO operations.
-    """
-
-    async def login(
-        self,
-        username: str,
-        password: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Login with username and password."""
-        return await self.custom_post(
-            "login",
-            {"username": username, "password": password},
-            response_model
-        )
-
-    async def logout(self, response_model: Optional[Type[BaseModel]] = None) -> Any:
-        """Logout from current session."""
-        return await self.custom_post("logout", None, response_model)
-
-    async def refresh_token(
-        self,
-        refresh_token: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Refresh access token."""
-        return await self.custom_post(
-            "refresh",
-            {"refresh_token": refresh_token},
-            response_model
-        )
-
-    async def get_providers(self, response_model: Optional[Type[BaseModel]] = None) -> List[Any]:
-        """Get list of authentication providers."""
-        return await self.custom_get("providers", response_model)
-
-    async def sso_login(
-        self,
-        provider: str,
-        response_model: Optional[Type[BaseModel]] = None,
-    ) -> Any:
-        """Initiate SSO login with provider."""
-        return await self.custom_get(f"{provider}/login", response_model)
-
-
-# Backward compatibility aliases
-BaseEndpointClient = SimpleEndpointClient  # For generated clients
+        return all_items

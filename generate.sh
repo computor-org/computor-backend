@@ -124,7 +124,7 @@ generate_python_client() {
         "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_python_clients.py" "$@"
 
     echo -e "${GREEN}✅ Python client library generated successfully!${NC}"
-    echo -e "📁 Check computor-client/src/computor_client/ for the generated files\n"
+    echo -e "📁 Check computor-client/src/computor_client/endpoints/ for the generated files\n"
 }
 
 # Function to generate TypeScript validators

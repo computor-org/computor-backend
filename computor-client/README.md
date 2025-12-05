@@ -1,243 +1,210 @@
-# Computor API Client
+# Computor Client
 
-Python HTTP client library for the Computor platform API.
+A type-safe async HTTP client library for the Computor platform.
 
 ## Features
 
-- 🚀 **Auto-generated clients** from Pydantic DTOs
-- 🔒 **Type-safe** with full type hints
-- ⚡ **Async/await** support via httpx
-- 🎯 **CRUD operations** for all endpoints
-- 🛡️ **Error handling** with custom exceptions
-- 📝 **Well documented** with examples
+- **Async/await support** - Built on httpx for modern async Python
+- **Type-safe** - Full type hints and Pydantic model integration
+- **Auto-generated clients** - Endpoint clients generated from API definitions
+- **Authentication** - Built-in support for username/password and token authentication
+- **Automatic token refresh** - Seamless handling of expired tokens
+- **Comprehensive exceptions** - Detailed error handling with HTTP status mapping
 
 ## Installation
 
 ```bash
-pip install -e computor-client/
+pip install computor-client
 ```
 
-**Note**: Requires `computor-types>=0.1.0`
+Or install with development dependencies:
+
+```bash
+pip install computor-client[dev]
+```
 
 ## Quick Start
 
 ```python
-import asyncio
 from computor_client import ComputorClient
-from computor_types.organizations import OrganizationCreate
 
 async def main():
-    # Initialize client
     async with ComputorClient(base_url="http://localhost:8000") as client:
         # Authenticate
-        await client.authenticate(username="admin", password="secret")
+        await client.login(username="admin", password="secret")
 
-        # List organizations
-        orgs = await client.organizations.list()
+        # List resources
+        organizations = await client.organizations.list()
 
-        # Create organization
-        new_org = await client.organizations.create(
-            OrganizationCreate(
-                name="My University",
-                gitlab_group_path="my-university",
-            )
-        )
+        # Get a single resource
+        user = await client.users.get("user-id")
 
-        # Get by ID
-        org = await client.organizations.get(new_org.id)
+        # Create a resource
+        from computor_types.organizations import OrganizationCreate
+        new_org = await client.organizations.create(OrganizationCreate(
+            title="My Organization",
+            path="my_org",
+            organization_type="organization",
+        ))
 
-        # Update
+        # Update a resource
         from computor_types.organizations import OrganizationUpdate
         updated = await client.organizations.update(
-            org.id,
-            OrganizationUpdate(description="Updated!")
+            "org-id",
+            OrganizationUpdate(title="Updated Title"),
         )
 
-        # Delete
-        await client.organizations.delete(org.id)
+        # Delete a resource
+        await client.organizations.delete("org-id")
 
+# Run with asyncio
+import asyncio
 asyncio.run(main())
-```
-
-## Available Endpoint Clients
-
-The `ComputorClient` provides access to all API endpoints:
-
-- `client.accounts` - User accounts
-- `client.organizations` - Organizations
-- `client.course_families` - Course families
-- `client.courses` - Courses
-- `client.users` - Users
-- `client.groups` - Groups
-- `client.roles` - Roles
-- `client.profiles` - User profiles
-- `client.messages` - Messages
-- `client.storage` - File storage
-- `client.extensions` - Extensions
-- `client.languages` - Programming languages
-- `client.execution_backends` - Code execution backends
-- `client.examples` - Example repositories
-- `client.course_content_kinds` - Course content types
-- `client.course_content_deployments` - Content deployments
-- ... and more
-
-## CRUD Operations
-
-All endpoint clients inherit from `BaseEndpointClient` and support:
-
-```python
-# Create
-resource = await client.endpoint.create(CreateDTO(...))
-
-# Get by ID
-resource = await client.endpoint.get(resource_id)
-
-# List with optional query parameters
-resources = await client.endpoint.list()
-resources = await client.endpoint.list(QueryDTO(limit=10))
-
-# Update
-updated = await client.endpoint.update(resource_id, UpdateDTO(...))
-
-# Delete
-await client.endpoint.delete(resource_id)
-```
-
-## Error Handling
-
-The client provides custom exceptions for different error scenarios:
-
-```python
-from computor_client import (
-    ComputorAPIError,
-    ComputorAuthenticationError,
-    ComputorAuthorizationError,
-    ComputorNotFoundError,
-    ComputorValidationError,
-    ComputorServerError,
-)
-
-try:
-    user = await client.users.get("invalid-id")
-except ComputorNotFoundError as e:
-    print(f"User not found: {e.status_code} - {e.message}")
-except ComputorAPIError as e:
-    print(f"API error: {e.status_code} - {e.message}")
-    print(f"Details: {e.detail}")
 ```
 
 ## Authentication
 
-### Using username/password:
+### Username/Password Login
 
 ```python
 async with ComputorClient(base_url="http://localhost:8000") as client:
-    await client.authenticate(username="admin", password="secret")
-    # Now all requests will include the auth token
+    await client.login(username="user", password="pass")
+    # Client is now authenticated
 ```
 
-### Using existing token:
-
-```python
-async with ComputorClient(base_url="http://localhost:8000") as client:
-    await client.set_token("your-jwt-token")
-    # Now all requests will include this token
-```
-
-## Advanced Configuration
+### Pre-existing Tokens
 
 ```python
 client = ComputorClient(
     base_url="http://localhost:8000",
-    timeout=60.0,  # Request timeout in seconds
-    verify_ssl=True,  # SSL verification
-    headers={  # Additional headers
-        "X-Custom-Header": "value"
-    }
+    access_token="your-access-token",
+    refresh_token="your-refresh-token",
 )
 ```
 
-## Using Individual Clients
-
-You can use endpoint clients independently:
+### Manual Token Management
 
 ```python
-import httpx
-from computor_client import OrganizationClient
-from computor_types.organizations import OrganizationCreate
-
-async with httpx.AsyncClient(base_url="http://localhost:8000") as http_client:
-    org_client = OrganizationClient(http_client)
-    orgs = await org_client.list()
+client.set_token("new-access-token", "new-refresh-token")
+client.clear_tokens()
 ```
 
-## Type Safety
+## Available Endpoint Clients
 
-All clients use Pydantic DTOs from `computor-types` for full type safety:
+After authentication, access endpoint clients as attributes:
 
 ```python
-from computor_types.users import UserCreate
+client.organizations  # OrganizationClient
+client.users          # UserClient
+client.courses        # CourseClient
+client.course_families # CourseFamilyClient
+# ... and more
+```
 
-# Type checkers will validate this
-new_user = await client.users.create(
-    UserCreate(
-        username="john",
-        email="john@example.com",
-        password="secret123",
-    )
+Each client provides standard CRUD operations:
+
+- `get(id)` - Get a single resource by ID
+- `list(skip, limit, query)` - List resources with pagination
+- `create(data)` - Create a new resource
+- `update(id, data)` - Update an existing resource
+- `delete(id)` - Delete a resource
+- `exists(id)` - Check if a resource exists
+- `get_all(query)` - Get all matching resources (handles pagination)
+
+## Exception Handling
+
+The library provides detailed exceptions for different error types:
+
+```python
+from computor_client import (
+    ComputorClientError,
+    AuthenticationError,
+    AuthorizationError,
+    NotFoundError,
+    ValidationError,
+    RateLimitError,
+    ServerError,
+    NetworkError,
 )
 
-# new_user is typed as UserGet
-print(new_user.id)  # ✅ Type checker knows this exists
-print(new_user.password)  # ❌ Type checker error - not in UserGet
+try:
+    user = await client.users.get("nonexistent")
+except NotFoundError as e:
+    print(f"User not found: {e.message}")
+    print(f"Error code: {e.error_code}")
+except AuthenticationError as e:
+    print(f"Auth failed: {e.message}")
+except ComputorClientError as e:
+    print(f"API error: {e.message} (HTTP {e.status_code})")
 ```
 
-## Examples
+## Custom Requests
 
-See the `examples/` directory for more comprehensive examples:
+For endpoints not covered by generated clients:
 
-- `basic_usage.py` - Basic CRUD operations
-- More examples coming soon...
+```python
+# GET request
+data = await client.get("/custom/endpoint", params={"key": "value"})
+
+# POST request
+result = await client.post("/custom/endpoint", json_data={"field": "value"})
+
+# With response model
+from pydantic import BaseModel
+
+class CustomResponse(BaseModel):
+    id: str
+    name: str
+
+response = await client.get("/custom/endpoint", response_model=CustomResponse)
+```
+
+## Configuration Options
+
+```python
+client = ComputorClient(
+    base_url="http://localhost:8000",
+    timeout=60.0,              # Request timeout in seconds
+    max_retries=5,             # Maximum retry attempts
+    headers={"X-Custom": "value"},  # Additional headers
+)
+```
+
+## Generating Endpoint Clients
+
+Endpoint clients are auto-generated from the API definitions:
+
+```bash
+bash generate.sh python-client
+```
+
+This generates typed clients in `computor-client/src/computor_client/endpoints/`.
 
 ## Development
 
-### Regenerate Clients
-
-Clients are auto-generated from `computor-types` EntityInterface definitions:
+### Setup
 
 ```bash
+# Create virtual environment
+python -m venv .venv
 source .venv/bin/activate
-python src/computor_backend/scripts/generate_python_clients.py
+
+# Install in development mode
+pip install -e ".[dev]"
 ```
 
-This will regenerate all clients in `src/computor_client/generated/`.
+### Running Tests
 
-### Package Structure
-
-```
-computor-client/
-├── src/
-│   └── computor_client/
-│       ├── __init__.py          # Main exports
-│       ├── client.py            # ComputorClient class
-│       ├── base.py              # BaseEndpointClient
-│       ├── exceptions.py        # Custom exceptions
-│       └── generated/           # Auto-generated clients
-│           ├── __init__.py
-│           ├── organizations.py
-│           ├── users.py
-│           └── ...
-├── examples/                    # Usage examples
-├── pyproject.toml              # Package config
-└── README.md                   # This file
+```bash
+pytest
 ```
 
-## Dependencies
+### Type Checking
 
-- `computor-types>=0.1.0` - Pydantic DTOs
-- `httpx>=0.27.0` - Async HTTP client
-- `pydantic>=2.0` - Data validation
+```bash
+mypy src/computor_client
+```
 
 ## License
 
-Same as main Computor project
+MIT License - see LICENSE file for details.
