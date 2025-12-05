@@ -1,126 +1,124 @@
-"""Computor API Client - Python HTTP client for Computor platform."""
+"""
+Computor Client Library.
 
-__version__ = "0.1.0"
+A type-safe async HTTP client for the Computor API.
 
-from .client import ComputorClient
-from .base import (
-    # Base client classes
-    SimpleEndpointClient,
+Example usage:
+    ```python
+    from computor_client import ComputorClient
+
+    async with ComputorClient(base_url="http://localhost:8000") as client:
+        # Authenticate
+        await client.login(username="admin", password="secret")
+
+        # List resources
+        orgs = await client.organizations.list()
+
+        # Get a single resource
+        user = await client.users.get("user-id")
+
+        # Create a resource
+        from computor_types.courses import CourseCreate
+        course = await client.courses.create(CourseCreate(
+            name="My Course",
+            ...
+        ))
+    ```
+
+For more examples, see the documentation.
+"""
+
+__version__ = "0.2.0"
+
+# Main client
+from computor_client.client import ComputorClient
+
+# HTTP client components (for advanced usage)
+from computor_client.http import (
+    AsyncHTTPClient,
+    AuthProvider,
+    TokenAuthProvider,
+)
+
+# Base classes (for building custom clients)
+from computor_client.base import (
+    BaseEndpointClient,
+    ReadOnlyEndpointClient,
+    CRUDEndpointClient,
     TypedEndpointClient,
-    BaseEndpointClient,  # Alias for SimpleEndpointClient (backward compat)
-    # Specialized client classes
-    CustomActionClient,
-    RoleBasedViewClient,
-    FileOperationClient,
-    TaskClient,
-    AuthenticationClient,
 )
-from .exceptions import (
+
+# Exceptions
+from computor_client.exceptions import (
+    # Base exception
     ComputorClientError,
-    ComputorAPIError,
-    ComputorAuthenticationError,
-    ComputorAuthorizationError,
-    ComputorNotFoundError,
-    ComputorValidationError,
-    ComputorServerError,
-)
-
-# Re-export all generated clients
-from .generated import (
-    AccountClient,
-    CourseClient,
-    CourseFamilyClient,
-    CourseGroupClient,
-    CourseRoleClient,
-    CourseContentKindClient,
-    CourseContentTypeClient,
-    ExampleRepositoryClient,
-    ExtensionClient,
-    GroupClient,
-    LanguageClient,
-    MessageClient,
-    OrganizationClient,
-    ProfileClient,
-    RoleClient,
-    RoleClaimClient,
-    StudentProfileClient,
-    SubmissionGroupMemberClient,
-    UserClient,
-    UserRoleClient,
-)
-
-# Import role-based clients
-from .role_clients import (
-    StudentViewClient,
-    TutorViewClient,
-    LecturerViewClient,
-)
-
-# Import custom clients
-from .custom_clients import (
-    ComputorAuthClient,
-    StorageFileClient,
-    ComputorTaskClient,
-    SystemAdminClient,
-    ExampleClient,
-    SubmissionClient,
-    TestExecutionClient,
-    DeploymentClient,
+    # Authentication errors
+    AuthenticationError,
+    TokenExpiredError,
+    InvalidCredentialsError,
+    # Authorization errors
+    AuthorizationError,
+    AdminRequiredError,
+    CourseAccessDeniedError,
+    # Validation errors
+    ValidationError,
+    MissingFieldError,
+    InvalidFieldFormatError,
+    # Not found errors
+    NotFoundError,
+    UserNotFoundError,
+    CourseNotFoundError,
+    # Conflict errors
+    ConflictError,
+    ResourceExistsError,
+    # Rate limiting
+    RateLimitError,
+    # Server errors
+    ServerError,
+    ServiceUnavailableError,
+    # Network errors
+    NetworkError,
+    TimeoutError,
+    ConnectionError,
+    # Utility
+    exception_from_response,
 )
 
 __all__ = [
+    # Version
+    "__version__",
     # Main client
     "ComputorClient",
+    # HTTP components
+    "AsyncHTTPClient",
+    "AuthProvider",
+    "TokenAuthProvider",
     # Base classes
-    "SimpleEndpointClient",
+    "BaseEndpointClient",
+    "ReadOnlyEndpointClient",
+    "CRUDEndpointClient",
     "TypedEndpointClient",
-    "BaseEndpointClient",  # Alias for backward compatibility
-    # Specialized classes
-    "CustomActionClient",
-    "RoleBasedViewClient",
-    "FileOperationClient",
-    "TaskClient",
-    "AuthenticationClient",
     # Exceptions
     "ComputorClientError",
-    "ComputorAPIError",
-    "ComputorAuthenticationError",
-    "ComputorAuthorizationError",
-    "ComputorNotFoundError",
-    "ComputorValidationError",
-    "ComputorServerError",
-    # Generated clients (CRUD)
-    "AccountClient",
-    "CourseClient",
-    "CourseFamilyClient",
-    "CourseGroupClient",
-    "CourseRoleClient",
-    "CourseContentKindClient",
-    "CourseContentTypeClient",
-    "ExampleRepositoryClient",
-    "ExtensionClient",
-    "GroupClient",
-    "LanguageClient",
-    "MessageClient",
-    "OrganizationClient",
-    "ProfileClient",
-    "RoleClient",
-    "RoleClaimClient",
-    "StudentProfileClient",
-    "SubmissionGroupMemberClient",
-    "UserClient",
-    "UserRoleClient",
-    # Role-based view clients
-    "StudentViewClient",
-    "TutorViewClient",
-    "LecturerViewClient",
-    # Custom clients
-    "ComputorAuthClient",
-    "StorageFileClient",
-    "ComputorTaskClient",
-    "SystemAdminClient",
-    "ExampleClient",
-    "SubmissionClient",
-    "TestExecutionClient",
-    "DeploymentClient",
+    "AuthenticationError",
+    "TokenExpiredError",
+    "InvalidCredentialsError",
+    "AuthorizationError",
+    "AdminRequiredError",
+    "CourseAccessDeniedError",
+    "ValidationError",
+    "MissingFieldError",
+    "InvalidFieldFormatError",
+    "NotFoundError",
+    "UserNotFoundError",
+    "CourseNotFoundError",
+    "ConflictError",
+    "ResourceExistsError",
+    "RateLimitError",
+    "ServerError",
+    "ServiceUnavailableError",
+    "NetworkError",
+    "TimeoutError",
+    "ConnectionError",
+    "exception_from_response",
 ]

@@ -1,337 +1,957 @@
 #!/usr/bin/env python3
 """
-Generate Python HTTP clients from EntityInterface definitions.
-Similar to TypeScript client generator but for Python.
+Generate Python HTTP clients from OpenAPI specification.
+
+This script generates typed endpoint clients for the computor-client package
+by parsing the OpenAPI specification from the running API server.
+
+Output structure:
+    computor-client/src/computor_client/endpoints/
+    ├── __init__.py          # Re-exports all clients
+    ├── auth.py              # AuthClient (login, logout, refresh, etc.)
+    ├── organizations.py     # OrganizationClient (CRUD + custom endpoints)
+    ├── lecturers.py         # LecturerClient (role-specific endpoints)
+    └── ...
 """
 
-import inspect
-import pkgutil
+import json
+import re
+import urllib.request
+from collections import defaultdict
 from pathlib import Path
-from typing import Type, List, Set, Optional
-from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
-def discover_interfaces() -> List[tuple[str, Type]]:
-    """Discover all EntityInterface subclasses from computor_backend.interfaces."""
+def fetch_openapi_spec(url: str = "http://localhost:8000/openapi.json") -> Dict[str, Any]:
+    """Fetch OpenAPI spec from the running server."""
     try:
-        import computor_backend.interfaces as backend_interfaces
-        from computor_backend.interfaces.base import BackendEntityInterface
-    except ImportError as e:
-        print(f"Error: Could not import backend interfaces: {e}")
-        print("Make sure you're running from the src directory")
-        return []
-
-    interfaces = []
-    seen_names = set()
-
-    # Get all interface classes from the backend.interfaces module
-    for name, obj in inspect.getmembers(backend_interfaces, inspect.isclass):
-        try:
-            if (
-                issubclass(obj, BackendEntityInterface) and
-                obj is not BackendEntityInterface and
-                hasattr(obj, 'endpoint') and
-                obj.endpoint and
-                name not in seen_names
-            ):
-                # Map back to types module for DTO imports
-                # Use the actual module where the DTOs are defined
-                # Get the module from one of the DTO classes (e.g., create, get, etc.)
-                import re
-
-                # Try to get the actual module from the DTO classes
-                dto_module = None
-                for dto_attr in ['create', 'get', 'update', 'list', 'query']:
-                    dto_class = getattr(obj, dto_attr, None)
-                    if dto_class is not None and hasattr(dto_class, '__module__'):
-                        dto_module = dto_class.__module__
-                        break
-
-                if dto_module and dto_module.startswith('computor_types.'):
-                    # Use the actual module name from the DTO
-                    module_name = dto_module
-                else:
-                    # Fallback: convert CamelCase to snake_case BEFORE lowercasing
-                    interface_base_name = name.replace("Interface", "")
-                    snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', interface_base_name).lower()
-                    module_name = f"computor_types.{snake_case}s" if not snake_case.endswith('s') else f"computor_types.{snake_case}"
-
-                interfaces.append((module_name, obj))
-                seen_names.add(name)
-
-        except Exception as e:
-            print(f"Warning: Could not process {name}: {e}")
-            continue
-
-    # Sort by interface name for deterministic output
-    interfaces.sort(key=lambda x: x[1].__name__)
-    return interfaces
+        with urllib.request.urlopen(url, timeout=10) as response:
+            return json.loads(response.read().decode())
+    except Exception as e:
+        print(f"Error fetching OpenAPI spec from {url}: {e}")
+        print("Make sure the API server is running.")
+        return {}
 
 
-def generate_client_class(module_name: str, interface: Type) -> str:
-    """Generate a client class for an EntityInterface."""
+def snake_to_pascal(name: str) -> str:
+    """Convert snake_case or kebab-case to PascalCase."""
+    name = name.replace("-", "_")
+    return "".join(word.capitalize() for word in name.split("_"))
 
-    class_name = interface.__name__.replace("Interface", "Client")
-    endpoint = interface.endpoint
-    module_base_name = module_name.split('.')[-1]
 
-    # Determine what operations are supported
-    has_create = interface.create is not None
-    has_get = interface.get is not None
-    has_list = getattr(interface, 'list', None) is not None
-    has_update = interface.update is not None
-    has_query = interface.query is not None
+def extract_path_params(path: str) -> List[str]:
+    """Extract path parameters from a route path."""
+    return re.findall(r"\{(\w+)\}", path)
 
-    # Collect imports - only import DTOs from computor_types
+
+def sanitize_method_name(name: str) -> str:
+    """Sanitize a string to be a valid Python identifier."""
+    # Replace hyphens and other invalid chars with underscores
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    # Remove leading numbers
+    name = re.sub(r'^[0-9]+', '', name)
+    # Collapse multiple underscores
+    name = re.sub(r'_+', '_', name)
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+    return name
+
+
+def path_to_method_name(path: str, method: str, operation_id: str, base_segments: List[str]) -> str:
+    """Generate a method name from path and operation."""
+    segments = [s for s in path.split("/") if s and not s.startswith("{")]
+
+    # Normalize base segments
+    normalized_base = [b.replace("-", "_").lower() for b in base_segments]
+
+    # Remove base segments from path
+    remaining = []
+    for seg in segments:
+        seg_normalized = seg.replace("-", "_").lower()
+        if seg_normalized not in normalized_base:
+            remaining.append(seg)
+
+    if not remaining:
+        # Standard CRUD
+        if method == "GET" and not path.endswith("}"):
+            return "list"
+        elif method == "GET" and path.endswith("}"):
+            return "get"
+        elif method == "POST" and not any(s.startswith("{") for s in path.split("/")[-2:]):
+            return "create"
+        elif method == "PATCH" and path.count("{") == 1:
+            return "update"
+        elif method == "PUT" and path.count("{") == 1:
+            return "replace"
+        elif method == "DELETE" and path.count("{") == 1:
+            return "delete"
+        return method.lower()
+
+    # Use remaining segments for method name
+    name_parts = []
+    for seg in remaining:
+        seg_clean = sanitize_method_name(seg)
+        if seg_clean:
+            name_parts.append(seg_clean)
+
+    method_name = "_".join(name_parts)
+
+    # Add method prefix for non-standard operations
+    if method == "POST" and "upload" not in method_name and "submit" not in method_name:
+        if method_name not in ["login", "logout", "register", "refresh", "validate", "join", "sync"]:
+            method_name = method_name
+    elif method == "DELETE" and path.count("{") > 1:
+        if not method_name.startswith("delete"):
+            method_name = f"delete_{method_name}" if method_name else "delete"
+    elif method == "GET" and path.count("{") > 1:
+        if not method_name.startswith("get"):
+            method_name = f"get_{method_name}" if method_name else "get"
+
+    # Ensure final name is valid
+    method_name = sanitize_method_name(method_name)
+    return method_name if method_name else method.lower()
+
+
+def find_schema_ref(schema: Dict[str, Any]) -> Optional[str]:
+    """Extract schema reference name from a schema definition."""
+    if "$ref" in schema:
+        return schema["$ref"].split("/")[-1]
+    if "items" in schema and "$ref" in schema.get("items", {}):
+        return schema["items"]["$ref"].split("/")[-1]
+    if "anyOf" in schema:
+        for item in schema["anyOf"]:
+            if "$ref" in item:
+                return item["$ref"].split("/")[-1]
+    return None
+
+
+def get_response_schema(operation: Dict[str, Any]) -> Tuple[Optional[str], bool]:
+    """Get the response schema name and whether it's a list."""
+    responses = operation.get("responses", {})
+    for status in ["200", "201"]:
+        if status in responses:
+            content = responses[status].get("content", {})
+            if "application/json" in content:
+                schema = content["application/json"].get("schema", {})
+                is_list = schema.get("type") == "array"
+                ref = find_schema_ref(schema)
+                return ref, is_list
+    return None, False
+
+
+def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
+    """Get the request body schema name for an operation."""
+    body = operation.get("requestBody", {})
+    content = body.get("content", {})
+    if "application/json" in content:
+        schema = content["application/json"].get("schema", {})
+        return find_schema_ref(schema)
+    return None
+
+
+# Complete mapping of schema names to their module locations in computor_types
+# Generated by scanning the actual source files
+SCHEMA_TO_MODULE = {
+    "AccountCreate": "accounts",
+    "AccountDeployment": "deployments_refactored",
+    "AccountGet": "accounts",
+    "AccountInterface": "accounts",
+    "AccountList": "accounts",
+    "AccountQuery": "accounts",
+    "AccountUpdate": "accounts",
+    "AdminResetPasswordRequest": "password_management",
+    "AdminSetPasswordRequest": "password_management",
+    "ApiTokenAdminCreate": "api_tokens",
+    "ApiTokenCreate": "api_tokens",
+    "ApiTokenCreateResponse": "api_tokens",
+    "ApiTokenGet": "api_tokens",
+    "ApiTokenInterface": "api_tokens",
+    "ApiTokenList": "api_tokens",
+    "ApiTokenQuery": "api_tokens",
+    "ApiTokenRevoke": "api_tokens",
+    "ApiTokenUpdate": "api_tokens",
+    "AssignExampleRequest": "deployment",
+    "AssignExampleResponse": "lecturer_deployments",
+    "AuthConfig": "auth",
+    "AvailableTeam": "team_management",
+    "BucketCreate": "storage",
+    "BucketInfo": "storage",
+    "BucketList": "storage",
+    "BulkAssignExamplesRequest": "system",
+    "ChangePasswordRequest": "password_management",
+    "Claims": "permissions",
+    "CommentCreate": "course_member_comments",
+    "CommentUpdate": "course_member_comments",
+    "ContentValidationCreate": "lecturer_content_validation",
+    "ContentValidationGet": "lecturer_content_validation",
+    "ContentValidationInterface": "lecturer_content_validation",
+    "ContentValidationItem": "lecturer_content_validation",
+    "ContentValidationResult": "lecturer_content_validation",
+    "ContentTypeGradingStats": "course_member_gradings",
+    "CourseContentConfig": "deployments_refactored",
+    "CourseContentCreate": "course_contents",
+    "CourseContentDeploymentCreate": "deployment",
+    "CourseContentDeploymentGet": "deployment",
+    "CourseContentDeploymentInterface": "deployment",
+    "CourseContentDeploymentList": "deployment",
+    "CourseContentDeploymentQuery": "deployment",
+    "CourseContentDeploymentUpdate": "deployment",
+    "CourseContentGet": "course_contents",
+    "CourseContentInterface": "course_contents",
+    "CourseContentKindCreate": "course_content_kind",
+    "CourseContentKindGet": "course_content_kind",
+    "CourseContentKindInterface": "course_content_kind",
+    "CourseContentKindList": "course_content_kind",
+    "CourseContentKindQuery": "course_content_kind",
+    "CourseContentKindUpdate": "course_content_kind",
+    "CourseContentLecturerGet": "lecturer_course_contents",
+    "CourseContentLecturerInterface": "lecturer_course_contents",
+    "CourseContentLecturerList": "lecturer_course_contents",
+    "CourseContentLecturerQuery": "lecturer_course_contents",
+    "CourseContentList": "course_contents",
+    "CourseContentProperties": "course_contents",
+    "CourseContentPropertiesGet": "course_contents",
+    "CourseContentQuery": "course_contents",
+    "CourseContentRepositoryLecturerGet": "lecturer_course_contents",
+    "CourseContentStudentGet": "student_course_contents",
+    "CourseContentStudentInterface": "student_course_contents",
+    "CourseContentStudentList": "student_course_contents",
+    "CourseContentStudentProperties": "student_course_contents",
+    "CourseContentStudentQuery": "student_course_contents",
+    "CourseContentStudentUpdate": "student_course_contents",
+    "CourseContentTypeConfig": "deployments_refactored",
+    "CourseContentTypeCreate": "course_content_types",
+    "CourseContentTypeGet": "course_content_types",
+    "CourseContentTypeInterface": "course_content_types",
+    "CourseContentTypeList": "course_content_types",
+    "CourseContentTypeQuery": "course_content_types",
+    "CourseContentTypeUpdate": "course_content_types",
+    "CourseContentUpdate": "course_contents",
+    "CourseCreate": "courses",
+    "CourseFamilyConfig": "deployments",
+    "CourseFamilyCreate": "course_families",
+    "CourseFamilyGet": "course_families",
+    "CourseFamilyInterface": "course_families",
+    "CourseFamilyList": "course_families",
+    "CourseFamilyProperties": "course_families",
+    "CourseFamilyPropertiesGet": "course_families",
+    "CourseFamilyQuery": "course_families",
+    "CourseFamilyTaskRequest": "system",
+    "CourseFamilyUpdate": "course_families",
+    "CourseGet": "courses",
+    "CourseGroupConfig": "deployments",
+    "CourseGroupCreate": "course_groups",
+    "CourseGroupGet": "course_groups",
+    "CourseGroupInterface": "course_groups",
+    "CourseGroupList": "course_groups",
+    "CourseGroupQuery": "course_groups",
+    "CourseGroupUpdate": "course_groups",
+    "CourseInterface": "courses",
+    "CourseList": "courses",
+    "CourseMemberCommentCreate": "course_member_comments",
+    "CourseMemberCommentGet": "course_member_comments",
+    "CourseMemberCommentInterface": "course_member_comments",
+    "CourseMemberCommentList": "course_member_comments",
+    "CourseMemberCommentQuery": "course_member_comments",
+    "CourseMemberCommentUpdate": "course_member_comments",
+    "CourseMemberCreate": "course_members",
+    "CourseMemberDeployment": "deployments_refactored",
+    "CourseMemberGet": "course_members",
+    "CourseMemberGitLabConfig": "course_members",
+    "CourseMemberGradingNode": "course_member_gradings",
+    "CourseMemberGradingsGet": "course_member_gradings",
+    "CourseMemberGradingsInterface": "course_member_gradings",
+    "CourseMemberGradingsList": "course_member_gradings",
+    "CourseMemberGradingsQuery": "course_member_gradings",
+    "CourseMemberImportRequest": "course_member_import",
+    "CourseMemberImportResponse": "course_member_import",
+    "CourseMemberInterface": "course_members",
+    "CourseMemberList": "course_members",
+    "CourseMemberProperties": "course_members",
+    "CourseMemberProviderAccountUpdate": "course_member_accounts",
+    "CourseMemberQuery": "course_members",
+    "CourseMemberReadinessStatus": "course_member_accounts",
+    "CourseMemberUpdate": "course_members",
+    "CourseMemberValidationRequest": "course_member_accounts",
+    "CourseProjects": "deployments_refactored",
+    "CourseProperties": "courses",
+    "CoursePropertiesGet": "courses",
+    "CourseQuery": "courses",
+    "CourseReleaseUpdate": "system",
+    "CourseRoleGet": "course_roles",
+    "CourseRoleInterface": "course_roles",
+    "CourseRoleList": "course_roles",
+    "CourseRoleQuery": "course_roles",
+    "CourseStudentGet": "student_courses",
+    "CourseStudentInterface": "student_courses",
+    "CourseStudentList": "student_courses",
+    "CourseStudentQuery": "student_courses",
+    "CourseStudentRepository": "student_courses",
+    "CourseTaskRequest": "system",
+    "CourseTutorGet": "tutor_courses",
+    "CourseTutorInterface": "tutor_courses",
+    "CourseTutorList": "tutor_courses",
+    "CourseTutorQuery": "tutor_courses",
+    "CourseTutorRepository": "tutor_courses",
+    "CourseUpdate": "courses",
+    "DeployExampleRequest": "deployment",
+    "DeploymentGet": "lecturer_deployments",
+    "DeploymentHistoryCreate": "deployment",
+    "DeploymentHistoryGet": "deployment",
+    "DeploymentHistoryInterface": "deployment",
+    "DeploymentHistoryList": "deployment",
+    "DeploymentList": "lecturer_deployments",
+    "DeploymentMetadata": "deployment",
+    "DeploymentSummary": "deployment",
+    "DeploymentWithHistory": "deployment",
+    "ErrorResponse": "errors",
+    "ExampleBatchUploadRequest": "example",
+    "ExampleCreate": "example",
+    "ExampleDependencyCreate": "example",
+    "ExampleDependencyGet": "example",
+    "ExampleDownloadResponse": "example",
+    "ExampleFileSet": "example",
+    "ExampleGet": "example",
+    "ExampleInterface": "example",
+    "ExampleList": "example",
+    "ExampleQuery": "example",
+    "ExampleRepositoryCreate": "example",
+    "ExampleRepositoryGet": "example",
+    "ExampleRepositoryInterface": "example",
+    "ExampleRepositoryList": "example",
+    "ExampleRepositoryQuery": "example",
+    "ExampleRepositoryUpdate": "example",
+    "ExampleUpdate": "example",
+    "ExampleUploadRequest": "example",
+    "ExampleValidationResult": "lecturer_content_validation",
+    "ExampleVersionCreate": "example",
+    "ExampleVersionGet": "example",
+    "ExampleVersionList": "example",
+    "ExampleVersionQuery": "example",
+    "ExtensionInterface": "extensions",
+    "ExtensionMetadata": "extensions",
+    "ExtensionPublishRequest": "extensions",
+    "ExtensionPublishResponse": "extensions",
+    "ExtensionVersionBase": "extensions",
+    "ExtensionVersionDetail": "extensions",
+    "ExtensionVersionListItem": "extensions",
+    "ExtensionVersionListResponse": "extensions",
+    "ExtensionVersionYankRequest": "extensions",
+    "GenerateAssignmentsRequest": "system",
+    "GenerateAssignmentsResponse": "system",
+    "GenerateTemplateRequest": "system",
+    "GenerateTemplateResponse": "system",
+    "GitCommit": "git",
+    "GitLabConfig": "deployments",
+    "GitLabConfigGet": "deployments",
+    "GitLabCredentials": "system",
+    "GitLabPATCredentials": "password_management",
+    "GitLabSyncRequest": "lecturer_gitlab_sync",
+    "GitLabSyncResult": "lecturer_gitlab_sync",
+    "GradedArtifactInfo": "tutor_grading",
+    "GradedByCourseMember": "grading",
+    "GradingAuthor": "grading",
+    "GradingStatus": "grading",
+    "GradingStudentView": "grading",
+    "GradingSummary": "grading",
+    "GroupClaimCreate": "group_claims",
+    "GroupClaimGet": "group_claims",
+    "GroupClaimInterface": "group_claims",
+    "GroupClaimList": "group_claims",
+    "GroupClaimQuery": "group_claims",
+    "GroupClaimUpdate": "group_claims",
+    "GroupCreate": "groups",
+    "GroupGet": "groups",
+    "GroupInterface": "groups",
+    "GroupList": "groups",
+    "GroupQuery": "groups",
+    "GroupType": "groups",
+    "GroupUpdate": "groups",
+    "JoinTeamRequest": "team_management",
+    "JoinTeamResponse": "team_management",
+    "LanguageCreate": "languages",
+    "LanguageGet": "languages",
+    "LanguageInterface": "languages",
+    "LanguageList": "languages",
+    "LanguageQuery": "languages",
+    "LanguageUpdate": "languages",
+    "LeaveTeamResponse": "team_management",
+    "ListQuery": "base",
+    "LocalLoginRequest": "auth",
+    "LocalLoginResponse": "auth",
+    "LocalTokenRefreshRequest": "auth",
+    "LocalTokenRefreshResponse": "auth",
+    "LoginRequest": "auth",
+    "LogoutRequest": "auth",
+    "LogoutResponse": "auth",
+    "MessageAuthor": "messages",
+    "MessageCreate": "messages",
+    "MessageGet": "messages",
+    "MessageInterface": "messages",
+    "MessageList": "messages",
+    "MessageQuery": "messages",
+    "MessageUpdate": "messages",
+    "OrganizationConfig": "deployments",
+    "OrganizationCreate": "organizations",
+    "OrganizationGet": "organizations",
+    "OrganizationInterface": "organizations",
+    "OrganizationList": "organizations",
+    "OrganizationProperties": "organizations",
+    "OrganizationPropertiesGet": "organizations",
+    "OrganizationQuery": "organizations",
+    "OrganizationTaskRequest": "system",
+    "OrganizationType": "organizations",
+    "OrganizationUpdate": "organizations",
+    "OrganizationUpdateTokenQuery": "organizations",
+    "OrganizationUpdateTokenUpdate": "organizations",
+    "PasswordOperationResponse": "password_management",
+    "PasswordStatusResponse": "password_management",
+    "PendingChange": "system",
+    "PendingChangesResponse": "system",
+    "PresignedUrlRequest": "storage",
+    "PresignedUrlResponse": "storage",
+    "Principal": "permissions",
+    "ProfileCreate": "profiles",
+    "ProfileGet": "profiles",
+    "ProfileInterface": "profiles",
+    "ProfileList": "profiles",
+    "ProfileQuery": "profiles",
+    "ProfileUpdate": "profiles",
+    "ProviderAuthCredentials": "password_management",
+    "ProviderInfo": "auth",
+    "ReleaseCourseContentCreate": "system",
+    "ReleaseCourseCreate": "system",
+    "ReleaseOverride": "system",
+    "ReleaseSelection": "system",
+    "ReleaseStudentsCreate": "system",
+    "ReleaseValidationError": "lecturer_deployments",
+    "Repository": "repositories",
+    "ResultArtifactCreate": "artifacts",
+    "ResultArtifactInterface": "artifacts",
+    "ResultArtifactListItem": "artifacts",
+    "ResultArtifactQuery": "artifacts",
+    "ResultCreate": "results",
+    "ResultGet": "results",
+    "ResultInterface": "results",
+    "ResultList": "results",
+    "ResultQuery": "results",
+    "ResultStudentGet": "student_course_contents",
+    "ResultStudentList": "student_course_contents",
+    "ResultUpdate": "results",
+    "ResultWithGrading": "results",
+    "RoleClaimGet": "roles_claims",
+    "RoleClaimInterface": "roles_claims",
+    "RoleClaimList": "roles_claims",
+    "RoleClaimQuery": "roles_claims",
+    "RoleGet": "roles",
+    "RoleInterface": "roles",
+    "RoleList": "roles",
+    "RoleQuery": "roles",
+    "ServiceCreate": "services",
+    "ServiceGet": "services",
+    "ServiceInterface": "services",
+    "ServiceList": "services",
+    "ServiceQuery": "services",
+    "ServiceTypeBase": "service_type",
+    "ServiceTypeCreate": "service_type",
+    "ServiceTypeGet": "service_type",
+    "ServiceTypeInterface": "service_type",
+    "ServiceTypeList": "service_type",
+    "ServiceTypeQuery": "service_type",
+    "ServiceTypeUpdate": "service_type",
+    "ServiceUpdate": "services",
+    "SessionCreate": "sessions",
+    "SessionGet": "sessions",
+    "SessionInterface": "sessions",
+    "SessionList": "sessions",
+    "SessionQuery": "sessions",
+    "SessionUpdate": "sessions",
+    "SetPasswordRequest": "password_management",
+    "StatusQuery": "system",
+    "StorageInterface": "storage",
+    "StorageObjectCreate": "storage",
+    "StorageObjectGet": "storage",
+    "StorageObjectList": "storage",
+    "StorageObjectMetadata": "storage",
+    "StorageObjectQuery": "storage",
+    "StorageObjectUpdate": "storage",
+    "StorageUsageStats": "storage",
+    "StudentCreate": "system",
+    "StudentProfileCreate": "student_profile",
+    "StudentProfileGet": "student_profile",
+    "StudentProfileInterface": "student_profile",
+    "StudentProfileList": "student_profile",
+    "StudentProfileQuery": "student_profile",
+    "StudentProfileUpdate": "student_profile",
+    "SubmissionArtifactCreate": "artifacts",
+    "SubmissionArtifactGet": "artifacts",
+    "SubmissionArtifactInterface": "artifacts",
+    "SubmissionArtifactList": "artifacts",
+    "SubmissionArtifactQuery": "artifacts",
+    "SubmissionArtifactUpdate": "artifacts",
+    "SubmissionCreate": "submissions",
+    "SubmissionGradeCreate": "artifacts",
+    "SubmissionGradeDetail": "artifacts",
+    "SubmissionGradeInterface": "artifacts",
+    "SubmissionGradeListItem": "artifacts",
+    "SubmissionGradeQuery": "artifacts",
+    "SubmissionGradeUpdate": "artifacts",
+    "SubmissionGroupCreate": "submission_groups",
+    "SubmissionGroupDetailed": "submission_groups",
+    "SubmissionGroupGet": "submission_groups",
+    "SubmissionGroupGradingCreate": "grading",
+    "SubmissionGroupGradingGet": "grading",
+    "SubmissionGroupGradingInterface": "grading",
+    "SubmissionGroupGradingList": "grading",
+    "SubmissionGroupGradingQuery": "grading",
+    "SubmissionGroupGradingUpdate": "grading",
+    "SubmissionGroupInterface": "submission_groups",
+    "SubmissionGroupList": "submission_groups",
+    "SubmissionGroupMemberBasic": "student_course_contents",
+    "SubmissionGroupMemberCreate": "submission_group_members",
+    "SubmissionGroupMemberGet": "submission_group_members",
+    "SubmissionGroupMemberInterface": "submission_group_members",
+    "SubmissionGroupMemberList": "submission_group_members",
+    "SubmissionGroupMemberProperties": "submission_group_members",
+    "SubmissionGroupMemberQuery": "submission_group_members",
+    "SubmissionGroupMemberUpdate": "submission_group_members",
+    "SubmissionGroupProperties": "submission_groups",
+    "SubmissionGroupQuery": "submission_groups",
+    "SubmissionGroupRepository": "student_course_contents",
+    "SubmissionGroupStudentGet": "student_course_contents",
+    "SubmissionGroupStudentList": "student_course_contents",
+    "SubmissionGroupStudentQuery": "submission_groups",
+    "SubmissionGroupUpdate": "submission_groups",
+    "SubmissionGroupWithGrading": "submission_groups",
+    "SubmissionInterface": "submissions",
+    "SubmissionListItem": "submissions",
+    "SubmissionQuery": "submissions",
+    "SubmissionReviewCreate": "artifacts",
+    "SubmissionReviewDetail": "artifacts",
+    "SubmissionReviewInterface": "artifacts",
+    "SubmissionReviewListItem": "artifacts",
+    "SubmissionReviewQuery": "artifacts",
+    "SubmissionReviewUpdate": "artifacts",
+    "SubmissionUploadResponseModel": "submissions",
+    "SubmissionUploadedFile": "submissions",
+    "TUGStudentExport": "system",
+    "TaskInfo": "tasks",
+    "TaskResponse": "system",
+    "TaskResult": "tasks",
+    "TaskStatus": "tasks",
+    "TaskSubmission": "tasks",
+    "TaskTrackerEntry": "tasks",
+    "TeamCreate": "team_management",
+    "TeamFormationRules": "team_management",
+    "TeamLockRequest": "team_management",
+    "TeamLockResponse": "team_management",
+    "TeamMemberInfo": "team_management",
+    "TeamResponse": "team_management",
+    "TestCreate": "tests",
+    "TestDependency": "codeability_meta",
+    "TestJob": "tests",
+    "TokenRefreshRequest": "auth",
+    "TokenRefreshResponse": "auth",
+    "TutorCourseMemberCourseContent": "tutor_course_members",
+    "TutorCourseMemberGet": "tutor_course_members",
+    "TutorCourseMemberList": "tutor_course_members",
+    "TutorGradeCreate": "tutor_grading",
+    "TutorGradeResponse": "tutor_grading",
+    "TutorSubmissionGroupGet": "tutor_submission_groups",
+    "TutorSubmissionGroupList": "tutor_submission_groups",
+    "TutorSubmissionGroupMember": "tutor_submission_groups",
+    "TutorSubmissionGroupQuery": "tutor_submission_groups",
+    "UnassignExampleResponse": "lecturer_deployments",
+    "UserCreate": "users",
+    "UserGet": "users",
+    "UserGroupCreate": "user_groups",
+    "UserGroupGet": "user_groups",
+    "UserGroupInterface": "user_groups",
+    "UserGroupList": "user_groups",
+    "UserGroupQuery": "user_groups",
+    "UserGroupUpdate": "user_groups",
+    "UserInterface": "users",
+    "UserList": "users",
+    "UserManagerResetPasswordRequest": "password_management",
+    "UserPassword": "users",
+    "UserQuery": "users",
+    "UserRegistrationRequest": "auth",
+    "UserRegistrationResponse": "auth",
+    "UserRoleCreate": "user_roles",
+    "UserRoleGet": "user_roles",
+    "UserRoleInterface": "user_roles",
+    "UserRoleList": "user_roles",
+    "UserRoleQuery": "user_roles",
+    "UserRoleUpdate": "user_roles",
+    "UserUpdate": "users",
+}
+
+# Known enum types (these use constructor instead of model_validate)
+ENUM_TYPES = {
+    "TaskStatus",
+    "GradingStatus",
+    "OrganizationType",
+    "GroupType",
+}
+
+
+def is_enum_type(schema_name: str) -> bool:
+    """Check if a schema name is a known enum type."""
+    return schema_name in ENUM_TYPES
+
+
+def map_schema_to_import(schema_name: str) -> Optional[Tuple[str, str]]:
+    """Map a schema name to its import path."""
+    if not schema_name:
+        return None
+
+    # Skip internal FastAPI/Pydantic schemas
+    if schema_name in ["HTTPValidationError", "ValidationError"] or schema_name.startswith("Body_"):
+        return None
+
+    # Skip schemas with namespaced names (e.g., computor_types__deployment__AssignExampleRequest)
+    if "__" in schema_name:
+        return None
+
+    # Look up in the known mapping
+    if schema_name in SCHEMA_TO_MODULE:
+        module = SCHEMA_TO_MODULE[schema_name]
+        return (f"computor_types.{module}", schema_name)
+
+    return None
+
+
+def group_operations_by_tag(spec: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Group all operations by their primary tag."""
+    by_tag = defaultdict(list)
+
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            if method not in ["get", "post", "put", "patch", "delete"]:
+                continue
+
+            tags = operation.get("tags", ["default"])
+            primary_tag = tags[0] if tags else "default"
+            primary_tag = primary_tag.replace("-", "_").replace(" ", "_").lower()
+
+            by_tag[primary_tag].append({
+                "path": path,
+                "method": method.upper(),
+                "operation": operation,
+                "operation_id": operation.get("operationId", ""),
+            })
+
+    return dict(by_tag)
+
+
+def generate_method(
+    path: str,
+    method: str,
+    operation: Dict[str, Any],
+    operation_id: str,
+    tag: str,
+) -> Tuple[str, Set[Tuple[str, str]]]:
+    """Generate a single method for an endpoint."""
     imports = set()
-    if has_get and hasattr(interface.get, '__module__') and interface.get.__module__.startswith('computor_types'):
-        imports.add(interface.get.__name__)
-    if has_create and hasattr(interface.create, '__module__') and interface.create.__module__.startswith('computor_types'):
-        imports.add(interface.create.__name__)
-    if has_update and hasattr(interface.update, '__module__') and interface.update.__module__.startswith('computor_types'):
-        imports.add(interface.update.__name__)
-    if has_query and hasattr(interface.query, '__module__') and interface.query.__module__.startswith('computor_types'):
-        imports.add(interface.query.__name__)
 
-    # Build the client class code
+    # Determine base segments from tag
+    base_segments = tag.replace("_", "-").split("-")
+    method_name = path_to_method_name(path, method, operation_id, base_segments)
+
+    # Avoid duplicate method names
+    path_params = extract_path_params(path)
+
+    # Get schemas
+    request_schema = get_request_schema(operation)
+    response_schema, is_list_response = get_response_schema(operation)
+
+    # Collect imports
+    if request_schema:
+        import_info = map_schema_to_import(request_schema)
+        if import_info:
+            imports.add(import_info)
+
+    if response_schema:
+        import_info = map_schema_to_import(response_schema)
+        if import_info:
+            imports.add(import_info)
+
+    # Build parameters
+    params = ["self"]
+    for pp in path_params:
+        params.append(f"{pp}: str")
+
+    if request_schema and map_schema_to_import(request_schema):
+        params.append(f"data: Union[{request_schema}, Dict[str, Any]]")
+
+    # Query params (skip user_id as it's auto-injected)
+    query_params = []
+    for param in operation.get("parameters", []):
+        if param.get("in") == "query" and param.get("name") != "user_id":
+            pname = param["name"]
+            required = param.get("required", False)
+            if pname not in ["skip", "limit"]:
+                query_params.append(pname)
+
+    # Add common pagination for list endpoints
+    if method_name == "list":
+        params.append("skip: int = 0")
+        params.append("limit: int = 100")
+
+    # Return type
+    if response_schema and map_schema_to_import(response_schema):
+        if is_list_response:
+            return_type = f"List[{response_schema}]"
+        else:
+            return_type = response_schema
+    elif method == "DELETE" or operation.get("responses", {}).get("204"):
+        return_type = "None"
+    else:
+        return_type = "Dict[str, Any]"
+
+    # Build method
+    docstring = operation.get("summary", f"{method} {path}")
+    path_formatted = path
+    for pp in path_params:
+        path_formatted = path_formatted.replace(f"{{{pp}}}", "{" + pp + "}")
+
     lines = [
-        '"""Auto-generated client for ' + interface.__name__ + '."""',
-        '',
-        'from typing import Optional, List',
-        'import httpx',
-        '',
-        f'from computor_types.{module_base_name} import (',
+        f"    async def {method_name}(",
     ]
-
-    # Add imports
-    for imp in sorted(imports):
-        lines.append(f'    {imp},')
-    lines.append(')')
-
-    # Determine which models are from computor_types (and thus were imported)
-    get_model_name = interface.get.__name__ if (has_get and hasattr(interface.get, '__module__') and interface.get.__module__.startswith('computor_types')) else "None"
-    create_model_name = interface.create.__name__ if (has_create and hasattr(interface.create, '__module__') and interface.create.__module__.startswith('computor_types')) else "None"
-    update_model_name = interface.update.__name__ if (has_update and hasattr(interface.update, '__module__') and interface.update.__module__.startswith('computor_types')) else "None"
-    query_model_name = interface.query.__name__ if (has_query and hasattr(interface.query, '__module__') and interface.query.__module__.startswith('computor_types')) else "None"
-
+    for p in params:
+        lines.append(f"        {p},")
     lines.extend([
-        'from computor_client.base import TypedEndpointClient',
-        '',
-        '',
-        f'class {class_name}(TypedEndpointClient):',
-        f'    """Client for {endpoint} endpoint."""',
-        '',
-        '    def __init__(self, client: httpx.AsyncClient):',
-        '        super().__init__(',
-        '            client=client,',
-        f'            base_path="/{endpoint}",',
-        f'            response_model={get_model_name},',
+        "        **kwargs: Any,",
+        f"    ) -> {return_type}:",
+        f'        """{docstring}"""',
     ])
 
-    if has_create:
-        lines.append(f'            create_model={create_model_name},')
-    if has_update:
-        lines.append(f'            update_model={update_model_name},')
-    if has_query:
-        lines.append(f'            query_model={query_model_name},')
+    # HTTP call
+    http_method = method.lower()
+    if http_method == "get":
+        if method_name == "list":
+            lines.append(f'        response = await self._http.get(')
+            lines.append(f'            f"{path_formatted}",')
+            lines.append(f'            params={{"skip": skip, "limit": limit, **kwargs}},')
+            lines.append('        )')
+        else:
+            lines.append(f'        response = await self._http.get(f"{path_formatted}", params=kwargs)')
+    elif http_method in ["post", "patch", "put"]:
+        if request_schema and map_schema_to_import(request_schema):
+            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", json_data=data, params=kwargs)')
+        else:
+            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", params=kwargs)')
+    elif http_method == "delete":
+        lines.append(f'        await self._http.delete(f"{path_formatted}", params=kwargs)')
+        lines.append('        return')
+        return "\n".join(lines), imports
 
-    lines.append('        )')
+    # Parse response
+    if response_schema and map_schema_to_import(response_schema):
+        if is_list_response:
+            lines.append('        data = response.json()')
+            lines.append('        if isinstance(data, list):')
+            if is_enum_type(response_schema):
+                lines.append(f'            return [{response_schema}(item) for item in data]')
+            else:
+                lines.append(f'            return [{response_schema}.model_validate(item) for item in data]')
+            lines.append('        return []')
+        else:
+            if is_enum_type(response_schema):
+                # Enums use constructor, not model_validate
+                lines.append(f'        return {response_schema}(response.json())')
+            else:
+                lines.append(f'        return {response_schema}.model_validate(response.json())')
+    else:
+        if return_type == "None":
+            lines.append('        return')
+        else:
+            lines.append('        return response.json()')
 
-    return '\n'.join(lines)
+    return "\n".join(lines), imports
 
 
-def generate_init_file(interfaces: List[tuple[str, Type]]) -> str:
-    """Generate __init__.py for generated clients."""
+def generate_client_class(
+    tag: str,
+    operations: List[Dict[str, Any]],
+) -> Tuple[str, Set[Tuple[str, str]], str]:
+    """Generate a complete client class for a tag."""
+    class_name = snake_to_pascal(tag) + "Client"
+
+    all_imports = set()
+    methods = []
+    seen_method_names = set()
+
+    for op in operations:
+        method_code, imports = generate_method(
+            op["path"],
+            op["method"],
+            op["operation"],
+            op["operation_id"],
+            tag,
+        )
+
+        # Extract method name to check for duplicates
+        match = re.search(r"async def (\w+)\(", method_code)
+        if match:
+            method_name = match.group(1)
+            if method_name in seen_method_names:
+                # Add HTTP method and path hint to make unique
+                http_method = op["method"].lower()
+                path_hint = sanitize_method_name(op["path"].replace("/", "_").replace("{", "").replace("}", ""))
+                # Use HTTP method as prefix to disambiguate
+                new_name = f"{http_method}_{method_name}"
+                if new_name in seen_method_names:
+                    # Also add path hint
+                    new_name = f"{http_method}_{path_hint[-30:]}" if len(path_hint) > 30 else f"{http_method}_{path_hint}"
+                new_name = sanitize_method_name(new_name)
+                method_code = method_code.replace(f"async def {method_name}(", f"async def {new_name}(")
+                method_name = new_name
+            seen_method_names.add(method_name)
+
+        methods.append(method_code)
+        all_imports.update(imports)
 
     lines = [
-        '"""Auto-generated client imports."""',
+        f'class {class_name}:',
+        f'    """',
+        f'    Client for {tag.replace("_", " ")} endpoints.',
+        f'    """',
         '',
-        '# This file is auto-generated. Do not edit manually.',
+        '    def __init__(self, http_client: AsyncHTTPClient) -> None:',
+        '        self._http = http_client',
         '',
     ]
 
-    # Import all generated clients
-    for module_name, interface in interfaces:
-        class_name = interface.__name__.replace("Interface", "Client")
-        module_base_name = module_name.split('.')[-1]
-        lines.append(f'from .{module_base_name} import {class_name}')
+    for m in methods:
+        lines.append(m)
+        lines.append('')
 
-    lines.append('')
-    lines.append('__all__ = [')
-
-    for _, interface in interfaces:
-        class_name = interface.__name__.replace("Interface", "Client")
-        lines.append(f'    "{class_name}",')
-
-    lines.append(']')
-
-    return '\n'.join(lines)
+    return "\n".join(lines), all_imports, class_name
 
 
-def main(output_dir: Optional[Path] = None, clean: bool = False, include_timestamp: bool = False):
+def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]:
+    """Generate a complete Python file for a tag."""
+    class_code, imports, class_name = generate_client_class(tag, operations)
+
+    imports_by_module = defaultdict(set)
+    for module, name in imports:
+        imports_by_module[module].add(name)
+
+    lines = [
+        '"""',
+        'Auto-generated endpoint client.',
+        '',
+        'This module is auto-generated from the OpenAPI specification.',
+        'Run `bash generate.sh python-client` to regenerate.',
+        '"""',
+        '',
+        'from typing import Any, Dict, List, Optional, Union',
+        '',
+    ]
+
+    for module in sorted(imports_by_module.keys()):
+        names = sorted(imports_by_module[module])
+        if len(names) == 1:
+            lines.append(f'from {module} import {names[0]}')
+        else:
+            lines.append(f'from {module} import (')
+            for name in names:
+                lines.append(f'    {name},')
+            lines.append(')')
+
+    lines.extend([
+        '',
+        'from computor_client.http import AsyncHTTPClient',
+        '',
+        '',
+        class_code,
+    ])
+
+    return "\n".join(lines), class_name
+
+
+def main(output_dir: Optional[Path] = None, spec_url: str = "http://localhost:8000/openapi.json"):
     """Main generator entry point."""
-
     if output_dir is None:
-        # Default output directory
         script_dir = Path(__file__).parent
         project_root = script_dir.parent.parent.parent.parent
-        output_dir = project_root / "computor-client" / "src" / "computor_client" / "generated"
+        output_dir = project_root / "computor-client" / "src" / "computor_client" / "endpoints"
 
-    # Verify output directory is writable
-    print("🐍 Generating Python API clients...")
-    print(f"📂 Output directory: {output_dir}")
-    print(f"📂 Output directory (absolute): {output_dir.absolute()}")
-    print(f"📂 Output directory exists: {output_dir.exists()}")
-
-    try:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        print(f"✅ Output directory created/verified")
-    except Exception as e:
-        print(f"❌ Failed to create output directory: {e}")
-        return []
-
-    # Test write permissions
-    test_file = output_dir / ".write_test"
-    try:
-        test_file.write_text("test")
-        test_file.unlink()
-        print(f"✅ Output directory is writable")
-    except Exception as e:
-        print(f"❌ Output directory is not writable: {e}")
-        return []
-
+    print("Generating Python API clients from OpenAPI spec...")
+    print(f"Output directory: {output_dir}")
     print()
 
-    # Clean existing files if requested
-    if clean:
-        for file in output_dir.glob("*.py"):
-            if file.name != "__init__.py":
-                try:
-                    file.unlink()
-                    print(f"🧹 Removed {file.name}")
-                except Exception as e:
-                    print(f"❌ Failed to remove {file.name}: {e}")
-
-    # Discover interfaces
-    interfaces = discover_interfaces()
-
-    if not interfaces:
-        print("❌ No interfaces found!")
+    spec = fetch_openapi_spec(spec_url)
+    if not spec:
+        print("Failed to fetch OpenAPI spec.")
         return []
 
-    print(f"📋 Found {len(interfaces)} interfaces")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for file in output_dir.glob("*.py"):
+        file.unlink()
+    print("Cleaned output directory")
+    print()
+
+    operations_by_tag = group_operations_by_tag(spec)
+    print(f"Found {len(operations_by_tag)} API tags")
     print()
 
     generated_files = []
-    failed_files = []
+    all_clients = []
 
-    # Group interfaces by module name to handle multiple interfaces per file
-    from collections import defaultdict
-    interfaces_by_module = defaultdict(list)
-    for module_name, interface in interfaces:
-        module_base_name = module_name.split('.')[-1]
-        interfaces_by_module[module_base_name].append((module_name, interface))
+    for tag in sorted(operations_by_tag.keys()):
+        operations = operations_by_tag[tag]
+        if tag in ["default"]:
+            continue
 
-    print(f"📦 Grouped into {len(interfaces_by_module)} modules")
-    print()
-
-    # Generate client for each module (may contain multiple interfaces)
-    for module_base_name, module_interfaces in sorted(interfaces_by_module.items()):
-        output_file = output_dir / f"{module_base_name}.py"
+        filename = tag + ".py"
+        output_file = output_dir / filename
 
         try:
-            # Generate all client classes for this module
-            client_classes = []
-            for module_name, interface in module_interfaces:
-                try:
-                    client_code = generate_client_class(module_name, interface)
-                    client_classes.append(client_code)
-                except Exception as e:
-                    print(f"⚠️  Failed to generate class for {interface.__name__}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
-
-            if not client_classes:
-                print(f"⚠️  No classes generated for {module_base_name}, skipping")
-                continue
-
-            # Combine all classes for this module
-            full_code = '\n\n'.join(client_classes)
-
-            # Write the file
-            print(f"📝 Writing {output_file} ({len(full_code)} bytes)...")
-            output_file.write_text(full_code + '\n')
-
-            # Immediately verify the file exists and has content
-            if not output_file.exists():
-                print(f"❌ ERROR: File {output_file} does not exist after write!")
-                failed_files.append(module_base_name)
-                continue
-
-            file_size = output_file.stat().st_size
-            if file_size == 0:
-                print(f"❌ ERROR: File {output_file} exists but is empty!")
-                failed_files.append(module_base_name)
-                continue
-
-            # Read back to verify content
-            read_back = output_file.read_text()
-            if len(read_back) != len(full_code) + 1:  # +1 for trailing newline
-                print(f"⚠️  WARNING: File size mismatch! Expected {len(full_code) + 1}, got {len(read_back)}")
-
+            file_content, class_name = generate_file(tag, operations)
+            output_file.write_text(file_content + "\n")
             generated_files.append(output_file)
-
-            if len(module_interfaces) > 1:
-                print(f"✅ Generated {output_file.name} ({len(module_interfaces)} clients, {file_size} bytes)")
-            else:
-                print(f"✅ Generated {output_file.name} ({file_size} bytes)")
-
+            all_clients.append((tag, class_name))
+            print(f"Generated {filename} ({len(operations)} endpoints)")
         except Exception as e:
-            print(f"❌ Failed to generate {module_base_name}: {e}")
+            print(f"Failed to generate {filename}: {e}")
             import traceback
             traceback.print_exc()
-            failed_files.append(module_base_name)
 
     print()
 
     # Generate __init__.py
-    try:
-        init_code = generate_init_file(interfaces)
-        init_file = output_dir / "__init__.py"
-        print(f"📝 Writing {init_file}...")
-        init_file.write_text(init_code + '\n')
+    init_lines = [
+        '"""',
+        'Auto-generated endpoint clients.',
+        '',
+        'This module is auto-generated from the OpenAPI specification.',
+        'Run `bash generate.sh python-client` to regenerate.',
+        '"""',
+        '',
+    ]
 
-        if init_file.exists():
-            init_size = init_file.stat().st_size
-            print(f"✅ Generated {init_file.name} ({init_size} bytes)")
-        else:
-            print(f"❌ ERROR: {init_file} does not exist after write!")
-    except Exception as e:
-        print(f"❌ Failed to generate __init__.py: {e}")
-        import traceback
-        traceback.print_exc()
+    for tag, class_name in sorted(all_clients):
+        init_lines.append(f'from computor_client.endpoints.{tag} import {class_name}')
+
+    init_lines.extend(['', '__all__ = ['])
+    for _, class_name in sorted(all_clients, key=lambda x: x[1]):
+        init_lines.append(f'    "{class_name}",')
+    init_lines.append(']')
+
+    init_file = output_dir / "__init__.py"
+    init_file.write_text("\n".join(init_lines) + "\n")
+    print("Generated __init__.py")
 
     print()
-    print("="*60)
-    print(f"📊 Generation Summary:")
-    print(f"   Total interfaces: {len(interfaces)}")
-    print(f"   Modules: {len(interfaces_by_module)}")
-    print(f"   Successfully generated: {len(generated_files)}")
-    print(f"   Failed: {len(failed_files)}")
-    if failed_files:
-        print(f"   Failed modules: {', '.join(failed_files)}")
-    print("="*60)
-
-    # Final verification - list all files in output directory
-    print()
-    print("📂 Final directory contents:")
-    all_files = sorted(output_dir.glob("*.py"))
-    for f in all_files:
-        size = f.stat().st_size
-        print(f"   {f.name} ({size} bytes)")
-    print(f"   Total files: {len(all_files)}")
-    print("="*60)
+    print("=" * 60)
+    print(f"Generation Summary:")
+    print(f"   Total tags: {len(operations_by_tag)}")
+    print(f"   Generated files: {len(generated_files)}")
+    print(f"   Total clients: {len(all_clients)}")
+    print("=" * 60)
 
     return generated_files
 
