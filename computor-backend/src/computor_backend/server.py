@@ -67,6 +67,7 @@ from computor_backend.api.team_management import team_management_router
 from computor_backend.api.service_accounts import service_accounts_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
+from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.exceptions import register_exception_handlers
 import json
 import tempfile
@@ -354,6 +355,13 @@ app.include_router(
 app.include_router(
     course_member_import_router,
     tags=["course-member-import", "bulk-operations"],
+    dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    course_member_gradings_router,
+    prefix="/course-member-gradings",
+    tags=["course-member-gradings", "progress"],
     dependencies=[Depends(get_current_principal)]
 )
 

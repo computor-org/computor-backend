@@ -10,6 +10,7 @@ from .course_content_types import CourseContentTypeClient
 from .course_families import CourseFamilyClient
 from .course_groups import CourseGroupClient
 from .courses import CourseClient
+from .course_member_gradings import CourseMemberGradingsClient
 from .course_members import CourseMemberClient
 from .course_roles import CourseRoleClient
 from .example import ExampleClient
@@ -41,6 +42,7 @@ __all__ = [
     "CourseFamilyClient",
     "CourseGroupClient",
     "CourseClient",
+    "CourseMemberGradingsClient",
     "CourseMemberClient",
     "CourseRoleClient",
     "ExampleClient",

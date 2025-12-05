@@ -51,6 +51,7 @@ from .example_dependency_repo import ExampleDependencyRepository
 from .student_view import StudentViewRepository
 from .tutor_view import TutorViewRepository
 from .lecturer_view import LecturerViewRepository
+from .course_member_gradings_view import CourseMemberGradingsViewRepository
 
 __all__ = [
     # Base classes
@@ -80,4 +81,5 @@ __all__ = [
     "StudentViewRepository",
     "TutorViewRepository",
     "LecturerViewRepository",
+    "CourseMemberGradingsViewRepository",
 ]

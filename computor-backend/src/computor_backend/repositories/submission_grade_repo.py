@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from .base import BaseRepository
-from ..model.artifact import SubmissionGrade
+from ..model.artifact import SubmissionGrade, SubmissionArtifact
 
 
 class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
@@ -44,6 +44,37 @@ class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
         """Grades change moderately - use 5 minute TTL."""
         return 300  # 5 minutes
 
+    def _get_course_and_member_from_grade(self, entity: SubmissionGrade) -> tuple[Optional[str], Set[str]]:
+        """
+        Get (course_id, {course_member_ids}) from a grade entity.
+
+        This is needed to invalidate course member grading caches.
+        """
+        from ..model.course import SubmissionGroup, SubmissionGroupMember
+
+        if not entity.artifact_id:
+            return None, set()
+
+        # Query: grade -> artifact -> submission_group -> members
+        result = self.db.query(
+            SubmissionGroup.course_id,
+            SubmissionGroupMember.course_member_id
+        ).select_from(SubmissionArtifact).join(
+            SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id
+        ).join(
+            SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id
+        ).filter(
+            SubmissionArtifact.id == entity.artifact_id
+        ).all()
+
+        if not result:
+            return None, set()
+
+        course_id = str(result[0].course_id) if result else None
+        member_ids = {str(r.course_member_id) for r in result}
+
+        return course_id, member_ids
+
     def get_entity_tags(self, entity: SubmissionGrade) -> Set[str]:
         """
         Get cache tags for submission grade.
@@ -54,6 +85,8 @@ class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
         - submission_artifact:{artifact_id} - Invalidate artifact-level caches
         - submission_grade:artifact:{artifact_id} - Grades for this artifact
         - submission_grade:grader:{grader_id} - Grades by this grader
+        - cm_grading:{member_id} - Course member grading stats (CRITICAL)
+        - course:{course_id} - General course-level invalidation
         """
         tags = {
             f"submission_grade:{entity.id}",
@@ -63,6 +96,15 @@ class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
         if entity.artifact_id:
             tags.add(f"submission_grade:artifact:{entity.artifact_id}")
             tags.add(f"submission_artifact:{entity.artifact_id}")
+
+            # CRITICAL: Invalidate course member grading stats
+            course_id, member_ids = self._get_course_and_member_from_grade(entity)
+            if course_id:
+                tags.add(f"course:{course_id}")
+
+                for member_id in member_ids:
+                    tags.add(f"cm_grading:{member_id}")
+                    tags.add(f"course_member:{member_id}")
 
         if entity.graded_by_course_member_id:
             tags.add(f"submission_grade:grader:{entity.graded_by_course_member_id}")
