@@ -97,9 +97,9 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 detail=f"Course member {course_member_id} does not belong to course {course_id}"
             )
 
-        # Permission check: Lecturer or higher role required
+        # Permission check: Tutor or higher role required
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_lecturer", self.db
+            permissions, CourseMember, "_tutor", self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id
@@ -108,7 +108,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if not has_course_perms:
             raise ForbiddenException(
                 detail="You don't have permission to view this course member's grading statistics. "
-                       "Lecturer role or higher is required."
+                       "Tutor role or higher is required."
             )
 
         # Initialize data repository
@@ -207,10 +207,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if course is None:
             raise NotFoundException(detail=f"Course {course_id} not found")
 
-        # Permission check
+        # Permission check: Tutor or higher role required
         user_id = permissions.get_user_id()
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_lecturer", self.db
+            permissions, CourseMember, "_tutor", self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id
@@ -219,7 +219,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if not has_course_perms:
             raise ForbiddenException(
                 detail="You don't have permission to view course member grading statistics. "
-                       "Lecturer role or higher is required."
+                       "Tutor role or higher is required."
             )
 
         # Initialize data repository
