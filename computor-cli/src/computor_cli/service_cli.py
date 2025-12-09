@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
-from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
-from computor_types.api_tokens import ApiTokenCreate, ApiTokenQuery
+from computor_types.services import ServiceCreate, ServiceUpdate
+from computor_types.api_tokens import ApiTokenCreate
+from computor_types.service_type import ServiceTypeCreate, ServiceTypeUpdate
 
 
 @click.group()
@@ -87,7 +88,7 @@ def create(slug, name, service_type, description, username, email, enabled, crea
 
     try:
         # Create service via API
-        service_result = run_async(client.services.create(service_create))
+        service_result = run_async(client.services.service_accounts(service_create))
 
         click.echo(f"\n✅ Service created successfully!")
         click.echo(f"   Service ID:   {service_result.id}")
@@ -107,7 +108,7 @@ def create(slug, name, service_type, description, username, email, enabled, crea
                 expires_at=datetime.utcnow() + timedelta(days=token_expires_days) if token_expires_days else None,
             )
 
-            token_result = run_async(client.api_tokens.create(token_create))
+            token_result = run_async(client.tokens.api_tokens(token_create))
 
             click.echo(f"\n✅ API Token created!")
             click.echo(f"   Token ID:     {token_result.id}")
@@ -160,13 +161,15 @@ def list(slug, enabled, format, auth: CLIAuthConfig):
     """
     client = run_async(get_computor_client(auth))
 
-    query = ServiceQuery(
-        slug=slug,
-        enabled=enabled,
-    )
-
     try:
-        services = run_async(client.services.list(query))
+        # Build query params
+        params = {}
+        if slug:
+            params['slug'] = slug
+        if enabled is not None:
+            params['enabled'] = enabled
+
+        services = run_async(client.services.get_service_accounts(**params))
 
         if format == 'json':
             import json
@@ -218,7 +221,7 @@ def get(slug, format, auth: CLIAuthConfig):
 
     try:
         # Find service by slug
-        services = run_async(client.services.list(ServiceQuery(slug=slug)))
+        services = run_async(client.services.get_service_accounts(slug=slug))
 
         if not services:
             click.secho(f"❌ Service not found: {slug}", fg="red", err=True)
@@ -247,7 +250,7 @@ def get(slug, format, auth: CLIAuthConfig):
 
         # Also show tokens for this service
         try:
-            tokens = run_async(client.api_tokens.list(ApiTokenQuery(user_id=str(svc.user_id))))
+            tokens = run_async(client.tokens.get_api_tokens(user_id=str(svc.user_id)))
             if tokens:
                 click.echo(f"🔑 API Tokens ({len(tokens)}):")
                 for token in tokens:
@@ -294,7 +297,7 @@ def update(slug, name, description, enabled, auth: CLIAuthConfig):
 
     try:
         # Find service by slug
-        services = run_async(client.services.list(ServiceQuery(slug=slug)))
+        services = run_async(client.services.get_service_accounts(slug=slug))
 
         if not services:
             click.secho(f"❌ Service not found: {slug}", fg="red", err=True)
@@ -310,7 +313,7 @@ def update(slug, name, description, enabled, auth: CLIAuthConfig):
         )
 
         # Update service
-        updated = run_async(client.services.update(str(svc.id), update_data))
+        updated = run_async(client.services.patch_service_accounts(str(svc.id), update_data))
 
         click.echo(f"\n✅ Service updated: {slug}")
         if name:
@@ -351,7 +354,7 @@ def create_token(slug, name, expires_days, auth: CLIAuthConfig):
 
     try:
         # Find service by slug
-        services = run_async(client.services.list(ServiceQuery(slug=slug)))
+        services = run_async(client.services.get_service_accounts(slug=slug))
 
         if not services:
             click.secho(f"❌ Service not found: {slug}", fg="red", err=True)
@@ -371,7 +374,7 @@ def create_token(slug, name, expires_days, auth: CLIAuthConfig):
             expires_at=expires_at,
         )
 
-        token_result = run_async(client.api_tokens.create(token_create))
+        token_result = run_async(client.tokens.api_tokens(token_create))
 
         click.echo(f"\n{'='*70}")
         click.echo(f"🔑 API Token Created for: {svc.name}")
@@ -432,7 +435,7 @@ def revoke_tokens(slug, token_prefix, revoke_all, reason, yes, auth: CLIAuthConf
 
     try:
         # Find service by slug
-        services = run_async(client.services.list(ServiceQuery(slug=slug)))
+        services = run_async(client.services.get_service_accounts(slug=slug))
 
         if not services:
             click.secho(f"❌ Service not found: {slug}", fg="red", err=True)
@@ -441,18 +444,21 @@ def revoke_tokens(slug, token_prefix, revoke_all, reason, yes, auth: CLIAuthConf
         svc = services[0]
 
         # Get tokens for this service
-        tokens = run_async(client.api_tokens.list(ApiTokenQuery(user_id=str(svc.user_id), revoked=False)))
+        tokens = run_async(client.tokens.get_api_tokens(user_id=str(svc.user_id)))
 
-        if not tokens:
+        # Filter out already revoked tokens
+        active_tokens = [t for t in tokens if not t.revoked_at]
+
+        if not active_tokens:
             click.echo(f"No active tokens found for service: {slug}")
             return
 
         # Filter tokens to revoke
         tokens_to_revoke = []
         if revoke_all:
-            tokens_to_revoke = tokens
+            tokens_to_revoke = active_tokens
         else:
-            for token in tokens:
+            for token in active_tokens:
                 if token.token_prefix.startswith(token_prefix):
                     tokens_to_revoke.append(token)
 
@@ -474,7 +480,7 @@ def revoke_tokens(slug, token_prefix, revoke_all, reason, yes, auth: CLIAuthConf
         revoked_count = 0
         for token in tokens_to_revoke:
             try:
-                run_async(client.api_tokens.revoke(str(token.id)))
+                run_async(client.tokens.delete_api_tokens(str(token.id)))
                 click.echo(f"  ✅ Revoked: {token.token_prefix}...")
                 revoked_count += 1
             except Exception as e:
@@ -490,36 +496,321 @@ def revoke_tokens(slug, token_prefix, revoke_all, reason, yes, auth: CLIAuthConf
 
 
 @service.command()
+@click.option('--category', help='Filter by category (worker, testing, review, metrics, integration, custom, agent)')
+@click.option('--enabled/--disabled', default=None, help='Filter by enabled status')
+@click.option('--format', '-f', type=click.Choice(['table', 'json', 'simple']), default='table', help='Output format')
 @authenticate
-def list_types(auth: CLIAuthConfig):
+def list_types(category, enabled, format, auth: CLIAuthConfig):
     """
     List available service types.
 
     Examples:
         computor service list-types
+        computor service list-types --category testing
+        computor service list-types --format json
     """
     client = run_async(get_computor_client(auth))
 
     try:
-        service_types = run_async(client.service_types.list())
+        # Build query params
+        params = {}
+        if category:
+            params['category'] = category
+        if enabled is not None:
+            params['enabled'] = enabled
+
+        service_types = run_async(client.service_types.get_service_types(**params))
+
+        if format == 'json':
+            import json
+            output = [st.model_dump(mode='json') for st in service_types]
+            click.echo(json.dumps(output, indent=2, default=str))
+            return
 
         if not service_types:
             click.echo("No service types found.")
             return
 
-        click.echo(f"\n{'='*70}")
-        click.echo("📋 Available Service Types")
-        click.echo(f"{'='*70}")
-        click.echo(f"\n{'Path':<30} {'Name':<30}")
-        click.echo(f"{'-'*30} {'-'*30}")
+        if format == 'simple':
+            for st in service_types:
+                status = "✅" if st.enabled else "❌"
+                click.echo(f"{status} {st.path} ({st.name})")
+            return
+
+        # Table format
+        click.echo(f"\n{'='*90}")
+        click.echo(f"{'Path':<30} {'Name':<25} {'Category':<15} {'Enabled':<10}")
+        click.echo(f"{'='*90}")
 
         for st in service_types:
-            click.echo(f"{st.path:<30} {st.name:<30}")
+            status = "Yes" if st.enabled else "No"
+            click.echo(f"{st.path:<30} {st.name:<25} {st.category:<15} {status:<10}")
 
-        click.echo(f"\nTotal: {len(service_types)} service type(s)\n")
+        click.echo(f"{'='*90}")
+        click.echo(f"Total: {len(service_types)} service type(s)\n")
 
     except Exception as e:
         click.secho(f"\n❌ Failed to list service types: {e}", fg="red", err=True)
+        raise click.Abort()
+
+
+# =============================================================================
+# Service Type Management Commands
+# =============================================================================
+
+@service.command()
+@click.option('--path', required=True, help='Hierarchical path (e.g., "testing.python", "review.llm.gpt4")')
+@click.option('--name', required=True, help='Display name for the service type')
+@click.option('--category', required=True, type=click.Choice(['worker', 'testing', 'review', 'metrics', 'integration', 'custom', 'agent']), help='Service type category')
+@click.option('--description', help='Detailed description')
+@click.option('--plugin-module', help='Python module providing functionality')
+@click.option('--icon', help='Icon identifier')
+@click.option('--color', help='Hex color for UI (e.g., #FF5733)')
+@click.option('--enabled/--disabled', default=True, help='Whether this service type is enabled (default: enabled)')
+@authenticate
+def create_type(path, name, category, description, plugin_module, icon, color, enabled, auth: CLIAuthConfig):
+    """
+    Create a new service type.
+
+    Service types define the kinds of services available in the system.
+    They use a hierarchical path structure (e.g., "testing.python", "testing.matlab").
+
+    Examples:
+        # Basic service type
+        computor service create-type \\
+            --path testing.python \\
+            --name "Python Testing" \\
+            --category testing
+
+        # Full options
+        computor service create-type \\
+            --path testing.matlab \\
+            --name "MATLAB Testing" \\
+            --category testing \\
+            --description "Service type for MATLAB test execution" \\
+            --color "#FF5733" \\
+            --icon "matlab"
+    """
+    client = run_async(get_computor_client(auth))
+
+    click.echo(f"\n{'='*70}")
+    click.echo("📋 Creating Service Type")
+    click.echo(f"{'='*70}")
+
+    # Build service type creation payload
+    service_type_create = ServiceTypeCreate(
+        path=path,
+        name=name,
+        category=category,
+        description=description,
+        plugin_module=plugin_module,
+        icon=icon,
+        color=color,
+        enabled=enabled,
+    )
+
+    click.echo(f"\n📝 Service Type Details:")
+    click.echo(f"   Path:         {path}")
+    click.echo(f"   Name:         {name}")
+    click.echo(f"   Category:     {category}")
+    if description:
+        click.echo(f"   Description:  {description}")
+    if plugin_module:
+        click.echo(f"   Plugin:       {plugin_module}")
+    if icon:
+        click.echo(f"   Icon:         {icon}")
+    if color:
+        click.echo(f"   Color:        {color}")
+    click.echo(f"   Enabled:      {enabled}")
+
+    try:
+        # Create service type via API
+        result = run_async(client.service_types.service_types(service_type_create))
+
+        click.echo(f"\n✅ Service type created successfully!")
+        click.echo(f"   ID:   {result.id}")
+        click.echo(f"   Path: {result.path}")
+        click.echo(f"{'='*70}\n")
+
+    except Exception as e:
+        click.secho(f"\n❌ Failed to create service type: {e}", fg="red", err=True)
+        raise click.Abort()
+
+
+@service.command()
+@click.argument('path')
+@click.option('--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format')
+@authenticate
+def get_type(path, format, auth: CLIAuthConfig):
+    """
+    Get details of a service type by path.
+
+    Examples:
+        computor service get-type testing.python
+        computor service get-type testing.python --format json
+    """
+    client = run_async(get_computor_client(auth))
+
+    try:
+        # Find service type by path
+        service_types = run_async(client.service_types.get_service_types(path=path))
+
+        if not service_types:
+            click.secho(f"❌ Service type not found: {path}", fg="red", err=True)
+            raise click.Abort()
+
+        st = service_types[0]
+
+        if format == 'json':
+            import json
+            click.echo(json.dumps(st.model_dump(mode='json'), indent=2, default=str))
+            return
+
+        # Table format
+        click.echo(f"\n{'='*70}")
+        click.echo(f"📋 Service Type: {st.name}")
+        click.echo(f"{'='*70}")
+        click.echo(f"   ID:           {st.id}")
+        click.echo(f"   Path:         {st.path}")
+        click.echo(f"   Name:         {st.name}")
+        click.echo(f"   Category:     {st.category}")
+        click.echo(f"   Enabled:      {'Yes' if st.enabled else 'No'}")
+        click.echo(f"   Version:      {st.version}")
+        click.echo(f"{'='*70}\n")
+
+    except click.Abort:
+        raise
+    except Exception as e:
+        click.secho(f"\n❌ Failed to get service type: {e}", fg="red", err=True)
+        raise click.Abort()
+
+
+@service.command()
+@click.argument('path')
+@click.option('--name', help='Update display name')
+@click.option('--description', help='Update description')
+@click.option('--category', type=click.Choice(['worker', 'testing', 'review', 'metrics', 'integration', 'custom', 'agent']), help='Update category')
+@click.option('--plugin-module', help='Update plugin module')
+@click.option('--icon', help='Update icon')
+@click.option('--color', help='Update color (hex format, e.g., #FF5733)')
+@click.option('--enabled/--disabled', default=None, help='Enable or disable the service type')
+@authenticate
+def update_type(path, name, description, category, plugin_module, icon, color, enabled, auth: CLIAuthConfig):
+    """
+    Update a service type.
+
+    Examples:
+        # Update name
+        computor service update-type testing.python --name "Python 3 Testing"
+
+        # Disable service type
+        computor service update-type testing.python --disabled
+
+        # Update multiple fields
+        computor service update-type testing.python \\
+            --name "Updated Name" \\
+            --description "New description" \\
+            --color "#00FF00"
+    """
+    client = run_async(get_computor_client(auth))
+
+    # Check if any update fields are provided
+    if all(x is None for x in [name, description, category, plugin_module, icon, color, enabled]):
+        click.secho("❌ No update fields provided.", fg="red", err=True)
+        click.echo("Use --name, --description, --category, --plugin-module, --icon, --color, or --enabled/--disabled.")
+        raise click.Abort()
+
+    try:
+        # Find service type by path
+        service_types = run_async(client.service_types.get_service_types(path=path))
+
+        if not service_types:
+            click.secho(f"❌ Service type not found: {path}", fg="red", err=True)
+            raise click.Abort()
+
+        st = service_types[0]
+
+        # Build update payload
+        update_data = ServiceTypeUpdate(
+            name=name,
+            description=description,
+            category=category,
+            plugin_module=plugin_module,
+            icon=icon,
+            color=color,
+            enabled=enabled,
+        )
+
+        # Update service type
+        updated = run_async(client.service_types.patch_service_types(str(st.id), update_data))
+
+        click.echo(f"\n✅ Service type updated: {path}")
+        if name:
+            click.echo(f"   Name:        {updated.name}")
+        if description is not None:
+            click.echo(f"   Description: {updated.description}")
+        if category:
+            click.echo(f"   Category:    {updated.category}")
+        if plugin_module is not None:
+            click.echo(f"   Plugin:      {updated.plugin_module}")
+        if icon is not None:
+            click.echo(f"   Icon:        {updated.icon}")
+        if color is not None:
+            click.echo(f"   Color:       {updated.color}")
+        if enabled is not None:
+            click.echo(f"   Enabled:     {'Yes' if updated.enabled else 'No'}")
+        click.echo("")
+
+    except click.Abort:
+        raise
+    except Exception as e:
+        click.secho(f"\n❌ Failed to update service type: {e}", fg="red", err=True)
+        raise click.Abort()
+
+
+@service.command()
+@click.argument('path')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation')
+@authenticate
+def delete_type(path, yes, auth: CLIAuthConfig):
+    """
+    Delete a service type.
+
+    WARNING: This will fail if services are using this type.
+
+    Examples:
+        computor service delete-type testing.deprecated
+        computor service delete-type testing.deprecated -y
+    """
+    client = run_async(get_computor_client(auth))
+
+    try:
+        # Find service type by path
+        service_types = run_async(client.service_types.get_service_types(path=path))
+
+        if not service_types:
+            click.secho(f"❌ Service type not found: {path}", fg="red", err=True)
+            raise click.Abort()
+
+        st = service_types[0]
+
+        # Confirmation
+        if not yes:
+            click.echo(f"\n⚠️  About to delete service type: {st.name} ({st.path})")
+            click.echo(f"   ID: {st.id}")
+            if not click.confirm("\nAre you sure?"):
+                click.echo("Cancelled.")
+                return
+
+        # Note: delete endpoint may not exist in the generated client
+        # This would need to be added if needed
+        click.secho("❌ Delete operation not yet implemented in API client", fg="red", err=True)
+        raise click.Abort()
+
+    except click.Abort:
+        raise
+    except Exception as e:
+        click.secho(f"\n❌ Failed to delete service type: {e}", fg="red", err=True)
         raise click.Abort()
 
 

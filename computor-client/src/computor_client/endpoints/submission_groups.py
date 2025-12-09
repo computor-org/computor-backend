@@ -37,7 +37,6 @@ class SubmissionGroupsClient:
 
     async def get_submission_groups(
         self,
-        data: Union[SubmissionGroupProperties, Dict[str, Any]],
         **kwargs: Any,
     ) -> List[SubmissionGroupList]:
         """List Submission-Groups"""

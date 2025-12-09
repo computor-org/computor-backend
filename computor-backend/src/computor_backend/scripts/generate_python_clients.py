@@ -681,7 +681,8 @@ def generate_method(
     for pp in path_params:
         params.append(f"{pp}: str")
 
-    if request_schema and map_schema_to_import(request_schema):
+    # Only add data parameter for methods that use request body (not GET/DELETE)
+    if request_schema and map_schema_to_import(request_schema) and method in ["POST", "PUT", "PATCH"]:
         params.append(f"data: Union[{request_schema}, Dict[str, Any]]")
 
     # Query params (skip user_id as it's auto-injected)
