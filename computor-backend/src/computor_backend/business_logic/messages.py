@@ -1,13 +1,15 @@
 """Business logic for message operations."""
 from uuid import UUID
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from computor_backend.api.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import MessageRead, Message
 from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
-from computor_types.messages import MessageCreate, MessageGet
+from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageQuery
 from computor_backend.cache import Cache
 
 
@@ -448,3 +450,56 @@ def mark_message_as_unread(
 
         # Invalidate cached views that include unread message counts
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
+
+
+async def list_messages_with_filters(
+    permissions: Principal,
+    db: Session,
+    params: MessageQuery,
+) -> Tuple[List[MessageList], int]:
+    """List messages with user-specific filtering (unread, tags, datetime).
+
+    This function extends the standard list_entities by passing the current
+    user's ID to the search function for unread filtering.
+
+    Args:
+        permissions: Current user permissions
+        db: Database session
+        params: Query parameters including unread, tags, datetime filters
+
+    Returns:
+        Tuple of (list of MessageList, total count)
+    """
+    from computor_backend.interfaces.message import MessageInterface
+
+    # Get permission-filtered base query
+    query = check_permissions(permissions, Message, "list", db)
+
+    if query is None:
+        return [], 0
+
+    # Apply search filters with reader_user_id for unread filtering
+    query = MessageInterface.search(
+        db, query, params,
+        reader_user_id=str(permissions.user_id) if permissions.user_id else None
+    )
+
+    # Execute paginated query in threadpool
+    def _get_paginated_results():
+        total = query.order_by(None).count()
+
+        paginated_query = query
+        if params.limit is not None:
+            paginated_query = paginated_query.limit(params.limit)
+        if params.skip is not None:
+            paginated_query = paginated_query.offset(params.skip)
+
+        results = paginated_query.all()
+        return results, total
+
+    results, total = await run_in_threadpool(_get_paginated_results)
+
+    # Convert to MessageList DTOs
+    items = [MessageList.model_validate(entity, from_attributes=True) for entity in results]
+
+    return items, total

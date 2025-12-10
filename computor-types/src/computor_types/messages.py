@@ -1,4 +1,5 @@
-from typing import Optional, Literal, TYPE_CHECKING
+from datetime import datetime
+from typing import Optional, Literal, List, TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -126,6 +127,30 @@ class MessageQuery(ListQuery):
     course_id_all_messages: Optional[bool] = None
     # Filter by message scope (e.g., "course", "course_content", "submission_group")
     scope: Optional[MessageScope] = None
+
+    # Datetime boundary filters (based on created_at)
+    created_after: Optional[datetime] = Field(
+        None, description="Filter messages created at or after this datetime (inclusive)"
+    )
+    created_before: Optional[datetime] = Field(
+        None, description="Filter messages created at or before this datetime (inclusive)"
+    )
+
+    # Unread filter (from current API user's perspective)
+    unread: Optional[bool] = Field(
+        None, description="Filter by read status: True = unread only, False = read only, None = all"
+    )
+
+    # Tag filtering (tags in title with format #scope::value)
+    tags: Optional[List[str]] = Field(
+        None, description="Filter by tags in title (e.g., ['ai::request', 'priority::high'])"
+    )
+    tags_match_all: Optional[bool] = Field(
+        True, description="True = must match ALL tags (AND), False = match ANY tag (OR)"
+    )
+    tag_scope: Optional[str] = Field(
+        None, description="Filter by tag scope prefix (e.g., 'ai' matches any #ai::* tag)"
+    )
 
 
 class MessageInterface(EntityInterface):
