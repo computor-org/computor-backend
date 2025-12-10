@@ -260,14 +260,14 @@ async def get_computor_client(auth: CLIAuthConfig, force_new: bool = False):
 
     # Authenticate based on auth type
     if auth.basic is not None:
-        await client.authenticate(
+        await client.login(
             username=auth.basic.username,
             password=auth.basic.password
         )
     elif auth.gitlab is not None:
         # For GitLab auth, set custom header
         if hasattr(auth.gitlab, 'token') and auth.gitlab.token:
-            client._client.headers["X-GitLab-Auth"] = auth.gitlab.token
+            client._http._headers["X-GitLab-Auth"] = auth.gitlab.token
     else:
         raise NotImplementedError("No authentication method configured")
 

@@ -53,7 +53,7 @@ class ServiceTypeBase(BaseModel):
     @classmethod
     def validate_category(cls, v: str) -> str:
         """Validate category is one of the allowed values."""
-        allowed = ['worker', 'testing', 'review', 'metrics', 'integration', 'custom']
+        allowed = ['worker', 'testing', 'review', 'metrics', 'integration', 'custom', 'agent']
         if v not in allowed:
             raise ValueError(
                 f"Invalid category: '{v}'. "
