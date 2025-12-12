@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.example import (
     ExampleRepositoryCreate,
     ExampleRepositoryGet,
@@ -25,7 +27,7 @@ class ExampleRepositoriesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def example_repositories(
+    async def create(
         self,
         data: Union[ExampleRepositoryCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -34,18 +36,24 @@ class ExampleRepositoriesClient:
         response = await self._http.post(f"/example-repositories", json_data=data, params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
-    async def get_example_repositories(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[ExampleRepositoryList]:
         """List Example-Repositories"""
-        response = await self._http.get(f"/example-repositories", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/example-repositories",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [ExampleRepositoryList.model_validate(item) for item in data]
         return []
 
-    async def get_example_repositories_id(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -54,7 +62,7 @@ class ExampleRepositoriesClient:
         response = await self._http.get(f"/example-repositories/{id}", params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
-    async def patch_example_repositories(
+    async def update(
         self,
         id: str,
         data: Union[ExampleRepositoryUpdate, Dict[str, Any]],
@@ -64,7 +72,7 @@ class ExampleRepositoriesClient:
         response = await self._http.patch(f"/example-repositories/{id}", json_data=data, params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
-    async def delete_example_repositories(
+    async def delete(
         self,
         id: str,
         **kwargs: Any,

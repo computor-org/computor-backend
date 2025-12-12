@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_member_gradings import (
     CourseMemberGradingsGet,
     CourseMemberGradingsList,
@@ -23,18 +25,24 @@ class CourseMemberGradingsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_member_gradings(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseMemberGradingsList]:
         """List course member grading statistics for a course"""
-        response = await self._http.get(f"/course-member-gradings", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-member-gradings",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseMemberGradingsList.model_validate(item) for item in data]
         return []
 
-    async def get_course_member_gradings(
+    async def get(
         self,
         course_member_id: str,
         **kwargs: Any,

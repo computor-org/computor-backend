@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.roles import (
     RoleGet,
     RoleList,
@@ -35,14 +37,15 @@ class RolesClient:
 
     async def list(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[RoleList]:
         """List Roles"""
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
         response = await self._http.get(
             f"/roles",
-            params={"skip": skip, "limit": limit, **kwargs},
+            params=params,
         )
         data = response.json()
         if isinstance(data, list):

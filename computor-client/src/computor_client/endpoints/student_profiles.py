@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.student_profile import (
     StudentProfileCreate,
     StudentProfileGet,
@@ -25,18 +27,24 @@ class StudentProfilesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def student_profiles(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[StudentProfileList]:
         """List Student Profiles"""
-        response = await self._http.get(f"/student-profiles", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/student-profiles",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [StudentProfileList.model_validate(item) for item in data]
         return []
 
-    async def post_student_profiles(
+    async def create(
         self,
         data: Union[StudentProfileCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -45,7 +53,7 @@ class StudentProfilesClient:
         response = await self._http.post(f"/student-profiles", json_data=data, params=kwargs)
         return StudentProfileGet.model_validate(response.json())
 
-    async def get_student_profiles(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -54,7 +62,7 @@ class StudentProfilesClient:
         response = await self._http.get(f"/student-profiles/{id}", params=kwargs)
         return StudentProfileGet.model_validate(response.json())
 
-    async def patch_student_profiles(
+    async def update(
         self,
         id: str,
         data: Union[StudentProfileUpdate, Dict[str, Any]],
@@ -64,7 +72,7 @@ class StudentProfilesClient:
         response = await self._http.patch(f"/student-profiles/{id}", json_data=data, params=kwargs)
         return StudentProfileGet.model_validate(response.json())
 
-    async def delete_student_profiles(
+    async def delete(
         self,
         id: str,
         **kwargs: Any,

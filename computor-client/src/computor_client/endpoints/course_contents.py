@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_contents import (
     CourseContentCreate,
     CourseContentGet,
@@ -29,7 +31,7 @@ class CourseContentsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_contents_assign_example(
+    async def assign_example(
         self,
         content_id: str,
         **kwargs: Any,
@@ -38,7 +40,7 @@ class CourseContentsClient:
         response = await self._http.post(f"/course-contents/{content_id}/assign-example", params=kwargs)
         return DeploymentWithHistory.model_validate(response.json())
 
-    async def course_contents_example(
+    async def example(
         self,
         content_id: str,
         **kwargs: Any,
@@ -47,7 +49,7 @@ class CourseContentsClient:
         await self._http.delete(f"/course-contents/{content_id}/example", params=kwargs)
         return
 
-    async def course_contents_deployment(
+    async def deployment(
         self,
         content_id: str,
         **kwargs: Any,
@@ -56,7 +58,7 @@ class CourseContentsClient:
         response = await self._http.get(f"/course-contents/deployment/{content_id}", params=kwargs)
         return response.json()
 
-    async def course_contents_courses_deployment_summary(
+    async def courses_deployment_summary(
         self,
         course_id: str,
         **kwargs: Any,
@@ -65,7 +67,7 @@ class CourseContentsClient:
         response = await self._http.get(f"/course-contents/courses/{course_id}/deployment-summary", params=kwargs)
         return DeploymentSummary.model_validate(response.json())
 
-    async def get_course_contents_deployment(
+    async def get_deployment(
         self,
         content_id: str,
         **kwargs: Any,
@@ -74,7 +76,7 @@ class CourseContentsClient:
         response = await self._http.get(f"/course-contents/{content_id}/deployment", params=kwargs)
         return DeploymentWithHistory.model_validate(response.json())
 
-    async def course_contents(
+    async def create(
         self,
         data: Union[CourseContentCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -83,18 +85,24 @@ class CourseContentsClient:
         response = await self._http.post(f"/course-contents", json_data=data, params=kwargs)
         return CourseContentGet.model_validate(response.json())
 
-    async def get_course_contents(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseContentList]:
         """List Course-Contents"""
-        response = await self._http.get(f"/course-contents", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-contents",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseContentList.model_validate(item) for item in data]
         return []
 
-    async def get_course_contents_id(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -103,7 +111,7 @@ class CourseContentsClient:
         response = await self._http.get(f"/course-contents/{id}", params=kwargs)
         return CourseContentGet.model_validate(response.json())
 
-    async def patch_course_contents(
+    async def update(
         self,
         id: str,
         data: Union[CourseContentUpdate, Dict[str, Any]],
@@ -113,7 +121,7 @@ class CourseContentsClient:
         response = await self._http.patch(f"/course-contents/{id}", json_data=data, params=kwargs)
         return CourseContentGet.model_validate(response.json())
 
-    async def delete_course_contents(
+    async def delete(
         self,
         id: str,
         **kwargs: Any,
@@ -122,7 +130,7 @@ class CourseContentsClient:
         await self._http.delete(f"/course-contents/{id}", params=kwargs)
         return
 
-    async def course_contents_archive(
+    async def archive(
         self,
         id: str,
         **kwargs: Any,
