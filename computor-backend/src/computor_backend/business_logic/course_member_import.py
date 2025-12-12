@@ -29,7 +29,7 @@ async def trigger_post_create_for_member(
     Trigger post-create hook for a single imported course member.
 
     Provisions submission groups and triggers repository creation workflow.
-    Skips service accounts (is_service=True).
+    Skips service accounts unless they are "agent.*" service types (actors).
 
     Args:
         course_member: Newly created course member
@@ -41,12 +41,22 @@ async def trigger_post_create_for_member(
     """
     from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
     from computor_backend.task_tracker import get_task_tracker
+    from computor_backend.model.service import Service
     from computor_types.tasks import TaskSubmission
 
-    # Skip service accounts
+    # Check if service account - only "agent.*" service types should get GitLab setup
     if course_member.user and course_member.user.is_service:
-        logger.info(f"Skipping post-create hooks for service account {course_member.user_id}")
-        return None
+        service = db.query(Service).filter(Service.user_id == course_member.user_id).first()
+        is_agent = False
+        if service and service.service_type_rel:
+            service_type_path = str(service.service_type_rel.path)
+            is_agent = service_type_path.startswith("agent")
+
+        if not is_agent:
+            logger.info(f"Skipping post-create hooks for non-agent service account {course_member.user_id}")
+            return None
+
+        logger.info(f"Agent service account {course_member.user_id} - proceeding with GitLab setup")
 
     # Step 1: Provision submission groups (fast, synchronous)
     try:
@@ -236,7 +246,14 @@ async def import_course_member(
             db.flush()
 
             course_member = existing_member
-            message = "Course member updated successfully"
+
+            # Check if member needs GitLab setup (no gitlab properties yet)
+            member_properties = existing_member.properties or {}
+            if not member_properties.get('gitlab'):
+                is_new_member = True  # Treat as new to trigger GitLab setup
+                message = "Course member updated and GitLab setup triggered"
+            else:
+                message = "Course member updated successfully"
         else:
             # Create new course member
             new_member = CourseMember(
