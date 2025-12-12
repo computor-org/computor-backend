@@ -24,9 +24,11 @@ load_dotenv(env_path)
 from database import get_db
 from model.auth import User, Account, StudentProfile
 from model.organization import Organization
-from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseContent, CourseContentType, CourseContentKind
+from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseContent, CourseContentType, CourseContentKind, SubmissionGroup, SubmissionGroupMember
 from model.role import Role, UserRole
-from ..custom_types import Ltree
+from model.artifact import SubmissionArtifact
+from model.message import Message
+from custom_types import Ltree
 from sqlalchemy.orm import Session
 import requests
 import time
@@ -48,19 +50,17 @@ except ImportError:
 def create_users(session, count=50):
     """Create fake users."""
     users = []
-    
+
     for i in range(count):
         user = User(
             given_name=fake.first_name(),
             family_name=fake.last_name(),
             email=fake.unique.email(),
             username=fake.unique.user_name(),
-            user_type='user',
-            fs_number=1000 + i
         )
         session.add(user)
         users.append(user)
-    
+
     session.flush()  # Get IDs
     print(f"✅ Created {count} users")
     return users
@@ -436,11 +436,174 @@ def create_course_contents(session, courses, course_content_types, users):
     print(f"✅ Created {len(course_contents)} course contents")
     return course_contents
 
+
+def create_submission_groups(session, courses, course_contents, course_members):
+    """Create submission groups for assignments (course content with 'assignment' in path)."""
+    submission_groups = []
+
+    for course in courses:
+        # Get assignments (course content) for this course
+        course_assignments = [cc for cc in course_contents
+                            if cc.course_id == course.id and '.' in str(cc.path)]  # assignments have dot in path
+
+        # Get student members for this course
+        student_role = session.query(CourseRole).filter(CourseRole.id == '_student').first()
+        course_student_members = [cm for cm in course_members
+                                  if cm.course_id == course.id and cm.course_role_id == student_role.id]
+
+        if not course_student_members:
+            continue
+
+        # Create submission groups for each assignment with random students
+        for assignment in course_assignments:
+            # Randomly select some students (30-70% of students) to have submission groups
+            selected_students = random.sample(
+                course_student_members,
+                k=random.randint(
+                    max(1, len(course_student_members) // 3),
+                    max(1, len(course_student_members) * 2 // 3)
+                )
+            )
+
+            for student_member in selected_students:
+                # Create submission group
+                submission_group = SubmissionGroup(
+                    display_name=None,  # Will be computed from member name
+                    max_group_size=assignment.max_group_size or 1,
+                    max_test_runs=assignment.max_test_runs,
+                    max_submissions=assignment.max_submissions,
+                    course_id=course.id,
+                    course_content_id=assignment.id,
+                    created_by=student_member.user_id
+                )
+                session.add(submission_group)
+                session.flush()  # Get the submission group ID
+
+                # Create submission group member
+                submission_group_member = SubmissionGroupMember(
+                    course_id=course.id,
+                    submission_group_id=submission_group.id,
+                    course_member_id=student_member.id,
+                    created_by=student_member.user_id
+                )
+                session.add(submission_group_member)
+                submission_groups.append(submission_group)
+
+    session.flush()
+    print(f"✅ Created {len(submission_groups)} submission groups")
+    return submission_groups
+
+
+def create_submission_artifacts(session, submission_groups, course_members):
+    """Create submission artifacts with submit=True for some submission groups."""
+    submission_artifacts = []
+
+    for submission_group in submission_groups:
+        # Randomly decide if this group has a submission (60% chance)
+        if random.random() < 0.6:
+            # Get the uploader (first member of the group)
+            group_member = session.query(SubmissionGroupMember).filter(
+                SubmissionGroupMember.submission_group_id == submission_group.id
+            ).first()
+
+            if not group_member:
+                continue
+
+            # Create a submission artifact with submit=True
+            artifact = SubmissionArtifact(
+                submission_group_id=submission_group.id,
+                uploaded_by_course_member_id=group_member.course_member_id,
+                content_type='application/zip',
+                file_size=random.randint(1000, 100000),  # Random file size
+                bucket_name='submissions',
+                object_key=f'{submission_group.id}/v1/submission.zip',
+                version_identifier='v1',
+                submit=True,  # This is an official submission
+                properties={
+                    'original_filename': 'submission.zip',
+                    'seeded': True
+                }
+            )
+            session.add(artifact)
+            submission_artifacts.append(artifact)
+
+    session.flush()
+    print(f"✅ Created {len(submission_artifacts)} submission artifacts (with submit=True)")
+    return submission_artifacts
+
+
+def create_messages_for_submissions(session, submission_artifacts, submission_groups):
+    """Create help request messages for submission artifacts with submit=True."""
+    messages = []
+
+    help_requests = [
+        "I'm stuck on this assignment. Can you help me understand the requirements?",
+        "My code compiles but I'm getting wrong results. Please help me debug!",
+        "I don't understand why my tests are failing. Could someone explain?",
+        "Need help with the algorithm implementation. What approach should I use?",
+        "Getting a runtime error that I can't figure out. Please assist!",
+        "The instructions are unclear to me. Can you clarify what's expected?",
+        "My solution works locally but fails the tests. What am I missing?",
+        "I'm having trouble with edge cases. Any hints would be appreciated!",
+    ]
+
+    for artifact in submission_artifacts:
+        # Randomly decide if this submission has a help message (40% chance)
+        if random.random() < 0.4:
+            # Get the submission group
+            submission_group = next(
+                (sg for sg in submission_groups if sg.id == artifact.submission_group_id),
+                None
+            )
+
+            if not submission_group:
+                continue
+
+            # Get the uploader's course member to find the author
+            group_member = session.query(SubmissionGroupMember).filter(
+                SubmissionGroupMember.submission_group_id == submission_group.id
+            ).first()
+
+            if not group_member or not group_member.course_member:
+                continue
+
+            author_id = group_member.course_member.user_id
+
+            # Create a help request message
+            message = Message(
+                author_id=author_id,
+                parent_id=None,
+                level=0,  # Top-level message
+                title="#ai::help",
+                content=random.choice(help_requests),
+                # Target the message to the submission group
+                submission_group_id=submission_group.id,
+                course_id=submission_group.course_id,
+                course_content_id=submission_group.course_content_id,
+                created_by=author_id
+            )
+            session.add(message)
+            messages.append(message)
+
+    session.flush()
+    print(f"✅ Created {len(messages)} messages with subject '#ai::help'")
+    return messages
+
+
 def clear_fake_data(session):
     """Clear existing fake data (but keep system data)."""
     print("🧹 Clearing existing fake data...")
-    
+
     # Delete in reverse dependency order
+    # First delete messages (they reference submission groups)
+    session.query(Message).delete(synchronize_session=False)
+    # Delete submission artifacts (they reference submission groups)
+    session.query(SubmissionArtifact).delete(synchronize_session=False)
+    # Delete submission group members (they reference submission groups and course members)
+    session.query(SubmissionGroupMember).delete(synchronize_session=False)
+    # Delete submission groups (they reference course content)
+    session.query(SubmissionGroup).delete(synchronize_session=False)
+
     session.query(CourseMember).delete(synchronize_session=False)
     # NOTE: CourseExecutionBackend table removed - use CourseService instead
     session.query(CourseGroup).delete(synchronize_session=False)
@@ -448,14 +611,14 @@ def clear_fake_data(session):
     session.query(CourseFamily).delete(synchronize_session=False)
 
     # NOTE: ExecutionBackend table removed - use ServiceType/Service instead
-    
+
     # Delete all organizations - we'll recreate them
     session.query(Organization).delete(synchronize_session=False)
-    
+
     # Delete users except admin
     admin_username = os.environ.get('API_ADMIN_USER', 'admin')
     session.query(User).filter(User.username != admin_username).delete(synchronize_session=False)
-    
+
     session.commit()
     print("✅ Cleared existing fake data")
 
@@ -489,9 +652,14 @@ def main():
             # Create course content hierarchy
             course_content_types = create_course_content_types(session, courses, users)
             course_contents = create_course_contents(session, courses, course_content_types, users)
-            
+
+            # Create submission groups, artifacts, and messages
+            submission_groups = create_submission_groups(session, courses, course_contents, course_members)
+            submission_artifacts = create_submission_artifacts(session, submission_groups, course_members)
+            messages = create_messages_for_submissions(session, submission_artifacts, submission_groups)
+
             session.commit()
-            
+
             print("🎉 Fake data seeding completed successfully!")
             print(f"Created:")
             print(f"  - {len(users)} users")
@@ -502,6 +670,9 @@ def main():
             print(f"  - {len(course_members)} course members")
             print(f"  - {len(course_content_types)} course content types (weekly, mandatory)")
             print(f"  - {len(course_contents)} course contents (units with assignments)")
+            print(f"  - {len(submission_groups)} submission groups")
+            print(f"  - {len(submission_artifacts)} submission artifacts (with submit=True)")
+            print(f"  - {len(messages)} messages with subject '#ai::help'")
             
             # Show some example structure
             if course_contents:

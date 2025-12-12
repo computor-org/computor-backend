@@ -31,6 +31,7 @@ class TutorCourseMemberList(BaseModel):
     course_role_id: str
     unreviewed: Optional[bool] = None
     ungraded_submissions_count: Optional[int] = None
+    unread_message_count: Optional[int] = None
 
     user: UserList
 

@@ -61,14 +61,16 @@ def path_to_method_name(path: str, method: str, operation_id: str, base_segments
     """Generate a method name from path and operation."""
     segments = [s for s in path.split("/") if s and not s.startswith("{")]
 
-    # Normalize base segments
+    # Normalize base segments - also create the joined version for hyphenated paths
     normalized_base = [b.replace("-", "_").lower() for b in base_segments]
+    joined_base = "_".join(normalized_base)  # e.g., "course_families"
 
     # Remove base segments from path
     remaining = []
     for seg in segments:
         seg_normalized = seg.replace("-", "_").lower()
-        if seg_normalized not in normalized_base:
+        # Check if segment matches either individual base segments or the joined base
+        if seg_normalized not in normalized_base and seg_normalized != joined_base:
             remaining.append(seg)
 
     if not remaining:
@@ -694,10 +696,9 @@ def generate_method(
             if pname not in ["skip", "limit"]:
                 query_params.append(pname)
 
-    # Add common pagination for list endpoints
+    # Add query parameter for list endpoints to accept Query objects
     if method_name == "list":
-        params.append("skip: int = 0")
-        params.append("limit: int = 100")
+        params.append("query: Optional[BaseModel] = None")
 
     # Return type
     if response_schema and map_schema_to_import(response_schema):
@@ -731,9 +732,11 @@ def generate_method(
     http_method = method.lower()
     if http_method == "get":
         if method_name == "list":
+            lines.append(f'        params = query.model_dump(exclude_none=True) if query else {{}}'  )
+            lines.append(f'        params.update(kwargs)')
             lines.append(f'        response = await self._http.get(')
             lines.append(f'            f"{path_formatted}",')
-            lines.append(f'            params={{"skip": skip, "limit": limit, **kwargs}},')
+            lines.append(f'            params=params,')
             lines.append('        )')
         else:
             lines.append(f'        response = await self._http.get(f"{path_formatted}", params=kwargs)')
@@ -848,6 +851,8 @@ def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]
         '"""',
         '',
         'from typing import Any, Dict, List, Optional, Union',
+        '',
+        'from pydantic import BaseModel',
         '',
     ]
 

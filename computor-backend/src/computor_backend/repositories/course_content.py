@@ -11,7 +11,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy import func, case, select, and_, literal
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, contains_eager, subqueryload
 from pydantic import BaseModel, ConfigDict
 
 from computor_backend.api.exceptions import NotFoundException
@@ -422,22 +422,22 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         )
 
     course_contents_query = course_contents_query.options(
-        # Load submission groups with members
-        joinedload(CourseContent.submission_groups)
+        # Use contains_eager for submission_groups since we already joined it with a filter
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
         # Load submission groups with artifacts
-        joinedload(CourseContent.submission_groups)
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.submission_artifacts),
-        # Load grades with grader info (separate joinedload chain)
-        joinedload(CourseContent.submission_groups)
+        # Load grades with grader info (separate chain)
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.submission_artifacts)
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
         # Also load course_role for grader
-        joinedload(CourseContent.submission_groups)
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.submission_artifacts)
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
@@ -556,13 +556,13 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         )
 
     query = query.options(
-        # Load submission groups with members
-        joinedload(CourseContent.submission_groups)
+        # Use contains_eager for submission_groups since we already joined it with a filter
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
         # Load submission groups with artifacts and their grades
-        joinedload(CourseContent.submission_groups)
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.submission_artifacts)
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
@@ -666,13 +666,13 @@ def course_member_course_content_query(
         )
 
     course_contents_query = course_contents_query.options(
-        # Load submission groups with members
-        joinedload(CourseContent.submission_groups)
+        # Use contains_eager for submission_groups since we already joined it
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
         # Load submission groups with artifacts and their grades
-        joinedload(CourseContent.submission_groups)
+        contains_eager(CourseContent.submission_groups)
         .joinedload(SubmissionGroup.submission_artifacts)
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
@@ -790,14 +790,15 @@ def course_member_course_content_list_query(
         )
 
     query = query.options(
-        # Load submission groups with members
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.members)
+        # Use contains_eager for submission_groups since we already joined it with a filter
+        # This tells SQLAlchemy to use the already-joined data instead of loading all submission groups
+        # Use subqueryload for nested relations to avoid row multiplication that breaks unread counts
+        contains_eager(CourseContent.submission_groups)
+        .subqueryload(SubmissionGroup.members)
         .joinedload(SubmissionGroupMember.course_member)
         .joinedload(CourseMember.user),
-        # Load submission groups with artifacts and their grades
-        joinedload(CourseContent.submission_groups)
-        .joinedload(SubmissionGroup.submission_artifacts)
+        contains_eager(CourseContent.submission_groups)
+        .subqueryload(SubmissionGroup.submission_artifacts)
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
@@ -927,3 +928,55 @@ def get_ungraded_submission_count_per_member(db: Session, course_id: Optional[st
 
     # Convert to dictionary
     return {str(row[0]): row[1] for row in ungraded_counts}
+
+
+def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = None):
+    """
+    Get count of unread messages per course member.
+
+    For each course member, counts messages that:
+    1. Target a submission_group they belong to
+    2. Have NOT been read by the course member's user (no entry in message_read)
+
+    Args:
+        db: Database session
+        course_id: Optional course ID to filter by
+
+    Returns:
+        Dictionary mapping course_member_id -> count of unread messages
+    """
+    from sqlalchemy import func, and_
+    from computor_backend.model.message import Message, MessageRead
+
+    # Base query: count messages per course_member via submission_group
+    # where there's no MessageRead entry for that message by the user
+    query = db.query(
+        CourseMember.id.label("course_member_id"),
+        func.count(Message.id).label("unread_count")
+    ).select_from(CourseMember).join(
+        SubmissionGroupMember,
+        SubmissionGroupMember.course_member_id == CourseMember.id
+    ).join(
+        Message,
+        Message.submission_group_id == SubmissionGroupMember.submission_group_id
+    ).outerjoin(
+        MessageRead,
+        and_(
+            MessageRead.message_id == Message.id,
+            MessageRead.reader_user_id == CourseMember.user_id
+        )
+    ).filter(
+        MessageRead.id.is_(None),  # No read entry = unread
+        Message.archived_at.is_(None)  # Not deleted
+    )
+
+    # Filter by course if provided
+    if course_id:
+        query = query.filter(CourseMember.course_id == course_id)
+
+    query = query.group_by(CourseMember.id)
+
+    results = query.all()
+
+    # Convert to dictionary
+    return {str(row[0]): row[1] for row in results}
