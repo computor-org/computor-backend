@@ -9,83 +9,39 @@ MAX_UPLOAD_SIZE = int(os.environ.get('MINIO_MAX_UPLOAD_SIZE', 10 * 1024 * 1024))
 MAX_STORAGE_PER_USER = int(os.environ.get('MAX_STORAGE_PER_USER', 1024 * 1024 * 1024))  # 1GB default
 MAX_STORAGE_PER_COURSE = int(os.environ.get('MAX_STORAGE_PER_COURSE', 10 * 1024 * 1024 * 1024))  # 10GB default
 
-# File type restrictions - Whitelist approach
-ALLOWED_EXTENSIONS: Set[str] = {
-    # Documents
-    '.pdf', '.doc', '.docx', '.odt', '.txt', '.md', '.tex', '.rtf',
-    # Spreadsheets
-    '.xls', '.xlsx', '.csv', '.ods',
-    # Presentations
-    '.ppt', '.pptx', '.odp',
-    # Images
-    '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp',
-    # Code files
-    '.py', '.java', '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.js', '.ts', 
-    '.html', '.css', '.jsx', '.tsx', '.vue', '.go', '.rs', '.swift', '.kt',
-    '.m', '.mat',  # MATLAB files
-    '.r', '.rmd',  # R files
-    '.ipynb',  # Jupyter notebooks
-    # Data files
-    '.json', '.xml', '.yaml', '.yml', '.toml',
-    # Archives (carefully allowed for assignments)
-    '.zip', '.tar', '.gz', '.7z',
-    # Other educational
-    '.sql', '.sh', '.bat', '.ps1',  # Scripts (text-based)
+# File type restrictions - Blacklist approach
+# Block dangerous executable and system file extensions
+BLOCKED_EXTENSIONS: Set[str] = {
+    # Executables
+    '.exe', '.dll', '.so', '.dylib', '.bin', '.com', '.scr', '.pif',
+    # Scripts that could be dangerous when executed directly
+    '.vbs', '.vbe', '.wsf', '.wsh', '.msi', '.msp', '.mst',
+    # Office files with macros
+    '.docm', '.xlsm', '.pptm', '.potm', '.xlam', '.ppsm', '.sldm',
+    # Other potentially dangerous
+    '.hta', '.cpl', '.msc', '.jar', '.jnlp',
+    '.cmd',  # Windows command scripts
+    '.reg',  # Windows registry files
+    '.lnk',  # Windows shortcuts
+    '.inf',  # Windows setup information
+    '.sys', '.drv',  # System/driver files
+    # Disk images
+    '.iso', '.img', '.dmg', '.vhd', '.vmdk',
 }
 
-# MIME type whitelist
-ALLOWED_MIME_TYPES: Set[str] = {
-    # Documents
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.oasis.opendocument.text',
-    'text/plain',
-    'text/markdown',
-    'text/x-tex',
-    'application/rtf',
-    # Spreadsheets
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv',
-    'application/vnd.oasis.opendocument.spreadsheet',
-    # Presentations
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'application/vnd.oasis.opendocument.presentation',
-    # Images
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/svg+xml',
-    'image/webp',
-    'image/bmp',
-    # Code/Text
-    'text/x-python',
-    'text/x-java',
-    'text/x-c',
-    'text/x-c++',
-    'text/javascript',
-    'application/javascript',
-    'text/html',
-    'text/css',
-    'application/json',
-    'application/xml',
-    'text/xml',
-    'application/x-yaml',
-    'text/yaml',
-    # MATLAB files
-    'text/x-matlab',  # MATLAB code files (.m)
-    'application/vnd.wolfram.mathematica.package',  # Sometimes .m is detected as Mathematica
-    'application/x-matlab-data',  # MATLAB data files (.mat)
-    # Archives
-    'application/zip',
-    'application/x-zip-compressed',
-    'application/x-tar',
-    'application/gzip',
-    'application/x-7z-compressed',
-    # Generic
-    'application/octet-stream',  # For binary files where MIME is uncertain
+# MIME types to block
+BLOCKED_MIME_TYPES: Set[str] = {
+    'application/x-msdownload',
+    'application/x-executable',
+    'application/x-dosexec',
+    'application/x-msdos-program',
+    'application/x-msi',
+    'application/x-ms-shortcut',
+    'application/vnd.ms-excel.sheet.macroEnabled.12',
+    'application/vnd.ms-word.document.macroEnabled.12',
+    'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+    'application/java-archive',
+    'application/x-java-archive',
 }
 
 # Dangerous file signatures to block
@@ -101,7 +57,7 @@ DANGEROUS_SIGNATURES: Dict[bytes, str] = {
 }
 
 # Special handling for archives
-ARCHIVE_EXTENSIONS = {'.zip', '.tar', '.gz', '.7z'}
+ARCHIVE_EXTENSIONS = {'.zip', '.tar', '.gz', '.7z', '.rar', '.tgz', '.tar.gz'}
 
 # Rate limiting settings (TODO: Implement with slowapi)
 # UPLOAD_RATE_LIMIT = os.environ.get('UPLOAD_RATE_LIMIT', '10/minute')
