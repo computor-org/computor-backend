@@ -68,10 +68,20 @@ class SyncHTTPWrapper:
     def __init__(self, computor_client):
         """Initialize with a ComputorClient instance."""
         import httpx
+
+        # Build headers including auth token if available
+        headers = dict(computor_client._http._default_headers)
+        headers["Content-Type"] = "application/json"
+        headers["Accept"] = "application/json"
+        if computor_client._auth_provider.is_authenticated():
+            token = computor_client._auth_provider._access_token
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
         self._client = httpx.Client(
-            base_url=str(computor_client._client.base_url),
-            headers=dict(computor_client._client.headers),
-            timeout=computor_client._client.timeout
+            base_url=computor_client._http.base_url,
+            headers=headers,
+            timeout=httpx.Timeout(computor_client._http.timeout)
         )
 
     def get(self, path: str, params: dict = None):
@@ -200,7 +210,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     client = run_async(get_computor_client(auth))
 
     # Get API clients
-    user_client = client.user
+    user_client = client.users  # Note: users (plural) for CRUD, user (singular) for current user
     account_client = client.accounts
     course_client = client.courses
     course_member_client = client.course_members
@@ -246,8 +256,9 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Assign system roles if provided
             if user_dep.roles:
                 role_client = client.roles
-                user_role_client = client.user_roles
-                
+                # user_roles methods are on client.user, not a separate client
+                user_client_current = client.user
+
                 for role_id in user_dep.roles:
                     try:
                         # Check if role exists
@@ -255,13 +266,14 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         if not roles:
                             click.echo(f"  ⚠️  Role not found: {role_id}")
                             continue
-                        
+
                         # Check if user already has this role
-                        existing_user_roles = run_async(user_role_client.list(UserRoleQuery(
+                        # Use kwargs to pass query params since user_roles() uses **kwargs
+                        existing_user_roles = run_async(user_client_current.user_roles(
                             user_id=str(user.id),
                             role_id=role_id
-                        )))
-                        
+                        ))
+
                         if existing_user_roles:
                             click.echo(f"  ℹ️  User already has role: {role_id}")
                         else:
@@ -270,7 +282,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                 user_id=str(user.id),
                                 role_id=role_id
                             )
-                            run_async(user_role_client.create(user_role_create))
+                            run_async(user_client_current.post_user_roles(user_role_create))
                             click.echo(f"  ✅ Assigned role: {role_id}")
                     except Exception as e:
                         click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
@@ -284,7 +296,14 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         "password": user_dep.password
                     }
                     # Use direct HTTP call since client doesn't have this method
-                    with httpx.Client(base_url=str(client._client.base_url), headers=dict(client._client.headers)) as sync_client:
+                    # Build headers with auth token
+                    headers = dict(client._http._default_headers)
+                    headers["Content-Type"] = "application/json"
+                    if client._auth_provider.is_authenticated():
+                        token = client._auth_provider._access_token
+                        if token:
+                            headers["Authorization"] = f"Bearer {token}"
+                    with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
                         response = sync_client.post("user/password", json=password_payload)
                         response.raise_for_status()
                     click.echo(f"  ✅ Set password for user: {user.display_name}")
@@ -1559,7 +1578,7 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
 
         try:
             # Use the underlying httpx client for multipart/form-data upload
-            # Note: client._client is async, so we need to use the sync httpx client
+            # Note: client._http is async, so we need to use the sync httpx client
             import httpx
             import io
 
@@ -1569,12 +1588,16 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
                 "file": (resolved_path.name, file_obj, "application/octet-stream")
             }
 
-            # Copy headers but remove Content-Type to let httpx set it for multipart
-            headers = dict(client._client.headers)
+            # Build headers with auth token, but remove Content-Type to let httpx set it for multipart
+            headers = dict(client._http._default_headers)
+            if client._auth_provider.is_authenticated():
+                token = client._auth_provider._access_token
+                if token:
+                    headers["Authorization"] = f"Bearer {token}"
             headers.pop('content-type', None)
             headers.pop('Content-Type', None)
 
-            with httpx.Client(base_url=str(client._client.base_url), headers=headers) as sync_client:
+            with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
                 response = sync_client.post(
                     f"extensions/{identity}/versions",
                     data=form_data,
