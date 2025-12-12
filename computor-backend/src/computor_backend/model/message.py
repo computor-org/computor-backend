@@ -13,12 +13,14 @@ class Message(Base):
     __table_args__ = (
         Index('msg_parent_archived_idx', 'parent_id', 'archived_at'),
         Index('msg_author_archived_idx', 'author_id', 'archived_at'),
-        Index('msg_user_archived_idx', 'user_id', 'archived_at'),
-        Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
-        Index('msg_submission_group_archived_idx', 'submission_group_id', 'archived_at'),
-        Index('msg_course_group_archived_idx', 'course_group_id', 'archived_at'),
-        Index('msg_course_content_archived_idx', 'course_content_id', 'archived_at'),
+        Index('msg_organization_archived_idx', 'organization_id', 'archived_at'),
+        Index('msg_course_family_archived_idx', 'course_family_id', 'archived_at'),
         Index('msg_course_archived_idx', 'course_id', 'archived_at'),
+        Index('msg_course_content_archived_idx', 'course_content_id', 'archived_at'),
+        Index('msg_course_group_archived_idx', 'course_group_id', 'archived_at'),
+        Index('msg_submission_group_archived_idx', 'submission_group_id', 'archived_at'),
+        Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
+        Index('msg_user_archived_idx', 'user_id', 'archived_at'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -41,13 +43,16 @@ class Message(Base):
     title = Column(String(255), nullable=False)
     content = Column(String(16384), nullable=False)
 
-    # Targets (all nullable; at least one may be set; if all course-related are NULL and user_id set, it's a direct user message)
-    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
-    course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
-    submission_group_id = Column(ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
-    course_group_id = Column(ForeignKey('course_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
-    course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    # Targets (all nullable; if ALL are NULL = global message visible to all users)
+    # Hierarchy: organization > course_family > course > course_content/course_group > submission_group > course_member > user
+    organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_group_id = Column(ForeignKey('course_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    submission_group_id = Column(ForeignKey('submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
 
     # Relationships
     author = relationship('User', foreign_keys=[author_id])
@@ -55,12 +60,14 @@ class Message(Base):
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
 
-    user = relationship('User', foreign_keys=[user_id])
-    course_member = relationship('CourseMember', foreign_keys=[course_member_id])
-    submission_group = relationship('SubmissionGroup', foreign_keys=[submission_group_id])
-    course_group = relationship('CourseGroup', foreign_keys=[course_group_id])
-    course_content = relationship('CourseContent', foreign_keys=[course_content_id])
+    organization = relationship('Organization', foreign_keys=[organization_id])
+    course_family = relationship('CourseFamily', foreign_keys=[course_family_id])
     course = relationship('Course', foreign_keys=[course_id])
+    course_content = relationship('CourseContent', foreign_keys=[course_content_id])
+    course_group = relationship('CourseGroup', foreign_keys=[course_group_id])
+    submission_group = relationship('SubmissionGroup', foreign_keys=[submission_group_id])
+    course_member = relationship('CourseMember', foreign_keys=[course_member_id])
+    user = relationship('User', foreign_keys=[user_id])
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
 
