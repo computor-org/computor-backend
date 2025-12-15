@@ -299,6 +299,9 @@ services:
     image: minio/minio:latest
     container_name: computor-minio
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"  # API port - localhost only (accessible via SSH tunnel)
+      - "127.0.0.1:9001:9001"  # Console port - localhost only (accessible via SSH tunnel)
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
     environment:
