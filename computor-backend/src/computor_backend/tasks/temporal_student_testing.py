@@ -89,7 +89,7 @@ async def fetch_example_version_with_dependencies(
 
         # Download example version with dependencies
         logger.info(f"Downloading example version {example_version_id} with dependencies")
-        response = await client._client.get(
+        response = await client._http.get(
             f"/examples/download/{example_version_id}?with_dependencies=true"
         )
 
@@ -233,9 +233,8 @@ async def fetch_submission_artifact(
 
         # Download artifact as ZIP
         logger.info(f"Downloading submission artifact {artifact_id}")
-        response = await client._client.get(
-            f"/submissions/artifacts/{artifact_id}/download",
-            follow_redirects=True,
+        response = await client._http.get(
+            f"/submissions/artifacts/{artifact_id}/download"
         )
 
         if response.status_code != 200:
@@ -274,7 +273,7 @@ async def fetch_submission_artifact(
         logger.info(f"  Contents: {os.listdir(actual_submission_path)}")
 
         # Get artifact metadata
-        artifact_response = await client._client.get(
+        artifact_response = await client._http.get(
             f"/submissions/artifacts/{artifact_id}"
         )
 
