@@ -22,7 +22,6 @@ class SubmissionGroupMemberCreate(BaseModel):
 class SubmissionGroupMemberGet(BaseEntityGet):
     id: str
     course_id: str
-    course_content_id: str
     course_member_id: str
     submission_group_id: str
     grading: Optional[float] = None
@@ -34,7 +33,6 @@ class SubmissionGroupMemberGet(BaseEntityGet):
 class SubmissionGroupMemberList(BaseModel):
     id: str
     course_id: str
-    course_content_id: str
     course_member_id: str
     submission_group_id: str
     grading: Optional[float] = None

@@ -445,6 +445,7 @@ def list_tutor_submission_groups(
         List of TutorSubmissionGroupList
     """
     from sqlalchemy import func, exists, and_
+    from sqlalchemy.orm import joinedload
 
     # Get courses where user is a tutor
     tutor_course_ids = db.query(Course.id).select_from(User).filter(
