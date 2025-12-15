@@ -79,13 +79,11 @@ async def fetch_example_version_with_dependencies(
 
     # Not cached - fetch from API
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+    api_token = api_config.get("token")
+    if not api_token:
+        raise ApplicationError("API token is required but not provided in api_config")
 
-    async with ComputorClient(base_url=base_url) as client:
-        # Authenticate with API token
-        api_token = api_config.get("token")
-        if not api_token:
-            raise ApplicationError("API token is required but not provided in api_config")
-        client.set_token(api_token)
+    async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
 
         # Download example version with dependencies
         logger.info(f"Downloading example version {example_version_id} with dependencies")
@@ -223,13 +221,11 @@ async def fetch_submission_artifact(
     logger.info(f"Fetching submission artifact {artifact_id}")
 
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+    api_token = api_config.get("token")
+    if not api_token:
+        raise ApplicationError("API token is required but not provided in api_config")
 
-    async with ComputorClient(base_url=base_url) as client:
-        # Authenticate with API token
-        api_token = api_config.get("token")
-        if not api_token:
-            raise ApplicationError("API token is required but not provided in api_config")
-        client.set_token(api_token)
+    async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
 
         # Download artifact as ZIP
         logger.info(f"Downloading submission artifact {artifact_id}")
@@ -494,13 +490,11 @@ async def commit_test_results_activity(
 
     try:
         base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+        api_token = api_config.get("token")
+        if not api_token:
+            raise ApplicationError("API token is required but not provided in api_config")
 
-        async with ComputorClient(base_url=base_url) as client:
-            # Authenticate with API token
-            api_token = api_config.get("token")
-            if not api_token:
-                raise ApplicationError("API token is required but not provided in api_config")
-            client.set_token(api_token)
+        async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
 
             # Update result
             result_update = ResultUpdate(
