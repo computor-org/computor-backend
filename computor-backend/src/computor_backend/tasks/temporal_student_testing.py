@@ -85,7 +85,7 @@ async def fetch_example_version_with_dependencies(
         api_token = api_config.get("token")
         if not api_token:
             raise ApplicationError("API token is required but not provided in api_config")
-        await client.set_token(api_token)
+        client.set_token(api_token)
 
         # Download example version with dependencies
         logger.info(f"Downloading example version {example_version_id} with dependencies")
@@ -229,7 +229,7 @@ async def fetch_submission_artifact(
         api_token = api_config.get("token")
         if not api_token:
             raise ApplicationError("API token is required but not provided in api_config")
-        await client.set_token(api_token)
+        client.set_token(api_token)
 
         # Download artifact as ZIP
         logger.info(f"Downloading submission artifact {artifact_id}")
@@ -501,7 +501,7 @@ async def commit_test_results_activity(
             api_token = api_config.get("token")
             if not api_token:
                 raise ApplicationError("API token is required but not provided in api_config")
-            await client.set_token(api_token)
+            client.set_token(api_token)
 
             # Update result
             result_update = ResultUpdate(
