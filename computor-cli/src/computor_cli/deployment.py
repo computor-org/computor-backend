@@ -42,9 +42,9 @@ from computor_types.course_groups import CourseGroupQuery, CourseGroupCreate
 from computor_types.organizations import OrganizationQuery
 from computor_types.course_families import CourseFamilyQuery
 # Execution backends removed - migrated to services architecture
-from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
+from computor_types.services import ServiceCreate, ServiceUpdate
 from computor_types.service_type import ServiceTypeQuery
-from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate, ApiTokenQuery
+from computor_types.api_tokens import ApiTokenCreate
 from computor_types.roles import RoleQuery
 from computor_types.user_roles import UserRoleCreate, UserRoleQuery
 from computor_types.example import (
@@ -472,7 +472,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     Returns:
         dict: Mapping of service slug to service details (id, token_id, user_id)
     """
-    from computor_types.services import ServiceCreate, ServiceQuery
+    from computor_types.services import ServiceCreate
     from computor_types.api_tokens import ApiTokenCreate, ApiTokenCreateResponse
     from computor_types.service_type import ServiceTypeQuery
     from datetime import datetime, timedelta
@@ -498,7 +498,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
         try:
             # Check if service already exists
-            existing_services = run_async(service_client.list(ServiceQuery(slug=service_config.slug)))
+            existing_services = run_async(service_client.get_service_accounts(slug=service_config.slug))
 
             # Track whether we need to create a token
             need_to_create_token = False
@@ -508,9 +508,8 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
 
                 # Look up the service's token by user_id (defaults to active tokens only)
-                from computor_types.api_tokens import ApiTokenQuery
-                existing_tokens = run_async(api_token_client.list(
-                    ApiTokenQuery(user_id=str(service.user_id))
+                existing_tokens = run_async(api_token_client.get_api_tokens(
+                    user_id=str(service.user_id)
                 ))
 
                 if existing_tokens and len(existing_tokens) > 0:
@@ -524,7 +523,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                         click.echo(f"    🔄 force_recreate=True: Deleting existing token(s)...")
                         for token in existing_tokens:
                             try:
-                                run_async(api_token_client.revoke(str(token.id)))
+                                run_async(api_token_client.delete_api_tokens(str(token.id)))
                                 click.echo(f"    ✅ Deleted token: {token.token_prefix}...")
                             except Exception as e:
                                 click.echo(f"    ⚠️  Failed to delete token {token.id}: {e}")
@@ -580,7 +579,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     enabled=True
                 )
 
-                service = run_async(service_client.create(service_create))
+                service = run_async(service_client.service_accounts(service_create))
                 click.echo(f"    ✅ Created service: {service_config.slug}")
                 need_to_create_token = True  # New service always needs a token
 
@@ -668,7 +667,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 token_create = ApiTokenCreate(**token_create_params)
 
-                token_response = run_async(api_token_client.create(token_create))
+                token_response = run_async(api_token_client.api_tokens(token_create))
                 click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
                 click.echo(f"    🔑 Token: {token_response.token}")
                 click.echo(f"    ⚠️  IMPORTANT: Store this token securely! It cannot be retrieved later.")
@@ -1271,7 +1270,7 @@ def _link_services_to_course(course_id: str, services: list, deployed_services: 
                 continue
 
             # Otherwise, look up by slug
-            existing_services = run_async(service_client.list(ServiceQuery(slug=service_ref.slug)))
+            existing_services = run_async(service_client.get_service_accounts(slug=service_ref.slug))
 
             if not existing_services or len(existing_services) == 0:
                 click.echo(f"      ⚠️  Service not found: {service_ref.slug}")
@@ -1334,7 +1333,7 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
                 continue
 
             # Get current token and display scopes
-            token = run_async(api_token_client.get(token_id))
+            token = run_async(api_token_client.get_api_tokens_token_id(token_id))
             current_scopes = token.scopes or []
 
             click.echo(f"    ✅ {service_slug}: {len(current_scopes)} scopes")
