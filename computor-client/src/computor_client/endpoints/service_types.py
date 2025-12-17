@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.service_type import (
     ServiceTypeCreate,
     ServiceTypeGet,
@@ -25,7 +27,7 @@ class ServiceTypesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def service_types(
+    async def create(
         self,
         data: Union[ServiceTypeCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -34,18 +36,24 @@ class ServiceTypesClient:
         response = await self._http.post(f"/service-types", json_data=data, params=kwargs)
         return ServiceTypeGet.model_validate(response.json())
 
-    async def get_service_types(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[ServiceTypeList]:
         """List Service Types"""
-        response = await self._http.get(f"/service-types", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/service-types",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [ServiceTypeList.model_validate(item) for item in data]
         return []
 
-    async def get_service_types_entity_id(
+    async def get(
         self,
         entity_id: str,
         **kwargs: Any,
@@ -54,7 +62,7 @@ class ServiceTypesClient:
         response = await self._http.get(f"/service-types/{entity_id}", params=kwargs)
         return ServiceTypeGet.model_validate(response.json())
 
-    async def patch_service_types(
+    async def update(
         self,
         entity_id: str,
         data: Union[ServiceTypeUpdate, Dict[str, Any]],

@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_groups import (
     CourseGroupCreate,
     CourseGroupGet,
@@ -25,7 +27,7 @@ class CourseGroupsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_groups(
+    async def create(
         self,
         data: Union[CourseGroupCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -34,18 +36,24 @@ class CourseGroupsClient:
         response = await self._http.post(f"/course-groups", json_data=data, params=kwargs)
         return CourseGroupGet.model_validate(response.json())
 
-    async def get_course_groups(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseGroupList]:
         """List Course-Groups"""
-        response = await self._http.get(f"/course-groups", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-groups",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseGroupList.model_validate(item) for item in data]
         return []
 
-    async def get_course_groups_id(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -54,7 +62,7 @@ class CourseGroupsClient:
         response = await self._http.get(f"/course-groups/{id}", params=kwargs)
         return CourseGroupGet.model_validate(response.json())
 
-    async def patch_course_groups(
+    async def update(
         self,
         id: str,
         data: Union[CourseGroupUpdate, Dict[str, Any]],
@@ -64,7 +72,7 @@ class CourseGroupsClient:
         response = await self._http.patch(f"/course-groups/{id}", json_data=data, params=kwargs)
         return CourseGroupGet.model_validate(response.json())
 
-    async def delete_course_groups(
+    async def delete(
         self,
         id: str,
         **kwargs: Any,

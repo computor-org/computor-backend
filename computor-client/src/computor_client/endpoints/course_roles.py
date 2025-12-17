@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_roles import (
     CourseRoleGet,
     CourseRoleList,
@@ -23,7 +25,7 @@ class CourseRolesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_roles(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -32,12 +34,18 @@ class CourseRolesClient:
         response = await self._http.get(f"/course-roles/{id}", params=kwargs)
         return CourseRoleGet.model_validate(response.json())
 
-    async def get_course_roles(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseRoleList]:
         """List Course-Roles"""
-        response = await self._http.get(f"/course-roles", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-roles",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseRoleList.model_validate(item) for item in data]

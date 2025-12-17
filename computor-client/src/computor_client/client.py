@@ -321,6 +321,8 @@ class ComputorClient:
                     "StorageClient": "StorageClient",
                     "UserClient": "UserClient",
                     "SystemClient": "SystemClient",
+                    # api_tokens -> TokensClient (tag is "tokens" but interface name is "api_tokens")
+                    "ApiTokensClient": "TokensClient",
                 }
                 actual_name = aliases.get(class_name)
                 if actual_name:

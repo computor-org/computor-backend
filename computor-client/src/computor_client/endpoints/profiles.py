@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.profiles import (
     ProfileCreate,
     ProfileGet,
@@ -27,14 +29,15 @@ class ProfilesClient:
 
     async def list(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[ProfileList]:
         """List Profiles Endpoint"""
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
         response = await self._http.get(
             f"/profiles",
-            params={"skip": skip, "limit": limit, **kwargs},
+            params=params,
         )
         data = response.json()
         if isinstance(data, list):

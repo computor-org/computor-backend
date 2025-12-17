@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_member_accounts import (
     CourseMemberProviderAccountUpdate,
     CourseMemberReadinessStatus,
@@ -75,14 +77,15 @@ class UserClient:
 
     async def list(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> UserGet:
         """Get Current User Endpoint"""
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
         response = await self._http.get(
             f"/user",
-            params={"skip": skip, "limit": limit, **kwargs},
+            params=params,
         )
         return UserGet.model_validate(response.json())
 

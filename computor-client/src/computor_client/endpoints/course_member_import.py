@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_member_import import (
     CourseMemberImportRequest,
     CourseMemberImportResponse,
@@ -23,7 +25,7 @@ class CourseMemberImportClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_member_import(
+    async def post(
         self,
         course_id: str,
         data: Union[CourseMemberImportRequest, Dict[str, Any]],

@@ -24,6 +24,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
     get_message_with_read_status,
     list_messages_with_read_status,
+    list_messages_with_filters,
     mark_message_as_read,
     mark_message_as_unread,
 )
@@ -76,8 +77,17 @@ async def list_messages(
     params: MessageQuery = Depends(),
     db: Session = Depends(get_db),
 ):
-    """List messages with read status."""
-    items, total = await list_db(permissions, db, params, MessageInterface)
+    """List messages with read status.
+
+    Supports filtering by:
+    - unread: True = unread only, False = read only, None = all
+    - created_after/created_before: Datetime boundaries
+    - tags: List of tags in format "scope::value" to filter by (in title)
+    - tags_match_all: True = must match ALL tags, False = match ANY tag
+    - tag_scope: Wildcard scope filter (e.g., "ai" matches any #ai::* tag)
+    """
+    # Use custom list function that supports user-specific filtering
+    items, total = await list_messages_with_filters(permissions, db, params)
     items = list_messages_with_read_status(items, permissions, db)
     response.headers["X-Total-Count"] = str(total)
     return items

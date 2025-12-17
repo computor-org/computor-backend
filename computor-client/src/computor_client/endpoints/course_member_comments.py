@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_member_comments import (
     CommentCreate,
     CommentUpdate,
@@ -24,18 +26,24 @@ class CourseMemberCommentsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_member_comments(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseMemberCommentList]:
         """List Comments"""
-        response = await self._http.get(f"/course-member-comments", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-member-comments",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return []
 
-    async def post_course_member_comments(
+    async def create(
         self,
         data: Union[CommentCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -47,7 +55,7 @@ class CourseMemberCommentsClient:
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return []
 
-    async def patch_course_member_comments(
+    async def update(
         self,
         course_member_comment_id: str,
         data: Union[CommentUpdate, Dict[str, Any]],
@@ -60,7 +68,7 @@ class CourseMemberCommentsClient:
             return [CourseMemberCommentList.model_validate(item) for item in data]
         return []
 
-    async def delete_course_member_comments(
+    async def delete(
         self,
         course_member_comment_id: str,
         **kwargs: Any,

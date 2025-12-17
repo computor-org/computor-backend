@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.course_content_types import (
     CourseContentTypeCreate,
     CourseContentTypeGet,
@@ -25,7 +27,7 @@ class CourseContentTypesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_content_types(
+    async def create(
         self,
         data: Union[CourseContentTypeCreate, Dict[str, Any]],
         **kwargs: Any,
@@ -34,18 +36,24 @@ class CourseContentTypesClient:
         response = await self._http.post(f"/course-content-types", json_data=data, params=kwargs)
         return CourseContentTypeGet.model_validate(response.json())
 
-    async def get_course_content_types(
+    async def list(
         self,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseContentTypeList]:
         """List Course-Content-Types"""
-        response = await self._http.get(f"/course-content-types", params=kwargs)
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
+        response = await self._http.get(
+            f"/course-content-types",
+            params=params,
+        )
         data = response.json()
         if isinstance(data, list):
             return [CourseContentTypeList.model_validate(item) for item in data]
         return []
 
-    async def get_course_content_types_id(
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -54,7 +62,7 @@ class CourseContentTypesClient:
         response = await self._http.get(f"/course-content-types/{id}", params=kwargs)
         return CourseContentTypeGet.model_validate(response.json())
 
-    async def patch_course_content_types(
+    async def update(
         self,
         id: str,
         data: Union[CourseContentTypeUpdate, Dict[str, Any]],
@@ -64,7 +72,7 @@ class CourseContentTypesClient:
         response = await self._http.patch(f"/course-content-types/{id}", json_data=data, params=kwargs)
         return CourseContentTypeGet.model_validate(response.json())
 
-    async def delete_course_content_types(
+    async def delete(
         self,
         id: str,
         **kwargs: Any,

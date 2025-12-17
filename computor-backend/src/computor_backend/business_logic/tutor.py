@@ -19,6 +19,7 @@ from computor_backend.repositories.course_content import (
     course_member_course_content_list_query,
     course_member_course_content_query,
     get_ungraded_submission_count_per_member,
+    get_unread_message_count_per_member,
 )
 from computor_backend.api.mappers import course_member_course_content_result_mapper
 from computor_backend.model.auth import User
@@ -301,6 +302,7 @@ def list_tutor_course_members(
     # Extract course_id from params if available
     course_id = params.course_id if params and hasattr(params, 'course_id') else None
     ungraded_counts = get_ungraded_submission_count_per_member(db, course_id)
+    unread_message_counts = get_unread_message_count_per_member(db, course_id)
 
     response_list = []
 
@@ -308,6 +310,7 @@ def list_tutor_course_members(
         tutor_course_member = TutorCourseMemberList.model_validate(course_member, from_attributes=True)
         tutor_course_member.unreviewed = True if latest_result_date is not None else False
         tutor_course_member.ungraded_submissions_count = ungraded_counts.get(str(course_member.id), 0)
+        tutor_course_member.unread_message_count = unread_message_counts.get(str(course_member.id), 0)
         response_list.append(tutor_course_member)
 
     return response_list
@@ -442,6 +445,7 @@ def list_tutor_submission_groups(
         List of TutorSubmissionGroupList
     """
     from sqlalchemy import func, exists, and_
+    from sqlalchemy.orm import joinedload
 
     # Get courses where user is a tutor
     tutor_course_ids = db.query(Course.id).select_from(User).filter(

@@ -42,9 +42,9 @@ from computor_types.course_groups import CourseGroupQuery, CourseGroupCreate
 from computor_types.organizations import OrganizationQuery
 from computor_types.course_families import CourseFamilyQuery
 # Execution backends removed - migrated to services architecture
-from computor_types.services import ServiceCreate, ServiceQuery, ServiceUpdate
+from computor_types.services import ServiceCreate, ServiceUpdate
 from computor_types.service_type import ServiceTypeQuery
-from computor_types.api_tokens import ApiTokenCreate, ApiTokenUpdate, ApiTokenQuery
+from computor_types.api_tokens import ApiTokenCreate
 from computor_types.roles import RoleQuery
 from computor_types.user_roles import UserRoleCreate, UserRoleQuery
 from computor_types.example import (
@@ -68,10 +68,20 @@ class SyncHTTPWrapper:
     def __init__(self, computor_client):
         """Initialize with a ComputorClient instance."""
         import httpx
+
+        # Build headers including auth token if available
+        headers = dict(computor_client._http._default_headers)
+        headers["Content-Type"] = "application/json"
+        headers["Accept"] = "application/json"
+        if computor_client._auth_provider.is_authenticated():
+            token = computor_client._auth_provider._access_token
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
         self._client = httpx.Client(
-            base_url=str(computor_client._client.base_url),
-            headers=dict(computor_client._client.headers),
-            timeout=computor_client._client.timeout
+            base_url=computor_client._http.base_url,
+            headers=headers,
+            timeout=httpx.Timeout(computor_client._http.timeout)
         )
 
     def get(self, path: str, params: dict = None):
@@ -200,7 +210,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     client = run_async(get_computor_client(auth))
 
     # Get API clients
-    user_client = client.user
+    user_client = client.users  # Note: users (plural) for CRUD, user (singular) for current user
     account_client = client.accounts
     course_client = client.courses
     course_member_client = client.course_members
@@ -246,8 +256,9 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Assign system roles if provided
             if user_dep.roles:
                 role_client = client.roles
-                user_role_client = client.user_roles
-                
+                # user_roles methods are on client.user, not a separate client
+                user_client_current = client.user
+
                 for role_id in user_dep.roles:
                     try:
                         # Check if role exists
@@ -255,13 +266,14 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         if not roles:
                             click.echo(f"  ⚠️  Role not found: {role_id}")
                             continue
-                        
+
                         # Check if user already has this role
-                        existing_user_roles = run_async(user_role_client.list(UserRoleQuery(
+                        # Use kwargs to pass query params since user_roles() uses **kwargs
+                        existing_user_roles = run_async(user_client_current.user_roles(
                             user_id=str(user.id),
                             role_id=role_id
-                        )))
-                        
+                        ))
+
                         if existing_user_roles:
                             click.echo(f"  ℹ️  User already has role: {role_id}")
                         else:
@@ -270,7 +282,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                 user_id=str(user.id),
                                 role_id=role_id
                             )
-                            run_async(user_role_client.create(user_role_create))
+                            run_async(user_client_current.post_user_roles(user_role_create))
                             click.echo(f"  ✅ Assigned role: {role_id}")
                     except Exception as e:
                         click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
@@ -284,7 +296,14 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         "password": user_dep.password
                     }
                     # Use direct HTTP call since client doesn't have this method
-                    with httpx.Client(base_url=str(client._client.base_url), headers=dict(client._client.headers)) as sync_client:
+                    # Build headers with auth token
+                    headers = dict(client._http._default_headers)
+                    headers["Content-Type"] = "application/json"
+                    if client._auth_provider.is_authenticated():
+                        token = client._auth_provider._access_token
+                        if token:
+                            headers["Authorization"] = f"Bearer {token}"
+                    with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
                         response = sync_client.post("user/password", json=password_payload)
                         response.raise_for_status()
                     click.echo(f"  ✅ Set password for user: {user.display_name}")
@@ -453,7 +472,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     Returns:
         dict: Mapping of service slug to service details (id, token_id, user_id)
     """
-    from computor_types.services import ServiceCreate, ServiceQuery
+    from computor_types.services import ServiceCreate
     from computor_types.api_tokens import ApiTokenCreate, ApiTokenCreateResponse
     from computor_types.service_type import ServiceTypeQuery
     from datetime import datetime, timedelta
@@ -479,7 +498,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
         try:
             # Check if service already exists
-            existing_services = run_async(service_client.list(ServiceQuery(slug=service_config.slug)))
+            existing_services = run_async(service_client.get_service_accounts(slug=service_config.slug))
 
             # Track whether we need to create a token
             need_to_create_token = False
@@ -489,9 +508,8 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
 
                 # Look up the service's token by user_id (defaults to active tokens only)
-                from computor_types.api_tokens import ApiTokenQuery
-                existing_tokens = run_async(api_token_client.list(
-                    ApiTokenQuery(user_id=str(service.user_id))
+                existing_tokens = run_async(api_token_client.get_api_tokens(
+                    user_id=str(service.user_id)
                 ))
 
                 if existing_tokens and len(existing_tokens) > 0:
@@ -505,7 +523,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                         click.echo(f"    🔄 force_recreate=True: Deleting existing token(s)...")
                         for token in existing_tokens:
                             try:
-                                run_async(api_token_client.revoke(str(token.id)))
+                                run_async(api_token_client.delete_api_tokens(str(token.id)))
                                 click.echo(f"    ✅ Deleted token: {token.token_prefix}...")
                             except Exception as e:
                                 click.echo(f"    ⚠️  Failed to delete token {token.id}: {e}")
@@ -561,7 +579,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     enabled=True
                 )
 
-                service = run_async(service_client.create(service_create))
+                service = run_async(service_client.service_accounts(service_create))
                 click.echo(f"    ✅ Created service: {service_config.slug}")
                 need_to_create_token = True  # New service always needs a token
 
@@ -649,7 +667,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 token_create = ApiTokenCreate(**token_create_params)
 
-                token_response = run_async(api_token_client.create(token_create))
+                token_response = run_async(api_token_client.api_tokens(token_create))
                 click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
                 click.echo(f"    🔑 Token: {token_response.token}")
                 click.echo(f"    ⚠️  IMPORTANT: Store this token securely! It cannot be retrieved later.")
@@ -1252,7 +1270,7 @@ def _link_services_to_course(course_id: str, services: list, deployed_services: 
                 continue
 
             # Otherwise, look up by slug
-            existing_services = run_async(service_client.list(ServiceQuery(slug=service_ref.slug)))
+            existing_services = run_async(service_client.get_service_accounts(slug=service_ref.slug))
 
             if not existing_services or len(existing_services) == 0:
                 click.echo(f"      ⚠️  Service not found: {service_ref.slug}")
@@ -1315,7 +1333,7 @@ def _update_token_scopes(service_course_mapping: dict, deployed_services: dict, 
                 continue
 
             # Get current token and display scopes
-            token = run_async(api_token_client.get(token_id))
+            token = run_async(api_token_client.get_api_tokens_token_id(token_id))
             current_scopes = token.scopes or []
 
             click.echo(f"    ✅ {service_slug}: {len(current_scopes)} scopes")
@@ -1559,7 +1577,7 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
 
         try:
             # Use the underlying httpx client for multipart/form-data upload
-            # Note: client._client is async, so we need to use the sync httpx client
+            # Note: client._http is async, so we need to use the sync httpx client
             import httpx
             import io
 
@@ -1569,12 +1587,16 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
                 "file": (resolved_path.name, file_obj, "application/octet-stream")
             }
 
-            # Copy headers but remove Content-Type to let httpx set it for multipart
-            headers = dict(client._client.headers)
+            # Build headers with auth token, but remove Content-Type to let httpx set it for multipart
+            headers = dict(client._http._default_headers)
+            if client._auth_provider.is_authenticated():
+                token = client._auth_provider._access_token
+                if token:
+                    headers["Authorization"] = f"Bearer {token}"
             headers.pop('content-type', None)
             headers.pop('Content-Type', None)
 
-            with httpx.Client(base_url=str(client._client.base_url), headers=headers) as sync_client:
+            with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
                 response = sync_client.post(
                     f"extensions/{identity}/versions",
                     data=form_data,

@@ -7,6 +7,8 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel
+
 from computor_types.extensions import (
     ExtensionMetadata,
     ExtensionPublishResponse,
@@ -55,14 +57,15 @@ class ExtensionsClient:
 
     async def list(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """List Extensions"""
+        params = query.model_dump(exclude_none=True) if query else {}
+        params.update(kwargs)
         response = await self._http.get(
             f"/extensions/",
-            params={"skip": skip, "limit": limit, **kwargs},
+            params=params,
         )
         return response.json()
 
