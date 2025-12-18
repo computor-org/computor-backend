@@ -294,6 +294,7 @@ async def execute_tests_activity(
     test_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     work_dir: Optional[str] = None,
+    store_graphics_artifacts: bool = True,
 ) -> Dict[str, Any]:
     """
     Execute tests comparing student and reference implementations.
@@ -304,6 +305,7 @@ async def execute_tests_activity(
         test_config: Test configuration
         service_type_config: Service type configuration
         work_dir: Working directory for test execution (creates temp if not provided)
+        store_graphics_artifacts: Whether to store graphics artifacts (plots, figures) generated during testing
 
     Returns:
         Test results dictionary
@@ -348,6 +350,7 @@ async def execute_tests_activity(
         "testDirectory": test_files_path,
         "artifactDirectory": artifacts_path,
         "studentTestCounter": 2,
+        "storeGraphicsArtifacts": store_graphics_artifacts,
     }
 
     with open(spec_file_path, 'w') as yaml_file:
@@ -618,12 +621,15 @@ async def run_complete_student_test_activity(
 
             # Step 3: Execute tests
             logger.info("Executing tests")
+            # Get store_graphics_artifacts from test_job (default: True)
+            store_graphics_artifacts = test_job.get("store_graphics_artifacts", True)
             test_results = await execute_tests_activity(
                 reference_path=reference_path,
                 student_path=student_path,
                 test_config=test_job,
                 service_type_config=service_type_config,
                 work_dir=work_dir,  # Pass the temporary work directory
+                store_graphics_artifacts=store_graphics_artifacts,
             )
 
             logger.info(f"Test execution completed: {test_results}")
