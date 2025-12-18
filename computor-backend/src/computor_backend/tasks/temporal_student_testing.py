@@ -513,6 +513,51 @@ async def commit_test_results_activity(
         raise ApplicationError(message=str(e))
 
 
+async def store_test_artifacts(result_id: str, artifacts_path: str) -> int:
+    """
+    Store all files from the artifacts directory to MinIO.
+
+    Args:
+        result_id: The result ID to associate artifacts with
+        artifacts_path: Path to the directory containing artifact files
+
+    Returns:
+        Number of artifacts stored
+    """
+    from computor_backend.services.result_storage import store_result_artifact
+
+    stored_count = 0
+
+    # Walk through all files in the artifacts directory (including subdirectories)
+    for root, dirs, files in os.walk(artifacts_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+
+            # Calculate relative path from artifacts_path for nested directories
+            rel_path = os.path.relpath(file_path, artifacts_path)
+
+            try:
+                # Read file content
+                with open(file_path, 'rb') as f:
+                    file_data = f.read()
+
+                # Store in MinIO
+                storage_info = await store_result_artifact(
+                    result_id=result_id,
+                    filename=rel_path,
+                    file_data=file_data,
+                )
+
+                stored_count += 1
+                logger.info(f"Stored artifact '{rel_path}' ({storage_info['file_size']} bytes)")
+
+            except Exception as e:
+                logger.warning(f"Failed to store artifact '{rel_path}': {e}")
+
+    logger.info(f"Stored {stored_count} artifacts for result {result_id}")
+    return stored_count
+
+
 @activity.defn(name="run_complete_student_test")
 async def run_complete_student_test_activity(
     test_job: Dict[str, Any],
@@ -582,6 +627,14 @@ async def run_complete_student_test_activity(
             )
 
             logger.info(f"Test execution completed: {test_results}")
+
+            # Step 3.5: Store any generated artifacts to MinIO
+            artifacts_path = os.path.join(work_dir, "artifacts")
+            if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
+                logger.info(f"Found artifacts to store in {artifacts_path}")
+                await store_test_artifacts(result_id, artifacts_path)
+            else:
+                logger.info("No artifacts generated during test execution")
 
             # Step 4: Commit results
             logger.info("Committing results to API")

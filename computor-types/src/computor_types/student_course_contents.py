@@ -93,7 +93,7 @@ class CourseContentStudentGet(BaseEntityGet):
     position: float
     max_group_size: Optional[int] = None
     submitted: Optional[bool] = None
-    course_content_types: CourseContentTypeGet
+    course_content_type: CourseContentTypeGet
     result_count: int
     submission_count: int
     max_test_runs: Optional[int] = None
