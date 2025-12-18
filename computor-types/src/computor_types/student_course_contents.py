@@ -97,6 +97,7 @@ class CourseContentStudentGet(BaseEntityGet):
     result_count: int
     submission_count: int
     max_test_runs: Optional[int] = None
+    testing_service_id: Optional[str] = None
     unread_message_count: int = 0
     result: Optional[ResultStudentGet] = None
     directory: Optional[str] = None
@@ -126,6 +127,7 @@ class CourseContentStudentList(BaseModel):
     result_count: int
     submission_count: int
     max_test_runs: Optional[int] = None
+    testing_service_id: Optional[str] = None
 
     directory: Optional[str] = None
     color: str
