@@ -56,5 +56,4 @@ __all__ = [
     "ConfigurationException",
     "NotImplementedException",
     "ServiceUnavailableException",
-    "response_to_http_exception",
 ]

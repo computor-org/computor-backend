@@ -71,9 +71,6 @@ from computor_backend.exceptions.exceptions import (
 
     # Legacy/deprecated
     ServiceUnavailableException,
-
-    # Helper functions
-    response_to_http_exception,
 )
 
 # Error registry functions
@@ -152,9 +149,6 @@ __all__ = [
 
     # Legacy
     "ServiceUnavailableException",
-
-    # Helpers
-    "response_to_http_exception",
 
     # Registry
     "load_error_registry",
