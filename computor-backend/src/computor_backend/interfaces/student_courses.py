@@ -49,4 +49,7 @@ class CourseStudentInterface(CourseStudentInterfaceBase, BackendEntityInterface)
                 CourseMember.properties["gitlab"].op("->>")("full_path") == params.full_path_student
             )
 
+        # Sort by path, then by title as secondary sort
+        query = query.order_by(Course.path, Course.title)
+
         return query
