@@ -244,7 +244,7 @@ async def course_member_course_content_result_mapper(
         position=list_obj.position,
         max_group_size=list_obj.max_group_size,
         submitted=list_obj.submitted,
-        course_content_types=CourseContentTypeGet.model_validate(course_content.course_content_type),
+        course_content_type=CourseContentTypeGet.model_validate(course_content.course_content_type),
         result_count=list_obj.result_count,
         submission_count=list_obj.submission_count,
         max_test_runs=list_obj.max_test_runs,
