@@ -8,6 +8,7 @@ from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.tasks import TaskStatus
 from computor_types.grading import SubmissionGroupGradingList
 from computor_types.deployment import CourseContentDeploymentList
+from computor_types.results import ResultArtifactInfo
 
 from computor_types.custom_types import Ltree
 
@@ -64,6 +65,7 @@ class SubmissionGroupStudentGet(SubmissionGroupStudentList):
     gradings: List[SubmissionGroupGradingList] = Field(default_factory=list)
 
 class ResultStudentList(BaseModel):
+    id: str
     testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -73,6 +75,7 @@ class ResultStudentList(BaseModel):
 
 class ResultStudentGet(ResultStudentList):
     result_json: Optional[dict] = None
+    result_artifacts: List[ResultArtifactInfo] = []
 
 class CourseContentStudentProperties(BaseModel):
     gitlab: Optional[GitLabConfigGet] = None

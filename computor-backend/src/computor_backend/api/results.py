@@ -53,12 +53,30 @@ async def get_result(
     result = await get_id_db(permissions, db, result_id, ResultInterface)
 
     # Fetch result_json from MinIO
-    from computor_backend.services.result_storage import retrieve_result_json
+    from computor_backend.services.result_storage import retrieve_result_json, list_result_artifacts
     result_json = await retrieve_result_json(result_id)
 
-    # Add result_json to the response
+    # Fetch artifact information
+    artifacts = await list_result_artifacts(result_id)
+
+    # Build result_artifacts list
+    result_artifacts = [
+        {
+            "id": f"{result_id}_{artifact['filename']}",
+            "filename": artifact['filename'],
+            "content_type": artifact.get('content_type'),
+            "file_size": artifact['size'],
+            "created_at": artifact['last_modified'].isoformat() if artifact.get('last_modified') else None,
+        }
+        for artifact in artifacts
+    ]
+
+    # Add result_json and artifact info to the response
     result_dict = result.model_dump()
     result_dict['result_json'] = result_json
+    result_dict['has_artifacts'] = len(artifacts) > 0
+    result_dict['artifact_count'] = len(artifacts)
+    result_dict['result_artifacts'] = result_artifacts
 
     return ResultGet.model_validate(result_dict)
 
@@ -152,3 +170,104 @@ async def result_status(
 ):
     """Get the current status of a test result."""
     return await get_result_status(result_id, permissions, db)
+
+
+# ===============================
+# Result Artifact Endpoints
+# ===============================
+
+from computor_types.artifacts import ResultArtifactListItem
+from typing import List
+
+
+@result_router.get("/{result_id}/artifacts", response_model=List[ResultArtifactListItem])
+async def list_result_artifacts_endpoint(
+    result_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+) -> List[ResultArtifactListItem]:
+    """
+    List all artifacts associated with a result.
+
+    Artifacts are files generated during test execution, such as:
+    - Plots and figures
+    - Generated reports
+    - Debug output files
+    """
+    from computor_backend.api.exceptions import NotFoundException
+
+    # Verify the user has access to this result
+    result = await get_id_db(permissions, db, result_id, ResultInterface)
+    if result is None:
+        raise NotFoundException(detail="Result not found")
+
+    # List artifacts from MinIO
+    from computor_backend.services.result_storage import list_result_artifacts, RESULTS_BUCKET
+    artifacts = await list_result_artifacts(result_id)
+
+    # Convert to ResultArtifactListItem format
+    return [
+        ResultArtifactListItem(
+            id=f"{result_id}_{artifact['filename']}",  # Synthetic ID
+            result_id=str(result_id),
+            content_type=artifact.get('content_type'),
+            file_size=artifact['size'],
+            bucket_name=RESULTS_BUCKET,
+            object_key=artifact['object_key'],
+            created_at=artifact['last_modified'],
+            properties={"filename": artifact['filename']},
+        )
+        for artifact in artifacts
+    ]
+
+
+@result_router.get("/{result_id}/artifacts/download")
+async def download_result_artifacts(
+    result_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """
+    Download all artifacts for a result as a ZIP file.
+
+    Returns a ZIP archive containing all artifacts generated during test execution.
+    """
+    from fastapi.responses import StreamingResponse
+    from computor_backend.api.exceptions import NotFoundException
+    import zipfile
+    from io import BytesIO
+
+    # Verify the user has access to this result
+    result = await get_id_db(permissions, db, result_id, ResultInterface)
+    if result is None:
+        raise NotFoundException(detail="Result not found")
+
+    # List artifacts from MinIO
+    from computor_backend.services.result_storage import list_result_artifacts, retrieve_result_artifact
+    artifacts = await list_result_artifacts(result_id)
+
+    if not artifacts:
+        raise NotFoundException(detail="No artifacts found for this result")
+
+    # Create ZIP file in memory
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for artifact in artifacts:
+            filename = artifact['filename']
+            # Retrieve artifact content from MinIO
+            content = await retrieve_result_artifact(result_id, filename)
+            if content:
+                zip_file.writestr(filename, content)
+
+    zip_buffer.seek(0)
+
+    # Generate filename for the download
+    download_filename = f"result_{result_id}_artifacts.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{download_filename}"'
+        }
+    )
