@@ -7,7 +7,7 @@ from pathlib import PurePosixPath
 from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Response, status, File, Form, UploadFile, Request
+from fastapi import APIRouter, Depends, Query, Response, status, File, Form, UploadFile, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
@@ -52,6 +52,8 @@ from computor_types.results import (
     ResultCreate,
     ResultUpdate,
     ResultList,
+    ResultGet,
+    ResultArtifactInfo,
 )
 from computor_types.submissions import (
     SubmissionCreate,
@@ -1001,14 +1003,20 @@ async def create_test_result(
 
     return ResultList.model_validate(result)
 
-@submissions_router.get("/artifacts/{artifact_id}/tests", response_model=list[ResultList])
+@submissions_router.get("/artifacts/{artifact_id}/tests", response_model=list[ResultGet])
 async def list_artifact_test_results(
     artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    include_failed: Annotated[bool, Query(description="Include failed/cancelled/crashed results")] = False,
 ):
-    """List all test results for an artifact. Students see their own, tutors/instructors see all."""
+    """List test results for an artifact. By default only successful results (status=0) are returned.
+
+    Use include_failed=true to also include failed/cancelled/crashed results.
+    Students see their own, tutors/instructors see all.
+    """
+    from computor_backend.services.result_storage import retrieve_result_json, list_result_artifacts
 
     # Verify artifact exists and get course info
     artifact = db.query(SubmissionArtifact).options(
@@ -1043,14 +1051,63 @@ async def list_artifact_test_results(
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You can only view test results for your own submissions")
 
-    # Get test results for this artifact
-    results = db.query(Result).filter(
-        Result.submission_artifact_id == artifact_id
-    ).order_by(Result.created_at.desc()).all()
+    # Build query for test results
+    query = db.query(Result).filter(Result.submission_artifact_id == artifact_id)
+
+    # By default, only return successful results (status=0)
+    # Failed=1, Cancelled=2, Crashed=6
+    if not include_failed:
+        query = query.filter(Result.status == 0)
+
+    results = query.order_by(Result.created_at.desc()).all()
 
     response.headers["X-Total-Count"] = str(len(results))
 
-    return [ResultList.model_validate(result) for result in results]
+    # Build ResultGet responses with full details
+    result_list = []
+    for result in results:
+        # Fetch result_json and artifacts from MinIO
+        result_json_data = await retrieve_result_json(result.id)
+        artifacts = await list_result_artifacts(result.id)
+
+        result_artifacts = [
+            ResultArtifactInfo(
+                id=f"{result.id}_{artifact['filename']}",
+                filename=artifact['filename'],
+                content_type=artifact.get('content_type'),
+                file_size=artifact['size'],
+                created_at=artifact['last_modified'].isoformat() if artifact.get('last_modified') else None,
+            )
+            for artifact in artifacts
+        ]
+
+        result_get = ResultGet(
+            id=str(result.id),
+            created_at=result.created_at,
+            updated_at=result.updated_at,
+            course_member_id=str(result.course_member_id),
+            submission_artifact_id=str(result.submission_artifact_id) if result.submission_artifact_id else None,
+            submission_group_id=str(result.submission_group_id) if result.submission_group_id else None,
+            course_content_id=str(result.course_content_id),
+            course_content_type_id=str(result.course_content_type_id),
+            testing_service_id=str(result.testing_service_id) if result.testing_service_id else None,
+            test_system_id=result.test_system_id,
+            grade=result.grade,
+            result=result.result,
+            result_json=result_json_data,
+            started_at=result.started_at,
+            finished_at=result.finished_at,
+            version_identifier=result.version_identifier,
+            reference_version_identifier=result.reference_version_identifier,
+            status=result.status,
+            properties=result.properties,
+            has_artifacts=len(artifacts) > 0,
+            artifact_count=len(artifacts),
+            result_artifacts=result_artifacts,
+        )
+        result_list.append(result_get)
+
+    return result_list
 
 @submissions_router.patch("/tests/{test_id}", response_model=ResultList)
 async def update_test_result(
