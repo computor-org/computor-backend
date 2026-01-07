@@ -139,9 +139,9 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             CourseMemberGradingNode(
                 path=node["path"],
                 title=node["title"],
-                submittable=node.get("submittable"),
-                position=node.get("position"),
-                course_content_type_color=node.get("course_content_type_color"),
+                submittable=node["submittable"],
+                position=node["position"],
+                course_content_type_color=node["course_content_type_color"],
                 max_assignments=node["max_assignments"],
                 submitted_assignments=node["submitted_assignments"],
                 progress_percentage=node["progress_percentage"],
@@ -150,6 +150,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                     ContentTypeGradingStats(**ct)
                     for ct in node["by_content_type"]
                 ],
+                grading=node["grading"],
+                average_grading=node["average_grading"],
+                graded_assignments=node["graded_assignments"],
+                grading_status=node["grading_status"],
             )
             for node in stats["nodes"]
         ]
@@ -161,6 +165,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             total_submitted_assignments=stats["total_submitted_assignments"],
             overall_progress_percentage=stats["overall_progress_percentage"],
             latest_submission_at=stats["latest_submission_at"],
+            overall_average_grading=stats["overall_average_grading"],
             by_content_type=by_content_type,
             nodes=nodes,
         )

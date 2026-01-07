@@ -372,6 +372,7 @@ class CourseMemberGradingsRepository:
             depth_filter = "AND path_depth <= :max_depth"
 
         # SQL query that uses PostgreSQL ltree functions for hierarchical aggregation
+        # Extended to include grading statistics from submission_grade table
         sql = text(f"""
         WITH submittable_contents AS (
             -- Get all submittable course contents with their path levels
@@ -392,7 +393,7 @@ class CourseMemberGradingsRepository:
               {content_type_filter}
         ),
         submitted_contents AS (
-            -- Get submitted contents for this member
+            -- Get submitted contents for this member with latest submission info
             SELECT DISTINCT
                 cc.id as content_id,
                 MAX(sa.created_at) as latest_submission_at
@@ -410,6 +411,28 @@ class CourseMemberGradingsRepository:
               {path_filter}
               {content_type_filter}
             GROUP BY cc.id
+        ),
+        graded_contents AS (
+            -- Get grading info for ALL submittable contents (not just submitted)
+            -- Unsubmitted = 0, ungraded submitted = 0, graded = actual grade
+            -- Also fetch the latest grading status
+            SELECT
+                sc.content_id,
+                COALESCE(latest_grade.grade, 0) as grade,
+                latest_grade.status as grading_status
+            FROM submittable_contents sc
+            LEFT JOIN LATERAL (
+                SELECT sg.grade, sg.status
+                FROM submission_grade sg
+                JOIN submission_artifact sa ON sa.id = sg.artifact_id
+                JOIN submission_group sgrp ON sgrp.id = sa.submission_group_id
+                JOIN submission_group_member sgm ON sgm.submission_group_id = sgrp.id
+                WHERE sgrp.course_content_id = sc.content_id
+                  AND sgm.course_member_id = :course_member_id
+                  AND sa.submit = true
+                ORDER BY sg.graded_at DESC
+                LIMIT 1
+            ) latest_grade ON true
         ),
         path_levels AS (
             -- Generate all path prefixes at each level
@@ -432,10 +455,19 @@ class CourseMemberGradingsRepository:
                 sc.content_type_color,
                 COUNT(sc.content_id) as max_assignments,
                 COUNT(sub.content_id) as submitted_assignments,
-                MAX(sub.latest_submission_at) as latest_submission_at
+                MAX(sub.latest_submission_at) as latest_submission_at,
+                -- Grading statistics (unsubmitted and ungraded count as grade=0)
+                -- graded_assignments = count of all submittable items (all have a grade: actual, or 0 if missing)
+                COUNT(gc.content_id) as graded_assignments,
+                -- average_grading = average including 0s for unsubmitted and ungraded items
+                AVG(gc.grade) as average_grading,
+                -- grading_status: for leaf nodes (single item), returns the actual status
+                -- for aggregated nodes, MAX returns highest status (used only if single item)
+                MAX(gc.grading_status) as grading_status
             FROM path_levels pl
             JOIN submittable_contents sc ON sc.path <@ pl.path_prefix
             LEFT JOIN submitted_contents sub ON sub.content_id = sc.content_id
+            JOIN graded_contents gc ON gc.content_id = sc.content_id
             GROUP BY pl.path_prefix, pl.path_depth, sc.content_type_id,
                      sc.content_type_slug, sc.content_type_title, sc.content_type_color
             ORDER BY pl.path_depth, pl.path_prefix::text, sc.content_type_slug
@@ -467,6 +499,10 @@ class CourseMemberGradingsRepository:
                 "max_assignments": r.max_assignments,
                 "submitted_assignments": r.submitted_assignments,
                 "latest_submission_at": r.latest_submission_at,
+                # Grading statistics
+                "graded_assignments": r.graded_assignments,
+                "average_grading": float(r.average_grading) if r.average_grading is not None else None,
+                "grading_status": int(r.grading_status) if r.grading_status is not None else None,
             }
             for r in results
         ]
@@ -564,6 +600,40 @@ class CourseMemberGradingsRepository:
               {path_filter}
               {content_type_filter}
             GROUP BY sgm.course_member_id, cct.id
+        ),
+        all_contents_with_grades AS (
+            -- For each submittable content per member, get latest grade (or 0 if unsubmitted/ungraded)
+            -- This ensures ALL submittable contents are included in the average
+            SELECT
+                s.course_member_id,
+                sc.content_id,
+                sc.content_type_id,
+                COALESCE(latest_grade.grade, 0) as grade
+            FROM all_students s
+            CROSS JOIN submittable_contents sc
+            LEFT JOIN LATERAL (
+                SELECT sg.grade
+                FROM submission_grade sg
+                JOIN submission_artifact sa ON sa.id = sg.artifact_id
+                JOIN submission_group sgrp ON sgrp.id = sa.submission_group_id
+                JOIN submission_group_member sgm ON sgm.submission_group_id = sgrp.id
+                WHERE sgrp.course_content_id = sc.content_id
+                  AND sgm.course_member_id = s.course_member_id
+                  AND sa.submit = true
+                ORDER BY sg.graded_at DESC
+                LIMIT 1
+            ) latest_grade ON true
+        ),
+        graded_by_member_and_type AS (
+            -- Aggregate grading stats per member and content type
+            -- All submittable contents included (unsubmitted/ungraded = 0)
+            SELECT
+                course_member_id,
+                content_type_id,
+                COUNT(*) as graded_assignments,
+                AVG(grade) as average_grading
+            FROM all_contents_with_grades
+            GROUP BY course_member_id, content_type_id
         )
         SELECT
             s.course_member_id,
@@ -577,12 +647,17 @@ class CourseMemberGradingsRepository:
             ctc.content_type_color,
             ctc.max_assignments,
             COALESCE(sbmt.submitted_assignments, 0) as submitted_assignments,
-            sbmt.latest_submission_at
+            sbmt.latest_submission_at,
+            COALESCE(grd.graded_assignments, 0) as graded_assignments,
+            grd.average_grading
         FROM all_students s
         CROSS JOIN content_type_counts ctc
         LEFT JOIN submitted_by_member_and_type sbmt
             ON sbmt.course_member_id = s.course_member_id
             AND sbmt.content_type_id = ctc.content_type_id
+        LEFT JOIN graded_by_member_and_type grd
+            ON grd.course_member_id = s.course_member_id
+            AND grd.content_type_id = ctc.content_type_id
         ORDER BY s.family_name, s.given_name, ctc.content_type_slug
         """)
 
@@ -608,9 +683,47 @@ class CourseMemberGradingsRepository:
                 "max_assignments": r.max_assignments,
                 "submitted_assignments": r.submitted_assignments,
                 "latest_submission_at": r.latest_submission_at,
+                # Grading statistics
+                "graded_assignments": r.graded_assignments,
+                "average_grading": float(r.average_grading) if r.average_grading is not None else None,
             }
             for r in results
         ]
+
+    def get_grading_for_assignment(
+        self,
+        course_member_id: UUID | str,
+        course_content_id: UUID | str,
+    ) -> Optional[float]:
+        """
+        Get the latest grade for a specific assignment for a course member.
+
+        Args:
+            course_member_id: The course member ID
+            course_content_id: The course content ID (assignment)
+
+        Returns:
+            The grade (0.0-1.0) or None if not graded
+        """
+        sql = text("""
+        SELECT sg.grade
+        FROM submission_grade sg
+        JOIN submission_artifact sa ON sa.id = sg.artifact_id
+        JOIN submission_group sgrp ON sgrp.id = sa.submission_group_id
+        JOIN submission_group_member sgm ON sgm.submission_group_id = sgrp.id
+        WHERE sgm.course_member_id = :course_member_id
+          AND sgrp.course_content_id = :course_content_id
+          AND sa.submit = true
+        ORDER BY sg.graded_at DESC
+        LIMIT 1
+        """)
+
+        result = self.db.execute(sql, {
+            "course_member_id": str(course_member_id),
+            "course_content_id": str(course_content_id),
+        }).fetchone()
+
+        return float(result.grade) if result else None
 
 
 def calculate_grading_stats(
