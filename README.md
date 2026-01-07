@@ -37,7 +37,7 @@ pip install -e computor-utils/
 pip install -e computor-backend/
 
 # Start Docker services (PostgreSQL, Redis, Temporal, MinIO)
-bash startup.sh -d
+bash startup.sh dev -d
 
 # Run database migrations
 bash migrations.sh
