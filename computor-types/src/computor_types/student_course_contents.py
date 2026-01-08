@@ -109,6 +109,11 @@ class CourseContentStudentGet(BaseEntityGet):
     deployment: Optional[CourseContentDeploymentList] = None
     has_deployment: Optional[bool] = None
 
+    # Aggregated status for unit-like course contents (non-submittable)
+    # For submittable contents, this mirrors submission_group.status
+    # For units, this is aggregated from descendant course contents
+    status: Optional[str] = None
+
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
@@ -141,6 +146,11 @@ class CourseContentStudentList(BaseModel):
     unread_message_count: int = 0
     deployment: Optional[CourseContentDeploymentList] = None
     has_deployment: Optional[bool] = None
+
+    # Aggregated status for unit-like course contents (non-submittable)
+    # For submittable contents, this mirrors submission_group.status
+    # For units, this is aggregated from descendant course contents
+    status: Optional[str] = None
 
     @field_validator('path', mode='before')
     @classmethod

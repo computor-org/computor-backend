@@ -128,11 +128,9 @@ class CourseMemberGradingNode(BaseModel):
         None,
         description="Count of graded assignments at or under this path"
     )
-    grading_status: Optional[int] = Field(
+    grading_status: Optional[str] = Field(
         None,
-        ge=0,
-        le=3,
-        description="For assignments: the latest grading status (GradingStatus enum: 0=NOT_REVIEWED, 1=CORRECTED, 2=CORRECTION_NECESSARY, 3=IMPROVEMENT_POSSIBLE). For units: always 0 (NOT_REVIEWED)."
+        description="Grading status: 'not_reviewed', 'corrected', 'correction_necessary', or 'improvement_possible'. For units: aggregated from descendants."
     )
 
     model_config = ConfigDict(from_attributes=True)

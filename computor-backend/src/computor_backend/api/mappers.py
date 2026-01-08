@@ -240,6 +240,9 @@ async def course_member_course_content_result_mapper(
         unread_message_count=unread_message_count,
         deployment=deployment_payload,
         has_deployment=has_deployment,
+        # Status: for submittable contents, use submission_group.status
+        # For units, this will be aggregated later by the view repository
+        status=submission_status,
     )
 
     if not detailed:
@@ -274,4 +277,5 @@ async def course_member_course_content_result_mapper(
         ),
         deployment=deployment_payload,
         has_deployment=has_deployment,
+        status=list_obj.status,
     )

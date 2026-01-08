@@ -461,9 +461,17 @@ class CourseMemberGradingsRepository:
                 COUNT(gc.content_id) as graded_assignments,
                 -- average_grading = average including 0s for unsubmitted and ungraded items
                 AVG(gc.grade) as average_grading,
-                -- grading_status: for leaf nodes (single item), returns the actual status
-                -- for aggregated nodes, MAX returns highest status (used only if single item)
-                MAX(gc.grading_status) as grading_status
+                -- grading_status aggregation rules (returns string):
+                -- 1. If ANY CORRECTION_NECESSARY(2) exists -> 'correction_necessary'
+                -- 2. Else if ANY IMPROVEMENT_POSSIBLE(3) exists -> 'improvement_possible'
+                -- 3. Else if ALL are CORRECTED(1) -> 'corrected'
+                -- 4. Else -> 'not_reviewed' (mix of CORRECTED/NOT_REVIEWED, or all NOT_REVIEWED)
+                CASE
+                    WHEN MAX(CASE WHEN gc.grading_status = 2 THEN 1 ELSE 0 END) = 1 THEN 'correction_necessary'
+                    WHEN MAX(CASE WHEN gc.grading_status = 3 THEN 1 ELSE 0 END) = 1 THEN 'improvement_possible'
+                    WHEN MIN(COALESCE(gc.grading_status, 0)) = 1 AND MAX(COALESCE(gc.grading_status, 0)) = 1 THEN 'corrected'
+                    ELSE 'not_reviewed'
+                END as grading_status
             FROM path_levels pl
             JOIN submittable_contents sc ON sc.path <@ pl.path_prefix
             LEFT JOIN submitted_contents sub ON sub.content_id = sc.content_id
@@ -502,7 +510,7 @@ class CourseMemberGradingsRepository:
                 # Grading statistics
                 "graded_assignments": r.graded_assignments,
                 "average_grading": float(r.average_grading) if r.average_grading is not None else None,
-                "grading_status": int(r.grading_status) if r.grading_status is not None else None,
+                "grading_status": r.grading_status,
             }
             for r in results
         ]

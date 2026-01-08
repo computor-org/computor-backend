@@ -102,6 +102,41 @@ async def list_course_member_gradings(
         repo.close()
 
 
+def _aggregate_grading_status(statuses: List[str]) -> str:
+    """
+    Aggregate multiple grading statuses following priority rules.
+
+    Rules:
+    1. If ANY 'correction_necessary' exists -> 'correction_necessary'
+    2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
+    3. Else if ALL are 'corrected' -> 'corrected'
+    4. Else -> 'not_reviewed' (mix of corrected/not_reviewed, or all not_reviewed)
+
+    Args:
+        statuses: List of grading status strings
+
+    Returns:
+        Aggregated status string
+    """
+    if not statuses:
+        return "not_reviewed"
+
+    # Check for correction_necessary (highest priority)
+    if "correction_necessary" in statuses:
+        return "correction_necessary"
+
+    # Check for improvement_possible
+    if "improvement_possible" in statuses:
+        return "improvement_possible"
+
+    # Check if ALL are corrected
+    if all(s == "corrected" for s in statuses):
+        return "corrected"
+
+    # Default: not_reviewed (mix or all not_reviewed)
+    return "not_reviewed"
+
+
 def _process_hierarchical_stats(
     db_stats: List[Dict[str, Any]],
     path_info: Dict[str, Any],
@@ -209,7 +244,7 @@ def _process_hierarchical_stats(
                 "grade_sum": 0.0,
                 "latest_submission_at": None,
                 "by_content_type": defaultdict(lambda: {"max": 0, "submitted": 0, "graded": 0, "grade_sum": 0.0}),
-                "grading_status": None,  # Will be set for leaf nodes only
+                "grading_statuses": [],  # Collect all statuses for aggregation
             }
 
         by_node[path]["max_assignments"] += max_assignments
@@ -218,10 +253,9 @@ def _process_hierarchical_stats(
         if average_grading is not None and graded_assignments > 0:
             by_node[path]["grade_sum"] += average_grading * graded_assignments
 
-        # Track grading_status - only meaningful for leaf nodes (submittable)
-        # For units with multiple children, this will be overwritten but we'll use 0 anyway
-        if grading_status is not None and by_node[path]["grading_status"] is None:
-            by_node[path]["grading_status"] = grading_status
+        # Collect grading_status for later aggregation
+        if grading_status is not None:
+            by_node[path]["grading_statuses"].append(grading_status)
 
         if latest_at:
             if by_node[path]["latest_submission_at"] is None or latest_at > by_node[path]["latest_submission_at"]:
@@ -302,13 +336,12 @@ def _process_hierarchical_stats(
         node_graded = node_data["graded_assignments"]
         node_avg = round(node_data["grade_sum"] / node_graded, 4) if node_graded > 0 else None
 
-        # Determine grading_status:
-        # For submittable nodes (assignments): use the actual status from the DB
-        # For non-submittable nodes (units): use 0 (NOT_REVIEWED)
-        if is_submittable:
-            node_grading_status = node_data["grading_status"]
-        else:
-            node_grading_status = 0  # NOT_REVIEWED for units
+        # Determine grading_status using aggregation rules:
+        # 1. If ANY CORRECTION_NECESSARY(2) -> CORRECTION_NECESSARY(2)
+        # 2. Else if ANY IMPROVEMENT_POSSIBLE(3) -> IMPROVEMENT_POSSIBLE(3)
+        # 3. Else if ALL are CORRECTED(1) -> CORRECTED(1)
+        # 4. Else -> NOT_REVIEWED(0)
+        node_grading_status = _aggregate_grading_status(node_data["grading_statuses"])
 
         node_list.append({
             "path": path,
