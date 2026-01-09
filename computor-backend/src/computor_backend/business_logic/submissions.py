@@ -33,6 +33,7 @@ from computor_backend.model.course import (
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.cache import Cache
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
+from computor_backend.repositories.submission_grade_repo import SubmissionGradeRepository
 from computor_backend.permissions.principal import Principal
 from computor_backend.services.storage_service import StorageService
 from computor_backend.storage_security import perform_full_file_validation, sanitize_filename
@@ -607,10 +608,11 @@ def update_artifact(
 def create_artifact_grade(
     artifact_id: UUID | str,
     grade: float,
-    status: str,
+    status: int | str,
     comment: Optional[str],
     permissions: Principal,
     db: Session,
+    cache: Cache | None = None,
 ) -> SubmissionGrade:
     """Create a grade for an artifact. Requires instructor/tutor permissions."""
 
@@ -649,9 +651,7 @@ def create_artifact_grade(
         comment=comment,
     )
 
-    db.add(grade_obj)
-    db.commit()
-    db.refresh(grade_obj)
+    SubmissionGradeRepository(db, cache).create(grade_obj)
 
     logger.info(f"Created grade {grade_obj.id} for artifact {artifact_id}")
 
@@ -661,10 +661,11 @@ def create_artifact_grade(
 def update_grade(
     grade_id: UUID | str,
     grade: Optional[float],
-    status: Optional[str],
+    status: Optional[int | str],
     comment: Optional[str],
     permissions: Principal,
     db: Session,
+    cache: Cache | None = None,
 ) -> SubmissionGrade:
     """Update an existing grade. Only the grader can update their own grade."""
 
@@ -680,20 +681,21 @@ def update_grade(
     if str(grade_obj.graded_by.user_id) != str(principal_user_id):
         raise ForbiddenException(detail="You can only update your own grades")
 
-    # Update fields
+    updates: dict = {}
     if grade is not None:
-        grade_obj.grade = grade
+        updates["grade"] = grade
     if status is not None:
-        grade_obj.status = status
+        updates["status"] = status
     if comment is not None:
-        grade_obj.comment = comment
+        updates["comment"] = comment
 
     # Validate grade
-    if grade_obj.grade < 0.0 or grade_obj.grade > 1.0:
+    effective_grade = updates.get("grade", grade_obj.grade)
+    if effective_grade < 0.0 or effective_grade > 1.0:
         raise BadRequestException(detail="Grade must be between 0.0 and 1.0")
 
-    db.commit()
-    db.refresh(grade_obj)
+    if updates:
+        SubmissionGradeRepository(db, cache).update_entity(grade_obj, updates)
 
     return grade_obj
 
@@ -702,6 +704,7 @@ def delete_grade(
     grade_id: UUID | str,
     permissions: Principal,
     db: Session,
+    cache: Cache | None = None,
 ) -> None:
     """Delete a grade. Only the grader or an admin can delete."""
 
@@ -725,8 +728,7 @@ def delete_grade(
         if not is_instructor:
             raise ForbiddenException(detail="Only instructors can delete other people's grades")
 
-    db.delete(grade_obj)
-    db.commit()
+    SubmissionGradeRepository(db, cache).delete(grade_id)
 
     logger.info(f"Deleted grade {grade_id}")
 

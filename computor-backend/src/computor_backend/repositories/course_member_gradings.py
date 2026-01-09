@@ -416,6 +416,7 @@ class CourseMemberGradingsRepository:
             -- Get grading info for ALL submittable contents (not just submitted)
             -- Unsubmitted = 0, ungraded submitted = 0, graded = actual grade
             -- Also fetch the latest grading status
+            -- NOTE: Grades can be applied to any artifact, not just submitted ones
             SELECT
                 sc.content_id,
                 COALESCE(latest_grade.grade, 0) as grade,
@@ -429,7 +430,6 @@ class CourseMemberGradingsRepository:
                 JOIN submission_group_member sgm ON sgm.submission_group_id = sgrp.id
                 WHERE sgrp.course_content_id = sc.content_id
                   AND sgm.course_member_id = :course_member_id
-                  AND sa.submit = true
                 ORDER BY sg.graded_at DESC
                 LIMIT 1
             ) latest_grade ON true

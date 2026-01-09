@@ -18,6 +18,44 @@ from ..cache import Cache
 logger = logging.getLogger(__name__)
 
 
+def _aggregate_grading_status(statuses: List[str]) -> Optional[str]:
+    """
+    Aggregate multiple grading statuses following priority rules.
+
+    Rules:
+    1. If ANY 'correction_necessary' exists -> 'correction_necessary'
+    2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
+    3. Else if ALL are 'corrected' -> 'corrected'
+    4. Else -> 'not_reviewed' (mix of corrected/not_reviewed, or all not_reviewed, or empty)
+
+    Args:
+        statuses: List of grading status strings (can include None values)
+
+    Returns:
+        Aggregated status string, or None if no valid statuses
+    """
+    # Filter out None values
+    valid_statuses = [s for s in statuses if s is not None]
+
+    if not valid_statuses:
+        return None
+
+    # Check for correction_necessary (highest priority)
+    if "correction_necessary" in valid_statuses:
+        return "correction_necessary"
+
+    # Check for improvement_possible
+    if "improvement_possible" in valid_statuses:
+        return "improvement_possible"
+
+    # Check if ALL are corrected
+    if all(s == "corrected" for s in valid_statuses):
+        return "corrected"
+
+    # Default: not_reviewed (mix or all not_reviewed)
+    return "not_reviewed"
+
+
 class ViewRepository(ABC):
     """
     Base class for view repositories that handle complex queries.
@@ -423,3 +461,133 @@ class ViewRepository(ABC):
                 related_ids[key] = str(value)
 
         return related_ids
+
+    def _aggregate_unit_statuses(
+        self,
+        course_contents: List[Any],
+        user_id: str,
+    ) -> List[Any]:
+        """
+        Aggregate status for unit-like course contents from their descendants.
+
+        Units (non-submittable course contents) don't have their own submission_group,
+        so their status is derived from their descendant submittable contents.
+
+        Aggregation rules:
+        1. If ANY 'correction_necessary' exists -> 'correction_necessary'
+        2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
+        3. Else if ALL are 'corrected' -> 'corrected'
+        4. Else -> 'not_reviewed' (mix or all not_reviewed)
+
+        Args:
+            course_contents: List of course contents with status already set for submittables
+            user_id: User ID (needed for fallback DB query)
+
+        Returns:
+            Same list with unit statuses aggregated from descendants
+        """
+        if not course_contents:
+            return course_contents
+
+        # Build a map of path -> course_content for quick lookup
+        path_to_content: Dict[str, Any] = {
+            str(cc.path): cc for cc in course_contents
+        }
+
+        # Identify units (non-submittable) - they have no submission_group
+        # and potentially no status set yet
+        units = [cc for cc in course_contents if cc.submission_group is None]
+
+        # For each unit, find descendants and aggregate their statuses
+        for unit in units:
+            unit_path = str(unit.path)
+            descendant_statuses: List[str] = []
+
+            # Find all descendants by checking if their path starts with unit_path
+            # In ltree, a.b.c is a descendant of a.b if a.b.c starts with a.b.
+            for path, cc in path_to_content.items():
+                # Skip self
+                if path == unit_path:
+                    continue
+
+                # Check if this is a descendant (path starts with unit_path + '.')
+                if path.startswith(unit_path + '.'):
+                    # Only collect status from submittable contents (those with submission_group)
+                    # If submission_group exists but status is None, treat as not_reviewed
+                    if cc.submission_group is not None:
+                        descendant_statuses.append(cc.status if cc.status else "not_reviewed")
+
+            # Aggregate and set the unit's status
+            if descendant_statuses:
+                unit.status = _aggregate_grading_status(descendant_statuses)
+            else:
+                # No descendants in result set - fall back to DB query
+                # This happens when filtering by path/id returns only the unit without descendants
+                unit.status = self._aggregate_single_unit_status_for_list(user_id, unit)
+
+        return course_contents
+
+    def _aggregate_single_unit_status_for_list(
+        self,
+        user_id: str,
+        course_content: Any,
+    ) -> Optional[str]:
+        """
+        Aggregate status for a single unit from DB when descendants aren't in result set.
+
+        This is a fallback method for when a query returns only a unit without its
+        descendants (e.g., filtering by path). It queries the DB to find all
+        descendants and aggregate their statuses.
+
+        Args:
+            user_id: User ID for the query
+            course_content: The unit course content to aggregate status for
+
+        Returns:
+            Aggregated status string, or None if no descendants with status
+        """
+        from computor_backend.repositories.course_content import user_course_content_list_query
+        from sqlalchemy import text
+
+        unit_path = str(course_content.path)
+
+        # Get all course contents for this user in the same course
+        # The query already joins to the user's submission group
+        query = user_course_content_list_query(user_id, self.db)
+        query = query.filter(text("course_content.course_id = :course_id"))
+        query = query.params(course_id=str(course_content.course_id))
+
+        all_contents = query.all()
+
+        # Find descendants and collect their statuses
+        # Use the status from the query result tuple which is already user-specific
+        descendant_statuses: List[str] = []
+        status_lookup = {
+            0: "not_reviewed",
+            1: "corrected",
+            2: "correction_necessary",
+            3: "improvement_possible"
+        }
+
+        for row in all_contents:
+            course_content_obj = row[0]
+            row_path = str(course_content_obj.path)
+
+            # Skip self and non-descendants
+            if row_path == unit_path or not row_path.startswith(unit_path + '.'):
+                continue
+
+            # row[3] is submission_group, row[5] is submission_status_int from the query
+            submission_group = row[3]
+            submission_status_int = row[5] if len(row) > 5 else None
+
+            # Only collect from submittable contents (those with submission_group)
+            # If submission_group exists but status is None, treat as not_reviewed
+            if submission_group is not None:
+                status_str = status_lookup.get(submission_status_int, "not_reviewed") if submission_status_int is not None else "not_reviewed"
+                descendant_statuses.append(status_str)
+
+        if descendant_statuses:
+            return _aggregate_grading_status(descendant_statuses)
+
+        return None

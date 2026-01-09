@@ -569,6 +569,7 @@ async def create_artifact_grade_endpoint(
     grade_data: SubmissionGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Create a grade for an artifact. Requires instructor/tutor permissions."""
 
@@ -579,6 +580,7 @@ async def create_artifact_grade_endpoint(
         comment=grade_data.comment,
         permissions=permissions,
         db=db,
+        cache=cache,
     )
 
     return SubmissionGradeDetail.model_validate(grade)
@@ -642,6 +644,7 @@ async def update_artifact_grade(
     update_data: SubmissionGradeUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
     from computor_backend.database import set_db_user
@@ -649,32 +652,15 @@ async def update_artifact_grade(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    grade = db.query(SubmissionGrade).options(
-        joinedload(SubmissionGrade.graded_by)
-    ).filter(SubmissionGrade.id == grade_id).first()
-
-    if not grade:
-        raise NotFoundException(detail="Grade not found")
-
-    # Check if user is the grader
-    principal_user_id = permissions.get_user_id()
-    if str(grade.graded_by.user_id) != str(principal_user_id):
-        raise ForbiddenException(detail="You can only update your own grades")
-
-    # Update fields
-    if update_data.grade is not None:
-        grade.grade = update_data.grade
-    if update_data.status is not None:
-        grade.status = update_data.status.value if hasattr(update_data.status, 'value') else update_data.status
-    if update_data.comment is not None:
-        grade.comment = update_data.comment
-
-    # Validate grade
-    if grade.grade < 0.0 or grade.grade > 1.0:
-        raise BadRequestException(detail="Grade must be between 0.0 and 1.0")
-
-    db.commit()
-    db.refresh(grade)
+    grade = update_grade(
+        grade_id=grade_id,
+        grade=update_data.grade,
+        status=update_data.status.value if hasattr(update_data.status, 'value') else update_data.status,
+        comment=update_data.comment,
+        permissions=permissions,
+        db=db,
+        cache=cache,
+    )
 
     return SubmissionGradeDetail.model_validate(grade)
 
@@ -683,6 +669,7 @@ async def delete_artifact_grade(
     grade_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Delete a grade. Only the grader or an admin can delete."""
     from computor_backend.database import set_db_user
@@ -690,30 +677,12 @@ async def delete_artifact_grade(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    grade = db.query(SubmissionGrade).filter(SubmissionGrade.id == grade_id).first()
-
-    if not grade:
-        raise NotFoundException(detail="Grade not found")
-
-    # Check permissions
-    principal_user_id = permissions.get_user_id()
-    if str(grade.graded_by.user_id) != str(principal_user_id):
-        # Check if user is instructor (higher permission needed to delete others' grades)
-        course = grade.artifact.submission_group.course
-        is_instructor = check_course_permissions(
-            permissions, CourseMember, "_lecturer", db  # Use _lecturer for instructor role
-        ).filter(
-            CourseMember.course_id == course.id,
-            CourseMember.user_id == principal_user_id
-        ).first()
-
-        if not is_instructor:
-            raise ForbiddenException(detail="Only instructors can delete other people's grades")
-
-    db.delete(grade)
-    db.commit()
-
-    logger.info(f"Deleted grade {grade_id}")
+    delete_grade(
+        grade_id=grade_id,
+        permissions=permissions,
+        db=db,
+        cache=cache,
+    )
 
 # ===============================
 # Artifact Review Endpoints
