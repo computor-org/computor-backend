@@ -128,7 +128,7 @@ class CourseMemberGradingNode(BaseModel):
         None,
         description="Count of graded assignments at or under this path"
     )
-    grading_status: Optional[str] = Field(
+    status: Optional[str] = Field(
         None,
         description="Grading status: 'not_reviewed', 'corrected', 'correction_necessary', or 'improvement_possible'. For units: aggregated from descendants."
     )

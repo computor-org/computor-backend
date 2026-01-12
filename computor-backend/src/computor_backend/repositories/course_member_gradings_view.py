@@ -153,7 +153,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 grading=node["grading"],
                 average_grading=node["average_grading"],
                 graded_assignments=node["graded_assignments"],
-                grading_status=node["grading_status"],
+                status=node["status"],
             )
             for node in stats["nodes"]
         ]

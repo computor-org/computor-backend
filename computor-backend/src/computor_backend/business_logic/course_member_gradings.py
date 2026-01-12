@@ -364,7 +364,7 @@ def _process_hierarchical_stats(
             "grading": node_avg if is_submittable else None,
             "average_grading": node_avg if not is_submittable else None,
             "graded_assignments": node_graded,
-            "grading_status": node_grading_status,
+            "status": node_grading_status,
         })
 
     # Calculate overall progress
