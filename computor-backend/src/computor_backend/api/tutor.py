@@ -156,34 +156,27 @@ def tutor_list_submission_groups_endpoint(
     """
     return list_tutor_submission_groups(permissions, params, db, cache)
 
-## Reference/Example Download Endpoint
+## Helper function to get example version for a course content
 
-@tutor_router.get("/course-contents/{course_content_id}/reference")
-async def download_course_content_reference(
+async def _get_example_version_for_course_content(
     course_content_id: UUID | str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
-    cache: Cache = Depends(get_cache),
-    with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
-    storage_service = Depends(get_storage_service),
+    permissions: Principal,
+    db: Session,
+    cache: Cache,
 ):
     """
-    Download the reference/example solution for a course content as a ZIP file.
+    Get the example version associated with a course content.
 
-    This endpoint allows tutors to download the example/reference repository
-    associated with an assignment for grading or reference purposes.
-
-    Query parameters:
-    - with_dependencies: Include all example dependencies recursively (default: False)
+    Checks tutor permissions and resolves the example version from deployment or legacy field.
 
     Returns:
-        StreamingResponse containing a ZIP file with the example files
+        Tuple of (course_content, example_version, repository)
+
+    Raises:
+        NotFoundException: If course content or example version not found
+        ForbiddenException: If user doesn't have tutor permissions
     """
-    import zipfile
-    import io
-    from fastapi.responses import StreamingResponse
     from computor_backend.model.deployment import CourseContentDeployment
-    from computor_backend.model.example import ExampleVersion
     from computor_backend.repositories.example_version_repo import ExampleVersionRepository
 
     # Get course content
@@ -243,6 +236,56 @@ async def download_course_content_reference(
     if repository.source_type not in ["minio", "s3"]:
         raise BadRequestException(f"Download not supported for {repository.source_type} repositories")
 
+    return course_content, version, repository
+
+
+## Reference/Example Download Endpoint
+
+@tutor_router.get("/course-contents/{course_content_id}/reference")
+async def download_course_content_reference(
+    course_content_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
+    storage_service = Depends(get_storage_service),
+):
+    """
+    Download the reference/example solution for a course content as a ZIP file.
+
+    This endpoint allows tutors to download the reference solution files
+    associated with an assignment for grading purposes.
+
+    The files included are determined by the meta.yaml properties:
+    - properties.studentSubmissionFiles: Files that students must submit
+    - properties.additionalFiles: Additional files provided to students
+
+    These can be individual files or directories.
+
+    Returns:
+        StreamingResponse containing a ZIP file with the reference solution files
+    """
+    import zipfile
+    import io
+    import yaml
+
+    course_content, version, repository = await _get_example_version_for_course_content(
+        course_content_id, permissions, db, cache
+    )
+
+    # Parse meta.yaml to get reference file paths
+    meta_data = yaml.safe_load(version.meta_yaml) if version.meta_yaml else {}
+    properties = meta_data.get('properties', {})
+
+    # Get the reference file patterns from meta.yaml
+    student_submission_files = properties.get('studentSubmissionFiles', []) or []
+    additional_files = properties.get('additionalFiles', []) or []
+    reference_paths = set(student_submission_files + additional_files)
+
+    if not reference_paths:
+        raise NotFoundException(
+            detail="No reference files defined in meta.yaml (studentSubmissionFiles or additionalFiles)"
+        )
+
     # Create ZIP file in memory
     zip_buffer = io.BytesIO()
 
@@ -257,15 +300,25 @@ async def download_course_content_reference(
 
         for obj in objects:
             if obj.object_name.endswith('/'):
-                continue  # Skip directories
+                continue  # Skip directory markers
 
-            # Get relative filename
+            # Get relative filename within the example
             filename = obj.object_name.replace(f"{version.storage_path}/", "")
 
-            # Filter out unwanted files and directories
-            if filename.startswith('localTests/'):
-                continue
-            if filename in ['meta.yaml', 'test.yaml']:
+            # Check if this file matches any of the reference paths
+            # A reference path can be a file or a directory prefix
+            should_include = False
+            for ref_path in reference_paths:
+                if filename == ref_path:
+                    # Exact file match
+                    should_include = True
+                    break
+                elif filename.startswith(ref_path.rstrip('/') + '/'):
+                    # File is inside a reference directory
+                    should_include = True
+                    break
+
+            if not should_include:
                 continue
 
             # Download file content
@@ -283,6 +336,93 @@ async def download_course_content_reference(
     # Create filename
     safe_title = course_content.title.replace(' ', '_').replace('/', '_')
     filename = f"{safe_title}_reference.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
+## Content/Description Download Endpoint
+
+@tutor_router.get("/course-contents/{course_content_id}/description")
+async def download_course_content_description(
+    course_content_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
+    storage_service = Depends(get_storage_service),
+):
+    """
+    Download the content/description files for a course content as a ZIP file.
+
+    This endpoint allows tutors to download the assignment description files
+    which are stored in the 'content/' directory of the example.
+
+    This typically includes:
+    - index_<language_id>.md files (assignment descriptions in different languages)
+    - mediaFiles/ directory (images, attachments, etc.)
+    - Other supporting content files
+
+    Returns:
+        StreamingResponse containing a ZIP file with the content/ directory
+    """
+    import zipfile
+    import io
+
+    course_content, version, repository = await _get_example_version_for_course_content(
+        course_content_id, permissions, db, cache
+    )
+
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+    files_added = 0
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Get bucket name and list objects
+        bucket_name = repository.source_url.split('/')[0]
+
+        objects = await storage_service.list_objects(
+            bucket_name=bucket_name,
+            prefix=version.storage_path,
+        )
+
+        for obj in objects:
+            if obj.object_name.endswith('/'):
+                continue  # Skip directory markers
+
+            # Get relative filename within the example
+            filename = obj.object_name.replace(f"{version.storage_path}/", "")
+
+            # Only include files from the content/ directory
+            if not filename.startswith('content/'):
+                continue
+
+            # Download file content
+            file_data = await storage_service.download_file(
+                bucket_name=bucket_name,
+                object_key=obj.object_name,
+            )
+
+            # Strip the 'content/' prefix so files are at root level in ZIP
+            zip_filename = filename[len('content/'):]
+            zip_file.writestr(zip_filename, file_data)
+            files_added += 1
+
+    if files_added == 0:
+        raise NotFoundException(
+            detail="No content files found in 'content/' directory for this course content"
+        )
+
+    # Seek to beginning of buffer
+    zip_buffer.seek(0)
+
+    # Create filename
+    safe_title = course_content.title.replace(' ', '_').replace('/', '_')
+    filename = f"{safe_title}_description.zip"
 
     return StreamingResponse(
         zip_buffer,
