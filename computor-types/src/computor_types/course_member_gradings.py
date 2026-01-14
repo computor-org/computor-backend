@@ -75,7 +75,7 @@ class CourseMemberGradingNode(BaseModel):
         None,
         description="Whether this node itself is submittable (True for assignments, False for units)"
     )
-    position: Optional[int] = Field(
+    position: Optional[float] = Field(
         None,
         description="Position/order of this content within its parent"
     )
