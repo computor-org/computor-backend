@@ -622,37 +622,3 @@ class ServiceUnavailableException(ComputorException):
         self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-
-def response_to_http_exception(status_code: int, details: dict) -> Optional[ComputorException]:
-    """
-    Convert HTTP status code and details to appropriate exception.
-
-    DEPRECATED: Use specific exception classes directly.
-
-    Args:
-        status_code: HTTP status code
-        details: Error details dictionary
-
-    Returns:
-        Appropriate ComputorException subclass or None
-    """
-    if status_code == status.HTTP_404_NOT_FOUND:
-        return NotFoundException(detail=details)
-    elif status_code == status.HTTP_403_FORBIDDEN:
-        return ForbiddenException(detail=details)
-    elif status_code == status.HTTP_400_BAD_REQUEST:
-        return BadRequestException(detail=details)
-    elif status_code == status.HTTP_401_UNAUTHORIZED:
-        return UnauthorizedException(detail=details)
-    elif status_code == status.HTTP_501_NOT_IMPLEMENTED:
-        return NotImplementedException(detail=details)
-    elif status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        return InternalServerException(detail=details)
-    elif status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
-        return ServiceUnavailableException(detail=details)
-    else:
-        return None

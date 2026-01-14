@@ -39,6 +39,18 @@ class ContentTypeGradingStats(BaseModel):
         description="Most recent SubmissionArtifact.created_at with submit=True for this type"
     )
 
+    # Grading statistics
+    graded_assignments: Optional[int] = Field(
+        None,
+        description="Count of assignments with at least one grading"
+    )
+    average_grading: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Average grade for all graded assignments of this type (0.0-1.0 scale)"
+    )
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -99,6 +111,28 @@ class CourseMemberGradingNode(BaseModel):
         description="Most recent SubmissionArtifact.created_at with submit=True under this path"
     )
 
+    # Grading statistics
+    grading: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="For assignments: the actual grade (0.0-1.0 scale). None if not graded or not an assignment."
+    )
+    average_grading: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="For units/containers: average of all descendant grades (0.0-1.0 scale). None if no graded descendants."
+    )
+    graded_assignments: Optional[int] = Field(
+        None,
+        description="Count of graded assignments at or under this path"
+    )
+    status: Optional[str] = Field(
+        None,
+        description="Grading status: 'not_reviewed', 'corrected', 'correction_necessary', or 'improvement_possible'. For units: aggregated from descendants."
+    )
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -127,6 +161,14 @@ class CourseMemberGradingsGet(BaseModel):
     latest_submission_at: Optional[datetime] = Field(
         None,
         description="Most recent submission across all content"
+    )
+
+    # Grading statistics at course level
+    overall_average_grading: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Course-level average grade across all graded assignments (0.0-1.0 scale)"
     )
 
     # Per content type totals at course level
@@ -175,6 +217,14 @@ class CourseMemberGradingsList(BaseModel):
     latest_submission_at: Optional[datetime] = Field(
         None,
         description="Most recent submission across all content"
+    )
+
+    # Grading statistics at course level
+    overall_average_grading: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Course-level average grade across all graded assignments (0.0-1.0 scale)"
     )
 
     # Per content type totals at course level

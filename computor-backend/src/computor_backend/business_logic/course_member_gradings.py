@@ -102,6 +102,41 @@ async def list_course_member_gradings(
         repo.close()
 
 
+def _aggregate_grading_status(statuses: List[str]) -> str:
+    """
+    Aggregate multiple grading statuses following priority rules.
+
+    Rules:
+    1. If ANY 'correction_necessary' exists -> 'correction_necessary'
+    2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
+    3. Else if ALL are 'corrected' -> 'corrected'
+    4. Else -> 'not_reviewed' (mix of corrected/not_reviewed, or all not_reviewed)
+
+    Args:
+        statuses: List of grading status strings
+
+    Returns:
+        Aggregated status string
+    """
+    if not statuses:
+        return "not_reviewed"
+
+    # Check for correction_necessary (highest priority)
+    if "correction_necessary" in statuses:
+        return "correction_necessary"
+
+    # Check for improvement_possible
+    if "improvement_possible" in statuses:
+        return "improvement_possible"
+
+    # Check if ALL are corrected
+    if all(s == "corrected" for s in statuses):
+        return "corrected"
+
+    # Default: not_reviewed (mix or all not_reviewed)
+    return "not_reviewed"
+
+
 def _process_hierarchical_stats(
     db_stats: List[Dict[str, Any]],
     path_info: Dict[str, Any],
@@ -123,6 +158,7 @@ def _process_hierarchical_stats(
         - total_submitted_assignments: Total submitted assignments
         - overall_progress_percentage: Overall progress percentage
         - latest_submission_at: Latest submission timestamp
+        - overall_average_grading: Course-level average grade (0.0-1.0)
         - by_content_type: List of content type breakdowns
         - nodes: List of hierarchical node breakdowns
     """
@@ -132,16 +168,19 @@ def _process_hierarchical_stats(
             "total_submitted_assignments": 0,
             "overall_progress_percentage": 0.0,
             "latest_submission_at": None,
+            "overall_average_grading": None,
             "by_content_type": [],
             "nodes": [],
         }
 
     # Group by content_type_id for top-level breakdown
-    by_content_type = defaultdict(lambda: {"max": 0, "submitted": 0})
+    by_content_type = defaultdict(lambda: {"max": 0, "submitted": 0, "graded": 0, "grade_sum": 0.0})
     by_node = {}  # path -> stats
 
     total_max = 0
     total_submitted = 0
+    total_graded = 0
+    total_grade_sum = 0.0
     latest_submission = None
 
     for row in db_stats:
@@ -153,11 +192,18 @@ def _process_hierarchical_stats(
         max_assignments = row["max_assignments"]
         submitted_assignments = row["submitted_assignments"]
         latest_at = row.get("latest_submission_at")
+        # Grading statistics from DB
+        graded_assignments = row.get("graded_assignments", 0) or 0
+        average_grading = row.get("average_grading")
+        grading_status = row.get("grading_status")
 
         # Aggregate by content type
         if content_type_id:
             by_content_type[content_type_id]["max"] += max_assignments
             by_content_type[content_type_id]["submitted"] += submitted_assignments
+            by_content_type[content_type_id]["graded"] += graded_assignments
+            if average_grading is not None and graded_assignments > 0:
+                by_content_type[content_type_id]["grade_sum"] += average_grading * graded_assignments
             by_content_type[content_type_id]["id"] = content_type_id
             by_content_type[content_type_id]["slug"] = content_type_slug
             by_content_type[content_type_id]["title"] = content_type_title
@@ -194,12 +240,22 @@ def _process_hierarchical_stats(
                 "course_content_type_color": course_content_type_color,
                 "max_assignments": 0,
                 "submitted_assignments": 0,
+                "graded_assignments": 0,
+                "grade_sum": 0.0,
                 "latest_submission_at": None,
-                "by_content_type": defaultdict(lambda: {"max": 0, "submitted": 0}),
+                "by_content_type": defaultdict(lambda: {"max": 0, "submitted": 0, "graded": 0, "grade_sum": 0.0}),
+                "grading_statuses": [],  # Collect all statuses for aggregation
             }
 
         by_node[path]["max_assignments"] += max_assignments
         by_node[path]["submitted_assignments"] += submitted_assignments
+        by_node[path]["graded_assignments"] += graded_assignments
+        if average_grading is not None and graded_assignments > 0:
+            by_node[path]["grade_sum"] += average_grading * graded_assignments
+
+        # Collect grading_status for later aggregation
+        if grading_status is not None:
+            by_node[path]["grading_statuses"].append(grading_status)
 
         if latest_at:
             if by_node[path]["latest_submission_at"] is None or latest_at > by_node[path]["latest_submission_at"]:
@@ -209,6 +265,9 @@ def _process_hierarchical_stats(
         if content_type_id:
             by_node[path]["by_content_type"][content_type_id]["max"] += max_assignments
             by_node[path]["by_content_type"][content_type_id]["submitted"] += submitted_assignments
+            by_node[path]["by_content_type"][content_type_id]["graded"] += graded_assignments
+            if average_grading is not None and graded_assignments > 0:
+                by_node[path]["by_content_type"][content_type_id]["grade_sum"] += average_grading * graded_assignments
             by_node[path]["by_content_type"][content_type_id]["id"] = content_type_id
             by_node[path]["by_content_type"][content_type_id]["slug"] = content_type_slug
             by_node[path]["by_content_type"][content_type_id]["title"] = content_type_title
@@ -217,6 +276,9 @@ def _process_hierarchical_stats(
         # Track overall totals
         total_max += max_assignments
         total_submitted += submitted_assignments
+        total_graded += graded_assignments
+        if average_grading is not None and graded_assignments > 0:
+            total_grade_sum += average_grading * graded_assignments
 
         if latest_at:
             if latest_submission is None or latest_at > latest_submission:
@@ -236,6 +298,9 @@ def _process_hierarchical_stats(
                 2
             ),
             "latest_submission_at": None,  # Not tracked at this level
+            # Grading statistics
+            "graded_assignments": ct_data["graded"],
+            "average_grading": round(ct_data["grade_sum"] / ct_data["graded"], 4) if ct_data["graded"] > 0 else None,
         }
         for ct_id, ct_data in by_content_type.items()
     ]
@@ -257,9 +322,26 @@ def _process_hierarchical_stats(
                     2
                 ),
                 "latest_submission_at": None,  # Not tracked per content type per node
+                # Grading statistics
+                "graded_assignments": ct_data["graded"],
+                "average_grading": round(ct_data["grade_sum"] / ct_data["graded"], 4) if ct_data["graded"] > 0 else None,
             }
             for ct_id, ct_data in node_data["by_content_type"].items()
         ]
+
+        # Determine grading values based on whether this is a leaf node (submittable)
+        # For submittable nodes (assignments): use grading (actual grade)
+        # For non-submittable nodes (units): use average_grading (average of descendants)
+        is_submittable = node_data.get("submittable", False)
+        node_graded = node_data["graded_assignments"]
+        node_avg = round(node_data["grade_sum"] / node_graded, 4) if node_graded > 0 else None
+
+        # Determine grading_status using aggregation rules:
+        # 1. If ANY CORRECTION_NECESSARY(2) -> CORRECTION_NECESSARY(2)
+        # 2. Else if ANY IMPROVEMENT_POSSIBLE(3) -> IMPROVEMENT_POSSIBLE(3)
+        # 3. Else if ALL are CORRECTED(1) -> CORRECTED(1)
+        # 4. Else -> NOT_REVIEWED(0)
+        node_grading_status = _aggregate_grading_status(node_data["grading_statuses"])
 
         node_list.append({
             "path": path,
@@ -276,6 +358,13 @@ def _process_hierarchical_stats(
             ),
             "latest_submission_at": node_data["latest_submission_at"],
             "by_content_type": node_ct_list,
+            # Grading statistics
+            # For assignments: grading is the actual grade, average_grading is None
+            # For units: grading is None, average_grading is the average of descendants
+            "grading": node_avg if is_submittable else None,
+            "average_grading": node_avg if not is_submittable else None,
+            "graded_assignments": node_graded,
+            "status": node_grading_status,
         })
 
     # Calculate overall progress
@@ -284,11 +373,15 @@ def _process_hierarchical_stats(
         2
     )
 
+    # Calculate overall average grading
+    overall_avg_grading = round(total_grade_sum / total_graded, 4) if total_graded > 0 else None
+
     return {
         "total_max_assignments": total_max,
         "total_submitted_assignments": total_submitted,
         "overall_progress_percentage": overall_progress,
         "latest_submission_at": latest_submission,
+        "overall_average_grading": overall_avg_grading,
         "by_content_type": content_type_list,
         "nodes": node_list,
     }

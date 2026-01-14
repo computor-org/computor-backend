@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status, Query
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.crud import (
@@ -76,6 +76,11 @@ async def list_messages(
     response: Response,
     params: MessageQuery = Depends(),
     db: Session = Depends(get_db),
+    # Explicit Query parameter for tags list - FastAPI doesn't parse List[str] from Pydantic Field
+    tags: Optional[List[str]] = Query(
+        None,
+        description="Filter by tags in title (e.g., tags=ai::request&tags=priority::high)"
+    ),
 ):
     """List messages with read status.
 
@@ -86,6 +91,10 @@ async def list_messages(
     - tags_match_all: True = must match ALL tags, False = match ANY tag
     - tag_scope: Wildcard scope filter (e.g., "ai" matches any #ai::* tag)
     """
+    # Merge the explicit tags parameter into params (FastAPI doesn't parse List from Pydantic Field)
+    if tags is not None:
+        params.tags = tags
+
     # Use custom list function that supports user-specific filtering
     items, total = await list_messages_with_filters(permissions, db, params)
     items = list_messages_with_read_status(items, permissions, db)

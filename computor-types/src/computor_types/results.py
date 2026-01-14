@@ -32,6 +32,17 @@ class ResultCreate(BaseModel):
             return value
         return map_int_to_task_status(value)
 
+class ResultArtifactInfo(BaseModel):
+    """Artifact information embedded in ResultGet."""
+    id: str
+    filename: str
+    content_type: Optional[str] = None
+    file_size: int
+    created_at: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ResultGet(BaseEntityGet):
     id: str
     course_member_id: str
@@ -50,7 +61,11 @@ class ResultGet(BaseEntityGet):
     status: TaskStatus
     # New: relationship to gradings
     grading_ids: Optional[List[str]] = []  # IDs of gradings that reference this result
-    
+    # New: artifact information
+    has_artifacts: bool = False  # Whether this result has associated artifacts (plots, figures, etc.)
+    artifact_count: int = 0  # Number of artifacts associated with this result
+    result_artifacts: List[ResultArtifactInfo] = []  # Full list of artifact details
+
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator("status", mode="before")
@@ -74,6 +89,9 @@ class ResultList(BaseEntityList):
     version_identifier: str
     reference_version_identifier: Optional[str] = None
     status: TaskStatus
+    # Artifact information
+    has_artifacts: bool = False  # Whether this result has associated artifacts
+    artifact_count: int = 0  # Number of artifacts associated with this result
 
     model_config = ConfigDict(from_attributes=True)
 

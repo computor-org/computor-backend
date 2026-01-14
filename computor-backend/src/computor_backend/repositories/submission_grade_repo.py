@@ -86,7 +86,10 @@ class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
         - submission_grade:artifact:{artifact_id} - Grades for this artifact
         - submission_grade:grader:{grader_id} - Grades by this grader
         - cm_grading:{member_id} - Course member grading stats (CRITICAL)
-        - course:{course_id} - General course-level invalidation
+        - course_id:{course_id} - Course-scoped user views
+        - student_view:{course_id} - Student aggregated views
+        - tutor_view:{course_id} - Tutor aggregated views
+        - lecturer_view:{course_id} - Lecturer aggregated views
         """
         tags = {
             f"submission_grade:{entity.id}",
@@ -100,11 +103,16 @@ class SubmissionGradeRepository(BaseRepository[SubmissionGrade]):
             # CRITICAL: Invalidate course member grading stats
             course_id, member_ids = self._get_course_and_member_from_grade(entity)
             if course_id:
-                tags.add(f"course:{course_id}")
+                tags.add(f"course:{course_id}")  # legacy/general tag
+                tags.add(f"course_id:{course_id}")  # user view invalidation (ViewRepository auto-tags by *_id)
+                tags.add(f"student_view:{course_id}")
+                tags.add(f"tutor_view:{course_id}")
+                tags.add(f"lecturer_view:{course_id}")
 
                 for member_id in member_ids:
                     tags.add(f"cm_grading:{member_id}")
                     tags.add(f"course_member:{member_id}")
+                    tags.add(f"course_member_id:{member_id}")
 
         if entity.graded_by_course_member_id:
             tags.add(f"submission_grade:grader:{entity.graded_by_course_member_id}")

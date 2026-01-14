@@ -8,6 +8,7 @@ from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.tasks import TaskStatus
 from computor_types.grading import SubmissionGroupGradingList
 from computor_types.deployment import CourseContentDeploymentList
+from computor_types.results import ResultArtifactInfo
 
 from computor_types.custom_types import Ltree
 
@@ -64,6 +65,7 @@ class SubmissionGroupStudentGet(SubmissionGroupStudentList):
     gradings: List[SubmissionGroupGradingList] = Field(default_factory=list)
 
 class ResultStudentList(BaseModel):
+    id: str
     testing_service_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -73,6 +75,7 @@ class ResultStudentList(BaseModel):
 
 class ResultStudentGet(ResultStudentList):
     result_json: Optional[dict] = None
+    result_artifacts: List[ResultArtifactInfo] = []
 
 class CourseContentStudentProperties(BaseModel):
     gitlab: Optional[GitLabConfigGet] = None
@@ -93,10 +96,11 @@ class CourseContentStudentGet(BaseEntityGet):
     position: float
     max_group_size: Optional[int] = None
     submitted: Optional[bool] = None
-    course_content_types: CourseContentTypeGet
+    course_content_type: CourseContentTypeGet
     result_count: int
     submission_count: int
     max_test_runs: Optional[int] = None
+    testing_service_id: Optional[str] = None
     unread_message_count: int = 0
     result: Optional[ResultStudentGet] = None
     directory: Optional[str] = None
@@ -104,6 +108,11 @@ class CourseContentStudentGet(BaseEntityGet):
     submission_group: Optional[SubmissionGroupStudentGet] = None
     deployment: Optional[CourseContentDeploymentList] = None
     has_deployment: Optional[bool] = None
+
+    # Aggregated status for unit-like course contents (non-submittable)
+    # For submittable contents, this mirrors submission_group.status
+    # For units, this is aggregated from descendant course contents
+    status: Optional[str] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -126,6 +135,7 @@ class CourseContentStudentList(BaseModel):
     result_count: int
     submission_count: int
     max_test_runs: Optional[int] = None
+    testing_service_id: Optional[str] = None
 
     directory: Optional[str] = None
     color: str
@@ -136,6 +146,11 @@ class CourseContentStudentList(BaseModel):
     unread_message_count: int = 0
     deployment: Optional[CourseContentDeploymentList] = None
     has_deployment: Optional[bool] = None
+
+    # Aggregated status for unit-like course contents (non-submittable)
+    # For submittable contents, this mirrors submission_group.status
+    # For units, this is aggregated from descendant course contents
+    status: Optional[str] = None
 
     @field_validator('path', mode='before')
     @classmethod

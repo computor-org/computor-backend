@@ -156,6 +156,10 @@ class TutorViewRepository(ViewRepository):
             typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
             response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
 
+        # Aggregate status for unit-like course contents (non-submittable)
+        # Units aggregate status from their descendant submittable contents
+        response_list = self._aggregate_unit_statuses(response_list, str(course_member.user_id))
+
         # Cache result with query-aware key
         # CRITICAL: Include course_id for proper invalidation when submissions/results change
         # CRITICAL: Tag each course_content for deployment-related invalidation

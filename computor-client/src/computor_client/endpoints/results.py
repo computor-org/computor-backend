@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.artifacts import ResultArtifactListItem
 from computor_types.results import (
     ResultCreate,
     ResultGet,
@@ -90,4 +91,25 @@ class ResultsClient:
         """Result Status"""
         response = await self._http.get(f"/results/{result_id}/status", params=kwargs)
         return TaskStatus(response.json())
+
+    async def artifacts(
+        self,
+        result_id: str,
+        **kwargs: Any,
+    ) -> List[ResultArtifactListItem]:
+        """List Result Artifacts Endpoint"""
+        response = await self._http.get(f"/results/{result_id}/artifacts", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [ResultArtifactListItem.model_validate(item) for item in data]
+        return []
+
+    async def artifacts_download(
+        self,
+        result_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Download Result Artifacts"""
+        response = await self._http.get(f"/results/{result_id}/artifacts/download", params=kwargs)
+        return response.json()
 

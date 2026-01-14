@@ -5,18 +5,20 @@ from computor_types.student_course_contents import (
     CourseContentStudentList,
     CourseContentStudentGet,
     ResultStudentList,
+    ResultStudentGet,
     SubmissionGroupStudentList,
     SubmissionGroupStudentGet,
     SubmissionGroupRepository,
     SubmissionGroupMemberBasic,
 )
+from computor_types.results import ResultArtifactInfo
 from computor_types.grading import GradingStatus, SubmissionGroupGradingList, GradedByCourseMember
 from computor_types.tasks import map_int_to_task_status
 from computor_types.deployment import CourseContentDeploymentList
 from computor_backend.model.course import CourseMember
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
-from computor_backend.services.result_storage import retrieve_result_json
+from computor_backend.services.result_storage import retrieve_result_json, list_result_artifacts
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +98,22 @@ async def course_member_course_content_result_mapper(
         if result.submission_artifact:
             submit_value = result.submission_artifact.submit
 
-        # Fetch result_json from MinIO only for detailed views
+        # Fetch result_json and artifacts from MinIO only for detailed views
         if detailed:
             result_json_data = await retrieve_result_json(result.id)
-            from computor_types.student_course_contents import ResultStudentGet
+            artifacts = await list_result_artifacts(result.id)
+            result_artifacts = [
+                ResultArtifactInfo(
+                    id=f"{result.id}_{artifact['filename']}",
+                    filename=artifact['filename'],
+                    content_type=artifact.get('content_type'),
+                    file_size=artifact['size'],
+                    created_at=artifact['last_modified'].isoformat() if artifact.get('last_modified') else None,
+                )
+                for artifact in artifacts
+            ]
             result_payload = ResultStudentGet(
+                id=str(result.id),
                 testing_service_id=result.testing_service_id,
                 test_system_id=result.test_system_id,
                 version_identifier=result.version_identifier,
@@ -108,10 +121,12 @@ async def course_member_course_content_result_mapper(
                 result=result.result,
                 result_json=result_json_data,
                 submit=submit_value,
+                result_artifacts=result_artifacts,
             )
         else:
             # For list views, don't fetch result_json from MinIO
             result_payload = ResultStudentList(
+                id=str(result.id),
                 testing_service_id=result.testing_service_id,
                 test_system_id=result.test_system_id,
                 version_identifier=result.version_identifier,
@@ -217,6 +232,7 @@ async def course_member_course_content_result_mapper(
         result_count=result_count if result_count is not None else 0,
         submission_count=submission_count if submission_count is not None else 0,
         max_test_runs=course_content.max_test_runs,
+        testing_service_id=str(course_content.testing_service_id) if course_content.testing_service_id else None,
         directory=directory,
         color=course_content.course_content_type.color,
         result=result_payload,
@@ -224,6 +240,9 @@ async def course_member_course_content_result_mapper(
         unread_message_count=unread_message_count,
         deployment=deployment_payload,
         has_deployment=has_deployment,
+        # Status: for submittable contents, use submission_group.status
+        # For units, this will be aggregated later by the view repository
+        status=submission_status,
     )
 
     if not detailed:
@@ -243,10 +262,11 @@ async def course_member_course_content_result_mapper(
         position=list_obj.position,
         max_group_size=list_obj.max_group_size,
         submitted=list_obj.submitted,
-        course_content_types=CourseContentTypeGet.model_validate(course_content.course_content_type),
+        course_content_type=CourseContentTypeGet.model_validate(course_content.course_content_type),
         result_count=list_obj.result_count,
         submission_count=list_obj.submission_count,
         max_test_runs=list_obj.max_test_runs,
+        testing_service_id=list_obj.testing_service_id,
         unread_message_count=list_obj.unread_message_count,
         result=list_obj.result,
         directory=list_obj.directory,
@@ -257,4 +277,5 @@ async def course_member_course_content_result_mapper(
         ),
         deployment=deployment_payload,
         has_deployment=has_deployment,
+        status=list_obj.status,
     )

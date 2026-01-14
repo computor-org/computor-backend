@@ -5,10 +5,12 @@ This repository handles complex student-view queries that aggregate data
 from multiple tables (courses, course_contents, submissions, results, etc.)
 """
 
-from typing import List
+from typing import List, Dict, Optional
 from uuid import UUID
 
-from .view_base import ViewRepository
+from .view_base import ViewRepository, _aggregate_grading_status
+
+
 from ..api.mappers import course_member_course_content_result_mapper
 from ..repositories.course_content import CourseMemberCourseContentQueryResult
 from ..repositories.course_content import (
@@ -79,6 +81,10 @@ class StudentViewRepository(ViewRepository):
         course_contents_result = user_course_content_query(user_id, course_content_id, self.db)
         result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
+        # Aggregate status for unit-like course contents (non-submittable)
+        if result and result.submission_group is None:
+            result.status = self._aggregate_single_unit_status(user_id, result)
+
         # Cache result
         if result:
             # CRITICAL: Tag with student_view for invalidation when results/submissions change
@@ -102,6 +108,79 @@ class StudentViewRepository(ViewRepository):
             )
 
         return result
+
+    def _aggregate_single_unit_status(
+        self,
+        user_id: str,
+        course_content: CourseContentStudentGet,
+    ) -> Optional[str]:
+        """
+        Aggregate status for a single unit-like course content from its descendants.
+
+        This is used for the single GET endpoint where we need to query descendants
+        from the database.
+
+        Args:
+            user_id: Student user ID
+            course_content: The unit course content to aggregate status for
+
+        Returns:
+            Aggregated status string, or None if no descendants with status
+        """
+        # Only aggregate for non-submittable content (units)
+        if course_content.submission_group is not None:
+            return course_content.status
+
+        # Query descendants from the same course with path starting with this unit's path
+        from computor_backend.repositories.course_content import user_course_content_list_query
+        from sqlalchemy import text
+
+        unit_path = str(course_content.path)
+
+        # Get all course contents for this user in the same course
+        # The query already joins to the user's submission group and includes grading status
+        query = user_course_content_list_query(user_id, self.db)
+        query = query.filter(text("course_content.course_id = :course_id"))
+        query = query.params(course_id=str(course_content.course_id))
+
+        all_contents = query.all()
+
+        # Find descendants and collect their statuses
+        # Use the status from the query result tuple which is already user-specific
+        descendant_statuses: List[str] = []
+        status_lookup = {
+            0: "not_reviewed",
+            1: "corrected",
+            2: "correction_necessary",
+            3: "improvement_possible"
+        }
+
+        for row in all_contents:
+            # row is a Row/tuple where index 0 is CourseContent
+            course_content_obj = row[0]
+            row_path = str(course_content_obj.path)
+
+            # Skip self and non-descendants
+            if row_path == unit_path or not row_path.startswith(unit_path + '.'):
+                continue
+
+            # row[3] is submission_group, row[5] is submission_status_int from the query
+            submission_group = row[3]
+            submission_status_int = row[5] if len(row) > 5 else None
+
+            # Only collect from submittable contents (those with submission_group)
+            # If submission_group exists but status is None, treat as not_reviewed
+            if submission_group is not None:
+                status_str = status_lookup.get(submission_status_int, "not_reviewed") if submission_status_int is not None else "not_reviewed"
+                descendant_statuses.append(status_str)
+
+        if descendant_statuses:
+            return _aggregate_grading_status(descendant_statuses)
+
+        return None
+
+    # Note: _aggregate_unit_statuses and _aggregate_single_unit_status_for_list
+    # are inherited from ViewRepository base class
 
     async def list_course_contents(
         self,
@@ -140,6 +219,10 @@ class StudentViewRepository(ViewRepository):
             # Convert tuple to typed model before mapping
             typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
             response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
+
+        # Aggregate status for unit-like course contents (non-submittable)
+        # Units aggregate status from their descendant submittable contents
+        response_list = self._aggregate_unit_statuses(response_list, user_id)
 
         # Cache result with query-aware key
         # CRITICAL: Tag with course_id AND individual course_content IDs for proper invalidation

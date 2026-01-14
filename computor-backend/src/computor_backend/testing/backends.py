@@ -300,11 +300,11 @@ async def execute_tests_with_backend(
             backend_properties
         )
     except Exception as e:
-        logger.error(f"Error creating or executing backend {backend_type}: {e}")
+        logger.error(f"Error creating or executing backend {service_slug}: {e}")
         return {
             "passed": 0,
             "failed": 1,
             "total": 1,
             "error": f"Backend error: {e}",
-            "details": {"backend_type": backend_type, "error": str(e)}
+            "details": {"service_slug": service_slug, "error": str(e)}
         }
