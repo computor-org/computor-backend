@@ -173,7 +173,18 @@ def _process_hierarchical_stats(
             "nodes": [],
         }
 
-    # Group by content_type_id for top-level breakdown
+    # Build a set of paths that represent actual submittable content.
+    # We need this to identify "leaf" nodes for course-level aggregation.
+    # The SQL query returns hierarchical data at ALL path levels, but for course-level
+    # totals (by_content_type, total_max, etc.) we should only count each submittable
+    # content once - at its actual path level, not at parent aggregate levels.
+    submittable_paths = set()
+    if path_info:
+        for p, info in path_info.items():
+            if isinstance(info, dict) and info.get("submittable"):
+                submittable_paths.add(p)
+
+    # Group by content_type_id for top-level breakdown (only from submittable paths)
     by_content_type = defaultdict(lambda: {"max": 0, "submitted": 0, "graded": 0, "grade_sum": 0.0})
     by_node = {}  # path -> stats
 
@@ -197,8 +208,10 @@ def _process_hierarchical_stats(
         average_grading = row.get("average_grading")
         grading_status = row.get("grading_status")
 
-        # Aggregate by content type
-        if content_type_id:
+        # Only aggregate course-level by_content_type stats from actual submittable paths
+        # to avoid double-counting contents that appear at multiple hierarchy levels
+        is_submittable_path = path in submittable_paths
+        if content_type_id and is_submittable_path:
             by_content_type[content_type_id]["max"] += max_assignments
             by_content_type[content_type_id]["submitted"] += submitted_assignments
             by_content_type[content_type_id]["graded"] += graded_assignments
@@ -273,16 +286,17 @@ def _process_hierarchical_stats(
             by_node[path]["by_content_type"][content_type_id]["title"] = content_type_title
             by_node[path]["by_content_type"][content_type_id]["color"] = content_type_color
 
-        # Track overall totals
-        total_max += max_assignments
-        total_submitted += submitted_assignments
-        total_graded += graded_assignments
-        if average_grading is not None and graded_assignments > 0:
-            total_grade_sum += average_grading * graded_assignments
+        # Track overall totals (only from submittable paths to avoid double-counting)
+        if is_submittable_path:
+            total_max += max_assignments
+            total_submitted += submitted_assignments
+            total_graded += graded_assignments
+            if average_grading is not None and graded_assignments > 0:
+                total_grade_sum += average_grading * graded_assignments
 
-        if latest_at:
-            if latest_submission is None or latest_at > latest_submission:
-                latest_submission = latest_at
+            if latest_at:
+                if latest_submission is None or latest_at > latest_submission:
+                    latest_submission = latest_at
 
     # Convert content type aggregations to list format (use course_content_type_* field names for DTO)
     content_type_list = [
