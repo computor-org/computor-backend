@@ -184,6 +184,18 @@ class CourseMemberGradingsGet(BaseModel):
     course_member_id: str
     course_id: str
 
+    # User info for display
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+
+    # Student profile info (from organization-scoped student_profile)
+    student_id: Optional[str] = Field(
+        None,
+        description="Student ID from the student_profile belonging to the course's organization"
+    )
+
     # Root level stats (whole course)
     total_max_assignments: int = Field(
         description="Total number of submittable course_contents in the course"
@@ -239,6 +251,12 @@ class CourseMemberGradingsList(BaseModel):
     username: Optional[str] = None
     given_name: Optional[str] = None
     family_name: Optional[str] = None
+
+    # Student profile info (from organization-scoped student_profile)
+    student_id: Optional[str] = Field(
+        None,
+        description="Student ID from the student_profile belonging to the course's organization"
+    )
 
     # Root level stats (whole course)
     total_max_assignments: int = Field(
