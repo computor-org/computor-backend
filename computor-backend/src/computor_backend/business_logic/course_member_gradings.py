@@ -140,6 +140,7 @@ def _aggregate_grading_status(statuses: List[str]) -> str:
 def _process_hierarchical_stats(
     db_stats: List[Dict[str, Any]],
     path_info: Dict[str, Any],
+    assignment_details: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Process raw database statistics into hierarchical structure.
@@ -151,6 +152,8 @@ def _process_hierarchical_stats(
         db_stats: Raw database query results
         path_info: Mapping of ltree paths to info dict (title, course_content_kind_id, submittable)
                    Can also be a simple Dict[str, str] for backwards compatibility (just titles)
+        assignment_details: Optional mapping of paths to per-assignment details
+                           (latest result, test runs count, submissions count)
 
     Returns:
         Dictionary with:
@@ -160,7 +163,7 @@ def _process_hierarchical_stats(
         - latest_submission_at: Latest submission timestamp
         - overall_average_grading: Course-level average grade (0.0-1.0)
         - by_content_type: List of content type breakdowns
-        - nodes: List of hierarchical node breakdowns
+        - nodes: List of hierarchical node breakdowns (with assignment details for submittable nodes)
     """
     if not db_stats:
         return {
@@ -357,6 +360,11 @@ def _process_hierarchical_stats(
         # 4. Else -> NOT_REVIEWED(0)
         node_grading_status = _aggregate_grading_status(node_data["grading_statuses"])
 
+        # Get assignment details for submittable nodes
+        details = None
+        if is_submittable and assignment_details:
+            details = assignment_details.get(path)
+
         node_list.append({
             "path": path,
             "title": node_data["title"],
@@ -379,6 +387,15 @@ def _process_hierarchical_stats(
             "average_grading": node_avg if not is_submittable else None,
             "graded_assignments": node_graded,
             "status": node_grading_status,
+            # Per-assignment details (only for submittable nodes)
+            "latest_result_id": details.get("latest_result_id") if details else None,
+            "latest_result_grade": details.get("latest_result_grade") if details else None,
+            "latest_result_status": details.get("latest_result_status") if details else None,
+            "latest_result_created_at": details.get("latest_result_created_at") if details else None,
+            "test_runs_count": details.get("test_runs_count") if details else None,
+            "max_test_runs": details.get("max_test_runs") if details else None,
+            "submissions_count": details.get("submissions_count") if details else None,
+            "max_submissions": details.get("max_submissions") if details else None,
         })
 
     # Calculate overall progress

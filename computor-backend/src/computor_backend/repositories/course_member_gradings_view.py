@@ -126,8 +126,14 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         # Get path info for display (includes title, course_content_kind_id, submittable)
         path_info = data_repo.get_path_info(course_id)
 
+        # Get per-assignment details (latest result, test runs/submissions counts)
+        assignment_details = data_repo.get_assignment_details_for_member(
+            course_member_id=course_member_id,
+            course_id=course_id,
+        )
+
         # Process database results into the expected structure
-        stats = self._process_hierarchical_stats(db_stats, path_info)
+        stats = self._process_hierarchical_stats(db_stats, path_info, assignment_details)
 
         # Convert to DTOs
         by_content_type = [
@@ -154,6 +160,15 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 average_grading=node["average_grading"],
                 graded_assignments=node["graded_assignments"],
                 status=node["status"],
+                # Per-assignment details (only for submittable nodes)
+                latest_result_id=node.get("latest_result_id"),
+                latest_result_grade=node.get("latest_result_grade"),
+                latest_result_status=node.get("latest_result_status"),
+                latest_result_created_at=node.get("latest_result_created_at"),
+                test_runs_count=node.get("test_runs_count"),
+                max_test_runs=node.get("max_test_runs"),
+                submissions_count=node.get("submissions_count"),
+                max_submissions=node.get("max_submissions"),
             )
             for node in stats["nodes"]
         ]
@@ -339,6 +354,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         self,
         db_stats: List[Dict[str, Any]],
         path_titles: Dict[str, str],
+        assignment_details: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Process raw database statistics into hierarchical structure.
@@ -346,4 +362,4 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         This is imported from the existing business logic helper.
         """
         from ..business_logic.course_member_gradings import _process_hierarchical_stats
-        return _process_hierarchical_stats(db_stats, path_titles)
+        return _process_hierarchical_stats(db_stats, path_titles, assignment_details)

@@ -133,6 +133,44 @@ class CourseMemberGradingNode(BaseModel):
         description="Grading status: 'not_reviewed', 'corrected', 'correction_necessary', or 'improvement_possible'. For units: aggregated from descendants."
     )
 
+    # Latest result info (only for submittable assignments)
+    latest_result_id: Optional[str] = Field(
+        None,
+        description="ID of the latest test result for this assignment"
+    )
+    latest_result_grade: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Grade from the latest test result (0.0-1.0 scale)"
+    )
+    latest_result_status: Optional[int] = Field(
+        None,
+        description="Status of the latest test result (0=finished, 1=failed, 2=cancelled, etc.)"
+    )
+    latest_result_created_at: Optional[datetime] = Field(
+        None,
+        description="When the latest test result was created"
+    )
+
+    # Test runs and submissions limits/counts (only for submittable assignments)
+    test_runs_count: Optional[int] = Field(
+        None,
+        description="Number of test runs used for this assignment"
+    )
+    max_test_runs: Optional[int] = Field(
+        None,
+        description="Maximum allowed test runs for this assignment (from course_content or submission_group)"
+    )
+    submissions_count: Optional[int] = Field(
+        None,
+        description="Number of submissions made for this assignment"
+    )
+    max_submissions: Optional[int] = Field(
+        None,
+        description="Maximum allowed submissions for this assignment (from course_content or submission_group)"
+    )
+
     model_config = ConfigDict(from_attributes=True)
 
 
