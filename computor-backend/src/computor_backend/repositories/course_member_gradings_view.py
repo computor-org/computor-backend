@@ -81,6 +81,9 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             return CourseMemberGradingsGet(**cached)
 
         # Cache miss - now access database (lazy connection)
+        from computor_backend.model.auth import User, StudentProfile
+        from sqlalchemy import and_
+
         course_member = self.db.query(CourseMember).filter(
             CourseMember.id == course_member_id
         ).first()
@@ -96,6 +99,31 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             raise NotFoundException(
                 detail=f"Course member {course_member_id} does not belong to course {course_id}"
             )
+
+        # Get organization_id from course for student_profile lookup
+        course = self.db.query(Course).filter(Course.id == course_id).first()
+        org_id = course.organization_id if course else None
+
+        # Fetch user info and student_id
+        member_info = (
+            self.db.query(
+                User.id.label("user_id"),
+                User.username,
+                User.given_name,
+                User.family_name,
+                StudentProfile.student_id,
+            )
+            .select_from(User)
+            .outerjoin(
+                StudentProfile,
+                and_(
+                    StudentProfile.user_id == User.id,
+                    StudentProfile.organization_id == org_id,
+                )
+            )
+            .filter(User.id == course_member.user_id)
+            .first()
+        )
 
         # Permission check: Tutor or higher role required
         has_course_perms = check_course_permissions(
@@ -176,6 +204,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         result = CourseMemberGradingsGet(
             course_member_id=str(course_member_id),
             course_id=course_id,
+            user_id=str(member_info.user_id) if member_info and member_info.user_id else None,
+            username=member_info.username if member_info else None,
+            given_name=member_info.given_name if member_info else None,
+            family_name=member_info.family_name if member_info else None,
+            student_id=member_info.student_id if member_info else None,
             total_max_assignments=stats["total_max_assignments"],
             total_submitted_assignments=stats["total_submitted_assignments"],
             overall_progress_percentage=stats["overall_progress_percentage"],
@@ -266,10 +299,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 CourseMemberGradingsList(
                     course_member_id=member["course_member_id"],
                     course_id=str(course_id),
-                    user_id=member.get("user_id"),
-                    username=member.get("username"),
-                    given_name=member.get("given_name"),
-                    family_name=member.get("family_name"),
+                    user_id=member["user_id"],
+                    username=member["username"],
+                    given_name=member["given_name"],
+                    family_name=member["family_name"],
+                    student_id=member["student_id"],
                     total_max_assignments=0,
                     total_submitted_assignments=0,
                     overall_progress_percentage=0.0,
@@ -301,6 +335,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                     username=member["username"],
                     given_name=member["given_name"],
                     family_name=member["family_name"],
+                    student_id=member["student_id"],
                     total_max_assignments=cached_data["total_max_assignments"],
                     total_submitted_assignments=cached_data["total_submitted_assignments"],
                     overall_progress_percentage=cached_data["overall_progress_percentage"],
@@ -320,10 +355,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                     list_item = CourseMemberGradingsList(
                         course_member_id=full_stats.course_member_id,
                         course_id=full_stats.course_id,
-                        user_id=member.get("user_id"),
-                        username=member.get("username"),
-                        given_name=member.get("given_name"),
-                        family_name=member.get("family_name"),
+                        user_id=member["user_id"],
+                        username=member["username"],
+                        given_name=member["given_name"],
+                        family_name=member["family_name"],
+                        student_id=member["student_id"],
                         total_max_assignments=full_stats.total_max_assignments,
                         total_submitted_assignments=full_stats.total_submitted_assignments,
                         overall_progress_percentage=full_stats.overall_progress_percentage,
@@ -337,10 +373,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                     results.append(CourseMemberGradingsList(
                         course_member_id=member_id,
                         course_id=str(course_id),
-                        user_id=member.get("user_id"),
-                        username=member.get("username"),
-                        given_name=member.get("given_name"),
-                        family_name=member.get("family_name"),
+                        user_id=member["user_id"],
+                        username=member["username"],
+                        given_name=member["given_name"],
+                        family_name=member["family_name"],
+                        student_id=member["student_id"],
                         total_max_assignments=0,
                         total_submitted_assignments=0,
                         overall_progress_percentage=0.0,

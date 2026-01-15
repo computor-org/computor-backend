@@ -232,8 +232,15 @@ class CourseMemberGradingsRepository:
             course_id: The course ID
 
         Returns:
-            List of dicts with course_member and user info
+            List of dicts with course_member and user info including student_id
         """
+        from computor_backend.model.auth import StudentProfile
+        from computor_backend.model.course import Course
+
+        # First get the organization_id for this course
+        course = self.db.query(Course.organization_id).filter(Course.id == course_id).first()
+        org_id = course.organization_id if course else None
+
         results = (
             self.db.query(
                 CourseMember.id.label("course_member_id"),
@@ -241,8 +248,16 @@ class CourseMemberGradingsRepository:
                 User.username.label("username"),
                 User.given_name.label("given_name"),
                 User.family_name.label("family_name"),
+                StudentProfile.student_id.label("student_id"),
             )
             .join(User, User.id == CourseMember.user_id)
+            .outerjoin(
+                StudentProfile,
+                and_(
+                    StudentProfile.user_id == CourseMember.user_id,
+                    StudentProfile.organization_id == org_id,
+                )
+            )
             .filter(
                 CourseMember.course_id == course_id,
                 CourseMember.course_role_id == "_student",
@@ -257,6 +272,7 @@ class CourseMemberGradingsRepository:
                 "username": r.username,
                 "given_name": r.given_name,
                 "family_name": r.family_name,
+                "student_id": r.student_id,
             }
             for r in results
         ]
@@ -545,7 +561,11 @@ class CourseMemberGradingsRepository:
             content_type_filter = "AND cct.id = :course_content_type_id"
 
         sql = text(f"""
-        WITH submittable_contents AS (
+        WITH course_org AS (
+            -- Get the organization_id for this course
+            SELECT organization_id FROM course WHERE id = :course_id
+        ),
+        submittable_contents AS (
             -- Get all submittable course contents
             SELECT
                 cc.id as content_id,
@@ -575,15 +595,18 @@ class CourseMemberGradingsRepository:
             GROUP BY content_type_id, content_type_slug, content_type_title, content_type_color
         ),
         all_students AS (
-            -- Get all students in the course
+            -- Get all students in the course with student_id from student_profile
             SELECT
                 cm.id as course_member_id,
                 cm.user_id,
                 u.username,
                 u.given_name,
-                u.family_name
+                u.family_name,
+                sp.student_id
             FROM course_member cm
             JOIN "user" u ON u.id = cm.user_id
+            LEFT JOIN student_profile sp ON sp.user_id = cm.user_id
+                AND sp.organization_id = (SELECT organization_id FROM course_org)
             WHERE cm.course_id = :course_id
               AND cm.course_role_id = '_student'
             ORDER BY u.family_name, u.given_name
@@ -649,6 +672,7 @@ class CourseMemberGradingsRepository:
             s.username,
             s.given_name,
             s.family_name,
+            s.student_id,
             ctc.content_type_id,
             ctc.content_type_slug,
             ctc.content_type_title,
@@ -684,6 +708,7 @@ class CourseMemberGradingsRepository:
                 "username": r.username,
                 "given_name": r.given_name,
                 "family_name": r.family_name,
+                "student_id": r.student_id,
                 "content_type_id": str(r.content_type_id),
                 "content_type_slug": r.content_type_slug,
                 "content_type_title": r.content_type_title,
