@@ -137,7 +137,18 @@ async def course_member_course_content_result_mapper(
 
     # Query grades directly from database for this submission group
     gradings_payload = []
+    latest_submission_artifact_id = None
     if submission_group is not None:
+        # First, find the latest submission artifact (submit=true) ordered by created_at
+        latest_submission = db.query(SubmissionArtifact).filter(
+            SubmissionArtifact.submission_group_id == submission_group.id,
+            SubmissionArtifact.submit == True
+        ).order_by(SubmissionArtifact.created_at.desc()).first()
+
+        if latest_submission:
+            latest_submission_artifact_id = latest_submission.id
+
+        # Get all grades for this submission group (for the gradings list)
         grades = db.query(SubmissionGrade).join(
             SubmissionArtifact, SubmissionArtifact.id == SubmissionGrade.artifact_id
         ).filter(
@@ -160,11 +171,17 @@ async def course_member_course_content_result_mapper(
                 graded_by_course_member=GradedByCourseMember.model_validate(grade.graded_by, from_attributes=True) if grade.graded_by else None,
             ))
 
-    # # Update latest grading values from most recent grade
-    if gradings_payload:
-        latest_grading_value = gradings_payload[0].grading
-        latest_status = gradings_payload[0].status
-        latest_status_value = latest_status.value if isinstance(latest_status, GradingStatus) else latest_status
+    # Update latest grading values from the latest SUBMISSION's most recent grade
+    # (not just the most recent grade overall)
+    if latest_submission_artifact_id is not None:
+        # Find the latest grade for the latest submission artifact
+        latest_submission_grade = db.query(SubmissionGrade).filter(
+            SubmissionGrade.artifact_id == latest_submission_artifact_id
+        ).order_by(SubmissionGrade.graded_at.desc()).first()
+
+        if latest_submission_grade:
+            latest_grading_value = latest_submission_grade.grade
+            latest_status_value = latest_submission_grade.status
 
     if latest_status_value is not None:
         submission_status = status_lookup.get(int(latest_status_value), "not_reviewed")
