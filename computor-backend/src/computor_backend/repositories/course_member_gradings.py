@@ -733,6 +733,127 @@ class CourseMemberGradingsRepository:
 
         return float(result.grade) if result else None
 
+    def get_assignment_details_for_member(
+        self,
+        course_member_id: UUID | str,
+        course_id: UUID | str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get per-assignment details for a course member including:
+        - Latest result info (id, grade, status, created_at)
+        - Test runs count and max_test_runs limit
+        - Submissions count and max_submissions limit
+
+        Args:
+            course_member_id: The course member ID
+            course_id: The course ID
+
+        Returns:
+            Dict mapping course_content path to assignment details
+        """
+        sql = text("""
+        WITH member_submission_groups AS (
+            -- Get all submission groups this member belongs to
+            SELECT DISTINCT
+                sg.id as submission_group_id,
+                sg.course_content_id,
+                sg.max_test_runs as sg_max_test_runs,
+                sg.max_submissions as sg_max_submissions
+            FROM submission_group sg
+            JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+            WHERE sgm.course_member_id = :course_member_id
+              AND sg.course_id = :course_id
+        ),
+        submittable_contents AS (
+            -- Get all submittable course contents
+            SELECT
+                cc.id as content_id,
+                cc.path,
+                cc.max_test_runs as cc_max_test_runs,
+                cc.max_submissions as cc_max_submissions
+            FROM course_content cc
+            JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+            JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+            WHERE cc.course_id = :course_id
+              AND cck.submittable = true
+              AND cc.archived_at IS NULL
+        ),
+        latest_results AS (
+            -- Get the latest result for each content
+            SELECT DISTINCT ON (sc.content_id)
+                sc.content_id,
+                r.id as result_id,
+                r.grade as result_grade,
+                r.status as result_status,
+                r.created_at as result_created_at
+            FROM submittable_contents sc
+            JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
+            LEFT JOIN result r ON r.course_content_id = sc.content_id
+                AND r.course_member_id = :course_member_id
+            ORDER BY sc.content_id, r.created_at DESC NULLS LAST
+        ),
+        test_runs_counts AS (
+            -- Count test runs (all results, not just submitted)
+            SELECT
+                sc.content_id,
+                COUNT(r.id) as test_runs_count
+            FROM submittable_contents sc
+            LEFT JOIN result r ON r.course_content_id = sc.content_id
+                AND r.course_member_id = :course_member_id
+            GROUP BY sc.content_id
+        ),
+        submissions_counts AS (
+            -- Count submissions (artifacts with submit=true)
+            SELECT
+                sc.content_id,
+                COUNT(DISTINCT sa.id) as submissions_count
+            FROM submittable_contents sc
+            JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
+            LEFT JOIN submission_artifact sa ON sa.submission_group_id = msg.submission_group_id
+                AND sa.submit = true
+            GROUP BY sc.content_id
+        )
+        SELECT
+            sc.path::text as path,
+            sc.content_id,
+            -- Limits: prefer submission_group override, fallback to course_content
+            COALESCE(msg.sg_max_test_runs, sc.cc_max_test_runs) as max_test_runs,
+            COALESCE(msg.sg_max_submissions, sc.cc_max_submissions) as max_submissions,
+            -- Latest result info
+            lr.result_id,
+            lr.result_grade,
+            lr.result_status,
+            lr.result_created_at,
+            -- Counts
+            COALESCE(trc.test_runs_count, 0) as test_runs_count,
+            COALESCE(smc.submissions_count, 0) as submissions_count
+        FROM submittable_contents sc
+        LEFT JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
+        LEFT JOIN latest_results lr ON lr.content_id = sc.content_id
+        LEFT JOIN test_runs_counts trc ON trc.content_id = sc.content_id
+        LEFT JOIN submissions_counts smc ON smc.content_id = sc.content_id
+        """)
+
+        results = self.db.execute(sql, {
+            "course_member_id": str(course_member_id),
+            "course_id": str(course_id),
+        }).fetchall()
+
+        return {
+            r.path: {
+                "content_id": str(r.content_id),
+                "max_test_runs": r.max_test_runs,
+                "max_submissions": r.max_submissions,
+                "latest_result_id": str(r.result_id) if r.result_id else None,
+                "latest_result_grade": float(r.result_grade) if r.result_grade is not None else None,
+                "latest_result_status": r.result_status,
+                "latest_result_created_at": r.result_created_at,
+                "test_runs_count": r.test_runs_count,
+                "submissions_count": r.submissions_count,
+            }
+            for r in results
+        }
+
 
 def calculate_grading_stats(
     submittable_contents: List[Dict[str, Any]],
