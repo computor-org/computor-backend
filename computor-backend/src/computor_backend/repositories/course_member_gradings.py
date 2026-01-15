@@ -808,7 +808,7 @@ class CourseMemberGradingsRepository:
             SELECT DISTINCT ON (sc.content_id)
                 sc.content_id,
                 r.id as result_id,
-                r.grade as result_grade,
+                r.result as result_grade,
                 r.status as result_status,
                 r.created_at as result_created_at
             FROM submittable_contents sc
