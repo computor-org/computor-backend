@@ -34,6 +34,7 @@ from computor_backend.business_logic.message_operations import (
     create_message_audit,
     get_message_audit_history,
 )
+from computor_backend.websocket.broadcast import ws_broadcast
 
 messages_router = APIRouter()
 
@@ -57,6 +58,9 @@ async def create_message(
     db_message = db.query(Message).filter(Message.id == message.id).first()
     if db_message:
         create_message_audit(db_message, permissions, db)
+
+    # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    await ws_broadcast.message_created(message, message.model_dump(mode="json"))
 
     return message
 
@@ -122,7 +126,12 @@ async def update_message(
     )
 
     # Convert to MessageGet
-    return get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
+    message_get = get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
+
+    # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    await ws_broadcast.message_updated(message_get, message_get.model_dump(mode="json"), str(id))
+
+    return message_get
 
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
@@ -131,8 +140,8 @@ async def delete_message(
     db: Session = Depends(get_db),
 ):
     """Soft delete a message (preserves thread structure)."""
-    # Verify user has access
-    await get_id_db(permissions, db, id, MessageInterface)
+    # Verify user has access and get message for broadcast
+    message = await get_id_db(permissions, db, id, MessageInterface)
 
     # Soft delete with audit
     soft_delete_message(
@@ -141,6 +150,10 @@ async def delete_message(
         db=db,
         reason="user_request"
     )
+
+    # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    await ws_broadcast.message_deleted(message, str(id))
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)

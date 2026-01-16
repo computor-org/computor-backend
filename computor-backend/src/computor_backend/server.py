@@ -69,6 +69,8 @@ from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.exceptions import register_exception_handlers
+from computor_backend.websocket.router import ws_router
+from computor_backend.websocket.connection_manager import manager as ws_manager
 import json
 import tempfile
 from pathlib import Path
@@ -178,7 +180,13 @@ async def lifespan(app: FastAPI):
         # Initialize plugin registry in development mode
         # await initialize_plugin_registry_with_config()
 
+    # Start WebSocket connection manager
+    await ws_manager.start()
+
     yield
+
+    # Stop WebSocket connection manager
+    await ws_manager.stop()
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -417,6 +425,12 @@ app.include_router(
 app.include_router(
     session_router,
     tags=["sessions"]
+)
+
+# WebSocket router (authentication handled internally)
+app.include_router(
+    ws_router,
+    tags=["websocket"]
 )
 
 
