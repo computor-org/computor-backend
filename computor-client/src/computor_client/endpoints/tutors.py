@@ -143,3 +143,12 @@ class TutorsClient:
         response = await self._http.get(f"/tutors/course-contents/{course_content_id}/reference", params=kwargs)
         return response.json()
 
+    async def course_contents_description(
+        self,
+        course_content_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Download Course Content Description"""
+        response = await self._http.get(f"/tutors/course-contents/{course_content_id}/description", params=kwargs)
+        return response.json()
+
