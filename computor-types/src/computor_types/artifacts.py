@@ -221,6 +221,25 @@ class ResultArtifactInterface(EntityInterface):
     create = ResultArtifactCreate
     query = ResultArtifactQuery
 
+
+# ===============================
+# Result Artifact Upload DTOs
+# ===============================
+
+class ArtifactInfo(BaseModel):
+    """Information about a single uploaded artifact."""
+    filename: str
+    file_size: int
+    content_type: Optional[str] = None
+
+
+class ResultArtifactUploadResponse(BaseModel):
+    """Response for artifact upload endpoint."""
+    result_id: str
+    artifacts_count: int
+    artifacts: List[ArtifactInfo]
+
+
 # Import the necessary types first
 from .results import ResultList
 

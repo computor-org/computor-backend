@@ -516,49 +516,66 @@ async def commit_test_results_activity(
         raise ApplicationError(message=str(e))
 
 
-async def store_test_artifacts(result_id: str, artifacts_path: str) -> int:
+async def store_test_artifacts(
+    result_id: str,
+    artifacts_path: str,
+    api_config: Dict[str, Any],
+) -> int:
     """
-    Store all files from the artifacts directory to MinIO.
+    Store all artifacts via the API by uploading them as a ZIP.
+
+    This uploads artifacts through the backend API endpoint, removing the need
+    for direct MinIO access from testing workers.
 
     Args:
         result_id: The result ID to associate artifacts with
         artifacts_path: Path to the directory containing artifact files
+        api_config: API connection configuration (requires 'token' and 'url')
 
     Returns:
         Number of artifacts stored
     """
-    from computor_backend.services.result_storage import store_result_artifact
+    import zipfile
+    from io import BytesIO
 
-    stored_count = 0
+    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+    api_token = api_config.get("token")
 
-    # Walk through all files in the artifacts directory (including subdirectories)
-    for root, dirs, files in os.walk(artifacts_path):
-        for filename in files:
-            file_path = os.path.join(root, filename)
+    if not api_token:
+        raise ApplicationError("API token is required for artifact upload")
 
-            # Calculate relative path from artifacts_path for nested directories
-            rel_path = os.path.relpath(file_path, artifacts_path)
+    # Create ZIP in memory
+    zip_buffer = BytesIO()
+    file_count = 0
 
-            try:
-                # Read file content
-                with open(file_path, 'rb') as f:
-                    file_data = f.read()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for root, dirs, files in os.walk(artifacts_path):
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(file_path, artifacts_path)
+                zip_file.write(file_path, rel_path)
+                file_count += 1
+                logger.info(f"Added artifact '{rel_path}' to ZIP")
 
-                # Store in MinIO
-                storage_info = await store_result_artifact(
-                    result_id=result_id,
-                    filename=rel_path,
-                    file_data=file_data,
-                )
+    if file_count == 0:
+        logger.info("No artifacts to upload")
+        return 0
 
-                stored_count += 1
-                logger.info(f"Stored artifact '{rel_path}' ({storage_info['file_size']} bytes)")
+    zip_buffer.seek(0)
+    zip_data = zip_buffer.read()
 
-            except Exception as e:
-                logger.warning(f"Failed to store artifact '{rel_path}': {e}")
+    logger.info(f"Uploading {file_count} artifacts as ZIP ({len(zip_data)} bytes)")
 
-    logger.info(f"Stored {stored_count} artifacts for result {result_id}")
-    return stored_count
+    # Upload via API
+    async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
+        response = await client._http.post(
+            f"/results/{result_id}/artifacts/upload",
+            files={"file": ("artifacts.zip", zip_data, "application/zip")},
+        )
+        response.raise_for_status()
+
+    logger.info(f"Uploaded {file_count} artifacts via API for result {result_id}")
+    return file_count
 
 
 @activity.defn(name="run_complete_student_test")
@@ -634,11 +651,12 @@ async def run_complete_student_test_activity(
 
             logger.info(f"Test execution completed: {test_results}")
 
-            # Step 3.5: Store any generated artifacts to MinIO
+            # Step 3.5: Store any generated artifacts via API
+            # This allows testing workers to operate without direct MinIO access
             artifacts_path = os.path.join(work_dir, "artifacts")
             if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
                 logger.info(f"Found artifacts to store in {artifacts_path}")
-                await store_test_artifacts(result_id, artifacts_path)
+                await store_test_artifacts(result_id, artifacts_path, api_config)
             else:
                 logger.info("No artifacts generated during test execution")
 
