@@ -18,8 +18,8 @@ from computor_backend.repositories.course_content import (
     course_course_member_list_query,
     course_member_course_content_list_query,
     course_member_course_content_query,
-    get_ungraded_submission_count_per_member,
     get_unread_message_count_per_member,
+    get_unreviewed_submission_count_per_member,
 )
 from computor_backend.api.mappers import course_member_course_content_result_mapper
 from computor_backend.model.auth import User
@@ -298,18 +298,20 @@ def list_tutor_course_members(
             Course.id.in_([r.id for r in subquery])
         ).join(User, User.id == CourseMember.user_id).order_by(User.family_name).all()
 
-    # Get ungraded submission counts for course members
+    # Get unreviewed submission counts for course members
+    # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
     # Extract course_id from params if available
     course_id = params.course_id if params and hasattr(params, 'course_id') else None
-    ungraded_counts = get_ungraded_submission_count_per_member(db, course_id)
-    unread_message_counts = get_unread_message_count_per_member(db, course_id)
+    reader_user_id = str(permissions.get_user_id_or_throw())
+    unreviewed_counts = get_unreviewed_submission_count_per_member(db, course_id)
+    unread_message_counts = get_unread_message_count_per_member(db, course_id, reader_user_id)
 
     response_list = []
 
     for course_member, latest_result_date in query:
         tutor_course_member = TutorCourseMemberList.model_validate(course_member, from_attributes=True)
         tutor_course_member.unreviewed = True if latest_result_date is not None else False
-        tutor_course_member.ungraded_submissions_count = ungraded_counts.get(str(course_member.id), 0)
+        tutor_course_member.ungraded_submissions_count = unreviewed_counts.get(str(course_member.id), 0)
         tutor_course_member.unread_message_count = unread_message_counts.get(str(course_member.id), 0)
         response_list.append(tutor_course_member)
 

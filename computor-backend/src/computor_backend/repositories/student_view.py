@@ -81,9 +81,11 @@ class StudentViewRepository(ViewRepository):
         course_contents_result = user_course_content_query(user_id, course_content_id, self.db)
         result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
-        # Aggregate status for unit-like course contents (non-submittable)
+        # Aggregate status and unreviewed_count for unit-like course contents (non-submittable)
         if result and result.submission_group is None:
-            result.status = self._aggregate_single_unit_status(user_id, result)
+            status, unreviewed_count = self._aggregate_single_unit_status(user_id, result)
+            result.status = status
+            result.unreviewed_count = unreviewed_count
 
         # Cache result
         if result:
@@ -113,9 +115,9 @@ class StudentViewRepository(ViewRepository):
         self,
         user_id: str,
         course_content: CourseContentStudentGet,
-    ) -> Optional[str]:
+    ) -> tuple:
         """
-        Aggregate status for a single unit-like course content from its descendants.
+        Aggregate status and unreviewed_count for a single unit-like course content from its descendants.
 
         This is used for the single GET endpoint where we need to query descendants
         from the database.
@@ -125,11 +127,11 @@ class StudentViewRepository(ViewRepository):
             course_content: The unit course content to aggregate status for
 
         Returns:
-            Aggregated status string, or None if no descendants with status
+            Tuple of (aggregated_status, total_unreviewed_count)
         """
         # Only aggregate for non-submittable content (units)
         if course_content.submission_group is not None:
-            return course_content.status
+            return (course_content.status, course_content.unreviewed_count)
 
         # Query descendants from the same course with path starting with this unit's path
         from computor_backend.repositories.course_content import user_course_content_list_query
@@ -148,6 +150,7 @@ class StudentViewRepository(ViewRepository):
         # Find descendants and collect their statuses
         # Use the status from the query result tuple which is already user-specific
         descendant_statuses: List[str] = []
+        total_unreviewed_count = 0
         status_lookup = {
             0: "not_reviewed",
             1: "corrected",
@@ -165,19 +168,22 @@ class StudentViewRepository(ViewRepository):
                 continue
 
             # row[3] is submission_group, row[5] is submission_status_int from the query
+            # row[10] is is_unreviewed from the query
             submission_group = row[3]
             submission_status_int = row[5] if len(row) > 5 else None
+            is_unreviewed = row[10] if len(row) > 10 else 0
 
             # Only collect from submittable contents (those with submission_group)
             # If submission_group exists but status is None, treat as not_reviewed
             if submission_group is not None:
                 status_str = status_lookup.get(submission_status_int, "not_reviewed") if submission_status_int is not None else "not_reviewed"
                 descendant_statuses.append(status_str)
+                total_unreviewed_count += is_unreviewed or 0
 
         if descendant_statuses:
-            return _aggregate_grading_status(descendant_statuses)
+            return (_aggregate_grading_status(descendant_statuses), total_unreviewed_count)
 
-        return None
+        return (None, 0)
 
     # Note: _aggregate_unit_statuses and _aggregate_single_unit_status_for_list
     # are inherited from ViewRepository base class

@@ -30,6 +30,8 @@ class TutorCourseMemberList(BaseModel):
     course_group_id: Optional[str] = None
     course_role_id: str
     unreviewed: Optional[bool] = None
+    # Count of course contents where latest submission is unreviewed
+    # (no grades OR latest grade has status = NOT_REVIEWED)
     ungraded_submissions_count: Optional[int] = None
     unread_message_count: Optional[int] = None
 

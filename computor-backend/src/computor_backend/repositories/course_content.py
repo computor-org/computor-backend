@@ -46,6 +46,8 @@ class CourseMemberCourseContentQueryResult(BaseModel):
         submission_grading: Latest grading score
         content_unread_count: Unread messages at content level
         submission_group_unread_count: Unread messages at submission group level
+        latest_grade_status_int: Grade status of the latest submission (0=NOT_REVIEWED, 1=CORRECTED, etc.)
+        is_latest_unreviewed: 1 if latest submission is unreviewed (no grades or status=0), 0 otherwise
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -58,6 +60,8 @@ class CourseMemberCourseContentQueryResult(BaseModel):
     submission_grading: Optional[float] = None
     content_unread_count: int = 0
     submission_group_unread_count: int = 0
+    latest_grade_status_int: Optional[int] = None
+    is_latest_unreviewed: int = 0
 
     @classmethod
     def from_tuple(cls, raw_result: tuple) -> "CourseMemberCourseContentQueryResult":
@@ -83,6 +87,8 @@ class CourseMemberCourseContentQueryResult(BaseModel):
             submission_grading=raw_result[6] if len(raw_result) > 6 else None,
             content_unread_count=raw_result[7] if len(raw_result) > 7 else 0,
             submission_group_unread_count=raw_result[8] if len(raw_result) > 8 else 0,
+            latest_grade_status_int=raw_result[9] if len(raw_result) > 9 else None,
+            is_latest_unreviewed=raw_result[10] if len(raw_result) > 10 else 0,
         )
 
 
@@ -244,6 +250,85 @@ def latest_grading_subquery(db: Session):
     ).filter(sa.literal(False)).subquery()  # Always empty for now
 
 
+def latest_submission_grade_status_subquery(db: Session):
+    """
+    Get the grade status of the latest submission artifact per submission group.
+
+    For each submission group, finds the latest submitted artifact (submit=true)
+    and returns its latest grade's status.
+
+    Returns columns:
+        - submission_group_id
+        - latest_grade_status: The status of the latest grade on the latest submission
+                              (0=NOT_REVIEWED, 1=CORRECTED, 2=CORRECTION_NECESSARY, 3=IMPROVEMENT_POSSIBLE)
+                              NULL if no grades exist
+        - is_unreviewed: 1 if unreviewed (no grades or latest grade status=0), 0 otherwise
+
+    Args:
+        db: Database session
+
+    Returns:
+        Subquery with latest submission grade status info
+    """
+    # First, get the latest submission artifact per submission group
+    latest_artifact_subquery = db.query(
+        SubmissionArtifact.submission_group_id,
+        func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at")
+    ).filter(
+        SubmissionArtifact.submit == True
+    ).group_by(
+        SubmissionArtifact.submission_group_id
+    ).subquery()
+
+    # Then, for each latest artifact, get its latest grade
+    # Using a window function to rank grades by graded_at DESC
+    latest_grade_subquery = db.query(
+        SubmissionArtifact.submission_group_id,
+        SubmissionGrade.status,
+        func.row_number().over(
+            partition_by=SubmissionArtifact.submission_group_id,
+            order_by=SubmissionGrade.graded_at.desc()
+        ).label("rn")
+    ).select_from(SubmissionArtifact).join(
+        latest_artifact_subquery,
+        and_(
+            SubmissionArtifact.submission_group_id == latest_artifact_subquery.c.submission_group_id,
+            SubmissionArtifact.created_at == latest_artifact_subquery.c.latest_artifact_created_at
+        )
+    ).join(
+        SubmissionGrade,
+        SubmissionGrade.artifact_id == SubmissionArtifact.id
+    ).filter(
+        SubmissionArtifact.submit == True
+    ).subquery()
+
+    # Get only rn=1 (latest grade) per submission group
+    latest_grade_status = db.query(
+        latest_grade_subquery.c.submission_group_id,
+        latest_grade_subquery.c.status.label("latest_grade_status")
+    ).filter(
+        latest_grade_subquery.c.rn == 1
+    ).subquery()
+
+    # Now build the final subquery that includes all submission groups with submissions
+    # and marks whether they are unreviewed
+    return db.query(
+        latest_artifact_subquery.c.submission_group_id,
+        latest_grade_status.c.latest_grade_status,
+        # is_unreviewed: 1 if no grade (NULL) or status=0 (NOT_REVIEWED)
+        case(
+            (latest_grade_status.c.latest_grade_status.is_(None), 1),
+            (latest_grade_status.c.latest_grade_status == 0, 1),
+            else_=0
+        ).label("is_unreviewed")
+    ).select_from(
+        latest_artifact_subquery
+    ).outerjoin(
+        latest_grade_status,
+        latest_artifact_subquery.c.submission_group_id == latest_grade_status.c.submission_group_id
+    ).subquery()
+
+
 def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
     """
     Count unread messages per course content.
@@ -338,6 +423,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -374,6 +460,8 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         latest_grading_sub.c.grading,
         content_unread_column,
         submission_group_unread_column,
+        latest_submission_grade_sub.c.latest_grade_status,
+        func.coalesce(latest_submission_grade_sub.c.is_unreviewed, 0).label("is_unreviewed"),
     ]
 
     course_contents_query = db.query(*query_columns) \
@@ -407,6 +495,9 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
+        ).outerjoin(
+            latest_submission_grade_sub,
+            latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
         )
 
     if content_unread_sub is not None:
@@ -472,6 +563,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -508,6 +600,8 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         latest_grading_sub.c.grading,
         content_unread_column,
         submission_group_unread_column,
+        latest_submission_grade_sub.c.latest_grade_status,
+        func.coalesce(latest_submission_grade_sub.c.is_unreviewed, 0).label("is_unreviewed"),
     ]
 
     query = db.query(*query_columns) \
@@ -541,6 +635,9 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
+        ).outerjoin(
+            latest_submission_grade_sub,
+            latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
         )
 
     if content_unread_sub is not None:
@@ -715,6 +812,7 @@ def course_member_course_content_list_query(
     latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -748,6 +846,8 @@ def course_member_course_content_list_query(
         latest_grading_sub.c.grading,
         content_unread_column,
         submission_group_unread_column,
+        latest_submission_grade_sub.c.latest_grade_status,
+        func.coalesce(latest_submission_grade_sub.c.is_unreviewed, 0).label("is_unreviewed"),
     ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
@@ -775,6 +875,9 @@ def course_member_course_content_list_query(
             latest_grading_sub,
             (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
+        ).outerjoin(
+            latest_submission_grade_sub,
+            latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
         )
 
     if content_unread_sub is not None:
@@ -930,17 +1033,125 @@ def get_ungraded_submission_count_per_member(db: Session, course_id: Optional[st
     return {str(row[0]): row[1] for row in ungraded_counts}
 
 
-def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = None):
+def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[str] = None):
     """
-    Get count of unread messages per course member.
+    Get count of unreviewed latest submission artifacts per course member.
 
-    For each course member, counts messages that:
-    1. Target a submission_group they belong to
-    2. Have NOT been read by the course member's user (no entry in message_read)
+    For each course member, counts how many course contents have a latest submitted
+    artifact that is "unreviewed" - meaning either:
+    1. It has NO associated submission_grade, OR
+    2. Its latest submission_grade has status = 0 (NOT_REVIEWED)
+
+    This differs from get_ungraded_submission_count_per_member which only counts
+    artifacts with NO grades at all.
 
     Args:
         db: Database session
         course_id: Optional course ID to filter by
+
+    Returns:
+        Dictionary mapping course_member_id -> count of unreviewed submissions
+    """
+    from sqlalchemy import func, and_, or_
+    from sqlalchemy.sql import expression
+    from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
+
+    # Step 1: Get the latest artifact per submission group (submit=True)
+    latest_artifact_subquery = db.query(
+        SubmissionArtifact.submission_group_id,
+        func.max(SubmissionArtifact.created_at).label("latest_created_at")
+    ).filter(
+        SubmissionArtifact.submit == True
+    ).group_by(
+        SubmissionArtifact.submission_group_id
+    ).subquery()
+
+    # Step 2: Get the actual latest artifact IDs with course_member mapping
+    latest_artifacts_query = db.query(
+        CourseMember.id.label("course_member_id"),
+        SubmissionArtifact.id.label("artifact_id")
+    ).select_from(SubmissionArtifact).join(
+        latest_artifact_subquery,
+        and_(
+            SubmissionArtifact.submission_group_id == latest_artifact_subquery.c.submission_group_id,
+            SubmissionArtifact.created_at == latest_artifact_subquery.c.latest_created_at
+        )
+    ).join(
+        SubmissionGroup,
+        SubmissionGroup.id == SubmissionArtifact.submission_group_id
+    ).join(
+        SubmissionGroupMember,
+        SubmissionGroupMember.submission_group_id == SubmissionGroup.id
+    ).join(
+        CourseMember,
+        CourseMember.id == SubmissionGroupMember.course_member_id
+    ).filter(
+        SubmissionArtifact.submit == True
+    )
+
+    if course_id:
+        latest_artifacts_query = latest_artifacts_query.filter(
+            CourseMember.course_id == course_id
+        )
+
+    latest_artifacts = latest_artifacts_query.subquery()
+
+    # Step 3: For each artifact, get the latest grade's status (using window function)
+    # We need to find artifacts where:
+    # - No grades exist, OR
+    # - The latest grade has status = 0
+
+    # Subquery for latest grade status per artifact
+    latest_grade_per_artifact = db.query(
+        SubmissionGrade.artifact_id,
+        SubmissionGrade.status.label("latest_grade_status"),
+        func.row_number().over(
+            partition_by=SubmissionGrade.artifact_id,
+            order_by=SubmissionGrade.graded_at.desc()
+        ).label("rn")
+    ).subquery()
+
+    # Get only the latest grade per artifact (rn = 1)
+    latest_grade = db.query(
+        latest_grade_per_artifact.c.artifact_id,
+        latest_grade_per_artifact.c.latest_grade_status
+    ).filter(
+        latest_grade_per_artifact.c.rn == 1
+    ).subquery()
+
+    # Step 4: Count artifacts that are "unreviewed"
+    # (no grades OR latest grade status = 0)
+    unreviewed_counts = db.query(
+        latest_artifacts.c.course_member_id,
+        func.count(latest_artifacts.c.artifact_id).label("unreviewed_count")
+    ).outerjoin(
+        latest_grade,
+        latest_grade.c.artifact_id == latest_artifacts.c.artifact_id
+    ).filter(
+        or_(
+            latest_grade.c.artifact_id.is_(None),  # No grade exists
+            latest_grade.c.latest_grade_status == 0  # Latest grade is NOT_REVIEWED
+        )
+    ).group_by(
+        latest_artifacts.c.course_member_id
+    ).all()
+
+    return {str(row[0]): row[1] for row in unreviewed_counts}
+
+
+def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = None, reader_user_id: Optional[str] = None):
+    """
+    Get count of unread messages per course member.
+
+    For each course member, counts messages in their submission groups that:
+    1. Target a submission_group they belong to
+    2. Have NOT been read by the reader_user_id (the tutor/viewer)
+    3. Were not authored by the reader
+
+    Args:
+        db: Database session
+        course_id: Optional course ID to filter by
+        reader_user_id: The user ID of the person viewing (tutor). Messages unread by this user are counted.
 
     Returns:
         Dictionary mapping course_member_id -> count of unread messages
@@ -948,8 +1159,11 @@ def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = 
     from sqlalchemy import func, and_
     from computor_backend.model.message import Message, MessageRead
 
+    if reader_user_id is None:
+        return {}
+
     # Base query: count messages per course_member via submission_group
-    # where there's no MessageRead entry for that message by the user
+    # where there's no MessageRead entry for that message by the reader (tutor)
     query = db.query(
         CourseMember.id.label("course_member_id"),
         func.count(Message.id).label("unread_count")
@@ -963,11 +1177,12 @@ def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = 
         MessageRead,
         and_(
             MessageRead.message_id == Message.id,
-            MessageRead.reader_user_id == CourseMember.user_id
+            MessageRead.reader_user_id == reader_user_id
         )
     ).filter(
-        MessageRead.id.is_(None),  # No read entry = unread
-        Message.archived_at.is_(None)  # Not deleted
+        MessageRead.id.is_(None),  # No read entry = unread by reader
+        Message.archived_at.is_(None),  # Not deleted
+        Message.author_id != reader_user_id  # Exclude reader's own messages
     )
 
     # Filter by course if provided

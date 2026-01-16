@@ -46,12 +46,13 @@ async def course_member_course_content_result_mapper(
     submission_count = course_member_course_content_result.submission_count
     submission_status_int = course_member_course_content_result.submission_status_int
     submission_grading = course_member_course_content_result.submission_grading
-    content_unread_count = course_member_course_content_result.content_unread_count
     submission_group_unread_count = course_member_course_content_result.submission_group_unread_count
+    latest_grade_status_int = course_member_course_content_result.latest_grade_status_int
+    is_latest_unreviewed = course_member_course_content_result.is_latest_unreviewed
 
-    content_unread_count = content_unread_count or 0
     submission_group_unread_count = submission_group_unread_count or 0
-    unread_message_count = content_unread_count + submission_group_unread_count
+    # Only count submission_group messages for course content unread count
+    unread_message_count = submission_group_unread_count
     
     # Convert integer status to string for backward compatibility
     status_lookup = {
@@ -64,6 +65,13 @@ async def course_member_course_content_result_mapper(
     submission_status = None
     latest_status_value = submission_status_int
     latest_grading_value = submission_grading
+
+    # Convert latest_grade_status_int to string
+    latest_grade_status = status_lookup.get(latest_grade_status_int) if latest_grade_status_int is not None else None
+
+    # unreviewed_count: 1 if latest submission is unreviewed, 0 otherwise
+    # For units, this will be aggregated later
+    unreviewed_count = is_latest_unreviewed or 0
 
     directory = course_content.deployment.deployment_path if course_content.deployment else None
 
@@ -260,6 +268,10 @@ async def course_member_course_content_result_mapper(
         # Status: for submittable contents, use submission_group.status
         # For units, this will be aggregated later by the view repository
         status=submission_status,
+        # Whether latest submission is unreviewed (for units, this is aggregated)
+        unreviewed_count=unreviewed_count,
+        # Latest grade status of the latest submission artifact
+        latest_grade_status=latest_grade_status,
     )
 
     if not detailed:
@@ -295,4 +307,6 @@ async def course_member_course_content_result_mapper(
         deployment=deployment_payload,
         has_deployment=has_deployment,
         status=list_obj.status,
+        unreviewed_count=list_obj.unreviewed_count,
+        latest_grade_status=list_obj.latest_grade_status,
     )

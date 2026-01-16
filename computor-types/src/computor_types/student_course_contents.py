@@ -114,13 +114,23 @@ class CourseContentStudentGet(BaseEntityGet):
     # For units, this is aggregated from descendant course contents
     status: Optional[str] = None
 
+    # Whether the latest submission is unreviewed
+    # For assignments: 0 (reviewed) or 1 (unreviewed/no grades)
+    # For units: count of descendant assignments with unreviewed latest submissions
+    unreviewed_count: int = 0
+
+    # Latest grade status for the latest submission artifact
+    # "not_reviewed", "corrected", "correction_necessary", "improvement_possible"
+    # None if no submissions or no grades on latest submission
+    latest_grade_status: Optional[str] = None
+
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 
     model_config = ConfigDict(from_attributes=True)
-    
+
 class CourseContentStudentList(BaseModel):
     id: str
     title: Optional[str] = None
@@ -152,13 +162,23 @@ class CourseContentStudentList(BaseModel):
     # For units, this is aggregated from descendant course contents
     status: Optional[str] = None
 
+    # Whether the latest submission is unreviewed
+    # For assignments: 0 (reviewed) or 1 (unreviewed/no grades)
+    # For units: count of descendant assignments with unreviewed latest submissions
+    unreviewed_count: int = 0
+
+    # Latest grade status for the latest submission artifact
+    # "not_reviewed", "corrected", "correction_necessary", "improvement_possible"
+    # None if no submissions or no grades on latest submission
+    latest_grade_status: Optional[str] = None
+
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 
     model_config = ConfigDict(from_attributes=True)
-    
+
 class CourseContentStudentUpdate(BaseModel):
     status: Optional[Literal["corrected", "correction_necessary", "improvement_possible", "not_reviewed"]] = None
     grading: Optional[float] = None
