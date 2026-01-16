@@ -706,18 +706,24 @@ class StudentTestingWorkflow(BaseWorkflow):
         result_id = parameters.get("result_id")
 
         job_id = str(uuid.uuid4())
-        workflow.logger.info(f"Starting student testing for job {job_id}")
+        workflow.logger.info(f"[TEST START] job={job_id}, result_id={result_id}")
+        workflow.logger.info(f"[TEST CONFIG] service_slug={test_job.get('testing_service_slug')}, "
+                            f"artifact_id={test_job.get('artifact_id')}, "
+                            f"example_version_id={test_job.get('example_version_id')}")
         started_at = datetime.utcnow()
 
         try:
             # API configuration
+            api_url = os.environ.get("API_URL", "http://localhost:8000")
+            api_token = os.environ.get("API_TOKEN")
             api_config = {
-                "url": os.environ.get("API_URL", "http://localhost:8000"),
-                "token": os.environ.get("API_TOKEN"),
+                "url": api_url,
+                "token": api_token,
             }
+            workflow.logger.info(f"[API CONFIG] url={api_url}, token_present={bool(api_token)}")
 
             # Run complete test in single activity
-            workflow.logger.info("Running complete student test")
+            workflow.logger.info(f"[ACTIVITY START] run_complete_student_test for result_id={result_id}")
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
                 args=[test_job, service_type_config, result_id, api_config],
@@ -726,6 +732,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             )
 
             completed_at = datetime.utcnow()
+            duration = (completed_at - started_at).total_seconds()
 
             # Extract results
             if "summary" in test_results:
@@ -737,13 +744,15 @@ class StudentTestingWorkflow(BaseWorkflow):
                 failed = test_results.get("failed", 0)
                 total = test_results.get("total", 0)
 
+            workflow.logger.info(f"[TEST COMPLETE] result_id={result_id}, passed={passed}/{total}, duration={duration:.1f}s")
+
             return WorkflowResult(
                 status="completed",
                 result={
                     "test_job_id": job_id,
                     "started_at": started_at.isoformat(),
                     "completed_at": completed_at.isoformat(),
-                    "duration_seconds": (completed_at - started_at).total_seconds(),
+                    "duration_seconds": duration,
                 },
                 metadata={
                     "workflow_type": "student_testing",
@@ -754,7 +763,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             )
 
         except Exception as e:
-            workflow.logger.error(f"Student testing failed: {str(e)}")
+            workflow.logger.error(f"[TEST FAILED] result_id={result_id}, error={str(e)}")
             return WorkflowResult(
                 status="failed",
                 result=None,
