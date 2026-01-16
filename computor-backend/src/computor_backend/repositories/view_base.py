@@ -468,23 +468,25 @@ class ViewRepository(ABC):
         user_id: str,
     ) -> List[Any]:
         """
-        Aggregate status for unit-like course contents from their descendants.
+        Aggregate status and unreviewed_count for unit-like course contents from their descendants.
 
         Units (non-submittable course contents) don't have their own submission_group,
         so their status is derived from their descendant submittable contents.
 
-        Aggregation rules:
+        Status aggregation rules:
         1. If ANY 'correction_necessary' exists -> 'correction_necessary'
         2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
         3. Else if ALL are 'corrected' -> 'corrected'
         4. Else -> 'not_reviewed' (mix or all not_reviewed)
+
+        unreviewed_count aggregation: Sum of all descendant submittable contents' unreviewed_count
 
         Args:
             course_contents: List of course contents with status already set for submittables
             user_id: User ID (needed for fallback DB query)
 
         Returns:
-            Same list with unit statuses aggregated from descendants
+            Same list with unit statuses and unreviewed_count aggregated from descendants
         """
         if not course_contents:
             return course_contents
@@ -498,10 +500,11 @@ class ViewRepository(ABC):
         # and potentially no status set yet
         units = [cc for cc in course_contents if cc.submission_group is None]
 
-        # For each unit, find descendants and aggregate their statuses
+        # For each unit, find descendants and aggregate their statuses and unreviewed_count
         for unit in units:
             unit_path = str(unit.path)
             descendant_statuses: List[str] = []
+            total_unreviewed_count = 0
 
             # Find all descendants by checking if their path starts with unit_path
             # In ltree, a.b.c is a descendant of a.b if a.b.c starts with a.b.
@@ -516,14 +519,22 @@ class ViewRepository(ABC):
                     # If submission_group exists but status is None, treat as not_reviewed
                     if cc.submission_group is not None:
                         descendant_statuses.append(cc.status if cc.status else "not_reviewed")
+                        # Sum up unreviewed_count from descendants
+                        total_unreviewed_count += getattr(cc, 'unreviewed_count', 0) or 0
 
             # Aggregate and set the unit's status
             if descendant_statuses:
                 unit.status = _aggregate_grading_status(descendant_statuses)
+                unit.unreviewed_count = total_unreviewed_count
             else:
                 # No descendants in result set - fall back to DB query
                 # This happens when filtering by path/id returns only the unit without descendants
-                unit.status = self._aggregate_single_unit_status_for_list(user_id, unit)
+                aggregated = self._aggregate_single_unit_status_for_list(user_id, unit)
+                if isinstance(aggregated, tuple):
+                    unit.status, unit.unreviewed_count = aggregated
+                else:
+                    unit.status = aggregated
+                    unit.unreviewed_count = 0
 
         return course_contents
 
@@ -531,20 +542,20 @@ class ViewRepository(ABC):
         self,
         user_id: str,
         course_content: Any,
-    ) -> Optional[str]:
+    ) -> tuple:
         """
-        Aggregate status for a single unit from DB when descendants aren't in result set.
+        Aggregate status and unreviewed_count for a single unit from DB when descendants aren't in result set.
 
         This is a fallback method for when a query returns only a unit without its
         descendants (e.g., filtering by path). It queries the DB to find all
-        descendants and aggregate their statuses.
+        descendants and aggregate their statuses and unreviewed counts.
 
         Args:
             user_id: User ID for the query
             course_content: The unit course content to aggregate status for
 
         Returns:
-            Aggregated status string, or None if no descendants with status
+            Tuple of (aggregated_status, total_unreviewed_count)
         """
         from computor_backend.repositories.course_content import user_course_content_list_query
         from sqlalchemy import text
@@ -562,6 +573,7 @@ class ViewRepository(ABC):
         # Find descendants and collect their statuses
         # Use the status from the query result tuple which is already user-specific
         descendant_statuses: List[str] = []
+        total_unreviewed_count = 0
         status_lookup = {
             0: "not_reviewed",
             1: "corrected",
@@ -578,16 +590,19 @@ class ViewRepository(ABC):
                 continue
 
             # row[3] is submission_group, row[5] is submission_status_int from the query
+            # row[10] is is_unreviewed from the query
             submission_group = row[3]
             submission_status_int = row[5] if len(row) > 5 else None
+            is_unreviewed = row[10] if len(row) > 10 else 0
 
             # Only collect from submittable contents (those with submission_group)
             # If submission_group exists but status is None, treat as not_reviewed
             if submission_group is not None:
                 status_str = status_lookup.get(submission_status_int, "not_reviewed") if submission_status_int is not None else "not_reviewed"
                 descendant_statuses.append(status_str)
+                total_unreviewed_count += is_unreviewed or 0
 
         if descendant_statuses:
-            return _aggregate_grading_status(descendant_statuses)
+            return (_aggregate_grading_status(descendant_statuses), total_unreviewed_count)
 
-        return None
+        return (None, 0)
