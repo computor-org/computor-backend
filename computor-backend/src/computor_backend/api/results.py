@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Response, status
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.crud import (
@@ -270,4 +270,87 @@ async def download_result_artifacts(
         headers={
             "Content-Disposition": f'attachment; filename="{download_filename}"'
         }
+    )
+
+
+@result_router.post("/{result_id}/artifacts/upload", status_code=status.HTTP_201_CREATED)
+async def upload_result_artifacts(
+    result_id: UUID | str,
+    file: Annotated[bytes, File()],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """
+    Upload artifacts as a ZIP archive.
+
+    The ZIP file is extracted and each file is stored as an artifact in MinIO.
+    Directory structure within the ZIP is preserved.
+
+    This endpoint allows testing workers to upload artifacts via API
+    instead of directly accessing MinIO.
+    """
+    import zipfile
+    from io import BytesIO
+    from computor_backend.api.exceptions import NotFoundException, BadRequestException
+    from computor_backend.services.result_storage import store_result_artifact
+    from computor_types.artifacts import ArtifactInfo, ResultArtifactUploadResponse
+
+    # Verify the user has access to this result
+    result = await get_id_db(permissions, db, result_id, ResultInterface)
+    if result is None:
+        raise NotFoundException(detail="Result not found")
+
+    # Read and validate ZIP
+    zip_buffer = BytesIO(file)
+
+    if not zipfile.is_zipfile(zip_buffer):
+        raise BadRequestException(detail="File must be a valid ZIP archive")
+
+    # Security: Validate ZIP file to prevent ZIP bomb attacks
+    zip_buffer.seek(0)
+    with zipfile.ZipFile(zip_buffer, 'r') as zip_file:
+        # Check for reasonable limits
+        MAX_FILES = 1000
+        MAX_TOTAL_SIZE = 100 * 1024 * 1024  # 100MB total uncompressed
+
+        file_infos = zip_file.infolist()
+        if len(file_infos) > MAX_FILES:
+            raise BadRequestException(
+                detail=f"ZIP contains too many files ({len(file_infos)}). Maximum is {MAX_FILES}."
+            )
+
+        total_size = sum(info.file_size for info in file_infos if not info.is_dir())
+        if total_size > MAX_TOTAL_SIZE:
+            raise BadRequestException(
+                detail=f"ZIP total uncompressed size ({total_size} bytes) exceeds maximum ({MAX_TOTAL_SIZE} bytes)."
+            )
+
+    # Extract and store each file
+    artifacts = []
+    zip_buffer.seek(0)
+    with zipfile.ZipFile(zip_buffer, 'r') as zip_file:
+        for zip_info in zip_file.infolist():
+            if zip_info.is_dir():
+                continue  # Skip directories
+
+            filename = zip_info.filename
+            file_data = zip_file.read(filename)
+
+            # Store via existing service
+            storage_info = await store_result_artifact(
+                result_id=result_id,
+                filename=filename,
+                file_data=file_data,
+            )
+
+            artifacts.append(ArtifactInfo(
+                filename=filename,
+                file_size=len(file_data),
+                content_type=storage_info.get('content_type'),
+            ))
+
+    return ResultArtifactUploadResponse(
+        result_id=str(result_id),
+        artifacts_count=len(artifacts),
+        artifacts=artifacts,
     )
