@@ -9,7 +9,8 @@ and all backend instances receive it and forward to their local connections.
 import asyncio
 import json
 import logging
-from typing import Callable, Awaitable, Optional, Set
+from dataclasses import dataclass
+from typing import Callable, Awaitable, Optional, Set, Any
 
 from computor_backend.redis_cache import get_redis_client
 
@@ -20,43 +21,122 @@ CHANNEL_PREFIX = "ws:broadcast:"
 TYPING_PREFIX = "ws:typing:"
 
 
+@dataclass
+class RawPubSubMessage:
+    """Raw message received from Redis pub/sub."""
+    channel: str  # Full channel name with prefix
+    data: bytes | str  # Raw message data
+    message_type: str  # Redis message type (e.g., "message", "subscribe")
+
+
+@dataclass
+class ParsedPubSubMessage:
+    """Parsed and validated pub/sub message ready for handling."""
+    channel: str  # Logical channel name (prefix removed)
+    data: dict  # Parsed JSON data
+
+
+def parse_pubsub_message(raw: RawPubSubMessage) -> Optional[ParsedPubSubMessage]:
+    """
+    Parse and validate a raw pub/sub message.
+
+    This function handles:
+    - Filtering non-message types
+    - Decoding bytes to strings
+    - Removing channel prefix
+    - Parsing JSON data
+
+    Args:
+        raw: Raw message from Redis pub/sub
+
+    Returns:
+        ParsedPubSubMessage if valid, None if should be skipped
+    """
+    # Only process actual messages (not subscribe/unsubscribe confirmations)
+    if raw.message_type != "message":
+        return None
+
+    # Decode channel if bytes
+    channel = raw.channel
+    if isinstance(channel, bytes):
+        channel = channel.decode("utf-8")
+
+    # Remove prefix to get logical channel name
+    if channel.startswith(CHANNEL_PREFIX):
+        channel = channel[len(CHANNEL_PREFIX):]
+
+    # Decode and parse data
+    data = raw.data
+    if isinstance(data, bytes):
+        data = data.decode("utf-8")
+
+    try:
+        parsed_data = json.loads(data)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in pubsub message: {e}")
+        return None
+
+    return ParsedPubSubMessage(channel=channel, data=parsed_data)
+
+
 class RedisPubSub:
     """
     Redis Pub/Sub manager for WebSocket event distribution.
 
-    Handles:
-    - Subscribing to channels
-    - Publishing events to channels
-    - Managing pubsub listener task
+    Supports multiple message handlers that are called for each received message.
+    Handlers can be registered/unregistered dynamically.
+
+    Example:
+        async def my_handler(channel: str, data: dict):
+            if data.get("type") == "message:new":
+                # Handle new messages
+                pass
+
+        pubsub.register_handler("messaging", my_handler)
     """
 
     def __init__(self):
         self._pubsub = None
         self._listener_task: Optional[asyncio.Task] = None
         self._subscribed_channels: Set[str] = set()
-        self._message_handler: Optional[Callable[[str, dict], Awaitable[None]]] = None
+        self._handlers: dict[str, Callable[[str, dict], Awaitable[None]]] = {}
         self._running = False
 
-    async def start(self, message_handler: Callable[[str, dict], Awaitable[None]]):
+    def register_handler(self, name: str, handler: Callable[[str, dict], Awaitable[None]]):
         """
-        Start the pub/sub listener.
+        Register a message handler.
 
         Args:
-            message_handler: Async callback for handling received messages.
-                            Called with (channel: str, data: dict)
+            name: Unique name for this handler (for logging/debugging)
+            handler: Async callback called with (channel: str, data: dict)
         """
+        self._handlers[name] = handler
+        logger.info(f"Registered pubsub handler: {name}")
+
+    def unregister_handler(self, name: str):
+        """
+        Unregister a message handler.
+
+        Args:
+            name: Name of the handler to remove
+        """
+        if name in self._handlers:
+            del self._handlers[name]
+            logger.info(f"Unregistered pubsub handler: {name}")
+
+    async def start(self):
+        """Start the pub/sub listener."""
         if self._running:
             logger.warning("PubSub listener already running")
             return
 
-        self._message_handler = message_handler
         redis_client = await get_redis_client()
         self._pubsub = redis_client.pubsub()
         self._running = True
 
         # Start listener task
         self._listener_task = asyncio.create_task(self._listen())
-        logger.info("Redis PubSub listener started")
+        logger.info(f"Redis PubSub listener started with {len(self._handlers)} handler(s)")
 
     async def stop(self):
         """Stop the pub/sub listener and clean up."""
@@ -139,28 +219,13 @@ class RedisPubSub:
         try:
             while self._running and self._pubsub:
                 try:
-                    message = await self._pubsub.get_message(
+                    raw_message = await self._pubsub.get_message(
                         ignore_subscribe_messages=True,
                         timeout=1.0
                     )
 
-                    if message and message["type"] == "message":
-                        channel = message["channel"]
-                        if isinstance(channel, bytes):
-                            channel = channel.decode("utf-8")
-
-                        # Remove prefix to get the logical channel name
-                        if channel.startswith(CHANNEL_PREFIX):
-                            channel = channel[len(CHANNEL_PREFIX):]
-
-                        try:
-                            data = json.loads(message["data"])
-                            if self._message_handler:
-                                await self._message_handler(channel, data)
-                        except json.JSONDecodeError as e:
-                            logger.error(f"Invalid JSON in pubsub message: {e}")
-                        except Exception as e:
-                            logger.error(f"Error handling pubsub message: {e}")
+                    if raw_message:
+                        await self._process_raw_message(raw_message)
 
                 except asyncio.CancelledError:
                     break
@@ -172,6 +237,35 @@ class RedisPubSub:
             pass
         finally:
             logger.info("PubSub listener loop ended")
+
+    async def _process_raw_message(self, raw_message: dict):
+        """
+        Process a raw message from Redis pub/sub.
+
+        This method converts the raw Redis message to our dataclass,
+        parses it, and dispatches to all registered handlers.
+
+        Args:
+            raw_message: Raw message dict from Redis pub/sub
+        """
+        # Convert to our dataclass for type safety
+        raw = RawPubSubMessage(
+            channel=raw_message.get("channel", ""),
+            data=raw_message.get("data", ""),
+            message_type=raw_message.get("type", "")
+        )
+
+        # Parse and validate
+        parsed = parse_pubsub_message(raw)
+        if parsed is None:
+            return  # Skip invalid or non-message types
+
+        # Dispatch to all registered handlers
+        for handler_name, handler in self._handlers.items():
+            try:
+                await handler(parsed.channel, parsed.data)
+            except Exception as e:
+                logger.error(f"Error in pubsub handler '{handler_name}': {e}")
 
 
 class TypingTracker:

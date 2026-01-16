@@ -53,12 +53,22 @@ class ConnectionManager:
             return
 
         self._running = True
-        await pubsub.start(self._handle_pubsub_message)
+
+        # Register our handler with pub/sub
+        pubsub.register_handler("connection_manager", self._handle_pubsub_message)
+
+        # Start pub/sub listener
+        await pubsub.start()
         logger.info("ConnectionManager started")
 
     async def stop(self):
         """Stop the connection manager and clean up."""
         self._running = False
+
+        # Unregister our handler
+        pubsub.unregister_handler("connection_manager")
+
+        # Stop pub/sub listener
         await pubsub.stop()
 
         # Close all connections
