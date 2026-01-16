@@ -8,7 +8,8 @@ from computor_types.base import EntityInterface, ListQuery
 
 class CourseTutorRepository(BaseModel):
     provider_url: Optional[str] = None
-    full_path_reference: Optional[str] = None
+    full_path_assignments: Optional[str] = None
+    full_path_student_template: Optional[str] = None
 
 class CourseTutorGet(BaseModel):
     id: str

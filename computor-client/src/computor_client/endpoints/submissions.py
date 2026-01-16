@@ -23,6 +23,7 @@ from computor_types.artifacts import (
 )
 from computor_types.results import (
     ResultCreate,
+    ResultGet,
     ResultList,
     ResultUpdate,
 )
@@ -190,12 +191,12 @@ class SubmissionsClient:
         self,
         artifact_id: str,
         **kwargs: Any,
-    ) -> List[ResultList]:
+    ) -> List[ResultGet]:
         """List Artifact Test Results"""
         response = await self._http.get(f"/submissions/artifacts/{artifact_id}/tests", params=kwargs)
         data = response.json()
         if isinstance(data, list):
-            return [ResultList.model_validate(item) for item in data]
+            return [ResultGet.model_validate(item) for item in data]
         return []
 
     async def tests(

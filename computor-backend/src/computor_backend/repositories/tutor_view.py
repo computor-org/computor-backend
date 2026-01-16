@@ -219,6 +219,9 @@ class TutorViewRepository(ViewRepository):
             from ..api.exceptions import NotFoundException
             raise NotFoundException()
 
+        gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
+        gitlab_projects = gitlab_props.get("projects", {})
+
         result = CourseTutorGet(
             id=str(course.id),
             title=course.title,
@@ -226,9 +229,10 @@ class TutorViewRepository(ViewRepository):
             organization_id=str(course.organization_id) if course.organization_id else None,
             path=course.path,
             repository=CourseTutorRepository(
-                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
-            ) if course.properties and course.properties.get("gitlab") else None
+                provider_url=gitlab_props.get("url"),
+                full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
+                full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
+            ) if gitlab_props else None
         )
 
         # Cache result
@@ -275,6 +279,9 @@ class TutorViewRepository(ViewRepository):
 
         response_list = []
         for course in courses:
+            gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
+            gitlab_projects = gitlab_props.get("projects", {})
+
             response_list.append(CourseTutorList(
                 id=str(course.id),
                 title=course.title,
@@ -282,9 +289,10 @@ class TutorViewRepository(ViewRepository):
                 organization_id=str(course.organization_id) if course.organization_id else None,
                 path=course.path,
                 repository=CourseTutorRepository(
-                    provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                    full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
-                ) if course.properties and course.properties.get("gitlab") else None
+                    provider_url=gitlab_props.get("url"),
+                    full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
+                    full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
+                ) if gitlab_props else None
             ))
 
         # Cache result with query-aware key
