@@ -641,7 +641,7 @@ class ResultPermissionHandler(PermissionHandler):
 
             # Check if user has tutor+ role in any course - they can see all results in their courses
             tutor_courses = CoursePermissionQueryBuilder.user_courses_subquery(
-                principal.user_id, ["_tutor"], db
+                principal.user_id, "_tutor", db
             )
 
             # Check if user is a student in any course
