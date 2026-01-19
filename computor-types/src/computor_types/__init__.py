@@ -111,6 +111,11 @@ from .exceptions import (
     VsixManifestError,
 )
 
+# Messages
+from .messages import (
+    MessageTargetProtocol,
+)
+
 # WebSocket Events
 from .websocket import (
     WSChannelSubscribe,

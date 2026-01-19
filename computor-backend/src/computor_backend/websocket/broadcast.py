@@ -3,24 +3,19 @@ WebSocket Broadcast Service.
 
 Provides an interface for REST API endpoints to broadcast events
 to WebSocket subscribers via Redis pub/sub.
+
+Supports hierarchical broadcasting: events are broadcast to both
+the specific target channel AND parent channels (e.g., course).
+This allows subscribers to listen at different levels of granularity.
 """
 
 import logging
-from typing import Optional, Any, Union, Protocol
+from typing import Optional, List
 
 from computor_backend.websocket.pubsub import pubsub
+from computor_types.messages import MessageTargetProtocol
 
 logger = logging.getLogger(__name__)
-
-
-class MessageLike(Protocol):
-    """Protocol for objects that have message target fields."""
-    submission_group_id: Optional[str]
-    course_content_id: Optional[str]
-    course_group_id: Optional[str]
-    course_id: Optional[str]
-    course_family_id: Optional[str]
-    organization_id: Optional[str]
 
 
 class WebSocketBroadcast:
@@ -55,101 +50,125 @@ class WebSocketBroadcast:
         await pubsub.publish(channel, event_type, data)
         logger.debug(f"Broadcast {event_type} to {channel}")
 
-    async def message_created(self, message: MessageLike, message_data: dict):
+    async def message_created(self, message: MessageTargetProtocol, message_data: dict):
         """
-        Broadcast a new message event.
+        Broadcast a new message event to all relevant channels.
 
-        Determines the appropriate channel from the message's target fields
-        and broadcasts the message:new event.
+        Broadcasts to both the specific target channel AND parent channels
+        (hierarchical broadcasting). For example, a message in submission_group:123
+        will also be broadcast to course:456 if course_id is set.
 
         Args:
             message: The Message model instance or MessageGet DTO
             message_data: Serialized message data (MessageGet.model_dump())
         """
-        channel = self._get_message_channel(message)
-        if not channel:
-            logger.warning(f"No channel determined for message")
+        channels = self._get_message_channels(message)
+        if not channels:
+            logger.warning("No channel determined for message")
             return
 
-        await self.publish(channel, "message:new", {
-            "channel": channel,
-            "data": message_data
-        })
+        logger.warning(f"Broadcasting message:new to channels: {channels}")
+        primary_channel = channels[0]  # Most specific channel
+        for channel in channels:
+            await self.publish(channel, "message:new", {
+                "channel": primary_channel,  # Always reference the primary channel
+                "data": message_data
+            })
 
-    async def message_updated(self, message: MessageLike, message_data: dict, message_id: str):
+    async def message_updated(self, message: MessageTargetProtocol, message_data: dict, message_id: str):
         """
-        Broadcast a message update event.
+        Broadcast a message update event to all relevant channels.
 
         Args:
             message: The Message model instance or MessageGet DTO
             message_data: Serialized message data (MessageGet.model_dump())
             message_id: The message ID
         """
-        channel = self._get_message_channel(message)
-        if not channel:
+        channels = self._get_message_channels(message)
+        if not channels:
             return
 
-        await self.publish(channel, "message:update", {
-            "channel": channel,
-            "message_id": message_id,
-            "data": message_data
-        })
+        primary_channel = channels[0]
+        for channel in channels:
+            await self.publish(channel, "message:update", {
+                "channel": primary_channel,
+                "message_id": message_id,
+                "data": message_data
+            })
 
-    async def message_deleted(self, message: MessageLike, message_id: str):
+    async def message_deleted(self, message: MessageTargetProtocol, message_id: str):
         """
-        Broadcast a message deletion event.
+        Broadcast a message deletion event to all relevant channels.
 
         Args:
             message: The Message model instance or MessageGet DTO (before deletion)
             message_id: The message ID
         """
-        channel = self._get_message_channel(message)
-        if not channel:
+        channels = self._get_message_channels(message)
+        if not channels:
             return
 
-        await self.publish(channel, "message:delete", {
-            "channel": channel,
-            "message_id": message_id
-        })
+        primary_channel = channels[0]
+        for channel in channels:
+            await self.publish(channel, "message:delete", {
+                "channel": primary_channel,
+                "message_id": message_id
+            })
 
-    def _get_message_channel(self, message: MessageLike) -> Optional[str]:
+    def _get_message_channels(self, message: MessageTargetProtocol) -> List[str]:
         """
-        Determine the WebSocket channel for a message based on its target.
+        Determine all WebSocket channels for a message (hierarchical broadcasting).
 
-        Priority order (most specific to least specific):
-        1. submission_group_id
-        2. course_content_id
-        3. course_group_id
+        Returns channels from most specific to least specific. Events are broadcast
+        to ALL returned channels, allowing subscribers at different levels to receive
+        notifications.
+
+        Hierarchy (most specific first):
+        1. submission_group_id → also broadcasts to course if course_id is set
+        2. course_content_id → also broadcasts to course if course_id is set
+        3. course_group_id → also broadcasts to course if course_id is set
         4. course_id
         5. course_family_id
         6. organization_id
 
         Args:
-            message: The Message model instance
+            message: The Message model instance or DTO
 
         Returns:
-            Channel name or None if no suitable target
+            List of channel names (most specific first), empty if no suitable target
         """
+        channels: List[str] = []
+
+        # Most specific targets first
         if message.submission_group_id:
-            return f"submission_group:{message.submission_group_id}"
+            channels.append(f"submission_group:{message.submission_group_id}")
 
         if message.course_content_id:
-            return f"course_content:{message.course_content_id}"
+            channels.append(f"course_content:{message.course_content_id}")
 
         if message.course_group_id:
-            return f"course_group:{message.course_group_id}"
+            channels.append(f"course_group:{message.course_group_id}")
 
+        # Course level - add if set (enables hierarchical notifications)
         if message.course_id:
-            return f"course:{message.course_id}"
+            channels.append(f"course:{message.course_id}")
 
+        # Higher levels
         if message.course_family_id:
-            return f"course_family:{message.course_family_id}"
+            channels.append(f"course_family:{message.course_family_id}")
 
         if message.organization_id:
-            return f"organization:{message.organization_id}"
+            channels.append(f"organization:{message.organization_id}")
 
-        # user_id and course_member_id are not currently supported for WebSocket
-        return None
+        # Remove duplicates while preserving order (most specific first)
+        seen = set()
+        unique_channels = []
+        for ch in channels:
+            if ch not in seen:
+                seen.add(ch)
+                unique_channels.append(ch)
+
+        return unique_channels
 
 
 # Singleton instance

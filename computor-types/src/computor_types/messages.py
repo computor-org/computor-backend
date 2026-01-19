@@ -1,8 +1,23 @@
 from datetime import datetime
-from typing import Optional, Literal, List, TYPE_CHECKING
+from typing import Optional, Literal, List, Protocol
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
+
+
+class MessageTargetProtocol(Protocol):
+    """
+    Protocol for objects that have message target fields.
+
+    Used for duck-typing SQLAlchemy models and Pydantic DTOs
+    when determining WebSocket broadcast channels.
+    """
+    submission_group_id: Optional[str]
+    course_content_id: Optional[str]
+    course_group_id: Optional[str]
+    course_id: Optional[str]
+    course_family_id: Optional[str]
+    organization_id: Optional[str]
 
 MessageScope = Literal[
     "global",           # All users in the system can see

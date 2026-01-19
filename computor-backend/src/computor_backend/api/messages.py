@@ -60,7 +60,11 @@ async def create_message(
         create_message_audit(db_message, permissions, db)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"About to broadcast message: course_id={message.course_id}, submission_group_id={message.submission_group_id}")
     await ws_broadcast.message_created(message, message.model_dump(mode="json"))
+    logger.warning("Broadcast completed")
 
     return message
 

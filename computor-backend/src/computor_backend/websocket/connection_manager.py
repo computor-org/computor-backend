@@ -370,11 +370,15 @@ class ConnectionManager:
             channel: Channel name (without prefix)
             data: Event data
         """
+        logger.info(f"Received pubsub message on channel: {channel}, local subscribers: {list(self._channel_subscribers.keys())}")
+
         if channel not in self._channel_subscribers:
+            logger.debug(f"No local subscribers for channel: {channel}")
             return
 
         # Get all users subscribed to this channel
         user_ids = self._channel_subscribers.get(channel, set())
+        logger.info(f"Forwarding to {len(user_ids)} users on channel {channel}")
 
         # Send to all connections for each user
         for user_id in user_ids:
@@ -383,6 +387,7 @@ class ConnectionManager:
                 if channel in conn.subscriptions:
                     try:
                         await conn.websocket.send_json(data)
+                        logger.debug(f"Sent message to user {user_id} on channel {channel}")
                     except Exception as e:
                         logger.error(f"Failed to send to user {user_id}: {e}")
 

@@ -219,6 +219,11 @@ class RedisPubSub:
         try:
             while self._running and self._pubsub:
                 try:
+                    # Wait until we have at least one subscription
+                    if not self._subscribed_channels:
+                        await asyncio.sleep(0.1)
+                        continue
+
                     raw_message = await self._pubsub.get_message(
                         ignore_subscribe_messages=True,
                         timeout=1.0

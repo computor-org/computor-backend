@@ -2,7 +2,9 @@
 WebSocket authentication module.
 
 Provides authentication for WebSocket connections using Bearer tokens.
-Reuses the existing SSO authentication infrastructure.
+Supports both:
+1. SSO session tokens (stored in Redis)
+2. API tokens (ctp_* prefix, stored in database)
 """
 
 import json
@@ -15,12 +17,14 @@ from computor_backend.database import get_db
 from computor_backend.model.role import UserRole
 from computor_backend.permissions.auth import (
     AuthenticationResult,
+    AuthenticationService,
     PrincipalBuilder,
     SSO_SESSION_TTL,
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.token_hash import hash_token
+from computor_backend.utils.api_token import validate_token_format
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +40,14 @@ class WebSocketAuthError(Exception):
 
 async def authenticate_websocket_token(token: str) -> Principal:
     """
-    Authenticate a WebSocket connection using a Bearer token.
+    Authenticate a WebSocket connection using a token.
 
-    This reuses the existing SSO session infrastructure:
-    1. Hash the token
-    2. Look up session in Redis
-    3. Build Principal from session data
+    Supports two authentication methods:
+    1. API tokens (ctp_* prefix) - looked up in database
+    2. SSO session tokens - looked up in Redis
 
     Args:
-        token: Bearer token from query parameter
+        token: Token from query parameter
 
     Returns:
         Principal object with user info and permissions
@@ -55,6 +58,53 @@ async def authenticate_websocket_token(token: str) -> Principal:
     if not token:
         raise WebSocketAuthError(4001, "No token provided")
 
+    # Check if this is an API token (ctp_* prefix)
+    if validate_token_format(token):
+        return await _authenticate_api_token(token)
+
+    # Otherwise try SSO session token
+    return await _authenticate_sso_token(token)
+
+
+async def _authenticate_api_token(token: str) -> Principal:
+    """
+    Authenticate using API token (ctp_* prefix).
+
+    Args:
+        token: API token string
+
+    Returns:
+        Principal object
+
+    Raises:
+        WebSocketAuthError: If authentication fails
+    """
+    try:
+        with next(get_db()) as db:
+            auth_result = AuthenticationService.authenticate_api_token(token, db)
+            principal = PrincipalBuilder.build(auth_result, db)
+
+        logger.info(f"WebSocket API token authentication successful for user {principal.user_id}")
+        return principal
+
+    except Exception as e:
+        logger.warning(f"WebSocket API token auth failed: {e}")
+        raise WebSocketAuthError(4001, "Invalid or expired API token")
+
+
+async def _authenticate_sso_token(token: str) -> Principal:
+    """
+    Authenticate using SSO session token (stored in Redis).
+
+    Args:
+        token: SSO session token
+
+    Returns:
+        Principal object
+
+    Raises:
+        WebSocketAuthError: If authentication fails
+    """
     redis_client = await get_redis_client()
 
     # Hash token for lookup (same as SSO auth)
@@ -94,7 +144,7 @@ async def authenticate_websocket_token(token: str) -> Principal:
         # Refresh session TTL
         await redis_client.expire(session_key, SSO_SESSION_TTL)
 
-        logger.info(f"WebSocket authentication successful for user {user_id}")
+        logger.info(f"WebSocket SSO authentication successful for user {user_id}")
         return principal
 
     except json.JSONDecodeError:
