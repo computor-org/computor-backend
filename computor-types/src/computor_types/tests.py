@@ -11,8 +11,6 @@ class TestJob(BaseModel):
     testing_service_type_path: str  # ServiceType path (e.g., testing.python)
     module: Repository
     reference: Optional[Repository] = None
-    test_number: int = -1
-    submission_number: int = -1
 
 class TestCreate(BaseModel):
     # Primary way to specify what to test - provide the artifact ID directly
