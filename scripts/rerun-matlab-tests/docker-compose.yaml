@@ -40,6 +40,13 @@ services:
       - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION:-main}
       # MATLAB License
       - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+    init: true
+    ulimits:
+      nproc: 2048
+      nofile:
+        soft: 8192
+        hard: 16384
+    pids_limit: 2048
     networks:
       - computor-network
     # Use the same network as the main docker-compose
