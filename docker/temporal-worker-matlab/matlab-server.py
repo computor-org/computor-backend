@@ -247,7 +247,26 @@ class MatlabServer(object):
                 })
 
           except Exception as ei:
+            error_str = str(ei).lower()
             print(f"Failed! Command error: {ei}", flush=True)
+
+            # Check if this is a timeout-related error (MATLAB may raise different exception types)
+            if 'timeout' in error_str or 'timed out' in error_str:
+                print("Detected timeout in exception message, treating as timeout", flush=True)
+                self._engine_stuck = True
+                self.engine = None
+                return MatlabServer.commit({
+                    "details": {
+                        "exception": {
+                            "message": f"Execution timeout: Test exceeded {timeout_seconds} seconds. "
+                                       "This usually indicates an infinite loop in the code.",
+                            "type": "TimeoutError"
+                        }
+                    },
+                    "timeout": True,
+                    "timeout_seconds": timeout_seconds
+                })
+
             return MatlabServer.raise_exception(ei, f"command failed: {command}")
 
         except MatlabTerminated as e:
