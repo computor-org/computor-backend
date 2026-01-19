@@ -187,7 +187,7 @@ class MatlabServer(object):
         print(f"Result: {result}", flush=True)
         return result
 
-    def test_student_example(self, test_file, spec_file, submit, test_number, submission_number, timeout_seconds=300):
+    def test_student_example(self, test_file, spec_file, timeout_seconds=300):
         """
         Execute student test with timeout protection.
 
@@ -195,8 +195,6 @@ class MatlabServer(object):
             test_file: Path to test YAML file
             spec_file: Path to specification YAML file
             submit: Submission identifier
-            test_number: Test number
-            submission_number: Submission number
             timeout_seconds: Maximum execution time in seconds (default: 300 = 5 minutes)
         """
         try:

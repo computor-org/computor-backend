@@ -140,11 +140,6 @@ class MatlabTestingBackend(TestingBackend):
         try:
             # Connect to MATLAB server via Pyro
             matlab_server = Pyro5.api.Proxy(pyro_address)
-            
-            # Extract test metadata from job config
-            test_number = test_job_config.get("test_number", -1)
-            submission_number = test_job_config.get("submission_number", -1)
-            submit = test_job_config.get("submit", False)
 
             # Get timeout from backend properties or test config (default: 5 minutes)
             timeout_seconds = backend_properties.get(
@@ -158,9 +153,6 @@ class MatlabTestingBackend(TestingBackend):
             result_json = matlab_server.test_student_example(
                 test_file_path,
                 spec_file_path,
-                submit,
-                test_number,
-                submission_number,
                 timeout_seconds
             )
 
