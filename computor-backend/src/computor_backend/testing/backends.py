@@ -149,7 +149,7 @@ class MatlabTestingBackend(TestingBackend):
             # Get timeout from backend properties or test config (default: 5 minutes)
             timeout_seconds = backend_properties.get(
                 "timeout_seconds",
-                test_job_config.get("timeout_seconds", 300)
+                test_job_config.get("timeout_seconds", 45)
             )
 
             logger.info(f"Executing MATLAB test with {timeout_seconds}s timeout")
