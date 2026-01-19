@@ -145,21 +145,42 @@ class MatlabTestingBackend(TestingBackend):
             test_number = test_job_config.get("test_number", -1)
             submission_number = test_job_config.get("submission_number", -1)
             submit = test_job_config.get("submit", False)
-            
-            # Call MATLAB test execution
+
+            # Get timeout from backend properties or test config (default: 5 minutes)
+            timeout_seconds = backend_properties.get(
+                "timeout_seconds",
+                test_job_config.get("timeout_seconds", 300)
+            )
+
+            logger.info(f"Executing MATLAB test with {timeout_seconds}s timeout")
+
+            # Call MATLAB test execution with timeout
             result_json = matlab_server.test_student_example(
                 test_file_path,
                 spec_file_path,
                 submit,
                 test_number,
-                submission_number
+                submission_number,
+                timeout_seconds
             )
-            
+
             logger.info(f"MATLAB test result: {result_json}")
-            
+
             # Parse the JSON result
             result = json.loads(result_json)
-            
+
+            # Check if there was a timeout
+            if result.get("timeout"):
+                return {
+                    "passed": 0,
+                    "failed": 1,
+                    "total": 1,
+                    "error": f"Execution timeout: Test exceeded {result.get('timeout_seconds', timeout_seconds)} seconds. "
+                             "This usually indicates an infinite loop in the code.",
+                    "details": result.get("details", {}),
+                    "timeout": True
+                }
+
             # Check if there was an exception
             if "details" in result and isinstance(result["details"], dict):
                 if "exception" in result["details"]:
@@ -170,7 +191,7 @@ class MatlabTestingBackend(TestingBackend):
                         "error": result["details"]["exception"].get("message", "MATLAB error"),
                         "details": result["details"]
                     }
-            
+
             # Parse successful test results
             # Adapt the MATLAB output format to our standard format
             return {

@@ -424,7 +424,7 @@ async def execute_tests_activity(
 
     # Execute tests
     try:
-        await execute_tests_with_backend(
+        backend_result = await execute_tests_with_backend(
             service_slug=service_slug,
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
@@ -432,20 +432,26 @@ async def execute_tests_activity(
             backend_properties=service_type_config.get("properties", {}),
         )
 
-        # Read results from output file
-        report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
-        if os.path.exists(report_file_path):
-            logger.info(f"Reading results from file: {report_file_path}")
-            with open(report_file_path, "r") as report_file:
-                test_results = json.load(report_file)
-            logger.info(f"Test results: {json.dumps(test_results, indent=2)}")
+        # Check if backend returned an error/timeout directly
+        # This happens for MATLAB timeout, communication errors, etc.
+        if backend_result is not None and (backend_result.get("error") or backend_result.get("timeout")):
+            logger.info(f"Backend returned error/timeout result: {backend_result}")
+            test_results = backend_result
         else:
-            test_results = {
-                "passed": 0,
-                "failed": 1,
-                "total": 1,
-                "error": "No test results file found",
-            }
+            # Read results from output file (normal case - results written to file)
+            report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
+            if os.path.exists(report_file_path):
+                logger.info(f"Reading results from file: {report_file_path}")
+                with open(report_file_path, "r") as report_file:
+                    test_results = json.load(report_file)
+                logger.info(f"Test results: {json.dumps(test_results, indent=2)}")
+            else:
+                test_results = {
+                    "passed": 0,
+                    "failed": 1,
+                    "total": 1,
+                    "error": "No test results file found",
+                }
 
         # Calculate result value
         try:
@@ -499,9 +505,16 @@ async def commit_test_results_activity(
 
         async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
 
+            # Determine status based on test results
+            # Use FAILED status if there was an error or timeout
+            if test_results.get("error") or test_results.get("timeout"):
+                status = TaskStatus.FAILED
+            else:
+                status = TaskStatus.FINISHED
+
             # Update result
             result_update = ResultUpdate(
-                status=TaskStatus.FINISHED,
+                status=status,
                 result=test_results.get("result_value", 0.0),
                 result_json=test_results,
             )
