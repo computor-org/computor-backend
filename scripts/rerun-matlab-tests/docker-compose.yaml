@@ -1,0 +1,51 @@
+# Docker Compose for MATLAB Artifact Regeneration
+#
+# This allows running the artifact regenerator with access to the same
+# services (database, minio, api) as the main application.
+#
+# Usage:
+#   # From project root:
+#   docker compose --env-file .env -f scripts/rerun-matlab-tests/docker-compose.yaml run --rm regenerator --dry-run
+#   docker compose --env-file .env -f scripts/rerun-matlab-tests/docker-compose.yaml run --rm regenerator --limit 10
+#   docker compose --env-file .env -f scripts/rerun-matlab-tests/docker-compose.yaml run --rm regenerator --result-id <uuid>
+
+services:
+  regenerator:
+    env_file:
+      - ../../.env
+    build:
+      context: ../../
+      dockerfile: scripts/rerun-matlab-tests/Dockerfile
+      args:
+        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b}
+    environment:
+      # Database - hardcoded to Docker service names (overrides .env localhost values)
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5437
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # MinIO - hardcoded to Docker service names
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_SECURE=false
+      # API - use host.docker.internal to reach API running on host machine
+      # Change to http://uvicorn:8000 if API runs in Docker
+      - API_URL=${API_URL:-http://host.docker.internal:8000}
+      - API_TOKEN=${MATLAB_WORKER_TOKEN}
+      # MATLAB Test Engine
+      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
+      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
+      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION:-main}
+      # MATLAB License
+      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+    networks:
+      - computor-network
+    # Use the same network as the main docker-compose
+    # This allows access to postgres, minio, uvicorn by service name
+
+networks:
+  computor-network:
+    external: true
+    name: computor-fullstack_default  # Adjust if your network has a different name
