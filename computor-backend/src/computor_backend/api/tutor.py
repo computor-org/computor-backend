@@ -1,19 +1,26 @@
+import os
+import logging
+import uuid as uuid_module
 from uuid import UUID
-from typing import Annotated
-from fastapi import APIRouter, Depends, Query
+from typing import Annotated, Optional
+from fastapi import APIRouter, Depends, Query, File, UploadFile, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
-from computor_backend.redis_cache import get_cache
+from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_backend.cache import Cache
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.api.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.services.storage_service import get_storage_service
-from computor_backend.model.course import CourseContent, CourseMember
+from computor_backend.model.course import CourseContent, CourseMember, Course
+from computor_backend.model.service import Service, ServiceType
+from computor_backend.model.deployment import CourseContentDeployment
 from computor_types.student_courses import CourseStudentQuery
+
+logger = logging.getLogger(__name__)
 from computor_types.student_course_contents import (
     CourseContentStudentList,
     CourseContentStudentQuery,
@@ -435,3 +442,397 @@ async def download_course_content_description(
 ## MR-based course-content messages removed (deprecated)
 
 ## Comments routes moved to generic /course-member-comments
+
+# ==============================================================================
+# Tutor Testing Endpoints
+# ==============================================================================
+# These endpoints allow tutors to test their own code against assignment references.
+# Unlike student testing, tutor tests:
+# - Don't create database records (state in Redis only)
+# - Store files in 'tutor-tests' bucket (with lifecycle cleanup)
+# - Are ephemeral (1 hour TTL)
+# ==============================================================================
+
+from computor_types.tutor_tests import (
+    TutorTestConfig,
+    TutorTestCreateResponse,
+    TutorTestStatus,
+    TutorTestArtifactList,
+    TutorTestArtifactInfo,
+)
+
+
+async def _check_tutor_permission_for_course_content(
+    course_content_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> tuple[CourseContent, Course]:
+    """
+    Check that user has tutor (or higher) permissions for the course content.
+
+    Returns:
+        Tuple of (course_content, course)
+
+    Raises:
+        NotFoundException: If course content not found
+        ForbiddenException: If user doesn't have tutor permissions
+    """
+    # Get course content
+    course_content = db.query(CourseContent).filter(
+        CourseContent.id == course_content_id
+    ).first()
+
+    if not course_content:
+        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+
+    # Get course
+    course = db.query(Course).filter(Course.id == course_content.course_id).first()
+    if not course:
+        raise NotFoundException(detail=f"Course not found")
+
+    # Check tutor permissions for the course
+    user_id = permissions.get_user_id()
+    if user_id and not permissions.is_admin:
+        has_tutor_perms = check_course_permissions(
+            permissions, CourseMember, "_tutor", db
+        ).filter(
+            CourseMember.course_id == course_content.course_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not has_tutor_perms:
+            raise ForbiddenException(
+                detail="You don't have tutor permissions for this course"
+            )
+
+    return course_content, course
+
+
+@tutor_router.post(
+    "/course-contents/{course_content_id}/test",
+    response_model=TutorTestCreateResponse,
+    status_code=202,
+)
+async def create_tutor_test(
+    course_content_id: UUID | str,
+    file: UploadFile = File(..., description="ZIP file containing tutor's code"),
+    config: Optional[str] = Form(None, description="Optional JSON configuration"),
+    permissions: Annotated[Principal, Depends(get_current_principal)] = None,
+    db: Session = Depends(get_db),
+    redis = Depends(get_redis_client),
+):
+    """
+    Create and execute a tutor test for an assignment.
+
+    This endpoint allows tutors to test their own code against the reference
+    solution (test.yaml) for an assignment. Unlike student tests, tutor tests:
+
+    - Don't create database records (state in Redis only)
+    - Are ephemeral (automatically cleaned up after 1 hour)
+    - Don't affect grading or submission history
+
+    The tutor uploads a ZIP file containing their code (matching the structure
+    expected by studentSubmissionFiles in meta.yaml), and the system runs the
+    same tests that students would run.
+
+    **Permissions**: Requires tutor role or higher for the course.
+
+    **Request**:
+    - `file`: ZIP file with tutor's code (multipart/form-data)
+    - `config`: Optional JSON string with configuration:
+      - `store_graphics_artifacts`: bool (default: true)
+      - `timeout_seconds`: int (optional, uses service default)
+
+    **Response**: Returns test_id for polling status via GET /tutors/tests/{test_id}
+    """
+    import json
+
+    # Check permissions
+    course_content, course = await _check_tutor_permission_for_course_content(
+        course_content_id, permissions, db
+    )
+
+    # Parse optional config
+    test_config = TutorTestConfig()
+    if config:
+        try:
+            config_data = json.loads(config)
+            test_config = TutorTestConfig(**config_data)
+        except (json.JSONDecodeError, Exception) as e:
+            raise BadRequestException(detail=f"Invalid config JSON: {e}")
+
+    # Validate file is a ZIP
+    if not file.filename or not file.filename.lower().endswith('.zip'):
+        raise BadRequestException(detail="File must be a ZIP archive")
+
+    # Check testing service is configured
+    if not course_content.testing_service_id:
+        raise BadRequestException(
+            detail="Testing service not configured for this assignment"
+        )
+
+    # Get testing service and service type
+    service = db.query(Service).filter(
+        Service.id == course_content.testing_service_id
+    ).first()
+
+    if not service:
+        raise BadRequestException(detail="Testing service not found")
+
+    service_type = db.query(ServiceType).filter(
+        ServiceType.id == service.service_type_id
+    ).first()
+
+    if not service_type:
+        raise BadRequestException(detail="Service type not found")
+
+    # Get deployment for example version
+    deployment = db.query(CourseContentDeployment).filter(
+        CourseContentDeployment.course_content_id == course_content_id
+    ).order_by(CourseContentDeployment.assigned_at.desc()).first()
+
+    example_version_id = None
+    if deployment and deployment.example_version_id:
+        example_version_id = str(deployment.example_version_id)
+    elif course_content.example_version_id:
+        example_version_id = str(course_content.example_version_id)
+
+    if not example_version_id:
+        raise BadRequestException(
+            detail="No reference/example deployment found for this assignment"
+        )
+
+    # Generate test ID
+    test_id = str(uuid_module.uuid4())
+
+    # Read uploaded file
+    zip_data = await file.read()
+
+    # Store input files in MinIO
+    from computor_backend.services.tutor_test_storage import store_tutor_test_input
+    await store_tutor_test_input(test_id, zip_data)
+
+    # Create Redis entry
+    from computor_backend.services.tutor_test_state import create_tutor_test_entry
+    user_id = permissions.get_user_id()
+
+    entry = await create_tutor_test_entry(
+        redis_client=redis,
+        test_id=test_id,
+        user_id=user_id,
+        course_content_id=course_content_id,
+        testing_service_id=service.id,
+        testing_service_slug=service.slug,
+        course_id=course.id,
+    )
+
+    # Start Temporal workflow
+    from computor_backend.tasks import get_task_executor, TaskSubmission
+
+    workflow_id = f"tutor-testing-{test_id}"
+
+    # Get task queue from service config
+    task_queue = "computor-tasks"
+    if service.config and isinstance(service.config, dict):
+        task_queue = service.config.get("task_queue", task_queue)
+    elif service_type.properties and isinstance(service_type.properties, dict):
+        task_queue = service_type.properties.get("task_queue", task_queue)
+
+    # Prepare workflow parameters
+    api_url = os.environ.get("API_URL", "http://localhost:8000")
+    api_token = os.environ.get("API_TOKEN")
+
+    redis_host = os.environ.get("REDIS_HOST", "localhost")
+    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
+    redis_password = os.environ.get("REDIS_PASSWORD", "")
+    redis_db = int(os.environ.get("REDIS_DB", "0"))
+
+    task_submission = TaskSubmission(
+        task_name="tutor_testing",
+        workflow_id=workflow_id,
+        parameters={
+            "test_id": test_id,
+            "example_version_id": example_version_id,
+            "service_type_config": {
+                "id": str(service_type.id),
+                "path": str(service_type.path),
+                "schema": service_type.schema or {},
+                "properties": service_type.properties or {},
+            },
+            "test_config": {
+                "testing_service_slug": service.slug,
+                "testing_service_id": str(service.id),
+                "course_content_id": str(course_content_id),
+                "user_id": str(user_id),
+                "store_graphics_artifacts": test_config.store_graphics_artifacts,
+            },
+            "api_config": {
+                "url": api_url,
+                "token": api_token,
+            },
+            "redis_config": {
+                "host": redis_host,
+                "port": redis_port,
+                "password": redis_password,
+                "db": redis_db,
+            },
+        },
+        queue=task_queue,
+    )
+
+    try:
+        task_executor = get_task_executor()
+        await task_executor.submit_task(task_submission)
+        logger.info(f"Started tutor test workflow {workflow_id} for test {test_id}")
+    except Exception as e:
+        logger.error(f"Failed to start tutor test workflow: {e}")
+        raise BadRequestException(detail=f"Failed to start test: {e}")
+
+    return TutorTestCreateResponse(
+        test_id=test_id,
+        status="pending",
+        created_at=entry["created_at"],
+    )
+
+
+@tutor_router.get("/tests/{test_id}", response_model=TutorTestStatus)
+async def get_tutor_test_status(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    Get the status and results of a tutor test.
+
+    Poll this endpoint to check if the test has completed.
+
+    **Status values**:
+    - `pending`: Test is queued
+    - `running`: Test is executing
+    - `completed`: Test finished successfully (results available)
+    - `failed`: Test failed (error message available)
+
+    **Permissions**: Any authenticated user can check test status.
+    Tests are ephemeral and expire after 1 hour.
+    """
+    from computor_backend.services.tutor_test_state import get_tutor_test_full
+    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
+
+    # Get test info from Redis
+    test_info = await get_tutor_test_full(redis, test_id)
+
+    if not test_info:
+        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+
+    # Check if user owns this test (optional - could be more permissive)
+    user_id = permissions.get_user_id()
+    if test_info.get("user_id") and str(user_id) != test_info.get("user_id"):
+        if not permissions.is_admin:
+            raise ForbiddenException(detail="You don't have access to this test")
+
+    # Get artifact info
+    artifacts = await list_tutor_test_artifacts(test_id)
+
+    return TutorTestStatus(
+        test_id=test_id,
+        status=test_info.get("status", "pending"),
+        created_at=test_info.get("created_at"),
+        started_at=test_info.get("started_at"),
+        finished_at=test_info.get("finished_at"),
+        result=test_info.get("result"),
+        error=test_info.get("result", {}).get("error") if test_info.get("status") == "failed" else None,
+        has_artifacts=len(artifacts) > 0,
+        artifact_count=len(artifacts),
+    )
+
+
+@tutor_router.get("/tests/{test_id}/artifacts")
+async def download_tutor_test_artifacts(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    Download all artifacts from a tutor test as a ZIP file.
+
+    Artifacts include generated files such as plots, figures, and debug output
+    created during test execution.
+
+    **Permissions**: Only the test owner or admin can download artifacts.
+    """
+    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
+    from computor_backend.services.tutor_test_storage import download_tutor_test_artifacts_as_zip
+
+    # Check test exists and get metadata
+    metadata = await get_tutor_test_metadata(redis, test_id)
+
+    if not metadata:
+        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
+        if not permissions.is_admin:
+            raise ForbiddenException(detail="You don't have access to this test")
+
+    # Download artifacts
+    zip_data = await download_tutor_test_artifacts_as_zip(test_id)
+
+    if not zip_data:
+        raise NotFoundException(detail="No artifacts found for this test")
+
+    from io import BytesIO
+    zip_buffer = BytesIO(zip_data)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="tutor_test_{test_id}_artifacts.zip"'
+        }
+    )
+
+
+@tutor_router.get("/tests/{test_id}/artifacts/list", response_model=TutorTestArtifactList)
+async def list_tutor_test_artifacts_endpoint(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    List all artifacts from a tutor test without downloading.
+
+    Returns metadata about each artifact file.
+
+    **Permissions**: Only the test owner or admin can list artifacts.
+    """
+    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
+    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
+
+    # Check test exists and get metadata
+    metadata = await get_tutor_test_metadata(redis, test_id)
+
+    if not metadata:
+        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
+        if not permissions.is_admin:
+            raise ForbiddenException(detail="You don't have access to this test")
+
+    # List artifacts
+    artifacts = await list_tutor_test_artifacts(test_id)
+
+    return TutorTestArtifactList(
+        test_id=test_id,
+        artifacts=[
+            TutorTestArtifactInfo(
+                filename=a["filename"],
+                size=a["size"],
+                last_modified=a.get("last_modified"),
+            )
+            for a in artifacts
+        ],
+        total_count=len(artifacts),
+    )
