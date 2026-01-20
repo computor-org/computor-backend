@@ -69,6 +69,14 @@ from .temporal_student_repository import (
     create_student_repository,
     create_team_repository
 )
+from .temporal_tutor_testing import (
+    TutorTestingWorkflow,
+    fetch_tutor_test_input,
+    update_tutor_test_status_activity,
+    commit_tutor_test_results_activity,
+    store_tutor_test_artifacts_activity,
+    run_complete_tutor_test_activity,
+)
 
 
 class TemporalWorker:
@@ -125,6 +133,7 @@ class TemporalWorker:
             GenerateAssignmentsRepositoryWorkflow,
             SyncDocumentsRepositoryWorkflow,  # Documents repository sync
             StudentRepositoryCreationWorkflow,  # Student repository forking
+            TutorTestingWorkflow,  # Tutor testing (ephemeral, no DB records)
         ]
         
         activities = [
@@ -143,6 +152,12 @@ class TemporalWorker:
             sync_documents_repository_activity,  # Documents repository sync from GitLab
             create_student_repository,  # Fork student-template for individual student
             create_team_repository,  # Fork student-template for team
+            # Tutor testing activities
+            fetch_tutor_test_input,
+            update_tutor_test_status_activity,
+            commit_tutor_test_results_activity,
+            store_tutor_test_artifacts_activity,
+            run_complete_tutor_test_activity,
         ]
         
         # Create a worker for each task queue
