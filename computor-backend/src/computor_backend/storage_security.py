@@ -13,6 +13,7 @@ from .storage_config import (
     BLOCKED_MIME_TYPES,
     DANGEROUS_SIGNATURES,
     ARCHIVE_EXTENSIONS,
+    OFFICE_XML_EXTENSIONS,
     format_bytes
 )
 from .api.exceptions import BadRequestException
@@ -155,12 +156,16 @@ def check_file_content_security(file_data: BinaryIO, filename: str) -> Tuple[boo
     # Check for dangerous file signatures
     for signature, description in DANGEROUS_SIGNATURES.items():
         if header.startswith(signature):
-            # Special handling for ZIP files
+            # Special handling for ZIP files (including Office XML formats)
             if signature == b'PK\x03\x04':
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in ARCHIVE_EXTENSIONS:
                     # Allow legitimate archives
                     logger.debug(f"Allowing ZIP archive: {filename}")
+                    return True, None
+                elif ext in OFFICE_XML_EXTENSIONS:
+                    # Allow Office Open XML formats (xlsx, docx, pptx, etc.)
+                    logger.debug(f"Allowing Office XML document: {filename}")
                     return True, None
                 else:
                     # Block disguised executables
