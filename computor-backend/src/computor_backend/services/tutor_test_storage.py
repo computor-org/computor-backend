@@ -303,6 +303,10 @@ async def retrieve_tutor_test_result(test_id: str | UUID) -> Optional[dict]:
         return None
 
 
+# Alias for API usage
+get_tutor_test_result_from_minio = retrieve_tutor_test_result
+
+
 async def store_tutor_test_artifact(
     test_id: str | UUID,
     filename: str,

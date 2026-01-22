@@ -5,9 +5,9 @@ This module manages ephemeral state for tutor test runs using Redis.
 All keys have TTL (1 hour) for automatic cleanup.
 
 Key structure:
-- computor:tutor_test:{test_id}:meta   -> JSON metadata
-- computor:tutor_test:{test_id}:status -> Status string
-- computor:tutor_test:{test_id}:result -> JSON test results (when completed)
+- tutor_test:{test_id}:meta   -> JSON metadata
+- tutor_test:{test_id}:status -> Status string
+- tutor_test:{test_id}:result -> JSON test results (when completed)
 
 No database records are created for tutor tests.
 """
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 # TTL for tutor test keys (1 hour in seconds)
 TUTOR_TEST_TTL = 3600
 
-# Key prefix
-KEY_PREFIX = "computor:tutor_test"
+# Key prefix (no "computor:" - that's only used by the Cache class)
+KEY_PREFIX = "tutor_test"
 
 
 class TutorTestStatus(str, Enum):
