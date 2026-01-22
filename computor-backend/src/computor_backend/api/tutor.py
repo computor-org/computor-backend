@@ -457,6 +457,7 @@ from computor_types.tutor_tests import (
     TutorTestConfig,
     TutorTestCreateResponse,
     TutorTestStatus,
+    TutorTestGet,
     TutorTestArtifactList,
     TutorTestArtifactInfo,
 )
@@ -511,7 +512,6 @@ async def _check_tutor_permission_for_course_content(
 @tutor_router.post(
     "/course-contents/{course_content_id}/test",
     response_model=TutorTestCreateResponse,
-    status_code=202,
 )
 async def create_tutor_test(
     course_content_id: UUID | str,
@@ -639,14 +639,7 @@ async def create_tutor_test(
         task_queue = service_type.properties.get("task_queue", task_queue)
 
     # Prepare workflow parameters
-    api_url = os.environ.get("API_URL", "http://localhost:8000")
-    api_token = os.environ.get("API_TOKEN")
-
-    redis_host = os.environ.get("REDIS_HOST", "localhost")
-    redis_port = int(os.environ.get("REDIS_PORT", "6379"))
-    redis_password = os.environ.get("REDIS_PASSWORD", "")
-    redis_db = int(os.environ.get("REDIS_DB", "0"))
-
+    # Note: api_config is read from environment in the workflow (same as StudentTestingWorkflow)
     task_submission = TaskSubmission(
         task_name="tutor_testing",
         workflow_id=workflow_id,
@@ -665,16 +658,6 @@ async def create_tutor_test(
                 "course_content_id": str(course_content_id),
                 "user_id": str(user_id),
                 "store_graphics_artifacts": test_config.store_graphics_artifacts,
-            },
-            "api_config": {
-                "url": api_url,
-                "token": api_token,
-            },
-            "redis_config": {
-                "host": redis_host,
-                "port": redis_port,
-                "password": redis_password,
-                "db": redis_db,
             },
         },
         queue=task_queue,
@@ -695,28 +678,28 @@ async def create_tutor_test(
     )
 
 
-@tutor_router.get("/tests/{test_id}", response_model=TutorTestStatus)
-async def get_tutor_test_status(
+async def _get_tutor_test_info_and_sync(
     test_id: str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    redis = Depends(get_redis_client),
-):
+    redis,
+    permissions: Principal,
+) -> tuple[dict, str, list]:
     """
-    Get the status and results of a tutor test.
+    Get tutor test info from Redis, sync with MinIO if needed, and check permissions.
 
-    Poll this endpoint to check if the test has completed.
-
-    **Status values**:
-    - `pending`: Test is queued
-    - `running`: Test is executing
-    - `completed`: Test finished successfully (results available)
-    - `failed`: Test failed (error message available)
-
-    **Permissions**: Any authenticated user can check test status.
-    Tests are ephemeral and expire after 1 hour.
+    Returns:
+        Tuple of (test_info, current_status, artifacts)
     """
-    from computor_backend.services.tutor_test_state import get_tutor_test_full
-    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
+    from computor_backend.services.tutor_test_state import (
+        get_tutor_test_full,
+        update_tutor_test_status,
+        store_tutor_test_result,
+        TutorTestStatus as TutorTestStatusEnum,
+    )
+    from computor_backend.services.tutor_test_storage import (
+        list_tutor_test_artifacts,
+        get_tutor_test_result_from_minio,
+    )
+    from datetime import datetime, timezone
 
     # Get test info from Redis
     test_info = await get_tutor_test_full(redis, test_id)
@@ -724,29 +707,195 @@ async def get_tutor_test_status(
     if not test_info:
         raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
 
-    # Check if user owns this test (optional - could be more permissive)
+    # Check if user owns this test
     user_id = permissions.get_user_id()
     if test_info.get("user_id") and str(user_id) != test_info.get("user_id"):
         if not permissions.is_admin:
             raise ForbiddenException(detail="You don't have access to this test")
 
+    current_status = test_info.get("status", "pending")
+
+    # If status is pending/running, check MinIO for results
+    if current_status in ("pending", "running"):
+        minio_result = await get_tutor_test_result_from_minio(test_id)
+
+        if minio_result is not None:
+            # Workflow completed - update Redis with results
+            if minio_result.get("error"):
+                status_enum = TutorTestStatusEnum.FAILED
+            else:
+                status_enum = TutorTestStatusEnum.COMPLETED
+
+            await store_tutor_test_result(
+                redis_client=redis,
+                test_id=test_id,
+                result=minio_result,
+                status=status_enum,
+            )
+
+            test_info["status"] = status_enum.value
+            test_info["result"] = minio_result
+            test_info["finished_at"] = datetime.now(timezone.utc).isoformat()
+            current_status = status_enum.value
+
+        elif current_status == "pending":
+            # Update to running if workflow has started
+            await update_tutor_test_status(
+                redis_client=redis,
+                test_id=test_id,
+                status=TutorTestStatusEnum.RUNNING,
+                started_at=datetime.now(timezone.utc),
+            )
+            test_info["status"] = "running"
+            current_status = "running"
+
     # Get artifact info
     artifacts = await list_tutor_test_artifacts(test_id)
 
+    return test_info, current_status, artifacts
+
+
+@tutor_router.get("/tests/{test_id}/status", response_model=TutorTestStatus)
+async def get_tutor_test_status_endpoint(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    Get quick status of a tutor test (for polling).
+
+    Use this endpoint to poll for completion status.
+    For full test results, use GET /tutors/tests/{test_id}.
+
+    **Status values**:
+    - `pending`: Test is queued
+    - `running`: Test is executing
+    - `completed`: Test finished successfully
+    - `failed`: Test failed
+
+    **Permissions**: Only the test owner or admin can check status.
+    Tests are ephemeral and expire after 1 hour.
+    """
+    test_info, current_status, artifacts = await _get_tutor_test_info_and_sync(
+        test_id, redis, permissions
+    )
+
     return TutorTestStatus(
         test_id=test_id,
-        status=test_info.get("status", "pending"),
+        status=current_status,
         created_at=test_info.get("created_at"),
         started_at=test_info.get("started_at"),
         finished_at=test_info.get("finished_at"),
-        result=test_info.get("result"),
-        error=test_info.get("result", {}).get("error") if test_info.get("status") == "failed" else None,
         has_artifacts=len(artifacts) > 0,
         artifact_count=len(artifacts),
     )
 
 
-@tutor_router.get("/tests/{test_id}/artifacts")
+@tutor_router.get("/tests/{test_id}", response_model=TutorTestGet)
+async def get_tutor_test_endpoint(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    Get full tutor test details including result_dict.
+
+    Returns the complete test information including the full result_dict
+    from MinIO (result.json). Use GET /tutors/tests/{test_id}/status for
+    quick polling without the full result data.
+
+    **Permissions**: Only the test owner or admin can access test details.
+    Tests are ephemeral and expire after 1 hour.
+    """
+    test_info, current_status, artifacts = await _get_tutor_test_info_and_sync(
+        test_id, redis, permissions
+    )
+
+    result_dict = test_info.get("result")
+
+    # Extract convenience fields from result_dict
+    passed = None
+    failed = None
+    total = None
+    result_value = None
+    error = None
+
+    if result_dict:
+        if "summary" in result_dict:
+            passed = result_dict["summary"].get("passed")
+            failed = result_dict["summary"].get("failed")
+            total = result_dict["summary"].get("total")
+        else:
+            passed = result_dict.get("passed")
+            failed = result_dict.get("failed")
+            total = result_dict.get("total")
+
+        result_value = result_dict.get("result_value")
+        error = result_dict.get("error")
+
+    return TutorTestGet(
+        test_id=test_id,
+        status=current_status,
+        created_at=test_info.get("created_at"),
+        started_at=test_info.get("started_at"),
+        finished_at=test_info.get("finished_at"),
+        result_dict=result_dict,
+        passed=passed,
+        failed=failed,
+        total=total,
+        result_value=result_value,
+        error=error,
+        has_artifacts=len(artifacts) > 0,
+        artifact_count=len(artifacts),
+    )
+
+
+@tutor_router.get("/tests/{test_id}/artifacts", response_model=TutorTestArtifactList)
+async def list_tutor_test_artifacts_endpoint(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
+):
+    """
+    List all artifacts from a tutor test.
+
+    Returns metadata about each artifact file.
+
+    **Permissions**: Only the test owner or admin can list artifacts.
+    """
+    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
+    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
+
+    # Check test exists and get metadata
+    metadata = await get_tutor_test_metadata(redis, test_id)
+
+    if not metadata:
+        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+
+    # Check permissions
+    user_id = permissions.get_user_id()
+    if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
+        if not permissions.is_admin:
+            raise ForbiddenException(detail="You don't have access to this test")
+
+    # List artifacts
+    artifacts = await list_tutor_test_artifacts(test_id)
+
+    return TutorTestArtifactList(
+        test_id=test_id,
+        artifacts=[
+            TutorTestArtifactInfo(
+                filename=a["filename"],
+                size=a["size"],
+                last_modified=a.get("last_modified"),
+            )
+            for a in artifacts
+        ],
+        total_count=len(artifacts),
+    )
+
+
+@tutor_router.get("/tests/{test_id}/artifacts/download")
 async def download_tutor_test_artifacts(
     test_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -790,49 +939,4 @@ async def download_tutor_test_artifacts(
         headers={
             "Content-Disposition": f'attachment; filename="tutor_test_{test_id}_artifacts.zip"'
         }
-    )
-
-
-@tutor_router.get("/tests/{test_id}/artifacts/list", response_model=TutorTestArtifactList)
-async def list_tutor_test_artifacts_endpoint(
-    test_id: str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    redis = Depends(get_redis_client),
-):
-    """
-    List all artifacts from a tutor test without downloading.
-
-    Returns metadata about each artifact file.
-
-    **Permissions**: Only the test owner or admin can list artifacts.
-    """
-    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
-    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
-
-    # Check test exists and get metadata
-    metadata = await get_tutor_test_metadata(redis, test_id)
-
-    if not metadata:
-        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
-
-    # Check permissions
-    user_id = permissions.get_user_id()
-    if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
-        if not permissions.is_admin:
-            raise ForbiddenException(detail="You don't have access to this test")
-
-    # List artifacts
-    artifacts = await list_tutor_test_artifacts(test_id)
-
-    return TutorTestArtifactList(
-        test_id=test_id,
-        artifacts=[
-            TutorTestArtifactInfo(
-                filename=a["filename"],
-                size=a["size"],
-                last_modified=a.get("last_modified"),
-            )
-            for a in artifacts
-        ],
-        total_count=len(artifacts),
     )

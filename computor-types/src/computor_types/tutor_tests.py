@@ -19,14 +19,32 @@ class TutorTestCreateResponse(BaseModel):
 
 
 class TutorTestStatus(BaseModel):
-    """Status of a tutor test run."""
+    """Quick status check for a tutor test run (for polling)."""
     test_id: str
     status: Literal["pending", "running", "completed", "failed", "timeout"]
     created_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
-    result: Optional[Any] = None  # Test result details
-    error: Optional[str] = None  # Error message if failed
+    has_artifacts: bool = False
+    artifact_count: int = 0
+
+
+class TutorTestGet(BaseModel):
+    """Full tutor test details including result_dict from MinIO."""
+    test_id: str
+    status: Literal["pending", "running", "completed", "failed", "timeout"]
+    created_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    # Full test result from result.json in MinIO
+    result_dict: Optional[Any] = None
+    # Convenience fields extracted from result_dict
+    passed: Optional[int] = None
+    failed: Optional[int] = None
+    total: Optional[int] = None
+    result_value: Optional[float] = None
+    error: Optional[str] = None
+    # Artifact info
     has_artifacts: bool = False
     artifact_count: int = 0
 
