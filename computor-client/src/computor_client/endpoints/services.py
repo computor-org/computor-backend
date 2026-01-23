@@ -83,3 +83,16 @@ class ServicesClient:
         response = await self._http.put(f"/service-accounts/{service_id}/heartbeat", params=kwargs)
         return
 
+    async def me(self) -> ServiceGet:
+        """
+        Get the authenticated service account's configuration.
+
+        This endpoint is designed for Temporal workers and other services
+        to fetch their configuration on startup using their API token.
+
+        Returns:
+            ServiceGet: The service's configuration including slug, config dict, etc.
+        """
+        response = await self._http.get("/service-accounts/me")
+        return ServiceGet.model_validate(response.json())
+

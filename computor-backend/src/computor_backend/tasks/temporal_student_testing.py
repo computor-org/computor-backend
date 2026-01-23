@@ -595,6 +595,16 @@ async def run_complete_student_test_activity(
     """
     logger.info(f"Starting complete student test for result {result_id}")
 
+    # Read API config from activity's worker environment (not workflow)
+    # This ensures the activity uses the token from the worker it runs on
+    api_url = os.environ.get("API_URL", api_config.get("url", "http://localhost:8000"))
+    api_token = os.environ.get("API_TOKEN") or api_config.get("token")
+    api_config = {
+        "url": api_url,
+        "token": api_token,
+    }
+    logger.info(f"[ACTIVITY API CONFIG] url={api_url}, token_present={bool(api_token)}")
+
     # Create temporary work directory for this test run
     # Use TemporaryDirectory for automatic cleanup - submissions don't need to be cached
     with tempfile.TemporaryDirectory(prefix=f"test_{result_id}_") as work_dir:

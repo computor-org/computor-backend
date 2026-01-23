@@ -42,10 +42,12 @@ class ServiceGet(BaseEntityGet):
     name: str
     description: Optional[str] = None
     service_type_id: Optional[str] = Field(None, description="ServiceType UUID")
+    service_type_path: Optional[str] = Field(None, description="ServiceType path (e.g., 'testing.python')")
     user_id: str
     config: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool
     last_seen_at: Optional[datetime] = None
+    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
 
 
 class ServiceList(BaseEntityList):
@@ -62,31 +64,13 @@ class ServiceQuery(ListQuery):
     user_id: Optional[str] = Field(None, description="Filter by user ID")
 
 
-class ServiceMeResponse(BaseModel):
-    """
-    Response for GET /services/me endpoint.
-
-    Returns the authenticated service account's configuration.
-    Workers use this to fetch their configuration on startup.
-    """
-    id: str = Field(..., description="Service UUID")
-    slug: str = Field(..., description="Service slug identifier")
-    name: str = Field(..., description="Service display name")
-    service_type_id: Optional[str] = Field(None, description="ServiceType UUID")
-    service_type_path: Optional[str] = Field(None, description="ServiceType path (e.g., 'testing.python')")
-    config: Dict[str, Any] = Field(default_factory=dict, description="Service configuration")
-    enabled: bool = Field(default=True, description="Whether the service is enabled")
-    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
-
-
 class ServiceInterface(EntityInterface):
     """Entity interface for Service API endpoints."""
     name = "services"
-    endpoint_base = "/services"
+    endpoint_base = "/service-accounts"
 
     create = ServiceCreate
     update = ServiceUpdate
     get = ServiceGet
     list = ServiceList
     query = ServiceQuery
-    me = ServiceMeResponse

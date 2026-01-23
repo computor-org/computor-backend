@@ -399,10 +399,13 @@ async def create_test_run(
             task_executor = get_task_executor()
 
             # Get task queue from service config (service-specific) or service type properties (default)
+            # Config structure: service.config.temporal.task_queue or service_type.properties.task_queue
             task_queue = "computor-tasks"  # Default
             if service.config and isinstance(service.config, dict):
-                task_queue = service.config.get("task_queue", task_queue)
-            elif service_type.properties and isinstance(service_type.properties, dict):
+                temporal_config = service.config.get("temporal", {})
+                if isinstance(temporal_config, dict):
+                    task_queue = temporal_config.get("task_queue", task_queue)
+            if task_queue == "computor-tasks" and service_type.properties and isinstance(service_type.properties, dict):
                 task_queue = service_type.properties.get("task_queue", task_queue)
 
             task_submission = TaskSubmission(

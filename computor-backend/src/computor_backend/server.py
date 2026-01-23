@@ -66,7 +66,6 @@ from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
-from computor_backend.api.service_accounts import service_accounts_router
 from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
@@ -318,16 +317,9 @@ app.include_router(
 )
 
 app.include_router(
-    service_accounts_router,
+    services_router,
     prefix="/service-accounts",
     tags=["services", "admin"],
-    dependencies=[Depends(get_current_principal)]
-)
-
-app.include_router(
-    services_router,
-    prefix="/services",
-    tags=["services"],
     dependencies=[Depends(get_current_principal)]
 )
 

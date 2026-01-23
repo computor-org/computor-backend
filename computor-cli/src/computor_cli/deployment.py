@@ -527,6 +527,19 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 service = existing_services[0]
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
 
+                # Update service config if provided in deployment YAML
+                if service_config.config:
+                    try:
+                        service_update = ServiceUpdate(config=service_config.config)
+                        updated_service = run_async(service_client.patch_service_accounts(
+                            str(service.id),
+                            service_update
+                        ))
+                        click.echo(f"    ✅ Updated service config")
+                        service = updated_service  # Use updated service object
+                    except Exception as e:
+                        click.echo(f"    ⚠️  Failed to update service config: {e}")
+
                 # Look up the service's token by user_id (defaults to active tokens only)
                 existing_tokens = run_async(api_token_client.get_api_tokens(
                     user_id=str(service.user_id)
