@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3.3.2
+    image: traefik:v3.6.6
     ports:
       - 8080:80
     command:
@@ -227,15 +227,15 @@ services:
     labels:
       - traefik.enable=false
 
-  # Python Testing Worker (for testing-python queue)
-  temporal-worker-python:
+  # Unified Testing Worker - handles Python, Octave, R, Julia, C, Fortran, Document
+  temporal-worker-testing:
     build:
       context: ./
-      dockerfile: ./docker/temporal-worker-python/Dockerfile
+      dockerfile: ./docker/temporal-worker-testing/Dockerfile
     restart: unless-stopped
-    command: ["--queues=testing-python"]
+    command: ["--queues=testing"]
     deploy:
-      replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-2}
+      replicas: ${TESTING_WORKER_REPLICAS:-2}
     environment:
       - TZ=UTC
       - RUNNING_IN_DOCKER=true
@@ -243,14 +243,20 @@ services:
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
       - API_URL=${API_URL}
-      - API_TOKEN=${PYTHON_WORKER_TOKEN}
-      - TESTING_EXECUTABLE=/tmp/engine/catester/testing.py run
-      - RUNTIME_ENVIRONMENT=/tmp/engine/venv/bin/python
-      - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
-      - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
-      - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
+      - API_TOKEN=${TESTING_WORKER_TOKEN}
+      # Computor-testing framework configuration
+      - TESTING_FRAMEWORK_URL=${TESTING_FRAMEWORK_URL}
+      - TESTING_FRAMEWORK_TOKEN=${TESTING_FRAMEWORK_TOKEN}
+      - TESTING_FRAMEWORK_VERSION=${TESTING_FRAMEWORK_VERSION}
+      # Default testing configuration (can be overridden by service.config)
+      - PYTHON_TEST_VERSION=${PYTHON_TEST_VERSION:-3.13}
+      - PYTHON_TEST_REQUIREMENTS=${PYTHON_TEST_REQUIREMENTS:-}
+      # R configuration
+      - R_LIBS_USER=/home/worker/.local/lib/R/library
     depends_on:
       - temporal
+      - postgres
+      - redis
       - minio
     labels:
       - traefik.enable=false
