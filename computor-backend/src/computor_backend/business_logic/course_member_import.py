@@ -48,8 +48,8 @@ async def trigger_post_create_for_member(
     if course_member.user and course_member.user.is_service:
         service = db.query(Service).filter(Service.user_id == course_member.user_id).first()
         is_agent = False
-        if service and service.service_type_rel:
-            service_type_path = str(service.service_type_rel.path)
+        if service and service.service_type:
+            service_type_path = str(service.service_type.path)
             is_agent = service_type_path.startswith("agent")
 
         if not is_agent:

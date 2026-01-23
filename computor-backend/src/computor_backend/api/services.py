@@ -63,7 +63,7 @@ async def get_service_me(
     # Get the associated service with its service type
     service = (
         db.query(Service)
-        .options(joinedload(Service.service_type_rel))
+        .options(joinedload(Service.service_type))
         .filter(Service.user_id == user_id)
         .first()
     )
@@ -76,8 +76,8 @@ async def get_service_me(
 
     # Get service type path if available
     service_type_path = None
-    if service.service_type_rel:
-        service_type_path = str(service.service_type_rel.path)
+    if service.service_type:
+        service_type_path = str(service.service_type.path)
 
     return ServiceMeResponse(
         id=str(service.id),
