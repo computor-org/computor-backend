@@ -7,6 +7,7 @@ from computor_cli.deployment import deployment
 from computor_cli.api_token_cli import token
 from computor_cli.documents import documents
 from computor_cli.service_cli import service
+from computor_cli.delete import delete
 
 # Commands that require computor_backend (DISABLED - use backend directly for these)
 # from computor_cli.admin import admin
@@ -43,6 +44,7 @@ cli.add_command(deployment, "deployment")
 cli.add_command(token, "token")
 cli.add_command(documents, "documents")
 cli.add_command(service, "service")
+cli.add_command(delete, "delete")
 
 # Backend-dependent commands (commented out - use from backend package instead)
 # cli.add_command(admin, "admin")

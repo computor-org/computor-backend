@@ -33,6 +33,11 @@ from computor_types.example import (
     ExampleFileSet,
     ExampleQuery,
 )
+from computor_types.cascade_deletion import (
+    ExampleBulkDeleteRequest,
+    ExampleBulkDeleteResult,
+    ForceLevel,
+)
 from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..permissions.auth import get_current_principal
@@ -40,6 +45,7 @@ from computor_backend.business_logic.crud import (
     get_entity_by_id as get_id_db,
     list_entities as list_db
 )
+from computor_backend.business_logic.cascade_deletion import delete_examples_by_pattern
 from ..api.exceptions import (
     NotFoundException,
     ForbiddenException,
@@ -1024,3 +1030,64 @@ async def delete_example_dependency(
     dependency_repo.delete(dependency)
 
     return {"message": "Dependency deleted successfully"}
+
+
+@examples_router.delete(
+    "/by-pattern",
+    response_model=ExampleBulkDeleteResult,
+    summary="Delete examples by identifier prefix pattern",
+    description="""
+    Delete examples matching an identifier pattern.
+
+    Pattern uses Ltree matching with * wildcard:
+    - "itpcp.progphys.py.*" matches all examples under itpcp.progphys.py
+    - "itpcp.*" matches all examples under itpcp
+
+    Force levels for handling deployments:
+    - "none" (default): Blocks if any active deployments exist
+    - "old": Allows deletion if deployments are only in archived courses
+    - "all": Deletes even if actively deployed (orphans deployments)
+
+    **WARNING**: This is a destructive operation. Use dry_run=true to preview.
+    """
+)
+async def delete_examples_by_pattern_endpoint(
+    permissions: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    identifier_pattern: str = Query(
+        ...,
+        description="Ltree pattern with * wildcard, e.g., 'itpcp.progphys.py.*'"
+    ),
+    repository_id: str = Query(
+        default=None,
+        description="Optional repository ID to scope deletion"
+    ),
+    dry_run: bool = Query(
+        default=False,
+        description="If true, only returns preview without deleting"
+    ),
+    force_level: ForceLevel = Query(
+        default=ForceLevel.NONE,
+        description="Force level: 'none' blocks active deployments, 'old' allows archived courses, 'all' forces deletion"
+    ),
+) -> ExampleBulkDeleteResult:
+    """Delete examples matching an identifier pattern."""
+    if not permissions.is_admin:
+        raise ForbiddenException("Deletion requires admin permissions")
+
+    # Build request object from query params
+    request = ExampleBulkDeleteRequest(
+        identifier_pattern=identifier_pattern,
+        repository_id=repository_id,
+        dry_run=dry_run,
+        force_level=force_level
+    )
+
+    storage = get_storage_service()
+    result = await delete_examples_by_pattern(
+        db=db,
+        request=request,
+        storage=storage
+    )
+
+    return result

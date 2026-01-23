@@ -53,6 +53,8 @@ from computor_backend.api.results import result_router
 from computor_backend.api.tutor import tutor_router
 from computor_backend.api.lecturer import lecturer_router
 from computor_backend.api.organizations import organization_router
+from computor_backend.api.courses import course_router
+from computor_backend.api.course_families import course_family_router
 from computor_backend.api.user_roles import user_roles_router
 from computor_backend.api.role_claims import role_claim_router
 from computor_backend.api.user import user_router
@@ -214,9 +216,9 @@ CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
 CrudRouter(SessionInterface).register_routes(app)
-CrudRouter(CourseInterface).register_routes(app)
+course_router.register_routes(app)
 organization_router.register_routes(app)
-CrudRouter(CourseFamilyInterface).register_routes(app)
+course_family_router.register_routes(app)
 CrudRouter(CourseGroupInterface).register_routes(app)
 CrudRouter(CourseMemberInterface).register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
