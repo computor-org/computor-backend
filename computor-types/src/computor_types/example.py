@@ -228,6 +228,8 @@ class ExampleDownloadResponse(BaseModel):
     example_id: str
     version_id: Optional[str] = None
     version_tag: str
+    identifier: str = Field(..., description="Hierarchical identifier of the example (e.g., itpcp.pgph.py.quadratic_eq)")
+    directory: str = Field(..., description="Directory name of the example")
     files: Dict[str, str] = Field(..., description="Map of filename to content")
     meta_yaml: str
     test_yaml: Optional[str] = None
