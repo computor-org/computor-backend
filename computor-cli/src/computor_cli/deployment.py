@@ -1808,7 +1808,35 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"  Status: {result.get('status')}")
                 click.echo(f"  Path: {result.get('deployment_path')}")
 
-                if wait and result.get('workflow_id'):
+                # Check if Phase 2 is needed (services, content types, contents, or user course assignments)
+                needs_phase_2 = False
+
+                # Check for courses with services/content
+                for org in config.organizations:
+                    for family in org.course_families:
+                        for course in family.courses:
+                            if course.services or course.content_types or course.contents:
+                                needs_phase_2 = True
+                                break
+                        if needs_phase_2:
+                            break
+                    if needs_phase_2:
+                        break
+
+                # Check for users with course assignments
+                if not needs_phase_2 and config.users:
+                    for user_config in config.users:
+                        if hasattr(user_config, 'course_members') and user_config.course_members:
+                            needs_phase_2 = True
+                            break
+
+                # Force waiting if Phase 2 is needed
+                should_wait = wait or needs_phase_2
+
+                if needs_phase_2 and not wait:
+                    click.echo("  ℹ️  Waiting for hierarchy completion (required for subsequent tasks)...")
+
+                if should_wait and result.get('workflow_id'):
                     # Poll for status
                     click.echo("\nWaiting for deployment to complete...")
                     import time
@@ -1836,7 +1864,15 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                                     _deploy_users(config, auth)
                                 break
                             elif status_data.get('status') == 'failed':
-                                click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
+                                error_msg = status_data.get('error', 'Unknown error')
+                                click.echo(f"\n\n❌ Deployment failed!", err=True)
+                                click.echo(f"\nError details:", err=True)
+                                click.echo(f"  {error_msg}", err=True)
+
+                                # Show workflow ID for debugging
+                                if workflow_id:
+                                    click.echo(f"\nWorkflow ID: {workflow_id}", err=True)
+                                    click.echo(f"Check Temporal UI for more details: http://localhost:8088", err=True)
                                 sys.exit(1)
                             click.echo(".", nl=False)
                         except Exception as e:
@@ -1845,21 +1881,10 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                     else:
                         click.echo("\n⚠️  Deployment is still running. Check status later.")
 
-                # If not waiting but deployment started, try to continue with remaining tasks
-                if not wait:
-                    click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
-                    # Try to link backends and create contents (might fail if hierarchy not ready)
-                    service_course_mapping = _link_backends_to_deployed_courses(
-                        config, auth, deployed_services, True
-                    )
-
-                    # Phase 3: Update token scopes
-                    if service_course_mapping and deployed_services:
-                        _update_token_scopes(service_course_mapping, deployed_services, auth)
-
-                    if config.users:
-                        click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
-                        _deploy_users(config, auth)
+                # If not waiting and Phase 2 not needed, inform user
+                if not should_wait:
+                    click.echo(f"\n✅ Hierarchy deployment started in background.")
+                    click.echo("     No Phase 2 tasks configured (service linking/content creation).")
             else:
                 click.echo("❌ Failed to start deployment", err=True)
                 sys.exit(1)

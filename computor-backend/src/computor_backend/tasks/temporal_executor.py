@@ -2,6 +2,7 @@
 Task executor implementation using Temporal.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
@@ -12,6 +13,8 @@ from .temporal_base import WorkflowResult
 from .base import BaseTask
 from .registry import task_registry
 from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
+
+logger = logging.getLogger(__name__)
 
 
 class TemporalTaskExecutor:
@@ -140,7 +143,24 @@ class TemporalTaskExecutor:
             
             # Determine if task has result
             has_result = description.status in [WorkflowExecutionStatus.COMPLETED, WorkflowExecutionStatus.FAILED]
-            
+
+            # Extract error message from failed workflows
+            error_message = None
+            if status == TaskStatus.FAILED:
+                try:
+                    raw_desc = description.raw_description
+                    if raw_desc and hasattr(raw_desc, 'workflow_execution_info'):
+                        failure = raw_desc.workflow_execution_info.failure
+                        if failure and hasattr(failure, 'message'):
+                            error_message = failure.message
+                        else:
+                            error_message = "Task failed (no error details available)"
+                    else:
+                        error_message = "Task failed"
+                except Exception as e:
+                    logger.warning(f"Failed to extract error message from workflow: {e}")
+                    error_message = "Task failed"
+
             # Build task info
             task_info = TaskInfo(
                 task_id=task_id,
@@ -152,7 +172,7 @@ class TemporalTaskExecutor:
                 started_at=description.start_time,
                 finished_at=description.close_time,
                 completed_at=description.close_time,
-                error="Task failed" if status == TaskStatus.FAILED else None,
+                error=error_message,
                 worker=description.task_queue,
                 queue=description.task_queue,
                 has_result=has_result,
