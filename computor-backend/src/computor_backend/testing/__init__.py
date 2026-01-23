@@ -5,7 +5,7 @@ Provides flexible backend system for different programming languages and testing
 
 from .backends import (
     TestingBackend,
-    UnifiedTestingBackend,
+    ComputorTestingBackend,
     PythonTestingBackend,
     MatlabTestingBackend,
     JavaTestingBackend,
@@ -15,7 +15,7 @@ from .backends import (
 
 __all__ = [
     "TestingBackend",
-    "UnifiedTestingBackend",
+    "ComputorTestingBackend",
     "PythonTestingBackend",
     "MatlabTestingBackend",
     "JavaTestingBackend",

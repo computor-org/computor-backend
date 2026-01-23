@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 
 class TestingBackend(ABC):
     """Abstract base class for testing backends."""
-    
+
+    def __init__(self, service_slug: str = None):
+        """Initialize backend with optional service slug."""
+        self.service_slug = service_slug
+
     @abstractmethod
     async def execute_tests(
         self,
@@ -213,11 +217,11 @@ class MatlabTestingBackend(TestingBackend):
             }
 
 
-class UnifiedTestingBackend(TestingBackend):
+class ComputorTestingBackend(TestingBackend):
     """
-    Unified testing backend using computor-testing framework.
+    Computor testing backend using computor-testing framework.
 
-    Supports multiple languages through a single unified CLI:
+    Supports multiple languages through a single CLI:
     - Python
     - Octave (GNU Octave, not MATLAB)
     - R
@@ -240,12 +244,8 @@ class UnifiedTestingBackend(TestingBackend):
         "itpcp.exec.doc": "document",
     }
 
-    def __init__(self, service_slug: str = None):
-        """Initialize with optional service slug to determine language."""
-        self.service_slug = service_slug
-
     def get_backend_type(self) -> str:
-        return "unified:computor-testing"
+        return "computor-testing"
 
     async def execute_tests(
         self,
@@ -304,7 +304,7 @@ class UnifiedTestingBackend(TestingBackend):
             cmd_parts.extend(["-v", str(verbosity)])
 
         cmd = " ".join(cmd_parts)
-        logger.info(f"Executing unified test command: {cmd}")
+        logger.info(f"Executing computor-test command: {cmd}")
 
         try:
             # Execute test command
@@ -337,7 +337,7 @@ class UnifiedTestingBackend(TestingBackend):
                 "details": {"timeout": True}
             }
         except Exception as e:
-            logger.error(f"Error executing unified tests: {e}")
+            logger.error(f"Error executing computor-test: {e}")
             return {
                 "passed": 0,
                 "failed": 1,
@@ -395,14 +395,14 @@ class TestingBackendFactory:
     """Factory for creating testing backend instances based on service slug."""
 
     _backends: Dict[str, type[TestingBackend]] = {
-        # Unified backend for computor-testing framework (multi-language)
-        "itpcp.exec.py": UnifiedTestingBackend,
-        "itpcp.exec.oct": UnifiedTestingBackend,      # Octave (not MATLAB!)
-        "itpcp.exec.r": UnifiedTestingBackend,
-        "itpcp.exec.julia": UnifiedTestingBackend,
-        "itpcp.exec.c": UnifiedTestingBackend,
-        "itpcp.exec.fortran": UnifiedTestingBackend,
-        "itpcp.exec.doc": UnifiedTestingBackend,
+        # ComputorTestingBackend for computor-testing framework (multi-language)
+        "itpcp.exec.py": ComputorTestingBackend,
+        "itpcp.exec.oct": ComputorTestingBackend,      # Octave (not MATLAB!)
+        "itpcp.exec.r": ComputorTestingBackend,
+        "itpcp.exec.julia": ComputorTestingBackend,
+        "itpcp.exec.c": ComputorTestingBackend,
+        "itpcp.exec.fortran": ComputorTestingBackend,
+        "itpcp.exec.doc": ComputorTestingBackend,
 
         # MATLAB - separate system with Pyro5 RPC (unchanged)
         "itpcp.exec.mat": MatlabTestingBackend,
@@ -424,12 +424,7 @@ class TestingBackendFactory:
         backend_class = cls._backends.get(service_slug.lower())
         if not backend_class:
             raise ValueError(f"Unknown testing backend for service: {service_slug}. Available: {list(cls._backends.keys())}")
-
-        # For UnifiedTestingBackend, pass the service slug to determine language
-        if backend_class == UnifiedTestingBackend:
-            return backend_class(service_slug=service_slug)
-        else:
-            return backend_class()
+        return backend_class(service_slug=service_slug)
 
     @classmethod
     def get_available_backends(cls) -> list[str]:
