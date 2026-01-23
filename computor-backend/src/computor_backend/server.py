@@ -67,6 +67,7 @@ from computor_backend.api.course_member_comments import router as course_member_
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
 from computor_backend.api.service_accounts import service_accounts_router
+from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
@@ -298,12 +299,6 @@ app.include_router(
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
-# app.include_router(
-#     services_router,
-#     prefix="/services",
-#     tags=["services"]
-# )
-
 app.include_router(
     user_roles_router,
     prefix="/user-roles",
@@ -326,6 +321,13 @@ app.include_router(
     service_accounts_router,
     prefix="/service-accounts",
     tags=["services", "admin"],
+    dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    services_router,
+    prefix="/services",
+    tags=["services"],
     dependencies=[Depends(get_current_principal)]
 )
 

@@ -1,53 +1,91 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, Request, Response
-import httpx
-from sqlalchemy import func
-from sqlalchemy.orm import Session
-import starlette
-from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import NotFoundException, ServiceUnavailableException
-from computor_backend.database import get_db
-from computor_backend.permissions.principal import Principal
-from computor_backend.model.course import CourseMember
+"""
+Service API endpoints.
 
-SERVICES = {
-}
+Provides endpoints for service account management and self-identification.
+"""
+
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
+
+from computor_backend.database import get_db
+from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.principal import Principal
+from computor_backend.model.auth import User
+from computor_backend.model.service import Service
+from computor_types.services import ServiceMeResponse
+
 
 services_router = APIRouter()
 
-@services_router.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def service_proxy(permissions: Annotated[Principal, Depends(get_current_principal)], service: str, path: str, request: Request, db: Session = Depends(get_db)):
 
-    target_roles = ["_maintainer", "_owner", "_tutor"]
-    result = db.query(func.count(CourseMember.course_role_id)) \
-        .filter(CourseMember.user_id == permissions.user_id, CourseMember.course_role_id.in_(target_roles)) \
-        .scalar()
+@services_router.get("/me", response_model=ServiceMeResponse)
+async def get_service_me(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db)
+):
+    """
+    Get the authenticated service account's configuration.
 
-    if result < 1:
-        raise NotFoundException()
+    This endpoint is designed for Temporal workers and other services
+    to fetch their configuration on startup using their API token.
 
-    service_name = SERVICES.get(service,None)
+    Requires authentication with a service account (is_service=true).
 
-    if service_name == None:
-        raise NotFoundException()
+    Returns:
+        ServiceMeResponse: The service's configuration including:
+            - id: Service UUID
+            - slug: Service identifier (e.g., "temporal-worker-python")
+            - name: Human-readable name
+            - service_type_id: ServiceType UUID (if set)
+            - service_type_path: ServiceType path (e.g., "testing.python")
+            - config: Service-specific configuration dict
+            - enabled: Whether the service is enabled
+            - properties: Additional properties
 
-    target_url = f"{service_name}/{path}"
-    method = request.method.lower()
-    data = await request.body()
+    Raises:
+        403: If the authenticated user is not a service account
+        404: If the service record is not found for the user
+    """
+    user_id = principal.get_user_id_or_throw()
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.request(method, target_url, content=data)
+    # Get the user and check if it's a service account
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.headers.get("content-type")
+    if not user.is_service:
+        raise HTTPException(
+            status_code=403,
+            detail="This endpoint is only available for service accounts"
         )
 
-    except httpx.ConnectError:
-        raise ServiceUnavailableException()
-    
-    except starlette.requests.ClientDisconnect:
-        raise ServiceUnavailableException()
+    # Get the associated service with its service type
+    service = (
+        db.query(Service)
+        .options(joinedload(Service.service_type_rel))
+        .filter(Service.user_id == user_id)
+        .first()
+    )
+
+    if not service:
+        raise HTTPException(
+            status_code=404,
+            detail="Service record not found for this service account"
+        )
+
+    # Get service type path if available
+    service_type_path = None
+    if service.service_type_rel:
+        service_type_path = str(service.service_type_rel.path)
+
+    return ServiceMeResponse(
+        id=str(service.id),
+        slug=service.slug,
+        name=service.name,
+        service_type_id=str(service.service_type_id) if service.service_type_id else None,
+        service_type_path=service_type_path,
+        config=service.config or {},
+        enabled=service.enabled,
+        properties=service.properties
+    )
