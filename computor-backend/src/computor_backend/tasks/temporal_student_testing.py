@@ -292,6 +292,7 @@ async def execute_tests_activity(
     reference_path: str,
     student_path: str,
     test_config: Dict[str, Any],
+    service_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     work_dir: Optional[str] = None,
     store_graphics_artifacts: bool = True,
@@ -303,7 +304,8 @@ async def execute_tests_activity(
         reference_path: Path to reference example (from cache)
         student_path: Path to student submission
         test_config: Test configuration
-        service_type_config: Service type configuration
+        service_config: Service instance configuration (from Service.config)
+        service_type_config: Service type configuration (from ServiceType.properties)
         work_dir: Working directory for test execution (creates temp if not provided)
         store_graphics_artifacts: Whether to store graphics artifacts (plots, figures) generated during testing
 
@@ -429,7 +431,8 @@ async def execute_tests_activity(
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
-            backend_properties=service_type_config.get("properties", {}),
+            service_config=service_config,
+            service_type_config=service_type_config,
         )
 
         # Check if backend returned an error/timeout directly
@@ -594,6 +597,7 @@ async def store_test_artifacts(
 @activity.defn(name="run_complete_student_test")
 async def run_complete_student_test_activity(
     test_job: Dict[str, Any],
+    service_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     result_id: str,
     api_config: Dict[str, Any],
@@ -657,6 +661,7 @@ async def run_complete_student_test_activity(
                 reference_path=reference_path,
                 student_path=student_path,
                 test_config=test_job,
+                service_config=service_config,
                 service_type_config=service_type_config,
                 work_dir=work_dir,  # Pass the temporary work directory
                 store_graphics_artifacts=store_graphics_artifacts,
@@ -726,6 +731,7 @@ class StudentTestingWorkflow(BaseWorkflow):
         Args:
             parameters: Dict containing:
                 - test_job: Test job configuration
+                - service_config: Service instance configuration
                 - service_type_config: Service type configuration
                 - result_id: Database result ID
 
@@ -733,6 +739,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             WorkflowResult with test results
         """
         test_job = parameters.get("test_job", {})
+        service_config = parameters.get("service_config", {})
         service_type_config = parameters.get("service_type_config", {})
         result_id = parameters.get("result_id")
 
@@ -757,7 +764,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             workflow.logger.info(f"[ACTIVITY START] run_complete_student_test for result_id={result_id}")
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
-                args=[test_job, service_type_config, result_id, api_config],
+                args=[test_job, service_config, service_type_config, result_id, api_config],
                 start_to_close_timeout=timedelta(minutes=30),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
