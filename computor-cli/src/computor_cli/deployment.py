@@ -97,13 +97,33 @@ class SyncHTTPWrapper:
     def create(self, path: str, data: dict = None):
         """POST request."""
         response = self._client.post(path, json=data or {})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            # Include response body in error for better debugging
+            if response.content:
+                try:
+                    error_detail = response.json()
+                    raise Exception(f"{e}\nAPI Response: {error_detail}")
+                except:
+                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
+            raise
         return response.json() if response.content else None
 
     def update(self, path: str, data: dict = None):
         """PATCH request."""
         response = self._client.patch(path, json=data or {})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            # Include response body in error for better debugging
+            if response.content:
+                try:
+                    error_detail = response.json()
+                    raise Exception(f"{e}\nAPI Response: {error_detail}")
+                except:
+                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
+            raise
         return response.json() if response.content else None
 
     def __del__(self):
@@ -641,8 +661,16 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 token_create = ApiTokenAdminCreate(**token_create_params)
 
+                # Debug: Log what we're sending
+                payload = token_create.model_dump(mode='json')
+                click.echo(f"    🔍 Debug - Token creation payload:")
+                click.echo(f"       user_id: {payload.get('user_id')}")
+                click.echo(f"       token length: {len(payload.get('predefined_token', ''))}")
+                click.echo(f"       scopes: {payload.get('scopes')}")
+                click.echo(f"       expires_at: {payload.get('expires_at')}")
+
                 # Call admin endpoint (use mode='json' to serialize datetime objects)
-                token_response = custom_client.create("api-tokens/admin/create", token_create.model_dump(mode='json'))
+                token_response = custom_client.create("api-tokens/admin/create", payload)
                 click.echo(f"    ✅ Created API token with predefined value: {token_response['token_prefix']}...")
 
                 deployed_services[service_config.slug] = {
