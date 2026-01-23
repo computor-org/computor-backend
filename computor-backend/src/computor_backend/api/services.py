@@ -5,10 +5,11 @@ Provides endpoints for service account management and self-identification.
 """
 
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload
 
 from computor_backend.database import get_db
+from computor_backend.exceptions import ForbiddenException, NotFoundException, UserNotFoundException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import User
@@ -52,12 +53,16 @@ async def get_service_me(
     # Get the user and check if it's a service account
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise UserNotFoundException(
+            error_code="NF_002",
+            detail=f"User {user_id} not found"
+        )
 
     if not user.is_service:
-        raise HTTPException(
-            status_code=403,
-            detail="This endpoint is only available for service accounts"
+        raise ForbiddenException(
+            error_code="AUTHZ_010",
+            detail="This endpoint is only available for service accounts",
+            context={"user_id": str(user_id)}
         )
 
     # Get the associated service with its service type
@@ -69,9 +74,10 @@ async def get_service_me(
     )
 
     if not service:
-        raise HTTPException(
-            status_code=404,
-            detail="Service record not found for this service account"
+        raise NotFoundException(
+            error_code="NF_010",
+            detail="Service record not found for this service account",
+            context={"user_id": str(user_id)}
         )
 
     # Get service type path if available
