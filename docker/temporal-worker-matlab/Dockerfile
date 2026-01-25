@@ -54,11 +54,12 @@ RUN chmod -R 777 /home/matlab
 RUN rm /etc/sudoers.d/localsudo
 RUN passwd -d matlab
 
+# Set timezone to UTC (must be done as root before switching user)
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 USER matlab
 WORKDIR /home/matlab
-
-# Set timezone to UTC
-ENV TZ=UTC
 
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10

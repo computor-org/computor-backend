@@ -42,10 +42,12 @@ class ServiceGet(BaseEntityGet):
     name: str
     description: Optional[str] = None
     service_type_id: Optional[str] = Field(None, description="ServiceType UUID")
+    service_type_path: Optional[str] = Field(None, description="ServiceType path (e.g., 'testing.python')")
     user_id: str
     config: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool
     last_seen_at: Optional[datetime] = None
+    properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
 
 
 class ServiceList(BaseEntityList):
@@ -65,7 +67,7 @@ class ServiceQuery(ListQuery):
 class ServiceInterface(EntityInterface):
     """Entity interface for Service API endpoints."""
     name = "services"
-    endpoint_base = "/services"
+    endpoint_base = "/service-accounts"
 
     create = ServiceCreate
     update = ServiceUpdate

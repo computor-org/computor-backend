@@ -168,6 +168,7 @@ async def store_tutor_test_result_to_minio(
 async def run_tutor_test_activity(
     test_id: str,
     example_version_id: str,
+    service_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     test_config: Dict[str, Any],
     api_config: Dict[str, Any],
@@ -186,7 +187,8 @@ async def run_tutor_test_activity(
     Args:
         test_id: The tutor test ID
         example_version_id: Reference example version UUID
-        service_type_config: Service type configuration
+        service_config: Service instance configuration (from Service.config)
+        service_type_config: Service type configuration (from ServiceType.properties)
         test_config: Test configuration (testing_service_slug, etc.)
         api_config: API connection configuration
 
@@ -227,6 +229,7 @@ async def run_tutor_test_activity(
                 reference_path=reference_path,
                 student_path=tutor_path,  # Tutor files act as "student" in test
                 test_config=test_config,
+                service_config=service_config,
                 service_type_config=service_type_config,
                 work_dir=work_dir,
                 store_graphics_artifacts=store_graphics_artifacts,
@@ -306,6 +309,7 @@ class TutorTestingWorkflow(BaseWorkflow):
             parameters: Dict containing:
                 - test_id: Unique test identifier (UUID)
                 - example_version_id: Reference example version UUID
+                - service_config: Service instance configuration
                 - service_type_config: Service type configuration
                 - test_config: Test configuration
 
@@ -314,6 +318,7 @@ class TutorTestingWorkflow(BaseWorkflow):
         """
         test_id = parameters.get("test_id")
         example_version_id = parameters.get("example_version_id")
+        service_config = parameters.get("service_config", {})
         service_type_config = parameters.get("service_type_config", {})
         test_config = parameters.get("test_config", {})
 
@@ -341,6 +346,7 @@ class TutorTestingWorkflow(BaseWorkflow):
                 args=[
                     test_id,
                     example_version_id,
+                    service_config,
                     service_type_config,
                     test_config,
                     api_config,

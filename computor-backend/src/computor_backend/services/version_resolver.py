@@ -9,6 +9,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from ..model.example import Example, ExampleVersion
+from ..custom_types import Ltree
 
 
 class VersionResolver:
@@ -31,7 +32,7 @@ class VersionResolver:
         """
         # Find the example by identifier
         example = self.db.query(Example).filter(
-            Example.identifier == example_slug
+            Example.identifier == Ltree(example_slug)
         ).first()
         
         if not example:

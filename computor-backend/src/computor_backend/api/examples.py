@@ -929,6 +929,8 @@ async def download_example_version(
         example_id=example.id,
         version_id=version.id,
         version_tag=version.version_tag,
+        identifier=str(example.identifier),
+        directory=example.directory,
         files=main_files,
         meta_yaml=version.meta_yaml,
         test_yaml=version.test_yaml,

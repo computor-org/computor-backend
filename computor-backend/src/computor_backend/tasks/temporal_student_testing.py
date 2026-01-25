@@ -41,6 +41,40 @@ EXAMPLE_CACHE_DIR = os.environ.get("EXAMPLE_CACHE_DIR", "/tmp/examples")
 # Storage and Caching Activities
 # ============================================================================
 
+def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
+    """
+    Save example files to disk, handling base64-encoded content.
+
+    Args:
+        target_path: Directory to save files to
+        files: Dict of filename -> content
+    """
+    import base64
+
+    os.makedirs(target_path, exist_ok=True)
+
+    for filename, content in files.items():
+        file_path = os.path.join(target_path, filename)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        if isinstance(content, dict) and "base64" in content:
+            file_content = base64.b64decode(content["base64"])
+            with open(file_path, 'wb') as f:
+                f.write(file_content)
+        elif isinstance(content, str):
+            if content.startswith('data:') and ';base64,' in content:
+                base64_data = content.split(';base64,', 1)[1]
+                file_content = base64.b64decode(base64_data)
+                with open(file_path, 'wb') as f:
+                    f.write(file_content)
+            else:
+                with open(file_path, 'w') as f:
+                    f.write(content)
+        else:
+            with open(file_path, 'wb') as f:
+                f.write(content)
+
+
 @activity.defn(name="fetch_example_version_with_dependencies")
 async def fetch_example_version_with_dependencies(
     example_version_id: str,
@@ -51,6 +85,12 @@ async def fetch_example_version_with_dependencies(
     Fetch an example version and all its dependencies from the API/MinIO.
 
     Uses local caching to avoid re-downloading the same example version.
+    Each example_version is cached under its own version_id directory.
+
+    Cache structure:
+        /tmp/examples/{version_id}/         <- main example files
+        /tmp/examples/{dep1_version_id}/    <- dependency 1 files
+        /tmp/examples/{dep2_version_id}/    <- dependency 2 files
 
     Args:
         example_version_id: UUID of the ExampleVersion to fetch
@@ -61,23 +101,19 @@ async def fetch_example_version_with_dependencies(
         Dict with:
             - main_path: Path to the main example
             - dependencies: List of dicts with dep info and paths
-            - example_version: ExampleVersion data
     """
     logger.info(f"Fetching example version {example_version_id}")
 
-    # Check cache first
     # Cache path: /tmp/examples/{example_version_id}/
     cache_path = os.path.join(target_base_dir, example_version_id)
-    if os.path.exists(cache_path):
-        logger.info(f"Example version {example_version_id} found in cache at {cache_path}")
-        # Return the cache path directly - files are already there
-        return {
-            "main_path": cache_path,
-            "dependencies": [],  # Dependencies already cached in subdirs
-            "example_version_id": example_version_id,
-        }
 
-    # Not cached - fetch from API
+    # Check if already cached (directory exists with files)
+    if os.path.isdir(cache_path) and os.listdir(cache_path):
+        logger.info(f"Example version {example_version_id} found in cache at {cache_path}")
+        # We still need to fetch dependency info from API to know their paths
+        # But we can skip downloading files that are already cached
+
+    # Fetch from API (needed for dependency resolution even if main is cached)
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
     api_token = api_config.get("token")
     if not api_token:
@@ -98,103 +134,44 @@ async def fetch_example_version_with_dependencies(
             )
 
         download_data = response.json()
+        main_identifier = download_data.get("identifier") or download_data.get("directory")
 
-        # Create cache directory - files go directly here, no "main" subdirectory
-        # Structure: /tmp/examples/{example_version_id}/
-        #            /tmp/examples/{example_version_id}/dependencies/{dep_directory}/
-        os.makedirs(cache_path, exist_ok=True)
+        # Cache main example if not already cached
+        if not os.path.isdir(cache_path) or not os.listdir(cache_path):
+            logger.info(f"Caching main example {example_version_id} at {cache_path}")
+            _save_example_files(cache_path, download_data.get("files", {}))
+        else:
+            logger.info(f"Main example {example_version_id} already cached")
 
-        # Save main example files directly in cache_path
-        logger.info(f"Saving main example files to {cache_path}")
-        files = download_data.get("files", {})
-        for filename, content in files.items():
-            file_path = os.path.join(cache_path, filename)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-            # Handle base64-encoded content if present
-            if isinstance(content, dict) and "base64" in content:
-                import base64
-                file_content = base64.b64decode(content["base64"])
-                with open(file_path, 'wb') as f:
-                    f.write(file_content)
-            elif isinstance(content, str):
-                # Check if string is a data URI with base64 encoding
-                if content.startswith('data:') and ';base64,' in content:
-                    import base64
-                    # Extract base64 part after the comma
-                    base64_data = content.split(';base64,', 1)[1]
-                    file_content = base64.b64decode(base64_data)
-                    with open(file_path, 'wb') as f:
-                        f.write(file_content)
-                else:
-                    # Regular string content
-                    with open(file_path, 'w') as f:
-                        f.write(content)
-            else:
-                with open(file_path, 'wb') as f:
-                    f.write(content)
-
-        # Save dependencies in subdirectories
+        # Process dependencies - each cached under its own version_id
         dependencies_info = []
-        dependencies_data = download_data.get("dependencies", [])
-
-        for dep in dependencies_data:
-            dep_id = dep.get("example_id")
+        for dep in download_data.get("dependencies", []):
             dep_version_id = dep.get("version_id")
-            dep_directory = dep.get("directory")
+            dep_identifier = dep.get("identifier") or dep.get("directory")
+            dep_cache_path = os.path.join(target_base_dir, dep_version_id)
 
-            logger.info(f"Saving dependency {dep_directory} (version {dep_version_id})")
-
-            dep_path = os.path.join(cache_path, "dependencies", dep_directory)
-            os.makedirs(dep_path, exist_ok=True)
-
-            # Save dependency files
-            dep_files = dep.get("files", {})
-            for filename, content in dep_files.items():
-                file_path = os.path.join(dep_path, filename)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-                if isinstance(content, dict) and "base64" in content:
-                    import base64
-                    file_content = base64.b64decode(content["base64"])
-                    with open(file_path, 'wb') as f:
-                        f.write(file_content)
-                elif isinstance(content, str):
-                    # Check if string is a data URI with base64 encoding
-                    if content.startswith('data:') and ';base64,' in content:
-                        import base64
-                        # Extract base64 part after the comma
-                        base64_data = content.split(';base64,', 1)[1]
-                        file_content = base64.b64decode(base64_data)
-                        with open(file_path, 'wb') as f:
-                            f.write(file_content)
-                    else:
-                        # Regular string content
-                        with open(file_path, 'w') as f:
-                            f.write(content)
-                else:
-                    with open(file_path, 'wb') as f:
-                        f.write(content)
+            # Cache dependency if not already cached
+            if not os.path.isdir(dep_cache_path) or not os.listdir(dep_cache_path):
+                logger.info(f"Caching dependency {dep_identifier} ({dep_version_id}) at {dep_cache_path}")
+                _save_example_files(dep_cache_path, dep.get("files", {}))
+            else:
+                logger.info(f"Dependency {dep_identifier} ({dep_version_id}) already cached")
 
             dependencies_info.append({
-                "example_id": dep_id,
+                "example_id": dep.get("example_id"),
                 "version_id": dep_version_id,
-                "directory": dep_directory,
-                "path": dep_path,
-                "identifier": dep.get("identifier"),
-                "title": dep.get("title"),
+                "identifier": dep_identifier,
+                "path": dep_cache_path,
             })
 
-        logger.info(f"Cached example version {example_version_id} at {cache_path}")
+        logger.info(f"Cached example version {example_version_id}: main at {cache_path}, "
+                   f"dependencies: {[d['identifier'] for d in dependencies_info]}")
 
-        # Return the path - simple, just like git clone
         return {
             "main_path": cache_path,
+            "main_identifier": main_identifier,
             "dependencies": dependencies_info,
             "example_version_id": example_version_id,
-            "version_tag": download_data.get("version_tag"),
-            "meta_yaml": download_data.get("meta_yaml"),
-            "test_yaml": download_data.get("test_yaml"),
         }
 
 
@@ -292,6 +269,7 @@ async def execute_tests_activity(
     reference_path: str,
     student_path: str,
     test_config: Dict[str, Any],
+    service_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     work_dir: Optional[str] = None,
     store_graphics_artifacts: bool = True,
@@ -303,7 +281,8 @@ async def execute_tests_activity(
         reference_path: Path to reference example (from cache)
         student_path: Path to student submission
         test_config: Test configuration
-        service_type_config: Service type configuration
+        service_config: Service instance configuration (from Service.config)
+        service_type_config: Service type configuration (from ServiceType.properties)
         work_dir: Working directory for test execution (creates temp if not provided)
         store_graphics_artifacts: Whether to store graphics artifacts (plots, figures) generated during testing
 
@@ -429,7 +408,8 @@ async def execute_tests_activity(
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
-            backend_properties=service_type_config.get("properties", {}),
+            service_config=service_config,
+            service_type_config=service_type_config,
         )
 
         # Check if backend returned an error/timeout directly
@@ -594,6 +574,7 @@ async def store_test_artifacts(
 @activity.defn(name="run_complete_student_test")
 async def run_complete_student_test_activity(
     test_job: Dict[str, Any],
+    service_config: Dict[str, Any],
     service_type_config: Dict[str, Any],
     result_id: str,
     api_config: Dict[str, Any],
@@ -613,6 +594,16 @@ async def run_complete_student_test_activity(
         Test results dictionary
     """
     logger.info(f"Starting complete student test for result {result_id}")
+
+    # Read API config from activity's worker environment (not workflow)
+    # This ensures the activity uses the token from the worker it runs on
+    api_url = os.environ.get("API_URL", api_config.get("url", "http://localhost:8000"))
+    api_token = os.environ.get("API_TOKEN") or api_config.get("token")
+    api_config = {
+        "url": api_url,
+        "token": api_token,
+    }
+    logger.info(f"[ACTIVITY API CONFIG] url={api_url}, token_present={bool(api_token)}")
 
     # Create temporary work directory for this test run
     # Use TemporaryDirectory for automatic cleanup - submissions don't need to be cached
@@ -649,6 +640,20 @@ async def run_complete_student_test_activity(
             student_path = submission_data["submission_path"]
             logger.info(f"Student submission at: {student_path}")
 
+            # Step 2.5: Copy dependencies next to student submission
+            # This allows sys.path.append("../dep_identifier/") to work from student code
+            dependencies = reference_data.get("dependencies", [])
+            if dependencies:
+                student_parent = os.path.dirname(student_path)
+                for dep in dependencies:
+                    dep_identifier = dep.get("identifier")
+                    dep_source = dep.get("path")
+                    if dep_identifier and dep_source and os.path.exists(dep_source):
+                        dep_dest = os.path.join(student_parent, dep_identifier)
+                        if not os.path.exists(dep_dest):
+                            shutil.copytree(dep_source, dep_dest)
+                            logger.info(f"Copied dependency: {dep_source} -> {dep_dest}")
+
             # Step 3: Execute tests
             logger.info("Executing tests")
             # Get store_graphics_artifacts from test_job (default: True)
@@ -657,6 +662,7 @@ async def run_complete_student_test_activity(
                 reference_path=reference_path,
                 student_path=student_path,
                 test_config=test_job,
+                service_config=service_config,
                 service_type_config=service_type_config,
                 work_dir=work_dir,  # Pass the temporary work directory
                 store_graphics_artifacts=store_graphics_artifacts,
@@ -726,6 +732,7 @@ class StudentTestingWorkflow(BaseWorkflow):
         Args:
             parameters: Dict containing:
                 - test_job: Test job configuration
+                - service_config: Service instance configuration
                 - service_type_config: Service type configuration
                 - result_id: Database result ID
 
@@ -733,6 +740,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             WorkflowResult with test results
         """
         test_job = parameters.get("test_job", {})
+        service_config = parameters.get("service_config", {})
         service_type_config = parameters.get("service_type_config", {})
         result_id = parameters.get("result_id")
 
@@ -757,7 +765,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             workflow.logger.info(f"[ACTIVITY START] run_complete_student_test for result_id={result_id}")
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
-                args=[test_job, service_type_config, result_id, api_config],
+                args=[test_job, service_config, service_type_config, result_id, api_config],
                 start_to_close_timeout=timedelta(minutes=30),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
