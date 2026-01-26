@@ -480,10 +480,12 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
 
 def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> dict:
     """
-    Deploy services from configuration (Phase 1 of deployment).
+    Deploy services from configuration (Phase 1, after hierarchy deployment).
 
-    Creates services with users and API tokens. Returns mapping of service slugs to IDs
-    for use in Phase 2 (course creation and token scope updates).
+    Creates services with users, API tokens, and course memberships.
+    Services are deployed AFTER hierarchy so that courses exist for course_member assignments.
+
+    Returns mapping of service slugs to IDs for use in Phase 2 (service linking and token scope updates).
 
     Args:
         config: Deployment configuration
@@ -501,7 +503,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     if not config.services:
         return {}
 
-    click.echo(f"\n🔧 Phase 1: Deploying {len(config.services)} services...")
+    click.echo(f"\n🔧 Phase 1: Deploying {len(config.services)} services (after hierarchy)...")
 
     client = run_async(get_computor_client(auth))
     service_client = client.services
@@ -509,6 +511,13 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     api_token_client = client.api_tokens
     service_type_client = client.service_types
     custom_client = SyncHTTPWrapper(client)
+
+    # API clients for course_members processing
+    course_member_client = client.course_members
+    course_client = client.courses
+    course_group_client = client.course_groups
+    org_client = client.organizations
+    family_client = client.course_families
 
     # Track deployed services for later use
     deployed_services = {}
@@ -573,7 +582,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                             "user_id": str(service.user_id),
                             "token_id": token_id
                         }
-                        continue
+                        # Don't continue - still need to process course_members below
                 else:
                     # Service exists but no token - need to create one
                     click.echo(f"    ⚠️  No token found for service, creating new token...")
@@ -608,6 +617,8 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     service_type=service_config.service_type_path if service_type else "custom",
                     username=user_username,
                     email=service_config.user.email,
+                    given_name=service_config.user.given_name,
+                    family_name=service_config.user.family_name,
                     config=service_config.config or {},
                     enabled=True
                 )
@@ -617,108 +628,192 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 need_to_create_token = True  # New service always needs a token
 
             # 4. Create API Token (if needed)
-            if not need_to_create_token:
-                # Service exists and has a token - already handled above
-                continue
-            token_config = service_config.api_token
+            if need_to_create_token:
+                token_config = service_config.api_token
 
-            # Check for predefined token
-            predefined_token = token_config.token
-            predefined_token_specified = bool(predefined_token)  # Remember if token was specified
+                # Check for predefined token
+                predefined_token = token_config.token
+                predefined_token_specified = bool(predefined_token)  # Remember if token was specified
 
-            if predefined_token:
-                # Store original value for error messages
-                original_token_value = predefined_token
+                if predefined_token:
+                    # Store original value for error messages
+                    original_token_value = predefined_token
 
-                # Expand environment variables
-                predefined_token = os.path.expandvars(predefined_token)
+                    # Expand environment variables
+                    predefined_token = os.path.expandvars(predefined_token)
 
-                # Validate expanded token
-                validation_errors = []
-                if not predefined_token or predefined_token.strip() == "":
-                    validation_errors.append("token is empty after environment variable expansion")
-                elif predefined_token.startswith("${"):
-                    validation_errors.append(f"environment variable not set or not exported (got: '{predefined_token}')")
-                elif len(predefined_token) < 32:
-                    validation_errors.append(f"token is too short (got {len(predefined_token)} chars, need at least 32)")
-                elif not predefined_token.startswith("ctp_"):
-                    validation_errors.append("token must start with 'ctp_' prefix")
+                    # Validate expanded token
+                    validation_errors = []
+                    if not predefined_token or predefined_token.strip() == "":
+                        validation_errors.append("token is empty after environment variable expansion")
+                    elif predefined_token.startswith("${"):
+                        validation_errors.append(f"environment variable not set or not exported (got: '{predefined_token}')")
+                    elif len(predefined_token) < 32:
+                        validation_errors.append(f"token is too short (got {len(predefined_token)} chars, need at least 32)")
+                    elif not predefined_token.startswith("ctp_"):
+                        validation_errors.append("token must start with 'ctp_' prefix")
 
-                if validation_errors:
-                    error_msg = f"Invalid predefined token for service '{service_config.slug}': {'; '.join(validation_errors)}"
-                    click.echo(f"    ❌ {error_msg}")
-                    click.echo(f"       Original value in deployment.yaml: {original_token_value}")
-                    click.echo(f"       Expanded value: {predefined_token if predefined_token else '(empty)'}")
-                    raise ValueError(error_msg)
+                    if validation_errors:
+                        error_msg = f"Invalid predefined token for service '{service_config.slug}': {'; '.join(validation_errors)}"
+                        click.echo(f"    ❌ {error_msg}")
+                        click.echo(f"       Original value in deployment.yaml: {original_token_value}")
+                        click.echo(f"       Expanded value: {predefined_token if predefined_token else '(empty)'}")
+                        raise ValueError(error_msg)
 
-            # Calculate expiration date
-            expires_at = None
-            if token_config.expires_days:
-                expires_at = datetime.utcnow() + timedelta(days=token_config.expires_days)
+                # Calculate expiration date
+                expires_at = None
+                if token_config.expires_days:
+                    expires_at = datetime.utcnow() + timedelta(days=token_config.expires_days)
 
-            if predefined_token:
-                # Use admin endpoint to create token with predefined value
-                click.echo(f"    ✅ Using predefined token (admin only)")
-                from computor_types.api_tokens import ApiTokenAdminCreate
+                if predefined_token:
+                    # Use admin endpoint to create token with predefined value
+                    click.echo(f"    ✅ Using predefined token (admin only)")
+                    from computor_types.api_tokens import ApiTokenAdminCreate
 
-                # Build token creation params - only include scopes if explicitly provided
-                token_create_params = {
-                    "name": token_config.name or f"{service_config.slug} Token",
-                    "description": f"API token for {service_config.slug}",
-                    "user_id": str(service.user_id),
-                    "predefined_token": predefined_token,
-                    "expires_at": expires_at
-                }
-                if token_config.scopes:  # Only add scopes if explicitly provided
-                    token_create_params["scopes"] = token_config.scopes
+                    # Build token creation params - only include scopes if explicitly provided
+                    token_create_params = {
+                        "name": token_config.name or f"{service_config.slug} Token",
+                        "description": f"API token for {service_config.slug}",
+                        "user_id": str(service.user_id),
+                        "predefined_token": predefined_token,
+                        "expires_at": expires_at
+                    }
+                    if token_config.scopes:  # Only add scopes if explicitly provided
+                        token_create_params["scopes"] = token_config.scopes
 
-                token_create = ApiTokenAdminCreate(**token_create_params)
+                    token_create = ApiTokenAdminCreate(**token_create_params)
 
-                # Debug: Log what we're sending
-                payload = token_create.model_dump(mode='json')
-                click.echo(f"    🔍 Debug - Token creation payload:")
-                click.echo(f"       user_id: {payload.get('user_id')}")
-                click.echo(f"       token length: {len(payload.get('predefined_token', ''))}")
-                click.echo(f"       scopes: {payload.get('scopes')}")
-                click.echo(f"       expires_at: {payload.get('expires_at')}")
+                    # Debug: Log what we're sending
+                    payload = token_create.model_dump(mode='json')
+                    click.echo(f"    🔍 Debug - Token creation payload:")
+                    click.echo(f"       user_id: {payload.get('user_id')}")
+                    click.echo(f"       token length: {len(payload.get('predefined_token', ''))}")
+                    click.echo(f"       scopes: {payload.get('scopes')}")
+                    click.echo(f"       expires_at: {payload.get('expires_at')}")
 
-                # Call admin endpoint (use mode='json' to serialize datetime objects)
-                token_response = custom_client.create("api-tokens/admin/create", payload)
-                click.echo(f"    ✅ Created API token with predefined value: {token_response['token_prefix']}...")
+                    # Call admin endpoint (use mode='json' to serialize datetime objects)
+                    token_response = custom_client.create("api-tokens/admin/create", payload)
+                    click.echo(f"    ✅ Created API token with predefined value: {token_response['token_prefix']}...")
 
-                deployed_services[service_config.slug] = {
-                    "id": str(service.id),
-                    "user_id": str(service.user_id),
-                    "token_id": str(token_response['id']),
-                    "token": predefined_token
-                }
-            else:
-                # Generate random token
-                click.echo(f"    ℹ️  Generating new random token...")
+                    deployed_services[service_config.slug] = {
+                        "id": str(service.id),
+                        "user_id": str(service.user_id),
+                        "token_id": str(token_response['id']),
+                        "token": predefined_token
+                    }
+                else:
+                    # Generate random token
+                    click.echo(f"    ℹ️  Generating new random token...")
 
-                # Build token creation params - only include scopes if explicitly provided
-                token_create_params = {
-                    "name": token_config.name or f"{service_config.slug} Token",
-                    "description": f"API token for {service_config.slug}",
-                    "user_id": str(service.user_id),
-                    "expires_at": expires_at
-                }
-                if token_config.scopes:  # Only add scopes if explicitly provided
-                    token_create_params["scopes"] = token_config.scopes
+                    # Build token creation params - only include scopes if explicitly provided
+                    token_create_params = {
+                        "name": token_config.name or f"{service_config.slug} Token",
+                        "description": f"API token for {service_config.slug}",
+                        "user_id": str(service.user_id),
+                        "expires_at": expires_at
+                    }
+                    if token_config.scopes:  # Only add scopes if explicitly provided
+                        token_create_params["scopes"] = token_config.scopes
 
-                token_create = ApiTokenCreate(**token_create_params)
+                    token_create = ApiTokenCreate(**token_create_params)
 
-                token_response = run_async(api_token_client.api_tokens(token_create))
-                click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
-                click.echo(f"    🔑 Token: {token_response.token}")
-                click.echo(f"    ⚠️  IMPORTANT: Store this token securely! It cannot be retrieved later.")
+                    token_response = run_async(api_token_client.api_tokens(token_create))
+                    click.echo(f"    ✅ Created API token: {token_response.token_prefix}...")
+                    click.echo(f"    🔑 Token: {token_response.token}")
+                    click.echo(f"    ⚠️  IMPORTANT: Store this token securely! It cannot be retrieved later.")
 
-                deployed_services[service_config.slug] = {
-                    "id": str(service.id),
-                    "user_id": str(service.user_id),
-                    "token_id": str(token_response.id),
-                    "token": token_response.token
-                }
+                    deployed_services[service_config.slug] = {
+                        "id": str(service.id),
+                        "user_id": str(service.user_id),
+                        "token_id": str(token_response.id),
+                        "token": token_response.token
+                    }
+
+            # 5. Process course memberships for this service's user
+            if service_config.course_members:
+                click.echo(f"    📚 Processing {len(service_config.course_members)} course memberships...")
+                for cm_dep in service_config.course_members:
+                    try:
+                        course = None
+
+                        # Resolve course by path or ID
+                        if cm_dep.is_path_based:
+                            # Find organization
+                            orgs = run_async(org_client.list(OrganizationQuery(path=cm_dep.organization)))
+                            if not orgs:
+                                click.echo(f"      ⚠️  Organization not found: {cm_dep.organization}")
+                                continue
+                            org = orgs[0]
+
+                            # Find course family
+                            families = run_async(family_client.list(CourseFamilyQuery(
+                                organization_id=str(org.id),
+                                path=cm_dep.course_family
+                            )))
+                            if not families:
+                                click.echo(f"      ⚠️  Course family not found: {cm_dep.course_family}")
+                                continue
+                            family = families[0]
+
+                            # Find course
+                            courses = run_async(course_client.list(CourseQuery(
+                                course_family_id=str(family.id),
+                                path=cm_dep.course
+                            )))
+                            if not courses:
+                                click.echo(f"      ⚠️  Course not found: {cm_dep.course}")
+                                continue
+                            course = courses[0]
+
+                        elif cm_dep.is_id_based:
+                            # Direct course lookup by ID
+                            course = run_async(course_client.get(cm_dep.id))
+                            if not course:
+                                click.echo(f"      ⚠️  Course not found: {cm_dep.id}")
+                                continue
+
+                        if course:
+                            # Handle course group (typically services don't need groups, but support it)
+                            course_group_id = None
+                            if cm_dep.group:
+                                groups = run_async(course_group_client.list(CourseGroupQuery(
+                                    course_id=str(course.id),
+                                    title=cm_dep.group
+                                )))
+                                if groups:
+                                    course_group_id = str(groups[0].id)
+
+                            # Check if course member already exists
+                            existing_members = run_async(course_member_client.list(CourseMemberQuery(
+                                user_id=str(service.user_id),
+                                course_id=str(course.id)
+                            )))
+
+                            if existing_members:
+                                existing_member = existing_members[0]
+                                # Check if we need to update role
+                                if existing_member.course_role_id != cm_dep.role:
+                                    member_update = {'course_role_id': cm_dep.role}
+                                    if course_group_id:
+                                        member_update['course_group_id'] = course_group_id
+                                    run_async(course_member_client.update(str(existing_member.id), member_update))
+                                    click.echo(f"      ✅ Updated course membership: {course.path} as {cm_dep.role}")
+                                else:
+                                    click.echo(f"      ℹ️  Already member of course: {course.path} as {cm_dep.role}")
+                            else:
+                                # Create new course member
+                                member_create = CourseMemberCreate(
+                                    user_id=str(service.user_id),
+                                    course_id=str(course.id),
+                                    course_role_id=cm_dep.role,
+                                    course_group_id=course_group_id
+                                )
+
+                                run_async(course_member_client.create(member_create))
+                                click.echo(f"      ✅ Added to course: {course.path} as {cm_dep.role}")
+
+                    except Exception as e:
+                        click.echo(f"      ⚠️  Failed to add course membership: {e}")
 
         except Exception as e:
             click.echo(f"    ❌ Failed to deploy service {service_config.slug}: {e}")
@@ -1201,7 +1296,7 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
     # Track which services are used by which courses for scope updates
     service_course_mapping = {}  # {service_id: [course_id1, course_id2, ...]}
 
-    click.echo(f"\n🔗 Phase 2: Linking services and backends to courses...")
+    click.echo(f"\n🔗 Phase 2: Linking services to courses and creating contents...")
 
     # Get API clients
     org_client = client.organizations
@@ -1806,10 +1901,9 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     # Setup client with authentication
     custom_client = SyncHTTPWrapper(client)
 
-    # Phase 1: Deploy services first (before hierarchy)
+    # Services will be deployed AFTER hierarchy creation (so courses exist for course_members)
     deployed_services = {}
-    if config.services:
-        deployed_services = _deploy_services(config, auth)
+
     # Optionally upload VS Code extensions prior to starting hierarchy deployment
     if getattr(config, 'extensions_upload', None):
         cfg_dir = Path(config_file).parent
@@ -1825,8 +1919,8 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         _upload_examples_from_directory(resolved_path, config.examples_upload.repository, auth, client)
 
     # Check if there's anything to deploy
-    if not config.organizations and not config.users:
-        click.echo("\nℹ️ No hierarchy or users defined in configuration; nothing to deploy.")
+    if not config.organizations and not config.users and not config.services:
+        click.echo("\nℹ️ No hierarchy, services, or users defined in configuration; nothing to deploy.")
         return
 
     # Deploy hierarchy if it exists
@@ -1849,32 +1943,37 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"  Status: {result.get('status')}")
                 click.echo(f"  Path: {result.get('deployment_path')}")
 
-                # Check if Phase 2 is needed (services, content types, contents, or user course assignments)
-                needs_phase_2 = False
+                # Check if post-hierarchy phases are needed (services, content types, contents, or user course assignments)
+                needs_post_hierarchy = False
+
+                # Check for services (always need to wait since services are deployed after hierarchy)
+                if config.services:
+                    needs_post_hierarchy = True
 
                 # Check for courses with services/content
-                for org in config.organizations:
-                    for family in org.course_families:
-                        for course in family.courses:
-                            if course.services or course.content_types or course.contents:
-                                needs_phase_2 = True
+                if not needs_post_hierarchy:
+                    for org in config.organizations:
+                        for family in org.course_families:
+                            for course in family.courses:
+                                if course.services or course.content_types or course.contents:
+                                    needs_post_hierarchy = True
+                                    break
+                            if needs_post_hierarchy:
                                 break
-                        if needs_phase_2:
+                        if needs_post_hierarchy:
                             break
-                    if needs_phase_2:
-                        break
 
                 # Check for users with course assignments
-                if not needs_phase_2 and config.users:
+                if not needs_post_hierarchy and config.users:
                     for user_config in config.users:
                         if hasattr(user_config, 'course_members') and user_config.course_members:
-                            needs_phase_2 = True
+                            needs_post_hierarchy = True
                             break
 
                 # Force waiting if Phase 2 is needed
-                should_wait = wait or needs_phase_2
+                should_wait = wait or needs_post_hierarchy
 
-                if needs_phase_2 and not wait:
+                if needs_post_hierarchy and not wait:
                     click.echo("  ℹ️  Waiting for hierarchy completion (required for subsequent tasks)...")
 
                 if should_wait and result.get('workflow_id'):
@@ -1888,7 +1987,11 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                         try:
                             status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
                             if status_data.get('status') == 'completed':
-                                click.echo("\n✅ Deployment completed successfully!")
+                                click.echo("\n✅ Hierarchy deployment completed successfully!")
+
+                                # Phase 1: Deploy services (AFTER hierarchy, so courses exist for course_members)
+                                if config.services:
+                                    deployed_services = _deploy_services(config, auth)
 
                                 # Phase 2: Link services/backends to courses and create contents
                                 service_course_mapping = _link_backends_to_deployed_courses(
@@ -1899,7 +2002,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                                 if service_course_mapping and deployed_services:
                                     _update_token_scopes(service_course_mapping, deployed_services, auth)
 
-                                # Deploy users if configured
+                                # Phase 4: Deploy users if configured
                                 if config.users:
                                     click.echo(f"\n📥 Creating {len(config.users)} users...")
                                     _deploy_users(config, auth)
@@ -1925,7 +2028,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 # If not waiting and Phase 2 not needed, inform user
                 if not should_wait:
                     click.echo(f"\n✅ Hierarchy deployment started in background.")
-                    click.echo("     No Phase 2 tasks configured (service linking/content creation).")
+                    click.echo("     No post-hierarchy tasks configured (services, content creation, users).")
             else:
                 click.echo("❌ Failed to start deployment", err=True)
                 sys.exit(1)
@@ -1934,7 +2037,12 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
             click.echo(f"❌ Error during deployment: {e}", err=True)
             sys.exit(1)
     else:
-        # No hierarchy deployment - just deploy users if they exist
+        # No hierarchy deployment - deploy services and users if they exist
+        if config.services:
+            click.echo(f"\n🔧 Deploying {len(config.services)} services (no hierarchy deployment)...")
+            deployed_services = _deploy_services(config, auth)
+            click.echo("✅ Service deployment completed!")
+
         if config.users:
             click.echo(f"\n📥 Deploying {len(config.users)} users (no hierarchy deployment)...")
             _deploy_users(config, auth)

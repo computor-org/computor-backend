@@ -77,11 +77,20 @@ def create_service_account(
     else:
         # Create new service user
         try:
+            # Use explicit given_name/family_name if provided, otherwise derive from service name
+            given_name = service_data.given_name
+            if given_name is None:
+                given_name = service_data.name.split()[0] if service_data.name else service_data.slug
+
+            family_name = service_data.family_name
+            if family_name is None:
+                family_name = " ".join(service_data.name.split()[1:]) if len(service_data.name.split()) > 1 else ""
+
             user = User(
                 username=username,
                 email=service_data.email,
-                given_name=service_data.name.split()[0] if service_data.name else service_data.slug,
-                family_name=" ".join(service_data.name.split()[1:]) if len(service_data.name.split()) > 1 else "",
+                given_name=given_name,
+                family_name=family_name,
                 is_service=True,
                 password=create_password_hash(service_data.password) if service_data.password else None,
                 created_by=permissions.user_id,
