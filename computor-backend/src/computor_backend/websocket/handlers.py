@@ -4,6 +4,7 @@ WebSocket event handlers.
 Handles incoming client events and dispatches appropriate actions.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -13,9 +14,9 @@ from sqlalchemy.orm import Session
 from computor_backend.database import get_db
 from computor_backend.model.auth import User
 from computor_backend.websocket.connection_manager import Connection, manager
-from computor_backend.websocket.pubsub import pubsub, typing_tracker
+from computor_backend.websocket.pubsub import pubsub, typing_tracker, CHANNEL_PREFIX
 from computor_backend.business_logic.messages import mark_message_as_read
-from computor_backend.redis_cache import get_cache
+from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_types.websocket import (
     parse_client_event,
     WSChannelSubscribe,
@@ -147,12 +148,18 @@ async def handle_typing_start(connection: Connection, event: WSTypingStart):
     await typing_tracker.set_typing(user_id, channel, user_name)
 
     # Broadcast typing update to channel (via Redis pub/sub for multi-instance)
-    await pubsub.publish(channel, "typing:update", {
-        "channel": channel,
-        "user_id": user_id,
-        "user_name": user_name,
-        "is_typing": True
-    })
+    # Note: typing events use flat structure (not nested under 'data')
+    redis_client = await get_redis_client()
+    await redis_client.publish(
+        f"{CHANNEL_PREFIX}{channel}",
+        json.dumps({
+            "type": "typing:update",
+            "channel": channel,
+            "user_id": user_id,
+            "user_name": user_name,
+            "is_typing": True
+        })
+    )
 
 
 async def handle_typing_stop(connection: Connection, event: WSTypingStop):
@@ -171,13 +178,18 @@ async def handle_typing_stop(connection: Connection, event: WSTypingStop):
     # Stop typing indicator
     await typing_tracker.stop_typing(user_id, channel)
 
-    # Broadcast typing update
-    await pubsub.publish(channel, "typing:update", {
-        "channel": channel,
-        "user_id": user_id,
-        "user_name": None,
-        "is_typing": False
-    })
+    # Broadcast typing update (flat structure, not nested under 'data')
+    redis_client = await get_redis_client()
+    await redis_client.publish(
+        f"{CHANNEL_PREFIX}{channel}",
+        json.dumps({
+            "type": "typing:update",
+            "channel": channel,
+            "user_id": user_id,
+            "user_name": None,
+            "is_typing": False
+        })
+    )
 
 
 async def handle_read_mark(connection: Connection, event: WSReadMark):
@@ -205,11 +217,17 @@ async def handle_read_mark(connection: Connection, event: WSReadMark):
 
     # Only broadcast read receipts for submission_group scope
     if channel.startswith("submission_group:"):
-        await pubsub.publish(channel, "read:update", {
-            "channel": channel,
-            "message_id": message_id,
-            "user_id": user_id
-        })
+        # Use flat structure (not nested under 'data')
+        redis_client = await get_redis_client()
+        await redis_client.publish(
+            f"{CHANNEL_PREFIX}{channel}",
+            json.dumps({
+                "type": "read:update",
+                "channel": channel,
+                "message_id": message_id,
+                "user_id": user_id
+            })
+        )
 
 
 async def handle_ping(connection: Connection):
