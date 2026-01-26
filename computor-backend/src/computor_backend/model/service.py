@@ -108,7 +108,7 @@ class ServiceType(Base):
     properties = Column(JSONB, server_default=text("'{}'::jsonb"), nullable=False)
 
     # Relationships
-    services = relationship('Service', foreign_keys='Service.service_type_id', back_populates='service_type_rel')
+    services = relationship('Service', foreign_keys='Service.service_type_id', back_populates='service_type')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
 
@@ -186,7 +186,7 @@ class Service(Base):
     last_seen_at = Column(DateTime(timezone=True))
 
     # Relationships
-    service_type_rel = relationship('ServiceType', foreign_keys=[service_type_id], back_populates='services')
+    service_type = relationship('ServiceType', foreign_keys=[service_type_id], back_populates='services')
     user = relationship('User', foreign_keys=[user_id], back_populates='service')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])

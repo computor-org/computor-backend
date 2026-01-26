@@ -97,13 +97,33 @@ class SyncHTTPWrapper:
     def create(self, path: str, data: dict = None):
         """POST request."""
         response = self._client.post(path, json=data or {})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            # Include response body in error for better debugging
+            if response.content:
+                try:
+                    error_detail = response.json()
+                    raise Exception(f"{e}\nAPI Response: {error_detail}")
+                except:
+                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
+            raise
         return response.json() if response.content else None
 
     def update(self, path: str, data: dict = None):
         """PATCH request."""
         response = self._client.patch(path, json=data or {})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            # Include response body in error for better debugging
+            if response.content:
+                try:
+                    error_detail = response.json()
+                    raise Exception(f"{e}\nAPI Response: {error_detail}")
+                except:
+                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
+            raise
         return response.json() if response.content else None
 
     def __del__(self):
@@ -507,6 +527,19 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                 service = existing_services[0]
                 click.echo(f"    ℹ️  Service already exists: {service.slug}")
 
+                # Update service config if provided in deployment YAML
+                if service_config.config:
+                    try:
+                        service_update = ServiceUpdate(config=service_config.config)
+                        updated_service = run_async(service_client.patch_service_accounts(
+                            str(service.id),
+                            service_update
+                        ))
+                        click.echo(f"    ✅ Updated service config")
+                        service = updated_service  # Use updated service object
+                    except Exception as e:
+                        click.echo(f"    ⚠️  Failed to update service config: {e}")
+
                 # Look up the service's token by user_id (defaults to active tokens only)
                 existing_tokens = run_async(api_token_client.get_api_tokens(
                     user_id=str(service.user_id)
@@ -641,8 +674,16 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
                 token_create = ApiTokenAdminCreate(**token_create_params)
 
+                # Debug: Log what we're sending
+                payload = token_create.model_dump(mode='json')
+                click.echo(f"    🔍 Debug - Token creation payload:")
+                click.echo(f"       user_id: {payload.get('user_id')}")
+                click.echo(f"       token length: {len(payload.get('predefined_token', ''))}")
+                click.echo(f"       scopes: {payload.get('scopes')}")
+                click.echo(f"       expires_at: {payload.get('expires_at')}")
+
                 # Call admin endpoint (use mode='json' to serialize datetime objects)
-                token_response = custom_client.create("api-tokens/admin/create", token_create.model_dump(mode='json'))
+                token_response = custom_client.create("api-tokens/admin/create", payload)
                 click.echo(f"    ✅ Created API token with predefined value: {token_response['token_prefix']}...")
 
                 deployed_services[service_config.slug] = {
@@ -1808,7 +1849,35 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"  Status: {result.get('status')}")
                 click.echo(f"  Path: {result.get('deployment_path')}")
 
-                if wait and result.get('workflow_id'):
+                # Check if Phase 2 is needed (services, content types, contents, or user course assignments)
+                needs_phase_2 = False
+
+                # Check for courses with services/content
+                for org in config.organizations:
+                    for family in org.course_families:
+                        for course in family.courses:
+                            if course.services or course.content_types or course.contents:
+                                needs_phase_2 = True
+                                break
+                        if needs_phase_2:
+                            break
+                    if needs_phase_2:
+                        break
+
+                # Check for users with course assignments
+                if not needs_phase_2 and config.users:
+                    for user_config in config.users:
+                        if hasattr(user_config, 'course_members') and user_config.course_members:
+                            needs_phase_2 = True
+                            break
+
+                # Force waiting if Phase 2 is needed
+                should_wait = wait or needs_phase_2
+
+                if needs_phase_2 and not wait:
+                    click.echo("  ℹ️  Waiting for hierarchy completion (required for subsequent tasks)...")
+
+                if should_wait and result.get('workflow_id'):
                     # Poll for status
                     click.echo("\nWaiting for deployment to complete...")
                     import time
@@ -1836,7 +1905,15 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                                     _deploy_users(config, auth)
                                 break
                             elif status_data.get('status') == 'failed':
-                                click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
+                                error_msg = status_data.get('error', 'Unknown error')
+                                click.echo(f"\n\n❌ Deployment failed!", err=True)
+                                click.echo(f"\nError details:", err=True)
+                                click.echo(f"  {error_msg}", err=True)
+
+                                # Show workflow ID for debugging
+                                if workflow_id:
+                                    click.echo(f"\nWorkflow ID: {workflow_id}", err=True)
+                                    click.echo(f"Check Temporal UI for more details: http://localhost:8088", err=True)
                                 sys.exit(1)
                             click.echo(".", nl=False)
                         except Exception as e:
@@ -1845,21 +1922,10 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                     else:
                         click.echo("\n⚠️  Deployment is still running. Check status later.")
 
-                # If not waiting but deployment started, try to continue with remaining tasks
-                if not wait:
-                    click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
-                    # Try to link backends and create contents (might fail if hierarchy not ready)
-                    service_course_mapping = _link_backends_to_deployed_courses(
-                        config, auth, deployed_services, True
-                    )
-
-                    # Phase 3: Update token scopes
-                    if service_course_mapping and deployed_services:
-                        _update_token_scopes(service_course_mapping, deployed_services, auth)
-
-                    if config.users:
-                        click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
-                        _deploy_users(config, auth)
+                # If not waiting and Phase 2 not needed, inform user
+                if not should_wait:
+                    click.echo(f"\n✅ Hierarchy deployment started in background.")
+                    click.echo("     No Phase 2 tasks configured (service linking/content creation).")
             else:
                 click.echo("❌ Failed to start deployment", err=True)
                 sys.exit(1)

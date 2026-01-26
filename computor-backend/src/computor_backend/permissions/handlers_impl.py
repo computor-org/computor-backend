@@ -598,39 +598,39 @@ class ResultPermissionHandler(PermissionHandler):
     
     ACTION_ROLE_MAP = {
         "get": ["_student"],      # Students can get their own results
-        "list": ["_student"],     # Students can list their own results  
+        "list": ["_student"],     # Students can list their own results
         "create": ["_student"],   # Students can create results (via tests)
         "update": ["_tutor"],     # Tutors can update results
         "delete": ["_lecturer"],  # Only lecturers can delete results
     }
-    
+
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
         if self.check_admin(principal):
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
+
         # For specific resource operations, check course membership through course_content
         if resource_id and action in self.ACTION_ROLE_MAP:
             # Would need to query the Result and check permissions through its course_content
             # This is handled in build_query for efficiency
             return True
-        
+
         return False
-    
+
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         from computor_backend.model.result import Result
         from computor_backend.model.course import CourseContent, CourseMember, SubmissionGroupMember
         from sqlalchemy.orm import aliased
         from sqlalchemy import or_, and_
-        
+
         if self.check_admin(principal):
             return db.query(Result)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(Result)
-        
+
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
             # For Result, we need to join through CourseContent to get to Course
@@ -638,38 +638,44 @@ class ResultPermissionHandler(PermissionHandler):
                 db.query(Result)
                 .join(CourseContent, CourseContent.id == Result.course_content_id)
             )
-            
-            # Students can only see their own results
-            if "_student" in min_role:
-                # Filter for results belonging to the user's course member
-                query = query.join(
-                    CourseMember, 
+
+            # Check if user has tutor+ role in any course - they can see all results in their courses
+            tutor_courses = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, "_tutor", db
+            )
+
+            # Check if user is a student in any course
+            student_course_member = aliased(CourseMember)
+
+            # Build query that allows:
+            # 1. Tutors/lecturers to see all results in courses they have tutor+ access to
+            # 2. Students to see only their own results (via course_member_id or submission_group membership)
+            query = query.outerjoin(
+                student_course_member,
+                and_(
+                    student_course_member.course_id == CourseContent.course_id,
+                    student_course_member.user_id == principal.user_id
+                )
+            ).filter(
+                or_(
+                    # Tutors/lecturers can see all results in their courses
+                    CourseContent.course_id.in_(tutor_courses),
+                    # Students can see their own results
                     and_(
-                        CourseMember.course_id == CourseContent.course_id,
-                        CourseMember.user_id == principal.user_id
-                    )
-                ).filter(
-                    or_(
-                        Result.course_member_id == CourseMember.id,
-                        # Also include results from submission groups the user belongs to
-                        Result.submission_group_id.in_(
-                            db.query(SubmissionGroupMember.submission_group_id)
-                            .filter(SubmissionGroupMember.course_member_id == CourseMember.id)
+                        student_course_member.id.isnot(None),
+                        or_(
+                            Result.course_member_id == student_course_member.id,
+                            Result.submission_group_id.in_(
+                                db.query(SubmissionGroupMember.submission_group_id)
+                                .filter(SubmissionGroupMember.course_member_id == student_course_member.id)
+                            )
                         )
                     )
                 )
-            else:
-                # For tutors/lecturers, filter by course membership with appropriate role
-                query = query.filter(
-                    CourseContent.course_id.in_(
-                        CoursePermissionQueryBuilder.user_courses_subquery(
-                            principal.user_id, min_role, db
-                        )
-                    )
-                )
-            
+            )
+
             return query
-        
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 

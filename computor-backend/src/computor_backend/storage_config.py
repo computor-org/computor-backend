@@ -56,8 +56,20 @@ DANGEROUS_SIGNATURES: Dict[bytes, str] = {
     b'PK\x03\x04': 'ZIP archive (check further)',  # Could be legitimate
 }
 
-# Special handling for archives
+# Special handling for archives and ZIP-based formats
 ARCHIVE_EXTENSIONS = {'.zip', '.tar', '.gz', '.7z', '.rar', '.tgz', '.tar.gz'}
+
+# Office Open XML formats (these are ZIP-based but not archives)
+# These formats use ZIP container but are documents, not archives
+OFFICE_XML_EXTENSIONS = {
+    '.xlsx',  # Excel 2007+ spreadsheet
+    '.xls',   # Excel 97-2003 (not ZIP but often confused)
+    '.docx',  # Word 2007+ document
+    '.pptx',  # PowerPoint 2007+ presentation
+    '.odt',   # OpenDocument text
+    '.ods',   # OpenDocument spreadsheet
+    '.odp',   # OpenDocument presentation
+}
 
 # Rate limiting settings (TODO: Implement with slowapi)
 # UPLOAD_RATE_LIMIT = os.environ.get('UPLOAD_RATE_LIMIT', '10/minute')

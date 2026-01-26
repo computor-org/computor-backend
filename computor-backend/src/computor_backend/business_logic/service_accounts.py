@@ -140,7 +140,7 @@ def create_service_account(
 
 
 def get_service_account(
-    service_id: UUID,
+    service_id: UUID | str,
     permissions: Principal,
     db: Session,
 ) -> ServiceGet:
@@ -175,7 +175,7 @@ def list_service_accounts(
 
 
 def update_service_account(
-    service_id: UUID,
+    service_id: UUID | str,
     service_data: ServiceUpdate,
     permissions: Principal,
     db: Session,
@@ -210,7 +210,7 @@ def update_service_account(
 
 
 def update_service_heartbeat(
-    service_id: UUID,
+    service_id: UUID | str,
     permissions: Principal,
     db: Session,
 ) -> None:
@@ -235,7 +235,7 @@ def update_service_heartbeat(
 
 
 def delete_service_account(
-    service_id: UUID,
+    service_id: UUID | str,
     permissions: Principal,
     db: Session,
 ) -> None:

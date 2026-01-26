@@ -7,9 +7,16 @@ import matlab
 import matlab.engine
 import subprocess
 from threading import Thread
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from Pyro5.api import expose, Daemon
 from computor_types.repositories import Repository
 from matlab.engine import RejectedExecutionError as MatlabTerminated
+
+# MATLAB engine may raise different timeout exceptions depending on version
+try:
+    from matlab.engine import MatlabExecutionError
+except ImportError:
+    MatlabExecutionError = Exception
 
 @expose
 class MatlabServer(object):
@@ -33,12 +40,82 @@ class MatlabServer(object):
     engine: matlab.engine = None
     server_thread: Thread
     testing_environment_path: str
+    _engine_stuck: bool = False  # Flag to track if engine needs restart
 
     def __init__(self,  worker_path: str):
       self.testing_environment_path = worker_path
+      self._engine_stuck = False
       self.connect()
 
+    def _force_restart_engine(self):
+      """Force restart the MATLAB engine after a timeout/stuck state."""
+      print("FORCE RESTART: Killing stuck MATLAB engine...", flush=True)
+
+      # First, try graceful quit (probably won't work if stuck)
+      if self.engine is not None:
+        try:
+          self.engine.quit()
+          print("Engine quit successfully", flush=True)
+        except Exception as e:
+          print(f"Engine quit failed (expected if stuck): {e}", flush=True)
+        finally:
+          self.engine = None
+
+      # Kill any MATLAB processes forcefully - use killall as backup
+      print("Killing MATLAB processes...", flush=True)
+      os.system("pkill -9 -f MATLAB 2>/dev/null || true")
+      os.system("pkill -9 -f MathWorksServiceHost 2>/dev/null || true")
+      os.system("killall -9 MATLAB 2>/dev/null || true")
+
+      # Clean up stale session files
+      import glob
+      import shutil
+      session_patterns = [
+          '/tmp/matlab_engine_*',
+          '/tmp/MathWorks_*',
+          '/tmp/.matlab_*'
+      ]
+      for pattern in session_patterns:
+        for f in glob.glob(pattern):
+          try:
+            if os.path.isfile(f):
+              os.remove(f)
+            elif os.path.isdir(f):
+              shutil.rmtree(f, ignore_errors=True)
+          except Exception:
+            pass
+
+      # Wait for MATLAB to actually die - check that no engines are found
+      max_wait = 10
+      waited = 0
+      while waited < max_wait:
+        time.sleep(1)
+        waited += 1
+        try:
+          engines = matlab.engine.find_matlab()
+          if len(engines) == 0:
+            print(f"FORCE RESTART: MATLAB processes terminated after {waited}s", flush=True)
+            break
+          else:
+            print(f"FORCE RESTART: Still found engines {engines}, waiting... ({waited}/{max_wait}s)", flush=True)
+            # Try killing again
+            os.system("pkill -9 -f MATLAB 2>/dev/null || true")
+        except Exception as e:
+          print(f"FORCE RESTART: find_matlab() error (good, means no engines): {e}", flush=True)
+          break
+
+      if waited >= max_wait:
+        print(f"WARNING: Could not confirm MATLAB termination after {max_wait}s, proceeding anyway", flush=True)
+
+      print("FORCE RESTART: Cleanup complete, starting fresh engine...", flush=True)
+      self._engine_stuck = False
+
     def connect(self):
+      # Check if we need to force restart due to previous timeout
+      if self._engine_stuck:
+        print("Engine marked as stuck from previous timeout, forcing restart...", flush=True)
+        self._force_restart_engine()
+
       retries = 5
       attempts = 0
       engine_name = MatlabServer.ENGINE_NAME()
@@ -58,13 +135,19 @@ class MatlabServer(object):
               self.engine = matlab.engine.connect_matlab(name)
               print(f"-- setup: connected to '{name}'", flush=True)
             else:
-              print(f"-- setup: starting new MATLAB engine '{engine_name}'", flush=True)
+              print(f"-- setup: starting new MATLAB engine", flush=True)
               start_time = time.time()
               self.engine = matlab.engine.start_matlab(background=False)
               elapsed = time.time() - start_time
               print(f"-- setup: MATLAB engine started in {elapsed:.1f}s", flush=True)
-              self.engine.eval(f"matlab.engine.shareEngine('{engine_name}')", nargout=0)
-              print(f"-- setup: engine '{engine_name}' shared and ready", flush=True)
+              # Try to share with preferred name, but don't fail if name is taken
+              # MATLAB remembers shared engine names even after process death
+              try:
+                self.engine.eval(f"matlab.engine.shareEngine('{engine_name}')", nargout=0)
+                print(f"-- setup: engine shared as '{engine_name}'", flush=True)
+              except Exception as share_err:
+                # Name conflict - just use the default auto-assigned name
+                print(f"-- setup: could not share as '{engine_name}' ({share_err}), using default name", flush=True)
           else:
             print('Engine is already available!', flush=True)
 
@@ -104,8 +187,16 @@ class MatlabServer(object):
         print(f"Result: {result}", flush=True)
         return result
 
-    def test_student_example(self, test_file, spec_file, submit, test_number, submission_number):
+    def test_student_example(self, test_file, spec_file, timeout_seconds=300):
+        """
+        Execute student test with timeout protection.
 
+        Args:
+            test_file: Path to test YAML file
+            spec_file: Path to specification YAML file
+            submit: Submission identifier
+            timeout_seconds: Maximum execution time in seconds (default: 300 = 5 minutes)
+        """
         try:
            self.connect()
         except Exception as e:
@@ -113,13 +204,67 @@ class MatlabServer(object):
 
         try:
           command = f"CodeAbilityTestSuite('{test_file}','{spec_file}')"
+          print(f"Executing test with {timeout_seconds}s timeout: {command}", flush=True)
 
           try:
-            lscmd = self.engine.evalc(command)
-            return MatlabServer.commit({ "details": lscmd})
+            # Execute asynchronously with background=True to enable timeout
+            future = self.engine.evalc(command, background=True)
+
+            # Wait for result with timeout
+            try:
+                lscmd = future.result(timeout=timeout_seconds)
+                return MatlabServer.commit({"details": lscmd})
+
+            except (FuturesTimeoutError, MatlabExecutionError) as timeout_err:
+                # Timeout occurred - cancel the execution
+                print(f"TIMEOUT: Test execution exceeded {timeout_seconds}s limit (exception: {type(timeout_err).__name__})", flush=True)
+                try:
+                    future.cancel()
+                    print("Cancelled pending MATLAB operation", flush=True)
+                except Exception as cancel_err:
+                    print(f"Warning: Could not cancel operation: {cancel_err}", flush=True)
+
+                # Mark engine as stuck - it will be force-restarted on next connect()
+                # MATLAB is single-threaded, so if it's stuck in an infinite loop,
+                # we can't send any commands to it. The only way to recover is to
+                # kill the process and start fresh.
+                print("Marking engine as stuck for force restart on next test", flush=True)
+                self._engine_stuck = True
+                self.engine = None  # Don't try to use this engine anymore
+
+                return MatlabServer.commit({
+                    "details": {
+                        "exception": {
+                            "message": f"Execution timeout: Test exceeded {timeout_seconds} seconds. "
+                                       "This usually indicates an infinite loop in the code.",
+                            "type": "TimeoutError"
+                        }
+                    },
+                    "timeout": True,
+                    "timeout_seconds": timeout_seconds
+                })
 
           except Exception as ei:
+            error_str = str(ei).lower()
             print(f"Failed! Command error: {ei}", flush=True)
+
+            # Check if this is a timeout-related error (MATLAB may raise different exception types)
+            if 'timeout' in error_str or 'timed out' in error_str:
+                print("Detected timeout in exception message, treating as timeout", flush=True)
+                self._engine_stuck = True
+                self.engine = None
+                return MatlabServer.commit({
+                    "details": {
+                        "exception": {
+                            "message": f"Execution timeout: Test exceeded {timeout_seconds} seconds. "
+                                       "This usually indicates an infinite loop in the code.",
+                            "type": "TimeoutError"
+                        }
+                    },
+                    "timeout": True,
+                    "timeout_seconds": timeout_seconds
+                })
+
             return MatlabServer.raise_exception(ei, f"command failed: {command}")
 
         except MatlabTerminated as e:

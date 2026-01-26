@@ -53,6 +53,8 @@ from computor_backend.api.results import result_router
 from computor_backend.api.tutor import tutor_router
 from computor_backend.api.lecturer import lecturer_router
 from computor_backend.api.organizations import organization_router
+from computor_backend.api.courses import course_router
+from computor_backend.api.course_families import course_family_router
 from computor_backend.api.user_roles import user_roles_router
 from computor_backend.api.role_claims import role_claim_router
 from computor_backend.api.user import user_router
@@ -64,7 +66,7 @@ from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
-from computor_backend.api.service_accounts import service_accounts_router
+from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
@@ -222,9 +224,9 @@ CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
 CrudRouter(SessionInterface).register_routes(app)
-CrudRouter(CourseInterface).register_routes(app)
+course_router.register_routes(app)
 organization_router.register_routes(app)
-CrudRouter(CourseFamilyInterface).register_routes(app)
+course_family_router.register_routes(app)
 CrudRouter(CourseGroupInterface).register_routes(app)
 CrudRouter(CourseMemberInterface).register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
@@ -304,12 +306,6 @@ app.include_router(
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
 )
 
-# app.include_router(
-#     services_router,
-#     prefix="/services",
-#     tags=["services"]
-# )
-
 app.include_router(
     user_roles_router,
     prefix="/user-roles",
@@ -329,7 +325,7 @@ app.include_router(
 )
 
 app.include_router(
-    service_accounts_router,
+    services_router,
     prefix="/service-accounts",
     tags=["services", "admin"],
     dependencies=[Depends(get_current_principal)]

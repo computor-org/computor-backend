@@ -38,6 +38,9 @@ from . import temporal_assignments_repository
 # Import Documents sync tasks to auto-register
 from . import temporal_documents_sync
 
+# Import Tutor testing tasks to auto-register
+from . import temporal_tutor_testing
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

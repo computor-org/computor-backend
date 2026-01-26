@@ -149,6 +149,16 @@ from .extensions import (
     ExtensionVersionDetail,
 )
 
+# Cascade Deletion
+from .cascade_deletion import (
+    EntityDeleteCount,
+    CascadeDeletePreview,
+    CascadeDeleteResult,
+    ExampleDeletePreview,
+    ExampleBulkDeleteRequest,
+    ExampleBulkDeleteResult,
+)
+
 __all__ = [
     "EntityInterface",
     "BaseEntityGet",
@@ -178,4 +188,11 @@ __all__ = [
     "ExtensionPublishRequest",
     "ExtensionMetadata",
     "ExtensionVersionDetail",
+    # Cascade Deletion
+    "EntityDeleteCount",
+    "CascadeDeletePreview",
+    "CascadeDeleteResult",
+    "ExampleDeletePreview",
+    "ExampleBulkDeleteRequest",
+    "ExampleBulkDeleteResult",
 ]
