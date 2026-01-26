@@ -495,7 +495,13 @@ def _invalidate_message_cache(
         db: Database session
         cache: Optional cache instance
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"_invalidate_message_cache called: message_id={message_id}, reader_user_id={reader_user_id}, cache={cache is not None}")
+
     if not cache:
+        logger.warning("Cache is None, skipping invalidation")
         return
 
     # Fetch the message to get its target fields
@@ -507,13 +513,16 @@ def _invalidate_message_cache(
     # This is necessary because unread message counts appear in course content lists,
     # and those views are cached with complex query parameters and related_ids.
     # The safest approach is to invalidate all views for the user.
+    logger.info(f"Invalidating user views for user_id={reader_user_id}")
     cache.invalidate_user_views(user_id=str(reader_user_id))
+    logger.info(f"User views invalidated for user_id={reader_user_id}")
 
     # Additionally, invalidate entity-specific tags for broader cache coherence
     # (in case other users' caches reference these entities)
 
     if message.submission_group_id:
         # Invalidate submission group entity tags
+        logger.info(f"Invalidating submission_group:{message.submission_group_id}")
         cache.invalidate_tags(f"submission_group:{message.submission_group_id}")
 
     if message.course_content_id:
@@ -555,6 +564,11 @@ def mark_message_as_read(
         db: Database session
         cache: Optional cache instance for invalidation
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"mark_message_as_read called: message_id={message_id}, user_id={permissions.user_id}, cache={cache is not None}")
+
     # Upsert read record for current user
     exists = (
         db.query(MessageRead)
@@ -562,11 +576,14 @@ def mark_message_as_read(
         .first()
     )
     if not exists:
+        logger.info(f"Creating new MessageRead record for message_id={message_id}, user_id={permissions.user_id}")
         db.add(MessageRead(message_id=message_id, reader_user_id=permissions.user_id))
         db.commit()
 
         # Invalidate cached views that include unread message counts
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
+    else:
+        logger.info(f"Message {message_id} already marked as read by user {permissions.user_id}")
 
 
 def mark_message_as_unread(

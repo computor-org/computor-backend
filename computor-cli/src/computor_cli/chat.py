@@ -135,6 +135,7 @@ class ChatClient:
         """Display a new message nicely."""
         msg_data = data.get("data", {})
 
+        message_id = msg_data.get("id", "")
         author = msg_data.get("author", {})
         author_name = None
         if author:
@@ -146,11 +147,12 @@ class ChatClient:
         content = msg_data.get("content", "")
 
         click.echo("")
-        click.echo(f"┌─ NEW MESSAGE")
+        click.echo(f"┌─ NEW MESSAGE [{message_id[:8]}...]")
         click.echo(f"│ From: {author_name}")
         if title:
             click.echo(f"│ Title: {title}")
         click.echo(f"│ {content}")
+        click.echo(f"│ (Use /read {message_id} to mark as read)")
         click.echo("└─")
 
     async def send_message(self, title: str, content: str) -> bool:
@@ -205,6 +207,7 @@ class ChatClient:
         click.echo("Commands:")
         click.echo("  /send                     - compose (with typing indicator)")
         click.echo("  /send <title> | <content> - quick send")
+        click.echo("  /read <message_id>        - mark message as read")
         click.echo("  /quit")
         click.echo("─" * 50)
         click.echo("")
@@ -227,8 +230,11 @@ class ChatClient:
                 elif line.startswith("/send "):
                     await self._handle_quick_send(line[6:])
 
+                elif line.startswith("/read "):
+                    await self._handle_read_mark(line[6:].strip())
+
                 else:
-                    click.echo("Unknown command. Use /send or /quit")
+                    click.echo("Unknown command. Use /send, /read, or /quit")
 
             except EOFError:
                 self.running = False
@@ -314,6 +320,24 @@ class ChatClient:
             return
 
         await self.send_message(title, content)
+
+    async def _handle_read_mark(self, message_id: str):
+        """Handle /read <message_id> - mark a message as read via WebSocket."""
+        if not message_id:
+            click.echo("Usage: /read <message_id>")
+            return
+
+        if not self.ws:
+            click.echo("[error] Not connected")
+            return
+
+        # Send read:mark event via WebSocket
+        await self.ws.send(json.dumps({
+            "type": "read:mark",
+            "channel": self.channel,
+            "message_id": message_id
+        }))
+        click.echo(f"[read:mark] Sent for message: {message_id}")
 
     async def run(self, listen_only: bool = False):
         """Main run loop."""

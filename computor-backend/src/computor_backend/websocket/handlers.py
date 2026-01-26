@@ -202,8 +202,11 @@ async def handle_read_mark(connection: Connection, event: WSReadMark):
     message_id = event.message_id
     user_id = connection.principal.user_id
 
+    logger.debug(f"read:mark received - channel: {channel}, message_id: {message_id}, user_id: {user_id}")
+
     # Verify user is subscribed to this channel
     if channel not in connection.subscriptions:
+        logger.warning(f"read:mark rejected - user {user_id} not subscribed to {channel}")
         await manager.send_to_connection(connection, WSError(
             code="NOT_SUBSCRIBED",
             message=f"Not subscribed to channel: {channel}"
@@ -211,9 +214,18 @@ async def handle_read_mark(connection: Connection, event: WSReadMark):
         return
 
     # Mark message as read in database
-    with next(get_db()) as db:
-        cache = get_cache()
-        mark_message_as_read(message_id, connection.principal, db, cache)
+    try:
+        with next(get_db()) as db:
+            cache = get_cache()
+            mark_message_as_read(message_id, connection.principal, db, cache)
+        logger.info(f"Message {message_id} marked as read by user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to mark message {message_id} as read: {e}")
+        await manager.send_to_connection(connection, WSError(
+            code="READ_MARK_FAILED",
+            message=f"Failed to mark message as read: {str(e)}"
+        ).model_dump())
+        return
 
     # Only broadcast read receipts for submission_group scope
     if channel.startswith("submission_group:"):
@@ -228,6 +240,7 @@ async def handle_read_mark(connection: Connection, event: WSReadMark):
                 "user_id": user_id
             })
         )
+        logger.debug(f"read:update broadcast sent for message {message_id}")
 
 
 async def handle_ping(connection: Connection):

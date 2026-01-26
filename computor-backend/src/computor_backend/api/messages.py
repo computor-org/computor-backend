@@ -63,7 +63,13 @@ async def create_message(
     enriched_message = get_message_with_read_status(message.id, message, permissions, db)
 
     # Broadcast to WebSocket subscribers
-    await ws_broadcast.message_created(enriched_message, enriched_message.model_dump(mode="json"))
+    # IMPORTANT: Remove user-specific fields (is_author, is_read) from broadcast
+    # These fields are relative to the API caller, not the WebSocket recipients
+    # Recipients should compute is_author themselves using: author_id === currentUserId
+    broadcast_data = enriched_message.model_dump(mode="json")
+    broadcast_data.pop("is_author", None)
+    broadcast_data.pop("is_read", None)
+    await ws_broadcast.message_created(enriched_message, broadcast_data)
 
     return enriched_message
 
@@ -132,7 +138,11 @@ async def update_message(
     message_get = get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
-    await ws_broadcast.message_updated(message_get, message_get.model_dump(mode="json"), str(id))
+    # IMPORTANT: Remove user-specific fields from broadcast
+    broadcast_data = message_get.model_dump(mode="json")
+    broadcast_data.pop("is_author", None)
+    broadcast_data.pop("is_read", None)
+    await ws_broadcast.message_updated(message_get, broadcast_data, str(id))
 
     return message_get
 
@@ -168,8 +178,17 @@ async def mark_message_read(
 ):
     """Mark a message as read."""
     # Ensure user has visibility on the message
-    await get_id_db(permissions, db, id, MessageInterface)
+    message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_read(id, permissions, db, cache)
+
+    # Broadcast read:update via WebSocket for submission_group messages
+    if message.submission_group_id:
+        await ws_broadcast.read_updated(
+            channel=f"submission_group:{message.submission_group_id}",
+            message_id=str(id),
+            user_id=str(permissions.user_id)
+        )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)

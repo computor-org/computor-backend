@@ -115,6 +115,35 @@ class WebSocketBroadcast:
                 "message_id": message_id
             })
 
+    async def read_updated(self, channel: str, message_id: str, user_id: str):
+        """
+        Broadcast a read status update event.
+
+        Used when a user marks a message as read via REST API.
+        Uses flat structure (not nested under 'data') for consistency with WebSocket handler.
+
+        Args:
+            channel: Channel name (e.g., "submission_group:123")
+            message_id: The message ID that was marked as read
+            user_id: The user ID who marked the message as read
+        """
+        # Use flat structure - publish directly to Redis to match WebSocket handler behavior
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        from computor_backend.redis_cache import get_redis_client
+        import json
+
+        redis_client = await get_redis_client()
+        await redis_client.publish(
+            f"{CHANNEL_PREFIX}{channel}",
+            json.dumps({
+                "type": "read:update",
+                "channel": channel,
+                "message_id": message_id,
+                "user_id": user_id
+            })
+        )
+        logger.debug(f"Broadcast read:update to {channel} for message {message_id}")
+
     def _get_message_channels(self, message: MessageTargetProtocol) -> List[str]:
         """
         Determine all WebSocket channels for a message (hierarchical broadcasting).
