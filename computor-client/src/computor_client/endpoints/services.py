@@ -26,6 +26,14 @@ class ServicesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def service_accounts_me(
+        self,
+        **kwargs: Any,
+    ) -> ServiceGet:
+        """Get Service Me"""
+        response = await self._http.get(f"/service-accounts/me", params=kwargs)
+        return ServiceGet.model_validate(response.json())
+
     async def service_accounts(
         self,
         data: Union[ServiceCreate, Dict[str, Any]],
@@ -82,17 +90,4 @@ class ServicesClient:
         """Service Heartbeat Endpoint"""
         response = await self._http.put(f"/service-accounts/{service_id}/heartbeat", params=kwargs)
         return
-
-    async def me(self) -> ServiceGet:
-        """
-        Get the authenticated service account's configuration.
-
-        This endpoint is designed for Temporal workers and other services
-        to fetch their configuration on startup using their API token.
-
-        Returns:
-            ServiceGet: The service's configuration including slug, config dict, etc.
-        """
-        response = await self._http.get("/service-accounts/me")
-        return ServiceGet.model_validate(response.json())
 

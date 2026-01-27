@@ -221,7 +221,10 @@ async def list_result_artifacts_endpoint(
     ]
 
 
-@result_router.get("/{result_id}/artifacts/download")
+@result_router.get(
+    "/{result_id}/artifacts/download",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_result_artifacts(
     result_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],

@@ -81,19 +81,19 @@ class SubmissionsClient:
     async def artifacts_download(
         self,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download Latest Submission"""
         response = await self._http.get(f"/submissions/artifacts/download", params=kwargs)
-        return response.json()
+        return response.content
 
     async def get_artifacts_download(
         self,
         artifact_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download Submission Artifact"""
         response = await self._http.get(f"/submissions/artifacts/{artifact_id}/download", params=kwargs)
-        return response.json()
+        return response.content
 
     async def artifacts_grades(
         self,

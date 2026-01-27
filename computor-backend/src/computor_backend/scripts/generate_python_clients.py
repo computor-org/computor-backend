@@ -127,18 +127,27 @@ def find_schema_ref(schema: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def get_response_schema(operation: Dict[str, Any]) -> Tuple[Optional[str], bool]:
-    """Get the response schema name and whether it's a list."""
+def get_response_schema(operation: Dict[str, Any]) -> Tuple[Optional[str], bool, bool]:
+    """Get the response schema name, whether it's a list, and whether it's binary.
+
+    Returns:
+        Tuple of (schema_name, is_list, is_binary)
+    """
     responses = operation.get("responses", {})
     for status in ["200", "201"]:
         if status in responses:
             content = responses[status].get("content", {})
+            # Check for binary responses (ZIP, octet-stream, etc.)
+            binary_types = ["application/octet-stream", "application/zip", "application/x-zip-compressed"]
+            for binary_type in binary_types:
+                if binary_type in content:
+                    return None, False, True  # Binary response
             if "application/json" in content:
                 schema = content["application/json"].get("schema", {})
                 is_list = schema.get("type") == "array"
                 ref = find_schema_ref(schema)
-                return ref, is_list
-    return None, False
+                return ref, is_list, False
+    return None, False, False
 
 
 def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
@@ -655,7 +664,7 @@ def generate_method(
 
     # Get schemas
     request_schema = get_request_schema(operation)
-    response_schema, is_list_response = get_response_schema(operation)
+    response_schema, is_list_response, is_binary_response = get_response_schema(operation)
 
     # Collect imports
     if request_schema:
@@ -691,7 +700,9 @@ def generate_method(
         params.append("query: Optional[BaseModel] = None")
 
     # Return type
-    if response_schema and map_schema_to_import(response_schema):
+    if is_binary_response:
+        return_type = "bytes"
+    elif response_schema and map_schema_to_import(response_schema):
         if is_list_response:
             return_type = f"List[{response_schema}]"
         else:
@@ -741,7 +752,9 @@ def generate_method(
         return "\n".join(lines), imports
 
     # Parse response
-    if response_schema and map_schema_to_import(response_schema):
+    if is_binary_response:
+        lines.append('        return response.content')
+    elif response_schema and map_schema_to_import(response_schema):
         if is_list_response:
             lines.append('        data = response.json()')
             lines.append('        if isinstance(data, list):')

@@ -42,10 +42,10 @@ class StorageClient:
         self,
         object_key: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download File"""
         response = await self._http.get(f"/storage/download/{object_key}", params=kwargs)
-        return response.json()
+        return response.content
 
     async def objects(
         self,

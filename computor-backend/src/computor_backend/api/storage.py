@@ -117,7 +117,10 @@ async def upload_file(
         updated_by=permissions.user_id
     )
 
-@storage_router.get("/download/{object_key:path}")
+@storage_router.get(
+    "/download/{object_key:path}",
+    responses={200: {"content": {"application/octet-stream": {}}}},
+)
 async def download_file(
     object_key: str,
     bucket_name: Optional[str] = Query(None),

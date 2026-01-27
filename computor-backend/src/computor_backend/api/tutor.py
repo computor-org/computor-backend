@@ -248,7 +248,10 @@ async def _get_example_version_for_course_content(
 
 ## Reference/Example Download Endpoint
 
-@tutor_router.get("/course-contents/{course_content_id}/reference")
+@tutor_router.get(
+    "/course-contents/{course_content_id}/reference",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_course_content_reference(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -355,7 +358,10 @@ async def download_course_content_reference(
 
 ## Content/Description Download Endpoint
 
-@tutor_router.get("/course-contents/{course_content_id}/description")
+@tutor_router.get(
+    "/course-contents/{course_content_id}/description",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_course_content_description(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -895,7 +901,10 @@ async def list_tutor_test_artifacts_endpoint(
     )
 
 
-@tutor_router.get("/tests/{test_id}/artifacts/download")
+@tutor_router.get(
+    "/tests/{test_id}/artifacts/download",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_tutor_test_artifacts(
     test_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],

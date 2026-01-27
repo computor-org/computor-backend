@@ -412,7 +412,10 @@ async def update_submission_artifact(
 
     return artifact_get
 
-@submissions_router.get("/artifacts/download")
+@submissions_router.get(
+    "/artifacts/download",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_latest_submission(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -533,7 +536,10 @@ async def download_latest_submission(
         }
     )
 
-@submissions_router.get("/artifacts/{artifact_id}/download")
+@submissions_router.get(
+    "/artifacts/{artifact_id}/download",
+    responses={200: {"content": {"application/zip": {}}}},
+)
 async def download_submission_artifact(
     artifact_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],

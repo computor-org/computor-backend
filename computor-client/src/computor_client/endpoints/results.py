@@ -108,8 +108,17 @@ class ResultsClient:
         self,
         result_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download Result Artifacts"""
         response = await self._http.get(f"/results/{result_id}/artifacts/download", params=kwargs)
+        return response.content
+
+    async def artifacts_upload(
+        self,
+        result_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Upload Result Artifacts"""
+        response = await self._http.post(f"/results/{result_id}/artifacts/upload", params=kwargs)
         return response.json()
 

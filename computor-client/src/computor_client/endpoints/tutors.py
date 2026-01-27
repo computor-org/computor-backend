@@ -138,17 +138,62 @@ class TutorsClient:
         self,
         course_content_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download Course Content Reference"""
         response = await self._http.get(f"/tutors/course-contents/{course_content_id}/reference", params=kwargs)
-        return response.json()
+        return response.content
 
     async def course_contents_description(
         self,
         course_content_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> bytes:
         """Download Course Content Description"""
         response = await self._http.get(f"/tutors/course-contents/{course_content_id}/description", params=kwargs)
+        return response.content
+
+    async def course_contents_test(
+        self,
+        course_content_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Create Tutor Test"""
+        response = await self._http.post(f"/tutors/course-contents/{course_content_id}/test", params=kwargs)
         return response.json()
+
+    async def tests_status(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Tutor Test Status Endpoint"""
+        response = await self._http.get(f"/tutors/tests/{test_id}/status", params=kwargs)
+        return response.json()
+
+    async def tests(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Tutor Test Endpoint"""
+        response = await self._http.get(f"/tutors/tests/{test_id}", params=kwargs)
+        return response.json()
+
+    async def tests_artifacts(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """List Tutor Test Artifacts Endpoint"""
+        response = await self._http.get(f"/tutors/tests/{test_id}/artifacts", params=kwargs)
+        return response.json()
+
+    async def tests_artifacts_download(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> bytes:
+        """Download Tutor Test Artifacts"""
+        response = await self._http.get(f"/tutors/tests/{test_id}/artifacts/download", params=kwargs)
+        return response.content
 

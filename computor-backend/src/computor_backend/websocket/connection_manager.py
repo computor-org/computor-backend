@@ -376,13 +376,13 @@ class ConnectionManager:
             logger.debug(f"No local subscribers for channel: {channel}")
             return
 
-        # Get all users subscribed to this channel
-        user_ids = self._channel_subscribers.get(channel, set())
+        # Get all users subscribed to this channel (make a copy to avoid modification during iteration)
+        user_ids = set(self._channel_subscribers.get(channel, set()))
         logger.info(f"Forwarding to {len(user_ids)} users on channel {channel}")
 
-        # Send to all connections for each user
+        # Send to all connections for each user (make copies to avoid modification during iteration)
         for user_id in user_ids:
-            connections = self._connections.get(user_id, [])
+            connections = list(self._connections.get(user_id, []))
             for conn in connections:
                 if channel in conn.subscriptions:
                     try:
@@ -399,7 +399,8 @@ class ConnectionManager:
             user_id: Target user ID
             event: Event data to send
         """
-        connections = self._connections.get(user_id, [])
+        # Make a copy to avoid modification during iteration
+        connections = list(self._connections.get(user_id, []))
         for conn in connections:
             try:
                 await conn.websocket.send_json(event)
@@ -430,13 +431,14 @@ class ConnectionManager:
             event: Event data to send
             exclude_user_id: Optional user ID to exclude from broadcast
         """
-        user_ids = self._channel_subscribers.get(channel, set())
+        # Make copies to avoid modification during iteration
+        user_ids = set(self._channel_subscribers.get(channel, set()))
 
         for user_id in user_ids:
             if exclude_user_id and user_id == exclude_user_id:
                 continue
 
-            connections = self._connections.get(user_id, [])
+            connections = list(self._connections.get(user_id, []))
             for conn in connections:
                 if channel in conn.subscriptions:
                     try:
