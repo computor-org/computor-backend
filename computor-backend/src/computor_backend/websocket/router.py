@@ -4,11 +4,14 @@ WebSocket router and endpoint.
 Provides the FastAPI WebSocket endpoint for real-time communication.
 """
 
+import asyncio
+import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
+from computor_backend.settings import settings
 from computor_backend.websocket.auth import authenticate_websocket_token, WebSocketAuthError
-from computor_backend.websocket.connection_manager import manager
+from computor_backend.websocket.connection_manager import manager, ConnectionLimitError
 from computor_backend.websocket.handlers import handle_client_message
 from computor_types.websocket import WSConnected, WSError
 
@@ -96,10 +99,35 @@ async def websocket_endpoint(
         ).model_dump())
 
         # Main message loop
+        # Note: We don't use a hard timeout here because:
+        # 1. WebSocket protocol-level ping/pong keeps the connection alive
+        # 2. The underlying websocket library handles ping/pong automatically
+        # 3. Long-lived connections (e.g., AI agents) should stay open indefinitely
+        # 4. Dead connections are detected when send fails or client disconnects
         while True:
             try:
-                data = await websocket.receive_json()
-                await handle_client_message(connection, data)
+                # receive() handles all message types including ping/pong
+                message = await websocket.receive()
+
+                if message["type"] == "websocket.receive":
+                    # Text message - parse as JSON
+                    if "text" in message:
+                        try:
+                            data = json.loads(message["text"])
+                            await handle_client_message(connection, data)
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"WebSocket invalid JSON from user={principal.user_id}: {e}")
+                            await manager.send_to_connection(connection, WSError(
+                                code="INVALID_JSON",
+                                message="Message must be valid JSON"
+                            ).model_dump())
+                    # Binary messages are typically ping/pong at protocol level
+                    # They're handled automatically by the websocket library
+
+                elif message["type"] == "websocket.disconnect":
+                    logger.info(f"WebSocket disconnected: user={principal.user_id}")
+                    break
+
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected: user={principal.user_id}")
                 break
@@ -114,6 +142,18 @@ async def websocket_endpoint(
                 message=e.reason
             ).model_dump())
             await websocket.close(code=e.code, reason=e.reason)
+        except Exception:
+            pass
+
+    except ConnectionLimitError as e:
+        logger.warning(f"WebSocket connection limit: {e.message}")
+        try:
+            await websocket.accept()
+            await websocket.send_json(WSError(
+                code="CONNECTION_LIMIT",
+                message=e.message
+            ).model_dump())
+            await websocket.close(code=e.code, reason=e.message)
         except Exception:
             pass
 

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, Awaitable, Optional, Set, Any
 
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -140,19 +141,35 @@ class RedisPubSub:
 
     async def stop(self):
         """Stop the pub/sub listener and clean up."""
+        logger.info("Stopping Redis PubSub listener...")
         self._running = False
 
         if self._listener_task:
             self._listener_task.cancel()
             try:
-                await self._listener_task
+                # Wait for task to finish with timeout
+                await asyncio.wait_for(self._listener_task, timeout=2.0)
             except asyncio.CancelledError:
                 pass
+            except asyncio.TimeoutError:
+                logger.warning("PubSub listener task did not stop within timeout")
+            except Exception as e:
+                logger.warning(f"Error stopping PubSub listener task: {e}")
             self._listener_task = None
 
         if self._pubsub:
-            await self._pubsub.unsubscribe()
-            await self._pubsub.close()
+            try:
+                await asyncio.wait_for(self._pubsub.unsubscribe(), timeout=1.0)
+            except asyncio.TimeoutError:
+                logger.warning("PubSub unsubscribe timed out")
+            except Exception as e:
+                logger.warning(f"Error unsubscribing from PubSub: {e}")
+            try:
+                await asyncio.wait_for(self._pubsub.close(), timeout=1.0)
+            except asyncio.TimeoutError:
+                logger.warning("PubSub close timed out")
+            except Exception as e:
+                logger.warning(f"Error closing PubSub: {e}")
             self._pubsub = None
 
         self._subscribed_channels.clear()
@@ -213,8 +230,15 @@ class RedisPubSub:
         logger.debug(f"Published to {full_channel}: {event_type}")
 
     async def _listen(self):
-        """Background task that listens for pub/sub messages."""
+        """
+        Background task that listens for pub/sub messages.
+
+        Uses polling with timeout to allow graceful shutdown.
+        The short timeout ensures we can check _running flag frequently.
+        """
         logger.info("PubSub listener loop started")
+        consecutive_errors = 0
+        max_consecutive_errors = 10
 
         try:
             while self._running and self._pubsub:
@@ -224,31 +248,83 @@ class RedisPubSub:
                         await asyncio.sleep(0.1)
                         continue
 
+                    # Use get_message with timeout instead of listen()
+                    # This allows us to check _running flag and respond to shutdown
                     raw_message = await self._pubsub.get_message(
                         ignore_subscribe_messages=True,
-                        timeout=1.0
+                        timeout=0.5  # Short timeout for responsive shutdown
                     )
 
-                    if raw_message:
+                    if raw_message is None:
+                        # No message received within timeout, just loop
+                        continue
+
+                    # Process the message
+                    if raw_message.get("type") == "message":
                         await self._process_raw_message(raw_message)
 
+                    # Reset error counter on successful iteration
+                    consecutive_errors = 0
+
                 except asyncio.CancelledError:
+                    logger.info("PubSub listener received cancellation signal")
                     break
                 except Exception as e:
-                    logger.error(f"PubSub listener error: {e}")
-                    await asyncio.sleep(1)  # Brief pause before retry
+                    consecutive_errors += 1
+                    logger.error(f"PubSub listener error ({consecutive_errors}/{max_consecutive_errors}): {e}")
+
+                    if consecutive_errors >= max_consecutive_errors:
+                        logger.critical(f"PubSub listener exceeded max errors, stopping")
+                        break
+
+                    # Exponential backoff: 0.1s, 0.2s, 0.4s, ..., max 5s
+                    backoff = min(0.1 * (2 ** (consecutive_errors - 1)), 5.0)
+                    await asyncio.sleep(backoff)
 
         except asyncio.CancelledError:
-            pass
+            logger.info("PubSub listener cancelled")
         finally:
             logger.info("PubSub listener loop ended")
+
+    async def _run_handler_with_timeout(
+        self,
+        handler_name: str,
+        handler: Callable[[str, dict], Awaitable[None]],
+        channel: str,
+        data: dict
+    ) -> bool:
+        """
+        Run a handler with timeout protection.
+
+        Args:
+            handler_name: Name of the handler for logging
+            handler: The handler coroutine
+            channel: Channel name
+            data: Message data
+
+        Returns:
+            True if handler completed successfully, False otherwise
+        """
+        try:
+            await asyncio.wait_for(
+                handler(channel, data),
+                timeout=settings.WS_HANDLER_TIMEOUT
+            )
+            return True
+        except asyncio.TimeoutError:
+            logger.warning(f"Handler '{handler_name}' timed out after {settings.WS_HANDLER_TIMEOUT}s on channel {channel}")
+            return False
+        except Exception as e:
+            logger.error(f"Error in pubsub handler '{handler_name}': {e}")
+            return False
 
     async def _process_raw_message(self, raw_message: dict):
         """
         Process a raw message from Redis pub/sub.
 
         This method converts the raw Redis message to our dataclass,
-        parses it, and dispatches to all registered handlers.
+        parses it, and dispatches to all registered handlers concurrently
+        with timeout protection.
 
         Args:
             raw_message: Raw message dict from Redis pub/sub
@@ -265,12 +341,14 @@ class RedisPubSub:
         if parsed is None:
             return  # Skip invalid or non-message types
 
-        # Dispatch to all registered handlers
-        for handler_name, handler in self._handlers.items():
-            try:
-                await handler(parsed.channel, parsed.data)
-            except Exception as e:
-                logger.error(f"Error in pubsub handler '{handler_name}': {e}")
+        # Dispatch to all registered handlers concurrently with timeout protection
+        handler_tasks = [
+            self._run_handler_with_timeout(handler_name, handler, parsed.channel, parsed.data)
+            for handler_name, handler in self._handlers.items()
+        ]
+
+        if handler_tasks:
+            await asyncio.gather(*handler_tasks, return_exceptions=True)
 
 
 class TypingTracker:
@@ -282,7 +360,10 @@ class TypingTracker:
     explicitly stopping typing.
     """
 
-    TYPING_TTL = 5  # seconds
+    @property
+    def typing_ttl(self) -> int:
+        """Get typing TTL from settings."""
+        return settings.WS_TYPING_TTL
 
     async def set_typing(self, user_id: str, channel: str, user_name: Optional[str] = None):
         """
@@ -298,7 +379,7 @@ class TypingTracker:
         # Store typing indicator with TTL
         key = f"{TYPING_PREFIX}{channel}:{user_id}"
         value = json.dumps({"user_name": user_name}) if user_name else "1"
-        await redis_client.setex(key, self.TYPING_TTL, value)
+        await redis_client.setex(key, self.typing_ttl, value)
 
         # Publish typing event
         await redis_client.publish(

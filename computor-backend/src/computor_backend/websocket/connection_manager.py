@@ -8,6 +8,7 @@ Uses Redis pub/sub for multi-instance support.
 import asyncio
 import json
 import logging
+import time
 from typing import Dict, List, Set, Optional
 from dataclasses import dataclass, field
 
@@ -18,9 +19,84 @@ from computor_backend.database import get_db
 from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember, CourseContent
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.settings import settings
 from computor_backend.websocket.pubsub import pubsub, typing_tracker, TYPING_PREFIX
 
 logger = logging.getLogger(__name__)
+
+
+class WebSocketMetrics:
+    """
+    Simple metrics tracking for WebSocket connections.
+
+    Tracks connection counts, message counts, and error rates.
+    Can be extended with Prometheus or other metrics backends.
+    """
+
+    def __init__(self):
+        self.total_connections = 0
+        self.total_disconnections = 0
+        self.total_messages_sent = 0
+        self.total_messages_received = 0
+        self.total_send_errors = 0
+        self.total_send_timeouts = 0
+        self.total_connection_limit_hits = 0
+
+    def connection_opened(self):
+        """Track a new connection."""
+        self.total_connections += 1
+
+    def connection_closed(self):
+        """Track a closed connection."""
+        self.total_disconnections += 1
+
+    def message_sent(self):
+        """Track a successfully sent message."""
+        self.total_messages_sent += 1
+
+    def message_received(self):
+        """Track a received message."""
+        self.total_messages_received += 1
+
+    def send_error(self):
+        """Track a send error."""
+        self.total_send_errors += 1
+
+    def send_timeout(self):
+        """Track a send timeout."""
+        self.total_send_timeouts += 1
+
+    def connection_limit_hit(self):
+        """Track when connection limit is reached."""
+        self.total_connection_limit_hits += 1
+
+    def get_metrics(self) -> dict:
+        """Get all metrics as a dictionary."""
+        return {
+            "total_connections": self.total_connections,
+            "total_disconnections": self.total_disconnections,
+            "active_connections": self.total_connections - self.total_disconnections,
+            "total_messages_sent": self.total_messages_sent,
+            "total_messages_received": self.total_messages_received,
+            "total_send_errors": self.total_send_errors,
+            "total_send_timeouts": self.total_send_timeouts,
+            "total_connection_limit_hits": self.total_connection_limit_hits,
+            "error_rate": (
+                self.total_send_errors / max(self.total_messages_sent, 1)
+            ) if self.total_messages_sent > 0 else 0.0
+        }
+
+
+# Global metrics instance
+ws_metrics = WebSocketMetrics()
+
+
+class ConnectionLimitError(Exception):
+    """Raised when connection limits are exceeded."""
+    def __init__(self, message: str, code: int = 4008):
+        self.message = message
+        self.code = code
+        super().__init__(message)
 
 
 @dataclass
@@ -63,6 +139,7 @@ class ConnectionManager:
 
     async def stop(self):
         """Stop the connection manager and clean up."""
+        logger.info("Stopping ConnectionManager...")
         self._running = False
 
         # Unregister our handler
@@ -71,17 +148,34 @@ class ConnectionManager:
         # Stop pub/sub listener
         await pubsub.stop()
 
-        # Close all connections
+        # Close all connections with timeout
+        close_tasks = []
         for user_id, connections in list(self._connections.items()):
             for conn in connections:
-                try:
-                    await conn.websocket.close()
-                except Exception:
-                    pass
+                close_tasks.append(self._close_connection_safe(conn))
+
+        if close_tasks:
+            # Wait for all close operations with overall timeout
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*close_tasks, return_exceptions=True),
+                    timeout=3.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout closing {len(close_tasks)} WebSocket connections")
 
         self._connections.clear()
         self._channel_subscribers.clear()
         logger.info("ConnectionManager stopped")
+
+    async def _close_connection_safe(self, conn: Connection):
+        """Close a connection safely with timeout."""
+        try:
+            await asyncio.wait_for(conn.websocket.close(), timeout=1.0)
+        except asyncio.TimeoutError:
+            pass
+        except Exception:
+            pass
 
     async def connect(self, websocket: WebSocket, principal: Principal) -> Connection:
         """
@@ -93,21 +187,48 @@ class ConnectionManager:
 
         Returns:
             Connection object
+
+        Raises:
+            ConnectionLimitError: If connection limits are exceeded
         """
+        user_id = principal.user_id
+
+        # Check total connection limit
+        total_connections = self.get_connection_count()
+        if total_connections >= settings.WS_MAX_TOTAL_CONNECTIONS:
+            logger.warning(f"Total connection limit reached: {total_connections}/{settings.WS_MAX_TOTAL_CONNECTIONS}")
+            ws_metrics.connection_limit_hit()
+            raise ConnectionLimitError(
+                f"Server connection limit reached",
+                code=4008
+            )
+
+        # Check per-user connection limit
+        user_connections = len(self._connections.get(user_id, []))
+        if user_connections >= settings.WS_MAX_CONNECTIONS_PER_USER:
+            logger.warning(f"User {user_id} connection limit reached: {user_connections}/{settings.WS_MAX_CONNECTIONS_PER_USER}")
+            ws_metrics.connection_limit_hit()
+            raise ConnectionLimitError(
+                f"Too many connections (max {settings.WS_MAX_CONNECTIONS_PER_USER})",
+                code=4008
+            )
+
         await websocket.accept()
 
-        user_id = principal.user_id
         connection = Connection(websocket=websocket, principal=principal)
 
         if user_id not in self._connections:
             self._connections[user_id] = []
         self._connections[user_id].append(connection)
 
-        # Set presence in Redis
+        # Set presence in Redis with configurable TTL
         redis_client = await get_redis_client()
-        await redis_client.setex(f"ws:presence:{user_id}", 30, "online")
+        await redis_client.setex(f"ws:presence:{user_id}", settings.WS_PRESENCE_TTL, "online")
 
-        logger.info(f"WebSocket connected: user={user_id}, total_connections={len(self._connections[user_id])}")
+        # Track metrics
+        ws_metrics.connection_opened()
+
+        logger.info(f"WebSocket connected: user={user_id}, user_connections={len(self._connections[user_id])}, total={self.get_connection_count()}")
 
         return connection
 
@@ -136,6 +257,9 @@ class ConnectionManager:
         if user_id not in self._connections:
             redis_client = await get_redis_client()
             await redis_client.delete(f"ws:presence:{user_id}")
+
+        # Track metrics
+        ws_metrics.connection_closed()
 
         logger.info(f"WebSocket disconnected: user={user_id}")
 
@@ -360,17 +484,46 @@ class ConnectionManager:
 
         return False, "Not a member of this course"
 
+    async def _send_with_timeout(self, conn: Connection, data: dict, user_id: str) -> bool:
+        """
+        Send data to a connection with timeout.
+
+        Args:
+            conn: Target connection
+            data: Data to send
+            user_id: User ID for logging
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await asyncio.wait_for(
+                conn.websocket.send_json(data),
+                timeout=settings.WS_SEND_TIMEOUT
+            )
+            ws_metrics.message_sent()
+            return True
+        except asyncio.TimeoutError:
+            logger.warning(f"Send timeout to user {user_id}")
+            ws_metrics.send_timeout()
+            return False
+        except Exception as e:
+            logger.error(f"Failed to send to user {user_id}: {e}")
+            ws_metrics.send_error()
+            return False
+
     async def _handle_pubsub_message(self, channel: str, data: dict):
         """
         Handle incoming message from Redis pub/sub.
 
         Routes the message to all local connections subscribed to this channel.
+        Uses concurrent sends for better performance.
 
         Args:
             channel: Channel name (without prefix)
             data: Event data
         """
-        logger.info(f"Received pubsub message on channel: {channel}, local subscribers: {list(self._channel_subscribers.keys())}")
+        logger.debug(f"Received pubsub message on channel: {channel}")
 
         if channel not in self._channel_subscribers:
             logger.debug(f"No local subscribers for channel: {channel}")
@@ -378,22 +531,26 @@ class ConnectionManager:
 
         # Get all users subscribed to this channel (make a copy to avoid modification during iteration)
         user_ids = set(self._channel_subscribers.get(channel, set()))
-        logger.info(f"Forwarding to {len(user_ids)} users on channel {channel}")
+        logger.debug(f"Forwarding to {len(user_ids)} users on channel {channel}")
 
-        # Send to all connections for each user (make copies to avoid modification during iteration)
+        # Collect all send tasks for concurrent execution
+        send_tasks = []
         for user_id in user_ids:
             connections = list(self._connections.get(user_id, []))
             for conn in connections:
                 if channel in conn.subscriptions:
-                    try:
-                        await conn.websocket.send_json(data)
-                        logger.debug(f"Sent message to user {user_id} on channel {channel}")
-                    except Exception as e:
-                        logger.error(f"Failed to send to user {user_id}: {e}")
+                    send_tasks.append(self._send_with_timeout(conn, data, user_id))
+
+        # Execute all sends concurrently
+        if send_tasks:
+            results = await asyncio.gather(*send_tasks, return_exceptions=True)
+            success_count = sum(1 for r in results if r is True)
+            logger.debug(f"Broadcast to channel {channel}: {success_count}/{len(send_tasks)} successful")
 
     async def send_to_user(self, user_id: str, event: dict):
         """
         Send an event directly to a specific user (all their connections).
+        Uses concurrent sends for better performance.
 
         Args:
             user_id: Target user ID
@@ -401,11 +558,12 @@ class ConnectionManager:
         """
         # Make a copy to avoid modification during iteration
         connections = list(self._connections.get(user_id, []))
-        for conn in connections:
-            try:
-                await conn.websocket.send_json(event)
-            except Exception as e:
-                logger.error(f"Failed to send to user {user_id}: {e}")
+        if not connections:
+            return
+
+        # Send to all connections concurrently
+        send_tasks = [self._send_with_timeout(conn, event, user_id) for conn in connections]
+        await asyncio.gather(*send_tasks, return_exceptions=True)
 
     async def send_to_connection(self, connection: Connection, event: dict):
         """
@@ -423,6 +581,7 @@ class ConnectionManager:
     async def broadcast_to_channel(self, channel: str, event: dict, exclude_user_id: Optional[str] = None):
         """
         Broadcast an event to all local subscribers of a channel.
+        Uses concurrent sends for better performance.
 
         Note: For multi-instance broadcasting, use pubsub.publish() instead.
 
@@ -434,6 +593,8 @@ class ConnectionManager:
         # Make copies to avoid modification during iteration
         user_ids = set(self._channel_subscribers.get(channel, set()))
 
+        # Collect all send tasks for concurrent execution
+        send_tasks = []
         for user_id in user_ids:
             if exclude_user_id and user_id == exclude_user_id:
                 continue
@@ -441,15 +602,16 @@ class ConnectionManager:
             connections = list(self._connections.get(user_id, []))
             for conn in connections:
                 if channel in conn.subscriptions:
-                    try:
-                        await conn.websocket.send_json(event)
-                    except Exception as e:
-                        logger.error(f"Failed to broadcast to user {user_id}: {e}")
+                    send_tasks.append(self._send_with_timeout(conn, event, user_id))
+
+        # Execute all sends concurrently
+        if send_tasks:
+            await asyncio.gather(*send_tasks, return_exceptions=True)
 
     async def refresh_presence(self, user_id: str):
         """Refresh user's presence TTL."""
         redis_client = await get_redis_client()
-        await redis_client.setex(f"ws:presence:{user_id}", 30, "online")
+        await redis_client.setex(f"ws:presence:{user_id}", settings.WS_PRESENCE_TTL, "online")
 
     def get_connection_count(self) -> int:
         """Get total number of active connections."""
@@ -458,6 +620,21 @@ class ConnectionManager:
     def get_user_count(self) -> int:
         """Get number of unique connected users."""
         return len(self._connections)
+
+    def get_metrics(self) -> dict:
+        """
+        Get comprehensive WebSocket metrics.
+
+        Returns:
+            Dictionary with connection and message metrics
+        """
+        metrics = ws_metrics.get_metrics()
+        metrics.update({
+            "current_connections": self.get_connection_count(),
+            "current_users": self.get_user_count(),
+            "subscribed_channels": len(self._channel_subscribers),
+        })
+        return metrics
 
 
 # Singleton instance

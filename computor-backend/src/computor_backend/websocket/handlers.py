@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
 from computor_backend.model.auth import User
-from computor_backend.websocket.connection_manager import Connection, manager
+from computor_backend.websocket.connection_manager import Connection, manager, ws_metrics
 from computor_backend.websocket.pubsub import pubsub, typing_tracker, CHANNEL_PREFIX
 from computor_backend.business_logic.messages import mark_message_as_read
 from computor_backend.redis_cache import get_cache, get_redis_client
@@ -47,6 +47,9 @@ async def handle_client_message(connection: Connection, raw_data: dict):
         connection: The WebSocket connection
         raw_data: Raw JSON data from the client
     """
+    # Track received message
+    ws_metrics.message_received()
+
     event = parse_client_event(raw_data)
 
     if event is None:
