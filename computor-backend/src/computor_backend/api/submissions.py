@@ -329,89 +329,6 @@ async def list_submission_artifacts(
 
     return result_list
 
-@submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
-async def get_submission_artifact(
-    artifact_id: str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
-):
-    """Get details of a specific submission artifact."""
-
-    artifact = check_artifact_access(artifact_id, permissions, db)
-    return get_artifact_with_details(artifact)
-
-@submissions_router.patch("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
-async def update_submission_artifact(
-    artifact_id: str,
-    update_data: SubmissionArtifactUpdate,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
-    cache: Cache = Depends(get_cache),
-):
-    """Update a submission artifact (e.g., change submit status)."""
-
-    can_update = _has_submission_artifact_permission(permissions, "update")
-    # Initialize repository with cache for automatic invalidation
-    artifact_repo = SubmissionArtifactRepository(db, cache)
-
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
-    ).filter(
-        SubmissionArtifact.id == artifact_id
-    ).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check permissions - only group members or tutors/instructors can update
-    user_id = permissions.get_user_id()
-    if user_id and not can_update:
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to update this artifact")
-    elif not can_update:
-        raise ForbiddenException(detail="You don't have permission to update this artifact")
-
-    # Build updates dict
-    updates = {}
-    if update_data.submit is not None:
-        updates['submit'] = update_data.submit
-    if update_data.properties is not None:
-        updates['properties'] = update_data.properties
-
-    # CRITICAL: Use repository.update() for automatic cache invalidation
-    if updates:
-        artifact = artifact_repo.update(str(artifact_id), updates)
-
-    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
-
-    # Return updated artifact with computed fields
-    artifact_get = SubmissionArtifactGet.model_validate(artifact)
-    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
-    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
-    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
-
-    if hasattr(artifact, 'grades') and artifact.grades:
-        grades = [g.grade for g in artifact.grades if g.grade is not None]
-        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
-
-    return artifact_get
-
 @submissions_router.get(
     "/artifacts/download",
     responses={200: {"content": {"application/zip": {}}}},
@@ -535,6 +452,89 @@ async def download_latest_submission(
             "Content-Disposition": f'attachment; filename="{filename}"'
         }
     )
+
+@submissions_router.get("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
+async def get_submission_artifact(
+    artifact_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Get details of a specific submission artifact."""
+
+    artifact = check_artifact_access(artifact_id, permissions, db)
+    return get_artifact_with_details(artifact)
+
+@submissions_router.patch("/artifacts/{artifact_id}", response_model=SubmissionArtifactGet)
+async def update_submission_artifact(
+    artifact_id: str,
+    update_data: SubmissionArtifactUpdate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
+):
+    """Update a submission artifact (e.g., change submit status)."""
+
+    can_update = _has_submission_artifact_permission(permissions, "update")
+    # Initialize repository with cache for automatic invalidation
+    artifact_repo = SubmissionArtifactRepository(db, cache)
+
+    artifact = db.query(SubmissionArtifact).options(
+        joinedload(SubmissionArtifact.submission_group)
+    ).filter(
+        SubmissionArtifact.id == artifact_id
+    ).first()
+
+    if not artifact:
+        raise NotFoundException(detail="Submission artifact not found")
+
+    # Check permissions - only group members or tutors/instructors can update
+    user_id = permissions.get_user_id()
+    if user_id and not can_update:
+        is_group_member = db.query(SubmissionGroupMember).join(
+            CourseMember
+        ).filter(
+            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+            CourseMember.user_id == user_id
+        ).first()
+
+        if not is_group_member:
+            # Check for tutor/instructor permissions
+            has_elevated_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", db
+            ).filter(
+                CourseMember.course_id == artifact.submission_group.course_id,
+                CourseMember.user_id == user_id
+            ).first()
+
+            if not has_elevated_perms:
+                raise ForbiddenException(detail="You don't have permission to update this artifact")
+    elif not can_update:
+        raise ForbiddenException(detail="You don't have permission to update this artifact")
+
+    # Build updates dict
+    updates = {}
+    if update_data.submit is not None:
+        updates['submit'] = update_data.submit
+    if update_data.properties is not None:
+        updates['properties'] = update_data.properties
+
+    # CRITICAL: Use repository.update() for automatic cache invalidation
+    if updates:
+        artifact = artifact_repo.update(str(artifact_id), updates)
+
+    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
+
+    # Return updated artifact with computed fields
+    artifact_get = SubmissionArtifactGet.model_validate(artifact)
+    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
+    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
+    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
+
+    if hasattr(artifact, 'grades') and artifact.grades:
+        grades = [g.grade for g in artifact.grades if g.grade is not None]
+        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
+
+    return artifact_get
 
 @submissions_router.get(
     "/artifacts/{artifact_id}/download",
