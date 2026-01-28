@@ -1325,6 +1325,32 @@ errors:
       - "Retry operation"
     documentation_url: "/docs/workflows"
 
+  - code: EXT_005
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "Task Queue Unavailable"
+    message:
+      plain: "No worker available for the specified task queue."
+      markdown: "**Task Queue Unavailable**\n\nNo worker is available to process tasks on the specified queue. The testing service may be misconfigured or the worker is not running."
+      html: "<strong>Task Queue Unavailable</strong><p>No worker is available to process tasks on the specified queue. The testing service may be misconfigured or the worker is not running.</p>"
+    retry_after: 120
+    internal_description: "Temporal task queue has no available workers or queue configuration is invalid"
+    affected_functions:
+      - "create_test_run"
+      - "submit_task"
+    common_causes:
+      - "Service configuration missing 'temporal.task_queue' setting"
+      - "Task queue name incorrectly configured (not nested under 'temporal')"
+      - "Worker not running for the specified queue"
+      - "Temporal service unavailable"
+    resolution_steps:
+      - "Verify service configuration includes 'temporal.task_queue' setting"
+      - "Ensure configuration follows the correct structure: {\"temporal\": {\"task_queue\": \"queue-name\"}}"
+      - "Check that a worker is running for the specified task queue"
+      - "Contact administrator to verify testing service setup"
+    documentation_url: "/docs/testing-services"
+
   # ============================================================================
   # DATABASE ERRORS (500, 503)
   # ============================================================================

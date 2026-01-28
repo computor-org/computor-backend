@@ -72,15 +72,27 @@ def setup_logging():
 
     # Set handler to root logger
     root.addHandler(handler)
-    root.setLevel(logging.INFO)
+    root.setLevel(logging.WARNING)  # Default to WARNING to avoid verbose logs
+
+    # Configure uvicorn.access to use our formatter
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.handlers = []  # Remove default handlers
+    access_logger.addHandler(handler)  # Use our handler with colors
+    access_logger.setLevel(logging.INFO)  # Keep access logs at INFO
+
+    # Configure uvicorn.error to use our formatter
+    error_logger = logging.getLogger("uvicorn.error")
+    error_logger.handlers = []
+    error_logger.addHandler(handler)
+    error_logger.setLevel(logging.INFO)
 
 
 # Configure logging
 setup_logging()
 
-# Configure logging levels for WebSocket modules based on environment
-def configure_websocket_logging():
-    """Configure WebSocket module logging based on environment variable."""
+# Configure logging levels for modules based on environment
+def configure_module_logging():
+    """Configure module logging based on environment variables."""
 
     # Get log level from environment (default to WARNING for quiet operation)
     ws_log_level = os.environ.get("WEBSOCKET_LOG_LEVEL", "WARNING").upper()
@@ -105,6 +117,24 @@ def configure_websocket_logging():
         logger = logging.getLogger(module)
         logger.setLevel(getattr(logging, ws_log_level))
 
+    # Set all computor_backend modules to WARNING to avoid verbose logs
+    # Add the root module and all sub-modules
+    backend_modules = [
+        "computor_backend",  # Root module - this catches all sub-modules
+        "computor_backend.api",
+        "computor_backend.repositories",
+        "computor_backend.business_logic",
+        "computor_backend.services",
+        "computor_backend.tasks",
+        "computor_backend.auth",
+        "computor_backend.database",
+        "computor_backend.minio_client",
+    ]
+
+    for module in backend_modules:
+        logger = logging.getLogger(module)
+        logger.setLevel(logging.WARNING)  # Only warnings and errors
+
     # Also configure uvicorn access logs based on environment
     if ws_log_level in ["ERROR", "CRITICAL"]:
         # Suppress access logs in quiet mode
@@ -113,8 +143,8 @@ def configure_websocket_logging():
     return ws_log_level
 
 if __name__ == "__main__":
-    # Configure WebSocket logging
-    ws_level = configure_websocket_logging()
+    # Configure module logging
+    ws_level = configure_module_logging()
 
     # Get Uvicorn log level from environment or use default
     # Default to "info" to always show HTTP requests unless explicitly set otherwise
@@ -128,12 +158,58 @@ if __name__ == "__main__":
     if settings.DEBUG_MODE != "production":
         asyncio.run(startup_logic())
 
+    # Create custom uvicorn log config to use our formatter
+    log_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "colored": {
+                "()": ColoredFormatter,
+                "fmt": "%(asctime)s - %(levelname)-8s - %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S"
+            },
+            "access": {
+                "()": ColoredFormatter,
+                "fmt": "%(asctime)s - %(levelname)-8s - %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S"
+            }
+        },
+        "handlers": {
+            "default": {
+                "class": "logging.StreamHandler",
+                "formatter": "colored",
+                "stream": "ext://sys.stdout"
+            },
+            "access": {
+                "class": "logging.StreamHandler",
+                "formatter": "access",
+                "stream": "ext://sys.stdout"
+            }
+        },
+        "loggers": {
+            "uvicorn": {
+                "handlers": ["default"],
+                "level": uvicorn_log_level.upper(),
+                "propagate": False
+            },
+            "uvicorn.error": {
+                "handlers": ["default"],
+                "level": uvicorn_log_level.upper(),
+                "propagate": False
+            },
+            "uvicorn.access": {
+                "handlers": ["access"],
+                "level": "INFO" if uvicorn_log_level != "error" else "WARNING",
+                "propagate": False
+            }
+        }
+    }
+
     uvicorn.run(
         "computor_backend.server:app",
         host="0.0.0.0",
         port=8000,
-        log_level=uvicorn_log_level,
+        log_config=log_config,  # Use our custom log config
         reload=True,
-        workers=1,
-        use_colors=True  # Enable colors in uvicorn logs
+        workers=1
     )

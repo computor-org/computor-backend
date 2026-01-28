@@ -5,6 +5,7 @@ This module handles test execution for submission artifacts.
 from typing import Annotated, Optional
 import logging
 import uuid
+import json
 from fastapi import Depends, APIRouter
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
@@ -371,7 +372,55 @@ async def create_test_run(
                 detail=f"A test is already running for this version. Please wait for it to complete."
             )
 
-    # Create test result record
+    # Validate task queue configuration BEFORE creating the Result record
+    # This prevents duplicate key errors when retrying with misconfigured services
+    task_queue = None
+    if str(service_type.path).startswith("testing."):
+        # Task queue MUST be in service.config.temporal.task_queue
+        if service.config and isinstance(service.config, dict):
+            temporal_config = service.config.get("temporal", {})
+            if isinstance(temporal_config, dict):
+                task_queue = temporal_config.get("task_queue")
+
+            # Warn about common misconfiguration - task_queue at root level
+            if not task_queue and "task_queue" in service.config:
+                logger.warning(
+                    f"Service '{service.name}' has task_queue at root level. "
+                    f"It should be nested under 'temporal': {{'temporal': {{'task_queue': 'queue-name'}}}}"
+                )
+
+        # Validate that we have a task queue
+        if not task_queue:
+            # Provide helpful error message with proper JSON formatting
+            config_example = {
+                "temporal": {
+                    "task_queue": "testing-matlab",
+                    "max_retries": 3,
+                    "timeout_minutes": 30
+                }
+            }
+            raise BadRequestException(
+                error_code="EXT_005",
+                detail=(
+                    f"Testing service '{service.name}' is not properly configured. "
+                    f"No task queue specified. Service configuration must include: "
+                    f"{json.dumps(config_example, indent=2)}"
+                )
+            )
+
+        # Warn if using default queue for specialized testing service
+        if task_queue == "computor-tasks" and "matlab" in service.name.lower():
+            logger.warning(
+                f"Service '{service.name}' appears to be a MATLAB testing service but is using the default queue. "
+                f"Consider using a specialized queue like 'testing-matlab'"
+            )
+    else:
+        raise BadRequestException(
+            error_code="TASK_003",
+            detail=f"Service type '{service_type.path}' is not a testing service. Expected path starting with 'testing.', got '{service_type.path}'"
+        )
+
+    # Create test result record (only after validation passes)
     result = Result(
         submission_artifact_id=artifact.id,
         submission_group_id=submission_group.id,
@@ -394,51 +443,35 @@ async def create_test_run(
 
     # Start Temporal workflow for testing
     try:
-        # Check if this is a testing service type (testing.*)
-        if str(service_type.path).startswith("testing."):
-            task_executor = get_task_executor()
+        # Task queue has already been validated above
+        task_executor = get_task_executor()
 
-            # Get task queue from service config (service-specific) or service type properties (default)
-            # Config structure: service.config.temporal.task_queue or service_type.properties.task_queue
-            task_queue = "computor-tasks"  # Default
-            if service.config and isinstance(service.config, dict):
-                temporal_config = service.config.get("temporal", {})
-                if isinstance(temporal_config, dict):
-                    task_queue = temporal_config.get("task_queue", task_queue)
-            if task_queue == "computor-tasks" and service_type.properties and isinstance(service_type.properties, dict):
-                task_queue = service_type.properties.get("task_queue", task_queue)
-
-            task_submission = TaskSubmission(
-                task_name="student_testing",
-                workflow_id=workflow_id,
-                parameters={
-                    "test_job": job,  # Already a dict, no need for model_dump()
-                    "service_config": {
-                        "id": str(service.id),
-                        "slug": service.slug,
-                        "name": service.name,
-                        "config": service.config or {},
-                    },
-                    "service_type_config": {
-                        "id": str(service_type.id),
-                        "path": str(service_type.path),
-                        "schema": service_type.schema or {},
-                        "properties": service_type.properties or {},
-                    },
-                    "result_id": str(result.id),
+        task_submission = TaskSubmission(
+            task_name="student_testing",
+            workflow_id=workflow_id,
+            parameters={
+                "test_job": job,  # Already a dict, no need for model_dump()
+                "service_config": {
+                    "id": str(service.id),
+                    "slug": service.slug,
+                    "name": service.name,
+                    "config": service.config or {},
                 },
-                queue=task_queue
-            )
+                "service_type_config": {
+                    "id": str(service_type.id),
+                    "path": str(service_type.path),
+                    "schema": service_type.schema or {},
+                    "properties": service_type.properties or {},
+                },
+                "result_id": str(result.id),
+            },
+            queue=task_queue
+        )
 
-            submitted_id = await task_executor.submit_task(task_submission)
+        submitted_id = await task_executor.submit_task(task_submission)
 
-            if submitted_id != workflow_id:
-                logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
-        else:
-            raise BadRequestException(
-                error_code="TASK_003",
-                detail=f"Service type '{service_type.path}' is not a testing service. Expected path starting with 'testing.', got '{service_type.path}'"
-            )
+        if submitted_id != workflow_id:
+            logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
 
     except Exception as e:
         # If task submission fails, update result status to FAILED

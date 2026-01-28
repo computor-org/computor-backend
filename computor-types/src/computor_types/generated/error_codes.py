@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2026-01-20T14:57:21.529044
+Generated at: 2026-01-28T14:24:08.680683
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -68,6 +68,7 @@ class ErrorCode(str, Enum):
     EXT_002 = "EXT_002"  # GitLab Authentication Failed
     EXT_003 = "EXT_003"  # MinIO Service Unavailable
     EXT_004 = "EXT_004"  # Temporal Service Unavailable
+    EXT_005 = "EXT_005"  # Task Queue Unavailable
     DB_001 = "DB_001"  # Database Connection Failed
     DB_002 = "DB_002"  # Database Query Failed
     DB_003 = "DB_003"  # Transaction Failed
@@ -148,6 +149,7 @@ ERROR_CATEGORIES = {
     ErrorCode.EXT_002: "external_service",
     ErrorCode.EXT_003: "external_service",
     ErrorCode.EXT_004: "external_service",
+    ErrorCode.EXT_005: "external_service",
     ErrorCode.DB_001: "database",
     ErrorCode.DB_002: "database",
     ErrorCode.DB_003: "database",
