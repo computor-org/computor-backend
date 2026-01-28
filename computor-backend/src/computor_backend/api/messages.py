@@ -34,6 +34,7 @@ from computor_backend.business_logic.message_operations import (
     create_message_audit,
     get_message_audit_history,
 )
+from computor_backend.websocket.broadcast import ws_broadcast
 
 messages_router = APIRouter()
 
@@ -58,7 +59,19 @@ async def create_message(
     if db_message:
         create_message_audit(db_message, permissions, db)
 
-    return message
+    # Enrich message with author info before broadcasting
+    enriched_message = get_message_with_read_status(message.id, message, permissions, db)
+
+    # Broadcast to WebSocket subscribers
+    # IMPORTANT: Remove user-specific fields (is_author, is_read) from broadcast
+    # These fields are relative to the API caller, not the WebSocket recipients
+    # Recipients should compute is_author themselves using: author_id === currentUserId
+    broadcast_data = enriched_message.model_dump(mode="json")
+    broadcast_data.pop("is_author", None)
+    broadcast_data.pop("is_read", None)
+    await ws_broadcast.message_created(enriched_message, broadcast_data)
+
+    return enriched_message
 
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
@@ -122,7 +135,16 @@ async def update_message(
     )
 
     # Convert to MessageGet
-    return get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
+    message_get = get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)
+
+    # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    # IMPORTANT: Remove user-specific fields from broadcast
+    broadcast_data = message_get.model_dump(mode="json")
+    broadcast_data.pop("is_author", None)
+    broadcast_data.pop("is_read", None)
+    await ws_broadcast.message_updated(message_get, broadcast_data, str(id))
+
+    return message_get
 
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
@@ -131,8 +153,8 @@ async def delete_message(
     db: Session = Depends(get_db),
 ):
     """Soft delete a message (preserves thread structure)."""
-    # Verify user has access
-    await get_id_db(permissions, db, id, MessageInterface)
+    # Verify user has access and get message for broadcast
+    message = await get_id_db(permissions, db, id, MessageInterface)
 
     # Soft delete with audit
     soft_delete_message(
@@ -141,6 +163,10 @@ async def delete_message(
         db=db,
         reason="user_request"
     )
+
+    # Broadcast to WebSocket subscribers (use DTO which has target fields)
+    await ws_broadcast.message_deleted(message, str(id))
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
@@ -152,8 +178,17 @@ async def mark_message_read(
 ):
     """Mark a message as read."""
     # Ensure user has visibility on the message
-    await get_id_db(permissions, db, id, MessageInterface)
+    message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_read(id, permissions, db, cache)
+
+    # Broadcast read:update via WebSocket for submission_group messages
+    if message.submission_group_id:
+        await ws_broadcast.read_updated(
+            channel=f"submission_group:{message.submission_group_id}",
+            message_id=str(id),
+            user_id=str(permissions.user_id)
+        )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)

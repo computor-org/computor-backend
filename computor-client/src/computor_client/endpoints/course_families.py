@@ -27,6 +27,15 @@ class CourseFamiliesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def delete(
+        self,
+        course_family_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete course family and all descendant courses"""
+        await self._http.delete(f"/course-families/{course_family_id}", params=kwargs)
+        return
+
     async def create(
         self,
         data: Union[CourseFamilyCreate, Dict[str, Any]],
@@ -72,7 +81,7 @@ class CourseFamiliesClient:
         response = await self._http.patch(f"/course-families/{id}", json_data=data, params=kwargs)
         return CourseFamilyGet.model_validate(response.json())
 
-    async def delete(
+    async def delete_delete(
         self,
         id: str,
         **kwargs: Any,

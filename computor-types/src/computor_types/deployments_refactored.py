@@ -205,7 +205,11 @@ class ExecutionBackendReference(BaseDeployment):
 # Service Configuration Classes (New Architecture)
 
 class ServiceUserConfig(BaseDeployment):
-    """User configuration for a service."""
+    """User configuration for a service.
+
+    DEPRECATED: Use UserDeployment directly in ServiceConfig instead.
+    Kept for backwards compatibility.
+    """
     username: str = Field(description="Username for the service user")
     email: Optional[str] = Field(None, description="Email for the service user")
     given_name: Optional[str] = Field(None, description="Given name")
@@ -234,7 +238,11 @@ class ServiceApiTokenConfig(BaseDeployment):
 
 
 class ServiceConfig(BaseDeployment):
-    """Full service configuration for defining services at root level."""
+    """Full service configuration for defining services at root level.
+
+    Services are deployed AFTER course hierarchy creation, allowing course_members
+    to be assigned to existing courses.
+    """
     slug: str = Field(description="Unique identifier for the service")
     service_type_path: str = Field(
         description="ServiceType Ltree path (e.g., 'testing.temporal')"
@@ -243,13 +251,19 @@ class ServiceConfig(BaseDeployment):
         None,
         description="Programming language for testing services (e.g., 'python', 'matlab')"
     )
-    user: ServiceUserConfig = Field(description="User configuration for this service")
+    # User configuration - uses the same UserDeployment as regular users
+    user: UserDeployment = Field(description="User configuration for this service (same as regular users)")
     api_token: ServiceApiTokenConfig = Field(description="API token configuration")
     config: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="Service-specific configuration (task_queue, timeouts, etc.)"
     )
     description: Optional[str] = Field(None, description="Service description")
+    # Course memberships for the service user (processed after course creation)
+    course_members: List[CourseMemberDeployment] = Field(
+        default_factory=list,
+        description="Course memberships for this service's user (e.g., _tutor role for testing services)"
+    )
 
 
 class ServiceReference(BaseDeployment):

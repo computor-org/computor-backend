@@ -382,6 +382,7 @@ class TypeScriptGenerator:
             'tasks': [],
             'examples': [],
             'messages': [],
+            'websocket': [],
             'common': [],
         }
 
@@ -430,7 +431,9 @@ class TypeScriptGenerator:
                 category = 'examples'
             elif 'message' in module_name or 'message' in model_name:
                 category = 'messages'
-            
+            elif 'websocket' in module_name or model_name.startswith('ws'):
+                category = 'websocket'
+
             model_categories[category].append(model)
             model_to_category[model.__name__] = category
 
@@ -459,6 +462,8 @@ class TypeScriptGenerator:
                 category = 'examples'
             elif 'message' in module_name or 'message' in enum_name:
                 category = 'messages'
+            elif 'websocket' in module_name or enum_name.startswith('ws'):
+                category = 'websocket'
 
             enum_categories[category].append(enum)
             model_to_category[enum.__name__] = category
@@ -639,6 +644,7 @@ python computor_backend/scripts/generate_typescript_interfaces.py
 - **sso.ts** - SSO provider interfaces
 - **tasks.ts** - Task and job interfaces
 - **messages.ts** - Messaging and discussion interfaces
+- **websocket.ts** - WebSocket event interfaces (client/server events)
 - **examples.ts** - Example and template interfaces
 - **common.ts** - Common/shared interfaces
 

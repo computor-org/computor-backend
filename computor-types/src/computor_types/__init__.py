@@ -111,6 +111,35 @@ from .exceptions import (
     VsixManifestError,
 )
 
+# Messages
+from .messages import (
+    MessageTargetProtocol,
+)
+
+# WebSocket Events
+from .websocket import (
+    WSChannelSubscribe,
+    WSChannelUnsubscribe,
+    WSTypingStart,
+    WSTypingStop,
+    WSReadMark,
+    WSPing,
+    WSChannelSubscribed,
+    WSChannelUnsubscribed,
+    WSChannelError,
+    WSMessageNew,
+    WSMessageUpdate,
+    WSMessageDelete,
+    WSTypingUpdate,
+    WSReadUpdate,
+    WSPong,
+    WSError,
+    WSConnected,
+    ClientEvent,
+    ServerEvent,
+    parse_client_event,
+)
+
 # Extensions
 from .extensions import (
     VsixMetadata,

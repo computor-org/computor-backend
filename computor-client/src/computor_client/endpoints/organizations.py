@@ -38,6 +38,15 @@ class OrganizationsClient:
         response = await self._http.patch(f"/organizations/{organization_id}/token", json_data=data, params=kwargs)
         return response.json()
 
+    async def delete(
+        self,
+        organization_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete organization and all descendant data"""
+        await self._http.delete(f"/organizations/{organization_id}", params=kwargs)
+        return
+
     async def create(
         self,
         data: Union[OrganizationCreate, Dict[str, Any]],
@@ -83,7 +92,7 @@ class OrganizationsClient:
         response = await self._http.patch(f"/organizations/{id}", json_data=data, params=kwargs)
         return OrganizationGet.model_validate(response.json())
 
-    async def delete(
+    async def delete_delete(
         self,
         id: str,
         **kwargs: Any,

@@ -72,7 +72,7 @@ Computor is a university programming course management platform with automated G
 # Environment setup
 python3.10 -m venv .venv
 source .venv/bin/activate
-pip install -r src/requirements.txt
+pip install -e computor-backend/
 
 # Database migrations
 bash migrations.sh                    # Run migrations

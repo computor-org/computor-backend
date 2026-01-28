@@ -27,6 +27,15 @@ class CoursesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def delete(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete course and all course-specific data"""
+        await self._http.delete(f"/courses/{course_id}", params=kwargs)
+        return
+
     async def create(
         self,
         data: Union[CourseCreate, Dict[str, Any]],
@@ -72,7 +81,7 @@ class CoursesClient:
         response = await self._http.patch(f"/courses/{id}", json_data=data, params=kwargs)
         return CourseGet.model_validate(response.json())
 
-    async def delete(
+    async def delete_delete(
         self,
         id: str,
         **kwargs: Any,

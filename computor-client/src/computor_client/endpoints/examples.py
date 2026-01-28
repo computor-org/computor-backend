@@ -157,3 +157,11 @@ class ExamplesClient:
         await self._http.delete(f"/examples/{example_id}/dependencies/{dependency_id}", params=kwargs)
         return
 
+    async def by_pattern(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        """Delete examples by identifier prefix pattern"""
+        await self._http.delete(f"/examples/by-pattern", params=kwargs)
+        return
+

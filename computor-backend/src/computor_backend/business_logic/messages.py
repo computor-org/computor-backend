@@ -52,9 +52,10 @@ def create_message_with_author(
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
-    # Validate that only ONE target is set (messages should have a single, clear scope)
-    target_fields = ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']
-    set_targets = [k for k in target_fields if model_dump.get(k)]
+    # Validate target fields - messages should have a primary scope
+    # Primary target fields (the most specific level)
+    primary_target_fields = ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']
+    set_targets = [k for k in primary_target_fields if model_dump.get(k)]
 
     # If parent_id is set, inherit target from parent message
     if model_dump.get('parent_id'):
@@ -64,7 +65,7 @@ def create_message_with_author(
             raise BadRequestException(detail=f"Parent message {model_dump['parent_id']} not found")
 
         # Inherit target fields from parent
-        for field in target_fields:
+        for field in primary_target_fields:
             parent_value = getattr(parent_message, field, None)
             if parent_value is not None:
                 # Don't override if user explicitly set a target (will be caught by validation below)
@@ -72,11 +73,29 @@ def create_message_with_author(
                     model_dump[field] = parent_value
 
         # Recalculate set_targets after inheriting from parent
-        set_targets = [k for k in target_fields if model_dump.get(k)]
+        set_targets = [k for k in primary_target_fields if model_dump.get(k)]
+
+    # Determine the PRIMARY target (most specific)
+    # Hierarchy from most specific to least: submission_group > course_content > course_group > course > course_family > organization
+    # Allow course_id alongside more specific targets (for hierarchical context)
+    primary_target = None
+    if 'submission_group_id' in set_targets:
+        primary_target = 'submission_group_id'
+        # Remove course_id from set_targets - it's allowed as hierarchical context
+        set_targets = [t for t in set_targets if t != 'course_id']
+    elif 'course_content_id' in set_targets:
+        primary_target = 'course_content_id'
+        set_targets = [t for t in set_targets if t != 'course_id']
+    elif 'course_group_id' in set_targets:
+        primary_target = 'course_group_id'
+        set_targets = [t for t in set_targets if t != 'course_id']
+    elif 'course_id' in set_targets:
+        primary_target = 'course_id'
 
     if len(set_targets) == 0:
         # Allow user-only message by setting user_id to current user if nothing else provided
         model_dump['user_id'] = permissions.user_id
+        set_targets = ['user_id']
     elif len(set_targets) > 1:
         raise BadRequestException(detail=f"Only ONE target field should be set, but got: {', '.join(set_targets)}. Please specify only one of: user_id, course_member_id, submission_group_id, course_group_id, course_content_id, or course_id.")
 
@@ -95,13 +114,29 @@ def create_message_with_author(
         submission_group_id = model_dump['submission_group_id']
         _check_submission_group_write_permission(permissions, submission_group_id, db)
 
+        # Populate course_id from submission group for hierarchical broadcasting
+        submission_group = db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == submission_group_id
+        ).first()
+        if submission_group and submission_group.course_id:
+            model_dump['course_id'] = str(submission_group.course_id)
+
     # course_content_id: Check if user has submission group with that content
     if model_dump.get('course_content_id') and not model_dump.get('submission_group_id'):
         course_content_id = model_dump['course_content_id']
         _check_course_content_write_permission(permissions, course_content_id, db)
 
-    # course_id: Check if user is a member
-    if model_dump.get('course_id'):
+        # Populate course_id from course content for hierarchical broadcasting
+        from computor_backend.model.course import CourseContent
+        course_content = db.query(CourseContent).filter(
+            CourseContent.id == course_content_id
+        ).first()
+        if course_content and course_content.course_id:
+            model_dump['course_id'] = str(course_content.course_id)
+
+    # course_id: Only check write permission if course_id was the PRIMARY target
+    # (not derived from submission_group_id or course_content_id)
+    if 'course_id' in set_targets:
         course_id = model_dump['course_id']
         _check_course_write_permission(permissions, course_id, db)
 
@@ -460,7 +495,13 @@ def _invalidate_message_cache(
         db: Database session
         cache: Optional cache instance
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"_invalidate_message_cache called: message_id={message_id}, reader_user_id={reader_user_id}, cache={cache is not None}")
+
     if not cache:
+        logger.warning("Cache is None, skipping invalidation")
         return
 
     # Fetch the message to get its target fields
@@ -472,13 +513,16 @@ def _invalidate_message_cache(
     # This is necessary because unread message counts appear in course content lists,
     # and those views are cached with complex query parameters and related_ids.
     # The safest approach is to invalidate all views for the user.
+    logger.info(f"Invalidating user views for user_id={reader_user_id}")
     cache.invalidate_user_views(user_id=str(reader_user_id))
+    logger.info(f"User views invalidated for user_id={reader_user_id}")
 
     # Additionally, invalidate entity-specific tags for broader cache coherence
     # (in case other users' caches reference these entities)
 
     if message.submission_group_id:
         # Invalidate submission group entity tags
+        logger.info(f"Invalidating submission_group:{message.submission_group_id}")
         cache.invalidate_tags(f"submission_group:{message.submission_group_id}")
 
     if message.course_content_id:
@@ -520,6 +564,11 @@ def mark_message_as_read(
         db: Database session
         cache: Optional cache instance for invalidation
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"mark_message_as_read called: message_id={message_id}, user_id={permissions.user_id}, cache={cache is not None}")
+
     # Upsert read record for current user
     exists = (
         db.query(MessageRead)
@@ -527,11 +576,14 @@ def mark_message_as_read(
         .first()
     )
     if not exists:
+        logger.info(f"Creating new MessageRead record for message_id={message_id}, user_id={permissions.user_id}")
         db.add(MessageRead(message_id=message_id, reader_user_id=permissions.user_id))
         db.commit()
 
         # Invalidate cached views that include unread message counts
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
+    else:
+        logger.info(f"Message {message_id} already marked as read by user {permissions.user_id}")
 
 
 def mark_message_as_unread(
