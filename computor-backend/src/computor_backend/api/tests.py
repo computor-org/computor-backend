@@ -355,7 +355,7 @@ async def create_test_run(
                     else:
                         existing_result.status = 6  # CRASHED (unknown state)
 
-                    logger.info(f"Status synced from Temporal for Result {existing_result.id}: {task_info.status.value} -> status {existing_result.status}")
+                    logger.info(f"Status synced from Temporal for Result {existing_result.id}: {task_info.status} -> status {existing_result.status}")
                     db.commit()
                     logger.info(f"Updated stale Result {existing_result.id} to status {existing_result.status}")
             except Exception as e:
