@@ -502,39 +502,41 @@ async def create_student_repository(
             
         # Get user information for repository naming
         user = course_member.user
-        username = user.email.split('@')[0] if user.email else f"user_{user.id}"
-        
-        # Generate repository name and path
-        repo_name = username
-        repo_path = repo_name.lower().replace(' ', '-').replace('_', '-')
-        
+        base_username = user.email.split('@')[0] if user.email else f"user_{user.id}"
+
+        # Generate base repository path
+        base_repo_path = base_username.lower().replace(' ', '-').replace('_', '-')
+
         # Get the students group namespace
         gitlab_namespace_id = gitlab_config['students_group_id']
-        
-        logger.info(f"Checking for existing repository {repo_path} in namespace {gitlab_namespace_id}")
-        
-        # Check if repository already exists
-        existing_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
-        
-        # If repository exists, use it; otherwise fork
-        if existing_project:
-            forked_project = existing_project
-            logger.info(f"Using existing repository {repo_path} for {username}")
-            
-            # Ensure student is maintainer even for existing repo
-            try:
-                await add_members_to_project(
-                    gitlab=gitlab,
-                    project=forked_project,
-                    member_ids=[course_member_id],
-                    db=db,
-                    provider_url=provider_url
-                )
-            except Exception as e:
-                logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
-        else:
-            # Fork the student-template repository
-            logger.info(f"Forking template {student_template_id} to {repo_path}")
+
+        # Find unique repo path and create repository
+        # Loop handles both DB collisions and race conditions (parallel imports)
+        repo_path = base_repo_path
+        repo_name = base_username
+        suffix = 1
+        max_attempts = 100  # Safety limit
+        forked_project = None
+
+        while suffix <= max_attempts:
+            # Check if another course member in this course already uses this repo path
+            existing_member = db.query(CourseMember).filter(
+                CourseMember.course_id == course_id,
+                CourseMember.id != course_member_id,
+                CourseMember.properties['gitlab']['full_path'].astext.endswith(f"/{repo_path}")
+            ).first()
+
+            if existing_member:
+                # DB collision - try next suffix
+                suffix += 1
+                repo_path = f"{base_repo_path}{suffix}"
+                repo_name = f"{base_username}{suffix}"
+                logger.info(f"Repository path collision in DB, trying {repo_path}")
+                continue
+
+            logger.info(f"Trying repository path {repo_path} for course member {course_member_id}")
+
+            # Try to create the repository in GitLab
             try:
                 forked_project = await fork_project_with_polling(
                     gitlab=gitlab,
@@ -543,31 +545,40 @@ async def create_student_repository(
                     dest_name=repo_name,
                     namespace_id=gitlab_namespace_id
                 )
+                # Success - break out of loop
+                break
+
             except Exception as fork_error:
-                # If fork fails with "already taken", try to find the existing repo
                 if "has already been taken" in str(fork_error):
-                    logger.warning(f"Repository already exists, searching for it...")
-                    forked_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
-                    if not forked_project:
-                        raise ValueError(f"Repository {repo_path} exists but cannot be accessed")
+                    # Race condition - another process created it first, try next suffix
+                    logger.warning(f"Repository {repo_path} already taken (race condition), trying next suffix")
+                    suffix += 1
+                    repo_path = f"{base_repo_path}{suffix}"
+                    repo_name = f"{base_username}{suffix}"
+                    continue
                 else:
                     raise fork_error
-                
-            # Unprotect branches to allow student pushes
-            for branch in ["main", "master"]:
-                try:
-                    gitlab_unprotect_branches(gitlab, forked_project.id, branch)
-                except Exception as e:
-                    logger.debug(f"Could not unprotect {branch} branch: {e}")
-                
-            # Add student as maintainer of the repository
-            await add_members_to_project(
-                gitlab=gitlab,
-                project=forked_project,
-                member_ids=[course_member_id],
-                db=db,
-                provider_url=provider_url
-            )
+
+        if not forked_project:
+            raise ValueError(f"Could not create unique repository after {max_attempts} attempts")
+
+        logger.info(f"Created repository {repo_path} for course member {course_member_id}")
+
+        # Unprotect branches to allow student pushes
+        for branch in ["main", "master"]:
+            try:
+                gitlab_unprotect_branches(gitlab, forked_project.id, branch)
+            except Exception as e:
+                logger.debug(f"Could not unprotect {branch} branch: {e}")
+
+        # Add student as maintainer of the repository
+        await add_members_to_project(
+            gitlab=gitlab,
+            project=forked_project,
+            member_ids=[course_member_id],
+            db=db,
+            provider_url=provider_url
+        )
         
         # Prepare repository information
         repository_info = {
