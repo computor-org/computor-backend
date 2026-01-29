@@ -27,10 +27,6 @@ class UploadSizeLimiterMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Check Content-Length header before processing request."""
 
-        # Skip WebSocket connections - BaseHTTPMiddleware doesn't handle them properly
-        if request.scope.get("type") == "websocket":
-            return await call_next(request)
-
         # Only check POST/PUT/PATCH requests (uploads)
         if request.method in ("POST", "PUT", "PATCH"):
             content_length = request.headers.get("content-length")
