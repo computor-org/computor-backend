@@ -141,16 +141,14 @@ services:
       - minio
     labels:
       - "traefik.enable=true"
+      # Service definition (required for proper routing)
+      - "traefik.http.services.uvicorn.loadbalancer.server.port=8000"
       # HTTP API router
       - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.uvicorn.entrypoints=web"
+      - "traefik.http.routers.uvicorn.service=uvicorn"
       - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
       - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
-      # WebSocket router (needs separate config for proper upgrade handling)
-      - "traefik.http.routers.uvicorn-ws.rule=PathPrefix(`/api/ws`)"
-      - "traefik.http.routers.uvicorn-ws.entrypoints=web"
-      - "traefik.http.middlewares.uvicorn-ws-stripprefix.stripprefix.prefixes=/api"
-      - "traefik.http.routers.uvicorn-ws.middlewares=uvicorn-ws-stripprefix"
   
   # Frontend service
   frontend:
