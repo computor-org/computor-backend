@@ -564,11 +564,12 @@ class CourseMemberPermissionHandler(PermissionHandler):
                 principal.user_id, min_role, db
             )
 
-            # Base filter: all course members in permitted courses
+            # Base filter: all entities in permitted courses
             filters = [self.entity.course_id.in_(permitted_courses)]
 
-            # For read actions, also allow viewing own membership (for students)
-            if action in ["get", "list"]:
+            # For read actions on entities with user_id (e.g., CourseMember),
+            # also allow viewing own record (for students)
+            if action in ["get", "list"] and hasattr(self.entity, 'user_id'):
                 filters.append(self.entity.user_id == principal.user_id)
 
             return db.query(self.entity).filter(or_(*filters))
