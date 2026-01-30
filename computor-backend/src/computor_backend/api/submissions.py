@@ -8,8 +8,8 @@ from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Response, status, File, Form, UploadFile, Request
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
+from sqlalchemy.orm import Session, joinedload, contains_eager, aliased
+from sqlalchemy import and_, or_, exists, func as sql_func
 
 from computor_backend.api.exceptions import (
     BadRequestException,
@@ -42,8 +42,9 @@ from computor_types.artifacts import (
     SubmissionArtifactQuery,
     SubmissionGradeCreate,
     SubmissionGradeUpdate,
-    SubmissionGradeListItem,
+    SubmissionGradeList,
     SubmissionGradeDetail,
+    SubmissionGradeQuery,
     SubmissionReviewCreate,
     SubmissionReviewUpdate,
     SubmissionReviewListItem,
@@ -591,14 +592,23 @@ async def create_artifact_grade_endpoint(
 
     return SubmissionGradeDetail.model_validate(grade)
 
-@submissions_router.get("/artifacts/{artifact_id}/grades", response_model=list[SubmissionGradeListItem])
+@submissions_router.get("/artifacts/{artifact_id}/grades", response_model=list[SubmissionGradeList])
 async def list_artifact_grades(
     artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    params: SubmissionGradeQuery = Depends(),
     db: Session = Depends(get_db),
 ):
-    """List all grades for an artifact. Students can view their own grades, tutors/instructors can view all."""
+    """List all grades for an artifact. Students can view their own grades, tutors/instructors can view all.
+
+    Query parameters:
+    - graded_by_course_member_id: Filter by grader
+    - status: Filter by grading status
+    - latest: If True, return only the most recent grade
+    - start_date: Filter grades at or after this datetime
+    - end_date: Filter grades at or before this datetime
+    """
 
     # Verify artifact exists and get submission group
     artifact = db.query(SubmissionArtifact).options(
@@ -633,16 +643,170 @@ async def list_artifact_grades(
             if not has_elevated_perms:
                 raise ForbiddenException(detail="You don't have permission to view these grades")
 
-    # Get grades for this artifact
-    grades = db.query(SubmissionGrade).options(
+    # Build query for grades
+    query = db.query(SubmissionGrade).options(
         joinedload(SubmissionGrade.graded_by)
     ).filter(
         SubmissionGrade.artifact_id == artifact_id
-    ).order_by(SubmissionGrade.graded_at.desc()).all()
+    )
 
-    response.headers["X-Total-Count"] = str(len(grades))
+    # Apply query filters
+    if params.graded_by_course_member_id:
+        query = query.filter(SubmissionGrade.graded_by_course_member_id == params.graded_by_course_member_id)
+    if params.status is not None:
+        query = query.filter(SubmissionGrade.status == params.status)
+    if params.start_date:
+        query = query.filter(SubmissionGrade.graded_at >= params.start_date)
+    if params.end_date:
+        query = query.filter(SubmissionGrade.graded_at <= params.end_date)
 
-    return [SubmissionGradeListItem.model_validate(grade) for grade in grades]
+    # Order by graded_at descending
+    query = query.order_by(SubmissionGrade.graded_at.desc())
+
+    # If latest=True, only return the most recent grade
+    if params.latest:
+        grade = query.first()
+        grades = [grade] if grade else []
+    else:
+        # Apply pagination
+        total = query.count()
+        grades = query.limit(params.limit).offset(params.skip).all()
+        response.headers["X-Total-Count"] = str(total)
+
+    if params.latest:
+        response.headers["X-Total-Count"] = str(len(grades))
+
+    return [SubmissionGradeList.model_validate(grade) for grade in grades]
+
+@submissions_router.get("/grades", response_model=list[SubmissionGradeList])
+async def list_grades(
+    response: Response,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    params: SubmissionGradeQuery = Depends(),
+    db: Session = Depends(get_db),
+):
+    """List submission grades with filtering.
+
+    Query parameters:
+    - artifact_id: Filter by specific artifact
+    - graded_by_course_member_id: Filter by grader
+    - status: Filter by grading status
+    - course_id: Filter by course
+    - latest: If True, return only the most recent grade per artifact
+    - start_date: Filter grades at or after this datetime
+    - end_date: Filter grades at or before this datetime
+    """
+
+    can_list_all = permissions.is_admin or permissions.permitted("submission_grade", "list")
+    user_id = permissions.get_user_id()
+
+    # Determine if we need to join artifact/submission_group for filtering
+    needs_artifact_join = params.course_id or (user_id and not can_list_all)
+
+    # Build base query with explicit joins when needed for filtering
+    if needs_artifact_join:
+        # Use explicit joins with contains_eager to populate relationships
+        query = db.query(SubmissionGrade).join(
+            SubmissionArtifact, SubmissionGrade.artifact_id == SubmissionArtifact.id
+        ).join(
+            SubmissionGroup, SubmissionArtifact.submission_group_id == SubmissionGroup.id
+        ).options(
+            joinedload(SubmissionGrade.graded_by),
+            contains_eager(SubmissionGrade.artifact).contains_eager(SubmissionArtifact.submission_group)
+        )
+    else:
+        # No filtering needs - use simple joinedload
+        query = db.query(SubmissionGrade).options(
+            joinedload(SubmissionGrade.graded_by),
+            joinedload(SubmissionGrade.artifact).joinedload(SubmissionArtifact.submission_group)
+        )
+
+    # Apply basic filters
+    if params.id:
+        query = query.filter(SubmissionGrade.id == params.id)
+    if params.artifact_id:
+        query = query.filter(SubmissionGrade.artifact_id == params.artifact_id)
+    if params.graded_by_course_member_id:
+        query = query.filter(SubmissionGrade.graded_by_course_member_id == params.graded_by_course_member_id)
+    if params.status is not None:
+        query = query.filter(SubmissionGrade.status == params.status)
+    if params.start_date:
+        query = query.filter(SubmissionGrade.graded_at >= params.start_date)
+    if params.end_date:
+        query = query.filter(SubmissionGrade.graded_at <= params.end_date)
+
+    # Filter by course_id (join already done above if needed)
+    if params.course_id:
+        query = query.filter(SubmissionGroup.course_id == params.course_id)
+
+    # Permission-based filtering using EXISTS (more efficient than IN with subqueries)
+    if user_id and not can_list_all:
+        # Create aliased tables for EXISTS subqueries to avoid conflicts
+        ArtifactAlias = aliased(SubmissionArtifact)
+        GroupMemberAlias = aliased(SubmissionGroupMember)
+        CourseMemberAlias = aliased(CourseMember)
+
+        # EXISTS: user is member of the submission group (owns the submission)
+        own_submission_exists = exists().where(
+            and_(
+                ArtifactAlias.id == SubmissionGrade.artifact_id,
+                GroupMemberAlias.submission_group_id == ArtifactAlias.submission_group_id,
+                CourseMemberAlias.id == GroupMemberAlias.course_member_id,
+                CourseMemberAlias.user_id == user_id
+            )
+        )
+
+        # EXISTS: user created this grade
+        GraderAlias = aliased(CourseMember)
+        own_grade_exists = exists().where(
+            and_(
+                GraderAlias.id == SubmissionGrade.graded_by_course_member_id,
+                GraderAlias.user_id == user_id
+            )
+        )
+
+        # EXISTS: user is tutor/instructor in the course
+        TutorAlias = aliased(CourseMember)
+        tutor_exists = exists().where(
+            and_(
+                TutorAlias.course_id == SubmissionGroup.course_id,
+                TutorAlias.user_id == user_id,
+                TutorAlias.course_role_id.in_(["_tutor", "_lecturer", "_maintainer", "_owner"])
+            )
+        )
+
+        # Combine with OR
+        query = query.filter(or_(own_submission_exists, own_grade_exists, tutor_exists))
+
+    # If latest=True, filter to only the most recent grade per artifact
+    if params.latest:
+        # Subquery to find max graded_at per artifact
+        latest_subquery = db.query(
+            SubmissionGrade.artifact_id,
+            sql_func.max(SubmissionGrade.graded_at).label('max_graded_at')
+        ).group_by(SubmissionGrade.artifact_id).subquery()
+
+        # Filter main query to only grades matching the max timestamp
+        query = query.filter(
+            and_(
+                SubmissionGrade.artifact_id == latest_subquery.c.artifact_id,
+                SubmissionGrade.graded_at == latest_subquery.c.max_graded_at
+            )
+        )
+
+    # Order by graded_at descending
+    query = query.order_by(SubmissionGrade.graded_at.desc())
+
+    # Get total count before pagination
+    total = query.count()
+
+    # Apply pagination
+    grades = query.limit(params.limit).offset(params.skip).all()
+
+    response.headers["X-Total-Count"] = str(total)
+
+    return [SubmissionGradeList.model_validate(grade) for grade in grades]
+
 
 @submissions_router.patch("/grades/{grade_id}", response_model=SubmissionGradeDetail)
 async def update_artifact_grade(

@@ -98,7 +98,7 @@ class SubmissionGradeUpdate(BaseModel):
     status: Optional[GradingStatus] = None
     comment: Optional[str] = None
 
-class SubmissionGradeListItem(BaseEntityList):
+class SubmissionGradeList(BaseEntityList):
     """List item representation for submission grades."""
     id: str
     artifact_id: str
@@ -117,7 +117,7 @@ class SubmissionGradeListItem(BaseEntityList):
             return value
         return GradingStatus(value) if value is not None else GradingStatus.NOT_REVIEWED
 
-class SubmissionGradeDetail(SubmissionGradeListItem):
+class SubmissionGradeDetail(SubmissionGradeList):
     """Detailed view of submission grade."""
     pass  # No additional fields beyond the list item
 
@@ -127,10 +127,15 @@ class SubmissionGradeQuery(ListQuery):
     artifact_id: Optional[str] = None
     graded_by_course_member_id: Optional[str] = None
     status: Optional[GradingStatus] = None
+    course_id: Optional[str] = None
+    latest: Optional[bool] = False
+    # Datetime boundary filters
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
 
 class SubmissionGradeInterface(EntityInterface):
     """Entity interface for submission grades."""
-    list = SubmissionGradeListItem
+    list = SubmissionGradeList
     get = SubmissionGradeDetail
     create = SubmissionGradeCreate
     update = SubmissionGradeUpdate

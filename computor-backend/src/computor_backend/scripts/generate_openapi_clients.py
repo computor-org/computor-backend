@@ -859,7 +859,7 @@ except Exception as e:
     'SubmissionArtifactUpdate': 'artifacts',
     'SubmissionGradeCreate': 'artifacts',
     'SubmissionGradeDetail': 'artifacts',
-    'SubmissionGradeListItem': 'artifacts',
+    'SubmissionGradeList': 'artifacts',
     'SubmissionGradeUpdate': 'artifacts',
     'SubmissionGroupCreate': 'submission_groups',
     'SubmissionGroupGet': 'submission_groups',

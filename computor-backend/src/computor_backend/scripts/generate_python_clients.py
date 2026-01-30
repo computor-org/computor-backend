@@ -495,7 +495,7 @@ SCHEMA_TO_MODULE = {
     "SubmissionGradeCreate": "artifacts",
     "SubmissionGradeDetail": "artifacts",
     "SubmissionGradeInterface": "artifacts",
-    "SubmissionGradeListItem": "artifacts",
+    "SubmissionGradeList": "artifacts",
     "SubmissionGradeQuery": "artifacts",
     "SubmissionGradeUpdate": "artifacts",
     "SubmissionGroupCreate": "submission_groups",

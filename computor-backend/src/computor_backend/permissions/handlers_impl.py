@@ -551,45 +551,28 @@ class CourseMemberPermissionHandler(PermissionHandler):
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
             return db.query(self.entity)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
-        
+
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            from sqlalchemy.orm import aliased
-            from sqlalchemy import or_, and_, select
-            
-            cm_other = aliased(CourseMember)
-            
-            # Base visibility: courses where user meets minimum role
-            base_filter = cm_other.course_id.in_(
-                CoursePermissionQueryBuilder.user_courses_subquery(
-                    principal.user_id, min_role, db
-                )
+            from sqlalchemy import or_
+
+            # Get courses where principal has required role
+            permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, min_role, db
             )
 
-            filters = [base_filter]
-            # For read actions, also allow the current student's own membership row
+            # Base filter: all course members in permitted courses
+            filters = [self.entity.course_id.in_(permitted_courses)]
+
+            # For read actions, also allow viewing own membership (for students)
             if action in ["get", "list"]:
-                filters.append(
-                    and_(
-                        User.id == principal.user_id,
-                        cm_other.course_role_id == "_student",
-                        self.entity.id == cm_other.id
-                    )
-                )
+                filters.append(self.entity.user_id == principal.user_id)
 
-            query = (
-                db.query(self.entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
-                .filter(or_(*filters))
-            )
-            
-            return query
-        
+            return db.query(self.entity).filter(or_(*filters))
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 

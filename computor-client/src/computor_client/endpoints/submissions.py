@@ -15,7 +15,7 @@ from computor_types.artifacts import (
     SubmissionArtifactUpdate,
     SubmissionGradeCreate,
     SubmissionGradeDetail,
-    SubmissionGradeListItem,
+    SubmissionGradeList,
     SubmissionGradeUpdate,
     SubmissionReviewCreate,
     SubmissionReviewListItem,
@@ -109,12 +109,12 @@ class SubmissionsClient:
         self,
         artifact_id: str,
         **kwargs: Any,
-    ) -> List[SubmissionGradeListItem]:
+    ) -> List[SubmissionGradeList]:
         """List Artifact Grades"""
         response = await self._http.get(f"/submissions/artifacts/{artifact_id}/grades", params=kwargs)
         data = response.json()
         if isinstance(data, list):
-            return [SubmissionGradeListItem.model_validate(item) for item in data]
+            return [SubmissionGradeList.model_validate(item) for item in data]
         return []
 
     async def grades(
