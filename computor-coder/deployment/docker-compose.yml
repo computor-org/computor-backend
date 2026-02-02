@@ -150,7 +150,7 @@ services:
       # ===========================================
 
       # ALLOW: With valid X-Admin-Secret header (priority 110)
-      - "traefik.http.routers.coder-users-allow.rule=Path(`/api/v2/users`) && Header(`X-Admin-Secret`, `${ADMIN_API_SECRET}`)"
+      - "traefik.http.routers.coder-users-allow.rule=Path(`/api/v2/users`) && Header(`X-Admin-Secret`, `${CODER_ADMIN_API_SECRET}`)"
       - "traefik.http.routers.coder-users-allow.priority=110"
       - "traefik.http.routers.coder-users-allow.entrypoints=web"
       - "traefik.http.routers.coder-users-allow.service=coder"
@@ -166,7 +166,7 @@ services:
       # ===========================================
 
       # ALLOW: With valid X-Admin-Secret header (priority 110)
-      - "traefik.http.routers.coder-workspace-allow.rule=PathRegexp(`^/api/v2/organizations/[^/]+/members/[^/]+/workspaces`) && Header(`X-Admin-Secret`, `${ADMIN_API_SECRET}`)"
+      - "traefik.http.routers.coder-workspace-allow.rule=PathRegexp(`^/api/v2/organizations/[^/]+/members/[^/]+/workspaces`) && Header(`X-Admin-Secret`, `${CODER_ADMIN_API_SECRET}`)"
       - "traefik.http.routers.coder-workspace-allow.priority=110"
       - "traefik.http.routers.coder-workspace-allow.entrypoints=web"
       - "traefik.http.routers.coder-workspace-allow.service=coder"
@@ -211,9 +211,9 @@ services:
         exit 0
     environment:
       CODER_PG_CONNECTION_URL: "${CODER_PG_CONNECTION_URL}"
-      CODER_INIT_USERNAME: "${ADMIN_USERNAME}"
-      CODER_INIT_EMAIL: "${ADMIN_EMAIL}"
-      CODER_INIT_PASSWORD: "${ADMIN_PASSWORD}"
+      CODER_INIT_USERNAME: "${CODER_ADMIN_USERNAME}"
+      CODER_INIT_EMAIL: "${CODER_ADMIN_EMAIL}"
+      CODER_INIT_PASSWORD: "${CODER_ADMIN_PASSWORD}"
     networks:
       - coder-network
     depends_on:
@@ -290,8 +290,8 @@ services:
 
         exit 0
     environment:
-      CODER_INIT_EMAIL: "${ADMIN_EMAIL}"
-      CODER_INIT_PASSWORD: "${ADMIN_PASSWORD}"
+      CODER_INIT_EMAIL: "${CODER_ADMIN_EMAIL}"
+      CODER_INIT_PASSWORD: "${CODER_ADMIN_PASSWORD}"
     volumes:
       - ${CODER_DIR}/templates:/templates:ro
     networks:
@@ -304,18 +304,18 @@ services:
   database:
     image: "postgres:17"
     ports:
-      - "127.0.0.1:${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "127.0.0.1:${CODER_POSTGRES_PORT}:${CODER_POSTGRES_PORT}"
     environment:
       POSTGRES_USER: coder
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CODER_POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD}
       POSTGRES_DB: coder
-      PGPORT: ${POSTGRES_PORT}
+      PGPORT: ${CODER_POSTGRES_PORT}
     volumes:
       - coder_data:/var/lib/postgresql/data
     networks:
       - coder-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coder -d coder -p ${POSTGRES_PORT}"]
+      test: ["CMD-SHELL", "pg_isready -U coder -d coder -p ${CODER_POSTGRES_PORT}"]
       interval: 5s
       timeout: 5s
       retries: 5

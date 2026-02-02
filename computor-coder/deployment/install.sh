@@ -24,10 +24,10 @@ while getopts "d:p:Q:P:D:Hu:e:w:h" opt; do
       CODER_DIR="$OPTARG"
       ;;
     p)
-      POSTGRES_PASSWORD="$OPTARG"
+      CODER_POSTGRES_PASSWORD="$OPTARG"
       ;;
     Q)
-      POSTGRES_PORT="$OPTARG"
+      CODER_POSTGRES_PORT="$OPTARG"
       ;;
     P)
       CODER_PORT="$OPTARG"
@@ -39,13 +39,13 @@ while getopts "d:p:Q:P:D:Hu:e:w:h" opt; do
       USE_HTTP=true
       ;;
     u)
-      ADMIN_USERNAME="$OPTARG"
+      CODER_ADMIN_USERNAME="$OPTARG"
       ;;
     e)
-      ADMIN_EMAIL="$OPTARG"
+      CODER_ADMIN_EMAIL="$OPTARG"
       ;;
     w)
-      ADMIN_PASSWORD="$OPTARG"
+      CODER_ADMIN_PASSWORD="$OPTARG"
       ;;
     h)
       echo "Usage: $0 [-d DIRECTORY] [-p PASSWORD] [-Q PGPORT] [-P PORT] [-D DOMAIN] [-H] [-u USER] [-e EMAIL] [-w PASS]"
@@ -103,8 +103,8 @@ fi
 ###########################
 
 # Generate PostgreSQL password if not provided
-if [ -z "$POSTGRES_PASSWORD" ]; then
-  POSTGRES_PASSWORD=$(openssl rand -hex 16)
+if [ -z "$CODER_POSTGRES_PASSWORD" ]; then
+  CODER_POSTGRES_PASSWORD=$(openssl rand -hex 16)
   echo "Generated PostgreSQL password."
 fi
 
@@ -135,9 +135,9 @@ echo "Port set to: $CODER_PORT"
 # GENERATE ADMIN API SECRET
 ###########################
 
-if [ -z "$ADMIN_API_SECRET" ]; then
+if [ -z "$CODER_ADMIN_API_SECRET" ]; then
   echo "Generating Admin API Secret for workspace creation protection..."
-  ADMIN_API_SECRET=$(openssl rand -hex 32)
+  CODER_ADMIN_API_SECRET=$(openssl rand -hex 32)
   echo "Admin API Secret generated."
 fi
 
@@ -145,20 +145,20 @@ fi
 # ADMIN USER INPUT (if partial info provided)
 ###########################
 
-if [ -n "$ADMIN_USERNAME" ] || [ -n "$ADMIN_EMAIL" ] || [ -n "$ADMIN_PASSWORD" ]; then
+if [ -n "$CODER_ADMIN_USERNAME" ] || [ -n "$CODER_ADMIN_EMAIL" ] || [ -n "$CODER_ADMIN_PASSWORD" ]; then
   echo ""
   echo "Admin user creation enabled."
 
-  if [ -z "$ADMIN_USERNAME" ]; then
-    read -p "Enter admin username: " ADMIN_USERNAME
+  if [ -z "$CODER_ADMIN_USERNAME" ]; then
+    read -p "Enter admin username: " CODER_ADMIN_USERNAME
   fi
 
-  if [ -z "$ADMIN_EMAIL" ]; then
-    read -p "Enter admin email: " ADMIN_EMAIL
+  if [ -z "$CODER_ADMIN_EMAIL" ]; then
+    read -p "Enter admin email: " CODER_ADMIN_EMAIL
   fi
 
-  if [ -z "$ADMIN_PASSWORD" ]; then
-    read -sp "Enter admin password: " ADMIN_PASSWORD
+  if [ -z "$CODER_ADMIN_PASSWORD" ]; then
+    read -sp "Enter admin password: " CODER_ADMIN_PASSWORD
     echo ""
   fi
 fi
@@ -230,20 +230,20 @@ echo "Creating .env file from template..."
 cp "${SCRIPT_DIR}/.env.example" "${CODER_DIR}/.env"
 
 # Build connection URL in parts
-PG_CONN="postgresql://coder:${POSTGRES_PASSWORD}"
-PG_CONN="${PG_CONN}@database:${POSTGRES_PORT}/coder?sslmode=disable"
+PG_CONN="postgresql://coder:${CODER_POSTGRES_PASSWORD}"
+PG_CONN="${PG_CONN}@database:${CODER_POSTGRES_PORT}/coder?sslmode=disable"
 
 # Replace placeholder values in .env
 sed -i "s|^CODER_DIR=.*|CODER_DIR=${CODER_DIR}|" "${CODER_DIR}/.env"
 sed -i "s|^CODER_PORT=.*|CODER_PORT=${CODER_PORT}|" "${CODER_DIR}/.env"
-sed -i "s|^POSTGRES_PORT=.*|POSTGRES_PORT=${POSTGRES_PORT}|" "${CODER_DIR}/.env"
+sed -i "s|^CODER_POSTGRES_PORT=.*|CODER_POSTGRES_PORT=${CODER_POSTGRES_PORT}|" "${CODER_DIR}/.env"
 sed -i "s|^CODER_ACCESS_URL=.*|CODER_ACCESS_URL=${CODER_ACCESS_URL}|" "${CODER_DIR}/.env"
 sed -i "s|^CODER_PG_CONNECTION_URL=.*|CODER_PG_CONNECTION_URL=${PG_CONN}|" "${CODER_DIR}/.env"
 sed -i "s|^DOCKER_GID=.*|DOCKER_GID=${DOCKER_GID}|" "${CODER_DIR}/.env"
-sed -i "s|^ADMIN_USERNAME=.*|ADMIN_USERNAME=${ADMIN_USERNAME}|" "${CODER_DIR}/.env"
-sed -i "s|^ADMIN_EMAIL=.*|ADMIN_EMAIL=${ADMIN_EMAIL}|" "${CODER_DIR}/.env"
-sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" "${CODER_DIR}/.env"
-sed -i "s|^ADMIN_API_SECRET=.*|ADMIN_API_SECRET=${ADMIN_API_SECRET}|" "${CODER_DIR}/.env"
+sed -i "s|^CODER_ADMIN_USERNAME=.*|CODER_ADMIN_USERNAME=${CODER_ADMIN_USERNAME}|" "${CODER_DIR}/.env"
+sed -i "s|^CODER_ADMIN_EMAIL=.*|CODER_ADMIN_EMAIL=${CODER_ADMIN_EMAIL}|" "${CODER_DIR}/.env"
+sed -i "s|^CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=${CODER_ADMIN_PASSWORD}|" "${CODER_DIR}/.env"
+sed -i "s|^CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=${CODER_ADMIN_API_SECRET}|" "${CODER_DIR}/.env"
 
 ###########################
 # COPY SETUP-ADMIN SCRIPT
@@ -282,16 +282,16 @@ fi
 if [ "$HAVE_MATLAB_TEMPLATE" = true ]; then
   echo "  - matlab-workspace (MATLAB R2024b + code-server)"
 fi
-if [ -n "$ADMIN_USERNAME" ]; then
+if [ -n "$CODER_ADMIN_USERNAME" ]; then
   echo ""
-  echo "Admin user: $ADMIN_USERNAME ($ADMIN_EMAIL)"
+  echo "Admin user: $CODER_ADMIN_USERNAME ($CODER_ADMIN_EMAIL)"
   echo "Templates will be created automatically."
 fi
 echo ""
 echo "WORKSPACE CREATION PROTECTION:"
-echo "  Admin API Secret: $ADMIN_API_SECRET"
+echo "  Admin API Secret: $CODER_ADMIN_API_SECRET"
 echo "  Use this header to create users/workspaces from your backend:"
-echo "    X-Admin-Secret: $ADMIN_API_SECRET"
+echo "    X-Admin-Secret: $CODER_ADMIN_API_SECRET"
 echo ""
 echo "To create users with specific templates, use:"
 echo "  ./create-user.sh -t python3.13-workspace ..."

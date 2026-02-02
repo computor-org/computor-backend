@@ -8,9 +8,9 @@ set -e
 
 CODER_URL="${CODER_URL:-http://localhost:8446}"
 TEMPLATE_NAME="${TEMPLATE_NAME:-docker-workspace}"
-ADMIN_API_SECRET="${ADMIN_API_SECRET:-}"
-ADMIN_EMAIL=""
-ADMIN_PASSWORD=""
+CODER_ADMIN_API_SECRET="${CODER_ADMIN_API_SECRET:-}"
+CODER_ADMIN_EMAIL=""
+CODER_ADMIN_PASSWORD=""
 NEW_USERNAME=""
 NEW_FULLNAME=""
 NEW_EMAIL=""
@@ -30,10 +30,10 @@ while getopts "U:t:a:A:u:n:e:p:w:S:C:gsh" opt; do
       TEMPLATE_NAME="$OPTARG"
       ;;
     a)
-      ADMIN_EMAIL="$OPTARG"
+      CODER_ADMIN_EMAIL="$OPTARG"
       ;;
     A)
-      ADMIN_PASSWORD="$OPTARG"
+      CODER_ADMIN_PASSWORD="$OPTARG"
       ;;
     u)
       NEW_USERNAME="$OPTARG"
@@ -51,7 +51,7 @@ while getopts "U:t:a:A:u:n:e:p:w:S:C:gsh" opt; do
       WORKSPACE_NAME="$OPTARG"
       ;;
     S)
-      ADMIN_API_SECRET="$OPTARG"
+      CODER_ADMIN_API_SECRET="$OPTARG"
       ;;
     C)
       CODE_SERVER_PASSWORD="$OPTARG"
@@ -63,7 +63,7 @@ while getopts "U:t:a:A:u:n:e:p:w:S:C:gsh" opt; do
       SKIP_WORKSPACE=true
       ;;
     h)
-      echo "Usage: $0 -a ADMIN_EMAIL -A ADMIN_PASS -u USERNAME -e EMAIL -p PASSWORD [-n NAME] [-w WORKSPACE] [-t TEMPLATE] [-U URL] [-S SECRET] [-C PASSWORD | -g] [-s]"
+      echo "Usage: $0 -a CODER_ADMIN_EMAIL -A ADMIN_PASS -u USERNAME -e EMAIL -p PASSWORD [-n NAME] [-w WORKSPACE] [-t TEMPLATE] [-U URL] [-S SECRET] [-C PASSWORD | -g] [-s]"
       echo ""
       echo "Creates a new Coder user and optionally their workspace."
       echo ""
@@ -79,7 +79,7 @@ while getopts "U:t:a:A:u:n:e:p:w:S:C:gsh" opt; do
       echo "  -w WORKSPACE  Workspace name (default: USERNAME-workspace)"
       echo "  -t TEMPLATE   Template name (default: docker-workspace)"
       echo "  -U URL        Coder URL (default: http://localhost:8446)"
-      echo "  -S SECRET     Admin API Secret (for Traefik protection, or set ADMIN_API_SECRET env)"
+      echo "  -S SECRET     Admin API Secret (for Traefik protection, or set CODER_ADMIN_API_SECRET env)"
       echo "  -C PASSWORD   code-server password for direct access (enables password auth)"
       echo "  -g            Auto-generate code-server password (random 16 chars)"
       echo "  -s            Skip workspace creation (user only)"
@@ -103,7 +103,7 @@ done
 # VALIDATION
 ###########################
 
-if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
+if [ -z "$CODER_ADMIN_EMAIL" ] || [ -z "$CODER_ADMIN_PASSWORD" ]; then
   echo "ERROR: Admin credentials required (-a EMAIL -A PASSWORD)"
   exit 1
 fi
@@ -132,7 +132,7 @@ echo "Authenticating as admin..."
 
 TOKEN=$(curl -s -X POST "${CODER_URL}/api/v2/users/login" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
+  -d "{\"email\":\"${CODER_ADMIN_EMAIL}\",\"password\":\"${CODER_ADMIN_PASSWORD}\"}" \
   | sed -n 's/.*"session_token":"\([^"]*\)".*/\1/p')
 
 if [ -z "$TOKEN" ]; then
@@ -185,11 +185,11 @@ else
   }"
 fi
 
-if [ -n "$ADMIN_API_SECRET" ]; then
+if [ -n "$CODER_ADMIN_API_SECRET" ]; then
   USER_RESULT=$(curl -s -X POST "${CODER_URL}/api/v2/users" \
     -H "Content-Type: application/json" \
     -H "Coder-Session-Token: ${TOKEN}" \
-    -H "X-Admin-Secret: ${ADMIN_API_SECRET}" \
+    -H "X-Admin-Secret: ${CODER_ADMIN_API_SECRET}" \
     -d "$USER_JSON")
 else
   USER_RESULT=$(curl -s -X POST "${CODER_URL}/api/v2/users" \
@@ -265,11 +265,11 @@ else
   }"
 fi
 
-if [ -n "$ADMIN_API_SECRET" ]; then
+if [ -n "$CODER_ADMIN_API_SECRET" ]; then
   WS_RESULT=$(curl -s -X POST "${CODER_URL}/api/v2/organizations/default/members/${NEW_USERNAME}/workspaces" \
     -H "Content-Type: application/json" \
     -H "Coder-Session-Token: ${TOKEN}" \
-    -H "X-Admin-Secret: ${ADMIN_API_SECRET}" \
+    -H "X-Admin-Secret: ${CODER_ADMIN_API_SECRET}" \
     -d "$WS_JSON")
 else
   WS_RESULT=$(curl -s -X POST "${CODER_URL}/api/v2/organizations/default/members/${NEW_USERNAME}/workspaces" \
