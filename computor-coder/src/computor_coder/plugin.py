@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from .client import CoderClient, get_coder_client, reset_coder_client
 from .config import CoderSettings, get_coder_settings
 from .router import create_admin_coder_router, create_coder_router
+from .web import create_web_router, mount_static_files
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,61 @@ class CoderPlugin:
             require_admin=require_admin,
             dependencies=dependencies,
         )
+
+    def get_web_router(
+        self,
+        prefix: str = "/coder-ui",
+        api_prefix: str = "/coder",
+        tags: Optional[list[str]] = None,
+    ) -> APIRouter:
+        """
+        Get the FastAPI router for the Coder web interface.
+
+        This router serves HTML pages that interact with the Coder API
+        endpoints for workspace management.
+
+        Args:
+            prefix: URL prefix for the web interface (e.g., "/coder-ui")
+            api_prefix: URL prefix for the API endpoints (e.g., "/coder")
+            tags: OpenAPI tags
+
+        Returns:
+            Configured APIRouter instance
+
+        Example:
+            ```python
+            web_router = coder.get_web_router(
+                prefix="/coder-ui",
+                api_prefix="/coder",
+            )
+            app.include_router(web_router)
+            coder.mount_static_files(app)
+            ```
+        """
+        return create_web_router(
+            prefix=prefix,
+            api_prefix=api_prefix,
+            tags=tags,
+        )
+
+    def mount_static_files(self, app, prefix: str = "/coder-ui/static") -> None:
+        """
+        Mount static files for the web interface.
+
+        This should be called after including the web router to serve
+        CSS, JavaScript, and other static assets.
+
+        Args:
+            app: FastAPI application instance
+            prefix: URL prefix for static files
+
+        Example:
+            ```python
+            app.include_router(coder.get_web_router())
+            coder.mount_static_files(app)
+            ```
+        """
+        mount_static_files(app, prefix)
 
     def get_metadata(self) -> dict[str, Any]:
         """Get plugin metadata."""

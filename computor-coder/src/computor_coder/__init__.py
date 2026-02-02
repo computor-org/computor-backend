@@ -78,6 +78,13 @@ from .router import (
     create_coder_router,
 )
 
+# Web interface
+from .web import (
+    create_web_router,
+    mount_static_files,
+    create_web_app_with_api,
+)
+
 # Schemas
 from .schemas import (
     CoderHealthResponse,
@@ -133,6 +140,10 @@ __all__ = [
     # Router
     "create_admin_coder_router",
     "create_coder_router",
+    # Web interface
+    "create_web_router",
+    "mount_static_files",
+    "create_web_app_with_api",
     # Schemas
     "CoderHealthResponse",
     "CoderTemplate",

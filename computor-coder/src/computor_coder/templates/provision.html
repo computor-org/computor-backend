@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Provision Workspace - Coder Workspaces{% endblock %}
+
+{% block content %}
+<div class="provision-page">
+    <div class="page-header">
+        <h1>Provision New Workspace</h1>
+    </div>
+
+    <div class="provision-container">
+        <form id="provision-form" class="provision-form">
+            <div class="form-group">
+                <label for="template">Workspace Template</label>
+                <select id="template" name="template" required>
+                    <option value="">Loading templates...</option>
+                </select>
+                <p class="form-help">Select the development environment template</p>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Your Password</label>
+                <input type="password" id="password" name="password" required
+                       placeholder="Enter your account password">
+                <p class="form-help">
+                    Your password is required to create your Coder account with the same credentials.
+                    It is only used for authentication and not stored.
+                </p>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
+                    Provision Workspace
+                </button>
+            </div>
+        </form>
+
+        <div id="provision-result" class="provision-result hidden">
+            <!-- Result will be shown here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadTemplateOptions();
+
+    // Check for template in URL
+    const params = new URLSearchParams(window.location.search);
+    const preselectedTemplate = params.get('template');
+    if (preselectedTemplate) {
+        setTimeout(() => {
+            const select = document.getElementById('template');
+            for (let option of select.options) {
+                if (option.value === preselectedTemplate) {
+                    option.selected = true;
+                    break;
+                }
+            }
+        }, 500);
+    }
+
+    document.getElementById('provision-form').addEventListener('submit', handleProvision);
+});
+
+function loadTemplateOptions() {
+    const select = document.getElementById('template');
+
+    fetch(API_BASE + '/templates')
+        .then(r => r.json())
+        .then(data => {
+            const templates = data.templates || [];
+            select.innerHTML = '<option value="">Select a template...</option>';
+
+            templates.forEach(tpl => {
+                const option = document.createElement('option');
+                option.value = tpl.name;
+                option.textContent = tpl.display_name || tpl.name;
+                select.appendChild(option);
+            });
+
+            // Add fallback options if no templates loaded
+            if (templates.length === 0) {
+                select.innerHTML = `
+                    <option value="">Select a template...</option>
+                    <option value="python3.13-workspace">Python 3.13 Workspace</option>
+                    <option value="matlab-workspace">MATLAB Workspace</option>
+                `;
+            }
+        })
+        .catch(err => {
+            // Fallback options
+            select.innerHTML = `
+                <option value="">Select a template...</option>
+                <option value="python3.13-workspace">Python 3.13 Workspace</option>
+                <option value="matlab-workspace">MATLAB Workspace</option>
+            `;
+        });
+}
+
+async function handleProvision(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('submit-btn');
+    const resultDiv = document.getElementById('provision-result');
+    const form = document.getElementById('provision-form');
+
+    const template = document.getElementById('template').value;
+    const password = document.getElementById('password').value;
+
+    if (!template) {
+        showNotification('Please select a template', 'error');
+        return;
+    }
+
+    if (!password) {
+        showNotification('Please enter your password', 'error');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Provisioning...';
+    resultDiv.classList.add('hidden');
+
+    try {
+        const response = await fetch(API_BASE + '/workspaces/provision', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                template: template,
+                password: password,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to provision workspace');
+        }
+
+        // Show success result
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="result-success">
+                <h3>Workspace Provisioned Successfully!</h3>
+                <table class="details-table">
+                    <tr><th>User</th><td>${data.user?.username || 'N/A'}</td></tr>
+                    <tr><th>Email</th><td>${data.user?.email || 'N/A'}</td></tr>
+                    <tr><th>Workspace</th><td>${data.workspace?.name || 'N/A'}</td></tr>
+                    <tr><th>User Created</th><td>${data.created_user ? 'Yes' : 'No (existing)'}</td></tr>
+                    <tr><th>Workspace Created</th><td>${data.created_workspace ? 'Yes' : 'No (existing)'}</td></tr>
+                </table>
+                <div class="result-actions">
+                    <a href="{{ url_for('coder_workspaces_page') }}" class="btn btn-primary">View Workspaces</a>
+                </div>
+            </div>
+        `;
+
+        form.reset();
+        showNotification('Workspace provisioned successfully!', 'success');
+
+    } catch (err) {
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = `
+            <div class="result-error">
+                <h3>Provisioning Failed</h3>
+                <p>${err.message}</p>
+                <p class="help-text">Please check your password and try again.</p>
+            </div>
+        `;
+        showNotification('Failed to provision workspace: ' + err.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Provision Workspace';
+    }
+}
+</script>
+{% endblock %}
