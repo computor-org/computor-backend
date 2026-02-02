@@ -81,6 +81,7 @@ from .router import (
 # Web interface
 from .web import (
     create_web_router,
+    create_login_router,
     mount_static_files,
     create_web_app_with_api,
 )
@@ -142,6 +143,7 @@ __all__ = [
     "create_coder_router",
     # Web interface
     "create_web_router",
+    "create_login_router",
     "mount_static_files",
     "create_web_app_with_api",
     # Schemas

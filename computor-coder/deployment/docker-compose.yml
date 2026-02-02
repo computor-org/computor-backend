@@ -119,9 +119,9 @@ services:
     expose:
       - "7080"
     environment:
-      CODER_PG_CONNECTION_URL: "${CODER_PG_CONNECTION_URL}"
+      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER}:${CODER_POSTGRES_PASSWORD}@database:${CODER_POSTGRES_PORT}/${CODER_POSTGRES_USER}?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
-      CODER_ACCESS_URL: "${CODER_ACCESS_URL}"
+      CODER_ACCESS_URL: "${CODER_PROTOCOL:-http}://${CODER_DOMAIN}:${CODER_PORT}"
     group_add:
       - "${DOCKER_GID}"
     volumes:
@@ -210,7 +210,7 @@ services:
           || echo "Admin creation skipped (may already exist)."
         exit 0
     environment:
-      CODER_PG_CONNECTION_URL: "${CODER_PG_CONNECTION_URL}"
+      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER}:${CODER_POSTGRES_PASSWORD}@database:${CODER_POSTGRES_PORT}/${CODER_POSTGRES_USER}?sslmode=disable"
       CODER_INIT_USERNAME: "${CODER_ADMIN_USERNAME}"
       CODER_INIT_EMAIL: "${CODER_ADMIN_EMAIL}"
       CODER_INIT_PASSWORD: "${CODER_ADMIN_PASSWORD}"
@@ -283,7 +283,7 @@ services:
         }
 
         # Create Python 3.13 template
-        create_template "python3.13-workspace" "/templates/python3.13"
+        create_template "python-workspace" "/templates/python3.13"
 
         # Create MATLAB template
         create_template "matlab-workspace" "/templates/matlab"
@@ -306,16 +306,16 @@ services:
     ports:
       - "127.0.0.1:${CODER_POSTGRES_PORT}:${CODER_POSTGRES_PORT}"
     environment:
-      POSTGRES_USER: coder
-      CODER_POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD}
-      POSTGRES_DB: coder
+      POSTGRES_USER: ${CODER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${CODER_POSTGRES_USER}
       PGPORT: ${CODER_POSTGRES_PORT}
     volumes:
       - coder_data:/var/lib/postgresql/data
     networks:
       - coder-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coder -d coder -p ${CODER_POSTGRES_PORT}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_USER} -p $${PGPORT}"]
       interval: 5s
       timeout: 5s
       retries: 5

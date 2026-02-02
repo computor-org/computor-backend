@@ -26,6 +26,7 @@ def create_web_router(
     prefix: str = "/coder-ui",
     api_prefix: str = "/coder",
     tags: Optional[list[str]] = None,
+    dependencies: Optional[list] = None,
 ) -> APIRouter:
     """
     Create a FastAPI router for the Coder web interface.
@@ -37,6 +38,7 @@ def create_web_router(
         prefix: URL prefix for the web interface (e.g., "/coder-ui")
         api_prefix: URL prefix for the API endpoints (e.g., "/coder")
         tags: OpenAPI tags
+        dependencies: Router dependencies (e.g., auth check)
 
     Returns:
         Configured APIRouter instance
@@ -44,12 +46,18 @@ def create_web_router(
     Example:
         ```python
         from computor_coder import create_web_router
+        from fastapi import Depends
+        from my_app.auth import get_current_principal
 
-        web_router = create_web_router(prefix="/coder-ui", api_prefix="/coder")
+        web_router = create_web_router(
+            prefix="/coder-ui",
+            api_prefix="/coder",
+            dependencies=[Depends(get_current_principal)],
+        )
         app.include_router(web_router)
         ```
     """
-    router = APIRouter(prefix=prefix, tags=tags or ["coder-web"])
+    router = APIRouter(prefix=prefix, tags=tags or ["coder-web"], dependencies=dependencies or [])
 
     # Initialize Jinja2 templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -106,6 +114,42 @@ def create_web_router(
                 "active_page": "provision",
                 "version": __version__,
                 "api_prefix": api_prefix,
+            },
+        )
+
+    return router
+
+
+def create_login_router(
+    prefix: str = "/coder-ui",
+    tags: Optional[list[str]] = None,
+) -> APIRouter:
+    """
+    Create a public router for the login page (no auth required).
+
+    Args:
+        prefix: URL prefix for the web interface
+        tags: OpenAPI tags
+
+    Returns:
+        APIRouter with login endpoint
+    """
+    router = APIRouter(prefix=prefix, tags=tags or ["coder-web"])
+
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+    from . import __version__
+
+    @router.get("/login", response_class=HTMLResponse, name="coder_login_page")
+    async def login_page(request: Request, next: Optional[str] = None):
+        """Render the login page."""
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "active_page": "login",
+                "version": __version__,
+                "next": next,
             },
         )
 

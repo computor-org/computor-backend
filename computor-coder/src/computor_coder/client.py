@@ -175,6 +175,40 @@ class CoderClient:
         except Exception:
             return None
 
+    @staticmethod
+    def _sanitize_username(username: str) -> str:
+        """
+        Sanitize username for Coder requirements.
+
+        Coder usernames must:
+        - Be lowercase
+        - Start with a letter (a-z)
+        - Only contain alphanumeric characters and hyphens
+        - Be max 32 characters (we use 31 to allow for 'u' prefix)
+
+        Args:
+            username: Raw username (e.g., UUID, email prefix)
+
+        Returns:
+            Sanitized username valid for Coder
+        """
+        import re
+
+        # Lowercase and remove invalid characters (keep only alphanumeric and hyphens)
+        clean = re.sub(r"[^a-z0-9-]", "", username.lower())
+
+        # Ensure it starts with a letter
+        if clean and not clean[0].isalpha():
+            clean = "u" + clean
+
+        # Truncate to 32 characters (Coder's limit)
+        clean = clean[:32]
+
+        # Remove trailing hyphens
+        clean = clean.rstrip("-")
+
+        return clean
+
     # -------------------------------------------------------------------------
     # User operations
     # -------------------------------------------------------------------------
@@ -307,8 +341,9 @@ class CoderClient:
             raise CoderUserExistsError(user_data.email)
 
         if resp.status_code not in (200, 201):
+            logger.error(f"Coder API user creation failed: status={resp.status_code}, response={resp.text}")
             raise CoderAPIError(
-                f"Failed to create user '{user_data.username}'",
+                f"Failed to create user '{user_data.username}': {resp.text}",
                 status_code=resp.status_code,
                 detail=resp.text,
             )
@@ -325,9 +360,96 @@ class CoderClient:
             status=data.get("status"),
         )
 
+    async def update_user_password(self, username: str, new_password: str) -> bool:
+        """
+        Update a user's password.
+
+        Args:
+            username: Username of the user
+            new_password: New password to set
+
+        Returns:
+            True if password was updated successfully
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        # Try the standard password update endpoint
+        resp = await client.put(
+            f"/api/v2/users/{username}/password",
+            headers=self._get_headers(token),
+            json={"password": new_password, "old_password": ""},
+        )
+
+        if resp.status_code in (200, 204):
+            logger.info(f"Updated password for Coder user: {username}")
+            return True
+
+        logger.warning(f"Password update failed for {username}: status={resp.status_code}, response={resp.text}")
+        return False
+
+    async def login_user(self, email: str, password: str) -> Optional[str]:
+        """
+        Login a user to Coder and get their session token.
+
+        Args:
+            email: User's email
+            password: User's password
+
+        Returns:
+            Session token if successful, None otherwise
+        """
+        client = await self._ensure_client()
+
+        resp = await client.post(
+            "/api/v2/users/login",
+            json={"email": email, "password": password},
+        )
+
+        if resp.status_code == 201:
+            data = resp.json()
+            session_token = data.get("session_token")
+            logger.info(f"User logged in successfully: {email}")
+            return session_token
+
+        logger.warning(f"Login failed for {email}: status={resp.status_code}, response={resp.text}")
+        return None
+
+    async def create_user_api_key(self, username: str, key_name: str = "computor-access") -> Optional[str]:
+        """
+        Create an API key for a user (admin function).
+
+        Args:
+            username: Username to create key for
+            key_name: Name for the API key
+
+        Returns:
+            API key if successful, None otherwise
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        resp = await client.post(
+            f"/api/v2/users/{username}/keys",
+            headers=self._get_headers(token),
+            json={"lifetime_seconds": 86400 * 7},  # 7 days
+        )
+
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            api_key = data.get("key")
+            logger.info(f"Created API key for user: {username}")
+            return api_key
+
+        logger.warning(f"Failed to create API key for {username}: status={resp.status_code}, response={resp.text}")
+        return None
+
     async def get_or_create_user(self, user_data: CoderUserCreate) -> tuple[CoderUser, bool]:
         """
         Get existing user or create new one.
+
+        If user exists, also updates their password to match the provided one,
+        so users can always log in with the password they entered during provisioning.
 
         Args:
             user_data: User data for creation if needed
@@ -337,6 +459,9 @@ class CoderClient:
         """
         try:
             user = await self._find_user_by_email(user_data.email)
+            # Update password so user can log in with the password they just entered
+            if user_data.password:
+                await self.update_user_password(user.username, user_data.password)
             return user, False
         except CoderUserNotFoundError:
             user = await self.create_user(user_data)
@@ -577,8 +702,9 @@ class CoderClient:
             raise CoderWorkspaceExistsError(workspace_name)
 
         if resp.status_code not in (200, 201):
+            logger.error(f"Coder API workspace creation failed: status={resp.status_code}, response={resp.text}")
             raise CoderAPIError(
-                f"Failed to create workspace '{workspace_name}'",
+                f"Failed to create workspace '{workspace_name}': {resp.text}",
                 status_code=resp.status_code,
                 detail=resp.text,
             )
@@ -616,22 +742,31 @@ class CoderClient:
         client = await self._ensure_client()
 
         workspace_name = workspace_name or f"{username}-workspace"
+        logger.info(f"delete_workspace called: username={username}, workspace_name={workspace_name}")
 
         # First get workspace ID
         try:
             details = await self.get_workspace(username, workspace_name)
+            logger.info(f"Found workspace to delete: id={details.workspace.id}, name={details.workspace.name}")
         except CoderWorkspaceNotFoundError:
+            logger.info(f"Workspace {workspace_name} not found - already deleted")
             return True  # Already doesn't exist
+        except Exception as e:
+            logger.error(f"Error getting workspace for delete: {e}")
+            return False
 
-        resp = await client.delete(
-            f"/api/v2/workspaces/{details.workspace.id}",
+        # Coder deletes workspaces by creating a build with transition="delete"
+        resp = await client.post(
+            f"/api/v2/workspaces/{details.workspace.id}/builds",
             headers=self._get_headers(token),
+            json={"transition": "delete"},
         )
 
-        if resp.status_code in (200, 204):
-            logger.info(f"Deleted workspace: {workspace_name}")
+        if resp.status_code in (200, 201, 202):
+            logger.info(f"Delete build started for workspace: {workspace_name} (status={resp.status_code})")
             return True
 
+        logger.error(f"Failed to delete workspace {workspace_name}: status={resp.status_code}, response={resp.text}")
         return False
 
     async def start_workspace(
@@ -736,19 +871,53 @@ class CoderClient:
         access_url = None
         code_server_url = None
         resources = {}
+        agent_status = None
 
+        # Build access URL for running workspaces (URL is deterministic)
+        if status == WorkspaceStatus.RUNNING and self.settings.url:
+            access_url = f"{self.settings.url}/@{data.get('owner_name', '')}/{data['name']}"
+
+        # Extract code-server URL from agent apps
+        logger.info(f"Parsing workspace resources: {len(latest_build.get('resources', []))} resources")
         for resource in latest_build.get("resources", []):
-            for agent in resource.get("agents", []):
-                if agent.get("status") == "connected":
-                    # Build access URL
-                    if self.settings.url:
-                        access_url = f"{self.settings.url}/@{data.get('owner_name', '')}/{data['name']}"
+            resource_name = resource.get("name", "unknown")
+            agents = resource.get("agents", [])
+            logger.info(f"Resource '{resource_name}' has {len(agents)} agents")
 
-                    # Look for code-server app
-                    for app in agent.get("apps", []):
-                        if "code" in app.get("slug", "").lower():
-                            code_server_url = app.get("url")
-                            break
+            for agent in agents:
+                agent_name = agent.get("name", "unknown")
+                agent_status = agent.get("status")
+                apps = agent.get("apps", [])
+                logger.info(f"Agent '{agent_name}' status={agent_status}, apps count={len(apps)}")
+
+                # Store agent info in resources
+                resources[agent_name] = {
+                    "status": agent_status,
+                    "apps": [app.get("slug") for app in apps],
+                }
+
+                # Look for code-server app (check multiple possible slugs)
+                for app in apps:
+                    app_slug = app.get("slug", "").lower()
+                    app_url = app.get("url")
+                    logger.info(f"App: slug='{app_slug}', url={app_url}")
+
+                    if any(term in app_slug for term in ["code", "vscode", "vs-code"]):
+                        # Skip localhost URLs - they're internal container URLs not accessible from outside
+                        if app_url and "localhost" not in app_url and "127.0.0.1" not in app_url:
+                            code_server_url = app_url
+                            logger.info(f"Found code-server URL: {code_server_url}")
+                        else:
+                            logger.info(f"Skipping internal URL: {app_url}")
+                        break
+
+        # If workspace is running but no code-server URL found, use the Coder app path
+        if status == WorkspaceStatus.RUNNING and access_url and not code_server_url:
+            # Default code-server app path via Coder proxy
+            code_server_url = f"{access_url}/apps/code-server/"
+            logger.info(f"Using fallback code-server URL: {code_server_url}")
+
+        logger.info(f"Workspace details: status={status}, access_url={access_url}, code_server_url={code_server_url}")
 
         return WorkspaceDetails(
             workspace=workspace,
@@ -824,8 +993,12 @@ class CoderClient:
             ProvisionResult with user and workspace info
         """
         # Derive username from email if not provided
+        # Coder usernames: lowercase alphanumeric and hyphens, must start with a letter
         if not username:
-            username = user_email.split("@")[0].replace(".", "_").replace("-", "_")
+            username = user_email.split("@")[0].replace(".", "-").replace("_", "-")
+
+        # Sanitize username for Coder requirements
+        username = self._sanitize_username(username)
 
         # Get or create user
         user_data = CoderUserCreate(
@@ -837,7 +1010,12 @@ class CoderClient:
         user, user_created = await self.get_or_create_user(user_data)
 
         # Check if workspace already exists
-        workspace_name = workspace_name or f"{user.username}-workspace"
+        # Workspace names are scoped per user, so we use a simple default name
+        # Coder workspace names also have length limits (~32 chars)
+        if not workspace_name:
+            workspace_name = "workspace"
+        # Sanitize workspace name (same rules as username)
+        workspace_name = self._sanitize_username(workspace_name)
         workspace = None
         workspace_created = False
 

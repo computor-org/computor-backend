@@ -99,6 +99,7 @@ function getStatusClass(status) {
 async function apiRequest(endpoint, options = {}) {
     const url = API_BASE + endpoint;
     const defaultOptions = {
+        credentials: 'include',  // Send cookies for session auth
         headers: {
             'Content-Type': 'application/json',
         },

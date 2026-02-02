@@ -77,6 +77,46 @@ import json
 import tempfile
 from pathlib import Path
 
+# Coder integration
+from computor_coder import CoderPlugin, create_web_router, create_login_router, mount_static_files, create_coder_router
+from typing import Optional
+
+# Global coder plugin instance
+coder_plugin: CoderPlugin | None = None
+
+
+# Coder dependencies
+async def get_user_email_for_coder(
+    permissions = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+) -> str:
+    """Get the current user's email for Coder API."""
+    user = db.query(User).filter(User.id == permissions.user_id).first()
+    if not user:
+        raise NotFoundException("User not found")
+    # Use email if available, otherwise construct from username
+    return user.email if user.email else f"{user.username}@computor.local"
+
+
+async def get_user_fullname_for_coder(
+    permissions = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+) -> Optional[str]:
+    """Get the current user's full name for Coder API."""
+    user = db.query(User).filter(User.id == permissions.user_id).first()
+    if not user:
+        return None
+    if user.given_name and user.family_name:
+        return f"{user.given_name} {user.family_name}"
+    return None
+
+
+async def get_user_id_for_coder(
+    permissions = Depends(get_current_principal),
+) -> str:
+    """Get the current user's ID (UUID) for use as Coder username."""
+    return str(permissions.user_id)
+
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
     import logging
@@ -173,6 +213,7 @@ async def startup_logic():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global coder_plugin
     # redis_client = await get_redis_client()
     # RedisCache(redis_client)
 
@@ -185,7 +226,22 @@ async def lifespan(app: FastAPI):
     # Start WebSocket connection manager
     await ws_manager.start()
 
+    # Initialize Coder plugin
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        coder_plugin = CoderPlugin()
+        await coder_plugin.initialize()
+        logger.info("Coder plugin initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Coder plugin: {e}")
+        coder_plugin = None
+
     yield
+
+    # Shutdown Coder plugin
+    if coder_plugin:
+        await coder_plugin.shutdown()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()
@@ -428,6 +484,39 @@ app.include_router(
     ws_router,
     tags=["websocket"]
 )
+
+# Coder integration routers
+app.include_router(
+    create_coder_router(
+        prefix="/coder",
+        tags=["coder", "workspaces"],
+        get_current_principal=get_current_principal,
+        get_user_email=get_user_email_for_coder,
+        get_user_fullname=get_user_fullname_for_coder,
+        get_user_id=get_user_id_for_coder,
+    ),
+)
+
+# Coder Web UI router (requires authentication)
+app.include_router(
+    create_web_router(
+        prefix="/coder-ui",
+        api_prefix="/coder",
+        tags=["coder-web"],
+        dependencies=[Depends(get_current_principal)],
+    ),
+)
+
+# Coder login page (public, no auth required)
+app.include_router(
+    create_login_router(
+        prefix="/coder-ui",
+        tags=["coder-web"],
+    ),
+)
+
+# Mount static files for the Coder web UI
+mount_static_files(app, prefix="/coder-ui/static")
 
 
 @app.head("/", status_code=204)

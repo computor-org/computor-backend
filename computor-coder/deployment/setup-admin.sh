@@ -86,10 +86,16 @@ if [ -f ".env" ]; then
   set +a
 fi
 
-if [ -z "$CODER_PG_CONNECTION_URL" ]; then
-  echo "ERROR: CODER_PG_CONNECTION_URL not found in .env file"
+# Build connection URL from components
+if [ -z "$CODER_POSTGRES_PASSWORD" ] || [ -z "$CODER_POSTGRES_PORT" ]; then
+  echo "ERROR: CODER_POSTGRES_PASSWORD and CODER_POSTGRES_PORT required in .env file"
   exit 1
 fi
+
+# Default postgres user if not set
+CODER_POSTGRES_USER="${CODER_POSTGRES_USER:-coder}"
+
+CODER_PG_CONNECTION_URL="postgresql://${CODER_POSTGRES_USER}:${CODER_POSTGRES_PASSWORD}@database:${CODER_POSTGRES_PORT}/${CODER_POSTGRES_USER}?sslmode=disable"
 
 ###########################
 # USER INPUT

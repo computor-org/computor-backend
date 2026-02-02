@@ -85,7 +85,7 @@ function loadTemplateOptions() {
             if (templates.length === 0) {
                 select.innerHTML = `
                     <option value="">Select a template...</option>
-                    <option value="python3.13-workspace">Python 3.13 Workspace</option>
+                    <option value="python-workspace">Python 3.13 Workspace</option>
                     <option value="matlab-workspace">MATLAB Workspace</option>
                 `;
             }
@@ -94,7 +94,7 @@ function loadTemplateOptions() {
             // Fallback options
             select.innerHTML = `
                 <option value="">Select a template...</option>
-                <option value="python3.13-workspace">Python 3.13 Workspace</option>
+                <option value="python-workspace">Python 3.13 Workspace</option>
                 <option value="matlab-workspace">MATLAB Workspace</option>
             `;
         });
@@ -127,6 +127,7 @@ async function handleProvision(e) {
     try {
         const response = await fetch(API_BASE + '/workspaces/provision', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },

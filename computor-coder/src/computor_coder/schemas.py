@@ -4,7 +4,7 @@ Pydantic schemas for Coder API integration.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 class WorkspaceTemplate(str, Enum):
     """Available workspace templates."""
 
-    PYTHON = "python3.13-workspace"
+    PYTHON = "python-workspace"
     MATLAB = "matlab-workspace"
 
 
@@ -35,10 +35,14 @@ class WorkspaceBuildStatus(str, Enum):
     """Workspace build status."""
 
     PENDING = "pending"
+    STARTING = "starting"
     RUNNING = "running"
+    STOPPING = "stopping"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    CANCELING = "canceling"
     CANCELED = "canceled"
+    DELETING = "deleting"
 
 
 # Request schemas
@@ -126,7 +130,7 @@ class WorkspaceDetails(BaseModel):
     status: WorkspaceStatus = Field(..., description="Current workspace status")
     access_url: Optional[str] = Field(None, description="Direct workspace access URL")
     code_server_url: Optional[str] = Field(None, description="Code-server URL")
-    health: Optional[str] = Field(None, description="Workspace health status")
+    health: Optional[Union[str, bool]] = Field(None, description="Workspace health status")
     resources: Optional[dict[str, Any]] = Field(None, description="Workspace resources")
 
 

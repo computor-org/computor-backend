@@ -91,6 +91,7 @@ def create_coder_router(
     get_current_principal: Optional[Callable] = None,
     get_user_email: Optional[Callable] = None,
     get_user_fullname: Optional[Callable] = None,
+    get_user_id: Optional[Callable] = None,
     dependencies: Optional[list] = None,
 ) -> APIRouter:
     """
@@ -105,6 +106,7 @@ def create_coder_router(
         get_current_principal: Dependency to get current Principal (permissions)
         get_user_email: Dependency to get user's email (receives permissions)
         get_user_fullname: Optional dependency to get user's full name
+        get_user_id: Optional dependency to get user's ID (used as Coder username)
         dependencies: Additional router dependencies
 
     Returns:
@@ -158,6 +160,18 @@ def create_coder_router(
         if not settings.enabled:
             raise CoderDisabledError()
         return settings
+
+    # Default fullname dependency (returns None if not provided)
+    async def _default_fullname() -> Optional[str]:
+        return None
+
+    _fullname_dependency = get_user_fullname if get_user_fullname else _default_fullname
+
+    # Default user_id dependency (returns None if not provided)
+    async def _default_user_id() -> Optional[str]:
+        return None
+
+    _user_id_dependency = get_user_id if get_user_id else _default_user_id
 
     # -------------------------------------------------------------------------
     # Health check endpoint (no auth required)
@@ -238,10 +252,8 @@ def create_coder_router(
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
             user_email: Annotated[str, Depends(get_user_email)],
-            user_fullname: Annotated[
-                Optional[str],
-                Depends(get_user_fullname),
-            ] = None if get_user_fullname is None else Depends(get_user_fullname),
+            user_fullname: Annotated[Optional[str], Depends(_fullname_dependency)],
+            user_id: Annotated[Optional[str], Depends(_user_id_dependency)],
         ) -> ProvisionResult:
             """Provision a workspace for the current user."""
             _ = permissions  # Used by dependencies, logged for audit
@@ -249,7 +261,8 @@ def create_coder_router(
                 result = await client.provision_workspace(
                     user_email=user_email,
                     user_password=request.password,
-                    full_name=user_fullname if get_user_fullname else None,
+                    username=user_id,  # Use user_id as Coder username if provided
+                    full_name=user_fullname,
                     template=request.template,
                     workspace_name=request.workspace_name,
                 )
@@ -442,6 +455,63 @@ def create_coder_router(
             )
         except Exception as e:
             raise _handle_coder_error(e)
+
+    # -------------------------------------------------------------------------
+    # Coder session/login endpoints
+    # -------------------------------------------------------------------------
+
+    if get_current_principal and get_user_email:
+        from fastapi.responses import RedirectResponse
+        from pydantic import BaseModel
+
+        class CoderLoginRequest(BaseModel):
+            """Request to login to Coder."""
+            password: str
+            redirect_url: Optional[str] = None
+
+        class CoderSessionResponse(BaseModel):
+            """Response with Coder session token."""
+            success: bool
+            session_token: Optional[str] = None
+            message: str
+
+        @router.post(
+            "/session",
+            response_model=CoderSessionResponse,
+            summary="Get a Coder session token",
+        )
+        async def get_coder_session(
+            request: CoderLoginRequest,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+            user_email: Annotated[str, Depends(get_user_email)],
+        ) -> CoderSessionResponse:
+            """
+            Login to Coder and get a session token.
+
+            This allows the frontend to authenticate with Coder using the
+            user's credentials without storing them.
+            """
+            _ = permissions
+            try:
+                session_token = await client.login_user(user_email, request.password)
+                if session_token:
+                    return CoderSessionResponse(
+                        success=True,
+                        session_token=session_token,
+                        message="Login successful",
+                    )
+                return CoderSessionResponse(
+                    success=False,
+                    message="Invalid credentials",
+                )
+            except Exception as e:
+                logger.error(f"Coder login error: {e}")
+                return CoderSessionResponse(
+                    success=False,
+                    message="Login failed",
+                )
 
     return router
 
