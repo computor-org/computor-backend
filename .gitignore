@@ -23,11 +23,27 @@ start.sh
 /build
 
 .DS_Store
+
+# Environment files (keep templates, ignore actual configs)
 .env
+.env.common
+.env.dev
+.env.prod
+.env.coder
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+# Keep templates in version control
+!.env.*.template
+
+# Old environment files (for migration period)
+.env.dev.old
+.env.prod.old
+startup.sh.old
+
+# Coder deployment environment
+computor-coder/deployment/.env
 
 npm-debug.log*
 yarn-debug.log*

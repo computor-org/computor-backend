@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class WorkspaceTemplate(str, Enum):
@@ -51,7 +51,7 @@ class CoderUserCreate(BaseModel):
     """Schema for creating a Coder user."""
 
     username: str = Field(..., min_length=1, max_length=100, description="Unique username")
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")  # Changed from EmailStr to str to allow .local domains
     password: str = Field(..., min_length=6, description="User password")
     full_name: Optional[str] = Field(None, max_length=200, description="Display name")
 

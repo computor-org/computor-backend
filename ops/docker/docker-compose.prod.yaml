@@ -1,0 +1,220 @@
+# Production-specific Docker Compose override
+# Extends docker-compose.base.yaml with production services and configuration
+
+version: '3.8'
+
+services:
+  # Production API service
+  uvicorn:
+    build:
+      context: ../../
+      dockerfile: ./docker/api/Dockerfile
+    networks:
+      - computor-network
+    restart: unless-stopped
+    command: ["sh", "startup.bash"]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      TZ: UTC
+      RUNNING_IN_DOCKER: true
+      API_ADMIN_USER: ${API_ADMIN_USER}
+      API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5437
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DEBUG_MODE: ${DEBUG_MODE}
+      TOKEN_SECRET: ${TOKEN_SECRET}
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      TEMPORAL_NAMESPACE: default
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SECURE: false
+      MINIO_MAX_UPLOAD_SIZE: ${MINIO_MAX_UPLOAD_SIZE:-10485760}
+      EXTENSION_PUBLIC_DOWNLOAD_URL: ${EXTENSION_PUBLIC_DOWNLOAD_URL}
+      EXTENSION_GETTING_STARTED_URL: ${EXTENSION_GETTING_STARTED_URL}
+      # Coder integration (if enabled)
+      CODER_ENABLED: ${CODER_ENABLED:-false}
+      CODER_URL: ${CODER_URL}
+      CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
+      CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
+      CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
+    depends_on:
+      - postgres
+      - minio
+      - redis
+      - temporal
+    labels:
+      - "traefik.enable=true"
+      # Service definition (required for proper routing)
+      - "traefik.http.services.uvicorn.loadbalancer.server.port=8000"
+      # HTTP API router
+      - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.uvicorn.entrypoints=web"
+      - "traefik.http.routers.uvicorn.service=uvicorn"
+      - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
+
+  # Frontend service
+  frontend:
+    build:
+      context: https://github.com/computor-org/computor-web.git#${COMPUTOR_WEB_VERSION:-main}
+      dockerfile: docker/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    networks:
+      - computor-network
+    restart: unless-stopped
+    depends_on:
+      - uvicorn
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.priority=1"  # Lower priority than API
+
+  # Temporal Worker (Production)
+  temporal-worker:
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker-dev/Dockerfile
+    networks:
+      - computor-network
+    restart: unless-stopped
+    deploy:
+      replicas: ${TEMPORAL_WORKER_REPLICAS:-2}
+    environment:
+      - TZ=UTC
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5437
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
+      - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
+      - PYTHONPATH=/home/worker/computor-backend/src
+      - API_URL=${API_URL}
+      - API_ADMIN_USER=${API_ADMIN_USER}
+      - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_SECURE=false
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+      - minio
+    labels:
+      - "traefik.enable=false"
+
+  # Unified Testing Worker
+  temporal-worker-testing:
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker-testing/Dockerfile
+    networks:
+      - computor-network
+    restart: unless-stopped
+    command: ["--queues=testing"]
+    deploy:
+      replicas: ${TESTING_WORKER_REPLICAS:-2}
+    environment:
+      - TZ=UTC
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - API_URL=${API_URL}
+      - API_TOKEN=${TESTING_WORKER_TOKEN}
+      - TESTING_FRAMEWORK_URL=${TESTING_FRAMEWORK_URL}
+      - TESTING_FRAMEWORK_TOKEN=${TESTING_FRAMEWORK_TOKEN}
+      - TESTING_FRAMEWORK_VERSION=${TESTING_FRAMEWORK_VERSION}
+      - PYTHON_TEST_VERSION=${PYTHON_TEST_VERSION:-3.13}
+      - PYTHON_TEST_REQUIREMENTS=${PYTHON_TEST_REQUIREMENTS:-}
+      - R_LIBS_USER=/home/worker/.local/lib/R/library
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+      - minio
+    labels:
+      - "traefik.enable=false"
+
+  # MATLAB Testing Worker
+  temporal-worker-matlab:
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker-matlab/Dockerfile
+      args:
+        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
+    networks:
+      - computor-network
+    restart: unless-stopped
+    command: ["--queues=testing-matlab"]
+    init: true  # Use tini as PID 1 to properly reap zombie processes
+    deploy:
+      replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
+    environment:
+      - TZ=UTC
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - PYTHONPATH=/home/matlab/computor-backend/src
+      - API_URL=${API_URL}
+      - API_TOKEN=${MATLAB_WORKER_TOKEN}
+      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
+      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
+      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
+      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+      - minio
+    ulimits:
+      nproc: 2048       # Limit number of processes (MATLAB needs more)
+      nofile:
+        soft: 8192      # Limit file descriptors
+        hard: 16384
+    pids_limit: 2048    # Limit total PIDs (MATLAB spawns many subprocesses)
+    labels:
+      - "traefik.enable=false"
+
+  # Override MinIO ports for production (localhost only for security)
+  minio:
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  # Override Temporal ports for production
+  temporal:
+    ports:
+      - "${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
+
+  # No Temporal UI in production (commented out)
+  # temporal-ui:

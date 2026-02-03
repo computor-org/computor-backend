@@ -156,7 +156,7 @@ def create_admin_user(db: Session):
     # Get credentials from environment variables
     admin_username = os.environ.get('API_ADMIN_USER', 'admin')
     admin_password = os.environ.get('API_ADMIN_PASSWORD', 'admin')
-    admin_email = 'admin@system.local'
+    admin_email = os.environ.get('API_ADMIN_EMAIL')
     
     # Check if admin user already exists
     existing_user = db.query(User).filter(User.username == admin_username).first()

@@ -1,0 +1,185 @@
+# Base Docker Compose configuration
+# Contains shared services, networks, and volumes used by all deployments
+# This file should be used together with environment-specific overrides
+
+version: '3.8'
+
+networks:
+  computor-network:
+    name: computor-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: computor-postgres-data
+  temporal_postgres_data:
+    name: computor-temporal-postgres-data
+  redis_data:
+    name: computor-redis-data
+  minio_data:
+    name: computor-minio-data
+  # Coder volumes (created even if not used, for consistency)
+  coder_home:
+    name: computor-coder-home
+  coder_registry_data:
+    name: computor-coder-registry
+
+services:
+  # Single Traefik instance for all routing
+  traefik:
+    image: traefik:v3.6.6
+    networks:
+      - computor-network
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-8080}:80"
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=computor-network"
+      - "--entrypoints.web.address=:80"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=false"  # Traefik itself doesn't need to be routed
+
+  # PostgreSQL with multiple databases support
+  postgres:
+    image: postgres:16
+    networks:
+      - computor-network
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5437"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    environment:
+      TZ: UTC
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGPORT: 5437
+      # Additional databases for Coder (created via init script if CODER_ENABLED=true)
+      POSTGRES_MULTIPLE_DATABASES: ${POSTGRES_MULTIPLE_DATABASES:-computor}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p 5437"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache
+  redis:
+    image: "redis:alpine"
+    networks:
+      - computor-network
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Temporal PostgreSQL database
+  temporal-postgres:
+    image: postgres:16
+    networks:
+      - computor-network
+    container_name: temporal-postgres
+    restart: unless-stopped
+    ports:
+      - "${TEMPORAL_POSTGRES_PORT:-5433}:5433"
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      POSTGRES_DB: temporal
+      PGPORT: 5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -p 5433"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Temporal server
+  temporal:
+    image: temporalio/auto-setup:1.27.0
+    networks:
+      - computor-network
+    container_name: temporal
+    restart: unless-stopped
+    ports:
+      - "${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5433
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig.yaml
+    volumes:
+      - ../../docker/temporal/dynamicconfig.yaml:/etc/temporal/config/dynamicconfig.yaml
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "tctl", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    networks:
+      - computor-network
+    container_name: computor-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+
+  # Static file server
+  static-server:
+    image: halverneus/static-file-server:latest
+    networks:
+      - computor-network
+    restart: unless-stopped
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/shared/documents:/web:ro
+    environment:
+      - FOLDER=/web
+      - PORT=8080
+      - SHOW_LISTING=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.static.rule=PathPrefix(`/docs`)"
+      - "traefik.http.routers.static.entrypoints=web"
+      - "traefik.http.middlewares.static-stripprefix.stripprefix.prefixes=/docs"
+      - "traefik.http.routers.static.middlewares=static-stripprefix"
+      - "traefik.http.services.static.loadbalancer.server.port=8080"
+    depends_on:
+      - traefik

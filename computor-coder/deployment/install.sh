@@ -67,8 +67,8 @@ while getopts "d:p:Q:P:D:Hu:e:w:h" opt; do
       echo ""
       echo "Examples:"
       echo "  cp .env.example .env && vim .env && $0"
-      echo "  $0 -D example.com -P 8443"
-      echo "  $0 -D localhost -P 8443 -H"
+      echo "  $0 -D example.com -P 8446"
+      echo "  $0 -D localhost -P 8446 -H"
       exit 0
       ;;
     \?)
@@ -117,7 +117,7 @@ if [ -z "$CODER_DOMAIN" ]; then
 fi
 
 if [ -z "$CODER_PORT" ]; then
-  read -p "Enter port for Coder (e.g. 8443): " CODER_PORT
+  read -p "Enter port for Coder (e.g. 8446): " CODER_PORT
 fi
 
 # Build access URL for display

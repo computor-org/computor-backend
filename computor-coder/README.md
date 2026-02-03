@@ -56,10 +56,10 @@ pip install -e computor-coder/
 cd computor-coder/deployment
 
 # Basic installation
-./install.sh -D coder.example.com -P 8443
+./install.sh -D coder.example.com -P 8446
 
 # With admin user
-./install.sh -D coder.example.com -P 8443 \
+./install.sh -D coder.example.com -P 8446 \
   -u admin -e admin@example.com -w secretpass
 ```
 
@@ -155,7 +155,7 @@ See `deployment/` directory for Coder server installation scripts:
 cd deployment
 
 # Install Coder server
-./install.sh -D coder.example.com -P 8443 -u admin -e admin@example.com -w secret
+./install.sh -D coder.example.com -P 8446 -u admin -e admin@example.com -w secret
 
 # Stop Coder server
 ./stop.sh
