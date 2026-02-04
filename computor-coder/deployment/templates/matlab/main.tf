@@ -124,6 +124,9 @@ resource "coder_agent" "main" {
 }
 COMPUTOR_EOF
 
+    # Create workspace marker file (triggers extension activation)
+    touch ~/workspace/.computor
+
     # Start code-server in background
     # Configure abs-proxy-base-path for Traefik routing at /coder prefix
     # Bind to 0.0.0.0 so Traefik can reach it from outside the container
