@@ -1,25 +1,17 @@
 # Coder addon Docker Compose configuration
 # Optional services for Coder workspace management
 # Use together with base + dev/prod configuration
-
-version: '3.8'
+#
+# Code-server access is via Traefik at /coder/{username}/{workspace}/
+# (configured in workspace Terraform template via Docker labels)
 
 services:
-  # Extend Traefik with additional Coder routing
-  traefik:
-    ports:
-      - "${CODER_EXTERNAL_PORT:-8446}:8446"  # Additional HTTPS port for Coder
-    command:
-      # Base commands are inherited, add Coder-specific entrypoint
-      - "--entrypoints.coder.address=:8446"
-
   # Extend PostgreSQL to create Coder database
   postgres:
     environment:
-      # Add coder to the list of databases to create
       POSTGRES_MULTIPLE_DATABASES: computor,coder
 
-  # Coder server
+  # Coder server (internal only - not exposed via Traefik)
   coder:
     image: ghcr.io/coder/coder:latest
     networks:
@@ -27,17 +19,14 @@ services:
     container_name: computor-coder
     restart: unless-stopped
     ports:
-      - "7080:7080"  # Expose for local API development
+      - "7080:7080"  # Expose for local API access
     environment:
       CODER_PG_CONNECTION_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
-      CODER_ACCESS_URL: "${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
-      # Optional: Use external URL if behind a proxy
-      CODER_WILDCARD_ACCESS_URL: "${CODER_WILDCARD_URL}"
-      # Security
+      # Internal Docker network URL - workspace containers use this to reach Coder
+      CODER_ACCESS_URL: "http://coder:7080"
       CODER_DISABLE_PASSWORD_AUTH: ${CODER_DISABLE_PASSWORD_AUTH:-false}
       CODER_DISABLE_SESSION_EXPIRY_REFRESH: ${CODER_DISABLE_SESSION_EXPIRY_REFRESH:-false}
-      # Telemetry
       CODER_TELEMETRY_ENABLE: ${CODER_TELEMETRY_ENABLE:-false}
     group_add:
       - "${DOCKER_GID}"
@@ -57,34 +46,7 @@ services:
       retries: 30
       start_period: 10s
     labels:
-      - "traefik.enable=true"
-      # Main Coder UI routing
-      - "traefik.http.routers.coder.rule=Host(`${CODER_DOMAIN}`)"
-      - "traefik.http.routers.coder.entrypoints=coder"
-      - "traefik.http.routers.coder.service=coder"
-      - "traefik.http.services.coder.loadbalancer.server.port=7080"
-      # WebSocket support
-      - "traefik.http.routers.coder-ws.rule=Host(`${CODER_DOMAIN}`) && PathPrefix(`/api/v2/workspaceagents`)"
-      - "traefik.http.routers.coder-ws.entrypoints=coder"
-      - "traefik.http.routers.coder-ws.service=coder"
-      # API protection middleware (blocks direct user creation)
-      - "traefik.http.middlewares.coder-api-protect.replacepathregex.regex=^/api/v2/users$$"
-      - "traefik.http.middlewares.coder-api-protect.replacepathregex.replacement=/blocked"
-      - "traefik.http.routers.coder-api.rule=Host(`${CODER_DOMAIN}`) && Path(`/api/v2/users`) && Method(`POST`)"
-      - "traefik.http.routers.coder-api.entrypoints=coder"
-      - "traefik.http.routers.coder-api.middlewares=coder-api-protect"
-      - "traefik.http.routers.coder-api.service=blocked-response"
-
-  # Blocked response service (returns 403 for unauthorized requests)
-  blocked-response:
-    image: nginx:alpine
-    networks:
-      - computor-network
-    volumes:
-      - ../../computor-coder/deployment/blocked.conf:/etc/nginx/conf.d/default.conf:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.services.blocked-response.loadbalancer.server.port=80"
+      - "traefik.enable=false"
 
   # Local Docker registry for workspace images
   coder-registry:
@@ -203,7 +165,7 @@ services:
           exit 1
         fi
 
-        # Create admin user using the exact same method as the working version
+        # Create admin user
         if [ -z "${CODER_ADMIN_USERNAME}" ]; then
           echo "No admin credentials provided, skipping admin creation."
           exit 0
@@ -223,7 +185,6 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
-      CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
     depends_on:
       coder:
         condition: service_healthy
@@ -255,7 +216,7 @@ services:
         export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
         export CODER_URL="http://coder:7080"
 
-        # Function to create template and set TTL (from working version)
+        # Function to create template and set TTL
         create_template() {
           TEMPLATE_NAME=$$1
           TEMPLATE_DIR=$$2
@@ -299,7 +260,7 @@ services:
     volumes:
       - ../../computor-coder/deployment/templates:/templates:ro
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
-    user: "0:0"  # Run as root to access Docker socket
+    user: "0:0"
     depends_on:
       coder-admin-setup:
         condition: service_completed_successfully

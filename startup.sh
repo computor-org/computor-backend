@@ -139,6 +139,28 @@ done
 if [ "$ENABLE_CODER" = true ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
+
+    # Auto-detect DOCKER_GID if not set (required for Coder to access Docker socket)
+    if [ -z "$DOCKER_GID" ]; then
+        echo -e "\n${GREEN}Auto-detecting Docker group ID...${NC}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS: get GID of docker.sock
+            DOCKER_GID=$(stat -f '%g' /var/run/docker.sock 2>/dev/null || echo "")
+        else
+            # Linux: get docker group ID
+            DOCKER_GID=$(getent group docker | cut -d: -f3 2>/dev/null || stat -c '%g' /var/run/docker.sock 2>/dev/null || echo "")
+        fi
+
+        if [ -n "$DOCKER_GID" ]; then
+            export DOCKER_GID
+            echo "  DOCKER_GID=$DOCKER_GID"
+        else
+            echo -e "${RED}ERROR: Could not detect Docker group ID${NC}"
+            echo "  Please set DOCKER_GID manually in your .env file"
+            echo "  You can find it with: getent group docker | cut -d: -f3"
+            exit 1
+        fi
+    fi
 fi
 
 # Copy defaults if source exists

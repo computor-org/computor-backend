@@ -38,8 +38,14 @@ variable "coder_internal_url" {
 }
 
 variable "docker_network" {
-  default     = "coder-network"
-  description = "Docker network for workspace containers"
+  default     = "computor-network"
+  description = "Docker network for workspace containers (must match Traefik network)"
+  type        = string
+}
+
+variable "coder_base_path" {
+  default     = "/coder"
+  description = "Base path prefix for code-server access via Traefik"
   type        = string
 }
 
@@ -113,18 +119,22 @@ resource "coder_agent" "main" {
 COMPUTOR_EOF
 
     # Start code-server in background
+    # Configure abs-proxy-base-path for Traefik routing at /coder prefix
+    # Bind to 0.0.0.0 so Traefik can reach it from outside the container
     # Use password auth if password is provided, otherwise no auth
     %{ if var.code_server_password != "" }
     export PASSWORD="${var.code_server_password}"
     code-server \
       --auth password \
-      --port ${var.code_server_port} \
+      --bind-addr 0.0.0.0:${var.code_server_port} \
+      --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
       --extensions-dir /opt/code-server/extensions \
       >/tmp/code-server.log 2>&1 &
     %{ else }
     code-server \
       --auth none \
-      --port ${var.code_server_port} \
+      --bind-addr 0.0.0.0:${var.code_server_port} \
+      --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
       --extensions-dir /opt/code-server/extensions \
       >/tmp/code-server.log 2>&1 &
     %{ endif }
@@ -167,15 +177,9 @@ COMPUTOR_EOF
 # MODULES
 ###########################
 
-# VS Code Web (code-server)
-module "code-server" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/code-server/coder"
-  version  = "~> 1.0"
-  agent_id = coder_agent.main.id
-  folder   = "/home/coder/workspace"
-  order    = 1
-}
+# NOTE: code-server is started manually in the startup_script above
+# to support --abs-proxy-base-path for Traefik routing at /coder/{user}/{workspace}
+# Do NOT add the code-server module here as it will conflict (EADDRINUSE)
 
 # JetBrains Gateway
 module "jetbrains" {
@@ -255,5 +259,37 @@ resource "docker_container" "workspace" {
   labels {
     label = "coder.workspace_id"
     value = data.coder_workspace.me.id
+  }
+
+  # Traefik labels for direct code-server access at /coder/{username}/{workspace}
+  labels {
+    label = "traefik.enable"
+    value = "true"
+  }
+
+  labels {
+    label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.rule"
+    value = "PathPrefix(`${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}`)"
+  }
+
+  labels {
+    label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.entrypoints"
+    value = "web"
+  }
+
+  labels {
+    label = "traefik.http.services.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.loadbalancer.server.port"
+    value = "${var.code_server_port}"
+  }
+
+  # Middleware to strip the /coder/{username}/{workspace} prefix before forwarding
+  labels {
+    label = "traefik.http.middlewares.strip-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.stripprefix.prefixes"
+    value = "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}"
+  }
+
+  labels {
+    label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.middlewares"
+    value = "strip-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   }
 }

@@ -1,8 +1,6 @@
 # Production-specific Docker Compose override
 # Extends docker-compose.base.yaml with production services and configuration
 
-version: '3.8'
-
 services:
   # Production API service
   uvicorn:

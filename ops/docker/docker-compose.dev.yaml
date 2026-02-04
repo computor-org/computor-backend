@@ -1,8 +1,6 @@
 # Development-specific Docker Compose override
 # Extends docker-compose.base.yaml with development services and configuration
 
-version: '3.8'
-
 services:
   # Development API configuration (no container, runs locally)
   # Add this service when running API in a container for development

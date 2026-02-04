@@ -29,7 +29,14 @@ class CoderSettings(BaseSettings):
     # Coder server configuration
     url: str = Field(
         default="http://localhost:8446",
-        description="Coder server URL"
+        description="Coder server URL (for API calls)"
+    )
+
+    # Traefik URL for accessing workspaces (code-server)
+    # Format: http://host:port/coder - workspace URLs will be {base_url}/{username}/{workspace}/
+    workspace_base_url: Optional[str] = Field(
+        default=None,
+        description="Base URL for workspace access via Traefik (e.g., http://localhost:8080/coder)"
     )
 
     # Admin credentials (same as backend admin)

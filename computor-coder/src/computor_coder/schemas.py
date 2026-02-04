@@ -38,6 +38,7 @@ class WorkspaceBuildStatus(str, Enum):
     STARTING = "starting"
     RUNNING = "running"
     STOPPING = "stopping"
+    STOPPED = "stopped"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELING = "canceling"

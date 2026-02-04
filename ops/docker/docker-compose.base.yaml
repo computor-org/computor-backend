@@ -2,8 +2,6 @@
 # Contains shared services, networks, and volumes used by all deployments
 # This file should be used together with environment-specific overrides
 
-version: '3.8'
-
 networks:
   computor-network:
     name: computor-network
