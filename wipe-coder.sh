@@ -25,20 +25,23 @@ docker rm docker-coder-image-builder-python-1 docker-coder-image-builder-matlab-
 echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
 docker volume rm computor-coder-home computor-coder-registry 2>/dev/null
 
-echo -e "\n${YELLOW}Cleaning Coder database (if PostgreSQL is running)...${NC}"
-# Check if postgres is running
-if docker ps | grep -q postgres; then
-    # Source environment to get DB credentials
-    source .env
+echo -e "\n${YELLOW}Removing Coder database (separate from main DB)...${NC}"
+# Source environment for paths
+source .env
 
-    # Drop the Coder database and recreate it empty
-    docker exec docker-postgres-1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "DROP DATABASE IF EXISTS coder;" 2>/dev/null
-    docker exec docker-postgres-1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE DATABASE coder;" 2>/dev/null
-    echo "  ✓ Coder database wiped"
+# Check if Coder's dedicated postgres is running
+if docker ps | grep -q computor-coder-postgres; then
+    docker stop computor-coder-postgres 2>/dev/null
+    docker rm -f computor-coder-postgres 2>/dev/null
+    echo "  ✓ Coder database container removed"
+fi
+
+# Remove Coder database files (bind mount)
+if [ -n "$SYSTEM_DEPLOYMENT_PATH" ] && [ -d "$SYSTEM_DEPLOYMENT_PATH/coder-postgres" ]; then
+    sudo rm -rf "$SYSTEM_DEPLOYMENT_PATH/coder-postgres"
+    echo "  ✓ Coder database files removed"
 else
-    echo "  ⚠ PostgreSQL not running - skipping database cleanup"
-    echo "  To clean database later, run:"
-    echo "    docker exec docker-postgres-1 psql -U \$POSTGRES_USER -c 'DROP DATABASE IF EXISTS coder;'"
+    echo "  ✓ No Coder database files to remove"
 fi
 
 echo -e "\n${YELLOW}Removing any Coder workspace images...${NC}"

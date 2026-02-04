@@ -16,11 +16,6 @@ volumes:
     name: computor-redis-data
   minio_data:
     name: computor-minio-data
-  # Coder volumes (created even if not used, for consistency)
-  coder_home:
-    name: computor-coder-home
-  coder_registry_data:
-    name: computor-coder-registry
 
 services:
   # Single Traefik instance for all routing

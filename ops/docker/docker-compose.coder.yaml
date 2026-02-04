@@ -302,3 +302,10 @@ services:
       coder-image-builder-matlab:
         condition: service_completed_successfully
     restart: "no"
+
+# Coder-specific volumes (isolated from main infrastructure)
+volumes:
+  coder_home:
+    name: computor-coder-home
+  coder_registry_data:
+    name: computor-coder-registry

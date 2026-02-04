@@ -77,9 +77,15 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -v|--volumes)
-            REMOVE_VOLUMES=true
-            DOCKER_ARGS="$DOCKER_ARGS -v"
-            shift
+            echo -e "${RED}ERROR: The -v/--volumes flag is disabled for safety!${NC}"
+            echo ""
+            echo "To remove volumes safely, use the dedicated cleanup scripts:"
+            echo "  ${GREEN}./wipe-coder-complete.sh${NC}  - Wipe all Coder data (database, volumes, images)"
+            echo "  ${GREEN}./wipe-coder.sh${NC}           - Quick Coder cleanup"
+            echo ""
+            echo "These scripts will NEVER touch your main infrastructure (Postgres, MinIO, Redis)."
+            echo ""
+            exit 1
             ;;
         --help|-h)
             echo "Usage: $0 [environment] [options]"
@@ -90,14 +96,16 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --coder            Include Coder services"
-            echo "  -v, --volumes      Remove volumes (data will be deleted!)"
             echo "  --help, -h         Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0                 Stop services (auto-detect configuration)"
             echo "  $0 dev             Stop development services"
             echo "  $0 dev --coder     Stop development + Coder services"
-            echo "  $0 prod -v         Stop production and remove volumes"
+            echo ""
+            echo "To remove Coder data safely (without touching main infrastructure):"
+            echo "  ./wipe-coder-complete.sh  - Complete Coder wipe (database, volumes, images)"
+            echo "  ./wipe-coder.sh           - Quick Coder cleanup"
             exit 0
             ;;
         *)
@@ -131,15 +139,6 @@ else
     echo -e "Coder: ${YELLOW}$([ "$ENABLE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
 fi
 
-if [ "$REMOVE_VOLUMES" = true ]; then
-    echo -e "${RED}⚠️  WARNING: Volumes will be removed (data will be deleted!)${NC}"
-    read -p "Are you sure? (y/N): " confirm
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo "Aborted."
-        exit 0
-    fi
-fi
-
 # Load environment file
 if [ -f .env ]; then
     echo -e "\n${GREEN}Loading environment file...${NC}"
@@ -170,10 +169,6 @@ docker compose $COMPOSE_FILES down $DOCKER_ARGS
 # Show result
 if [ $? -eq 0 ]; then
     echo -e "\n${GREEN}✓ Services stopped successfully${NC}"
-
-    if [ "$REMOVE_VOLUMES" = true ]; then
-        echo -e "${YELLOW}Volumes have been removed.${NC}"
-    fi
 
     # Show how to start again
     echo -e "\n${BLUE}To start services again:${NC}"

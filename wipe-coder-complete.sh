@@ -30,22 +30,21 @@ echo -e "\n${YELLOW}2. Removing Coder Docker volumes...${NC}"
 docker volume rm -f computor-coder-home computor-coder-registry 2>/dev/null
 echo "  ✓ Volumes removed"
 
-echo -e "\n${YELLOW}3. Dropping and recreating Coder database...${NC}"
-# Check if postgres is running
-if docker ps | grep -q docker-postgres-1; then
-    # Drop ALL tables and data in Coder database
-    docker exec docker-postgres-1 psql -U $POSTGRES_USER -c "DROP DATABASE IF EXISTS coder WITH (FORCE);" 2>/dev/null
-    echo "  ✓ Coder database dropped"
+echo -e "\n${YELLOW}3. Wiping Coder database (separate from main DB)...${NC}"
+# Check if Coder's dedicated postgres is running
+if docker ps | grep -q computor-coder-postgres; then
+    # Stop Coder postgres to ensure clean wipe
+    docker stop computor-coder-postgres 2>/dev/null
+    docker rm -f computor-coder-postgres 2>/dev/null
+    echo "  ✓ Coder database container stopped and removed"
 
-    # Recreate empty database
-    docker exec docker-postgres-1 psql -U $POSTGRES_USER -c "CREATE DATABASE coder;" 2>/dev/null
-    echo "  ✓ Empty Coder database created"
-
-    # Also clear any Coder data in main database (if any)
-    docker exec docker-postgres-1 psql -U $POSTGRES_USER -d $POSTGRES_DB -c "DELETE FROM \"user\" WHERE email LIKE '%@computor.edu' AND username = 'admin';" 2>/dev/null
+    # Remove Coder database directory (bind mount)
+    if [ -n "$SYSTEM_DEPLOYMENT_PATH" ] && [ -d "$SYSTEM_DEPLOYMENT_PATH/coder-postgres" ]; then
+        sudo rm -rf "$SYSTEM_DEPLOYMENT_PATH/coder-postgres"
+        echo "  ✓ Coder database files removed from $SYSTEM_DEPLOYMENT_PATH/coder-postgres"
+    fi
 else
-    echo "  ⚠ PostgreSQL not running - start it first with: bash startup.sh dev"
-    exit 1
+    echo "  ✓ Coder database not running (will be recreated on next startup)"
 fi
 
 echo -e "\n${YELLOW}4. Removing Coder workspace images...${NC}"
@@ -54,10 +53,10 @@ docker images | grep "coder" | grep "workspace" | awk '{print $3}' | xargs -r do
 echo "  ✓ Images removed"
 
 echo -e "\n${YELLOW}5. Clearing Coder registry data...${NC}"
-# Remove any registry data that might be cached
-docker exec docker-postgres-1 psql -U $POSTGRES_USER -c "DROP DATABASE IF EXISTS coder_registry WITH (FORCE);" 2>/dev/null
+# The registry uses Docker volume (already removed in step 2)
+# Just clean up any dangling Docker resources
 docker system prune -f 2>/dev/null
-echo "  ✓ Registry cleared"
+echo "  ✓ Registry data cleared"
 
 echo -e "\n${GREEN}✓ COMPLETE Coder wipe finished!${NC}"
 echo ""
