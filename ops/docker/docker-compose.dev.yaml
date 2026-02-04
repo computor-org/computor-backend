@@ -2,6 +2,11 @@
 # Extends docker-compose.base.yaml with development services and configuration
 
 services:
+  # Traefik override for development - allow access to host machine
+  traefik:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # Development API configuration (no container, runs locally)
   # Add this service when running API in a container for development
 

@@ -6,10 +6,30 @@
 # (configured in workspace Terraform template via Docker labels)
 
 services:
-  # Extend PostgreSQL to create Coder database
-  postgres:
+  # Dedicated PostgreSQL database for Coder (separate from main DB)
+  coder-postgres:
+    image: postgres:16
+    networks:
+      - computor-network
+    container_name: computor-coder-postgres
+    restart: unless-stopped
+    ports:
+      - "5439:5439"  # Different port from main postgres
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder-postgres:/var/lib/postgresql/data
     environment:
-      POSTGRES_MULTIPLE_DATABASES: computor,coder
+      TZ: UTC
+      POSTGRES_USER: ${CODER_POSTGRES_USER:-coder}
+      POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD:-coder_password}
+      POSTGRES_DB: coder
+      PGPORT: 5439
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CODER_POSTGRES_USER:-coder} -p 5439"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
 
   # Coder server (internal only - not exposed via Traefik)
   coder:
@@ -21,7 +41,7 @@ services:
     ports:
       - "7080:7080"  # Expose for local API access
     environment:
-      CODER_PG_CONNECTION_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/coder?sslmode=disable"
+      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
       # Internal Docker network URL - workspace containers use this to reach Coder
       CODER_ACCESS_URL: "http://coder:7080"
@@ -35,7 +55,7 @@ services:
       - coder_home:/home/coder
       - ../../computor-coder/deployment/templates:/templates:ro
     depends_on:
-      postgres:
+      coder-postgres:
         condition: service_healthy
       coder-registry:
         condition: service_healthy
@@ -176,7 +196,7 @@ services:
           --username "${CODER_ADMIN_USERNAME}" \
           --email "${CODER_ADMIN_EMAIL}" \
           --password "${CODER_ADMIN_PASSWORD}" \
-          --postgres-url "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/coder?sslmode=disable" \
+          --postgres-url "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable" \
           && echo "Admin user created successfully." \
           || echo "Admin creation skipped (may already exist)."
 
@@ -216,6 +236,15 @@ services:
         export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
         export CODER_URL="http://coder:7080"
 
+        # Determine backend URL based on DEBUG_MODE
+        if [ "${DEBUG_MODE}" = "production" ]; then
+          BACKEND_INTERNAL_URL="http://uvicorn:8000"
+          echo "Production mode: Using backend at $$BACKEND_INTERNAL_URL"
+        else
+          BACKEND_INTERNAL_URL="http://host.docker.internal:8000"
+          echo "Development mode: Using backend at $$BACKEND_INTERNAL_URL"
+        fi
+
         # Function to create template and set TTL
         create_template() {
           TEMPLATE_NAME=$$1
@@ -226,9 +255,12 @@ services:
             return
           fi
 
-          echo "Pushing template: $$TEMPLATE_NAME"
+          echo "Pushing template: $$TEMPLATE_NAME with backend URL: $$BACKEND_INTERNAL_URL"
           cd "$$TEMPLATE_DIR"
-          coder templates push "$$TEMPLATE_NAME" --directory . --yes \
+          coder templates push "$$TEMPLATE_NAME" \
+            --directory . \
+            --variable computor_backend_internal="$$BACKEND_INTERNAL_URL" \
+            --yes \
             && echo "Template '$$TEMPLATE_NAME' created successfully." \
             || echo "Template '$$TEMPLATE_NAME' creation skipped (may already exist)."
 
@@ -257,6 +289,7 @@ services:
     environment:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
+      DEBUG_MODE: ${DEBUG_MODE:-development}
     volumes:
       - ../../computor-coder/deployment/templates:/templates:ro
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock

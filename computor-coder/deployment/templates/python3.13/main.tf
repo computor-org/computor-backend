@@ -55,6 +55,12 @@ variable "computor_backend_url" {
   type        = string
 }
 
+variable "computor_backend_internal" {
+  default     = "http://host.docker.internal:8000"
+  description = "Internal backend service URL for ForwardAuth (Docker network). Use 'http://uvicorn:8000' in production."
+  type        = string
+}
+
 variable "code_server_password" {
   default     = ""
   description = "Password for code-server access (empty = no password required)"
@@ -129,6 +135,7 @@ COMPUTOR_EOF
       --bind-addr 0.0.0.0:${var.code_server_port} \
       --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
       --extensions-dir /opt/code-server/extensions \
+      /home/coder/workspace \
       >/tmp/code-server.log 2>&1 &
     %{ else }
     code-server \
@@ -136,6 +143,7 @@ COMPUTOR_EOF
       --bind-addr 0.0.0.0:${var.code_server_port} \
       --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
       --extensions-dir /opt/code-server/extensions \
+      /home/coder/workspace \
       >/tmp/code-server.log 2>&1 &
     %{ endif }
   EOT
@@ -240,6 +248,12 @@ resource "docker_container" "workspace" {
 
   env = ["CODER_AGENT_TOKEN=${coder_agent.main.token}"]
 
+  # Allow container to reach host machine (for development)
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
+
   # Connect to the same network as Coder services
   networks_advanced {
     name = var.docker_network
@@ -288,8 +302,20 @@ resource "docker_container" "workspace" {
     value = "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}"
   }
 
+  # ForwardAuth middleware - verify user authentication before allowing access
+  labels {
+    label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.address"
+    value = "${var.computor_backend_internal}/auth/verify-coder-access"
+  }
+
+  labels {
+    label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.authResponseHeaders"
+    value = "X-Auth-User"
+  }
+
+  # Chain both authentication and strip-prefix middlewares
   labels {
     label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.middlewares"
-    value = "strip-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)},strip-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   }
 }
