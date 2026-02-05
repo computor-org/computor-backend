@@ -66,6 +66,13 @@ variable "code_server_password" {
   sensitive   = true
 }
 
+variable "computor_auth_token" {
+  default     = ""
+  description = "Pre-minted API token for automatic VSCode extension authentication (per-workspace)"
+  type        = string
+  sensitive   = true
+}
+
 ###########################
 # DATA SOURCES
 ###########################
@@ -154,6 +161,7 @@ COMPUTOR_EOF
     GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
     GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
+    COMPUTOR_AUTH_TOKEN  = var.computor_auth_token
   }
 
   # Metadata blocks for workspace monitoring

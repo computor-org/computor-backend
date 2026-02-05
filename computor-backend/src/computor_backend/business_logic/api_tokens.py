@@ -490,3 +490,57 @@ def create_api_token_admin(
         db.rollback()
         logger.error(f"Error creating admin API token: {e}")
         raise
+
+
+def get_or_create_singleton_token(
+    token_data: ApiTokenCreate,
+    permissions: Principal,
+    db: Session,
+    revocation_reason: str = "replaced by new token",
+) -> ApiTokenCreateResponse:
+    """
+    Get or create a singleton API token by name for a user.
+
+    Ensures exactly one active token with the given name exists per user.
+    Any existing tokens with the same name are revoked before creating a new one.
+
+    This is useful for automated systems that need a single long-lived token
+    per user (e.g., workspace auto-login, CI integrations).
+
+    Args:
+        token_data: Token creation data (name is used as the singleton key)
+        permissions: Current user permissions
+        db: Database session
+        revocation_reason: Reason recorded when revoking old tokens
+
+    Returns:
+        Newly created token with full token string (shown only once)
+
+    Note:
+        Since raw tokens are not stored (only hashes), we cannot retrieve
+        an existing token's value. We always mint a fresh token.
+    """
+    from datetime import datetime, timezone
+
+    target_user_id = token_data.user_id or str(permissions.user_id)
+
+    # Revoke any existing tokens with this name for the user
+    existing = db.query(ApiToken).filter(
+        ApiToken.user_id == target_user_id,
+        ApiToken.name == token_data.name,
+        ApiToken.revoked_at.is_(None),
+    ).all()
+
+    for old_token in existing:
+        old_token.revoked_at = datetime.now(timezone.utc)
+        old_token.revocation_reason = revocation_reason
+
+    if existing:
+        db.flush()
+        logger.info(
+            f"Revoked {len(existing)} existing '{token_data.name}' token(s) "
+            f"for user {target_user_id}"
+        )
+
+    # Create the new token
+    return create_api_token(token_data, permissions, db)

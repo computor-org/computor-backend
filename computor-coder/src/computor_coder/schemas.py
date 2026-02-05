@@ -74,6 +74,10 @@ class CoderWorkspaceCreate(BaseModel):
         None,
         description="Password for direct code-server access"
     )
+    computor_auth_token: Optional[str] = Field(
+        None,
+        description="Pre-minted API token for automatic extension authentication"
+    )
 
 
 class WorkspaceProvisionRequest(BaseModel):

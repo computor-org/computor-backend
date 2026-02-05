@@ -702,14 +702,20 @@ class CoderClient:
             "template_id": template_id,
         }
 
-        # Add code-server password if provided
+        # Add rich parameter values (per-workspace Terraform variables)
+        rich_params = []
         if workspace_data.code_server_password:
-            payload["rich_parameter_values"] = [
-                {
-                    "name": "code_server_password",
-                    "value": workspace_data.code_server_password,
-                }
-            ]
+            rich_params.append({
+                "name": "code_server_password",
+                "value": workspace_data.code_server_password,
+            })
+        if workspace_data.computor_auth_token:
+            rich_params.append({
+                "name": "computor_auth_token",
+                "value": workspace_data.computor_auth_token,
+            })
+        if rich_params:
+            payload["rich_parameter_values"] = rich_params
 
         resp = await client.post(
             f"/api/v2/organizations/default/members/{username}/workspaces",
@@ -1002,6 +1008,7 @@ class CoderClient:
         full_name: Optional[str] = None,
         template: WorkspaceTemplate = WorkspaceTemplate.PYTHON,
         workspace_name: Optional[str] = None,
+        computor_auth_token: Optional[str] = None,
     ) -> ProvisionResult:
         """
         Full provisioning: get or create user and workspace.
@@ -1017,6 +1024,7 @@ class CoderClient:
             full_name: User's display name
             template: Workspace template to use
             workspace_name: Custom workspace name
+            computor_auth_token: Pre-minted API token for extension auto-login
 
         Returns:
             ProvisionResult with user and workspace info
@@ -1056,6 +1064,7 @@ class CoderClient:
             ws_data = CoderWorkspaceCreate(
                 name=workspace_name,
                 template=template,
+                computor_auth_token=computor_auth_token,
             )
             workspace = await self.create_workspace(user.username, ws_data)
             workspace_created = True

@@ -124,6 +124,7 @@ def create_coder_router(
     get_user_email: Optional[Callable] = None,
     get_user_fullname: Optional[Callable] = None,
     get_user_id: Optional[Callable] = None,
+    mint_workspace_token: Optional[Callable] = None,
     dependencies: Optional[list] = None,
 ) -> APIRouter:
     """
@@ -139,6 +140,8 @@ def create_coder_router(
         get_user_email: Dependency to get user's email (receives permissions)
         get_user_fullname: Optional dependency to get user's full name
         get_user_id: Optional dependency to get user's ID (used as Coder username)
+        mint_workspace_token: Optional dependency that returns a pre-minted API token string
+                              for automatic extension authentication in the workspace
         dependencies: Additional router dependencies
 
     Returns:
@@ -204,6 +207,12 @@ def create_coder_router(
         return None
 
     _user_id_dependency = get_user_id if get_user_id else _default_user_id
+
+    # Default workspace token dependency (returns None if not provided)
+    async def _default_workspace_token() -> Optional[str]:
+        return None
+
+    _workspace_token_dependency = mint_workspace_token if mint_workspace_token else _default_workspace_token
 
     # -------------------------------------------------------------------------
     # Health check endpoint (no auth required)
@@ -286,6 +295,7 @@ def create_coder_router(
             user_email: Annotated[str, Depends(get_user_email)],
             user_fullname: Annotated[Optional[str], Depends(_fullname_dependency)],
             user_id: Annotated[Optional[str], Depends(_user_id_dependency)],
+            workspace_token: Annotated[Optional[str], Depends(_workspace_token_dependency)],
         ) -> ProvisionResult:
             """Provision a workspace for the current user."""
             _check_workspace_access(permissions, "provision")
@@ -296,6 +306,7 @@ def create_coder_router(
                     full_name=user_fullname,
                     template=request.template,
                     workspace_name=request.workspace_name,
+                    computor_auth_token=workspace_token,
                 )
                 return result
             except Exception as e:
