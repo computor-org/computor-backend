@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Coder Workspaces{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('coder_static', path='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('coder_static', path='css/style.css') }}?v={{ version }}">
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -17,6 +17,7 @@
             <li><a href="{{ url_for('coder_workspaces_page') }}" {% if active_page == 'workspaces' %}class="active"{% endif %}>My Workspaces</a></li>
             <li><a href="{{ url_for('coder_templates_page') }}" {% if active_page == 'templates' %}class="active"{% endif %}>Templates</a></li>
             <li><a href="{{ url_for('coder_provision_page') }}" {% if active_page == 'provision' %}class="active"{% endif %}>Provision</a></li>
+            <li><a href="{{ url_for('coder_users_page') }}" {% if active_page == 'users' %}class="active"{% endif %}>Users</a></li>
         </ul>
         <div class="nav-status">
             <span id="health-status" class="status-indicator">Checking...</span>

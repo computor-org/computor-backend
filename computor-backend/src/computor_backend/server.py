@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
-from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager
+from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.tokens import encrypt_api_key
 from computor_backend.model.auth import User
@@ -70,6 +70,7 @@ from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
+from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
 from computor_backend.websocket.connection_manager import manager as ws_manager
@@ -205,6 +206,8 @@ async def startup_logic():
     with next(get_db()) as db:
         db_apply_roles("_user_manager",claims_user_manager(),db)
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
+        db_apply_roles("_workspace_user",claims_workspace_user(),db)
+        db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
 
         await init_admin_user(db)
     
@@ -483,6 +486,14 @@ app.include_router(
 app.include_router(
     ws_router,
     tags=["websocket"]
+)
+
+# Coder workspace role management
+app.include_router(
+    workspace_roles_router,
+    prefix="/workspaces/roles",
+    tags=["workspaces", "roles"],
+    dependencies=[Depends(get_current_principal)],
 )
 
 # Coder integration routers

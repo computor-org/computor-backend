@@ -79,11 +79,6 @@ class CoderWorkspaceCreate(BaseModel):
 class WorkspaceProvisionRequest(BaseModel):
     """Request to provision a workspace for a user."""
 
-    password: str = Field(
-        ...,
-        min_length=6,
-        description="User's password (required for Coder user creation)"
-    )
     template: WorkspaceTemplate = Field(
         WorkspaceTemplate.PYTHON,
         description="Workspace template to use"

@@ -5,6 +5,7 @@ Async HTTP client for Coder API.
 import asyncio
 import logging
 import secrets
+import string
 from typing import Any, Optional
 
 import httpx
@@ -34,6 +35,28 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_coder_password(length: int = 24) -> str:
+    """Generate a random password that satisfies Coder's requirements.
+
+    Coder requires: min 6 chars. We generate a strong random password
+    with uppercase, lowercase, digits, and special chars since this
+    password is never seen or used by the user (auth is via ForwardAuth).
+    """
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+    # Ensure at least one of each category
+    password = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%&*"),
+    ]
+    password += [secrets.choice(alphabet) for _ in range(length - 4)]
+    # Shuffle to avoid predictable positions
+    result = list(password)
+    secrets.SystemRandom().shuffle(result)
+    return "".join(result)
 
 
 class CoderClient:
@@ -448,8 +471,8 @@ class CoderClient:
         """
         Get existing user or create new one.
 
-        If user exists, also updates their password to match the provided one,
-        so users can always log in with the password they entered during provisioning.
+        Password is auto-generated and only used for Coder API user creation.
+        Actual authentication is handled by computor-backend via ForwardAuth.
 
         Args:
             user_data: User data for creation if needed
@@ -459,9 +482,6 @@ class CoderClient:
         """
         try:
             user = await self._find_user_by_email(user_data.email)
-            # Update password so user can log in with the password they just entered
-            if user_data.password:
-                await self.update_user_password(user.username, user_data.password)
             return user, False
         except CoderUserNotFoundError:
             user = await self.create_user(user_data)
@@ -978,7 +998,6 @@ class CoderClient:
     async def provision_workspace(
         self,
         user_email: str,
-        user_password: str,
         username: Optional[str] = None,
         full_name: Optional[str] = None,
         template: WorkspaceTemplate = WorkspaceTemplate.PYTHON,
@@ -989,10 +1008,11 @@ class CoderClient:
 
         This is the main method for on-demand workspace provisioning.
         Uses email to check if user already exists in Coder.
+        A random password is generated for the Coder user account since
+        authentication is handled by the computor-backend via ForwardAuth.
 
         Args:
             user_email: User's email (must match backend user)
-            user_password: User's password (same as backend)
             username: Username (derived from email if not provided)
             full_name: User's display name
             template: Workspace template to use
@@ -1009,11 +1029,11 @@ class CoderClient:
         # Sanitize username for Coder requirements
         username = self._sanitize_username(username)
 
-        # Get or create user
+        # Get or create user (random password - never used, auth is via ForwardAuth)
         user_data = CoderUserCreate(
             username=username,
             email=user_email,
-            password=user_password,
+            password=_generate_coder_password(),
             full_name=full_name,
         )
         user, user_created = await self.get_or_create_user(user_data)

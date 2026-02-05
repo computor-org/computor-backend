@@ -84,11 +84,34 @@ def create_web_router(
         """Build a redirect response to the login page with ?next= param."""
         return RedirectResponse(f"{prefix}/login?next={request.url.path}")
 
+    def _has_workspace_access(principal, action: str = "access") -> bool:
+        """Check if the principal has a specific workspace permission."""
+        if principal is None:
+            return False
+        if principal.is_admin:
+            return True
+        if hasattr(principal, "permitted"):
+            return principal.permitted("workspace", action)
+        return False
+
+    def _forbidden_response(request: Request):
+        """Return a 403 forbidden page for users without workspace access."""
+        return templates.TemplateResponse(
+            "forbidden.html",
+            {
+                "request": request,
+                "version": __version__,
+            },
+            status_code=403,
+        )
+
     @router.get("/", response_class=HTMLResponse, name="coder_dashboard")
     async def dashboard(request: Request, principal=Depends(get_principal)):
         """Render the dashboard page."""
         if principal is None:
             return _login_redirect(request)
+        if not _has_workspace_access(principal):
+            return _forbidden_response(request)
         return templates.TemplateResponse(
             "dashboard.html",
             {
@@ -105,6 +128,8 @@ def create_web_router(
         """Render the workspaces management page."""
         if principal is None:
             return _login_redirect(request)
+        if not _has_workspace_access(principal):
+            return _forbidden_response(request)
         return templates.TemplateResponse(
             "workspaces.html",
             {
@@ -121,6 +146,8 @@ def create_web_router(
         """Render the templates listing page."""
         if principal is None:
             return _login_redirect(request)
+        if not _has_workspace_access(principal):
+            return _forbidden_response(request)
         return templates.TemplateResponse(
             "templates.html",
             {
@@ -137,11 +164,33 @@ def create_web_router(
         """Render the workspace provisioning page."""
         if principal is None:
             return _login_redirect(request)
+        if not _has_workspace_access(principal):
+            return _forbidden_response(request)
+        if not _has_workspace_access(principal, "provision"):
+            return _forbidden_response(request)
         return templates.TemplateResponse(
             "provision.html",
             {
                 "request": request,
                 "active_page": "provision",
+                "version": __version__,
+                "api_prefix": api_prefix,
+                "principal": principal,
+            },
+        )
+
+    @router.get("/users", response_class=HTMLResponse, name="coder_users_page")
+    async def users_page(request: Request, principal=Depends(get_principal)):
+        """Render the workspace role management page."""
+        if principal is None:
+            return _login_redirect(request)
+        if not _has_workspace_access(principal, "manage"):
+            return _forbidden_response(request)
+        return templates.TemplateResponse(
+            "users.html",
+            {
+                "request": request,
+                "active_page": "users",
                 "version": __version__,
                 "api_prefix": api_prefix,
                 "principal": principal,

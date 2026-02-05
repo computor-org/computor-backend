@@ -45,6 +45,8 @@ services:
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
       # Internal Docker network URL - workspace containers use this to reach Coder
       CODER_ACCESS_URL: "http://coder:7080"
+      # Note: Password auth must stay enabled for admin API operations (CoderClient._get_session_token).
+      # This is safe because Coder's port 7080 is not exposed through Traefik - users can't reach it.
       CODER_DISABLE_PASSWORD_AUTH: ${CODER_DISABLE_PASSWORD_AUTH:-false}
       CODER_DISABLE_SESSION_EXPIRY_REFRESH: ${CODER_DISABLE_SESSION_EXPIRY_REFRESH:-false}
       CODER_TELEMETRY_ENABLE: ${CODER_TELEMETRY_ENABLE:-false}

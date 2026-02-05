@@ -54,6 +54,38 @@ class PrincipalProtocol(Protocol):
         """Get user ID or raise exception."""
         ...
 
+    def permitted(
+        self,
+        resource: str,
+        action: str | list[str],
+        resource_id: Optional[str] = None,
+        course_role: Optional[str] = None,
+    ) -> bool:
+        """Check if principal has permission for a resource action."""
+        ...
+
+
+def _check_workspace_access(permissions, action: str = "access") -> None:
+    """Check if the principal has a specific workspace permission.
+
+    Admins always have access. Other users need the workspace:<action> claim.
+
+    Args:
+        permissions: The Principal object.
+        action: The specific workspace action to check (e.g., "access", "provision",
+                "list", "start", "stop", "delete", "manage", "session", "templates").
+
+    Raises:
+        HTTPException: 403 if the user lacks the required permission.
+    """
+    if permissions.is_admin:
+        return
+    if not permissions.permitted("workspace", action):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Workspace '{action}' permission required. Contact your administrator.",
+        )
+
 
 def _handle_coder_error(e: Exception) -> HTTPException:
     """Convert Coder exceptions to HTTP exceptions."""
@@ -238,12 +270,12 @@ def create_coder_router(
 
             This endpoint will:
             1. Check if the user exists in Coder (by email)
-            2. Create the user in Coder if they don't exist (using provided password)
+            2. Create the user in Coder if they don't exist
             3. Check if the user has a workspace
             4. Create a workspace if they don't have one
 
-            **Note**: Password is required in the request body because backend
-            passwords are hashed and cannot be retrieved.
+            Authentication is handled by the computor-backend via ForwardAuth.
+            Coder user passwords are auto-generated and never exposed.
             """,
         )
         async def provision_workspace(
@@ -256,11 +288,10 @@ def create_coder_router(
             user_id: Annotated[Optional[str], Depends(_user_id_dependency)],
         ) -> ProvisionResult:
             """Provision a workspace for the current user."""
-            _ = permissions  # Used by dependencies, logged for audit
+            _check_workspace_access(permissions, "provision")
             try:
                 result = await client.provision_workspace(
                     user_email=user_email,
-                    user_password=request.password,
                     username=user_id,  # Use user_id as Coder username if provided
                     full_name=user_fullname,
                     template=request.template,
@@ -282,7 +313,7 @@ def create_coder_router(
             user_email: Annotated[str, Depends(get_user_email)],
         ) -> WorkspaceListResponse:
             """Get all workspaces for the current authenticated user."""
-            _ = permissions  # Used by dependencies
+            _check_workspace_access(permissions, "list")
             try:
                 user = await client._find_user_by_email(user_email)
                 workspaces = await client.get_user_workspaces(user.username)
@@ -307,7 +338,7 @@ def create_coder_router(
             user_email: Annotated[str, Depends(get_user_email)],
         ) -> bool:
             """Check if the current user has any workspaces in Coder."""
-            _ = permissions  # Used by dependencies
+            _check_workspace_access(permissions, "list")
             try:
                 user = await client._find_user_by_email(user_email)
                 workspaces = await client.get_user_workspaces(user.username)
@@ -318,143 +349,157 @@ def create_coder_router(
                 raise _handle_coder_error(e)
 
     # -------------------------------------------------------------------------
-    # Workspace query endpoints (check by email - admin/lookup)
+    # Workspace query endpoints (workspace:manage - queries any user's workspaces)
     # -------------------------------------------------------------------------
 
-    @router.get(
-        "/workspaces/by-email/{email}",
-        response_model=WorkspaceListResponse,
-        summary="Get workspaces for a user by email",
-    )
-    async def get_workspaces_by_email(
-        email: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> WorkspaceListResponse:
-        """
-        Get all workspaces for a user identified by email.
+    if get_current_principal:
 
-        This checks the Coder API directly - no database lookup.
-        """
-        try:
-            user = await client._find_user_by_email(email)
-            workspaces = await client.get_user_workspaces(user.username)
-            return WorkspaceListResponse(
-                workspaces=workspaces,
-                count=len(workspaces),
-            )
-        except CoderNotFoundError:
-            return WorkspaceListResponse(workspaces=[], count=0)
-        except Exception as e:
-            raise _handle_coder_error(e)
+        @router.get(
+            "/workspaces/by-email/{email}",
+            response_model=WorkspaceListResponse,
+            summary="Get workspaces for a user by email (manage)",
+        )
+        async def get_workspaces_by_email(
+            email: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> WorkspaceListResponse:
+            """Get all workspaces for a user identified by email. Requires workspace:manage."""
+            _check_workspace_access(permissions, "manage")
+            try:
+                user = await client._find_user_by_email(email)
+                workspaces = await client.get_user_workspaces(user.username)
+                return WorkspaceListResponse(
+                    workspaces=workspaces,
+                    count=len(workspaces),
+                )
+            except CoderNotFoundError:
+                return WorkspaceListResponse(workspaces=[], count=0)
+            except Exception as e:
+                raise _handle_coder_error(e)
 
-    @router.get(
-        "/workspaces/by-email/{email}/exists",
-        response_model=bool,
-        summary="Check if user has any workspaces",
-    )
-    async def user_has_workspace(
-        email: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> bool:
-        """Check if a user (by email) has any workspaces in Coder."""
-        try:
-            user = await client._find_user_by_email(email)
-            workspaces = await client.get_user_workspaces(user.username)
-            return len(workspaces) > 0
-        except CoderNotFoundError:
-            return False
-        except Exception as e:
-            raise _handle_coder_error(e)
-
-    # -------------------------------------------------------------------------
-    # Workspace details endpoint
-    # -------------------------------------------------------------------------
-
-    @router.get(
-        "/workspaces/{username}/{workspace_name}",
-        response_model=WorkspaceDetails,
-        summary="Get workspace details",
-    )
-    async def get_workspace_details(
-        username: str,
-        workspace_name: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> WorkspaceDetails:
-        """Get detailed information about a specific workspace."""
-        try:
-            return await client.get_workspace(username, workspace_name)
-        except Exception as e:
-            raise _handle_coder_error(e)
+        @router.get(
+            "/workspaces/by-email/{email}/exists",
+            response_model=bool,
+            summary="Check if user has any workspaces (manage)",
+        )
+        async def user_has_workspace(
+            email: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> bool:
+            """Check if a user (by email) has any workspaces. Requires workspace:manage."""
+            _check_workspace_access(permissions, "manage")
+            try:
+                user = await client._find_user_by_email(email)
+                workspaces = await client.get_user_workspaces(user.username)
+                return len(workspaces) > 0
+            except CoderNotFoundError:
+                return False
+            except Exception as e:
+                raise _handle_coder_error(e)
 
     # -------------------------------------------------------------------------
-    # Workspace lifecycle endpoints
+    # Workspace details endpoint (requires workspace access)
     # -------------------------------------------------------------------------
 
-    @router.post(
-        "/workspaces/{username}/{workspace_name}/start",
-        response_model=WorkspaceActionResponse,
-        summary="Start a workspace",
-    )
-    async def start_workspace(
-        username: str,
-        workspace_name: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> WorkspaceActionResponse:
-        """Start a stopped workspace."""
-        try:
-            success = await client.start_workspace(username, workspace_name)
-            return WorkspaceActionResponse(
-                success=success,
-                message="Workspace starting" if success else "Failed to start workspace",
-            )
-        except Exception as e:
-            raise _handle_coder_error(e)
+    if get_current_principal:
 
-    @router.post(
-        "/workspaces/{username}/{workspace_name}/stop",
-        response_model=WorkspaceActionResponse,
-        summary="Stop a workspace",
-    )
-    async def stop_workspace(
-        username: str,
-        workspace_name: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> WorkspaceActionResponse:
-        """Stop a running workspace."""
-        try:
-            success = await client.stop_workspace(username, workspace_name)
-            return WorkspaceActionResponse(
-                success=success,
-                message="Workspace stopping" if success else "Failed to stop workspace",
-            )
-        except Exception as e:
-            raise _handle_coder_error(e)
+        @router.get(
+            "/workspaces/{username}/{workspace_name}",
+            response_model=WorkspaceDetails,
+            summary="Get workspace details",
+        )
+        async def get_workspace_details(
+            username: str,
+            workspace_name: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> WorkspaceDetails:
+            """Get detailed information about a specific workspace."""
+            _check_workspace_access(permissions)
+            try:
+                return await client.get_workspace(username, workspace_name)
+            except Exception as e:
+                raise _handle_coder_error(e)
 
-    @router.delete(
-        "/workspaces/{username}/{workspace_name}",
-        response_model=WorkspaceActionResponse,
-        summary="Delete a workspace",
-    )
-    async def delete_workspace(
-        username: str,
-        workspace_name: str,
-        _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-        client: Annotated[CoderClient, Depends(get_coder_client)],
-    ) -> WorkspaceActionResponse:
-        """Delete a workspace."""
-        try:
-            success = await client.delete_workspace(username, workspace_name)
-            return WorkspaceActionResponse(
-                success=success,
-                message="Workspace deleted" if success else "Failed to delete workspace",
-            )
-        except Exception as e:
-            raise _handle_coder_error(e)
+    # -------------------------------------------------------------------------
+    # Workspace lifecycle endpoints (requires workspace access)
+    # -------------------------------------------------------------------------
+
+    if get_current_principal:
+
+        @router.post(
+            "/workspaces/{username}/{workspace_name}/start",
+            response_model=WorkspaceActionResponse,
+            summary="Start a workspace",
+        )
+        async def start_workspace(
+            username: str,
+            workspace_name: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> WorkspaceActionResponse:
+            """Start a stopped workspace."""
+            _check_workspace_access(permissions, "start")
+            try:
+                success = await client.start_workspace(username, workspace_name)
+                return WorkspaceActionResponse(
+                    success=success,
+                    message="Workspace starting" if success else "Failed to start workspace",
+                )
+            except Exception as e:
+                raise _handle_coder_error(e)
+
+        @router.post(
+            "/workspaces/{username}/{workspace_name}/stop",
+            response_model=WorkspaceActionResponse,
+            summary="Stop a workspace",
+        )
+        async def stop_workspace(
+            username: str,
+            workspace_name: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> WorkspaceActionResponse:
+            """Stop a running workspace."""
+            _check_workspace_access(permissions, "stop")
+            try:
+                success = await client.stop_workspace(username, workspace_name)
+                return WorkspaceActionResponse(
+                    success=success,
+                    message="Workspace stopping" if success else "Failed to stop workspace",
+                )
+            except Exception as e:
+                raise _handle_coder_error(e)
+
+        @router.delete(
+            "/workspaces/{username}/{workspace_name}",
+            response_model=WorkspaceActionResponse,
+            summary="Delete a workspace",
+        )
+        async def delete_workspace(
+            username: str,
+            workspace_name: str,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+        ) -> WorkspaceActionResponse:
+            """Delete a workspace."""
+            _check_workspace_access(permissions, "delete")
+            try:
+                success = await client.delete_workspace(username, workspace_name)
+                return WorkspaceActionResponse(
+                    success=success,
+                    message="Workspace deleted" if success else "Failed to delete workspace",
+                )
+            except Exception as e:
+                raise _handle_coder_error(e)
 
     # -------------------------------------------------------------------------
     # Coder session/login endpoints
@@ -493,7 +538,7 @@ def create_coder_router(
             This allows the frontend to authenticate with Coder using the
             user's credentials without storing them.
             """
-            _ = permissions
+            _check_workspace_access(permissions, "session")
             try:
                 session_token = await client.login_user(user_email, request.password)
                 if session_token:
@@ -599,7 +644,6 @@ def create_admin_coder_router(
             try:
                 return await client.provision_workspace(
                     user_email=email,
-                    user_password=request.password,
                     full_name=full_name,
                     template=request.template,
                     workspace_name=request.workspace_name,
