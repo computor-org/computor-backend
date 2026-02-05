@@ -366,7 +366,7 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
 
     # If no Authorization header, check for access_token cookie
     if not authorization:
-        access_token = request.cookies.get("access_token")
+        access_token = request.cookies.get("ct_access_token")
         if access_token:
             logger.debug("Using access_token from cookie")
             return SSOAuthCredentials(token=access_token, scheme="Bearer")

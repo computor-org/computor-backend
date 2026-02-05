@@ -140,7 +140,7 @@ async def login_with_credentials(
 
     # Set access token as httponly cookie
     response.set_cookie(
-        key="access_token",
+        key="ct_access_token",
         value=result.access_token,
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
@@ -150,7 +150,7 @@ async def login_with_credentials(
 
     # Also set refresh token as httponly cookie
     response.set_cookie(
-        key="refresh_token",
+        key="ct_refresh_token",
         value=result.refresh_token,
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
@@ -359,7 +359,7 @@ async def logout(
         current_token = authorization.replace("Bearer ", "")
     else:
         # Try to get from cookie
-        current_token = request.cookies.get("access_token")
+        current_token = request.cookies.get("ct_access_token")
 
     result = await logout_session(
         access_token=current_token,
@@ -369,8 +369,8 @@ async def logout(
     )
 
     # Clear cookies
-    response.delete_cookie(key="access_token", samesite="lax")
-    response.delete_cookie(key="refresh_token", samesite="lax")
+    response.delete_cookie(key="ct_access_token", samesite="lax")
+    response.delete_cookie(key="ct_refresh_token", samesite="lax")
 
     return result
 
