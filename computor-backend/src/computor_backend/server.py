@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
-from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
 from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
@@ -497,13 +497,13 @@ app.include_router(
     ),
 )
 
-# Coder Web UI router (requires authentication)
+# Coder Web UI router (redirects to login if not authenticated)
 app.include_router(
     create_web_router(
         prefix="/coder-ui",
         api_prefix="/coder",
         tags=["coder-web"],
-        dependencies=[Depends(get_current_principal)],
+        get_current_principal_optional=get_current_principal_optional,
     ),
 )
 
