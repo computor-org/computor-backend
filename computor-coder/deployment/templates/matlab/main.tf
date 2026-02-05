@@ -50,14 +50,12 @@ variable "coder_base_path" {
 }
 
 variable "computor_backend_url" {
-  default     = "https://computor.itp.tugraz.at/api"
-  description = "Backend URL for Computor extension"
+  description = "External backend URL for Computor extension (set via template deployment based on DEBUG_MODE)"
   type        = string
 }
 
 variable "computor_backend_internal" {
-  default     = "http://host.docker.internal:8000"
-  description = "Internal backend service URL for ForwardAuth (Docker network). Use 'http://uvicorn:8000' in production."
+  description = "Internal backend service URL for ForwardAuth (Docker network). Set via template deployment based on DEBUG_MODE: 'http://host.docker.internal:8000' in dev, 'http://uvicorn:8000' in prod."
   type        = string
 }
 
@@ -308,7 +306,7 @@ resource "docker_container" "workspace" {
   # ForwardAuth middleware - verify user authentication before allowing access
   labels {
     label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.address"
-    value = "${var.computor_backend_internal}/api/auth/verify-coder-access"
+    value = "${var.computor_backend_internal}/auth/verify-coder-access"
   }
 
   labels {

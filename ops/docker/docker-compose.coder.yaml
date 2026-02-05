@@ -236,13 +236,15 @@ services:
         export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
         export CODER_URL="http://coder:7080"
 
-        # Determine backend URL based on DEBUG_MODE
+        # Determine backend URLs based on DEBUG_MODE
         if [ "${DEBUG_MODE}" = "production" ]; then
           BACKEND_INTERNAL_URL="http://uvicorn:8000"
-          echo "Production mode: Using backend at $$BACKEND_INTERNAL_URL"
+          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_PROD}"
+          echo "Production mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
         else
           BACKEND_INTERNAL_URL="http://host.docker.internal:8000"
-          echo "Development mode: Using backend at $$BACKEND_INTERNAL_URL"
+          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}"
+          echo "Development mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
         fi
 
         # Function to create template and set TTL
@@ -255,11 +257,14 @@ services:
             return
           fi
 
-          echo "Pushing template: $$TEMPLATE_NAME with backend URL: $$BACKEND_INTERNAL_URL"
+          echo "Pushing template: $$TEMPLATE_NAME"
+          echo "  Internal backend: $$BACKEND_INTERNAL_URL"
+          echo "  External backend: $$BACKEND_EXTERNAL_URL"
           cd "$$TEMPLATE_DIR"
           coder templates push "$$TEMPLATE_NAME" \
             --directory . \
             --variable computor_backend_internal="$$BACKEND_INTERNAL_URL" \
+            --variable computor_backend_url="$$BACKEND_EXTERNAL_URL" \
             --yes \
             && echo "Template '$$TEMPLATE_NAME' created successfully." \
             || echo "Template '$$TEMPLATE_NAME' creation skipped (may already exist)."
@@ -290,6 +295,8 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       DEBUG_MODE: ${DEBUG_MODE:-development}
+      BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
+      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD}
     volumes:
       - ../../computor-coder/deployment/templates:/templates:ro
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
