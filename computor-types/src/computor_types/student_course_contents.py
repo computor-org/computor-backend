@@ -6,7 +6,7 @@ from computor_types.course_content_types import CourseContentTypeGet, CourseCont
 from computor_types.deployments import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.tasks import TaskStatus
-from computor_types.grading import SubmissionGroupGradingList
+from computor_types.grading import SubmissionGroupGradingList, GradedByCourseMember
 from computor_types.deployment import CourseContentDeploymentList
 from computor_types.results import ResultArtifactInfo
 
@@ -54,6 +54,7 @@ class SubmissionGroupStudentList(BaseModel):
     repository: Optional[SubmissionGroupRepository] = None
     status: Optional[str] = None  # Backward compatibility
     grading: Optional[float] = None  # Backward compatibility
+    graded_by_course_member: Optional[GradedByCourseMember] = None  # Who graded this
     count: int = 0  # Backward compatibility - submission count
     max_submissions: Optional[int] = None  # Backward compatibility
     unread_message_count: int = 0

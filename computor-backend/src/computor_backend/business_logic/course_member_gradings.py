@@ -396,6 +396,7 @@ def _process_hierarchical_stats(
             "max_test_runs": details.get("max_test_runs") if details else None,
             "submissions_count": details.get("submissions_count") if details else None,
             "max_submissions": details.get("max_submissions") if details else None,
+            "graded_by_course_member": details.get("graded_by_course_member") if details else None,
         })
 
     # Calculate overall progress

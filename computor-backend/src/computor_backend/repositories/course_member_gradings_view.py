@@ -197,6 +197,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 max_test_runs=node.get("max_test_runs"),
                 submissions_count=node.get("submissions_count"),
                 max_submissions=node.get("max_submissions"),
+                graded_by_course_member=node.get("graded_by_course_member"),
             )
             for node in stats["nodes"]
         ]
