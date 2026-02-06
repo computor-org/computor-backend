@@ -279,6 +279,7 @@ async def lifespan(app: FastAPI):
     # Stop WebSocket connection manager
     await ws_manager.stop()
 
+
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 

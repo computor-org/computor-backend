@@ -201,12 +201,16 @@ class AuthenticationService:
             raise UnauthorizedException("SSO authentication failed")
 
     @staticmethod
-    def authenticate_api_token(token: str, db: Session) -> AuthenticationResult:
+    async def authenticate_api_token(token: str, db: Session) -> AuthenticationResult:
         """
-        Authenticate using API token.
+        Authenticate using API token (with Redis caching).
 
         API tokens provide scoped authentication for services and automation.
         Token format: ctp_<random_32_chars>
+
+        Caching strategy:
+        - Token validation results cached in Redis for fast auth
+        - Cache invalidated on token revocation
 
         Args:
             token: The full API token string
@@ -218,14 +222,31 @@ class AuthenticationService:
         Raises:
             UnauthorizedException: If token is invalid, revoked, or expired
         """
+        from computor_backend.permissions.api_token_cache import (
+            get_cached_token_data,
+            set_cached_token_data,
+            track_user_token,
+            CachedTokenData,
+        )
+
         # Validate token format
         if not validate_token_format(token):
             raise UnauthorizedException(error_code="AUTH_004", detail="Invalid API token format")
 
         # Hash token for lookup
         token_hash = hash_api_token(token)
+        token_hash_hex = token_hash.hex()
 
-        # Find token in database
+        # Try cache first
+        cached = await get_cached_token_data(token_hash_hex)
+
+        if cached:
+            # Cache hit - return cached auth result
+            auth_result = AuthenticationResult(cached.user_id, cached.role_ids, "api_token")
+            auth_result.scopes = cached.scopes
+            return auth_result
+
+        # Cache miss - query database
         api_token = (
             db.query(ApiToken)
             .filter(
@@ -246,7 +267,7 @@ class AuthenticationService:
                 logger.warning(f"API token {api_token.id} has expired")
                 raise UnauthorizedException(error_code="AUTH_005", detail="API token expired")
 
-        # Update usage stats
+        # Update usage stats (direct DB write on cache miss only)
         api_token.last_used_at = datetime.datetime.now(datetime.timezone.utc)
         api_token.usage_count += 1
         db.commit()
@@ -259,11 +280,22 @@ class AuthenticationService:
         )
         role_ids = [r[0] for r in role_ids if r[0] is not None]
 
+        # Cache the token data
+        token_data = CachedTokenData(
+            token_id=str(api_token.id),
+            user_id=str(api_token.user_id),
+            role_ids=role_ids,
+            scopes=api_token.scopes or [],
+            expires_at=api_token.expires_at.isoformat() if api_token.expires_at else None,
+            token_prefix=api_token.token_prefix,
+        )
+        await set_cached_token_data(token_hash_hex, token_data)
+        await track_user_token(str(api_token.user_id), token_hash_hex)
+
         logger.info(f"API token authentication successful for user {api_token.user_id} (token: {api_token.token_prefix}...)")
 
         # Create authentication result with scopes
         auth_result = AuthenticationResult(api_token.user_id, role_ids, "api_token")
-        # Store scopes in the result for later use
         auth_result.scopes = api_token.scopes
 
         return auth_result
@@ -443,7 +475,7 @@ async def get_current_principal(
     with next(get_db()) as db:
         # Route to appropriate authentication method
         if isinstance(credentials, ApiTokenCredentials):
-            auth_result = AuthenticationService.authenticate_api_token(
+            auth_result = await AuthenticationService.authenticate_api_token(
                 credentials.token, db
             )
             principal = PrincipalBuilder.build(auth_result, db)
