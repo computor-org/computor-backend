@@ -197,6 +197,25 @@ def create_web_router(
             },
         )
 
+    @router.get("/users/{user_id}", response_class=HTMLResponse, name="coder_user_detail_page")
+    async def user_detail_page(request: Request, user_id: str, principal=Depends(get_principal)):
+        """Render the user detail/workspace management page."""
+        if principal is None:
+            return _login_redirect(request)
+        if not _has_workspace_access(principal, "manage"):
+            return _forbidden_response(request)
+        return templates.TemplateResponse(
+            "user_detail.html",
+            {
+                "request": request,
+                "active_page": "users",
+                "version": __version__,
+                "api_prefix": api_prefix,
+                "principal": principal,
+                "user_id": user_id,
+            },
+        )
+
     return router
 
 

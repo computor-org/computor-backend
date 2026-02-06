@@ -716,8 +716,12 @@ class CoderClient:
                 "name": "computor_auth_token",
                 "value": workspace_data.computor_auth_token,
             })
+            logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:15]}...)")
+        else:
+            logger.warning("No computor_auth_token provided for workspace creation!")
         if rich_params:
             payload["rich_parameter_values"] = rich_params
+            logger.info(f"Sending rich_parameter_values: {[p['name'] for p in rich_params]}")
 
         resp = await client.post(
             f"/api/v2/organizations/default/members/{username}/workspaces",
@@ -999,6 +1003,65 @@ class CoderClient:
 
         return WorkspaceStatus.PENDING
 
+    async def _update_workspace_token(
+        self,
+        workspace_id: str,
+        computor_auth_token: str,
+    ) -> bool:
+        """
+        Update an existing workspace with a new auth token.
+
+        This triggers a rebuild of the workspace with the new token value.
+
+        Args:
+            workspace_id: Workspace ID to update
+            computor_auth_token: New token value
+
+        Returns:
+            True if update was initiated successfully
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        # Get workspace to find template version
+        resp = await client.get(
+            f"/api/v2/workspaces/{workspace_id}",
+            headers={"Coder-Session-Token": token},
+        )
+
+        if resp.status_code != 200:
+            logger.error(f"Failed to get workspace for token update: {resp.status_code}")
+            return False
+
+        workspace = resp.json()
+        template_version_id = workspace["latest_build"]["template_version_id"]
+
+        # Create a new build with the updated token parameter
+        rich_params = [{
+            "name": "computor_auth_token",
+            "value": computor_auth_token,
+        }]
+
+        resp = await client.post(
+            f"/api/v2/workspaces/{workspace_id}/builds",
+            headers=self._get_headers(token),
+            json={
+                "template_version_id": template_version_id,
+                "transition": "start",
+                "rich_parameter_values": rich_params,
+            },
+            timeout=self.settings.workspace_timeout,
+        )
+
+        success = resp.status_code in (200, 201)
+        if success:
+            print(f"[CODER] Token update build initiated for workspace {workspace_id}")
+            logger.info(f"Workspace {workspace_id}: token update build initiated")
+        else:
+            print(f"[CODER] FAILED to update token: {resp.status_code} - {resp.text}")
+            logger.error(f"Failed to update workspace token: {resp.status_code} - {resp.text}")
+        return success
+
     # -------------------------------------------------------------------------
     # Provisioning (combined user + workspace)
     # -------------------------------------------------------------------------
@@ -1064,6 +1127,14 @@ class CoderClient:
         try:
             details = await self.get_workspace(user.username, workspace_name)
             workspace = details.workspace
+            # Workspace exists - update it with new token by triggering a rebuild
+            if computor_auth_token:
+                print(f"[CODER] Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
+                logger.info(f"Workspace exists, updating with new token...")
+                await self._update_workspace_token(
+                    workspace.id,
+                    computor_auth_token,
+                )
         except CoderWorkspaceNotFoundError:
             # Create workspace
             ws_data = CoderWorkspaceCreate(

@@ -78,16 +78,10 @@ import json
 import tempfile
 from pathlib import Path
 
-# Coder integration
-from computor_coder import CoderPlugin, create_web_router, create_login_router, mount_static_files, create_coder_router
-from computor_backend.dependencies.plugin import (
-    get_current_user,
-    mint_workspace_token,
-)
+# Coder integration (now part of computor_backend)
+from computor_backend.api.coder import router as coder_api_router
+from computor_backend.api.coder_web import router as coder_web_router, login_router as coder_login_router, mount_static_files
 from typing import Optional
-
-# Global coder plugin instance
-coder_plugin: CoderPlugin | None = None
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -468,34 +462,10 @@ app.include_router(
     dependencies=[Depends(get_current_principal)],
 )
 
-# Coder integration routers
-app.include_router(
-    create_coder_router(
-        prefix="/coder",
-        tags=["coder", "workspaces"],
-        get_current_principal=get_current_principal,
-        get_user=get_current_user,
-        mint_workspace_token=mint_workspace_token,
-    ),
-)
-
-# Coder Web UI router (redirects to login if not authenticated)
-app.include_router(
-    create_web_router(
-        prefix="/coder-ui",
-        api_prefix="/coder",
-        tags=["coder-web"],
-        get_current_principal_optional=get_current_principal_optional,
-    ),
-)
-
-# Coder login page (public, no auth required)
-app.include_router(
-    create_login_router(
-        prefix="/coder-ui",
-        tags=["coder-web"],
-    ),
-)
+# Coder integration routers (now part of computor_backend)
+app.include_router(coder_api_router)
+app.include_router(coder_web_router)
+app.include_router(coder_login_router)
 
 # Mount static files for the Coder web UI
 mount_static_files(app, prefix="/coder-ui/static")

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Coder Workspaces{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('coder_static', path='css/style.css') }}?v={{ version }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="{{ url_for('coder_dashboard') }}">Coder Workspaces</a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('coder_dashboard') }}" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+            <li><a href="{{ url_for('coder_workspaces_page') }}" {% if active_page == 'workspaces' %}class="active"{% endif %}>My Workspaces</a></li>
+            <li><a href="{{ url_for('coder_templates_page') }}" {% if active_page == 'templates' %}class="active"{% endif %}>Templates</a></li>
+            <li><a href="{{ url_for('coder_provision_page') }}" {% if active_page == 'provision' %}class="active"{% endif %}>Provision</a></li>
+            <li><a href="{{ url_for('coder_users_page') }}" {% if active_page == 'users' %}class="active"{% endif %}>Users</a></li>
+        </ul>
+        <div class="nav-status">
+            <span id="health-status" class="status-indicator">Checking...</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Computor Coder Plugin v{{ version }}</p>
+    </footer>
+
+    <div id="notification" class="notification hidden"></div>
+
+    <script src="{{ url_for('coder_static', path='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
