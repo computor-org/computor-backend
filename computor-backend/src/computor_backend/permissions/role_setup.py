@@ -77,5 +77,48 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
         ("permissions", f"{Example.__tablename__}:upload"),
         ("permissions", f"{Example.__tablename__}:download")
     ])
-    
+
     return claims
+
+
+def claims_workspace_user() -> List[Tuple[str, str]]:
+    """
+    Generate claims for the workspace user role.
+
+    Basic access: view UI, list own workspaces, start/stop own workspaces.
+    Cannot provision, delete, or manage other users' workspaces.
+
+    Returns:
+        List of (claim_type, claim_value) tuples for workspace access permissions
+    """
+    return [
+        ("permissions", "workspace:access"),       # Gate-keeper: can access coder-ui
+        ("permissions", "workspace:list"),          # List own workspaces
+        ("permissions", "workspace:start"),         # Start own workspace
+        ("permissions", "workspace:stop"),          # Stop own workspace
+    ]
+
+
+def claims_workspace_maintainer() -> List[Tuple[str, str]]:
+    """
+    Generate claims for the workspace maintainer role.
+
+    Full access: everything a workspace user can do, plus provisioning,
+    deleting, managing other users' workspaces, and template management.
+
+    Returns:
+        List of (claim_type, claim_value) tuples for workspace maintainer permissions
+    """
+    return [
+        # Includes all workspace user claims
+        ("permissions", "workspace:access"),
+        ("permissions", "workspace:list"),
+        ("permissions", "workspace:start"),
+        ("permissions", "workspace:stop"),
+        # Maintainer-only claims
+        ("permissions", "workspace:provision"),     # Provision new workspaces
+        ("permissions", "workspace:delete"),        # Delete workspaces
+        ("permissions", "workspace:manage"),        # Query/manage any user's workspaces
+        ("permissions", "workspace:session"),       # Create coder sessions
+        ("permissions", "workspace:templates"),     # View/manage templates
+    ]

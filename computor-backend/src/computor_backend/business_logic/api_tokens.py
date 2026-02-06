@@ -358,6 +358,8 @@ def revoke_api_token(
 
     Users can revoke their own tokens.
     Admins can revoke any token.
+
+    Also invalidates the token's Redis cache for immediate effect.
     """
     token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
     if not token:
@@ -378,6 +380,9 @@ def revoke_api_token(
 
         db.commit()
 
+        # Invalidate token cache for immediate revocation effect
+        _invalidate_token_cache_sync(token.token_hash)
+
         logger.info(
             f"Revoked API token '{token.name}' (prefix: {token.token_prefix}) - "
             f"reason: {reason or 'not specified'}"
@@ -387,6 +392,24 @@ def revoke_api_token(
         db.rollback()
         logger.error(f"Error revoking API token: {e}")
         raise
+
+
+def _invalidate_token_cache_sync(token_hash: bytes) -> None:
+    """Helper to invalidate token cache from sync context."""
+    import asyncio
+    try:
+        from computor_backend.permissions.api_token_cache import invalidate_token_cache
+        token_hash_hex = token_hash.hex()
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(invalidate_token_cache(token_hash_hex))
+    except Exception as e:
+        logger.warning(f"Failed to invalidate token cache: {e}")
 
 
 def create_api_token_admin(
@@ -490,3 +513,63 @@ def create_api_token_admin(
         db.rollback()
         logger.error(f"Error creating admin API token: {e}")
         raise
+
+
+async def get_or_create_singleton_token(
+    token_data: ApiTokenCreate,
+    permissions: Principal,
+    db: Session,
+    revocation_reason: str = "replaced by new token",
+) -> ApiTokenCreateResponse:
+    """
+    Get or create a singleton API token by name for a user.
+
+    Ensures exactly one active token with the given name exists per user.
+    Any existing tokens with the same name are revoked before creating a new one.
+
+    This is useful for automated systems that need a single long-lived token
+    per user (e.g., workspace auto-login, CI integrations).
+
+    Args:
+        token_data: Token creation data (name is used as the singleton key)
+        permissions: Current user permissions
+        db: Database session
+        revocation_reason: Reason recorded when revoking old tokens
+
+    Returns:
+        Newly created token with full token string (shown only once)
+
+    Note:
+        Since raw tokens are not stored (only hashes), we cannot retrieve
+        an existing token's value. We always mint a fresh token.
+    """
+    from datetime import datetime, timezone
+    from computor_backend.permissions.api_token_cache import invalidate_token_cache
+
+    target_user_id = token_data.user_id or str(permissions.user_id)
+
+    # Revoke any existing tokens with this name for the user
+    existing = db.query(ApiToken).filter(
+        ApiToken.user_id == target_user_id,
+        ApiToken.name == token_data.name,
+        ApiToken.revoked_at.is_(None),
+    ).all()
+
+    for old_token in existing:
+        old_token.revoked_at = datetime.now(timezone.utc)
+        old_token.revocation_reason = revocation_reason
+        # Invalidate cache for revoked token
+        try:
+            await invalidate_token_cache(old_token.token_hash.hex())
+        except Exception as e:
+            logger.warning(f"Failed to invalidate token cache: {e}")
+
+    if existing:
+        db.flush()
+        logger.info(
+            f"Revoked {len(existing)} existing '{token_data.name}' token(s) "
+            f"for user {target_user_id}"
+        )
+
+    # Create the new token
+    return create_api_token(token_data, permissions, db)

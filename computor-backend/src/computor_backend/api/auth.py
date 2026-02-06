@@ -140,7 +140,7 @@ async def login_with_credentials(
 
     # Set access token as httponly cookie
     response.set_cookie(
-        key="access_token",
+        key="ct_access_token",
         value=result.access_token,
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
@@ -150,7 +150,7 @@ async def login_with_credentials(
 
     # Also set refresh token as httponly cookie
     response.set_cookie(
-        key="refresh_token",
+        key="ct_refresh_token",
         value=result.refresh_token,
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
@@ -359,7 +359,7 @@ async def logout(
         current_token = authorization.replace("Bearer ", "")
     else:
         # Try to get from cookie
-        current_token = request.cookies.get("access_token")
+        current_token = request.cookies.get("ct_access_token")
 
     result = await logout_session(
         access_token=current_token,
@@ -369,8 +369,8 @@ async def logout(
     )
 
     # Clear cookies
-    response.delete_cookie(key="access_token", samesite="lax")
-    response.delete_cookie(key="refresh_token", samesite="lax")
+    response.delete_cookie(key="ct_access_token", samesite="lax")
+    response.delete_cookie(key="ct_refresh_token", samesite="lax")
 
     return result
 
@@ -534,3 +534,87 @@ async def refresh_token(
     )
 
     return TokenRefreshResponse(**result)
+
+
+@auth_router.get("/verify-coder-access")
+async def verify_coder_access(
+    request: Request,
+    principal: Principal = Depends(get_current_principal)
+) -> JSONResponse:
+    """
+    Traefik ForwardAuth endpoint for Coder workspace access control.
+
+    This endpoint is called by Traefik before forwarding requests to code-server workspaces.
+    It verifies that:
+    1. The user is authenticated (via Bearer token, Basic auth, or API token)
+    2. The authenticated user matches the user ID in the workspace URL
+
+    URL Format: /coder/u{user_id}/{workspace_name}/...
+    Example: /coder/u0232de59-e05d-4bc2-898f-b879c06/{workspace}/
+
+    The 'u' prefix is required for Coder username compatibility, so we strip it to get the actual user ID.
+
+    Returns:
+    - 200 OK: User is authorized to access this workspace
+    - 401 Unauthorized: User is not authenticated
+    - 403 Forbidden: User is authenticated but not authorized for this workspace
+    """
+    import re
+
+    # Get the original URI from Traefik headers
+    original_uri = request.headers.get("X-Forwarded-Uri", request.url.path)
+
+    # Debug: Log all headers to understand the authentication flow
+    logger.info("=== ForwardAuth Debug ===")
+    logger.info(f"ForwardAuth request for: {original_uri}")
+    logger.info(f"Authenticated user: {principal.user_id}")
+    logger.info("Headers received:")
+    for header_name, header_value in request.headers.items():
+        # Mask sensitive values
+        if header_name.lower() in ["authorization", "cookie", "x-api-key"]:
+            logger.info(f"  {header_name}: {header_value[:20]}..." if len(header_value) > 20 else f"  {header_name}: ***")
+        else:
+            logger.info(f"  {header_name}: {header_value}")
+    logger.info("=========================")
+
+    # Extract username from URL path: /coder/u{user_id}/{workspace}/...
+    # Pattern: /coder/u<uuid>/<workspace>/*
+    pattern = r"/coder/u([a-f0-9\-]+)/([^/]+)"
+    match = re.match(pattern, original_uri)
+
+    if not match:
+        logger.warning(f"Invalid Coder URL format: {original_uri}")
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Invalid workspace URL format"}
+        )
+
+    url_user_id = match.group(1)  # Extract user ID without 'u' prefix
+    workspace_name = match.group(2)
+
+    logger.debug(f"URL user_id: {url_user_id}, workspace: {workspace_name}")
+
+    # Check if the authenticated user matches the workspace owner
+    # Note: Coder may truncate usernames due to length limits, so we check if the
+    # authenticated user ID starts with the URL user ID (which may be truncated)
+    if not principal.user_id.startswith(url_user_id):
+        logger.warning(
+            f"User {principal.user_id} attempted to access workspace belonging to {url_user_id}"
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "You are not authorized to access this workspace",
+                "workspace_owner": url_user_id,
+                "authenticated_user": principal.user_id
+            }
+        )
+
+    # User is authorized
+    logger.info(f"User {principal.user_id} authorized for workspace {workspace_name}")
+
+    # Return 200 OK - Traefik will forward the request
+    return JSONResponse(
+        status_code=200,
+        content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
+    )

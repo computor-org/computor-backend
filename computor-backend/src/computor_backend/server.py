@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
-from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager
+from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.tokens import encrypt_api_key
 from computor_backend.model.auth import User
@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
-from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
 from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
@@ -70,12 +70,24 @@ from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
+from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
 from computor_backend.websocket.connection_manager import manager as ws_manager
 import json
 import tempfile
 from pathlib import Path
+
+# Coder integration
+from computor_coder import CoderPlugin, create_web_router, create_login_router, mount_static_files, create_coder_router
+from computor_backend.dependencies.plugin import (
+    get_current_user,
+    mint_workspace_token,
+)
+from typing import Optional
+
+# Global coder plugin instance
+coder_plugin: CoderPlugin | None = None
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -165,6 +177,8 @@ async def startup_logic():
     with next(get_db()) as db:
         db_apply_roles("_user_manager",claims_user_manager(),db)
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
+        db_apply_roles("_workspace_user",claims_workspace_user(),db)
+        db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
 
         await init_admin_user(db)
     
@@ -173,6 +187,7 @@ async def startup_logic():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global coder_plugin
     # redis_client = await get_redis_client()
     # RedisCache(redis_client)
 
@@ -185,10 +200,26 @@ async def lifespan(app: FastAPI):
     # Start WebSocket connection manager
     await ws_manager.start()
 
+    # Initialize Coder plugin
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        coder_plugin = CoderPlugin()
+        await coder_plugin.initialize()
+        logger.info("Coder plugin initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Coder plugin: {e}")
+        coder_plugin = None
+
     yield
+
+    # Shutdown Coder plugin
+    if coder_plugin:
+        await coder_plugin.shutdown()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()
+
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -428,6 +459,46 @@ app.include_router(
     ws_router,
     tags=["websocket"]
 )
+
+# Coder workspace role management
+app.include_router(
+    workspace_roles_router,
+    prefix="/workspaces/roles",
+    tags=["workspaces", "roles"],
+    dependencies=[Depends(get_current_principal)],
+)
+
+# Coder integration routers
+app.include_router(
+    create_coder_router(
+        prefix="/coder",
+        tags=["coder", "workspaces"],
+        get_current_principal=get_current_principal,
+        get_user=get_current_user,
+        mint_workspace_token=mint_workspace_token,
+    ),
+)
+
+# Coder Web UI router (redirects to login if not authenticated)
+app.include_router(
+    create_web_router(
+        prefix="/coder-ui",
+        api_prefix="/coder",
+        tags=["coder-web"],
+        get_current_principal_optional=get_current_principal_optional,
+    ),
+)
+
+# Coder login page (public, no auth required)
+app.include_router(
+    create_login_router(
+        prefix="/coder-ui",
+        tags=["coder-web"],
+    ),
+)
+
+# Mount static files for the Coder web UI
+mount_static_files(app, prefix="/coder-ui/static")
 
 
 @app.head("/", status_code=204)

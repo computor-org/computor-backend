@@ -1,0 +1,320 @@
+# Coder addon Docker Compose configuration
+# Optional services for Coder workspace management
+# Use together with base + dev/prod configuration
+#
+# Code-server access is via Traefik at /coder/{username}/{workspace}/
+# (configured in workspace Terraform template via Docker labels)
+
+services:
+  # Dedicated PostgreSQL database for Coder (separate from main DB)
+  coder-postgres:
+    image: postgres:16
+    networks:
+      - computor-network
+    container_name: computor-coder-postgres
+    restart: unless-stopped
+    ports:
+      - "5439:5439"  # Different port from main postgres
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder-postgres:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      POSTGRES_USER: ${CODER_POSTGRES_USER:-coder}
+      POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD:-coder_password}
+      POSTGRES_DB: coder
+      PGPORT: 5439
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CODER_POSTGRES_USER:-coder} -p 5439"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+
+  # Coder server (internal only - not exposed via Traefik)
+  coder:
+    image: ghcr.io/coder/coder:latest
+    networks:
+      - computor-network
+    container_name: computor-coder
+    restart: unless-stopped
+    ports:
+      - "7080:7080"  # Expose for local API access
+    environment:
+      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable"
+      CODER_HTTP_ADDRESS: "0.0.0.0:7080"
+      # Internal Docker network URL - workspace containers use this to reach Coder
+      CODER_ACCESS_URL: "http://coder:7080"
+      # Note: Password auth must stay enabled for admin API operations (CoderClient._get_session_token).
+      # This is safe because Coder's port 7080 is not exposed through Traefik - users can't reach it.
+      CODER_DISABLE_PASSWORD_AUTH: ${CODER_DISABLE_PASSWORD_AUTH:-false}
+      CODER_DISABLE_SESSION_EXPIRY_REFRESH: ${CODER_DISABLE_SESSION_EXPIRY_REFRESH:-false}
+      CODER_TELEMETRY_ENABLE: ${CODER_TELEMETRY_ENABLE:-false}
+    group_add:
+      - "${DOCKER_GID}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - coder_home:/home/coder
+      - ../../computor-coder/deployment/templates:/templates:ro
+    depends_on:
+      coder-postgres:
+        condition: service_healthy
+      coder-registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7080/api/v2/buildinfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    labels:
+      - "traefik.enable=false"
+
+  # Local Docker registry for workspace images
+  coder-registry:
+    image: registry:2
+    networks:
+      - computor-network
+    container_name: computor-coder-registry
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CODER_REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - coder_registry_data:/var/lib/registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/v2/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Build Python 3.13 workspace image
+  coder-image-builder-python:
+    image: docker:latest
+    networks:
+      - computor-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for registry to be ready..."
+        until wget -q --spider http://coder-registry:5000/v2/; do
+          sleep 1
+        done
+        echo "Registry is ready."
+
+        if [ ! -f /workspace/Dockerfile ]; then
+          echo "No Dockerfile found for Python 3.13, skipping."
+          exit 0
+        fi
+
+        echo "Building Python 3.13 workspace image..."
+        cd /workspace
+        docker build -t localhost:5000/computor-workspace-python3.13:latest .
+
+        echo "Pushing Python 3.13 image to local registry..."
+        docker push localhost:5000/computor-workspace-python3.13:latest
+
+        echo "Python 3.13 workspace image built and pushed successfully."
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../../computor-coder/deployment/templates/python3.13:/workspace:ro
+    depends_on:
+      coder-registry:
+        condition: service_healthy
+    restart: "no"
+
+  # Build MATLAB workspace image
+  coder-image-builder-matlab:
+    image: docker:latest
+    networks:
+      - computor-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for registry to be ready..."
+        until wget -q --spider http://coder-registry:5000/v2/; do
+          sleep 1
+        done
+        echo "Registry is ready."
+
+        if [ ! -f /workspace/Dockerfile ]; then
+          echo "No Dockerfile found for MATLAB, skipping."
+          exit 0
+        fi
+
+        echo "Building MATLAB workspace image..."
+        cd /workspace
+        docker build -t localhost:5000/computor-workspace-matlab:latest .
+
+        echo "Pushing MATLAB image to local registry..."
+        docker push localhost:5000/computor-workspace-matlab:latest
+
+        echo "MATLAB workspace image built and pushed successfully."
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../../computor-coder/deployment/templates/matlab:/workspace:ro
+    depends_on:
+      coder-registry:
+        condition: service_healthy
+    restart: "no"
+
+  # Coder admin setup (one-time initialization)
+  coder-admin-setup:
+    image: ghcr.io/coder/coder:latest
+    networks:
+      - computor-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Waiting for Coder to be ready..."
+
+        max_attempts=60
+        attempt=1
+        while [ $$attempt -le $$max_attempts ]; do
+          if curl -f http://coder:7080/api/v2/buildinfo 2>/dev/null; then
+            echo "Coder is ready!"
+            break
+          fi
+          echo "Attempt $$attempt/$$max_attempts: Coder not ready yet, waiting..."
+          sleep 2
+          attempt=$$((attempt + 1))
+        done
+
+        if [ $$attempt -gt $$max_attempts ]; then
+          echo "Coder failed to become ready after $$max_attempts attempts"
+          exit 1
+        fi
+
+        # Create admin user
+        if [ -z "${CODER_ADMIN_USERNAME}" ]; then
+          echo "No admin credentials provided, skipping admin creation."
+          exit 0
+        fi
+
+        echo "Creating admin user: ${CODER_ADMIN_USERNAME}"
+        coder server create-admin-user \
+          --username "${CODER_ADMIN_USERNAME}" \
+          --email "${CODER_ADMIN_EMAIL}" \
+          --password "${CODER_ADMIN_PASSWORD}" \
+          --postgres-url "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable" \
+          && echo "Admin user created successfully." \
+          || echo "Admin creation skipped (may already exist)."
+
+        exit 0
+    environment:
+      CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
+      CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
+      CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
+    depends_on:
+      coder:
+        condition: service_healthy
+    restart: "no"
+
+  # Template provisioning (after admin setup)
+  coder-template-setup:
+    image: ghcr.io/coder/coder:latest
+    networks:
+      - computor-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Setting up Coder templates..."
+
+        # Login via API and get session token
+        SESSION_TOKEN=$$(curl -s -X POST "http://coder:7080/api/v2/users/login" \
+          -H "Content-Type: application/json" \
+          -d "{\"email\":\"${CODER_ADMIN_EMAIL}\",\"password\":\"${CODER_ADMIN_PASSWORD}\"}" \
+          | sed -n 's/.*"session_token":"\([^"]*\)".*/\1/p')
+
+        if [ -z "$$SESSION_TOKEN" ]; then
+          echo "Failed to get session token, skipping template creation."
+          exit 0
+        fi
+
+        echo "Session token obtained."
+        export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
+        export CODER_URL="http://coder:7080"
+
+        # Determine backend URLs based on DEBUG_MODE
+        if [ "${DEBUG_MODE}" = "production" ]; then
+          BACKEND_INTERNAL_URL="http://uvicorn:8000"
+          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_PROD}"
+          echo "Production mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
+        else
+          BACKEND_INTERNAL_URL="http://host.docker.internal:8000"
+          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}"
+          echo "Development mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
+        fi
+
+        # Function to create template and set TTL
+        create_template() {
+          TEMPLATE_NAME=$$1
+          TEMPLATE_DIR=$$2
+
+          if [ ! -f "$$TEMPLATE_DIR/main.tf" ]; then
+            echo "No template files found for $$TEMPLATE_NAME, skipping."
+            return
+          fi
+
+          echo "Pushing template: $$TEMPLATE_NAME"
+          echo "  Internal backend: $$BACKEND_INTERNAL_URL"
+          echo "  External backend: $$BACKEND_EXTERNAL_URL"
+          cd "$$TEMPLATE_DIR"
+          coder templates push "$$TEMPLATE_NAME" \
+            --directory . \
+            --variable computor_backend_internal="$$BACKEND_INTERNAL_URL" \
+            --variable computor_backend_url="$$BACKEND_EXTERNAL_URL" \
+            --yes \
+            && echo "Template '$$TEMPLATE_NAME' created successfully." \
+            || echo "Template '$$TEMPLATE_NAME' creation skipped (may already exist)."
+
+          # Set default auto-stop (TTL) to 1 hour
+          echo "Setting auto-stop for $$TEMPLATE_NAME to 1 hour..."
+
+          TEMPLATE_ID=$$(curl -s "http://coder:7080/api/v2/organizations/default/templates/$$TEMPLATE_NAME" \
+            -H "Coder-Session-Token: $$SESSION_TOKEN" \
+            | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+
+          if [ -n "$$TEMPLATE_ID" ]; then
+            curl -s -X PATCH "http://coder:7080/api/v2/templates/$$TEMPLATE_ID" \
+              -H "Content-Type: application/json" \
+              -H "Coder-Session-Token: $$SESSION_TOKEN" \
+              -d '{"default_ttl_ms": 3600000, "activity_bump_ms": 3600000}' \
+              && echo "Auto-stop configured for $$TEMPLATE_NAME." \
+              || echo "Failed to set auto-stop for $$TEMPLATE_NAME."
+          fi
+        }
+
+        # Create templates
+        create_template "python-workspace" "/templates/python3.13"
+        create_template "matlab-workspace" "/templates/matlab"
+
+        echo "Template setup complete."
+    environment:
+      CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
+      CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
+      DEBUG_MODE: ${DEBUG_MODE:-development}
+      BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
+      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD}
+    volumes:
+      - ../../computor-coder/deployment/templates:/templates:ro
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+    user: "0:0"
+    depends_on:
+      coder-admin-setup:
+        condition: service_completed_successfully
+      coder-image-builder-python:
+        condition: service_completed_successfully
+      coder-image-builder-matlab:
+        condition: service_completed_successfully
+    restart: "no"
+
+# Coder-specific volumes (isolated from main infrastructure)
+volumes:
+  coder_home:
+    name: computor-coder-home
+  coder_registry_data:
+    name: computor-coder-registry

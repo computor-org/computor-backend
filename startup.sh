@@ -1,94 +1,219 @@
 #!/bin/bash
 
-# Stop on error
+# Computor startup script with optional Coder support
+# Usage:
+#   ./startup.sh [dev|prod] [--coder] [docker-compose-options]
+#   ./startup.sh dev             # Development without Coder
+#   ./startup.sh dev --coder     # Development with Coder
+#   ./startup.sh prod            # Production without Coder
+#   ./startup.sh prod --coder -d # Production with Coder, detached
+
 set -e
 
-# Export env vars from .env
-set -a
-source .env
-set +a
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-ENVIRONMENT=${1:-dev}
+# Default values
+ENVIRONMENT="dev"
+ENABLE_CODER=false
+DOCKER_ARGS=""
 
-# Shift the first argument if it's an environment (dev/prod)
-if [[ "$1" == "dev" ]] || [[ "$1" == "prod" ]]; then
-    shift
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        dev|development)
+            ENVIRONMENT="dev"
+            shift
+            ;;
+        prod|production)
+            ENVIRONMENT="prod"
+            shift
+            ;;
+        --coder)
+            ENABLE_CODER=true
+            shift
+            ;;
+        *)
+            # Collect remaining arguments for docker-compose
+            DOCKER_ARGS="$DOCKER_ARGS $1"
+            shift
+            ;;
+    esac
+done
+
+echo -e "${GREEN}=== Computor Startup Script ===${NC}"
+echo -e "Environment: ${YELLOW}$ENVIRONMENT${NC}"
+echo -e "Coder enabled: ${YELLOW}$ENABLE_CODER${NC}"
+
+# Get script directory (should be project root)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+OPS_DIR="${SCRIPT_DIR}/ops"
+
+# Check if environment files exist
+check_env_file() {
+    local file=$1
+    local template="${OPS_DIR}/environments/$(basename $file).template"
+
+    if [ ! -f "$file" ]; then
+        if [ -f "$template" ]; then
+            echo -e "${YELLOW}Warning: $file not found.${NC}"
+            echo -e "Creating from template. Please edit $file with your configuration."
+            cp "$template" "$file"
+        else
+            echo -e "${RED}Error: Neither $file nor $template found!${NC}"
+            echo -e "Please run ./setup-env.sh first to create environment files."
+            exit 1
+        fi
+    fi
+}
+
+# Check required environment files
+if [ ! -f .env ]; then
+    echo -e "${RED}No .env file found!${NC}"
+    echo "Please create a .env file with your configuration."
+    echo "You can copy from .env.common if it exists: cp .env.common .env"
+    exit 1
 fi
 
-# Capture any additional docker-compose arguments (like --build)
-DOCKER_ARGS="$@"
+# Load environment file
+echo -e "\n${GREEN}Loading environment file...${NC}"
+set -a
 
-DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
+# Load configuration from .env in root ONLY
+source .env && echo "  ✓ .env"
+
+set +a
+
+# Check if Coder should be enabled based on environment variable
+if [ "$CODER_ENABLED" = "true" ] && [ "$ENABLE_CODER" != true ]; then
+    echo -e "  ${YELLOW}Note: CODER_ENABLED=true in configuration${NC}"
+fi
+
+# Build docker-compose command
+COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
+if [ "$ENABLE_CODER" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.coder.yaml"
+    # Set flag for PostgreSQL to create coder database
+    export POSTGRES_MULTIPLE_DATABASES="computor,coder"
+else
+    export POSTGRES_MULTIPLE_DATABASES="computor"
+fi
 
 # Function to safely create directories
 create_dir_if_needed() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
-        echo "Creating directory: $dir_path"
+        echo "  Creating: $dir_path"
         mkdir -p "$dir_path"
     elif [ ! -w "$dir_path" ]; then
-        echo "ERROR: Directory $dir_path exists but is not writable!"
-        echo "  Owner: $(stat -c '%U:%G' "$dir_path" 2>/dev/null)"
+        echo -e "${RED}ERROR: Directory $dir_path exists but is not writable!${NC}"
+        echo "  Owner: $(stat -c '%U:%G' "$dir_path" 2>/dev/null || stat -f '%Su:%Sg' "$dir_path" 2>/dev/null)"
         echo "  Please run: sudo chown -R $(whoami):$(whoami) ${SYSTEM_DEPLOYMENT_PATH}"
         echo "  Or remove it: sudo rm -rf ${SYSTEM_DEPLOYMENT_PATH}"
         exit 1
     fi
 }
 
-# Pre-create ALL Docker volume mount points with correct ownership
-# This prevents Docker from creating them as root
-echo "=== Pre-creating Docker volume directories ==="
+# Pre-create directories
+echo -e "\n${GREEN}Creating necessary directories...${NC}"
 
-# # Database directories
-# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/postgres"
-# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/temporal-postgres"
-# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis"
-# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis-data"
+# Database directories
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/postgres"
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/temporal-postgres"
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis"
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis-data"
 
-# # MinIO storage
-# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/minio/data"
+# MinIO storage
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/minio/data"
 
-# CRITICAL: Create shared directory BEFORE Docker mounts it
+# Shared application directories
 create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/shared"
-
-# Now create the application subdirectories
-destination="${SYSTEM_DEPLOYMENT_PATH}/shared"
-
-directories=(
-    "documents"
-    "courses"
-    "course-contents"
-    "defaults"
-    "repositories"
-)
-
-echo "=== Creating application directories ==="
-for dir in "${directories[@]}"; do
-    full_path="${destination}/${dir}"
-    create_dir_if_needed "$full_path"
+for dir in documents courses course-contents defaults repositories; do
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/shared/$dir"
 done
+
+# Coder directories (if enabled)
+if [ "$ENABLE_CODER" = true ]; then
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
+
+    # Auto-detect DOCKER_GID if not set (required for Coder to access Docker socket)
+    if [ -z "$DOCKER_GID" ]; then
+        echo -e "\n${GREEN}Auto-detecting Docker group ID...${NC}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS: get GID of docker.sock
+            DOCKER_GID=$(stat -f '%g' /var/run/docker.sock 2>/dev/null || echo "")
+        else
+            # Linux: get docker group ID
+            DOCKER_GID=$(getent group docker | cut -d: -f3 2>/dev/null || stat -c '%g' /var/run/docker.sock 2>/dev/null || echo "")
+        fi
+
+        if [ -n "$DOCKER_GID" ]; then
+            export DOCKER_GID
+            echo "  DOCKER_GID=$DOCKER_GID"
+        else
+            echo -e "${RED}ERROR: Could not detect Docker group ID${NC}"
+            echo "  Please set DOCKER_GID manually in your .env file"
+            echo "  You can find it with: getent group docker | cut -d: -f3"
+            exit 1
+        fi
+    fi
+fi
 
 # Copy defaults if source exists
 if [ -d "computor-backend/src/defaults" ]; then
-    echo "Copying defaults..."
-    cp -r computor-backend/src/defaults "${SYSTEM_DEPLOYMENT_PATH}/shared"
+    echo -e "\n${GREEN}Copying default files...${NC}"
+    cp -r computor-backend/src/defaults/* "${SYSTEM_DEPLOYMENT_PATH}/shared/defaults/" 2>/dev/null || true
 fi
 
-# Create Keycloak directories if they don't exist
-keycloak_imports="${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
-keycloak_themes="${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
+# Optional: Create Keycloak directories if enabled
+if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
+    echo -e "\n${GREEN}Setting up Keycloak directories...${NC}"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
 
-create_dir_if_needed "$keycloak_imports"
-create_dir_if_needed "$keycloak_themes"
-
-# Copy Keycloak realm configuration if it exists
-if [ -f "data/keycloak/computor-realm.json" ]; then
-    echo "Copying Keycloak realm configuration..."
-    cp data/keycloak/computor-realm.json "$keycloak_imports/"
+    # Copy Keycloak realm configuration if it exists
+    if [ -f "data/keycloak/computor-realm.json" ]; then
+        echo "  Copying Keycloak realm configuration..."
+        cp data/keycloak/computor-realm.json "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/"
+    fi
 fi
 
-echo "=== Starting Computor Server ==="
-echo "Environment: $ENVIRONMENT"
-echo "Docker compose file: $DOCKERCFILE"
+# Make postgres init script executable
+if [ -f "docker/postgres-init/01-create-multiple-databases.sh" ]; then
+    chmod +x docker/postgres-init/01-create-multiple-databases.sh
+fi
 
-docker-compose -f $DOCKERCFILE up $DOCKER_ARGS
+# Start services
+echo -e "\n${GREEN}Starting Computor services...${NC}"
+echo "Command: docker compose $COMPOSE_FILES up $DOCKER_ARGS"
+
+docker compose $COMPOSE_FILES up $DOCKER_ARGS
+
+# Show status if running in detached mode
+if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
+    echo -e "\n${GREEN}Services status:${NC}"
+    docker compose $COMPOSE_FILES ps
+
+    echo -e "\n${GREEN}Service URLs:${NC}"
+    echo "  • API: http://localhost:${API_PORT:-8000}"
+    echo "  • Traefik: http://localhost:${TRAEFIK_HTTP_PORT:-8080}"
+
+    if [ "$ENVIRONMENT" = "dev" ]; then
+        echo "  • Temporal UI: http://localhost:${TEMPORAL_UI_PORT:-8088}"
+        echo "  • MinIO Console: http://localhost:${MINIO_CONSOLE_PORT:-9001}"
+    fi
+
+    if [ "$ENABLE_CODER" = true ]; then
+        echo "  • Coder: ${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
+    fi
+
+    echo -e "\n${GREEN}To stop services:${NC}"
+    echo "  docker compose $COMPOSE_FILES down"
+
+    echo -e "\n${GREEN}To view logs:${NC}"
+    echo "  docker compose $COMPOSE_FILES logs -f [service-name]"
+fi
