@@ -15,9 +15,14 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.api.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.services.storage_service import get_storage_service
-from computor_backend.model.course import CourseContent, CourseMember, Course
-from computor_backend.model.service import Service, ServiceType
-from computor_backend.model.deployment import CourseContentDeployment
+from computor_backend.model.course import CourseMember
+from computor_backend.repositories import (
+    CourseRepository,
+    CourseContentRepository,
+    CourseContentDeploymentRepository,
+    ServiceRepository,
+    ServiceTypeRepository,
+)
 from computor_types.student_courses import CourseStudentQuery
 
 logger = logging.getLogger(__name__)
@@ -183,13 +188,11 @@ async def _get_example_version_for_course_content(
         NotFoundException: If course content or example version not found
         ForbiddenException: If user doesn't have tutor permissions
     """
-    from computor_backend.model.deployment import CourseContentDeployment
     from computor_backend.repositories.example_version_repo import ExampleVersionRepository
 
-    # Get course content
-    course_content = db.query(CourseContent).filter(
-        CourseContent.id == course_content_id
-    ).first()
+    # Get course content using repository
+    course_content_repo = CourseContentRepository(db, cache)
+    course_content = course_content_repo.get_by_id_optional(str(course_content_id))
 
     if not course_content:
         raise NotFoundException(detail=f"Course content {course_content_id} not found")
@@ -210,9 +213,8 @@ async def _get_example_version_for_course_content(
             )
 
     # Check for deployment first (newer approach), then fall back to example_version_id (deprecated)
-    deployment = db.query(CourseContentDeployment).filter(
-        CourseContentDeployment.course_content_id == course_content_id
-    ).order_by(CourseContentDeployment.assigned_at.desc()).first()
+    deployment_repo = CourseContentDeploymentRepository(db, cache)
+    deployment = deployment_repo.find_latest_for_course_content(str(course_content_id))
 
     example_version_id = None
 
@@ -473,7 +475,8 @@ async def _check_tutor_permission_for_course_content(
     course_content_id: UUID | str,
     permissions: Principal,
     db: Session,
-) -> tuple[CourseContent, Course]:
+    cache: Cache = None,
+):
     """
     Check that user has tutor (or higher) permissions for the course content.
 
@@ -484,16 +487,16 @@ async def _check_tutor_permission_for_course_content(
         NotFoundException: If course content not found
         ForbiddenException: If user doesn't have tutor permissions
     """
-    # Get course content
-    course_content = db.query(CourseContent).filter(
-        CourseContent.id == course_content_id
-    ).first()
+    # Get course content using repository
+    course_content_repo = CourseContentRepository(db, cache)
+    course_content = course_content_repo.get_by_id_optional(str(course_content_id))
 
     if not course_content:
         raise NotFoundException(detail=f"Course content {course_content_id} not found")
 
-    # Get course
-    course = db.query(Course).filter(Course.id == course_content.course_id).first()
+    # Get course using repository
+    course_repo = CourseRepository(db, cache)
+    course = course_repo.get_by_id_optional(str(course_content.course_id))
     if not course:
         raise NotFoundException(detail=f"Course not found")
 
@@ -525,6 +528,7 @@ async def create_tutor_test(
     config: Optional[str] = Form(None, description="Optional JSON configuration"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
     redis = Depends(get_redis_client),
 ):
     """
@@ -555,7 +559,7 @@ async def create_tutor_test(
 
     # Check permissions
     course_content, course = await _check_tutor_permission_for_course_content(
-        course_content_id, permissions, db
+        course_content_id, permissions, db, cache
     )
 
     # Parse optional config
@@ -577,25 +581,22 @@ async def create_tutor_test(
             detail="Testing service not configured for this assignment"
         )
 
-    # Get testing service and service type
-    service = db.query(Service).filter(
-        Service.id == course_content.testing_service_id
-    ).first()
+    # Get testing service and service type using repositories
+    service_repo = ServiceRepository(db, cache)
+    service = service_repo.get_by_id_optional(str(course_content.testing_service_id))
 
     if not service:
         raise BadRequestException(detail="Testing service not found")
 
-    service_type = db.query(ServiceType).filter(
-        ServiceType.id == service.service_type_id
-    ).first()
+    service_type_repo = ServiceTypeRepository(db, cache)
+    service_type = service_type_repo.get_by_id_optional(str(service.service_type_id))
 
     if not service_type:
         raise BadRequestException(detail="Service type not found")
 
-    # Get deployment for example version
-    deployment = db.query(CourseContentDeployment).filter(
-        CourseContentDeployment.course_content_id == course_content_id
-    ).order_by(CourseContentDeployment.assigned_at.desc()).first()
+    # Get latest deployment for example version using repository
+    deployment_repo = CourseContentDeploymentRepository(db, cache)
+    deployment = deployment_repo.find_latest_for_course_content(str(course_content_id))
 
     example_version_id = None
     if deployment and deployment.example_version_id:

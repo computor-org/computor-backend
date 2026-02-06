@@ -1,7 +1,7 @@
 """Business logic for API token management."""
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -14,8 +14,13 @@ from computor_backend.api.exceptions import (
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.service import ApiToken, Service, ServiceType
-from computor_backend.model.auth import User
+from computor_backend.model.service import ApiToken
+from computor_backend.repositories import (
+    ApiTokenRepository,
+    ServiceRepository,
+    ServiceTypeRepository,
+    UserRepository,
+)
 from computor_backend.utils.api_token import generate_api_token
 from computor_types.api_tokens import (
     ApiTokenCreate,
@@ -24,6 +29,9 @@ from computor_types.api_tokens import (
     ApiTokenGet,
     ApiTokenUpdate,
 )
+
+if TYPE_CHECKING:
+    from computor_backend.cache import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -88,32 +96,37 @@ DEFAULT_SERVICE_SCOPES = {
 }
 
 
-def get_default_scopes_for_service(user_id: str, db: Session) -> List[str]:
+def get_default_scopes_for_service(
+    user_id: str,
+    db: Session,
+    cache: Optional["Cache"] = None,
+) -> List[str]:
     """
     Get default scopes for a service account based on its service type.
 
     Args:
         user_id: Service user ID
         db: Database session
+        cache: Optional cache for repository operations
 
     Returns:
         List of default scope strings, or empty list if not a service or no defaults
     """
     # Check if user is a service account
-    user = db.query(User).filter(User.id == user_id).first()
+    user_repo = UserRepository(db, cache)
+    user = user_repo.get_by_id_optional(user_id)
     if not user or not user.is_service:
         return []
 
     # Get the service record
-    service = db.query(Service).filter(
-        Service.user_id == user_id,
-        Service.archived_at.is_(None)
-    ).first()
+    service_repo = ServiceRepository(db, cache)
+    service = service_repo.find_by_user_id(user_id)
     if not service or not service.service_type_id:
         return []
 
     # Get the service type to determine category
-    service_type = db.query(ServiceType).filter(ServiceType.id == service.service_type_id).first()
+    service_type_repo = ServiceTypeRepository(db, cache)
+    service_type = service_type_repo.get_by_id_optional(str(service.service_type_id))
     if not service_type:
         return []
 
@@ -125,6 +138,7 @@ def create_api_token(
     token_data: ApiTokenCreate,
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> ApiTokenCreateResponse:
     """
     Create a new API token.
@@ -133,6 +147,7 @@ def create_api_token(
         token_data: Token creation data
         permissions: Current user permissions
         db: Database session
+        cache: Optional cache for repository operations
 
     Returns:
         Created token with full token string (shown only once)
@@ -151,7 +166,8 @@ def create_api_token(
         target_user_id = permissions.user_id
 
     # Verify user exists
-    user = db.query(User).filter(User.id == target_user_id).first()
+    user_repo = UserRepository(db, cache)
+    user = user_repo.get_by_id_optional(str(target_user_id))
     if not user:
         raise BadRequestException(detail="User not found")
 
@@ -162,7 +178,7 @@ def create_api_token(
     # Determine scopes: use provided scopes, or get defaults for service accounts
     scopes = token_data.scopes
     if not scopes:
-        default_scopes = get_default_scopes_for_service(target_user_id, db)
+        default_scopes = get_default_scopes_for_service(str(target_user_id), db, cache)
         if default_scopes:
             scopes = default_scopes
             logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
@@ -227,6 +243,7 @@ def get_api_token(
     token_id: UUID,
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> ApiTokenGet:
     """
     Get API token details by ID.
@@ -234,12 +251,13 @@ def get_api_token(
     Users can only view their own tokens unless they have admin permissions.
     The actual token value is never returned.
     """
-    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
+    token_repo = ApiTokenRepository(db, cache)
+    token = token_repo.get_by_id_optional(str(token_id))
     if not token:
         raise NotFoundException(detail="API token not found")
 
     # Check permissions: owner or admin
-    if token.user_id != permissions.user_id:
+    if str(token.user_id) != str(permissions.user_id):
         check_permissions(permissions, ApiToken, "read", db)
 
     return ApiTokenGet.model_validate(token, from_attributes=True)
@@ -250,6 +268,7 @@ def list_api_tokens(
     include_revoked: bool,
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> List[ApiTokenGet]:
     """
     List API tokens.
@@ -257,28 +276,32 @@ def list_api_tokens(
     Regular users can only list their own tokens.
     Admins can list all tokens or filter by user_id.
     """
-    # Start with base query
-    query = db.query(ApiToken)
+    token_repo = ApiTokenRepository(db, cache)
 
-    # Determine filtering
+    # Determine which user's tokens to list
     if user_id:
         # Admin filtering by specific user
         check_permissions(permissions, ApiToken, "read", db)
-        query = query.filter(ApiToken.user_id == str(user_id))
+        target_user_id = str(user_id)
     else:
         # Check if user can list all tokens or only their own
         try:
             check_permissions(permissions, ApiToken, "read", db)
-            # Admin - can list all tokens (no filter)
+            # Admin - can list all tokens
+            target_user_id = None
         except ForbiddenException:
             # Regular user - only their own tokens
-            query = query.filter(ApiToken.user_id == permissions.user_id)
+            target_user_id = str(permissions.user_id)
 
-    # Filter revoked tokens
-    if not include_revoked:
-        query = query.filter(ApiToken.revoked_at.is_(None))
-
-    tokens = query.all()
+    # Get tokens based on filtering
+    if target_user_id:
+        tokens = token_repo.find_by_user(target_user_id, include_revoked=include_revoked)
+    else:
+        # Admin listing all tokens
+        if include_revoked:
+            tokens = token_repo.list()
+        else:
+            tokens = token_repo.find_by(revoked_at=None)
 
     return [ApiTokenGet.model_validate(t, from_attributes=True) for t in tokens]
 
@@ -288,6 +311,7 @@ def update_api_token_admin(
     token_data: "ApiTokenUpdate",
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> ApiTokenGet:
     """
     Update an API token (admin-only).
@@ -300,6 +324,7 @@ def update_api_token_admin(
         token_data: Token update data
         permissions: Current user permissions (must be admin)
         db: Database session
+        cache: Optional cache for repository operations
 
     Returns:
         Updated token details
@@ -312,28 +337,26 @@ def update_api_token_admin(
     check_permissions(permissions, ApiToken, "update", db)
 
     # Get token
-    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
+    token_repo = ApiTokenRepository(db, cache)
+    token = token_repo.get_by_id_optional(str(token_id))
     if not token:
         raise NotFoundException(detail="API token not found")
 
     try:
-        # Update fields if provided
+        # Build updates dict
+        updates = {"updated_by": permissions.user_id, "updated_at": datetime.now(timezone.utc)}
         if token_data.name is not None:
-            token.name = token_data.name
+            updates["name"] = token_data.name
         if token_data.description is not None:
-            token.description = token_data.description
+            updates["description"] = token_data.description
         if token_data.scopes is not None:
-            token.scopes = token_data.scopes
+            updates["scopes"] = token_data.scopes
         if token_data.expires_at is not None:
-            token.expires_at = token_data.expires_at
+            updates["expires_at"] = token_data.expires_at
         if token_data.properties is not None:
-            token.properties = token_data.properties
+            updates["properties"] = token_data.properties
 
-        token.updated_by = permissions.user_id
-        token.updated_at = datetime.now(timezone.utc)
-
-        db.commit()
-        db.refresh(token)
+        token = token_repo.update(str(token_id), updates)
 
         logger.info(
             f"Updated API token '{token.name}' (prefix: {token.token_prefix})"
@@ -352,6 +375,7 @@ def revoke_api_token(
     reason: Optional[str],
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> None:
     """
     Revoke an API token.
@@ -361,7 +385,8 @@ def revoke_api_token(
 
     Also invalidates the token's Redis cache for immediate effect.
     """
-    token = db.query(ApiToken).filter(ApiToken.id == str(token_id)).first()
+    token_repo = ApiTokenRepository(db, cache)
+    token = token_repo.get_by_id_optional(str(token_id))
     if not token:
         raise NotFoundException(detail="API token not found")
 
@@ -370,18 +395,19 @@ def revoke_api_token(
         raise BadRequestException(detail="Token is already revoked")
 
     # Check permissions: owner or admin
-    if token.user_id != permissions.user_id:
+    if str(token.user_id) != str(permissions.user_id):
         check_permissions(permissions, ApiToken, "delete", db)
 
     try:
-        token.revoked_at = datetime.now(timezone.utc)
-        token.revocation_reason = reason
-        token.updated_by = permissions.user_id
-
-        db.commit()
+        revoked_token = token_repo.revoke(
+            str(token_id),
+            reason=reason,
+            revoked_by=str(permissions.user_id)
+        )
 
         # Invalidate token cache for immediate revocation effect
-        _invalidate_token_cache_sync(token.token_hash)
+        if revoked_token:
+            _invalidate_token_cache_sync(revoked_token.token_hash)
 
         logger.info(
             f"Revoked API token '{token.name}' (prefix: {token.token_prefix}) - "
@@ -416,6 +442,7 @@ def create_api_token_admin(
     token_data: ApiTokenAdminCreate,
     permissions: Principal,
     db: Session,
+    cache: Optional["Cache"] = None,
 ) -> ApiTokenCreateResponse:
     """
     Create an API token with a predefined value (admin-only).
@@ -427,6 +454,7 @@ def create_api_token_admin(
         token_data: Token creation data with predefined token
         permissions: Current user permissions (must be admin)
         db: Database session
+        cache: Optional cache for repository operations
 
     Returns:
         Created token with the predefined token value
@@ -439,7 +467,8 @@ def create_api_token_admin(
     check_permissions(permissions, ApiToken, "create", db)
 
     # Verify user exists
-    user = db.query(User).filter(User.id == token_data.user_id).first()
+    user_repo = UserRepository(db, cache)
+    user = user_repo.get_by_id_optional(token_data.user_id)
     if not user:
         raise BadRequestException(detail="User not found")
 
@@ -463,7 +492,7 @@ def create_api_token_admin(
     # Determine scopes: use provided scopes, or get defaults for service accounts
     scopes = token_data.scopes
     if not scopes:
-        default_scopes = get_default_scopes_for_service(token_data.user_id, db)
+        default_scopes = get_default_scopes_for_service(token_data.user_id, db, cache)
         if default_scopes:
             scopes = default_scopes
             logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
@@ -520,6 +549,7 @@ async def get_or_create_singleton_token(
     permissions: Principal,
     db: Session,
     revocation_reason: str = "replaced by new token",
+    cache: Optional["Cache"] = None,
 ) -> ApiTokenCreateResponse:
     """
     Get or create a singleton API token by name for a user.
@@ -535,6 +565,7 @@ async def get_or_create_singleton_token(
         permissions: Current user permissions
         db: Database session
         revocation_reason: Reason recorded when revoking old tokens
+        cache: Optional cache for repository operations
 
     Returns:
         Newly created token with full token string (shown only once)
@@ -543,21 +574,19 @@ async def get_or_create_singleton_token(
         Since raw tokens are not stored (only hashes), we cannot retrieve
         an existing token's value. We always mint a fresh token.
     """
-    from datetime import datetime, timezone
     from computor_backend.permissions.api_token_cache import invalidate_token_cache
 
     target_user_id = token_data.user_id or str(permissions.user_id)
+    token_repo = ApiTokenRepository(db, cache)
 
-    # Revoke any existing tokens with this name for the user
-    existing = db.query(ApiToken).filter(
-        ApiToken.user_id == target_user_id,
-        ApiToken.name == token_data.name,
-        ApiToken.revoked_at.is_(None),
-    ).all()
+    # Find and revoke any existing tokens with this name for the user
+    existing = token_repo.find_all_active_by_name(target_user_id, token_data.name)
 
     for old_token in existing:
-        old_token.revoked_at = datetime.now(timezone.utc)
-        old_token.revocation_reason = revocation_reason
+        token_repo.revoke(
+            str(old_token.id),
+            reason=revocation_reason,
+        )
         # Invalidate cache for revoked token
         try:
             await invalidate_token_cache(old_token.token_hash.hex())
@@ -565,11 +594,10 @@ async def get_or_create_singleton_token(
             logger.warning(f"Failed to invalidate token cache: {e}")
 
     if existing:
-        db.flush()
         logger.info(
             f"Revoked {len(existing)} existing '{token_data.name}' token(s) "
             f"for user {target_user_id}"
         )
 
     # Create the new token
-    return create_api_token(token_data, permissions, db)
+    return create_api_token(token_data, permissions, db, cache)

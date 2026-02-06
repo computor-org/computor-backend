@@ -48,6 +48,7 @@ async def get_current_user(
 async def mint_workspace_token(
     permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ) -> Optional[str]:
     """
     Mint a singleton API token for automatic extension auth in workspaces.
@@ -71,6 +72,7 @@ async def mint_workspace_token(
             permissions,
             db,
             revocation_reason="replaced by new workspace provision",
+            cache=cache,
         )
         logger.info(f"Minted workspace token for user {permissions.user_id} (prefix: {result.token_prefix})")
         return result.token

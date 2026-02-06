@@ -45,7 +45,6 @@ _sync_redis_client = redis.Redis(
 # Initialize write-through cache with sync client
 _cache = Cache(
     client=_sync_redis_client,
-    prefix="computor",
     default_ttl=600  # 10 minutes default
 )
 

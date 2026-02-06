@@ -18,6 +18,7 @@ from computor_types.messages import MessageCreate, MessageGet, MessageList, Mess
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
+from computor_backend.repositories import MessageRepository
 
 # Import business logic
 from computor_backend.business_logic.messages import (
@@ -43,6 +44,7 @@ async def create_message(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     payload: MessageCreate,
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Create a new message with enforced author and defaults."""
     model_dump = create_message_with_author(payload, permissions, db)
@@ -53,9 +55,9 @@ async def create_message(
     entity = _Create(**model_dump)
     message = await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
 
-    # Create audit log entry
-    from computor_backend.model.message import Message
-    db_message = db.query(Message).filter(Message.id == message.id).first()
+    # Create audit log entry using repository
+    message_repo = MessageRepository(db, cache)
+    db_message = message_repo.get_by_id_optional(str(message.id))
     if db_message:
         create_message_audit(db_message, permissions, db)
 

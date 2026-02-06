@@ -48,6 +48,9 @@ from .submission_grade_repo import SubmissionGradeRepository
 from .submission_group_member_repo import SubmissionGroupMemberRepository
 from .course_content_deployment_repo import CourseContentDeploymentRepository
 from .example_dependency_repo import ExampleDependencyRepository
+from .api_token import ApiTokenRepository
+from .service import ServiceRepository
+from .service_type import ServiceTypeRepository
 from .student_view import StudentViewRepository
 from .tutor_view import TutorViewRepository
 from .lecturer_view import LecturerViewRepository
@@ -77,6 +80,9 @@ __all__ = [
     "SubmissionGroupMemberRepository",
     "CourseContentDeploymentRepository",
     "ExampleDependencyRepository",
+    "ApiTokenRepository",
+    "ServiceRepository",
+    "ServiceTypeRepository",
     # View repositories
     "StudentViewRepository",
     "TutorViewRepository",
