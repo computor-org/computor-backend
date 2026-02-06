@@ -59,7 +59,7 @@ class CrudRouter:
             self._invalidate_user_views_for_entity(entity_created, db)
 
             for task in self.on_created:
-                background_tasks.add_task(task, entity_created, db, permissions)
+                background_tasks.add_task(task, entity_created, permissions)
 
             return entity_created
         return route
@@ -135,7 +135,7 @@ class CrudRouter:
             self._invalidate_user_views_for_entity(entity_updated, db)
 
             for task in self.on_updated:
-                background_tasks.add_task(task, entity_updated, db, permissions)
+                background_tasks.add_task(task, entity_updated, permissions)
 
             return entity_updated
         return route
@@ -166,7 +166,7 @@ class CrudRouter:
             # Run on_deleted tasks (not on_created)
             for task in self.on_deleted:
                 if entity_deleted:
-                    background_tasks.add_task(task, entity_deleted, db, permissions)
+                    background_tasks.add_task(task, entity_deleted, permissions)
 
             return await delete_db(permissions, db, id, self.dto.model)
 
@@ -185,7 +185,7 @@ class CrudRouter:
                     entity_archived = await get_id_db(permissions, db, id, self.dto)
 
                     for task in self.on_archived:
-                        background_tasks.add_task(task, entity_archived, db, permissions)
+                        background_tasks.add_task(task, entity_archived, permissions)
 
                 return await archive_db(permissions, db, id, self.dto.model)
             return route
