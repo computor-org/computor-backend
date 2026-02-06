@@ -65,6 +65,41 @@ class PrincipalProtocol(Protocol):
         ...
 
 
+@runtime_checkable
+class UserProtocol(Protocol):
+    """
+    Protocol defining the expected interface for User objects.
+
+    This matches the computor-types UserList/UserGet interface.
+    Used for workspace provisioning to get user email, name, and ID.
+    """
+
+    @property
+    def id(self) -> str:
+        """Get user ID (UUID)."""
+        ...
+
+    @property
+    def email(self) -> Optional[str]:
+        """Get user email."""
+        ...
+
+    @property
+    def username(self) -> Optional[str]:
+        """Get username."""
+        ...
+
+    @property
+    def given_name(self) -> Optional[str]:
+        """Get user's given name."""
+        ...
+
+    @property
+    def family_name(self) -> Optional[str]:
+        """Get user's family name."""
+        ...
+
+
 def _check_workspace_access(permissions, action: str = "access") -> None:
     """Check if the principal has a specific workspace permission.
 
@@ -121,9 +156,7 @@ def create_coder_router(
     prefix: str = "/coder",
     tags: Optional[list[str]] = None,
     get_current_principal: Optional[Callable] = None,
-    get_user_email: Optional[Callable] = None,
-    get_user_fullname: Optional[Callable] = None,
-    get_user_id: Optional[Callable] = None,
+    get_user: Optional[Callable] = None,
     mint_workspace_token: Optional[Callable] = None,
     dependencies: Optional[list] = None,
 ) -> APIRouter:
@@ -137,11 +170,11 @@ def create_coder_router(
         prefix: URL prefix for the router
         tags: OpenAPI tags for the endpoints
         get_current_principal: Dependency to get current Principal (permissions)
-        get_user_email: Dependency to get user's email (receives permissions)
-        get_user_fullname: Optional dependency to get user's full name
-        get_user_id: Optional dependency to get user's ID (used as Coder username)
-        mint_workspace_token: Optional dependency that returns a pre-minted API token string
-                              for automatic extension authentication in the workspace
+        get_user: Dependency to get the current user object (UserList/UserGet).
+                  Must return an object matching UserProtocol with id, email,
+                  username, given_name, family_name properties.
+        mint_workspace_token: Optional dependency that returns a pre-minted API token
+                              string for automatic extension authentication in workspace.
         dependencies: Additional router dependencies
 
     Returns:
@@ -151,33 +184,12 @@ def create_coder_router(
         ```python
         from computor_coder import create_coder_router
         from computor_backend.permissions.auth import get_current_principal
-        from computor_backend.permissions.principal import Principal
-        from computor_backend.database import get_db
-        from computor_backend.model.auth import User
-        from fastapi import Depends
-        from typing import Annotated
-
-        # Define user info dependencies following backend pattern
-        async def get_user_email(
-            permissions: Annotated[Principal, Depends(get_current_principal)],
-            db: Session = Depends(get_db),
-        ) -> str:
-            user = db.query(User).filter(User.id == permissions.user_id).first()
-            return user.email
-
-        async def get_user_fullname(
-            permissions: Annotated[Principal, Depends(get_current_principal)],
-            db: Session = Depends(get_db),
-        ) -> Optional[str]:
-            user = db.query(User).filter(User.id == permissions.user_id).first()
-            if user.given_name and user.family_name:
-                return f"{user.given_name} {user.family_name}"
-            return None
+        from computor_backend.dependencies.plugin import get_current_user, mint_workspace_token
 
         router = create_coder_router(
             get_current_principal=get_current_principal,
-            get_user_email=get_user_email,
-            get_user_fullname=get_user_fullname,
+            get_user=get_current_user,
+            mint_workspace_token=mint_workspace_token,
         )
         app.include_router(router)
         ```
@@ -195,18 +207,6 @@ def create_coder_router(
         if not settings.enabled:
             raise CoderDisabledError()
         return settings
-
-    # Default fullname dependency (returns None if not provided)
-    async def _default_fullname() -> Optional[str]:
-        return None
-
-    _fullname_dependency = get_user_fullname if get_user_fullname else _default_fullname
-
-    # Default user_id dependency (returns None if not provided)
-    async def _default_user_id() -> Optional[str]:
-        return None
-
-    _user_id_dependency = get_user_id if get_user_id else _default_user_id
 
     # Default workspace token dependency (returns None if not provided)
     async def _default_workspace_token() -> Optional[str]:
@@ -265,10 +265,24 @@ def create_coder_router(
             raise _handle_coder_error(e)
 
     # -------------------------------------------------------------------------
+    # Helper function to get user email (with fallback)
+    # -------------------------------------------------------------------------
+
+    def _get_user_email(user: UserProtocol) -> str:
+        """Get user email with fallback to username@computor.local."""
+        return user.email if user.email else f"{user.username}@computor.local"
+
+    def _get_user_fullname(user: UserProtocol) -> Optional[str]:
+        """Get user full name if both given and family name are set."""
+        if user.given_name and user.family_name:
+            return f"{user.given_name} {user.family_name}"
+        return None
+
+    # -------------------------------------------------------------------------
     # Authenticated endpoints (require get_current_principal)
     # -------------------------------------------------------------------------
 
-    if get_current_principal and get_user_email:
+    if get_current_principal and get_user:
 
         @router.post(
             "/workspaces/provision",
@@ -292,18 +306,16 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user_email: Annotated[str, Depends(get_user_email)],
-            user_fullname: Annotated[Optional[str], Depends(_fullname_dependency)],
-            user_id: Annotated[Optional[str], Depends(_user_id_dependency)],
+            user: Annotated[UserProtocol, Depends(get_user)],
             workspace_token: Annotated[Optional[str], Depends(_workspace_token_dependency)],
         ) -> ProvisionResult:
             """Provision a workspace for the current user."""
             _check_workspace_access(permissions, "provision")
             try:
                 result = await client.provision_workspace(
-                    user_email=user_email,
-                    username=user_id,  # Use user_id as Coder username if provided
-                    full_name=user_fullname,
+                    user_email=_get_user_email(user),
+                    username=str(user.id),
+                    full_name=_get_user_fullname(user),
                     template=request.template,
                     workspace_name=request.workspace_name,
                     computor_auth_token=workspace_token,
@@ -321,13 +333,13 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user_email: Annotated[str, Depends(get_user_email)],
+            user: Annotated[UserProtocol, Depends(get_user)],
         ) -> WorkspaceListResponse:
             """Get all workspaces for the current authenticated user."""
             _check_workspace_access(permissions, "list")
             try:
-                user = await client._find_user_by_email(user_email)
-                workspaces = await client.get_user_workspaces(user.username)
+                coder_user = await client._find_user_by_email(_get_user_email(user))
+                workspaces = await client.get_user_workspaces(coder_user.username)
                 return WorkspaceListResponse(
                     workspaces=workspaces,
                     count=len(workspaces),
@@ -346,13 +358,13 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user_email: Annotated[str, Depends(get_user_email)],
+            user: Annotated[UserProtocol, Depends(get_user)],
         ) -> bool:
             """Check if the current user has any workspaces in Coder."""
             _check_workspace_access(permissions, "list")
             try:
-                user = await client._find_user_by_email(user_email)
-                workspaces = await client.get_user_workspaces(user.username)
+                coder_user = await client._find_user_by_email(_get_user_email(user))
+                workspaces = await client.get_user_workspaces(coder_user.username)
                 return len(workspaces) > 0
             except CoderNotFoundError:
                 return False
@@ -516,7 +528,7 @@ def create_coder_router(
     # Coder session/login endpoints
     # -------------------------------------------------------------------------
 
-    if get_current_principal and get_user_email:
+    if get_current_principal and get_user:
         from fastapi.responses import RedirectResponse
         from pydantic import BaseModel
 
@@ -541,7 +553,7 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user_email: Annotated[str, Depends(get_user_email)],
+            user: Annotated[UserProtocol, Depends(get_user)],
         ) -> CoderSessionResponse:
             """
             Login to Coder and get a session token.
@@ -551,7 +563,7 @@ def create_coder_router(
             """
             _check_workspace_access(permissions, "session")
             try:
-                session_token = await client.login_user(user_email, request.password)
+                session_token = await client.login_user(_get_user_email(user), request.password)
                 if session_token:
                     return CoderSessionResponse(
                         success=True,

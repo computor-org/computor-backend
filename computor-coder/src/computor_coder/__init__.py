@@ -76,6 +76,8 @@ from .plugin import (
 from .router import (
     create_admin_coder_router,
     create_coder_router,
+    PrincipalProtocol,
+    UserProtocol,
 )
 
 # Web interface
@@ -141,6 +143,8 @@ __all__ = [
     # Router
     "create_admin_coder_router",
     "create_coder_router",
+    "PrincipalProtocol",
+    "UserProtocol",
     # Web interface
     "create_web_router",
     "create_login_router",

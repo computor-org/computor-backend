@@ -7,7 +7,6 @@ queries on every request.
 Cache Strategy:
 - Token validation results cached for 120 seconds
 - Revocation invalidates cache immediately
-- Rate limiting for token minting
 """
 
 import json
@@ -206,58 +205,3 @@ async def track_user_token(user_id: str, token_hash_hex: str) -> None:
         await redis_client.expire(user_tokens_key, API_TOKEN_CACHE_TTL * 2)
     except Exception as e:
         logger.debug(f"Failed to track user token: {e}")
-
-
-# =============================================================================
-# Rate Limiting for Token Minting
-# =============================================================================
-
-async def check_token_mint_rate_limit(user_id: str, limit: int = 5, window: int = 60) -> bool:
-    """
-    Check if user is within rate limit for token minting.
-
-    Args:
-        user_id: User attempting to mint token
-        limit: Maximum tokens per window
-        window: Time window in seconds
-
-    Returns:
-        True if within limit, False if rate limited
-    """
-    from computor_backend.redis_cache import get_redis_client
-
-    rate_key = f"rate:token_mint:{user_id}"
-
-    try:
-        redis_client = await get_redis_client()
-
-        # Get current count
-        current = await redis_client.get(rate_key)
-        current_count = int(current) if current else 0
-
-        if current_count >= limit:
-            logger.warning(f"Rate limit exceeded for token minting: user {user_id}")
-            return False
-
-        # Increment counter
-        pipe = redis_client.pipeline()
-        pipe.incr(rate_key)
-        pipe.expire(rate_key, window)
-        await pipe.execute()
-
-        return True
-    except Exception as e:
-        logger.warning(f"Rate limit check failed: {e}")
-        # Fail open - allow the request if Redis is down
-        return True
-
-
-async def record_token_mint(user_id: str) -> None:
-    """
-    Record a token mint event for rate limiting.
-
-    Args:
-        user_id: User who minted token
-    """
-    # This is handled by check_token_mint_rate_limit which increments on success
-    pass

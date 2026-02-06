@@ -515,7 +515,7 @@ def create_api_token_admin(
         raise
 
 
-def get_or_create_singleton_token(
+async def get_or_create_singleton_token(
     token_data: ApiTokenCreate,
     permissions: Principal,
     db: Session,
@@ -543,30 +543,10 @@ def get_or_create_singleton_token(
         Since raw tokens are not stored (only hashes), we cannot retrieve
         an existing token's value. We always mint a fresh token.
     """
-    import asyncio
     from datetime import datetime, timezone
+    from computor_backend.permissions.api_token_cache import invalidate_token_cache
 
     target_user_id = token_data.user_id or str(permissions.user_id)
-
-    # Check rate limit for token minting
-    try:
-        from computor_backend.permissions.api_token_cache import check_token_mint_rate_limit
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        if not loop.run_until_complete(check_token_mint_rate_limit(target_user_id)):
-            raise BadRequestException(
-                detail="Rate limit exceeded for token creation. Please wait before creating more tokens."
-            )
-    except BadRequestException:
-        raise
-    except Exception as e:
-        # Fail open if rate limiting fails
-        logger.warning(f"Rate limit check failed: {e}")
 
     # Revoke any existing tokens with this name for the user
     existing = db.query(ApiToken).filter(
@@ -579,7 +559,10 @@ def get_or_create_singleton_token(
         old_token.revoked_at = datetime.now(timezone.utc)
         old_token.revocation_reason = revocation_reason
         # Invalidate cache for revoked token
-        _invalidate_token_cache_sync(old_token.token_hash)
+        try:
+            await invalidate_token_cache(old_token.token_hash.hex())
+        except Exception as e:
+            logger.warning(f"Failed to invalidate token cache: {e}")
 
     if existing:
         db.flush()

@@ -80,73 +80,14 @@ from pathlib import Path
 
 # Coder integration
 from computor_coder import CoderPlugin, create_web_router, create_login_router, mount_static_files, create_coder_router
+from computor_backend.dependencies.plugin import (
+    get_current_user,
+    mint_workspace_token,
+)
 from typing import Optional
 
 # Global coder plugin instance
 coder_plugin: CoderPlugin | None = None
-
-
-# Coder dependencies
-async def get_user_email_for_coder(
-    permissions = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-) -> str:
-    """Get the current user's email for Coder API."""
-    user = db.query(User).filter(User.id == permissions.user_id).first()
-    if not user:
-        raise NotFoundException("User not found")
-    # Use email if available, otherwise construct from username
-    return user.email if user.email else f"{user.username}@computor.local"
-
-
-async def get_user_fullname_for_coder(
-    permissions = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-) -> Optional[str]:
-    """Get the current user's full name for Coder API."""
-    user = db.query(User).filter(User.id == permissions.user_id).first()
-    if not user:
-        return None
-    if user.given_name and user.family_name:
-        return f"{user.given_name} {user.family_name}"
-    return None
-
-
-async def get_user_id_for_coder(
-    permissions = Depends(get_current_principal),
-) -> str:
-    """Get the current user's ID (UUID) for use as Coder username."""
-    return str(permissions.user_id)
-
-
-async def mint_workspace_token_for_coder(
-    permissions = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-) -> Optional[str]:
-    """Mint a singleton API token for automatic VSCode extension auth in workspace."""
-    import logging
-    _logger = logging.getLogger(__name__)
-    try:
-        from computor_backend.business_logic.api_tokens import get_or_create_singleton_token
-        from computor_types.api_tokens import ApiTokenCreate
-
-        token_data = ApiTokenCreate(
-            name="workspace-auto-login",
-            description="Auto-generated token for VSCode extension in Coder workspace",
-            user_id=str(permissions.user_id),
-            scopes=[],  # Empty scopes = inherits user's full permissions via role claims
-        )
-        result = get_or_create_singleton_token(
-            token_data,
-            permissions,
-            db,
-            revocation_reason="replaced by new workspace provision",
-        )
-        _logger.info(f"Minted workspace token for user {permissions.user_id} (prefix: {result.token_prefix})")
-        return result.token
-    except Exception as e:
-        _logger.warning(f"Failed to mint workspace token: {e}")
-        return None
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -533,10 +474,8 @@ app.include_router(
         prefix="/coder",
         tags=["coder", "workspaces"],
         get_current_principal=get_current_principal,
-        get_user_email=get_user_email_for_coder,
-        get_user_fullname=get_user_fullname_for_coder,
-        get_user_id=get_user_id_for_coder,
-        mint_workspace_token=mint_workspace_token_for_coder,
+        get_user=get_current_user,
+        mint_workspace_token=mint_workspace_token,
     ),
 )
 
