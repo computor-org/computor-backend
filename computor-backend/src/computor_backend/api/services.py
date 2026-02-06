@@ -8,14 +8,15 @@ from typing import Annotated, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
+from computor_backend.cache import Cache
+from computor_backend.redis_cache import get_cache
 from computor_backend.exceptions import ForbiddenException, NotFoundException, UserNotFoundException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.auth import User
-from computor_backend.model.service import Service
+from computor_backend.repositories import UserRepository, ServiceRepository
 from computor_backend.business_logic.service_accounts import (
     create_service_account,
     get_service_account,
@@ -42,7 +43,8 @@ services_router = APIRouter()
 @services_router.get("/me", response_model=ServiceGet)
 async def get_service_me(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """
     Get the authenticated service account's configuration.
@@ -62,7 +64,8 @@ async def get_service_me(
     user_id = principal.get_user_id_or_throw()
 
     # Get the user and check if it's a service account
-    user = db.query(User).filter(User.id == user_id).first()
+    user_repo = UserRepository(db, cache)
+    user = user_repo.get_by_id_optional(str(user_id))
     if not user:
         raise UserNotFoundException(
             error_code="NF_002",
@@ -76,13 +79,9 @@ async def get_service_me(
             context={"user_id": str(user_id)}
         )
 
-    # Get the associated service with its service type
-    service = (
-        db.query(Service)
-        .options(joinedload(Service.service_type))
-        .filter(Service.user_id == user_id)
-        .first()
-    )
+    # Get the associated service
+    service_repo = ServiceRepository(db, cache)
+    service = service_repo.find_by_user_id(str(user_id))
 
     if not service:
         raise NotFoundException(
@@ -91,10 +90,14 @@ async def get_service_me(
             context={"user_id": str(user_id)}
         )
 
-    # Get service type path if available
+    # Get service type path if available (lazy load relationship)
     service_type_path = None
-    if service.service_type:
-        service_type_path = str(service.service_type.path)
+    if service.service_type_id:
+        from computor_backend.repositories import ServiceTypeRepository
+        service_type_repo = ServiceTypeRepository(db, cache)
+        service_type = service_type_repo.get_by_id_optional(str(service.service_type_id))
+        if service_type:
+            service_type_path = str(service_type.path)
 
     return ServiceGet(
         id=str(service.id),

@@ -123,6 +123,43 @@ class CourseContentDeploymentRepository(BaseRepository[CourseContentDeployment])
             CourseContentDeployment.course_content_id == str(content_id)
         ).first()
 
+    def find_latest_for_course_content(self, content_id: str | UUID) -> Optional[CourseContentDeployment]:
+        """
+        Find the latest deployment for a course content (ordered by assigned_at desc).
+
+        Uses caching when enabled. The cache key includes 'latest' to differentiate
+        from the simple find_by_content lookup.
+
+        Args:
+            content_id: Course content identifier
+
+        Returns:
+            Most recent CourseContentDeployment if exists, None otherwise
+        """
+        content_id_str = str(content_id)
+
+        if self._use_cache():
+            key = self.cache.key(self.entity_type, f"latest:content:{content_id_str}")
+            cached = self.cache.get_by_key(key)
+            if cached is not None:
+                return self._deserialize_entity(cached) if cached else None
+
+        entity = self.db.query(CourseContentDeployment).filter(
+            CourseContentDeployment.course_content_id == content_id_str
+        ).order_by(CourseContentDeployment.assigned_at.desc()).first()
+
+        if self._use_cache():
+            key = self.cache.key(self.entity_type, f"latest:content:{content_id_str}")
+            tags = self.get_entity_tags(entity) if entity else {f"course_content_deployment:content:{content_id_str}"}
+            self.cache.set_with_tags(
+                key=key,
+                payload=self._serialize_entity(entity) if entity else None,
+                tags=tags,
+                ttl=self.get_ttl()
+            )
+
+        return entity
+
     def find_by_example_version(self, version_id: str | UUID) -> List[CourseContentDeployment]:
         """
         Find all deployments using a specific example version.

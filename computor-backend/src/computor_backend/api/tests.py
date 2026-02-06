@@ -15,7 +15,13 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.database import get_db
-from computor_backend.redis_cache import get_redis_client
+from computor_backend.redis_cache import get_redis_client, get_cache
+from computor_backend.cache import Cache
+from computor_backend.repositories import (
+    ServiceRepository,
+    ServiceTypeRepository,
+    CourseContentDeploymentRepository,
+)
 from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
@@ -83,7 +89,8 @@ async def create_test_run(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
-    cache = Depends(get_redis_client)
+    cache = Depends(get_redis_client),
+    repo_cache: Cache = Depends(get_cache),
 ):
     """
     Create and execute a test for a submission artifact.
@@ -250,10 +257,9 @@ async def create_test_run(
             detail="Assignment or testing service not configured"
         )
 
-    # Get testing service (e.g., itp-worker-python)
-    service = db.query(Service).filter(
-        Service.id == course_content.testing_service_id
-    ).first()
+    # Get testing service using repository (e.g., itp-worker-python)
+    service_repo = ServiceRepository(db, repo_cache)
+    service = service_repo.get_by_id_optional(str(course_content.testing_service_id))
 
     if not service:
         raise BadRequestException(
@@ -261,10 +267,9 @@ async def create_test_run(
             detail="Testing service not found"
         )
 
-    # Get the service type to understand what kind of testing this is
-    service_type = db.query(ServiceType).filter(
-        ServiceType.id == service.service_type_id
-    ).first()
+    # Get the service type using repository
+    service_type_repo = ServiceTypeRepository(db, repo_cache)
+    service_type = service_type_repo.get_by_id_optional(str(service.service_type_id))
 
     if not service_type:
         raise BadRequestException(
@@ -280,10 +285,9 @@ async def create_test_run(
     organization_properties = OrganizationProperties(**organization.properties)
     course_properties = CourseProperties(**course.properties)
 
-    # Get deployment info for reference example
-    deployment = db.query(CourseContentDeployment).filter(
-        CourseContentDeployment.course_content_id == course_content.id
-    ).first()
+    # Get deployment info for reference example using repository
+    deployment_repo = CourseContentDeploymentRepository(db, repo_cache)
+    deployment = deployment_repo.find_by_content(str(course_content.id))
 
     if not deployment or not deployment.example_version_id:
         raise BadRequestException(
