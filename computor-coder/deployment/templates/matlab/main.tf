@@ -66,12 +66,8 @@ variable "code_server_password" {
   sensitive   = true
 }
 
-variable "computor_auth_token" {
-  default     = ""
-  description = "Pre-minted API token for automatic VSCode extension authentication (per-workspace)"
-  type        = string
-  sensitive   = true
-}
+# NOTE: computor_auth_token is now defined as a coder_parameter below
+# to allow per-workspace values via rich_parameter_values API
 
 ###########################
 # DATA SOURCES
@@ -84,6 +80,17 @@ locals {
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
+
+# Per-workspace parameter for Computor API token (set via rich_parameter_values)
+data "coder_parameter" "computor_auth_token" {
+  name         = "computor_auth_token"
+  type         = "string"
+  description  = "Pre-minted API token for automatic VSCode extension authentication"
+  mutable      = true
+  default      = ""
+  display_name = "Computor Auth Token"
+  order        = 100
+}
 
 ###########################
 # PROVIDERS
@@ -161,7 +168,7 @@ COMPUTOR_EOF
     GIT_AUTHOR_EMAIL    = data.coder_workspace_owner.me.email
     GIT_COMMITTER_NAME  = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
-    COMPUTOR_AUTH_TOKEN  = var.computor_auth_token
+    COMPUTOR_AUTH_TOKEN = data.coder_parameter.computor_auth_token.value
   }
 
   # Metadata blocks for workspace monitoring

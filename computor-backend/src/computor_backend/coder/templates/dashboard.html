@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Coder Workspaces{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Coder Workspace Dashboard</h1>
+
+    <div class="cards">
+        <div class="card">
+            <h3>Server Health</h3>
+            <div id="health-details" class="card-content">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>My Workspaces</h3>
+            <div id="workspace-summary" class="card-content">
+                <p class="loading">Loading...</p>
+            </div>
+            <a href="{{ url_for('coder_workspaces_page') }}" class="btn btn-secondary">View All</a>
+        </div>
+
+        <div class="card">
+            <h3>Available Templates</h3>
+            <div id="template-summary" class="card-content">
+                <p class="loading">Loading...</p>
+            </div>
+            <a href="{{ url_for('coder_templates_page') }}" class="btn btn-secondary">View All</a>
+        </div>
+
+        <div class="card card-action">
+            <h3>Quick Actions</h3>
+            <div class="card-content">
+                <a href="{{ url_for('coder_provision_page') }}" class="btn btn-primary">Provision Workspace</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load health details
+    fetchHealth().then(data => {
+        const healthEl = document.getElementById('health-details');
+        if (data.healthy) {
+            healthEl.innerHTML = `
+                <p class="status-ok">Server is healthy</p>
+                <p>Version: ${data.version || 'Unknown'}</p>
+            `;
+        } else {
+            healthEl.innerHTML = '<p class="status-error">Server is unhealthy</p>';
+        }
+    }).catch(err => {
+        document.getElementById('health-details').innerHTML =
+            '<p class="status-error">Failed to check health</p>';
+    });
+
+    // Load workspace summary
+    fetch(API_BASE + '/workspaces/me')
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('workspace-summary');
+            const count = data.workspaces ? data.workspaces.length : 0;
+            el.innerHTML = `<p>You have <strong>${count}</strong> workspace(s)</p>`;
+        })
+        .catch(err => {
+            document.getElementById('workspace-summary').innerHTML =
+                '<p>Login required to view workspaces</p>';
+        });
+
+    // Load template summary
+    fetch(API_BASE + '/templates')
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('template-summary');
+            const count = data.templates ? data.templates.length : 0;
+            el.innerHTML = `<p><strong>${count}</strong> template(s) available</p>`;
+        })
+        .catch(err => {
+            document.getElementById('template-summary').innerHTML =
+                '<p class="status-error">Failed to load templates</p>';
+        });
+});
+</script>
+{% endblock %}

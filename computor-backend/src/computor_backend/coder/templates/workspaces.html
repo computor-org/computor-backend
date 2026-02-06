@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}My Workspaces - Coder Workspaces{% endblock %}
+
+{% block content %}
+<div class="workspaces-page">
+    <div class="page-header">
+        <h1>My Workspaces</h1>
+        <a href="{{ url_for('coder_provision_page') }}" class="btn btn-primary">New Workspace</a>
+    </div>
+
+    <div id="workspaces-list" class="workspaces-grid">
+        <p class="loading">Loading workspaces...</p>
+    </div>
+</div>
+
+<!-- Workspace Details Modal -->
+<div id="workspace-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Workspace Details</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div id="modal-body" class="modal-body">
+            <!-- Content loaded dynamically -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pollInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadWorkspaces();
+    // Poll every 3 seconds to update workspace status
+    pollInterval = setInterval(loadWorkspaces, 3000);
+});
+
+// Stop polling when page is hidden, resume when visible
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    } else {
+        if (!pollInterval) {
+            loadWorkspaces();
+            pollInterval = setInterval(loadWorkspaces, 3000);
+        }
+    }
+});
+
+function loadWorkspaces() {
+    const container = document.getElementById('workspaces-list');
+
+    fetch(API_BASE + '/workspaces/me', { credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to fetch workspaces');
+            return r.json();
+        })
+        .then(data => {
+            const workspaces = data.workspaces || [];
+            if (workspaces.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No Workspaces Yet</h3>
+                        <p>You haven't created any workspaces.</p>
+                        <a href="{{ url_for('coder_provision_page') }}" class="btn btn-primary">Create Your First Workspace</a>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = workspaces.map(ws => `
+                <div class="workspace-card" data-workspace="${ws.name}" data-owner="${ws.owner_name || 'unknown'}">
+                    <div class="workspace-header">
+                        <h3>${ws.name}</h3>
+                        <span class="status-badge status-${getStatusClass(ws.latest_build_status)}">${ws.latest_build_status || 'unknown'}</span>
+                    </div>
+                    <div class="workspace-info">
+                        <p><strong>Template:</strong> ${ws.template_name || 'Unknown'}</p>
+                        <p><strong>Created:</strong> ${formatDate(ws.created_at)}</p>
+                    </div>
+                    <div class="workspace-actions">
+                        ${ws.latest_build_status === 'running' || ws.latest_build_status === 'succeeded' ?
+                            `<button class="btn btn-primary" onclick="openWorkspace('${ws.owner_name}', '${ws.name}')">Open</button>
+                             <button class="btn btn-warning" onclick="stopWorkspace('${ws.owner_name}', '${ws.name}')">Stop</button>` :
+                            `<button class="btn btn-success" onclick="startWorkspace('${ws.owner_name}', '${ws.name}')">Start</button>`
+                        }
+                        <button class="btn btn-secondary" onclick="showWorkspaceDetails('${ws.owner_name}', '${ws.name}')">Details</button>
+                        <button class="btn btn-danger" onclick="confirmDelete('${ws.owner_name}', '${ws.name}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(err => {
+            container.innerHTML = `
+                <div class="error-state">
+                    <p class="status-error">Failed to load workspaces: ${err.message}</p>
+                    <p>Please ensure you are logged in and try again.</p>
+                </div>
+            `;
+        });
+}
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'running':
+        case 'succeeded':
+            return 'running';
+        case 'stopped':
+        case 'canceled':
+            return 'stopped';
+        case 'starting':
+        case 'stopping':
+        case 'pending':
+        case 'canceling':
+        case 'deleting':
+            return 'pending';
+        case 'failed':
+            return 'failed';
+        default:
+            return 'unknown';
+    }
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'Never';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+
+function openWorkspace(owner, name) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Opening...';
+
+    fetch(`${API_BASE}/workspaces/${owner}/${name}`, { credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to fetch workspace details');
+            return r.json();
+        })
+        .then(data => {
+            if (data.code_server_url) {
+                window.open(data.code_server_url, '_blank');
+            } else if (data.access_url) {
+                window.open(data.access_url, '_blank');
+            } else {
+                showNotification('Workspace is not ready yet. Please wait for it to start.', 'error');
+            }
+        })
+        .catch(err => {
+            showNotification('Failed to open workspace: ' + err.message, 'error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Open';
+        });
+}
+
+function startWorkspace(owner, name) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+
+    fetch(`${API_BASE}/workspaces/${owner}/${name}/start`, { method: 'POST', credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to start workspace');
+            return r.json();
+        })
+        .then(data => {
+            showNotification('Workspace is starting...', 'success');
+            setTimeout(loadWorkspaces, 2000);
+        })
+        .catch(err => {
+            showNotification('Failed to start workspace: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Start';
+        });
+}
+
+function stopWorkspace(owner, name) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Stopping...';
+
+    fetch(`${API_BASE}/workspaces/${owner}/${name}/stop`, { method: 'POST', credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to stop workspace');
+            return r.json();
+        })
+        .then(data => {
+            showNotification('Workspace is stopping...', 'success');
+            setTimeout(loadWorkspaces, 2000);
+        })
+        .catch(err => {
+            showNotification('Failed to stop workspace: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Stop';
+        });
+}
+
+function confirmDelete(owner, name) {
+    if (confirm(`Are you sure you want to delete workspace "${name}"? This action cannot be undone.`)) {
+        deleteWorkspace(owner, name);
+    }
+}
+
+function deleteWorkspace(owner, name) {
+    fetch(`${API_BASE}/workspaces/${owner}/${name}`, { method: 'DELETE', credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to delete workspace');
+            return r.json();
+        })
+        .then(data => {
+            showNotification('Workspace deleted successfully', 'success');
+            loadWorkspaces();
+        })
+        .catch(err => {
+            showNotification('Failed to delete workspace: ' + err.message, 'error');
+        });
+}
+
+function showWorkspaceDetails(owner, name) {
+    const modal = document.getElementById('workspace-modal');
+    const modalBody = document.getElementById('modal-body');
+    const modalTitle = document.getElementById('modal-title');
+
+    modalTitle.textContent = name;
+    modalBody.innerHTML = '<p class="loading">Loading details...</p>';
+    modal.classList.remove('hidden');
+
+    fetch(`${API_BASE}/workspaces/${owner}/${name}`, { credentials: 'include' })
+        .then(r => {
+            if (!r.ok) throw new Error('Failed to fetch details');
+            return r.json();
+        })
+        .then(data => {
+            const ws = data.workspace;
+            modalBody.innerHTML = `
+                <table class="details-table">
+                    <tr><th>ID</th><td>${ws.id}</td></tr>
+                    <tr><th>Name</th><td>${ws.name}</td></tr>
+                    <tr><th>Owner</th><td>${ws.owner_name || 'N/A'}</td></tr>
+                    <tr><th>Template</th><td>${ws.template_name || 'N/A'}</td></tr>
+                    <tr><th>Status</th><td><span class="status-badge status-${getStatusClass(data.status)}">${data.status || 'unknown'}</span></td></tr>
+                    <tr><th>Build Status</th><td>${ws.latest_build_status || 'N/A'}</td></tr>
+                    <tr><th>Created</th><td>${formatDate(ws.created_at)}</td></tr>
+                    <tr><th>Health</th><td>${data.health === true ? 'Healthy' : data.health || 'N/A'}</td></tr>
+                </table>
+                ${data.code_server_url ? `<p style="margin-top: 1rem;"><a href="${data.code_server_url}" target="_blank" class="btn btn-primary">Open Code Server</a></p>` : ''}
+            `;
+        })
+        .catch(err => {
+            modalBody.innerHTML = `<p class="status-error">Failed to load details: ${err.message}</p>`;
+        });
+}
+
+function closeModal() {
+    document.getElementById('workspace-modal').classList.add('hidden');
+}
+
+// Close modal on outside click
+document.getElementById('workspace-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

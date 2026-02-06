@@ -156,8 +156,8 @@ def create_coder_router(
     prefix: str = "/coder",
     tags: Optional[list[str]] = None,
     get_current_principal: Optional[Callable] = None,
-    get_user: Optional[Callable] = None,
-    mint_workspace_token: Optional[Callable] = None,
+    get_db: Optional[Callable] = None,
+    get_cache: Optional[Callable] = None,
     dependencies: Optional[list] = None,
 ) -> APIRouter:
     """
@@ -170,11 +170,8 @@ def create_coder_router(
         prefix: URL prefix for the router
         tags: OpenAPI tags for the endpoints
         get_current_principal: Dependency to get current Principal (permissions)
-        get_user: Dependency to get the current user object (UserList/UserGet).
-                  Must return an object matching UserProtocol with id, email,
-                  username, given_name, family_name properties.
-        mint_workspace_token: Optional dependency that returns a pre-minted API token
-                              string for automatic extension authentication in workspace.
+        get_db: FastAPI dependency to get database session.
+        get_cache: FastAPI dependency to get cache instance.
         dependencies: Additional router dependencies
 
     Returns:
@@ -184,12 +181,13 @@ def create_coder_router(
         ```python
         from computor_coder import create_coder_router
         from computor_backend.permissions.auth import get_current_principal
-        from computor_backend.dependencies.plugin import get_current_user, mint_workspace_token
+        from computor_backend.database import get_db
+        from computor_backend.redis_cache import get_cache
 
         router = create_coder_router(
             get_current_principal=get_current_principal,
-            get_user=get_current_user,
-            mint_workspace_token=mint_workspace_token,
+            get_db=get_db,
+            get_cache=get_cache,
         )
         app.include_router(router)
         ```
@@ -207,12 +205,6 @@ def create_coder_router(
         if not settings.enabled:
             raise CoderDisabledError()
         return settings
-
-    # Default workspace token dependency (returns None if not provided)
-    async def _default_workspace_token() -> Optional[str]:
-        return None
-
-    _workspace_token_dependency = mint_workspace_token if mint_workspace_token else _default_workspace_token
 
     # -------------------------------------------------------------------------
     # Health check endpoint (no auth required)
@@ -278,11 +270,58 @@ def create_coder_router(
             return f"{user.given_name} {user.family_name}"
         return None
 
+    def _get_user_by_id(db, cache, user_id: str):
+        """Helper to get user from database using lazy imports."""
+        from computor_backend.repositories.user import UserRepository
+        user_repo = UserRepository(db, cache)
+        return user_repo.get_by_id(user_id)
+
+    def _mint_token_for_user(db, cache, target_user_id: str, created_by: str) -> Optional[str]:
+        """Helper to mint workspace token using lazy imports."""
+        print(f"[DEBUG] _mint_token_for_user called: target_user_id={target_user_id}, created_by={created_by}")
+        try:
+            from computor_backend.repositories import ApiTokenRepository
+            from computor_backend.model.service import ApiToken
+            from computor_backend.utils.api_token import generate_api_token
+
+            print("[DEBUG] Lazy imports successful")
+            token_repo = ApiTokenRepository(db, cache)
+            token_name = "workspace-auto-login"
+
+            # Revoke existing tokens with this name (singleton pattern)
+            existing = token_repo.find_all_active_by_name(target_user_id, token_name)
+            print(f"[DEBUG] Found {len(existing)} existing tokens to revoke")
+            for old_token in existing:
+                token_repo.revoke(str(old_token.id), reason="replaced by new workspace provision")
+
+            # Generate and create new token
+            full_token, token_prefix, token_hash = generate_api_token()
+            print(f"[DEBUG] Generated token with prefix: {token_prefix}")
+            api_token = ApiToken(
+                name=token_name,
+                description="Auto-generated token for VSCode extension in workspace",
+                user_id=target_user_id,
+                token_hash=token_hash,
+                token_prefix=token_prefix,
+                scopes=[],
+                created_by=created_by,
+            )
+            db.add(api_token)
+            db.commit()
+
+            print(f"[DEBUG] Token minted successfully: {token_prefix}")
+            return full_token
+        except Exception as e:
+            import traceback
+            print(f"[DEBUG] EXCEPTION in _mint_token_for_user: {e}")
+            traceback.print_exc()
+            return None
+
     # -------------------------------------------------------------------------
     # Authenticated endpoints (require get_current_principal)
     # -------------------------------------------------------------------------
 
-    if get_current_principal and get_user:
+    if get_current_principal and get_db and get_cache:
 
         @router.post(
             "/workspaces/provision",
@@ -306,12 +345,16 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user: Annotated[UserProtocol, Depends(get_user)],
-            workspace_token: Annotated[Optional[str], Depends(_workspace_token_dependency)],
+            db: Annotated[Any, Depends(get_db)],
+            cache: Annotated[Any, Depends(get_cache)],
         ) -> ProvisionResult:
             """Provision a workspace for the current user."""
+            print(f"[DEBUG] provision_workspace (self) called: user_id={permissions.user_id}")
             _check_workspace_access(permissions, "provision")
             try:
+                user = _get_user_by_id(db, cache, str(permissions.user_id))
+                workspace_token = _mint_token_for_user(db, cache, str(user.id), str(permissions.user_id))
+
                 result = await client.provision_workspace(
                     user_email=_get_user_email(user),
                     username=str(user.id),
@@ -333,11 +376,13 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user: Annotated[UserProtocol, Depends(get_user)],
+            db: Annotated[Any, Depends(get_db)],
+            cache: Annotated[Any, Depends(get_cache)],
         ) -> WorkspaceListResponse:
             """Get all workspaces for the current authenticated user."""
             _check_workspace_access(permissions, "list")
             try:
+                user = _get_user_by_id(db, cache, str(permissions.user_id))
                 coder_user = await client._find_user_by_email(_get_user_email(user))
                 workspaces = await client.get_user_workspaces(coder_user.username)
                 return WorkspaceListResponse(
@@ -358,11 +403,13 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user: Annotated[UserProtocol, Depends(get_user)],
+            db: Annotated[Any, Depends(get_db)],
+            cache: Annotated[Any, Depends(get_cache)],
         ) -> bool:
             """Check if the current user has any workspaces in Coder."""
             _check_workspace_access(permissions, "list")
             try:
+                user = _get_user_by_id(db, cache, str(permissions.user_id))
                 coder_user = await client._find_user_by_email(_get_user_email(user))
                 workspaces = await client.get_user_workspaces(coder_user.username)
                 return len(workspaces) > 0
@@ -375,7 +422,7 @@ def create_coder_router(
     # Workspace query endpoints (workspace:manage - queries any user's workspaces)
     # -------------------------------------------------------------------------
 
-    if get_current_principal:
+    if get_current_principal and get_db and get_cache:
 
         @router.get(
             "/workspaces/by-email/{email}",
@@ -421,6 +468,59 @@ def create_coder_router(
                 return len(workspaces) > 0
             except CoderNotFoundError:
                 return False
+            except Exception as e:
+                raise _handle_coder_error(e)
+
+        @router.post(
+            "/workspaces/by-email/{email}/provision",
+            response_model=ProvisionResult,
+            summary="Provision workspace for user by email (maintainer)",
+        )
+        async def provision_workspace_by_email(
+            email: str,
+            request: WorkspaceProvisionRequest,
+            permissions: Annotated[Any, Depends(get_current_principal)],
+            _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+            client: Annotated[CoderClient, Depends(get_coder_client)],
+            db: Annotated[Any, Depends(get_db)],
+            cache: Annotated[Any, Depends(get_cache)],
+        ) -> ProvisionResult:
+            """
+            Provision a workspace for a user identified by email.
+
+            Requires workspace:provision permission (maintainers and admins).
+            Creates Coder user if needed, then provisions workspace.
+            Mints an API token for the workspace extension auto-login.
+            """
+            print(f"[DEBUG] provision_workspace_by_email called: email={email}")
+            _check_workspace_access(permissions, "provision")
+            try:
+                # Look up user by email in backend database
+                from computor_backend.repositories.user import UserRepository
+                user_repo = UserRepository(db, cache)
+                backend_user = user_repo.find_by_email(email)
+                if not backend_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"User with email {email} not found in backend",
+                    )
+
+                # Mint workspace token using helper
+                workspace_token = _mint_token_for_user(db, cache, str(backend_user.id), str(permissions.user_id))
+                print(f"[DEBUG] workspace_token returned: {workspace_token[:20] if workspace_token else 'None'}...")
+
+                # Provision workspace with user's UUID as username
+                result = await client.provision_workspace(
+                    user_email=email,
+                    username=str(backend_user.id),
+                    full_name=_get_user_fullname(backend_user),
+                    template=request.template,
+                    workspace_name=request.workspace_name,
+                    computor_auth_token=workspace_token,
+                )
+                return result
+            except HTTPException:
+                raise
             except Exception as e:
                 raise _handle_coder_error(e)
 
@@ -528,7 +628,7 @@ def create_coder_router(
     # Coder session/login endpoints
     # -------------------------------------------------------------------------
 
-    if get_current_principal and get_user:
+    if get_current_principal and get_db and get_cache:
         from fastapi.responses import RedirectResponse
         from pydantic import BaseModel
 
@@ -553,7 +653,8 @@ def create_coder_router(
             permissions: Annotated[Any, Depends(get_current_principal)],
             _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
             client: Annotated[CoderClient, Depends(get_coder_client)],
-            user: Annotated[UserProtocol, Depends(get_user)],
+            db: Annotated[Any, Depends(get_db)],
+            cache: Annotated[Any, Depends(get_cache)],
         ) -> CoderSessionResponse:
             """
             Login to Coder and get a session token.
@@ -563,6 +664,10 @@ def create_coder_router(
             """
             _check_workspace_access(permissions, "session")
             try:
+                from computor_backend.repositories.user import UserRepository
+                user_repo = UserRepository(db, cache)
+                user = user_repo.get_by_id(str(permissions.user_id))
+
                 session_token = await client.login_user(_get_user_email(user), request.password)
                 if session_token:
                     return CoderSessionResponse(
