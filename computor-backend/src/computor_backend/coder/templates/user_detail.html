@@ -131,7 +131,7 @@ function loadWorkspaces() {
 
     container.innerHTML = '<p class="loading">Loading workspaces...</p>';
 
-    fetch(`${API_BASE}/workspaces/by-email/${encodeURIComponent(currentUser.email)}`, { credentials: 'include' })
+    fetch(`${API_BASE}/workspaces?email=${encodeURIComponent(currentUser.email)}`, { credentials: 'include' })
         .then(r => {
             if (!r.ok) throw new Error('Failed to fetch workspaces');
             return r.json();
@@ -214,14 +214,14 @@ function provisionWorkspace() {
     btn.disabled = true;
     btn.textContent = 'Provisioning...';
 
-    fetch(`${API_BASE}/workspaces/by-email/${encodeURIComponent(currentUser.email)}/provision`, {
+    fetch(`${API_BASE}/workspaces/provision`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: 'python-workspace', workspace_name: 'workspace' }),
+        body: JSON.stringify({ email: currentUser.email, template: 'python-workspace', workspace_name: 'workspace' }),
     })
         .then(r => {
-            if (!r.ok) return r.json().then(e => { throw new Error(e.detail || 'Provisioning failed'); });
+            if (!r.ok) return r.json().then(e => { throw new Error(e.message || e.detail || 'Provisioning failed'); });
             return r.json();
         })
         .then(result => {

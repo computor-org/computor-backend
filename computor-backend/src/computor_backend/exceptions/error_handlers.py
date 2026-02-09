@@ -147,6 +147,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         BadRequestException,
         InternalServerException,
         NotImplementedException,
+        ServiceUnavailableException,
     )
 
     # Map status codes to exception types
@@ -158,6 +159,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         status.HTTP_405_METHOD_NOT_ALLOWED: BadRequestException,
         status.HTTP_500_INTERNAL_SERVER_ERROR: InternalServerException,
         status.HTTP_501_NOT_IMPLEMENTED: NotImplementedException,
+        status.HTTP_503_SERVICE_UNAVAILABLE: ServiceUnavailableException,
     }
 
     exception_class = exception_map.get(exc.status_code, InternalServerException)
@@ -249,7 +251,13 @@ def log_error(request: Request, exception: ComputorException, error_response_dic
     }
 
     # Log with appropriate level based on status code
-    if exception.status_code >= 500:
+    # 503 is "service unavailable" (expected condition, e.g. Coder not ready) — log as warning, not error
+    if exception.status_code == 503:
+        logger.warning(
+            f"Service unavailable: {exception.error_code}",
+            extra=log_data,
+        )
+    elif exception.status_code >= 500:
         logger.error(
             f"Server error: {exception.error_code}",
             extra=log_data,

@@ -638,12 +638,18 @@ async def create_tutor_test(
 
     workflow_id = f"tutor-testing-{test_id}"
 
-    # Get task queue from service config
-    task_queue = "computor-tasks"
+    # Get task queue from service config (must be in temporal.task_queue, same as student testing)
+    task_queue = None
     if service.config and isinstance(service.config, dict):
-        task_queue = service.config.get("task_queue", task_queue)
-    elif service_type.properties and isinstance(service_type.properties, dict):
-        task_queue = service_type.properties.get("task_queue", task_queue)
+        temporal_config = service.config.get("temporal", {})
+        if isinstance(temporal_config, dict):
+            task_queue = temporal_config.get("task_queue")
+
+    if not task_queue:
+        raise BadRequestException(
+            detail=f"Testing service '{service.name}' is missing required temporal.task_queue configuration. "
+                   f'Configure it in service.config: {{"temporal": {{"task_queue": "testing"}}}}'
+        )
 
     # Prepare workflow parameters
     # Note: api_config is read from environment in the workflow (same as StudentTestingWorkflow)

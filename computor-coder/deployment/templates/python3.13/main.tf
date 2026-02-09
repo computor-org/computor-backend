@@ -66,6 +66,12 @@ variable "code_server_password" {
   sensitive   = true
 }
 
+variable "dev_forward_ports" {
+  default     = ""
+  description = "Comma-separated localhost ports to forward to host.docker.internal (dev only, empty = disabled)"
+  type        = string
+}
+
 # NOTE: computor_auth_token is now defined as a coder_parameter below
 # to allow per-workspace values via rich_parameter_values API
 
@@ -110,6 +116,14 @@ resource "coder_agent" "main" {
 
   startup_script = <<-EOT
     set -e
+
+    # Dev mode: forward localhost ports to host machine via socat
+    %{ if var.dev_forward_ports != "" }
+    for port in $(echo "${var.dev_forward_ports}" | tr ',' ' '); do
+      echo "Forwarding localhost:$port -> host.docker.internal:$port"
+      socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+    done
+    %{ endif }
 
     # Initialize home directory from skeleton if first run
     if [ ! -f ~/.init_done ]; then

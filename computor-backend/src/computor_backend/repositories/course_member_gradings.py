@@ -817,6 +817,23 @@ class CourseMemberGradingsRepository:
                 AND r.course_member_id = :course_member_id
             ORDER BY sc.content_id, r.created_at DESC NULLS LAST
         ),
+        latest_grades AS (
+            -- Get the latest grade info including grader for each content
+            SELECT DISTINCT ON (sc.content_id)
+                sc.content_id,
+                sg.graded_by_course_member_id,
+                cm.course_role_id as grader_course_role_id,
+                cm.user_id as grader_user_id,
+                u.given_name as grader_given_name,
+                u.family_name as grader_family_name
+            FROM submittable_contents sc
+            JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
+            JOIN submission_artifact sa ON sa.submission_group_id = msg.submission_group_id
+            JOIN submission_grade sg ON sg.artifact_id = sa.id
+            JOIN course_member cm ON cm.id = sg.graded_by_course_member_id
+            JOIN "user" u ON u.id = cm.user_id
+            ORDER BY sc.content_id, sg.graded_at DESC
+        ),
         test_runs_counts AS (
             -- Count test runs (all results, not just submitted)
             SELECT
@@ -851,12 +868,19 @@ class CourseMemberGradingsRepository:
             lr.result_created_at,
             -- Counts
             COALESCE(trc.test_runs_count, 0) as test_runs_count,
-            COALESCE(smc.submissions_count, 0) as submissions_count
+            COALESCE(smc.submissions_count, 0) as submissions_count,
+            -- Grader info
+            lg.graded_by_course_member_id,
+            lg.grader_course_role_id,
+            lg.grader_user_id,
+            lg.grader_given_name,
+            lg.grader_family_name
         FROM submittable_contents sc
         LEFT JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
         LEFT JOIN latest_results lr ON lr.content_id = sc.content_id
         LEFT JOIN test_runs_counts trc ON trc.content_id = sc.content_id
         LEFT JOIN submissions_counts smc ON smc.content_id = sc.content_id
+        LEFT JOIN latest_grades lg ON lg.content_id = sc.content_id
         """)
 
         results = self.db.execute(sql, {
@@ -875,6 +899,15 @@ class CourseMemberGradingsRepository:
                 "latest_result_created_at": r.result_created_at,
                 "test_runs_count": r.test_runs_count,
                 "submissions_count": r.submissions_count,
+                # Grader info
+                "graded_by_course_member": {
+                    "course_role_id": r.grader_course_role_id,
+                    "user_id": str(r.grader_user_id) if r.grader_user_id else None,
+                    "user": {
+                        "given_name": r.grader_given_name,
+                        "family_name": r.grader_family_name,
+                    } if r.grader_user_id else None,
+                } if r.graded_by_course_member_id else None,
             }
             for r in results
         }

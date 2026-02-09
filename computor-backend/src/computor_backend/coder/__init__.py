@@ -57,9 +57,7 @@ from .schemas import (
     WorkspaceActionResponse,
     WorkspaceDetails,
     WorkspaceListResponse,
-    WorkspaceProvisionRequest,
     WorkspaceStatus,
-    WorkspaceTemplate,
     WorkspaceBuildStatus,
 )
 
@@ -102,8 +100,6 @@ __all__ = [
     "WorkspaceActionResponse",
     "WorkspaceDetails",
     "WorkspaceListResponse",
-    "WorkspaceProvisionRequest",
     "WorkspaceStatus",
-    "WorkspaceTemplate",
     "WorkspaceBuildStatus",
 ]

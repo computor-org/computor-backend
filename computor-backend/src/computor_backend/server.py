@@ -194,22 +194,7 @@ async def lifespan(app: FastAPI):
     # Start WebSocket connection manager
     await ws_manager.start()
 
-    # Initialize Coder plugin
-    import logging
-    logger = logging.getLogger(__name__)
-    try:
-        coder_plugin = CoderPlugin()
-        await coder_plugin.initialize()
-        logger.info("Coder plugin initialized successfully")
-    except Exception as e:
-        logger.warning(f"Failed to initialize Coder plugin: {e}")
-        coder_plugin = None
-
     yield
-
-    # Shutdown Coder plugin
-    if coder_plugin:
-        await coder_plugin.shutdown()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()

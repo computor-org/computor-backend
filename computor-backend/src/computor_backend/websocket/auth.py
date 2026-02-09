@@ -81,7 +81,7 @@ async def _authenticate_api_token(token: str) -> Principal:
     """
     try:
         with next(get_db()) as db:
-            auth_result = AuthenticationService.authenticate_api_token(token, db)
+            auth_result = await AuthenticationService.authenticate_api_token(token, db)
             principal = PrincipalBuilder.build(auth_result, db)
 
         logger.info(f"WebSocket API token authentication successful for user {principal.user_id}")

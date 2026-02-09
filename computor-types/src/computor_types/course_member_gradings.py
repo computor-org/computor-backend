@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
 from computor_types.base import EntityInterface, ListQuery
+from computor_types.grading import GradedByCourseMember
 
 
 class ContentTypeGradingStats(BaseModel):
@@ -169,6 +170,12 @@ class CourseMemberGradingNode(BaseModel):
     max_submissions: Optional[int] = Field(
         None,
         description="Maximum allowed submissions for this assignment (from course_content or submission_group)"
+    )
+
+    # Grader info (only for graded assignments)
+    graded_by_course_member: Optional[GradedByCourseMember] = Field(
+        None,
+        description="Information about who graded this assignment (only for submittable nodes that have been graded)"
     )
 
     model_config = ConfigDict(from_attributes=True)

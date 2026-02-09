@@ -80,19 +80,6 @@ class CoderWorkspaceCreate(BaseModel):
     )
 
 
-class WorkspaceProvisionRequest(BaseModel):
-    """Request to provision a workspace for a user."""
-
-    template: WorkspaceTemplate = Field(
-        WorkspaceTemplate.PYTHON,
-        description="Workspace template to use"
-    )
-    workspace_name: Optional[str] = Field(
-        None,
-        description="Custom workspace name (defaults to {username}-workspace)"
-    )
-
-
 # Response schemas
 
 class CoderUser(BaseModel):

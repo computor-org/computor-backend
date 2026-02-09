@@ -181,15 +181,24 @@ async def course_member_course_content_result_mapper(
 
     # Update latest grading values from the latest SUBMISSION's most recent grade
     # (not just the most recent grade overall)
+    graded_by_course_member_payload = None
     if latest_submission_artifact_id is not None:
         # Find the latest grade for the latest submission artifact
         latest_submission_grade = db.query(SubmissionGrade).filter(
             SubmissionGrade.artifact_id == latest_submission_artifact_id
+        ).options(
+            joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.user),
+            joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.course_role),
         ).order_by(SubmissionGrade.graded_at.desc()).first()
 
         if latest_submission_grade:
             latest_grading_value = latest_submission_grade.grade
             latest_status_value = latest_submission_grade.status
+            # Get the grader info from the latest grading
+            if latest_submission_grade.graded_by:
+                graded_by_course_member_payload = GradedByCourseMember.model_validate(
+                    latest_submission_grade.graded_by, from_attributes=True
+                )
 
     if latest_status_value is not None:
         submission_status = status_lookup.get(int(latest_status_value), "not_reviewed")
@@ -224,6 +233,7 @@ async def course_member_course_content_result_mapper(
             count=submission_count or 0,
             max_submissions=submission_group.max_submissions,
             unread_message_count=submission_group_unread_count,
+            graded_by_course_member=graded_by_course_member_payload,
         )
 
         submission_group_detail = SubmissionGroupStudentGet(
@@ -241,6 +251,7 @@ async def course_member_course_content_result_mapper(
             max_submissions=submission_group.max_submissions,
             unread_message_count=submission_group_unread_count,
             gradings=gradings_payload,
+            graded_by_course_member=graded_by_course_member_payload,
         )
 
     list_obj = CourseContentStudentList(
