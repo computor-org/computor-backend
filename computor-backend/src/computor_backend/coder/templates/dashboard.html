@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Load workspace summary
-    fetch(API_BASE + '/workspaces/me')
+    fetch(API_BASE + '/workspaces', { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
             const el = document.getElementById('workspace-summary');

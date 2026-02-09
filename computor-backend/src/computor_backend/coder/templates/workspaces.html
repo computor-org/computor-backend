@@ -59,7 +59,7 @@ document.addEventListener('visibilitychange', function() {
 function loadWorkspaces() {
     const container = document.getElementById('workspaces-list');
 
-    fetch(API_BASE + '/workspaces/me', { credentials: 'include' })
+    fetch(API_BASE + '/workspaces', { credentials: 'include' })
         .then(r => {
             if (!r.ok) throw new Error('Failed to fetch workspaces');
             return r.json();
