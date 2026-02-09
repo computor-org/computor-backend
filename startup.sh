@@ -140,6 +140,20 @@ if [ "$ENABLE_CODER" = true ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
+    # Seed default templates from repo (only copies missing ones, never overwrites)
+    if [ -d "${SCRIPT_DIR}/computor-coder/deployment/templates" ]; then
+        echo -e "  ${GREEN}Seeding Coder templates...${NC}"
+        for tpl_dir in "${SCRIPT_DIR}/computor-coder/deployment/templates"/*/; do
+            tpl_name=$(basename "$tpl_dir")
+            if [ ! -d "${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}" ]; then
+                echo "    Copying template: ${tpl_name}"
+                cp -r "$tpl_dir" "${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}"
+            else
+                echo "    Template already exists: ${tpl_name} (skipping)"
+            fi
+        done
+    fi
+
     # Auto-detect DOCKER_GID if not set (required for Coder to access Docker socket)
     if [ -z "$DOCKER_GID" ]; then
         echo -e "\n${GREEN}Auto-detecting Docker group ID...${NC}"

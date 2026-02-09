@@ -15,9 +15,11 @@ from computor_backend.coder.client import CoderClient, get_coder_client
 from computor_backend.coder.config import CoderSettings, get_coder_settings
 from computor_backend.coder.exceptions import (
     CoderAPIError,
+    CoderAuthenticationError,
     CoderConnectionError,
     CoderDisabledError,
     CoderNotFoundError,
+    CoderTemplateNotFoundError,
 )
 from computor_backend.coder.schemas import (
     CoderHealthResponse,
@@ -67,6 +69,11 @@ def _handle_coder_error(e: Exception) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Cannot connect to Coder server",
+        )
+    if isinstance(e, CoderAuthenticationError):
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Coder is not ready yet (admin setup may still be in progress)",
         )
     if isinstance(e, CoderNotFoundError):
         return HTTPException(
@@ -166,6 +173,15 @@ async def provision_workspace(
     """Provision a workspace for the current user."""
     _check_workspace_access(permissions, "provision")
     try:
+        # Verify template exists in Coder before minting a token
+        try:
+            await client.get_template_id(request.template.value)
+        except CoderTemplateNotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
+            )
+
         user = get_user_by_id(db, cache, str(permissions.user_id))
         workspace_token = mint_workspace_token(db, cache, str(user.id), str(permissions.user_id))
         if workspace_token:
@@ -182,6 +198,8 @@ async def provision_workspace(
             computor_auth_token=workspace_token,
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise _handle_coder_error(e)
 
@@ -315,6 +333,15 @@ async def provision_workspace_by_email(
     """
     _check_workspace_access(permissions, "provision")
     try:
+        # Verify template exists in Coder before minting a token
+        try:
+            await client.get_template_id(request.template.value)
+        except CoderTemplateNotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
+            )
+
         backend_user = get_user_by_email(db, cache, email)
         if not backend_user:
             raise HTTPException(
@@ -323,9 +350,7 @@ async def provision_workspace_by_email(
             )
 
         # Mint workspace token
-        print(f"[CODER API] About to mint token for user {backend_user.id}")
         workspace_token = mint_workspace_token(db, cache, str(backend_user.id), str(permissions.user_id))
-        print(f"[CODER API] Token result: {workspace_token[:20] if workspace_token else 'None'}...")
         if workspace_token:
             logger.info(f"Token minted successfully (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
         else:

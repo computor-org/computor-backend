@@ -55,7 +55,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - coder_home:/home/coder
-      - ../../computor-coder/deployment/templates:/templates:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
     depends_on:
       coder-postgres:
         condition: service_healthy
@@ -118,7 +118,7 @@ services:
         echo "Python 3.13 workspace image built and pushed successfully."
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../../computor-coder/deployment/templates/python3.13:/workspace:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates/python3.13:/workspace:ro
     depends_on:
       coder-registry:
         condition: service_healthy
@@ -153,7 +153,7 @@ services:
         echo "MATLAB workspace image built and pushed successfully."
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../../computor-coder/deployment/templates/matlab:/workspace:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates/matlab:/workspace:ro
     depends_on:
       coder-registry:
         condition: service_healthy
@@ -300,7 +300,7 @@ services:
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD}
     volumes:
-      - ../../computor-coder/deployment/templates:/templates:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
     user: "0:0"
     depends_on:
