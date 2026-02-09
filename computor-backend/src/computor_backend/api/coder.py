@@ -28,8 +28,8 @@ from computor_backend.coder.schemas import (
     WorkspaceActionResponse,
     WorkspaceDetails,
     WorkspaceListResponse,
-    WorkspaceProvisionRequest,
 )
+from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
     get_user_by_email,
     get_user_by_id,
@@ -154,13 +154,13 @@ async def list_templates(
 
 
 # -----------------------------------------------------------------------------
-# Self-service workspace endpoints
+# Workspace provisioning
 # -----------------------------------------------------------------------------
 
 @router.post(
     "/workspaces/provision",
     response_model=ProvisionResult,
-    summary="Provision a workspace for current user",
+    summary="Provision a workspace",
 )
 async def provision_workspace(
     request: WorkspaceProvisionRequest,
@@ -170,7 +170,12 @@ async def provision_workspace(
     db: Annotated[Session, Depends(get_db)],
     cache: Annotated[object, Depends(get_cache)],
 ) -> ProvisionResult:
-    """Provision a workspace for the current user."""
+    """
+    Provision a workspace.
+
+    If `email` is provided, provisions for that user (requires workspace:provision permission).
+    If `email` is omitted, provisions for the current user.
+    """
     _check_workspace_access(permissions, "provision")
     try:
         # Verify template exists in Coder before minting a token
@@ -182,185 +187,28 @@ async def provision_workspace(
                 detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
             )
 
-        user = get_user_by_id(db, cache, str(permissions.user_id))
-        workspace_token = mint_workspace_token(db, cache, str(user.id), str(permissions.user_id))
-        if workspace_token:
-            logger.info(f"Self-provision: token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
+        # Resolve target user
+        if request.email:
+            target_user = get_user_by_email(db, cache, request.email)
+            if not target_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with email {request.email} not found",
+                )
         else:
-            logger.error("Self-provision: token minting returned None!")
-
-        result = await client.provision_workspace(
-            user_email=get_user_email(user),
-            username=str(user.id),
-            full_name=get_user_fullname(user),
-            template=request.template,
-            workspace_name=request.workspace_name,
-            computor_auth_token=workspace_token,
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise _handle_coder_error(e)
-
-
-@router.get(
-    "/workspaces/me",
-    response_model=WorkspaceListResponse,
-    summary="Get current user's workspaces",
-)
-async def get_my_workspaces(
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
-    cache: Annotated[object, Depends(get_cache)],
-) -> WorkspaceListResponse:
-    """Get all workspaces for the current authenticated user."""
-    _check_workspace_access(permissions, "list")
-    try:
-        user = get_user_by_id(db, cache, str(permissions.user_id))
-        coder_user = await client._find_user_by_email(get_user_email(user))
-        workspaces = await client.get_user_workspaces(coder_user.username)
-        return WorkspaceListResponse(
-            workspaces=workspaces,
-            count=len(workspaces),
-        )
-    except CoderNotFoundError:
-        return WorkspaceListResponse(workspaces=[], count=0)
-    except Exception as e:
-        raise _handle_coder_error(e)
-
-
-@router.get(
-    "/workspaces/me/exists",
-    response_model=bool,
-    summary="Check if current user has any workspaces",
-)
-async def my_workspace_exists(
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
-    cache: Annotated[object, Depends(get_cache)],
-) -> bool:
-    """Check if the current user has any workspaces in Coder."""
-    _check_workspace_access(permissions, "list")
-    try:
-        user = get_user_by_id(db, cache, str(permissions.user_id))
-        coder_user = await client._find_user_by_email(get_user_email(user))
-        workspaces = await client.get_user_workspaces(coder_user.username)
-        return len(workspaces) > 0
-    except CoderNotFoundError:
-        return False
-    except Exception as e:
-        raise _handle_coder_error(e)
-
-
-# -----------------------------------------------------------------------------
-# Admin/manage workspace endpoints
-# -----------------------------------------------------------------------------
-
-@router.get(
-    "/workspaces/by-email/{email}",
-    response_model=WorkspaceListResponse,
-    summary="Get workspaces for a user by email (manage)",
-)
-async def get_workspaces_by_email(
-    email: str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    client: Annotated[CoderClient, Depends(get_coder_client)],
-) -> WorkspaceListResponse:
-    """Get all workspaces for a user identified by email. Requires workspace:manage."""
-    _check_workspace_access(permissions, "manage")
-    try:
-        user = await client._find_user_by_email(email)
-        workspaces = await client.get_user_workspaces(user.username)
-        return WorkspaceListResponse(
-            workspaces=workspaces,
-            count=len(workspaces),
-        )
-    except CoderNotFoundError:
-        return WorkspaceListResponse(workspaces=[], count=0)
-    except Exception as e:
-        raise _handle_coder_error(e)
-
-
-@router.get(
-    "/workspaces/by-email/{email}/exists",
-    response_model=bool,
-    summary="Check if user has any workspaces (manage)",
-)
-async def user_has_workspace(
-    email: str,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    client: Annotated[CoderClient, Depends(get_coder_client)],
-) -> bool:
-    """Check if a user (by email) has any workspaces. Requires workspace:manage."""
-    _check_workspace_access(permissions, "manage")
-    try:
-        user = await client._find_user_by_email(email)
-        workspaces = await client.get_user_workspaces(user.username)
-        return len(workspaces) > 0
-    except CoderNotFoundError:
-        return False
-    except Exception as e:
-        raise _handle_coder_error(e)
-
-
-@router.post(
-    "/workspaces/by-email/{email}/provision",
-    response_model=ProvisionResult,
-    summary="Provision workspace for user by email (maintainer)",
-)
-async def provision_workspace_by_email(
-    email: str,
-    request: WorkspaceProvisionRequest,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
-    cache: Annotated[object, Depends(get_cache)],
-) -> ProvisionResult:
-    """
-    Provision a workspace for a user identified by email.
-
-    Requires workspace:provision permission (maintainers and admins).
-    Creates Coder user if needed, then provisions workspace.
-    Mints an API token for the workspace extension auto-login.
-    """
-    _check_workspace_access(permissions, "provision")
-    try:
-        # Verify template exists in Coder before minting a token
-        try:
-            await client.get_template_id(request.template.value)
-        except CoderTemplateNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
-            )
-
-        backend_user = get_user_by_email(db, cache, email)
-        if not backend_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with email {email} not found in backend",
-            )
+            target_user = get_user_by_id(db, cache, str(permissions.user_id))
 
         # Mint workspace token
-        workspace_token = mint_workspace_token(db, cache, str(backend_user.id), str(permissions.user_id))
+        workspace_token = mint_workspace_token(db, cache, str(target_user.id), str(permissions.user_id))
         if workspace_token:
-            logger.info(f"Token minted successfully (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
+            logger.info(f"Token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
         else:
             logger.error("Token minting returned None!")
 
-        # Provision workspace with user's UUID as username
         result = await client.provision_workspace(
-            user_email=email,
-            username=str(backend_user.id),
-            full_name=get_user_fullname(backend_user),
+            user_email=get_user_email(target_user),
+            username=str(target_user.id),
+            full_name=get_user_fullname(target_user),
             template=request.template,
             workspace_name=request.workspace_name,
             computor_auth_token=workspace_token,
@@ -368,6 +216,87 @@ async def provision_workspace_by_email(
         return result
     except HTTPException:
         raise
+    except Exception as e:
+        raise _handle_coder_error(e)
+
+
+# -----------------------------------------------------------------------------
+# Workspace listing
+# -----------------------------------------------------------------------------
+
+@router.get(
+    "/workspaces",
+    response_model=WorkspaceListResponse,
+    summary="Get workspaces",
+)
+async def get_workspaces(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[object, Depends(get_cache)],
+    email: Optional[str] = None,
+) -> WorkspaceListResponse:
+    """
+    Get workspaces.
+
+    If `email` query param is provided, returns workspaces for that user (requires workspace:manage).
+    If omitted, returns workspaces for the current user.
+    """
+    if email:
+        _check_workspace_access(permissions, "manage")
+        target_email = email
+    else:
+        _check_workspace_access(permissions, "list")
+        user = get_user_by_id(db, cache, str(permissions.user_id))
+        target_email = get_user_email(user)
+
+    try:
+        coder_user = await client._find_user_by_email(target_email)
+        workspaces = await client.get_user_workspaces(coder_user.username)
+        return WorkspaceListResponse(
+            workspaces=workspaces,
+            count=len(workspaces),
+        )
+    except CoderNotFoundError:
+        return WorkspaceListResponse(workspaces=[], count=0)
+    except Exception as e:
+        raise _handle_coder_error(e)
+
+
+@router.get(
+    "/workspaces/exists",
+    response_model=bool,
+    summary="Check if user has any workspaces",
+)
+async def workspace_exists(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+    cache: Annotated[object, Depends(get_cache)],
+    email: Optional[str] = None,
+) -> bool:
+    """
+    Check if a user has any workspaces.
+
+    If `email` query param is provided, checks for that user (requires workspace:manage).
+    If omitted, checks for the current user.
+    """
+    if email:
+        _check_workspace_access(permissions, "manage")
+        target_email = email
+    else:
+        _check_workspace_access(permissions, "list")
+        user = get_user_by_id(db, cache, str(permissions.user_id))
+        target_email = get_user_email(user)
+
+    try:
+        coder_user = await client._find_user_by_email(target_email)
+        workspaces = await client.get_user_workspaces(coder_user.username)
+        return len(workspaces) > 0
+    except CoderNotFoundError:
+        return False
     except Exception as e:
         raise _handle_coder_error(e)
 

@@ -99,7 +99,7 @@ function checkUserWorkspace(email) {
     userWorkspaceStatus[email] = { loading: true, hasWorkspace: false };
     updateWorkspaceCell(email);
 
-    fetch(`${API_BASE}/workspaces/by-email/${encodeURIComponent(email)}/exists`, { credentials: 'include' })
+    fetch(`${API_BASE}/workspaces/exists?email=${encodeURIComponent(email)}`, { credentials: 'include' })
         .then(r => {
             if (!r.ok) throw new Error('Failed');
             return r.json();
@@ -296,11 +296,11 @@ function assignRoleByEmail(event) {
 }
 
 function doProvisionWorkspace(email) {
-    return fetch(`${API_BASE}/workspaces/by-email/${encodeURIComponent(email)}/provision`, {
+    return fetch(`${API_BASE}/workspaces/provision`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: 'python-workspace', workspace_name: 'workspace' }),
+        body: JSON.stringify({ email: email, template: 'python-workspace', workspace_name: 'workspace' }),
     }).then(r => {
         if (!r.ok) return r.json().then(e => { throw new Error(e.message || e.detail || 'Workspace provisioning failed'); });
         return r.json();
