@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.13 from source

@@ -238,15 +238,20 @@ services:
         export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
         export CODER_URL="http://coder:7080"
 
-        # Determine backend URLs based on DEBUG_MODE
+        # Determine backend URLs and dev settings based on DEBUG_MODE
         if [ "${DEBUG_MODE}" = "production" ]; then
           BACKEND_INTERNAL_URL="http://uvicorn:8000"
           BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_PROD}"
+          FORWARD_PORTS=""
           echo "Production mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
         else
           BACKEND_INTERNAL_URL="http://host.docker.internal:8000"
           BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}"
+          FORWARD_PORTS="${DEV_FORWARD_PORTS}"
           echo "Development mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
+          if [ -n "$$FORWARD_PORTS" ]; then
+            echo "  Port forwarding: $$FORWARD_PORTS"
+          fi
         fi
 
         # Function to create template and set TTL
@@ -267,6 +272,7 @@ services:
             --directory . \
             --variable computor_backend_internal="$$BACKEND_INTERNAL_URL" \
             --variable computor_backend_url="$$BACKEND_EXTERNAL_URL" \
+            --variable dev_forward_ports="$$FORWARD_PORTS" \
             --yes \
             && echo "Template '$$TEMPLATE_NAME' created successfully." \
             || echo "Template '$$TEMPLATE_NAME' creation skipped (may already exist)."
@@ -299,6 +305,7 @@ services:
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD}
+      DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
