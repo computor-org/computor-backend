@@ -120,8 +120,8 @@ resource "coder_agent" "main" {
     # Dev mode: forward localhost ports to host machine via socat
     %{ if var.dev_forward_ports != "" }
     for port in $(echo "${var.dev_forward_ports}" | tr ',' ' '); do
-      echo "Forwarding localhost:$$port -> host.docker.internal:$$port"
-      socat TCP-LISTEN:$$port,fork,reuseaddr TCP:host.docker.internal:$$port &
+      echo "Forwarding localhost:$port -> host.docker.internal:$port"
+      socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
     done
     %{ endif }
 
