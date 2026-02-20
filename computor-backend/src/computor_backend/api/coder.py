@@ -22,13 +22,18 @@ from computor_backend.coder.exceptions import (
     CoderTemplateNotFoundError,
 )
 from computor_backend.coder.schemas import (
+    CoderAdminTaskResponse,
     CoderHealthResponse,
+    ImageBuildRequest,
     ProvisionResult,
+    TemplatePushRequest,
     TemplateListResponse,
     WorkspaceActionResponse,
     WorkspaceDetails,
     WorkspaceListResponse,
 )
+from computor_backend.tasks import get_task_executor, TaskSubmission
+from computor_types.tasks import TaskInfo
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
     get_user_by_email,
@@ -447,4 +452,131 @@ async def get_coder_session(
         return CoderSessionResponse(
             success=False,
             message="Login failed",
+        )
+
+
+# -----------------------------------------------------------------------------
+# Admin endpoints — image building + template pushing (workspace:manage)
+# -----------------------------------------------------------------------------
+
+
+def _build_template_parameters(settings: CoderSettings) -> dict:
+    """Build common parameters for coder template workflows from settings and env."""
+    import os
+
+    debug_mode = os.environ.get("DEBUG_MODE", "development")
+    if debug_mode == "production":
+        backend_internal = "http://uvicorn:8000"
+        backend_external = os.environ.get("BACKEND_EXTERNAL_URL_PROD", "")
+        forward_ports = ""
+    else:
+        backend_internal = "http://host.docker.internal:8000"
+        backend_external = os.environ.get("BACKEND_EXTERNAL_URL_DEV", "http://host.docker.internal:8000")
+        forward_ports = os.environ.get("DEV_FORWARD_PORTS", "")
+
+    return {
+        "templates_dir": settings.templates_dir,
+        "registry_host": settings.registry_host,
+        "coder_url": settings.url,
+        "coder_admin_email": settings.admin_email,
+        "coder_admin_password": settings.admin_password,
+        "backend_internal_url": backend_internal,
+        "backend_external_url": backend_external,
+        "dev_forward_ports": forward_ports,
+        "ttl_ms": 3600000,
+        "activity_bump_ms": 3600000,
+    }
+
+
+@router.post(
+    "/admin/images/build",
+    response_model=CoderAdminTaskResponse,
+    summary="Build workspace Docker images",
+)
+async def build_workspace_images(
+    request: ImageBuildRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> CoderAdminTaskResponse:
+    """
+    Trigger workspace image builds via Temporal workflow.
+    Requires workspace:manage permission.
+    """
+    _check_workspace_access(permissions, "manage")
+
+    executor = get_task_executor()
+    params = {
+        "templates": request.templates,
+        "templates_dir": settings.templates_dir,
+        "registry_host": settings.registry_host,
+    }
+    submission = TaskSubmission(
+        task_name="build_workspace_images",
+        parameters=params,
+        queue="coder-tasks",
+    )
+    workflow_id = await executor.submit_task(submission)
+
+    return CoderAdminTaskResponse(
+        workflow_id=workflow_id,
+        task_name="build_workspace_images",
+        status="submitted",
+    )
+
+
+@router.post(
+    "/admin/templates/push",
+    response_model=CoderAdminTaskResponse,
+    summary="Push Coder templates",
+)
+async def push_coder_templates(
+    request: TemplatePushRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> CoderAdminTaskResponse:
+    """
+    Push Coder templates (Terraform configs) via Temporal workflow.
+    Optionally builds images first. Requires workspace:manage permission.
+    """
+    _check_workspace_access(permissions, "manage")
+
+    executor = get_task_executor()
+    params = _build_template_parameters(settings)
+    params["templates"] = request.templates
+    params["build_images"] = request.build_images
+
+    submission = TaskSubmission(
+        task_name="push_coder_templates",
+        parameters=params,
+        queue="coder-tasks",
+    )
+    workflow_id = await executor.submit_task(submission)
+
+    return CoderAdminTaskResponse(
+        workflow_id=workflow_id,
+        task_name="push_coder_templates",
+        status="submitted",
+    )
+
+
+@router.get(
+    "/admin/tasks/{workflow_id}",
+    response_model=TaskInfo,
+    summary="Get admin task status",
+)
+async def get_admin_task_status(
+    workflow_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> TaskInfo:
+    """Get the status of an admin task (image build / template push)."""
+    _check_workspace_access(permissions, "manage")
+
+    executor = get_task_executor()
+    try:
+        return await executor.get_task_status(workflow_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
         )

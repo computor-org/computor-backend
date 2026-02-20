@@ -19,8 +19,7 @@ fi
 echo -e "\n${YELLOW}Stopping all containers...${NC}"
 docker stop computor-coder computor-coder-registry 2>/dev/null
 docker rm computor-coder computor-coder-registry 2>/dev/null
-docker rm docker-coder-admin-setup-1 docker-coder-template-setup-1 2>/dev/null
-docker rm docker-coder-image-builder-python-1 docker-coder-image-builder-matlab-1 2>/dev/null
+docker rm docker-coder-admin-setup-1 2>/dev/null
 
 echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
 docker volume rm computor-coder-home computor-coder-registry 2>/dev/null
@@ -53,6 +52,9 @@ echo "To reinitialize Coder:"
 echo "  1. Ensure CODER_ENABLED=true in .env"
 echo "  2. Start services: bash startup.sh dev -d"
 echo "  3. Coder will recreate its database and admin user automatically"
+echo "  4. Build images and push templates via admin API:"
+echo "     POST /coder/admin/images/build"
+echo "     POST /coder/admin/templates/push"
 echo ""
 echo "Note: User workspace data in Docker volumes has been deleted."
 echo "      Templates in \${SYSTEM_DEPLOYMENT_PATH}/coder/templates/ are preserved."

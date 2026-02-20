@@ -175,3 +175,35 @@ class CoderHealthResponse(BaseModel):
     healthy: bool = Field(..., description="Whether Coder is healthy")
     version: Optional[str] = Field(None, description="Coder version")
     message: Optional[str] = Field(None, description="Status message")
+
+
+# Admin task schemas (image building, template pushing)
+
+class ImageBuildRequest(BaseModel):
+    """Request to build workspace Docker images."""
+
+    templates: Optional[list[str]] = Field(
+        None,
+        description="Template names to build (e.g. ['python3.13', 'matlab']). None = all templates."
+    )
+
+
+class TemplatePushRequest(BaseModel):
+    """Request to push Coder templates (Terraform configs)."""
+
+    templates: Optional[list[str]] = Field(
+        None,
+        description="Template names to push (e.g. ['python-workspace', 'matlab-workspace']). None = all templates."
+    )
+    build_images: bool = Field(
+        False,
+        description="Build workspace images before pushing templates."
+    )
+
+
+class CoderAdminTaskResponse(BaseModel):
+    """Response for admin task submission."""
+
+    workflow_id: str = Field(..., description="Temporal workflow ID for tracking")
+    task_name: str = Field(..., description="Name of the submitted task")
+    status: str = Field("submitted", description="Initial task status")

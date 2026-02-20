@@ -89,76 +89,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Build Python 3.13 workspace image
-  coder-image-builder-python:
-    image: docker:latest
-    networks:
-      - computor-network
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Waiting for registry to be ready..."
-        until wget -q --spider http://coder-registry:5000/v2/; do
-          sleep 1
-        done
-        echo "Registry is ready."
-
-        if [ ! -f /workspace/Dockerfile ]; then
-          echo "No Dockerfile found for Python 3.13, skipping."
-          exit 0
-        fi
-
-        echo "Building Python 3.13 workspace image..."
-        cd /workspace
-        docker build -t localhost:5000/computor-workspace-python3.13:latest .
-
-        echo "Pushing Python 3.13 image to local registry..."
-        docker push localhost:5000/computor-workspace-python3.13:latest
-
-        echo "Python 3.13 workspace image built and pushed successfully."
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates/python3.13:/workspace:ro
-    depends_on:
-      coder-registry:
-        condition: service_healthy
-    restart: "no"
-
-  # Build MATLAB workspace image
-  coder-image-builder-matlab:
-    image: docker:latest
-    networks:
-      - computor-network
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Waiting for registry to be ready..."
-        until wget -q --spider http://coder-registry:5000/v2/; do
-          sleep 1
-        done
-        echo "Registry is ready."
-
-        if [ ! -f /workspace/Dockerfile ]; then
-          echo "No Dockerfile found for MATLAB, skipping."
-          exit 0
-        fi
-
-        echo "Building MATLAB workspace image..."
-        cd /workspace
-        docker build -t localhost:5000/computor-workspace-matlab:latest .
-
-        echo "Pushing MATLAB image to local registry..."
-        docker push localhost:5000/computor-workspace-matlab:latest
-
-        echo "MATLAB workspace image built and pushed successfully."
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates/matlab:/workspace:ro
-    depends_on:
-      coder-registry:
-        condition: service_healthy
-    restart: "no"
-
   # Coder admin setup (one-time initialization)
   coder-admin-setup:
     image: ghcr.io/coder/coder:latest
@@ -212,112 +142,40 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # Template provisioning (after admin setup)
-  coder-template-setup:
-    image: ghcr.io/coder/coder:latest
+  # Temporal worker for Coder tasks (image building, template pushing)
+  # Triggered via API endpoints: POST /coder/admin/images/build, POST /coder/admin/templates/push
+  temporal-worker-coder:
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker-coder/Dockerfile
     networks:
       - computor-network
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        echo "Setting up Coder templates..."
-
-        # Login via API and get session token
-        SESSION_TOKEN=$$(curl -s -X POST "http://coder:7080/api/v2/users/login" \
-          -H "Content-Type: application/json" \
-          -d "{\"email\":\"${CODER_ADMIN_EMAIL}\",\"password\":\"${CODER_ADMIN_PASSWORD}\"}" \
-          | sed -n 's/.*"session_token":"\([^"]*\)".*/\1/p')
-
-        if [ -z "$$SESSION_TOKEN" ]; then
-          echo "Failed to get session token, skipping template creation."
-          exit 0
-        fi
-
-        echo "Session token obtained."
-        export CODER_SESSION_TOKEN="$$SESSION_TOKEN"
-        export CODER_URL="http://coder:7080"
-
-        # Determine backend URLs and dev settings based on DEBUG_MODE
-        if [ "${DEBUG_MODE}" = "production" ]; then
-          BACKEND_INTERNAL_URL="http://uvicorn:8000"
-          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_PROD}"
-          FORWARD_PORTS=""
-          echo "Production mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
-        else
-          BACKEND_INTERNAL_URL="http://host.docker.internal:8000"
-          BACKEND_EXTERNAL_URL="${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}"
-          FORWARD_PORTS="${DEV_FORWARD_PORTS}"
-          echo "Development mode: Internal backend at $$BACKEND_INTERNAL_URL, External at $$BACKEND_EXTERNAL_URL"
-          if [ -n "$$FORWARD_PORTS" ]; then
-            echo "  Port forwarding: $$FORWARD_PORTS"
-          fi
-        fi
-
-        # Function to create template and set TTL
-        create_template() {
-          TEMPLATE_NAME=$$1
-          TEMPLATE_DIR=$$2
-
-          if [ ! -f "$$TEMPLATE_DIR/main.tf" ]; then
-            echo "No template files found for $$TEMPLATE_NAME, skipping."
-            return
-          fi
-
-          echo "Pushing template: $$TEMPLATE_NAME"
-          echo "  Internal backend: $$BACKEND_INTERNAL_URL"
-          echo "  External backend: $$BACKEND_EXTERNAL_URL"
-          cd "$$TEMPLATE_DIR"
-          coder templates push "$$TEMPLATE_NAME" \
-            --directory . \
-            --variable computor_backend_internal="$$BACKEND_INTERNAL_URL" \
-            --variable computor_backend_url="$$BACKEND_EXTERNAL_URL" \
-            --variable dev_forward_ports="$$FORWARD_PORTS" \
-            --yes \
-            && echo "Template '$$TEMPLATE_NAME' created successfully." \
-            || echo "Template '$$TEMPLATE_NAME' creation skipped (may already exist)."
-
-          # Set default auto-stop (TTL) to 1 hour
-          echo "Setting auto-stop for $$TEMPLATE_NAME to 1 hour..."
-
-          TEMPLATE_ID=$$(curl -s "http://coder:7080/api/v2/organizations/default/templates/$$TEMPLATE_NAME" \
-            -H "Coder-Session-Token: $$SESSION_TOKEN" \
-            | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
-
-          if [ -n "$$TEMPLATE_ID" ]; then
-            curl -s -X PATCH "http://coder:7080/api/v2/templates/$$TEMPLATE_ID" \
-              -H "Content-Type: application/json" \
-              -H "Coder-Session-Token: $$SESSION_TOKEN" \
-              -d '{"default_ttl_ms": 3600000, "activity_bump_ms": 3600000}' \
-              && echo "Auto-stop configured for $$TEMPLATE_NAME." \
-              || echo "Failed to set auto-stop for $$TEMPLATE_NAME."
-          fi
-        }
-
-        # Create templates
-        create_template "python-workspace" "/templates/python3.13"
-        create_template "matlab-workspace" "/templates/matlab"
-
-        echo "Template setup complete."
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates:ro
+    group_add:
+      - "${DOCKER_GID}"
     environment:
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      CODER_URL: http://coder:7080
+      CODER_ENABLED: "true"
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
+      CODER_TEMPLATES_DIR: /templates
+      CODER_REGISTRY_HOST: coder-registry:5000
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
-      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD}
+      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
-    user: "0:0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
+      coder:
+        condition: service_healthy
       coder-admin-setup:
         condition: service_completed_successfully
-      coder-image-builder-python:
-        condition: service_completed_successfully
-      coder-image-builder-matlab:
-        condition: service_completed_successfully
-    restart: "no"
 
 # Coder-specific volumes (isolated from main infrastructure)
 volumes:

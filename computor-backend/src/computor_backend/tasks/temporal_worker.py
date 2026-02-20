@@ -76,6 +76,12 @@ from .temporal_tutor_testing import (
     store_tutor_test_result_to_minio,
     run_tutor_test_activity,
 )
+from .temporal_coder_setup import (
+    BuildWorkspaceImagesWorkflow,
+    PushCoderTemplatesWorkflow,
+    build_workspace_image,
+    push_coder_template,
+)
 
 
 class TemporalWorker:
@@ -133,6 +139,8 @@ class TemporalWorker:
             SyncDocumentsRepositoryWorkflow,  # Documents repository sync
             StudentRepositoryCreationWorkflow,  # Student repository forking
             TutorTestingWorkflow,  # Tutor testing (ephemeral, no DB records)
+            BuildWorkspaceImagesWorkflow,  # Coder workspace image building
+            PushCoderTemplatesWorkflow,  # Coder template pushing
         ]
         
         activities = [
@@ -156,6 +164,9 @@ class TemporalWorker:
             store_tutor_test_artifacts_activity,
             store_tutor_test_result_to_minio,
             run_tutor_test_activity,
+            # Coder setup activities (image build + template push)
+            build_workspace_image,
+            push_coder_template,
         ]
         
         # Create a worker for each task queue

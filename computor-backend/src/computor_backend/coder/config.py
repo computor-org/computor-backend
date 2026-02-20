@@ -87,6 +87,16 @@ class CoderSettings(BaseSettings):
         description="Delay between retries in seconds"
     )
 
+    # Template management
+    templates_dir: str = Field(
+        default="/templates",
+        description="Directory containing workspace template files (Dockerfiles + Terraform)"
+    )
+    registry_host: str = Field(
+        default="localhost:5000",
+        description="Docker registry host for workspace images"
+    )
+
 
 # Singleton instance
 _settings: Optional[CoderSettings] = None

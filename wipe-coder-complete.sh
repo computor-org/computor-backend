@@ -22,8 +22,7 @@ source .env
 echo -e "\n${YELLOW}1. Stopping all Coder containers...${NC}"
 docker stop computor-coder computor-coder-registry 2>/dev/null
 docker rm -f computor-coder computor-coder-registry 2>/dev/null
-docker rm -f docker-coder-admin-setup-1 docker-coder-template-setup-1 2>/dev/null
-docker rm -f docker-coder-image-builder-python-1 docker-coder-image-builder-matlab-1 2>/dev/null
+docker rm -f docker-coder-admin-setup-1 2>/dev/null
 echo "  ✓ Containers stopped and removed"
 
 echo -e "\n${YELLOW}2. Removing Coder Docker volumes...${NC}"
@@ -63,7 +62,10 @@ echo ""
 echo "Next steps:"
 echo "1. Ensure CODER_ENABLED=true in .env, then: bash startup.sh dev -d"
 echo "2. Coder will be completely fresh - new database, new admin user"
-echo "3. Admin will be created with credentials from .env:"
+echo "3. Build images and push templates via admin API:"
+echo "   POST /coder/admin/images/build"
+echo "   POST /coder/admin/templates/push"
+echo "4. Admin will be created with credentials from .env:"
 echo "   - Email: $CODER_ADMIN_EMAIL"
 echo "   - Password: $CODER_ADMIN_PASSWORD"
 echo ""
