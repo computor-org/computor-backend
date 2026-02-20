@@ -80,7 +80,6 @@ from pathlib import Path
 
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
-from computor_backend.api.coder_web import router as coder_web_router, login_router as coder_login_router, mount_static_files
 from typing import Optional
 
 async def initialize_plugin_registry_with_config():
@@ -443,12 +442,9 @@ app.include_router(
     dependencies=[Depends(get_current_principal)],
 )
 
-# Coder integration routers (only registered when CODER_ENABLED=true)
+# Coder integration API (only registered when CODER_ENABLED=true)
 if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
     app.include_router(coder_api_router)
-    app.include_router(coder_web_router)
-    app.include_router(coder_login_router)
-    mount_static_files(app, prefix="/coder-ui/static")
 
 
 @app.head("/", status_code=204)
