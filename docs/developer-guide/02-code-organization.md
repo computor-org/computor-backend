@@ -462,7 +462,6 @@ api.sh                      # Start FastAPI backend
 startup.sh                  # Start Docker services
 stop.sh                     # Stop Docker services
 migrations.sh               # Run Alembic migrations
-initialize_system.sh        # Initialize system with admin user
 test.sh                     # Run tests
 generate_types.sh           # Generate TypeScript types
 generate_clients.sh         # Generate Python client

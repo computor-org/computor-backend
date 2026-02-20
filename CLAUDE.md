@@ -79,9 +79,8 @@ bash migrations.sh                    # Run migrations
 alembic revision --autogenerate -m "description"  # Generate migration
 alembic upgrade head                  # Apply migrations
 
-# Initialize system
-bash initialize_system.sh            # Create admin user and base data
-cd src && python seeder.py           # Seed development data
+# Seed development data (optional)
+cd src && python seeder.py
 
 # Install CLI
 pip install -e src

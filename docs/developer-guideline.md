@@ -259,10 +259,7 @@ bash startup.sh
 # Run database migrations
 bash migrations.sh
 
-# Initialize system with admin user
-bash initialize_system.sh
-
-# Start backend API
+# Start backend API (creates admin user automatically on startup)
 bash api.sh
 ```
 

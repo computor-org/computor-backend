@@ -42,10 +42,7 @@ bash startup.sh dev -d
 # Run database migrations
 bash migrations.sh
 
-# Initialize admin user
-bash initialize_system.sh
-
-# Start the API server
+# Start the API server (creates admin user automatically on startup)
 bash api.sh
 ```
 
