@@ -67,6 +67,9 @@ async def build_workspace_image(
     if not info:
         return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
 
+    # Prefer the worker's own env vars (docker network) over parameters from the backend
+    registry_host = os.environ.get("CODER_REGISTRY_HOST", registry_host)
+
     build_dir = os.path.join(templates_dir, info["dir_name"])
     dockerfile_path = os.path.join(build_dir, "Dockerfile")
 
@@ -78,7 +81,7 @@ async def build_workspace_image(
     logger.info(f"Building image {tag} from {build_dir}")
 
     try:
-        client = docker_sdk.from_env()
+        client = docker_sdk.DockerClient(base_url="unix:///var/run/docker.sock")
 
         # Build
         image, build_logs = client.images.build(path=build_dir, tag=tag, rm=True)
@@ -130,6 +133,10 @@ async def push_coder_template(
         return {"success": True, "template": template_key, "skipped": True, "reason": "No main.tf"}
 
     coder_template_name = info["coder_template_name"]
+
+    # Prefer the worker's own CODER_URL env var (docker network) over the
+    # parameter passed from the backend (which may be localhost).
+    coder_url = os.environ.get("CODER_URL", coder_url)
 
     # Step 1: get session token via API login
     logger.info(f"Logging in to Coder at {coder_url} as {coder_admin_email}")

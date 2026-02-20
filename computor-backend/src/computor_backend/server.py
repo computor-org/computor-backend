@@ -189,11 +189,38 @@ async def startup_logic():
             email=coder_settings.admin_email,
             password=coder_settings.admin_password,
         )
-        await client.close()
 
         if not result:
+            await client.close()
             print("[STARTUP] Coder admin setup failed — check Coder server logs and .env credentials")
             quit(1)
+
+        # Check if templates exist in Coder — if not, auto-push them
+        try:
+            templates = await client.list_templates()
+            if not templates:
+                print("[STARTUP] No Coder templates found — submitting build+push workflow")
+                from computor_backend.api.coder import _build_template_parameters
+                from computor_backend.tasks import get_task_executor, TaskSubmission
+
+                params = _build_template_parameters(coder_settings)
+                params["templates"] = None  # all templates
+                params["build_images"] = True
+
+                executor = get_task_executor()
+                workflow_id = await executor.submit_task(TaskSubmission(
+                    task_name="push_coder_templates",
+                    parameters=params,
+                    queue="coder-tasks",
+                ))
+                print(f"[STARTUP] Template build+push workflow submitted: {workflow_id}")
+            else:
+                print(f"[STARTUP] Coder has {len(templates)} template(s) — skipping auto-push")
+        except Exception as e:
+            # Non-fatal — templates can be pushed manually via API
+            print(f"[STARTUP] Template check/push failed (non-fatal): {e}")
+
+        await client.close()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

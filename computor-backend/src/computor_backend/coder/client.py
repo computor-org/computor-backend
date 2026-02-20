@@ -1270,6 +1270,7 @@ class CoderClient:
                 json={"email": email, "password": password},
             )
             if resp.status_code == 201:
+                self._session_token = resp.json()["session_token"]
                 logger.info("Coder admin login verified successfully")
                 return True
 
