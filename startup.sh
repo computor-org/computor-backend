@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Computor startup script with optional Coder support
+# Computor startup script
+# Coder support is controlled via CODER_ENABLED in .env
 # Usage:
-#   ./startup.sh [dev|prod] [--coder] [docker-compose-options]
-#   ./startup.sh dev             # Development without Coder
-#   ./startup.sh dev --coder     # Development with Coder
-#   ./startup.sh prod            # Production without Coder
-#   ./startup.sh prod --coder -d # Production with Coder, detached
+#   ./startup.sh [dev|prod] [docker-compose-options]
+#   ./startup.sh dev             # Development
+#   ./startup.sh dev -d          # Development, detached
+#   ./startup.sh prod -d         # Production, detached
+#   ./startup.sh prod --build -d # Production, rebuild images
 
 set -e
 
@@ -18,7 +19,6 @@ NC='\033[0m' # No Color
 
 # Default values
 ENVIRONMENT="dev"
-ENABLE_CODER=false
 DOCKER_ARGS=""
 
 # Parse arguments
@@ -32,10 +32,6 @@ while [[ $# -gt 0 ]]; do
             ENVIRONMENT="prod"
             shift
             ;;
-        --coder)
-            ENABLE_CODER=true
-            shift
-            ;;
         *)
             # Collect remaining arguments for docker-compose
             DOCKER_ARGS="$DOCKER_ARGS $1"
@@ -46,7 +42,6 @@ done
 
 echo -e "${GREEN}=== Computor Startup Script ===${NC}"
 echo -e "Environment: ${YELLOW}$ENVIRONMENT${NC}"
-echo -e "Coder enabled: ${YELLOW}$ENABLE_CODER${NC}"
 
 # Get script directory (should be project root)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -87,18 +82,14 @@ source .env && echo "  ✓ .env"
 
 set +a
 
-# Check if Coder should be enabled based on environment variable
-if [ "$CODER_ENABLED" = "true" ] && [ "$ENABLE_CODER" != true ]; then
-    echo -e "  ${YELLOW}Note: CODER_ENABLED=true in configuration${NC}"
-fi
-
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
-if [ "$ENABLE_CODER" = true ]; then
+if [ "$CODER_ENABLED" = "true" ]; then
+    echo -e "Coder: ${YELLOW}enabled${NC}"
     COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.coder.yaml"
-    # Set flag for PostgreSQL to create coder database
     export POSTGRES_MULTIPLE_DATABASES="computor,coder"
 else
+    echo -e "Coder: ${YELLOW}disabled${NC} (set CODER_ENABLED=true in .env to enable)"
     export POSTGRES_MULTIPLE_DATABASES="computor"
 fi
 
@@ -136,7 +127,7 @@ for dir in documents courses course-contents defaults repositories; do
 done
 
 # Coder directories (if enabled)
-if [ "$ENABLE_CODER" = true ]; then
+if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
@@ -221,7 +212,7 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
         echo "  • MinIO Console: http://localhost:${MINIO_CONSOLE_PORT:-9001}"
     fi
 
-    if [ "$ENABLE_CODER" = true ]; then
+    if [ "$CODER_ENABLED" = "true" ]; then
         echo "  • Coder: ${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
     fi
 

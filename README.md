@@ -64,31 +64,29 @@ No local Python installation required — everything runs in Docker containers.
 # Clone and configure
 git clone <repository-url> <dir-name>
 cd <dir-name>
-cp .env.common .env  # Then edit .env with your production configuration
+cp ops/environments/.env.common.template .env  # Then edit .env with your production configuration
 
 # Start all services (builds Docker images, runs migrations, starts API)
 bash startup.sh prod --build -d
 
-# With Coder workspace support
-bash startup.sh prod --coder --build -d
+# To enable Coder workspace support, set CODER_ENABLED=true in .env
 ```
 
 ### startup.sh
 
 ```
-Usage: ./startup.sh [dev|prod] [--coder] [docker-compose-options]
+Usage: ./startup.sh [dev|prod] [docker-compose-options]
 
   dev              Development services only (default)
   prod             Production services (includes API server)
-  --coder          Enable Coder workspace integration
   -d               Run in detached mode
   --build          Rebuild Docker images before starting
 
+Coder workspace support is controlled via CODER_ENABLED=true in .env.
+
 Examples:
   ./startup.sh dev -d              # Dev services, detached
-  ./startup.sh dev --coder -d      # Dev services + Coder, detached
   ./startup.sh prod                # Production (foreground)
-  ./startup.sh prod --coder        # Production + Coder
   ./startup.sh prod --build -d     # Rebuild images and start detached
 ```
 

@@ -140,7 +140,7 @@ CODER_ADMIN_EMAIL=admin@yourdomain.com
 
 Then start with:
 ```bash
-./startup.sh dev --coder -d
+./startup.sh dev -d
 ```
 
 ## Migration from Old Structure
@@ -182,7 +182,7 @@ If a service complains about missing variables:
 ### Coder Not Working
 1. Check `CODER_ENABLED=true` in `.env.common`
 2. Verify PostgreSQL is running: `docker ps | grep postgres`
-3. Check Coder database exists: The script automatically creates it when `--coder` is used
+3. Check Coder database exists: The startup script automatically creates it when `CODER_ENABLED=true`
 
 ### Environment Confusion
 To see which environment variables are loaded:

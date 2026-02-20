@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# Computor stop script with optional Coder support
+# Computor stop script
+# Coder support is controlled via CODER_ENABLED in .env
 # Usage:
-#   ./stop.sh [dev|prod] [--coder] [docker-compose-options]
+#   ./stop.sh [dev|prod] [docker-compose-options]
 #   ./stop.sh dev             # Stop development services
-#   ./stop.sh dev --coder     # Stop development + Coder services
 #   ./stop.sh prod            # Stop production services
-#   ./stop.sh prod --coder -v # Stop production + Coder, remove volumes
 #   ./stop.sh                 # Stop last used configuration
 
 set -e
@@ -24,7 +23,6 @@ OPS_DIR="${SCRIPT_DIR}/ops"
 
 # Default values
 ENVIRONMENT=""
-ENABLE_CODER=false
 DOCKER_ARGS=""
 REMOVE_VOLUMES=false
 
@@ -52,7 +50,7 @@ detect_running_config() {
 
         # Check if Coder is running
         if docker ps --format "{{.Names}}" | grep -q "computor-coder"; then
-            ENABLE_CODER=true
+            CODER_DETECTED=true
         fi
 
         return 0
@@ -70,10 +68,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         prod|production)
             ENVIRONMENT="prod"
-            shift
-            ;;
-        --coder)
-            ENABLE_CODER=true
             shift
             ;;
         -v|--volumes)
@@ -95,13 +89,13 @@ while [[ $# -gt 0 ]]; do
             echo "  prod, production    Stop production services"
             echo ""
             echo "Options:"
-            echo "  --coder            Include Coder services"
             echo "  --help, -h         Show this help message"
+            echo ""
+            echo "Coder services are included automatically when CODER_ENABLED=true in .env."
             echo ""
             echo "Examples:"
             echo "  $0                 Stop services (auto-detect configuration)"
             echo "  $0 dev             Stop development services"
-            echo "  $0 dev --coder     Stop development + Coder services"
             echo ""
             echo "To remove Coder data safely (without touching main infrastructure):"
             echo "  ./wipe-coder-complete.sh  - Complete Coder wipe (database, volumes, images)"
@@ -124,8 +118,8 @@ if [ -z "$ENVIRONMENT" ]; then
 
     if detect_running_config; then
         echo -e "  Detected: ${YELLOW}$ENVIRONMENT${NC} environment"
-        if [ "$ENABLE_CODER" = true ]; then
-            echo -e "  Coder: ${YELLOW}enabled${NC}"
+        if [ "$CODER_DETECTED" = true ]; then
+            echo -e "  Coder: ${YELLOW}running${NC}"
         fi
     else
         echo -e "${YELLOW}No running Computor services detected or unable to determine configuration.${NC}"
@@ -136,7 +130,6 @@ if [ -z "$ENVIRONMENT" ]; then
     fi
 else
     echo -e "Environment: ${YELLOW}$ENVIRONMENT${NC}"
-    echo -e "Coder: ${YELLOW}$([ "$ENABLE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
 fi
 
 # Load environment file
@@ -150,9 +143,18 @@ else
     echo "Some features may not work correctly without environment variables."
 fi
 
+# Determine if Coder compose file should be included
+# Use CODER_ENABLED from .env, or auto-detected running Coder containers
+INCLUDE_CODER=false
+if [ "$CODER_ENABLED" = "true" ] || [ "$CODER_DETECTED" = true ]; then
+    INCLUDE_CODER=true
+fi
+
+echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
+
 # Build docker-compose command
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
-if [ "$ENABLE_CODER" = true ]; then
+if [ "$INCLUDE_CODER" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.coder.yaml"
 fi
 
@@ -172,11 +174,7 @@ if [ $? -eq 0 ]; then
 
     # Show how to start again
     echo -e "\n${BLUE}To start services again:${NC}"
-    if [ "$ENABLE_CODER" = true ]; then
-        echo -e "  ${GREEN}./startup.sh $ENVIRONMENT --coder -d${NC}"
-    else
-        echo -e "  ${GREEN}./startup.sh $ENVIRONMENT -d${NC}"
-    fi
+    echo -e "  ${GREEN}./startup.sh $ENVIRONMENT -d${NC}"
 else
     echo -e "\n${RED}✗ Failed to stop services${NC}"
     echo -e "Check the error messages above for details."

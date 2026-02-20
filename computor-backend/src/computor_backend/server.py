@@ -443,13 +443,12 @@ app.include_router(
     dependencies=[Depends(get_current_principal)],
 )
 
-# Coder integration routers (now part of computor_backend)
-app.include_router(coder_api_router)
-app.include_router(coder_web_router)
-app.include_router(coder_login_router)
-
-# Mount static files for the Coder web UI
-mount_static_files(app, prefix="/coder-ui/static")
+# Coder integration routers (only registered when CODER_ENABLED=true)
+if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
+    app.include_router(coder_api_router)
+    app.include_router(coder_web_router)
+    app.include_router(coder_login_router)
+    mount_static_files(app, prefix="/coder-ui/static")
 
 
 @app.head("/", status_code=204)

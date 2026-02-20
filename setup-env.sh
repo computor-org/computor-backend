@@ -347,14 +347,10 @@ echo "2. Keep these files secure - they contain passwords"
 echo "3. Never commit .env files to version control"
 
 echo -e "\n${GREEN}To start Computor:${NC}"
+echo "  ./startup.sh $ENVIRONMENT -d"
 if [ "$ENABLE_CODER" = true ]; then
-    echo "  ./startup.sh $ENVIRONMENT --coder -d"
-else
-    echo "  ./startup.sh $ENVIRONMENT -d"
+    echo "  (Coder is enabled via CODER_ENABLED=true in .env)"
 fi
 
 echo -e "\n${GREEN}To stop Computor:${NC}"
 echo "  ./stop.sh $ENVIRONMENT"
-if [ "$ENABLE_CODER" = true ]; then
-    echo "  (or ./stop.sh $ENVIRONMENT --coder)"
-fi

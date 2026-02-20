@@ -69,22 +69,16 @@ cd computor-fullstack
 #### Development Mode
 
 ```bash
-# Core services only
 ./startup.sh dev -d
-
-# Core + Coder services
-./startup.sh dev --coder -d
 ```
 
 #### Production Mode
 
 ```bash
-# Core services only
 ./startup.sh prod -d
-
-# Core + Coder services
-./startup.sh prod --coder -d
 ```
+
+Coder workspace support is controlled via `CODER_ENABLED=true` in `.env`.
 
 ### 3. Stop Services
 

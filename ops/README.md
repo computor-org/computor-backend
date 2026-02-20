@@ -37,14 +37,10 @@ From the project root directory:
 # Development
 ./startup.sh dev -d
 
-# Development with Coder
-./startup.sh dev --coder -d
-
 # Production
 ./startup.sh prod -d
 
-# Production with Coder
-./startup.sh prod --coder -d
+# Coder workspace support is controlled via CODER_ENABLED=true in .env
 ```
 
 ### Environment Setup
