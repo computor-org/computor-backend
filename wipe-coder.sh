@@ -19,7 +19,6 @@ fi
 echo -e "\n${YELLOW}Stopping all containers...${NC}"
 docker stop computor-coder computor-coder-registry 2>/dev/null
 docker rm computor-coder computor-coder-registry 2>/dev/null
-docker rm docker-coder-admin-setup-1 2>/dev/null
 
 echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
 docker volume rm computor-coder-home computor-coder-registry 2>/dev/null

@@ -22,7 +22,6 @@ source .env
 echo -e "\n${YELLOW}1. Stopping all Coder containers...${NC}"
 docker stop computor-coder computor-coder-registry 2>/dev/null
 docker rm -f computor-coder computor-coder-registry 2>/dev/null
-docker rm -f docker-coder-admin-setup-1 2>/dev/null
 echo "  ✓ Containers stopped and removed"
 
 echo -e "\n${YELLOW}2. Removing Coder Docker volumes...${NC}"

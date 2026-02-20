@@ -89,59 +89,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Coder admin setup (one-time initialization)
-  coder-admin-setup:
-    image: ghcr.io/coder/coder:latest
-    networks:
-      - computor-network
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        echo "Waiting for Coder to be ready..."
-
-        max_attempts=60
-        attempt=1
-        while [ $$attempt -le $$max_attempts ]; do
-          if curl -f http://coder:7080/api/v2/buildinfo 2>/dev/null; then
-            echo "Coder is ready!"
-            break
-          fi
-          echo "Attempt $$attempt/$$max_attempts: Coder not ready yet, waiting..."
-          sleep 2
-          attempt=$$((attempt + 1))
-        done
-
-        if [ $$attempt -gt $$max_attempts ]; then
-          echo "Coder failed to become ready after $$max_attempts attempts"
-          exit 1
-        fi
-
-        # Create admin user
-        if [ -z "${CODER_ADMIN_USERNAME}" ]; then
-          echo "No admin credentials provided, skipping admin creation."
-          exit 0
-        fi
-
-        echo "Creating admin user: ${CODER_ADMIN_USERNAME}"
-        coder server create-admin-user \
-          --username "${CODER_ADMIN_USERNAME}" \
-          --email "${CODER_ADMIN_EMAIL}" \
-          --password "${CODER_ADMIN_PASSWORD}" \
-          --postgres-url "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable" \
-          && echo "Admin user created successfully." \
-          || echo "Admin creation skipped (may already exist)."
-
-        exit 0
-    environment:
-      CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
-      CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
-      CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
-    depends_on:
-      coder:
-        condition: service_healthy
-    restart: "no"
-
   # Temporal worker for Coder tasks (image building, template pushing)
   # Triggered via API endpoints: POST /coder/admin/images/build, POST /coder/admin/templates/push
   temporal-worker-coder:
@@ -174,8 +121,6 @@ services:
     depends_on:
       coder:
         condition: service_healthy
-      coder-admin-setup:
-        condition: service_completed_successfully
 
 # Coder-specific volumes (isolated from main infrastructure)
 volumes:

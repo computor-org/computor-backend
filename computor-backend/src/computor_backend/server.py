@@ -178,6 +178,38 @@ async def startup_logic():
     # Initialize plugin registry with configuration
     # await initialize_plugin_registry_with_config()
 
+async def _ensure_coder_admin():
+    """Background task: wait for Coder to be healthy, then create initial admin."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        from computor_backend.coder.client import CoderClient
+        from computor_backend.coder.config import get_coder_settings
+
+        settings = get_coder_settings()
+        client = CoderClient(settings)
+
+        admin_username = os.environ.get("CODER_ADMIN_USERNAME", "admin")
+        admin_email = settings.admin_email
+        admin_password = settings.admin_password
+
+        result = await client.ensure_initial_admin(
+            username=admin_username,
+            email=admin_email,
+            password=admin_password,
+            max_wait=120,
+        )
+        if result:
+            logger.info("Coder admin setup completed successfully")
+        else:
+            logger.error("Coder admin setup failed — check Coder server logs")
+
+        await client.close()
+    except Exception as e:
+        logger.error(f"Coder admin setup error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global coder_plugin
@@ -189,7 +221,17 @@ async def lifespan(app: FastAPI):
     # Start WebSocket connection manager
     await ws_manager.start()
 
+    # If Coder is enabled, create initial admin in background (non-blocking)
+    import asyncio
+    coder_admin_task = None
+    if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
+        coder_admin_task = asyncio.create_task(_ensure_coder_admin())
+
     yield
+
+    # Cancel background coder task if still running
+    if coder_admin_task and not coder_admin_task.done():
+        coder_admin_task.cancel()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()

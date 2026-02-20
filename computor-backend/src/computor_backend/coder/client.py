@@ -1177,6 +1177,106 @@ class CoderClient:
             logger.warning(f"Coder health check failed: {e}")
             return False, None
 
+    # -------------------------------------------------------------------------
+    # Initial admin setup
+    # -------------------------------------------------------------------------
+
+    async def has_initial_user(self) -> bool:
+        """Check if an initial (admin) user has been created in Coder."""
+        try:
+            client = await self._ensure_client()
+            resp = await client.get("/api/v2/users/first")
+            # 200 means no initial user yet (returns the form)
+            # Coder returns 200 when first user has NOT been created
+            # and a redirect/different status when it HAS been created
+            # Actually the semantics: if the endpoint returns successfully,
+            # it means we can still create the first user (none exists).
+            # A non-success status means one already exists.
+            return resp.status_code != 200
+        except Exception as e:
+            logger.warning(f"Failed to check initial user status: {e}")
+            return False
+
+    async def ensure_initial_admin(
+        self,
+        username: str,
+        email: str,
+        password: str,
+        max_wait: int = 120,
+        poll_interval: int = 2,
+    ) -> bool:
+        """
+        Wait for Coder to be healthy, then create the initial admin user
+        if one doesn't exist yet via POST /api/v2/users/first.
+
+        Args:
+            username: Admin username
+            email: Admin email
+            password: Admin password
+            max_wait: Maximum seconds to wait for Coder to be ready
+            poll_interval: Seconds between health check polls
+
+        Returns:
+            True if admin was created or already exists
+        """
+        # Wait for Coder to be healthy
+        waited = 0
+        while waited < max_wait:
+            healthy, version = await self.health_check()
+            if healthy:
+                logger.info(f"Coder is healthy (version: {version})")
+                break
+            logger.info(f"Waiting for Coder to be ready... ({waited}s/{max_wait}s)")
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+
+        if waited >= max_wait:
+            logger.error(f"Coder did not become healthy after {max_wait}s")
+            return False
+
+        # Check if initial user already exists
+        client = await self._ensure_client()
+
+        try:
+            resp = await client.get("/api/v2/users/first")
+            if resp.status_code != 200:
+                # Initial user already exists
+                logger.info("Coder initial admin user already exists")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to check initial user: {e}")
+            return False
+
+        # Create initial admin user
+        try:
+            resp = await client.post(
+                "/api/v2/users/first",
+                json={
+                    "username": username,
+                    "email": email,
+                    "password": password,
+                },
+            )
+
+            if resp.status_code == 201:
+                logger.info(f"Coder initial admin user created: {username} ({email})")
+                return True
+
+            # 409 or similar — already exists (race condition)
+            if resp.status_code in (409, 400):
+                logger.info(f"Coder admin user already exists (status {resp.status_code})")
+                return True
+
+            logger.error(
+                f"Failed to create Coder initial admin: "
+                f"status={resp.status_code}, response={resp.text}"
+            )
+            return False
+
+        except Exception as e:
+            logger.error(f"Exception creating Coder initial admin: {e}")
+            return False
+
 
 # Singleton instance
 _coder_client: Optional[CoderClient] = None
