@@ -47,6 +47,11 @@ bash startup.sh dev -d
 
 # Start the API (runs migrations + creates admin user automatically)
 bash api.sh
+
+# Tip: Run without -d to see Docker service logs (useful for debugging).
+# This requires a second terminal for api.sh:
+#   Terminal 1: bash startup.sh dev
+#   Terminal 2: bash api.sh
 ```
 
 The API will be available at http://localhost:8000/docs
