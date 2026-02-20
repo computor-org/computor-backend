@@ -32,7 +32,7 @@ PYTHON_TEST_VERSION=3.13
 PYTHON_TEST_REQUIREMENTS=
 
 # Computor-testing framework source
-TESTING_FRAMEWORK_URL=https://gitlab.tugraz.at/.../computor-testing.git
+TESTING_FRAMEWORK_URL=https://your-gitlab-instance/.../computor-testing.git
 TESTING_FRAMEWORK_TOKEN=glpat-xxxxx
 TESTING_FRAMEWORK_VERSION=main
 ```
