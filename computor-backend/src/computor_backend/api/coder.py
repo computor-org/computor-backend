@@ -78,7 +78,7 @@ def _handle_coder_error(e: Exception) -> HTTPException:
     if isinstance(e, CoderAuthenticationError):
         return HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Coder is not ready yet (admin setup may still be in progress)",
+            detail="Coder admin authentication failed — check CODER_ADMIN_EMAIL and CODER_ADMIN_PASSWORD in .env",
         )
     if isinstance(e, CoderNotFoundError):
         return HTTPException(

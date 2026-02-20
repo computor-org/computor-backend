@@ -80,7 +80,6 @@ from pathlib import Path
 
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
-from typing import Optional
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -174,64 +173,36 @@ async def startup_logic():
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
 
         await init_admin_user(db)
-    
+
     # Initialize plugin registry with configuration
     # await initialize_plugin_registry_with_config()
 
-async def _ensure_coder_admin():
-    """Background task: wait for Coder to be healthy, then create initial admin."""
-    import logging
-    logger = logging.getLogger(__name__)
-
-    try:
+    # If Coder is enabled, wait for it and ensure admin user exists (blocks startup)
+    if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient
         from computor_backend.coder.config import get_coder_settings
 
-        settings = get_coder_settings()
-        client = CoderClient(settings)
-
-        admin_username = os.environ.get("CODER_ADMIN_USERNAME", "admin")
-        admin_email = settings.admin_email
-        admin_password = settings.admin_password
-
+        coder_settings = get_coder_settings()
+        client = CoderClient(coder_settings)
         result = await client.ensure_initial_admin(
-            username=admin_username,
-            email=admin_email,
-            password=admin_password,
-            max_wait=120,
+            username=os.environ.get("CODER_ADMIN_USERNAME", "admin"),
+            email=coder_settings.admin_email,
+            password=coder_settings.admin_password,
         )
-        if result:
-            logger.info("Coder admin setup completed successfully")
-        else:
-            logger.error("Coder admin setup failed — check Coder server logs")
-
         await client.close()
-    except Exception as e:
-        logger.error(f"Coder admin setup error: {e}")
 
+        if not result:
+            print("[STARTUP] Coder admin setup failed — check Coder server logs and .env credentials")
+            quit(1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global coder_plugin
-    # redis_client = await get_redis_client()
-    # RedisCache(redis_client)
-
     await startup_logic()
 
     # Start WebSocket connection manager
     await ws_manager.start()
 
-    # If Coder is enabled, create initial admin in background (non-blocking)
-    import asyncio
-    coder_admin_task = None
-    if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
-        coder_admin_task = asyncio.create_task(_ensure_coder_admin())
-
     yield
-
-    # Cancel background coder task if still running
-    if coder_admin_task and not coder_admin_task.done():
-        coder_admin_task.cancel()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()

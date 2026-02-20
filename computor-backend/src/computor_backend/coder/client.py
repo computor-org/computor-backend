@@ -1182,17 +1182,16 @@ class CoderClient:
     # -------------------------------------------------------------------------
 
     async def has_initial_user(self) -> bool:
-        """Check if an initial (admin) user has been created in Coder."""
+        """Check if an initial (admin) user has been created in Coder.
+
+        Coder API semantics:
+        - GET /api/v2/users/first returns 200 when admin EXISTS
+        - Returns 404 when no admin has been created yet
+        """
         try:
             client = await self._ensure_client()
             resp = await client.get("/api/v2/users/first")
-            # 200 means no initial user yet (returns the form)
-            # Coder returns 200 when first user has NOT been created
-            # and a redirect/different status when it HAS been created
-            # Actually the semantics: if the endpoint returns successfully,
-            # it means we can still create the first user (none exists).
-            # A non-success status means one already exists.
-            return resp.status_code != 200
+            return resp.status_code == 200
         except Exception as e:
             logger.warning(f"Failed to check initial user status: {e}")
             return False
@@ -1206,8 +1205,8 @@ class CoderClient:
         poll_interval: int = 2,
     ) -> bool:
         """
-        Wait for Coder to be healthy, then create the initial admin user
-        if one doesn't exist yet via POST /api/v2/users/first.
+        Wait for Coder to be healthy, create the initial admin user if needed,
+        then verify that login works with the provided credentials.
 
         Args:
             username: Admin username
@@ -1217,7 +1216,7 @@ class CoderClient:
             poll_interval: Seconds between health check polls
 
         Returns:
-            True if admin was created or already exists
+            True if admin login succeeds
         """
         # Wait for Coder to be healthy
         waited = 0
@@ -1234,47 +1233,54 @@ class CoderClient:
             logger.error(f"Coder did not become healthy after {max_wait}s")
             return False
 
-        # Check if initial user already exists
+        # Check if initial user needs to be created
         client = await self._ensure_client()
 
         try:
             resp = await client.get("/api/v2/users/first")
-            if resp.status_code != 200:
-                # Initial user already exists
-                logger.info("Coder initial admin user already exists")
-                return True
+            if resp.status_code == 200:
+                # 200 = initial user already exists
+                logger.info("Coder initial admin already exists")
+            else:
+                # 404 = no initial user yet — create one
+                logger.info(f"No Coder admin found (status={resp.status_code}), creating...")
+                resp = await client.post(
+                    "/api/v2/users/first",
+                    json={
+                        "username": username,
+                        "email": email,
+                        "password": password,
+                    },
+                )
+                if resp.status_code == 201:
+                    logger.info(f"Coder initial admin created: {username} ({email})")
+                elif resp.status_code == 409:
+                    logger.info("Coder admin already exists (race condition)")
+                else:
+                    logger.error(f"Failed to create Coder admin: status={resp.status_code}, response={resp.text}")
+                    return False
         except Exception as e:
-            logger.error(f"Failed to check initial user: {e}")
+            logger.error(f"Failed during admin user check/creation: {e}")
             return False
 
-        # Create initial admin user
+        # Verify login actually works with the configured credentials
         try:
             resp = await client.post(
-                "/api/v2/users/first",
-                json={
-                    "username": username,
-                    "email": email,
-                    "password": password,
-                },
+                "/api/v2/users/login",
+                json={"email": email, "password": password},
             )
-
             if resp.status_code == 201:
-                logger.info(f"Coder initial admin user created: {username} ({email})")
-                return True
-
-            # 409 or similar — already exists (race condition)
-            if resp.status_code in (409, 400):
-                logger.info(f"Coder admin user already exists (status {resp.status_code})")
+                logger.info("Coder admin login verified successfully")
                 return True
 
             logger.error(
-                f"Failed to create Coder initial admin: "
-                f"status={resp.status_code}, response={resp.text}"
+                f"Coder admin login failed — credentials in .env may not match "
+                f"the existing admin user. Run wipe-coder-complete.sh to reset. "
+                f"(status={resp.status_code})"
             )
             return False
-
         except Exception as e:
-            logger.error(f"Exception creating Coder initial admin: {e}")
+            logger.error(f"Coder admin login verification error: {e}")
             return False
 
 
