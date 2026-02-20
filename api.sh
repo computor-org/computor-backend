@@ -6,10 +6,15 @@
 # Default values
 WEBSOCKET_LOG_LEVEL="${WEBSOCKET_LOG_LEVEL:-WARNING}"  # Quiet WebSocket by default
 UVICORN_LOG_LEVEL="${UVICORN_LOG_LEVEL:-info}"         # Show HTTP requests by default
+RUN_MIGRATIONS=true
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --no-migrations)
+            RUN_MIGRATIONS=false
+            shift
+            ;;
         --verbose|-v)
             export WEBSOCKET_LOG_LEVEL="INFO"
             export UVICORN_LOG_LEVEL="info"
@@ -30,19 +35,21 @@ while [[ $# -gt 0 ]]; do
 Usage: $0 [OPTIONS]
 
 Options:
-  --verbose, -v     Show WebSocket connection logs + HTTP requests
-  --debug, -d       Show all debug logs (very verbose)
-  --quiet, -q       Show only errors (hides HTTP requests too)
-  --help, -h        Show this help message
+  --no-migrations     Skip running Alembic migrations before starting
+  --verbose, -v       Show WebSocket connection logs + HTTP requests
+  --debug, -d         Show all debug logs (very verbose)
+  --quiet, -q         Show only errors (hides HTTP requests too)
+  --help, -h          Show this help message
 
 Environment Variables:
   WEBSOCKET_LOG_LEVEL   Set WebSocket logging level (DEBUG, INFO, WARNING, ERROR)
   UVICORN_LOG_LEVEL     Set Uvicorn logging level (debug, info, warning, error)
 
-Default: Shows HTTP requests but quiet WebSocket (no connection spam)
+Default: Runs migrations, shows HTTP requests, quiet WebSocket (no connection spam)
 
 Examples:
-  $0                           # Default: HTTP requests visible, WebSocket quiet
+  $0                           # Run migrations + start API (default)
+  $0 --no-migrations           # Start API without running migrations
   $0 --verbose                 # Show WebSocket connections + HTTP requests
   $0 --debug                   # Show everything (very verbose)
   $0 --quiet                   # Only errors (no HTTP requests)
@@ -95,6 +102,13 @@ echo ""
 # Export for the Python server to use
 export WEBSOCKET_LOG_LEVEL
 export UVICORN_LOG_LEVEL
+
+# Run migrations unless --no-migrations was passed
+if [ "$RUN_MIGRATIONS" = true ]; then
+    echo "Applying Alembic migrations..."
+    cd computor-backend/src/computor_backend && alembic upgrade head && cd -  > /dev/null
+    echo ""
+fi
 
 # Start the server
 cd computor-backend/src && python3 server.py

@@ -134,19 +134,18 @@ bash migrations.sh
 
 This runs Alembic migrations to create all tables.
 
-### 7. Initialize System
+### 7. Start the Server
 
-Create the admin user and seed base data:
+The server automatically creates the admin user and applies roles on startup:
 
 ```bash
-bash initialize_system.sh
+bash api.sh
 ```
 
-This creates:
-- Admin user with credentials from `.env`
-- Base roles and permissions
-- Default course content types
-- Sample data (if seeder is run)
+This handles:
+- Admin user creation with credentials from `.env` (`API_ADMIN_USER`, `API_ADMIN_PASSWORD`)
+- Role and permission setup
+- Base roles and content kinds are seeded by Alembic migrations
 
 **Optional: Seed development data**:
 
@@ -298,7 +297,6 @@ kill -9 <PID>
 docker-compose -f docker-compose-dev.yaml down -v
 bash startup.sh
 bash migrations.sh
-bash initialize_system.sh
 ```
 
 ### Issue: Import Errors

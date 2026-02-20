@@ -3,7 +3,7 @@ import os
 from computor_backend.exceptions.exceptions import NotFoundException
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer
 from computor_backend.permissions.core import db_apply_roles
-from computor_types.tokens import encrypt_api_key
+from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
@@ -147,7 +147,7 @@ async def init_admin_user(db: Session):
             given_name="Admin",
             family_name="System",
             username=username,
-            password=encrypt_api_key(password)
+            password=create_password_hash(password, validate=False)
         )
 
         db.add(admin_user)
@@ -185,11 +185,7 @@ async def lifespan(app: FastAPI):
     # redis_client = await get_redis_client()
     # RedisCache(redis_client)
 
-    if settings.DEBUG_MODE == "production":
-        await startup_logic()
-    # else:
-        # Initialize plugin registry in development mode
-        # await initialize_plugin_registry_with_config()
+    await startup_logic()
 
     # Start WebSocket connection manager
     await ws_manager.start()
