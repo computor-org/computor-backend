@@ -14,7 +14,8 @@ A university programming course management platform with automated GitLab integr
 
 ## Prerequisites
 
-- Docker & Docker Compose
+- Debian-based Linux recommended
+- Docker >= 29.x and Docker Compose >= 5.x
 - Git
 - Python 3.10 (development only)
 
