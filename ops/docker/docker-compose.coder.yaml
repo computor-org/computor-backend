@@ -116,6 +116,7 @@ services:
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
+      MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

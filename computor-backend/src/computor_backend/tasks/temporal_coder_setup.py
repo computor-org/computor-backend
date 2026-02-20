@@ -3,7 +3,14 @@ Temporal workflows for Coder workspace image building and template management.
 
 These workflows replace the docker-compose init services (coder-image-builder-*,
 coder-template-setup) with admin-triggered operations via API endpoints.
+
+Templates are discovered dynamically from the templates directory. Each template
+directory must contain a `template.json` manifest with:
+  - coder_template_name: Name used in Coder (e.g. "python-workspace")
+  - image_name: Docker image name (e.g. "computor-workspace-python3.13")
+  - build_args_env: List of env var names to pass as Docker build args (optional)
 """
+import json
 import logging
 import os
 import subprocess
@@ -18,31 +25,58 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 
 logger = logging.getLogger(__name__)
 
-# Template name → directory name + registry image name mapping
-TEMPLATE_REGISTRY = {
-    "python3.13": {
-        "dir_name": "python3.13",
-        "image_name": "computor-workspace-python3.13",
-        "coder_template_name": "python-workspace",
-    },
-    "matlab": {
-        "dir_name": "matlab",
-        "image_name": "computor-workspace-matlab",
-        "coder_template_name": "matlab-workspace",
-    },
-}
+
+def _discover_templates(templates_dir: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Scan the templates directory for subdirectories containing template.json.
+
+    Returns a dict keyed by directory name (template key) with manifest contents.
+    """
+    templates = {}
+    if not os.path.isdir(templates_dir):
+        logger.warning(f"Templates directory does not exist: {templates_dir}")
+        return templates
+
+    for entry in sorted(os.listdir(templates_dir)):
+        manifest_path = os.path.join(templates_dir, entry, "template.json")
+        if os.path.isfile(manifest_path):
+            try:
+                with open(manifest_path) as f:
+                    manifest = json.load(f)
+                manifest["dir_name"] = entry
+                templates[entry] = manifest
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(f"Failed to read {manifest_path}: {e}")
+
+    return templates
 
 
-def _get_all_template_keys() -> List[str]:
-    """Get all registered template keys."""
-    return list(TEMPLATE_REGISTRY.keys())
+def _resolve_templates(
+    requested: Optional[List[str]], templates_dir: str
+) -> List[Dict[str, Any]]:
+    """
+    Resolve which templates to process.
 
+    requested=None means all discovered templates.
+    Requested names are matched against both the directory name (key) and
+    the coder_template_name from the manifest.
+    """
+    discovered = _discover_templates(templates_dir)
+    if not discovered:
+        return []
 
-def _resolve_templates(requested: Optional[List[str]]) -> List[str]:
-    """Resolve template list — None means all templates."""
     if requested is None:
-        return _get_all_template_keys()
-    return [t for t in requested if t in TEMPLATE_REGISTRY]
+        return list(discovered.values())
+
+    results = []
+    for name in requested:
+        # Match by directory name or coder_template_name
+        for key, info in discovered.items():
+            if key == name or info.get("coder_template_name") == name:
+                results.append(info)
+                break
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +97,9 @@ async def build_workspace_image(
     """
     import docker as docker_sdk
 
-    info = TEMPLATE_REGISTRY.get(template_key)
+    # Discover template from filesystem
+    discovered = _discover_templates(templates_dir)
+    info = discovered.get(template_key)
     if not info:
         return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
 
@@ -78,13 +114,21 @@ async def build_workspace_image(
         return {"success": True, "template": template_key, "skipped": True, "reason": "No Dockerfile"}
 
     tag = f"{registry_host}/{info['image_name']}:latest"
-    logger.info(f"Building image {tag} from {build_dir}")
+
+    # Collect build args from environment variables
+    buildargs = {}
+    for env_name in info.get("build_args_env", []):
+        val = os.environ.get(env_name)
+        if val:
+            buildargs[env_name] = val
+
+    logger.info(f"Building image {tag} from {build_dir}" + (f" (build_args: {list(buildargs.keys())})" if buildargs else ""))
 
     try:
-        client = docker_sdk.DockerClient(base_url="unix:///var/run/docker.sock")
+        client = docker_sdk.DockerClient(base_url="unix://" + os.environ.get("DOCKER_SOCKET_PATH", "/var/run/docker.sock"))
 
         # Build
-        image, build_logs = client.images.build(path=build_dir, tag=tag, rm=True)
+        image, build_logs = client.images.build(path=build_dir, tag=tag, rm=True, buildargs=buildargs or None)
         for chunk in build_logs:
             if "stream" in chunk:
                 line = chunk["stream"].strip()
@@ -121,7 +165,9 @@ async def push_coder_template(
     """
     import httpx
 
-    info = TEMPLATE_REGISTRY.get(template_key)
+    # Discover template from filesystem
+    discovered = _discover_templates(templates_dir)
+    info = discovered.get(template_key)
     if not info:
         return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
 
@@ -240,25 +286,27 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
 
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
-        """
-        Build workspace images.
-
-        Args:
-            parameters: Dictionary containing:
-                - templates: Optional list of template keys (None = all)
-                - templates_dir: Path to templates directory
-                - registry_host: Docker registry host
-        """
         templates_dir = parameters.get("templates_dir", "/templates")
         registry_host = parameters.get("registry_host", "localhost:5000")
         requested = parameters.get("templates")
 
-        template_keys = _resolve_templates(requested)
+        # Discovery happens inside the activity (which runs on the worker).
+        # The workflow just needs to know which keys to iterate over.
+        # Pass templates_dir so activities can discover at runtime.
+        template_keys = parameters.get("_resolved_keys")
+        if not template_keys:
+            # Fallback: resolve from requested names via a lightweight activity
+            template_keys = await workflow.execute_activity(
+                discover_template_keys,
+                args=[templates_dir, requested],
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+
         if not template_keys:
             return WorkflowResult(
                 status="failed",
                 result=None,
-                error="No valid templates specified",
+                error="No valid templates found in " + templates_dir,
                 metadata={"workflow_type": "build_workspace_images"},
             )
 
@@ -313,24 +361,6 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
 
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
-        """
-        Push Coder templates.
-
-        Args:
-            parameters: Dictionary containing:
-                - templates: Optional list of template names (None = all)
-                - build_images: Whether to build images first
-                - templates_dir: Path to templates directory
-                - registry_host: Docker registry host
-                - coder_url: Coder server URL
-                - coder_admin_email: Admin email
-                - coder_admin_password: Admin password
-                - backend_internal_url: Internal backend URL for Terraform
-                - backend_external_url: External backend URL for Terraform
-                - dev_forward_ports: Dev port forwarding config
-                - ttl_ms: Default workspace TTL in ms
-                - activity_bump_ms: Activity bump TTL in ms
-        """
         templates_dir = parameters.get("templates_dir", "/templates")
         registry_host = parameters.get("registry_host", "localhost:5000")
         build_images = parameters.get("build_images", False)
@@ -353,38 +383,25 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
 
         requested = parameters.get("templates")
 
+        # Discover available templates on the worker filesystem
+        template_keys = await workflow.execute_activity(
+            discover_template_keys,
+            args=[templates_dir, requested],
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+        if not template_keys:
+            return WorkflowResult(
+                status="failed",
+                result=None,
+                error="No valid templates found in " + templates_dir,
+                metadata={"workflow_type": "push_coder_templates"},
+            )
+
         # Step 1: optionally build images
         if build_images:
-            workflow.logger.info("Building images before pushing templates...")
-
-            # Resolve template keys from requested coder template names
-            # If user passes coder template names like "python-workspace", map back to keys
-            build_keys = None
-            if requested:
-                build_keys = []
-                for name in requested:
-                    # Check if it's a coder template name, resolve to key
-                    for key, info in TEMPLATE_REGISTRY.items():
-                        if info["coder_template_name"] == name or key == name:
-                            build_keys.append(key)
-                            break
-
-            build_result = await workflow.execute_activity(
-                build_workspace_image,
-                args=[
-                    (build_keys or _get_all_template_keys())[0],
-                    templates_dir,
-                    registry_host,
-                ],
-                start_to_close_timeout=timedelta(minutes=15),
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(seconds=5),
-                    backoff_coefficient=2.0,
-                    maximum_attempts=2,
-                ),
-            )
-            # Build remaining
-            for key in (build_keys or _get_all_template_keys())[1:]:
+            workflow.logger.info(f"Building images before pushing templates: {template_keys}")
+            for key in template_keys:
                 await workflow.execute_activity(
                     build_workspace_image,
                     args=[key, templates_dir, registry_host],
@@ -397,29 +414,10 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 )
 
         # Step 2: push templates
-        # Resolve coder template names to push
-        if requested:
-            push_keys = []
-            for name in requested:
-                for key, info in TEMPLATE_REGISTRY.items():
-                    if info["coder_template_name"] == name or key == name:
-                        push_keys.append(key)
-                        break
-        else:
-            push_keys = _get_all_template_keys()
-
-        if not push_keys:
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error="No valid templates to push",
-                metadata={"workflow_type": "push_coder_templates"},
-            )
-
-        workflow.logger.info(f"Pushing templates: {push_keys}")
+        workflow.logger.info(f"Pushing templates: {template_keys}")
 
         results = []
-        for key in push_keys:
+        for key in template_keys:
             result = await workflow.execute_activity(
                 push_coder_template,
                 args=[
@@ -457,3 +455,18 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
             result={"pushes": results},
             metadata={"workflow_type": "push_coder_templates"},
         )
+
+
+@activity.defn(name="discover_template_keys")
+async def discover_template_keys(
+    templates_dir: str,
+    requested: Optional[List[str]],
+) -> List[str]:
+    """
+    Lightweight activity to discover template keys on the worker filesystem.
+
+    Workflows run in a sandbox and can't do filesystem I/O directly,
+    so this activity handles the discovery.
+    """
+    templates = _resolve_templates(requested, templates_dir)
+    return [t["dir_name"] for t in templates]

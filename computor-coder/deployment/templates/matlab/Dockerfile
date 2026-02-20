@@ -27,7 +27,8 @@ RUN npm ci \
 # =========================
 # Stage 2: Runtime image with MATLAB + code-server
 # =========================
-FROM registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b
+ARG MATLAB_BASE_IMAGE=matlab-base:latest
+FROM ${MATLAB_BASE_IMAGE}
 
 USER root
 
