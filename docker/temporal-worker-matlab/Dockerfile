@@ -1,10 +1,5 @@
-# Build argument for base image - defaults to local build, can be overridden
-# ARG MATLAB_BASE_IMAGE=matlab-base:latest
-
-# # Use the MATLAB base image (can be overridden via --build-arg)
-# FROM ${MATLAB_BASE_IMAGE}
-
-FROM registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b
+ARG MATLAB_BASE_IMAGE=matlab-base:latest
+FROM ${MATLAB_BASE_IMAGE}
 
 USER root
 

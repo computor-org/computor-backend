@@ -1,0 +1,5 @@
+{
+    "coder_template_name": "python-workspace",
+    "image_name": "computor-workspace-python3.13",
+    "build_args_env": []
+}

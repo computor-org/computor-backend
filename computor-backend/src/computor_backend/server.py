@@ -80,8 +80,6 @@ from pathlib import Path
 
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
-from computor_backend.api.coder_web import router as coder_web_router, login_router as coder_login_router, mount_static_files
-from typing import Optional
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -175,16 +173,57 @@ async def startup_logic():
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
 
         await init_admin_user(db)
-    
+
     # Initialize plugin registry with configuration
     # await initialize_plugin_registry_with_config()
 
+    # If Coder is enabled, wait for it and ensure admin user exists (blocks startup)
+    if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
+        from computor_backend.coder.client import CoderClient
+        from computor_backend.coder.config import get_coder_settings
+
+        coder_settings = get_coder_settings()
+        client = CoderClient(coder_settings)
+        result = await client.ensure_initial_admin(
+            username=os.environ.get("CODER_ADMIN_USERNAME", "admin"),
+            email=coder_settings.admin_email,
+            password=coder_settings.admin_password,
+        )
+
+        if not result:
+            await client.close()
+            print("[STARTUP] Coder admin setup failed — check Coder server logs and .env credentials")
+            quit(1)
+
+        # Check if templates exist in Coder — if not, auto-push them
+        try:
+            templates = await client.list_templates()
+            if not templates:
+                print("[STARTUP] No Coder templates found — submitting build+push workflow")
+                from computor_backend.api.coder import _build_template_parameters
+                from computor_backend.tasks import get_task_executor, TaskSubmission
+
+                params = _build_template_parameters(coder_settings)
+                params["templates"] = None  # all templates
+                params["build_images"] = True
+
+                executor = get_task_executor()
+                workflow_id = await executor.submit_task(TaskSubmission(
+                    task_name="push_coder_templates",
+                    parameters=params,
+                    queue="coder-tasks",
+                ))
+                print(f"[STARTUP] Template build+push workflow submitted: {workflow_id}")
+            else:
+                print(f"[STARTUP] Coder has {len(templates)} template(s) — skipping auto-push")
+        except Exception as e:
+            # Non-fatal — templates can be pushed manually via API
+            print(f"[STARTUP] Template check/push failed (non-fatal): {e}")
+
+        await client.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global coder_plugin
-    # redis_client = await get_redis_client()
-    # RedisCache(redis_client)
-
     await startup_logic()
 
     # Start WebSocket connection manager
@@ -443,13 +482,9 @@ app.include_router(
     dependencies=[Depends(get_current_principal)],
 )
 
-# Coder integration routers (now part of computor_backend)
-app.include_router(coder_api_router)
-app.include_router(coder_web_router)
-app.include_router(coder_login_router)
-
-# Mount static files for the Coder web UI
-mount_static_files(app, prefix="/coder-ui/static")
+# Coder integration API (only registered when CODER_ENABLED=true)
+if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
+    app.include_router(coder_api_router)
 
 
 @app.head("/", status_code=204)

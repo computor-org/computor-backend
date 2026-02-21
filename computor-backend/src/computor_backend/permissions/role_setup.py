@@ -92,7 +92,7 @@ def claims_workspace_user() -> List[Tuple[str, str]]:
         List of (claim_type, claim_value) tuples for workspace access permissions
     """
     return [
-        ("permissions", "workspace:access"),       # Gate-keeper: can access coder-ui
+        ("permissions", "workspace:access"),       # Gate-keeper: can access workspace features
         ("permissions", "workspace:list"),          # List own workspaces
         ("permissions", "workspace:start"),         # Start own workspace
         ("permissions", "workspace:stop"),          # Stop own workspace

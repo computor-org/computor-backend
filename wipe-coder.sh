@@ -16,42 +16,49 @@ if [ "$confirmation" != "yes" ]; then
     exit 0
 fi
 
-echo -e "\n${YELLOW}Stopping all containers...${NC}"
-docker stop computor-coder computor-coder-registry 2>/dev/null
-docker rm computor-coder computor-coder-registry 2>/dev/null
-docker rm docker-coder-admin-setup-1 docker-coder-template-setup-1 2>/dev/null
-docker rm docker-coder-image-builder-python-1 docker-coder-image-builder-matlab-1 2>/dev/null
-
-echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
-docker volume rm computor-coder-home computor-coder-registry 2>/dev/null
-
-echo -e "\n${YELLOW}Removing Coder database (separate from main DB)...${NC}"
 # Source environment for paths
 source .env
 
-# Check if Coder's dedicated postgres is running
-if docker ps | grep -q computor-coder-postgres; then
-    docker stop computor-coder-postgres 2>/dev/null
-    docker rm -f computor-coder-postgres 2>/dev/null
-    echo "  ✓ Coder database container removed"
+# Detect which environment is running (dev or prod) for compose file selection
+ENVIRONMENT=""
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "temporal-ui"; then
+    ENVIRONMENT="dev"
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q "uvicorn"; then
+    ENVIRONMENT="prod"
+else
+    ENVIRONMENT="dev"
 fi
 
-# Remove Coder database files (bind mount)
+COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml -f ops/docker/docker-compose.coder.yaml"
+
+echo -e "\n${YELLOW}Stopping all Coder services via docker compose...${NC}"
+docker compose $COMPOSE_FILES stop coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
+docker compose $COMPOSE_FILES rm -f coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
+
+echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
+docker volume rm -f computor-coder-home computor-coder-registry 2>/dev/null
+
+echo -e "\n${YELLOW}Removing Coder database (separate from main DB)...${NC}"
+# Remove Coder database files (bind mount) — always attempt, not just when container is running
 if [ -n "$SYSTEM_DEPLOYMENT_PATH" ] && [ -d "$SYSTEM_DEPLOYMENT_PATH/coder-postgres" ]; then
     sudo rm -rf "$SYSTEM_DEPLOYMENT_PATH/coder-postgres"
-    echo "  ✓ Coder database files removed"
+    echo "  Coder database files removed"
 else
-    echo "  ✓ No Coder database files to remove"
+    echo "  No Coder database files to remove"
 fi
 
 echo -e "\n${YELLOW}Removing any Coder workspace images...${NC}"
 docker images | grep "localhost:5000/computor-workspace" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null
 
-echo -e "\n${GREEN}✓ Coder data wipe complete!${NC}"
+echo -e "\n${GREEN}=== Coder data wipe complete! ===${NC}"
 echo ""
 echo "To reinitialize Coder:"
-echo "  1. Start services: bash startup.sh dev --coder"
-echo "  2. Coder will recreate its database and admin user automatically"
+echo "  1. Ensure CODER_ENABLED=true in .env"
+echo "  2. Start services: bash startup.sh dev -d"
+echo "  3. Coder will recreate its database and admin user automatically"
+echo "  4. Build images and push templates via admin API:"
+echo "     POST /coder/admin/images/build"
+echo "     POST /coder/admin/templates/push"
 echo ""
 echo "Note: User workspace data in Docker volumes has been deleted."
 echo "      Templates in \${SYSTEM_DEPLOYMENT_PATH}/coder/templates/ are preserved."

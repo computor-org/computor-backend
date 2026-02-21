@@ -41,6 +41,9 @@ from . import temporal_documents_sync
 # Import Tutor testing tasks to auto-register
 from . import temporal_tutor_testing
 
+# Import Coder setup tasks to auto-register (image building, template push)
+from . import temporal_coder_setup
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

@@ -1,0 +1,5 @@
+{
+    "coder_template_name": "matlab-workspace",
+    "image_name": "computor-workspace-matlab",
+    "build_args_env": ["MATLAB_BASE_IMAGE"]
+}
