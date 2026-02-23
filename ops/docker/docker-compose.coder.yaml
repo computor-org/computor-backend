@@ -43,7 +43,7 @@ services:
     environment:
       CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
-      # Internal Docker network URL - workspace containers use this to reach Coder
+      # Internal URL - used by Coder for agent binary downloads (must be reachable from workspace containers)
       CODER_ACCESS_URL: "http://coder:7080"
       # Note: Password auth must stay enabled for admin API operations (CoderClient._get_session_token).
       # This is safe because Coder's port 7080 is not exposed through Traefik - users can't reach it.

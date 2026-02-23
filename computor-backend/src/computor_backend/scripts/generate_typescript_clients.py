@@ -736,8 +736,11 @@ class TypeScriptClientGenerator:
             ts_type, type_deps = self._schema_to_ts(schema)
             dependencies |= type_deps
 
-            if ts_type == 'unknown' and location == 'path':
-                ts_type = 'string | number'
+            if location == 'path':
+                # Path parameters can never be null — strip nullability
+                ts_type = re.sub(r'\s*\|\s*null', '', ts_type).strip()
+                if ts_type == 'unknown' or not ts_type:
+                    ts_type = 'string | number'
             elif ts_type == 'unknown':
                 ts_type = 'string | number | boolean'
 
@@ -925,6 +928,10 @@ class TypeScriptClientGenerator:
         if '$ref' in schema:
             ref = schema['$ref']
             type_name = ref.split('/')[-1]
+            # Strip Python module prefix from mangled names like
+            # "computor_types__deployment__AssignExampleRequest" -> "AssignExampleRequest"
+            if '__' in type_name:
+                type_name = type_name.rsplit('__', 1)[-1]
             return type_name, {type_name}
 
         if 'enum' in schema:
@@ -1300,7 +1307,7 @@ class TypeScriptClientGenerator:
 
 def main(output_dir: Optional[Path] = None, clean: bool = False, include_timestamp: bool = False) -> list[Path]:
     if output_dir is None:
-        output_dir = PROJECT_ROOT / "generated" / "clients"
+        output_dir = PROJECT_ROOT / "computor-web" / "src" / "generated" / "clients"
 
     generator = TypeScriptClientGenerator(output_dir, include_timestamp=include_timestamp)
     return generator.generate(clean=clean)

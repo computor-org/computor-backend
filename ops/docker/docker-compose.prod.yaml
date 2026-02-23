@@ -44,9 +44,11 @@ services:
       # Coder integration (if enabled)
       CODER_ENABLED: ${CODER_ENABLED:-false}
       CODER_URL: ${CODER_URL}
+      CODER_WORKSPACE_BASE_URL: ${CODER_WORKSPACE_BASE_URL:-}
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
+      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
     depends_on:
       - postgres
       - minio
@@ -63,24 +65,7 @@ services:
       - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
       - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
 
-  # Frontend service
-  frontend:
-    build:
-      context: https://github.com/computor-org/computor-web.git#${COMPUTOR_WEB_VERSION:-main}
-      dockerfile: docker/Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    networks:
-      - computor-network
-    restart: unless-stopped
-    depends_on:
-      - uvicorn
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.routers.frontend.priority=1"  # Lower priority than API
+  # Frontend: see docker-compose.web.yaml (included automatically in prod)
 
   # Temporal Worker (Production)
   temporal-worker:
@@ -202,17 +187,6 @@ services:
     pids_limit: 2048    # Limit total PIDs (MATLAB spawns many subprocesses)
     labels:
       - "traefik.enable=false"
-
-  # Override MinIO ports for production (localhost only for security)
-  minio:
-    ports:
-      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
-
-  # Override Temporal ports for production
-  temporal:
-    ports:
-      - "${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
 
   # No Temporal UI in production (commented out)
   # temporal-ui:

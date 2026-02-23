@@ -905,9 +905,12 @@ class CoderClient:
         resources = {}
         agent_status = None
 
-        # Build access URL for running workspaces (URL is deterministic)
-        if status == WorkspaceStatus.RUNNING and self.settings.url:
-            access_url = f"{self.settings.url}/@{data.get('owner_name', '')}/{data['name']}"
+        # Build access URL for running workspaces via Traefik
+        if status == WorkspaceStatus.RUNNING and self.settings.workspace_base_url:
+            owner_name = data.get("owner_name", "")
+            workspace_name = data["name"]
+            base_url = self.settings.workspace_base_url.rstrip("/")
+            access_url = f"{base_url}/{owner_name}/{workspace_name}/"
 
         # Extract code-server URL from agent apps
         logger.info(f"Parsing workspace resources: {len(latest_build.get('resources', []))} resources")
@@ -943,20 +946,13 @@ class CoderClient:
                             logger.info(f"Skipping internal URL: {app_url}")
                         break
 
-        # Generate code-server URL for running workspaces
-        if status == WorkspaceStatus.RUNNING and not code_server_url:
+        # Generate code-server URL for running workspaces via Traefik
+        if status == WorkspaceStatus.RUNNING and not code_server_url and self.settings.workspace_base_url:
             owner_name = data.get("owner_name", "")
             workspace_name = data["name"]
-
-            # Prefer Traefik URL if configured (bypasses Coder proxy)
-            if self.settings.workspace_base_url:
-                base_url = self.settings.workspace_base_url.rstrip("/")
-                code_server_url = f"{base_url}/{owner_name}/{workspace_name}/"
-                logger.info(f"Using Traefik code-server URL: {code_server_url}")
-            elif access_url:
-                # Fallback: Coder app proxy path
-                code_server_url = f"{access_url}/apps/code-server/"
-                logger.info(f"Using Coder proxy code-server URL: {code_server_url}")
+            base_url = self.settings.workspace_base_url.rstrip("/")
+            code_server_url = f"{base_url}/{owner_name}/{workspace_name}/"
+            logger.info(f"Using Traefik code-server URL: {code_server_url}")
 
         logger.info(f"Workspace details: status={status}, access_url={access_url}, code_server_url={code_server_url}")
 

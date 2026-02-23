@@ -1,7 +1,11 @@
 # Generated files (TypeScript types, schemas, validators, clients)
 /generated/
+computor-web/src/generated/
 # But keep computor-client generated files (needed for Docker builds)
 !computor-client/src/computor_client/generated/
+
+# Next.js
+computor-web/.next/
 
 __pycache__
 .vscode

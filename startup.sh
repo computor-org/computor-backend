@@ -84,6 +84,15 @@ set +a
 
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
+
+# Include web frontend in production (in dev, run `next dev` locally)
+if [ "$ENVIRONMENT" = "prod" ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.web.yaml"
+    echo -e "Frontend: ${YELLOW}docker (production build)${NC}"
+else
+    echo -e "Frontend: ${YELLOW}run locally with 'cd computor-web && npm run dev'${NC}"
+fi
+
 if [ "$CODER_ENABLED" = "true" ]; then
     echo -e "Coder: ${YELLOW}enabled${NC}"
     COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.coder.yaml"
@@ -206,6 +215,10 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
     echo -e "\n${GREEN}Service URLs:${NC}"
     echo "  • API: http://localhost:${API_PORT:-8000}"
     echo "  • Traefik: http://localhost:${TRAEFIK_HTTP_PORT:-8080}"
+
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        echo "  • Frontend: http://localhost:${TRAEFIK_HTTP_PORT:-8080}"
+    fi
 
     if [ "$ENVIRONMENT" = "dev" ]; then
         echo "  • Temporal UI: http://localhost:${TEMPORAL_UI_PORT:-8088}"

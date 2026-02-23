@@ -46,8 +46,8 @@ def main(include_timestamp: bool = False):
     backend_root = src_dir.parent  # computor-backend
     project_root = backend_root.parent  # computor-fullstack
 
-    # Output to generated/schemas directory
-    schema_path = project_root / 'generated' / 'schemas' / 'meta-yaml-schema.json'
+    # Output to computor-web/src/generated/schemas directory
+    schema_path = project_root / 'computor-web' / 'src' / 'generated' / 'schemas' / 'meta-yaml-schema.json'
 
     # Create schemas directory if it doesn't exist
     schema_path.parent.mkdir(parents=True, exist_ok=True)
