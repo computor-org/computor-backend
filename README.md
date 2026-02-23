@@ -10,6 +10,7 @@ A university programming course management platform with automated GitLab integr
 | `computor-client` | Auto-generated async HTTP client library |
 | `computor-cli` | Command-line interface for admin and dev tasks |
 | `computor-backend` | FastAPI server with business logic and Temporal workflows |
+| `computor-web` | Next.js frontend application |
 | `computor-utils` | Shared utility functions |
 
 ## Prerequisites
@@ -45,16 +46,21 @@ cp ops/environments/.env.common.template .env  # Then edit .env with your config
 # Start Docker services (PostgreSQL, Redis, Temporal, MinIO)
 bash startup.sh dev -d
 
-# Start the API (runs migrations + creates admin user automatically)
+# Start the API server (runs migrations + creates admin user automatically)
 bash api.sh
 
+# Start the web frontend (separate terminal)
+bash web.sh
+
 # Tip: Run without -d to see Docker service logs (useful for debugging).
-# This requires a second terminal for api.sh:
+# This requires additional terminals for api.sh and web.sh:
 #   Terminal 1: bash startup.sh dev
 #   Terminal 2: bash api.sh
+#   Terminal 3: bash web.sh
 ```
 
-The API will be available at http://localhost:8000/docs
+- API: http://localhost:8000/docs
+- Web: http://localhost:3000
 
 ### Production Mode
 
@@ -99,6 +105,19 @@ Usage: ./api.sh [OPTIONS]
   --verbose, -v       Show WebSocket connection logs + HTTP requests
   --debug, -d         Show all debug logs (very verbose)
   --quiet, -q         Show only errors (hides HTTP requests too)
+```
+
+### web.sh (development)
+
+```
+Usage: ./web.sh [OPTIONS]
+
+  --port, -p PORT     Set dev server port (default: 3000)
+  --install, -i       Run yarn install before starting
+
+Environment Variables:
+  NEXT_PUBLIC_API_URL    Backend API URL (default: http://localhost:8000)
+  COMPUTOR_WEB_PORT      Dev server port (default: 3000)
 ```
 
 ## Documentation
