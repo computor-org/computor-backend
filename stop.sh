@@ -152,8 +152,11 @@ fi
 
 echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
 
-# Build docker-compose command
+# Build docker-compose command (must match startup.sh)
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
+if [ "$ENVIRONMENT" = "prod" ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.web.yaml"
+fi
 if [ "$INCLUDE_CODER" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.coder.yaml"
 fi
