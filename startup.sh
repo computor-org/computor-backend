@@ -108,12 +108,6 @@ create_dir_if_needed() {
     if [ ! -d "$dir_path" ]; then
         echo "  Creating: $dir_path"
         mkdir -p "$dir_path"
-    elif [ ! -w "$dir_path" ]; then
-        echo -e "${RED}ERROR: Directory $dir_path exists but is not writable!${NC}"
-        echo "  Owner: $(stat -c '%U:%G' "$dir_path" 2>/dev/null || stat -f '%Su:%Sg' "$dir_path" 2>/dev/null)"
-        echo "  Please run: sudo chown -R $(whoami):$(whoami) ${SYSTEM_DEPLOYMENT_PATH}"
-        echo "  Or remove it: sudo rm -rf ${SYSTEM_DEPLOYMENT_PATH}"
-        exit 1
     fi
 }
 
