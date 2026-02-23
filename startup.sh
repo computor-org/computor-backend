@@ -132,6 +132,8 @@ done
 # Coder directories (if enabled)
 if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/home"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/registry"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
     # Seed default templates from repo (only copies missing ones, never overwrites)

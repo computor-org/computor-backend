@@ -54,7 +54,7 @@ services:
       - "${DOCKER_GID}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - coder_home:/home/coder
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/home:/home/coder
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
     depends_on:
       coder-postgres:
@@ -80,7 +80,7 @@ services:
     ports:
       - "127.0.0.1:${CODER_REGISTRY_PORT:-5000}:5000"
     volumes:
-      - coder_registry_data:/var/lib/registry
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/registry:/var/lib/registry
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
     healthcheck:
@@ -123,9 +123,3 @@ services:
       coder:
         condition: service_healthy
 
-# Coder-specific volumes (isolated from main infrastructure)
-volumes:
-  coder_home:
-    name: computor-coder-home
-  coder_registry_data:
-    name: computor-coder-registry
