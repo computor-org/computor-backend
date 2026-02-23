@@ -1,0 +1,22 @@
+# Web frontend (computor-web) Docker Compose overlay
+# Adds the Next.js frontend service behind Traefik
+# Included automatically in production mode by startup.sh
+
+services:
+  frontend:
+    build:
+      context: ../../
+      dockerfile: ./docker/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    networks:
+      - computor-network
+    restart: unless-stopped
+    depends_on:
+      - uvicorn
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.priority=1"  # Lower priority than API
