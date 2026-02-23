@@ -80,6 +80,7 @@ from .temporal_coder_setup import (
     BuildWorkspaceImagesWorkflow,
     PushCoderTemplatesWorkflow,
     build_workspace_image,
+    discover_template_keys,
     push_coder_template,
 )
 
@@ -166,6 +167,7 @@ class TemporalWorker:
             run_tutor_test_activity,
             # Coder setup activities (image build + template push)
             build_workspace_image,
+            discover_template_keys,
             push_coder_template,
         ]
         

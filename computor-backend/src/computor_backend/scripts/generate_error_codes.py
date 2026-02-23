@@ -515,11 +515,11 @@ def main():
     registry_path = project_root / "computor-backend" / "error_registry.yaml"
 
     # Output paths - following project structure conventions
-    # TypeScript goes to generated/types/ (shared by frontend projects)
-    ts_output = project_root / "generated" / "types" / "error-codes.ts"
+    # TypeScript goes to computor-web/src/generated/types/ (frontend project)
+    ts_output = project_root / "computor-web" / "src" / "generated" / "types" / "error-codes.ts"
 
-    # JSON catalog and docs go to generated/errors/
-    errors_dir = project_root / "generated" / "errors"
+    # JSON catalog and docs go to computor-web/src/generated/errors/
+    errors_dir = project_root / "computor-web" / "src" / "generated" / "errors"
     json_output = errors_dir / "error-catalog.json"
     json_vscode_output = errors_dir / "error-catalog.vscode.json"
     md_output = errors_dir / "ERROR_CODES.md"

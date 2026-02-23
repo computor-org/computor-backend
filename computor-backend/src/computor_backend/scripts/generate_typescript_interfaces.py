@@ -597,7 +597,7 @@ def main():
     ]
 
     # Output directory
-    output_dir = project_root / "generated" / "types"
+    output_dir = project_root / "computor-web" / "src" / "generated" / "types"
     
     print("🚀 TypeScript Interface Generator")
     print("=" * 50)

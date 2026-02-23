@@ -26,8 +26,6 @@ TARGETS:
     types           Generate TypeScript interfaces from Pydantic models
     clients         Generate TypeScript API client classes
     python-client   Generate Python HTTP client library
-    validators      Generate TypeScript validation classes
-    schema          Generate JSON Schema for meta.yaml files
     error-codes     Generate error code definitions (TypeScript, JSON, Markdown)
     all             Generate all artifacts (default)
 
@@ -40,7 +38,7 @@ EXAMPLES:
     bash generate.sh                    # Generate all artifacts
     bash generate.sh types              # Generate only TypeScript types
     bash generate.sh types --watch      # Generate types in watch mode
-    bash generate.sh clients validators # Generate clients and validators
+    bash generate.sh clients            # Generate only clients
     bash generate.sh all --no-error-codes  # Generate all except error codes
 
 EOF
@@ -102,7 +100,7 @@ generate_types() {
         "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_interfaces.py" ${args[@]+"${args[@]}"}
 
     echo -e "${GREEN}✅ TypeScript interfaces generated successfully!${NC}"
-    echo -e "📁 Check frontend/src/types/generated/ for the generated files\n"
+    echo -e "📁 Check computor-web/src/generated/types/ for the generated files\n"
 }
 
 # Function to generate TypeScript clients
@@ -113,7 +111,7 @@ generate_clients() {
         "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_clients.py" "$@"
 
     echo -e "${GREEN}✅ TypeScript API clients generated successfully!${NC}"
-    echo -e "📁 Check frontend/src/api/generated/ for the generated files\n"
+    echo -e "📁 Check computor-web/src/generated/clients/ for the generated files\n"
 }
 
 # Function to generate Python client
@@ -125,28 +123,6 @@ generate_python_client() {
 
     echo -e "${GREEN}✅ Python client library generated successfully!${NC}"
     echo -e "📁 Check computor-client/src/computor_client/endpoints/ for the generated files\n"
-}
-
-# Function to generate TypeScript validators
-generate_validators() {
-    echo -e "${BLUE}🚀 Generating TypeScript Validation Classes...${NC}"
-
-    cd "${ROOT_DIR}" && \
-        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_validators.py" --export-schemas "$@"
-
-    echo -e "${GREEN}✅ Validation classes generated successfully!${NC}"
-    echo -e "📁 Schemas: frontend/src/types/schemas/"
-    echo -e "📁 Validators: frontend/src/types/validators/\n"
-}
-
-# Function to generate JSON schema
-generate_schema() {
-    echo -e "${BLUE}🔧 Generating JSON Schema for meta.yaml files...${NC}"
-
-    cd "${ROOT_DIR}" && \
-        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_pydantic_schemas.py" "$@"
-
-    echo -e "${GREEN}✅ JSON Schema generation completed successfully!${NC}\n"
 }
 
 # Function to generate error codes
@@ -195,12 +171,6 @@ for target in "${TARGETS[@]}"; do
         python-client)
             generate_python_client
             ;;
-        validators)
-            generate_validators
-            ;;
-        schema)
-            generate_schema
-            ;;
         error-codes)
             generate_error_codes
             ;;
@@ -208,8 +178,6 @@ for target in "${TARGETS[@]}"; do
             generate_types
             generate_clients
             generate_python_client
-            generate_validators
-            generate_schema
             if [ "$SKIP_ERROR_CODES" = false ]; then
                 generate_error_codes
             fi
