@@ -1,0 +1,826 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-02-23T14:11:50.425151",
+  "error_count": 63,
+  "errors": {
+    "AUTH_001": {
+      "code": "AUTH_001",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "Authentication Required",
+      "message": {
+        "plain": "You must be authenticated to access this resource.",
+        "markdown": "**Authentication Required**\n\nYou must be authenticated to access this resource. Please log in and try again.",
+        "html": "<strong>Authentication Required</strong><p>You must be authenticated to access this resource. Please log in and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTH_002": {
+      "code": "AUTH_002",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "Invalid Credentials",
+      "message": {
+        "plain": "The username or password provided is incorrect.",
+        "markdown": "**Invalid Credentials**\n\nThe username or password you provided is incorrect. Please check your credentials and try again.",
+        "html": "<strong>Invalid Credentials</strong><p>The username or password you provided is incorrect. Please check your credentials and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTH_003": {
+      "code": "AUTH_003",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "Token Expired",
+      "message": {
+        "plain": "Your authentication token has expired. Please log in again.",
+        "markdown": "**Token Expired**\n\nYour authentication token has expired. Please log in again to continue.",
+        "html": "<strong>Token Expired</strong><p>Your authentication token has expired. Please log in again to continue.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTH_004": {
+      "code": "AUTH_004",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "error",
+      "title": "SSO Authentication Failed",
+      "message": {
+        "plain": "Single Sign-On authentication failed. Please try again or contact support.",
+        "markdown": "**SSO Authentication Failed**\n\nSingle Sign-On authentication failed. Please try again or contact support if the problem persists.",
+        "html": "<strong>SSO Authentication Failed</strong><p>Single Sign-On authentication failed. Please try again or contact support if the problem persists.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_001": {
+      "code": "AUTHZ_001",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Insufficient Permissions",
+      "message": {
+        "plain": "You do not have permission to perform this action.",
+        "markdown": "**Insufficient Permissions**\n\nYou do not have the required permissions to perform this action.",
+        "html": "<strong>Insufficient Permissions</strong><p>You do not have the required permissions to perform this action.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_002": {
+      "code": "AUTHZ_002",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Admin Access Required",
+      "message": {
+        "plain": "This operation requires administrator privileges.",
+        "markdown": "**Admin Access Required**\n\nThis operation requires administrator privileges. Please contact your system administrator.",
+        "html": "<strong>Admin Access Required</strong><p>This operation requires administrator privileges. Please contact your system administrator.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_003": {
+      "code": "AUTHZ_003",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Course Access Denied",
+      "message": {
+        "plain": "You do not have access to this course.",
+        "markdown": "**Course Access Denied**\n\nYou do not have access to this course. Please enroll or contact the course instructor.",
+        "html": "<strong>Course Access Denied</strong><p>You do not have access to this course. Please enroll or contact the course instructor.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_004": {
+      "code": "AUTHZ_004",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Insufficient Course Role",
+      "message": {
+        "plain": "Your course role is insufficient for this operation.",
+        "markdown": "**Insufficient Course Role**\n\nYour current role in this course does not allow this operation. Required role: {required_role}.",
+        "html": "<strong>Insufficient Course Role</strong><p>Your current role in this course does not allow this operation. Required role: <code>{required_role}</code>.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_005": {
+      "code": "AUTHZ_005",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "error",
+      "title": "Role Escalation Denied",
+      "message": {
+        "plain": "You cannot assign a role higher than your own.",
+        "markdown": "**Role Escalation Denied**\n\nYou cannot assign the role '{target_role}'. Your role '{user_role}' can only assign roles at or below your privilege level.",
+        "html": "<strong>Role Escalation Denied</strong><p>You cannot assign the role <code>{target_role}</code>. Your role <code>{user_role}</code> can only assign roles at or below your privilege level.</p>"
+      },
+      "retry_after": null
+    },
+    "VAL_001": {
+      "code": "VAL_001",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid Request Data",
+      "message": {
+        "plain": "The request data is invalid or malformed.",
+        "markdown": "**Invalid Request Data**\n\nThe request data you provided is invalid or malformed. Please check your input and try again.",
+        "html": "<strong>Invalid Request Data</strong><p>The request data you provided is invalid or malformed. Please check your input and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "VAL_002": {
+      "code": "VAL_002",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Missing Required Field",
+      "message": {
+        "plain": "A required field is missing from the request.",
+        "markdown": "**Missing Required Field**\n\nA required field is missing from your request: `{field_name}`.",
+        "html": "<strong>Missing Required Field</strong><p>A required field is missing from your request: <code>{field_name}</code>.</p>"
+      },
+      "retry_after": null
+    },
+    "VAL_003": {
+      "code": "VAL_003",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid Field Format",
+      "message": {
+        "plain": "A field has an invalid format.",
+        "markdown": "**Invalid Field Format**\n\nThe field `{field_name}` has an invalid format. Expected: {expected_format}.",
+        "html": "<strong>Invalid Field Format</strong><p>The field <code>{field_name}</code> has an invalid format. Expected: <code>{expected_format}</code>.</p>"
+      },
+      "retry_after": null
+    },
+    "VAL_004": {
+      "code": "VAL_004",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid File Upload",
+      "message": {
+        "plain": "The uploaded file is invalid or exceeds size limits.",
+        "markdown": "**Invalid File Upload**\n\nThe uploaded file is invalid or exceeds size limits. Maximum size: {max_size}.",
+        "html": "<strong>Invalid File Upload</strong><p>The uploaded file is invalid or exceeds size limits. Maximum size: <code>{max_size}</code>.</p>"
+      },
+      "retry_after": null
+    },
+    "NF_001": {
+      "code": "NF_001",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Resource Not Found",
+      "message": {
+        "plain": "The requested resource was not found.",
+        "markdown": "**Resource Not Found**\n\nThe requested resource was not found. It may have been deleted or the URL is incorrect.",
+        "html": "<strong>Resource Not Found</strong><p>The requested resource was not found. It may have been deleted or the URL is incorrect.</p>"
+      },
+      "retry_after": null
+    },
+    "NF_002": {
+      "code": "NF_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "User Not Found",
+      "message": {
+        "plain": "The specified user was not found.",
+        "markdown": "**User Not Found**\n\nThe specified user was not found in the system.",
+        "html": "<strong>User Not Found</strong><p>The specified user was not found in the system.</p>"
+      },
+      "retry_after": null
+    },
+    "NF_003": {
+      "code": "NF_003",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Course Not Found",
+      "message": {
+        "plain": "The specified course was not found.",
+        "markdown": "**Course Not Found**\n\nThe specified course was not found or you do not have permission to access it.",
+        "html": "<strong>Course Not Found</strong><p>The specified course was not found or you do not have permission to access it.</p>"
+      },
+      "retry_after": null
+    },
+    "NF_004": {
+      "code": "NF_004",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Endpoint Not Found",
+      "message": {
+        "plain": "The requested API endpoint does not exist.",
+        "markdown": "**Endpoint Not Found**\n\nThe requested API endpoint does not exist. Please check the URL and API version.",
+        "html": "<strong>Endpoint Not Found</strong><p>The requested API endpoint does not exist. Please check the URL and API version.</p>"
+      },
+      "retry_after": null
+    },
+    "CONFLICT_001": {
+      "code": "CONFLICT_001",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "warning",
+      "title": "Resource Already Exists",
+      "message": {
+        "plain": "A resource with this identifier already exists.",
+        "markdown": "**Resource Already Exists**\n\nA resource with this identifier already exists. Use a different identifier or update the existing resource.",
+        "html": "<strong>Resource Already Exists</strong><p>A resource with this identifier already exists. Use a different identifier or update the existing resource.</p>"
+      },
+      "retry_after": null
+    },
+    "CONFLICT_002": {
+      "code": "CONFLICT_002",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "warning",
+      "title": "Concurrent Modification",
+      "message": {
+        "plain": "The resource was modified by another user. Please refresh and try again.",
+        "markdown": "**Concurrent Modification**\n\nThe resource was modified by another user. Please refresh and try again.",
+        "html": "<strong>Concurrent Modification</strong><p>The resource was modified by another user. Please refresh and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "RATE_001": {
+      "code": "RATE_001",
+      "http_status": 429,
+      "category": "rate_limit",
+      "severity": "warning",
+      "title": "Rate Limit Exceeded",
+      "message": {
+        "plain": "You have exceeded the rate limit. Please try again later.",
+        "markdown": "**Rate Limit Exceeded**\n\nYou have exceeded the rate limit. Please try again in {retry_after} seconds.",
+        "html": "<strong>Rate Limit Exceeded</strong><p>You have exceeded the rate limit. Please try again in <code>{retry_after}</code> seconds.</p>"
+      },
+      "retry_after": 60
+    },
+    "RATE_002": {
+      "code": "RATE_002",
+      "http_status": 429,
+      "category": "rate_limit",
+      "severity": "warning",
+      "title": "Login Rate Limit Exceeded",
+      "message": {
+        "plain": "Too many login attempts. Please try again later.",
+        "markdown": "**Login Rate Limit Exceeded**\n\nToo many login attempts for this username. Please wait {retry_after} seconds before trying again.",
+        "html": "<strong>Login Rate Limit Exceeded</strong><p>Too many login attempts for this username. Please wait <code>{retry_after}</code> seconds before trying again.</p>"
+      },
+      "retry_after": 60
+    },
+    "RATE_003": {
+      "code": "RATE_003",
+      "http_status": 429,
+      "category": "rate_limit",
+      "severity": "warning",
+      "title": "Test Request Rate Limit Exceeded",
+      "message": {
+        "plain": "Too many test requests. Please wait before submitting another test.",
+        "markdown": "**Test Request Rate Limit Exceeded**\n\nYou are submitting tests too quickly. Please wait {retry_after} second before trying again.",
+        "html": "<strong>Test Request Rate Limit Exceeded</strong><p>You are submitting tests too quickly. Please wait <code>{retry_after}</code> second before trying again.</p>"
+      },
+      "retry_after": 1
+    },
+    "CONTENT_001": {
+      "code": "CONTENT_001",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Course Content Not Found",
+      "message": {
+        "plain": "The requested course content was not found.",
+        "markdown": "**Course Content Not Found**\n\nThe requested course content (assignment, exercise, etc.) was not found or you do not have permission to access it.",
+        "html": "<strong>Course Content Not Found</strong><p>The requested course content was not found or you do not have permission to access it.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_002": {
+      "code": "CONTENT_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "warning",
+      "title": "Content Type Not Configured",
+      "message": {
+        "plain": "The content type for this assignment is not configured.",
+        "markdown": "**Content Type Not Configured**\n\nThe content type for this assignment is not properly configured. Please contact your instructor.",
+        "html": "<strong>Content Type Not Configured</strong><p>The content type for this assignment is not properly configured. Please contact your instructor.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_003": {
+      "code": "CONTENT_003",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid Content Type Operation",
+      "message": {
+        "plain": "This operation is not valid for this content type.",
+        "markdown": "**Invalid Content Type Operation**\n\nThis operation cannot be performed on this content type. For example, you cannot assign examples to non-submittable content.",
+        "html": "<strong>Invalid Content Type Operation</strong><p>This operation cannot be performed on this content type.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_004": {
+      "code": "CONTENT_004",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Example Not Found",
+      "message": {
+        "plain": "The requested example was not found.",
+        "markdown": "**Example Not Found**\n\nThe requested example or example version was not found.",
+        "html": "<strong>Example Not Found</strong><p>The requested example or example version was not found.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_005": {
+      "code": "CONTENT_005",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Example Version Not Found",
+      "message": {
+        "plain": "The requested example version was not found.",
+        "markdown": "**Example Version Not Found**\n\nThe requested version of this example was not found. It may not exist or may have been deleted.",
+        "html": "<strong>Example Version Not Found</strong><p>The requested version of this example was not found.</p>"
+      },
+      "retry_after": null
+    },
+    "VERSION_001": {
+      "code": "VERSION_001",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "warning",
+      "title": "Example Version Already Exists",
+      "message": {
+        "plain": "This version already exists for this example.",
+        "markdown": "**Example Version Already Exists**\n\nVersion `{version_tag}` already exists for this example. To update it, set `update_existing: true` in meta.yaml or use a different version tag.",
+        "html": "<strong>Example Version Already Exists</strong><p>Version <code>{version_tag}</code> already exists for this example. To update it, set <code>update_existing: true</code> in meta.yaml or use a different version tag.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_001": {
+      "code": "DEPLOY_001",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "warning",
+      "title": "Assignment Not Released",
+      "message": {
+        "plain": "This assignment has not been released yet.",
+        "markdown": "**Assignment Not Released**\n\nThis assignment has not been released to students yet. Please wait for your instructor to release it.",
+        "html": "<strong>Assignment Not Released</strong><p>This assignment has not been released to students yet.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_002": {
+      "code": "DEPLOY_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Deployment Not Found",
+      "message": {
+        "plain": "The requested deployment was not found.",
+        "markdown": "**Deployment Not Found**\n\nThe requested deployment configuration was not found.",
+        "html": "<strong>Deployment Not Found</strong><p>The requested deployment configuration was not found.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_003": {
+      "code": "DEPLOY_003",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "error",
+      "title": "Repository Not Configured",
+      "message": {
+        "plain": "The GitLab repository is not configured for this resource.",
+        "markdown": "**Repository Not Configured**\n\nThe GitLab repository has not been configured. Please contact your administrator.",
+        "html": "<strong>Repository Not Configured</strong><p>The GitLab repository has not been configured. Please contact your administrator.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_004": {
+      "code": "DEPLOY_004",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Missing Deployment Information",
+      "message": {
+        "plain": "Required deployment information is missing.",
+        "markdown": "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured.",
+        "html": "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_001": {
+      "code": "SUBMIT_001",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Submission Artifact Not Found",
+      "message": {
+        "plain": "The requested submission artifact was not found.",
+        "markdown": "**Submission Artifact Not Found**\n\nThe requested submission artifact was not found. You may need to submit first.",
+        "html": "<strong>Submission Artifact Not Found</strong><p>The requested submission artifact was not found.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_002": {
+      "code": "SUBMIT_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Submission Group Not Found",
+      "message": {
+        "plain": "The requested submission group was not found.",
+        "markdown": "**Submission Group Not Found**\n\nThe requested submission group was not found or you do not have access to it.",
+        "html": "<strong>Submission Group Not Found</strong><p>The requested submission group was not found or you do not have access to it.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_003": {
+      "code": "SUBMIT_003",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Test Already Running",
+      "message": {
+        "plain": "A test is already running for this submission.",
+        "markdown": "**Test Already Running**\n\nA test is already running for this submission. Please wait for it to complete before starting another test.",
+        "html": "<strong>Test Already Running</strong><p>A test is already running for this submission.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_004": {
+      "code": "SUBMIT_004",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Maximum Test Runs Exceeded",
+      "message": {
+        "plain": "You have reached the maximum number of test runs for this submission.",
+        "markdown": "**Maximum Test Runs Exceeded**\n\nYou have reached the maximum number of test runs allowed for this submission.",
+        "html": "<strong>Maximum Test Runs Exceeded</strong><p>You have reached the maximum number of test runs allowed.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_005": {
+      "code": "SUBMIT_005",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Execution Backend Not Configured",
+      "message": {
+        "plain": "The execution backend for this assignment is not configured.",
+        "markdown": "**Execution Backend Not Configured**\n\nThe execution backend for this assignment is not properly configured. Please contact your instructor.",
+        "html": "<strong>Execution Backend Not Configured</strong><p>The execution backend is not configured.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_006": {
+      "code": "SUBMIT_006",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Version Identifier Required",
+      "message": {
+        "plain": "A version identifier (commit) is required for testing.",
+        "markdown": "**Version Identifier Required**\n\nA version identifier (commit hash) is required to test your submission. Please ensure your submission includes version information.",
+        "html": "<strong>Version Identifier Required</strong><p>A version identifier is required for testing.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_007": {
+      "code": "SUBMIT_007",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Test Identifier Required",
+      "message": {
+        "plain": "You must provide either an artifact ID or submission group ID to test.",
+        "markdown": "**Test Identifier Required**\n\nYou must provide either an artifact ID or submission group ID to identify what to test.",
+        "html": "<strong>Test Identifier Required</strong><p>You must provide an identifier for what to test.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_008": {
+      "code": "SUBMIT_008",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Artifact Already Tested",
+      "message": {
+        "plain": "You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.",
+        "markdown": "**Artifact Already Tested**\n\nYou have already successfully tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.",
+        "html": "<strong>Artifact Already Tested</strong><p>You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.</p>"
+      },
+      "retry_after": null
+    },
+    "TASK_001": {
+      "code": "TASK_001",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Task Not Found",
+      "message": {
+        "plain": "The requested task execution was not found.",
+        "markdown": "**Task Not Found**\n\nThe requested task execution was not found or you do not have permission to view it.",
+        "html": "<strong>Task Not Found</strong><p>The requested task execution was not found.</p>"
+      },
+      "retry_after": null
+    },
+    "TASK_002": {
+      "code": "TASK_002",
+      "http_status": 500,
+      "category": "internal",
+      "severity": "error",
+      "title": "Task Submission Failed",
+      "message": {
+        "plain": "Failed to submit the task for execution.",
+        "markdown": "**Task Submission Failed**\n\nFailed to submit the task to the execution system. Please try again or contact support.",
+        "html": "<strong>Task Submission Failed</strong><p>Failed to submit the task for execution.</p>"
+      },
+      "retry_after": null
+    },
+    "TASK_003": {
+      "code": "TASK_003",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Unsupported Execution Backend",
+      "message": {
+        "plain": "The execution backend type is not supported.",
+        "markdown": "**Unsupported Execution Backend**\n\nThe execution backend type configured for this assignment is not supported.",
+        "html": "<strong>Unsupported Execution Backend</strong><p>The execution backend type is not supported.</p>"
+      },
+      "retry_after": null
+    },
+    "TASK_004": {
+      "code": "TASK_004",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "info",
+      "title": "Course Membership Not Found",
+      "message": {
+        "plain": "You are not a member of this course.",
+        "markdown": "**Course Membership Not Found**\n\nYou are not enrolled as a member of this course.",
+        "html": "<strong>Course Membership Not Found</strong><p>You are not enrolled in this course.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_001": {
+      "code": "GITLAB_001",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "GitLab Not Configured",
+      "message": {
+        "plain": "GitLab integration is not configured for this course.",
+        "markdown": "**GitLab Not Configured**\n\nGitLab integration has not been set up for this course. Please contact your instructor.",
+        "html": "<strong>GitLab Not Configured</strong><p>GitLab integration has not been set up for this course. Please contact your instructor.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_002": {
+      "code": "GITLAB_002",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "info",
+      "title": "GitLab Account Not Registered",
+      "message": {
+        "plain": "You have not registered your GitLab account for this course.",
+        "markdown": "**GitLab Account Not Registered**\n\nYou need to register your GitLab account to access course repositories. Please register via `/user/courses/{course_id}/register`.",
+        "html": "<strong>GitLab Account Not Registered</strong><p>You need to register your GitLab account to access course repositories.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_003": {
+      "code": "GITLAB_003",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "GitLab Token Mismatch",
+      "message": {
+        "plain": "The GitLab access token does not match your registered account.",
+        "markdown": "**GitLab Token Mismatch**\n\nThe access token you provided belongs to GitLab user `{actual_username}`, but your registered account is `{expected_username}`.",
+        "html": "<strong>GitLab Token Mismatch</strong><p>The access token belongs to a different GitLab user than your registered account.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_004": {
+      "code": "GITLAB_004",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "warning",
+      "title": "GitLab Account Already Linked",
+      "message": {
+        "plain": "This GitLab username is already linked to another user.",
+        "markdown": "**GitLab Account Already Linked**\n\nThe GitLab username `{username}` is already linked to another user account in this course.",
+        "html": "<strong>GitLab Account Already Linked</strong><p>This GitLab username is already linked to another user account.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_005": {
+      "code": "GITLAB_005",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "GitLab Token Required",
+      "message": {
+        "plain": "A GitLab personal access token is required for this operation.",
+        "markdown": "**GitLab Token Required**\n\nPlease provide your GitLab personal access token to register or validate your account. The token must have `api` scope.",
+        "html": "<strong>GitLab Token Required</strong><p>Please provide your GitLab personal access token with <code>api</code> scope.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_006": {
+      "code": "GITLAB_006",
+      "http_status": 502,
+      "category": "external_service",
+      "severity": "error",
+      "title": "GitLab Token Invalid",
+      "message": {
+        "plain": "The GitLab access token is invalid or has been revoked.",
+        "markdown": "**GitLab Token Invalid**\n\nThe GitLab access token you provided is invalid, expired, or has been revoked. Please generate a new token with `api` scope.",
+        "html": "<strong>GitLab Token Invalid</strong><p>The GitLab access token is invalid, expired, or revoked. Please generate a new token.</p>"
+      },
+      "retry_after": null
+    },
+    "GITLAB_007": {
+      "code": "GITLAB_007",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "GitLab API Unreachable",
+      "message": {
+        "plain": "Unable to connect to GitLab API. Please try again later.",
+        "markdown": "**GitLab API Unreachable**\n\nUnable to connect to the GitLab API to verify your account. Please try again later.",
+        "html": "<strong>GitLab API Unreachable</strong><p>Unable to connect to GitLab. Please try again later.</p>"
+      },
+      "retry_after": 60
+    },
+    "GITLAB_008": {
+      "code": "GITLAB_008",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid GitLab Username",
+      "message": {
+        "plain": "The GitLab username format is invalid.",
+        "markdown": "**Invalid GitLab Username**\n\nThe provided GitLab username is empty or has invalid format. Please provide a valid GitLab username.",
+        "html": "<strong>Invalid GitLab Username</strong><p>Please provide a valid GitLab username.</p>"
+      },
+      "retry_after": null
+    },
+    "EXT_001": {
+      "code": "EXT_001",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "GitLab Service Unavailable",
+      "message": {
+        "plain": "GitLab service is temporarily unavailable.",
+        "markdown": "**GitLab Service Unavailable**\n\nThe GitLab service is temporarily unavailable. Please try again later.",
+        "html": "<strong>GitLab Service Unavailable</strong><p>The GitLab service is temporarily unavailable. Please try again later.</p>"
+      },
+      "retry_after": 300
+    },
+    "EXT_002": {
+      "code": "EXT_002",
+      "http_status": 502,
+      "category": "external_service",
+      "severity": "error",
+      "title": "GitLab Authentication Failed",
+      "message": {
+        "plain": "Failed to authenticate with GitLab.",
+        "markdown": "**GitLab Authentication Failed**\n\nFailed to authenticate with GitLab. Please check API token configuration.",
+        "html": "<strong>GitLab Authentication Failed</strong><p>Failed to authenticate with GitLab. Please check API token configuration.</p>"
+      },
+      "retry_after": null
+    },
+    "EXT_003": {
+      "code": "EXT_003",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "MinIO Service Unavailable",
+      "message": {
+        "plain": "Object storage service is temporarily unavailable.",
+        "markdown": "**MinIO Service Unavailable**\n\nThe object storage service is temporarily unavailable. Please try again later.",
+        "html": "<strong>MinIO Service Unavailable</strong><p>The object storage service is temporarily unavailable. Please try again later.</p>"
+      },
+      "retry_after": 60
+    },
+    "EXT_004": {
+      "code": "EXT_004",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "Temporal Service Unavailable",
+      "message": {
+        "plain": "Workflow service is temporarily unavailable.",
+        "markdown": "**Temporal Service Unavailable**\n\nThe workflow orchestration service is temporarily unavailable. Please try again later.",
+        "html": "<strong>Temporal Service Unavailable</strong><p>The workflow orchestration service is temporarily unavailable. Please try again later.</p>"
+      },
+      "retry_after": 120
+    },
+    "EXT_005": {
+      "code": "EXT_005",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "Task Queue Unavailable",
+      "message": {
+        "plain": "No worker available for the specified task queue.",
+        "markdown": "**Task Queue Unavailable**\n\nNo worker is available to process tasks on the specified queue. The testing service may be misconfigured or the worker is not running.",
+        "html": "<strong>Task Queue Unavailable</strong><p>No worker is available to process tasks on the specified queue. The testing service may be misconfigured or the worker is not running.</p>"
+      },
+      "retry_after": 120
+    },
+    "DB_001": {
+      "code": "DB_001",
+      "http_status": 503,
+      "category": "database",
+      "severity": "critical",
+      "title": "Database Connection Failed",
+      "message": {
+        "plain": "Unable to connect to the database.",
+        "markdown": "**Database Connection Failed**\n\nUnable to connect to the database. The service is temporarily unavailable.",
+        "html": "<strong>Database Connection Failed</strong><p>Unable to connect to the database. The service is temporarily unavailable.</p>"
+      },
+      "retry_after": 120
+    },
+    "DB_002": {
+      "code": "DB_002",
+      "http_status": 500,
+      "category": "database",
+      "severity": "error",
+      "title": "Database Query Failed",
+      "message": {
+        "plain": "A database query failed. Please try again.",
+        "markdown": "**Database Query Failed**\n\nA database query failed. Please try again or contact support if the problem persists.",
+        "html": "<strong>Database Query Failed</strong><p>A database query failed. Please try again or contact support if the problem persists.</p>"
+      },
+      "retry_after": null
+    },
+    "DB_003": {
+      "code": "DB_003",
+      "http_status": 500,
+      "category": "database",
+      "severity": "error",
+      "title": "Transaction Failed",
+      "message": {
+        "plain": "Database transaction failed and was rolled back.",
+        "markdown": "**Transaction Failed**\n\nThe database transaction failed and was rolled back. No changes were made.",
+        "html": "<strong>Transaction Failed</strong><p>The database transaction failed and was rolled back. No changes were made.</p>"
+      },
+      "retry_after": null
+    },
+    "INT_001": {
+      "code": "INT_001",
+      "http_status": 500,
+      "category": "internal",
+      "severity": "critical",
+      "title": "Internal Server Error",
+      "message": {
+        "plain": "An unexpected error occurred. Please try again later.",
+        "markdown": "**Internal Server Error**\n\nAn unexpected error occurred. Please try again later or contact support.",
+        "html": "<strong>Internal Server Error</strong><p>An unexpected error occurred. Please try again later or contact support.</p>"
+      },
+      "retry_after": null
+    },
+    "INT_002": {
+      "code": "INT_002",
+      "http_status": 500,
+      "category": "internal",
+      "severity": "critical",
+      "title": "Configuration Error",
+      "message": {
+        "plain": "Server configuration error. Please contact administrator.",
+        "markdown": "**Configuration Error**\n\nA server configuration error occurred. Please contact your administrator.",
+        "html": "<strong>Configuration Error</strong><p>A server configuration error occurred. Please contact your administrator.</p>"
+      },
+      "retry_after": null
+    },
+    "NIMPL_001": {
+      "code": "NIMPL_001",
+      "http_status": 501,
+      "category": "not_implemented",
+      "severity": "info",
+      "title": "Feature Not Implemented",
+      "message": {
+        "plain": "This feature is not yet implemented.",
+        "markdown": "**Feature Not Implemented**\n\nThis feature is not yet implemented. Check the documentation for available alternatives.",
+        "html": "<strong>Feature Not Implemented</strong><p>This feature is not yet implemented. Check the documentation for available alternatives.</p>"
+      },
+      "retry_after": null
+    }
+  }
+}

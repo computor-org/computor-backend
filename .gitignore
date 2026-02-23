@@ -1,8 +1,5 @@
-# Generated files (TypeScript types, schemas, validators, clients)
-/generated/
-computor-web/src/generated/
 # But keep computor-client generated files (needed for Docker builds)
-!computor-client/src/computor_client/generated/
+# Generated TypeScript types/clients in computor-web/src/generated/ are tracked in git
 
 # Next.js
 computor-web/.next/
