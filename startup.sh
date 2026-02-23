@@ -134,8 +134,7 @@ if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/home"
     # Coder container runs as UID 1000 — ensure it can write to its home directory
-    chmod 755 "${SYSTEM_DEPLOYMENT_PATH}/coder/home" 2>/dev/null || true
-    chown 1000:1000 "${SYSTEM_DEPLOYMENT_PATH}/coder/home" 2>/dev/null || true
+    chmod 777 "${SYSTEM_DEPLOYMENT_PATH}/coder/home" 2>/dev/null || true
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/registry"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
