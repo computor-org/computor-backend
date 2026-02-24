@@ -956,3 +956,98 @@ async def download_tutor_test_artifacts(
             "Content-Disposition": f'attachment; filename="tutor_test_{test_id}_artifacts.zip"'
         }
     )
+
+
+# ============================================================================
+# Worker-facing endpoints (called by Temporal testing workers via API)
+# ============================================================================
+
+@tutor_router.get(
+    "/tests/{test_id}/input/download",
+    responses={200: {"content": {"application/zip": {}}}},
+)
+async def download_tutor_test_input(
+    test_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+):
+    """
+    Download tutor test input files as a ZIP.
+
+    Used by the testing worker to fetch the tutor's uploaded code
+    for test execution.
+    """
+    from computor_backend.services.tutor_test_storage import download_tutor_test_input_as_zip
+
+    zip_data = await download_tutor_test_input_as_zip(test_id)
+
+    from io import BytesIO
+    zip_buffer = BytesIO(zip_data)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="tutor_test_{test_id}_input.zip"'
+        }
+    )
+
+
+@tutor_router.post("/tests/{test_id}/results")
+async def submit_tutor_test_results(
+    test_id: str,
+    result_data: dict,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis=Depends(get_redis_client),
+):
+    """
+    Submit test results for a tutor test.
+
+    Used by the testing worker to report results after test execution.
+    Stores result.json in MinIO and updates Redis state.
+    """
+    from computor_backend.services.tutor_test_storage import (
+        store_tutor_test_result as store_result_minio,
+    )
+    from computor_backend.services.tutor_test_state import (
+        store_tutor_test_result as store_result_redis,
+        TutorTestStatus as TutorTestStatusEnum,
+    )
+
+    # Store result.json in MinIO (persistent storage)
+    await store_result_minio(test_id, result_data)
+
+    # Update Redis state
+    if result_data.get("error"):
+        status_enum = TutorTestStatusEnum.FAILED
+    else:
+        status_enum = TutorTestStatusEnum.COMPLETED
+
+    await store_result_redis(
+        redis_client=redis,
+        test_id=test_id,
+        result=result_data,
+        status=status_enum,
+    )
+
+    return {"stored": True}
+
+
+@tutor_router.post("/tests/{test_id}/artifacts/upload")
+async def upload_tutor_test_artifacts(
+    test_id: str,
+    file: Annotated[bytes, File()],
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+):
+    """
+    Upload test artifacts as a ZIP archive.
+
+    Used by the testing worker to upload generated artifacts (plots, figures,
+    debug output) after test execution.
+    """
+    from computor_backend.services.tutor_test_storage import (
+        store_tutor_test_artifacts_from_zip,
+    )
+
+    artifacts_stored = await store_tutor_test_artifacts_from_zip(test_id, file)
+
+    return {"artifacts_stored": artifacts_stored}
