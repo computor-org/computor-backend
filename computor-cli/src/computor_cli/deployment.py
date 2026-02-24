@@ -1511,11 +1511,11 @@ def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
             repos = response.json()
             click.echo(f"    🔍 Found {len(repos)} matching repositories")
 
+            from types import SimpleNamespace
+
             if repos:
                 repo = repos[0]
                 click.echo(f"    ✅ Using existing repository: {repo['name']} (ID: {repo['id']}, source_url: {repo['source_url']})")
-                # Convert to ExampleRepositoryGet-like object
-                from types import SimpleNamespace
                 return SimpleNamespace(**repo)
 
             # Create new repository
