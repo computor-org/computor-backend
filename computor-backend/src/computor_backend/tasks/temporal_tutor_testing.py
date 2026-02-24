@@ -202,7 +202,7 @@ async def store_tutor_test_result_to_minio(
         async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
             response = await client._http.post(
                 f"/tutors/tests/{test_id}/results",
-                json=test_results,
+                json_data=test_results,
             )
             response.raise_for_status()
 
