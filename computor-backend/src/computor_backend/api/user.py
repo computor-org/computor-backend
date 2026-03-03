@@ -13,7 +13,8 @@ from computor_types.course_member_accounts import (
 from computor_types.users import UserGet, UserPassword
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.course import CourseMember
+from computor_backend.model.course import Course, CourseMember
+from computor_backend.model.organization import Organization
 from fastapi import APIRouter, Depends
 
 # Import business logic
@@ -142,28 +143,76 @@ async def _trigger_permission_workflow_if_needed(
     permissions: Principal,
     db: Session,
 ) -> None:
-    """Check if a course member's GitLab permission sync failed and trigger the Temporal workflow."""
+    """Trigger GitLab permission workflows for all courses on the same GitLab realm.
+
+    When a student registers their GitLab account for one course, this checks ALL
+    courses the user belongs to on the same GitLab instance and triggers the
+    permission workflow for any with status 'pending' or 'sync_failed'.
+    """
     try:
-        member = (
+        # Find the GitLab URL for the current course's organization
+        course = (
+            db.query(Course)
+            .filter(Course.id == str(course_id))
+            .first()
+        )
+        if not course:
+            return
+
+        organization = (
+            db.query(Organization)
+            .filter(Organization.id == course.organization_id)
+            .first()
+        )
+        if not organization:
+            return
+
+        gitlab_url = (organization.properties or {}).get("gitlab", {}).get("url")
+        if not gitlab_url:
+            return
+
+        # Find all organizations on the same GitLab realm
+        all_orgs = db.query(Organization).all()
+        same_realm_org_ids = [
+            str(org.id) for org in all_orgs
+            if (org.properties or {}).get("gitlab", {}).get("url") == gitlab_url
+        ]
+
+        # Find all courses belonging to those organizations
+        same_realm_course_ids = [
+            str(c.id) for c in db.query(Course)
+            .filter(Course.organization_id.in_(same_realm_org_ids))
+            .all()
+        ]
+
+        # Find all CourseMember records for this user across those courses
+        members = (
             db.query(CourseMember)
             .filter(
                 CourseMember.user_id == permissions.user_id,
-                CourseMember.course_id == str(course_id),
+                CourseMember.course_id.in_(same_realm_course_ids),
             )
-            .first()
+            .all()
         )
-        if not member:
-            return
 
-        status = (member.properties or {}).get("gitlab_permissions_status")
-        if status == "sync_failed":
+        for member in members:
+            status = (member.properties or {}).get("gitlab_permissions_status")
+            if status not in ("pending", "sync_failed"):
+                continue
+
+            # Only trigger if a repo exists (full_path is set)
+            full_path = (member.properties or {}).get("gitlab", {}).get("full_path")
+            if not full_path:
+                continue
+
             workflow_id = await trigger_permission_grant_workflow(
                 member, db, permissions.user_id
             )
             if workflow_id:
                 logger.info(
-                    "Triggered fallback permission workflow %s for user %s in course %s",
-                    workflow_id, permissions.user_id, course_id,
+                    "Triggered permission workflow %s for user %s in course %s (status was %s)",
+                    workflow_id, permissions.user_id, member.course_id, status,
                 )
+
     except Exception as exc:
-        logger.error("Failed to trigger fallback permission workflow: %s", exc)
+        logger.error("Failed to trigger permission workflows: %s", exc)
