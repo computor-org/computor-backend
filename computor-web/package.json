@@ -17,6 +17,9 @@
     "recharts": "^3.7.0",
     "remark-gfm": "^4.0.1"
   },
+  "resolutions": {
+    "minimatch": ">=9.0.7"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
