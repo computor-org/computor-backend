@@ -129,13 +129,6 @@ async def set_initial_password(
                 db=db,
             )
 
-            # IMPORTANT: Only allow password initialization if user has NO password
-            if user.password is not None:
-                raise ForbiddenException(
-                    "This authentication method can only be used for initial password setup. "
-                    "Use /password/change to change an existing password."
-                )
-
             # Create/update GitLab account entry (reusing existing code pattern)
             await find_or_create_gitlab_account(
                 user=user,
