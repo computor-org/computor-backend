@@ -44,6 +44,9 @@ from . import temporal_tutor_testing
 # Import Coder setup tasks to auto-register (image building, template push)
 from . import temporal_coder_setup
 
+# Import GitLab permission granting tasks to auto-register
+from . import temporal_gitlab_permissions
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

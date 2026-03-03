@@ -520,18 +520,7 @@ async def create_student_repository(
         if existing_project:
             forked_project = existing_project
             logger.info(f"Using existing repository {repo_path} for {username}")
-            
-            # Ensure student is maintainer even for existing repo
-            try:
-                await add_members_to_project(
-                    gitlab=gitlab,
-                    project=forked_project,
-                    member_ids=[course_member_id],
-                    db=db,
-                    provider_url=provider_url
-                )
-            except Exception as e:
-                logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
+            # Permission grant is handled by the separate grant_gitlab_permissions activity
         else:
             # Fork the student-template repository
             logger.info(f"Forking template {student_template_id} to {repo_path}")
@@ -559,15 +548,8 @@ async def create_student_repository(
                     gitlab_unprotect_branches(gitlab, forked_project.id, branch)
                 except Exception as e:
                     logger.debug(f"Could not unprotect {branch} branch: {e}")
-                
-            # Add student as maintainer of the repository
-            await add_members_to_project(
-                gitlab=gitlab,
-                project=forked_project,
-                member_ids=[course_member_id],
-                db=db,
-                provider_url=provider_url
-            )
+
+            # Permission grant is handled by the separate grant_gitlab_permissions activity
         
         # Prepare repository information
         repository_info = {
@@ -590,6 +572,7 @@ async def create_student_repository(
         from sqlalchemy.orm.attributes import flag_modified
         course_member.properties = course_member.properties or {}
         course_member.properties['gitlab'] = repository_info
+        course_member.properties['gitlab_permissions_status'] = 'pending'
         flag_modified(course_member, "properties")
         db.add(course_member)
         db.commit()
@@ -755,15 +738,9 @@ async def create_team_repository(
         gitlab_unprotect_branches(gitlab, team_project.id, "main")
         gitlab_unprotect_branches(gitlab, team_project.id, "master")
 
-        # Add team members as maintainers
-        await add_members_to_project(
-            gitlab=gitlab,
-            project=team_project,
-            member_ids=team_members,
-            db=db,
-            provider_url=gitlab_url
-        )
-                    
+        # Permission grant for team members is handled by the separate
+        # grant_gitlab_permissions activity called from the workflow
+
         # Get assignment directory from course content's example
         course_content = submission_group.course_content
         assignment_directory = None
@@ -838,7 +815,14 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
     async def run(self, params: Dict[str, Any]) -> WorkflowResult:
         """
         Execute the student repository creation workflow.
-        
+
+        Two-phase approach:
+        1. Create/fork the repository (fast retry, 3 attempts)
+        2. Grant GitLab permissions (generous retry, 10 attempts with backoff)
+
+        This separation ensures that a GitLab rate limit or missing account
+        during permission granting does not re-trigger the expensive fork.
+
         Expected params:
         - course_member_id: ID of the course member
         - course_id: ID of the course
@@ -846,53 +830,87 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
         - is_team: Whether this is for team repositories
         - team_members: List of member IDs (for team repos)
         """
-        retry_policy = RetryPolicy(
+        from .temporal_gitlab_permissions import grant_gitlab_permissions
+
+        repo_retry_policy = RetryPolicy(
             maximum_attempts=3,
             initial_interval=timedelta(seconds=1),
             maximum_interval=timedelta(seconds=10),
-            backoff_coefficient=2
+            backoff_coefficient=2,
         )
-        
+
+        permission_retry_policy = RetryPolicy(
+            maximum_attempts=10,
+            initial_interval=timedelta(seconds=60),
+            maximum_interval=timedelta(seconds=60),
+            backoff_coefficient=1.0,
+        )
+
         try:
             course_member_id = params.get('course_member_id')
             course_id = params.get('course_id')
             submission_group_ids = params.get('submission_group_ids', [])
             is_team = params.get('is_team', False)
             team_members = params.get('team_members', [])
-            
+
             results = []
-            
+
             if is_team:
                 # Create team repositories
                 for submission_group_id in submission_group_ids:
-                    result = await workflow.execute_activity(
+                    # Step 1: Create/fork team repository
+                    repo_result = await workflow.execute_activity(
                         create_team_repository,
                         args=[submission_group_id, course_id, team_members],
-                        retry_policy=retry_policy,
-                        start_to_close_timeout=timedelta(minutes=5)
+                        retry_policy=repo_retry_policy,
+                        start_to_close_timeout=timedelta(minutes=5),
                     )
-                    results.append(result)
+                    results.append(repo_result)
+
+                    # Step 2: Grant permissions to all team members
+                    project_full_path = (
+                        repo_result.get("repository", {})
+                        .get("gitlab", {})
+                        .get("full_path")
+                    )
+                    if project_full_path:
+                        await workflow.execute_activity(
+                            grant_gitlab_permissions,
+                            args=[team_members, course_id, project_full_path, True],
+                            retry_policy=permission_retry_policy,
+                            start_to_close_timeout=timedelta(minutes=15),
+                        )
             else:
-                # Create ONE student repository (not one per submission group!)
-                result = await workflow.execute_activity(
+                # Step 1: Create ONE student repository
+                repo_result = await workflow.execute_activity(
                     create_student_repository,
-                    args=[course_member_id, course_id, submission_group_ids],  # Pass ALL submission group IDs
-                    retry_policy=retry_policy,
-                    start_to_close_timeout=timedelta(minutes=5)
+                    args=[course_member_id, course_id, submission_group_ids],
+                    retry_policy=repo_retry_policy,
+                    start_to_close_timeout=timedelta(minutes=5),
                 )
-                results.append(result)
-                    
+                results.append(repo_result)
+
+                # Step 2: Grant permissions to the student
+                project_full_path = repo_result.get("repository", {}).get("full_path")
+                if project_full_path:
+                    await workflow.execute_activity(
+                        grant_gitlab_permissions,
+                        args=[[course_member_id], course_id, project_full_path, True],
+                        retry_policy=permission_retry_policy,
+                        start_to_close_timeout=timedelta(minutes=15),
+                    )
+
             return WorkflowResult(
                 status="success",
                 result={"message": f"Created {len(results)} repositories", "repositories": results},
-                metadata={"repository_count": len(results)}
+                metadata={"repository_count": len(results)},
             )
-            
+
         except Exception as e:
             logger.error(f"Student repository creation workflow failed: {e}")
             return WorkflowResult(
                 status="failed",
                 result=None,
                 error=str(e),
-                metadata={"error_details": str(e)}
+                metadata={"error_details": str(e)},
             )

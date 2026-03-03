@@ -83,6 +83,10 @@ from .temporal_coder_setup import (
     discover_template_keys,
     push_coder_template,
 )
+from .temporal_gitlab_permissions import (
+    GrantGitlabPermissionsWorkflow,
+    grant_gitlab_permissions,
+)
 
 
 class TemporalWorker:
@@ -142,6 +146,7 @@ class TemporalWorker:
             TutorTestingWorkflow,  # Tutor testing (ephemeral, no DB records)
             BuildWorkspaceImagesWorkflow,  # Coder workspace image building
             PushCoderTemplatesWorkflow,  # Coder template pushing
+            GrantGitlabPermissionsWorkflow,  # GitLab permission granting with retry
         ]
         
         activities = [
@@ -169,6 +174,8 @@ class TemporalWorker:
             build_workspace_image,
             discover_template_keys,
             push_coder_template,
+            # GitLab permission granting (separate from repo creation for proper retry)
+            grant_gitlab_permissions,
         ]
         
         # Create a worker for each task queue

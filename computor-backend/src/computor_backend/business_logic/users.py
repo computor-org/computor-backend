@@ -857,6 +857,105 @@ def _sync_gitlab_memberships(
             )
 
 
+def _set_gitlab_permissions_status(
+    course_member: CourseMember,
+    status: str,
+    db: Session,
+) -> None:
+    """Update the gitlab_permissions_status on a CourseMember's properties.
+
+    Args:
+        course_member: The CourseMember to update
+        status: One of "pending", "granted", "sync_failed"
+        db: Database session
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    course_member.properties = course_member.properties or {}
+    course_member.properties["gitlab_permissions_status"] = status
+    flag_modified(course_member, "properties")
+    db.add(course_member)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning("Could not update gitlab_permissions_status to '%s' for %s", status, course_member.id)
+
+
+async def trigger_permission_grant_workflow(
+    course_member: CourseMember,
+    db: Session,
+    created_by: str,
+) -> Optional[str]:
+    """Submit a GrantGitlabPermissionsWorkflow for a course member.
+
+    Called from the API layer when the synchronous _sync_gitlab_memberships fails,
+    providing a Temporal-based retry safety net.
+
+    Args:
+        course_member: CourseMember whose permissions need granting
+        db: Database session
+        created_by: User ID who triggered the action
+
+    Returns:
+        workflow_id if submitted, None if unable to submit
+    """
+    from computor_backend.task_tracker import get_task_tracker
+    from computor_types.tasks import TaskSubmission
+
+    member_props = course_member.properties or {}
+    gitlab_info = member_props.get("gitlab", {})
+    project_full_path = gitlab_info.get("full_path")
+
+    if not project_full_path:
+        logger.warning(
+            "No gitlab.full_path on course_member %s — cannot trigger permission workflow",
+            course_member.id,
+        )
+        return None
+
+    try:
+        task_tracker = await get_task_tracker()
+
+        course = db.query(Course).filter(Course.id == course_member.course_id).first()
+        org_id = str(course.organization_id) if course and course.organization_id else None
+
+        task_submission = TaskSubmission(
+            task_name="GrantGitlabPermissionsWorkflow",
+            parameters={
+                "course_member_ids": [str(course_member.id)],
+                "course_id": str(course_member.course_id),
+                "project_full_path": project_full_path,
+                "grant_template_reporter": True,
+            },
+            queue="computor-tasks",
+        )
+
+        workflow_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=created_by,
+            user_id=str(course_member.user_id),
+            course_id=str(course_member.course_id),
+            organization_id=org_id,
+            entity_type="course_member",
+            entity_id=str(course_member.id),
+            description=f"Granting GitLab permissions for {course_member.user.email if course_member.user else 'course member'}",
+        )
+
+        logger.info(
+            "Triggered GrantGitlabPermissionsWorkflow %s for course_member %s",
+            workflow_id, course_member.id,
+        )
+        return workflow_id
+
+    except Exception as exc:
+        logger.error(
+            "Failed to trigger GrantGitlabPermissionsWorkflow for %s: %s",
+            course_member.id, exc, exc_info=True,
+        )
+        return None
+
+
 def validate_user_course(
     course_id: UUID | str,
     provider_access_token: Optional[str],
@@ -948,10 +1047,14 @@ def validate_user_course(
                 db,
                 user_access_token=provider_access_token,
             )
+            # Mark permissions as granted on success
+            _set_gitlab_permissions_status(course_member, "granted", db)
         except BadRequestException:
             raise
         except Exception as exc:
             logger.warning("GitLab access provisioning failed during validation: %s", exc)
+            # Mark as sync_failed so the API layer can trigger the Temporal workflow
+            _set_gitlab_permissions_status(course_member, "sync_failed", db)
 
     return _build_validation_status(
         course_member,
@@ -1076,10 +1179,14 @@ def register_user_course_account(
             db,
             user_access_token=provider_access_token,
         )
+        # Mark permissions as granted on success
+        _set_gitlab_permissions_status(course_member, "granted", db)
     except BadRequestException:
         raise
     except Exception as exc:
         logger.warning("GitLab access provisioning failed: %s", exc)
+        # Mark as sync_failed so the API layer can trigger the Temporal workflow
+        _set_gitlab_permissions_status(course_member, "sync_failed", db)
 
     return _build_validation_status(
         course_member,
