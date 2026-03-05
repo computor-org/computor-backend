@@ -140,7 +140,7 @@ def list_services_endpoint(
 
 @services_router.get("/{service_id}", response_model=ServiceGet)
 def get_service_endpoint(
-    service_id: UUID | str,
+    service_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -150,7 +150,7 @@ def get_service_endpoint(
 
 @services_router.patch("/{service_id}", response_model=ServiceGet)
 def update_service_endpoint(
-    service_id: UUID | str,
+    service_id: UUID,
     service_data: ServiceUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -161,7 +161,7 @@ def update_service_endpoint(
 
 @services_router.put("/{service_id}/heartbeat", status_code=status.HTTP_204_NO_CONTENT)
 def service_heartbeat_endpoint(
-    service_id: UUID | str,
+    service_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -171,7 +171,7 @@ def service_heartbeat_endpoint(
 
 @services_router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_service_endpoint(
-    service_id: UUID | str,
+    service_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):

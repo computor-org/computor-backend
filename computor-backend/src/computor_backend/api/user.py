@@ -72,7 +72,7 @@ async def get_course_views_for_current_user(
     response_model=List[str],
 )
 async def get_course_views_for_current_user_by_course(
-    course_id: UUID | str,
+    course_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -88,7 +88,7 @@ async def get_course_views_for_current_user_by_course(
     response_model=CourseMemberReadinessStatus,
 )
 async def validate_current_user_course(
-    course_id: UUID | str,
+    course_id: UUID,
     validation: CourseMemberValidationRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -106,7 +106,7 @@ async def validate_current_user_course(
     response_model=CourseMemberReadinessStatus,
 )
 async def register_current_user_course_account(
-    course_id: UUID | str,
+    course_id: UUID,
     payload: CourseMemberProviderAccountUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),

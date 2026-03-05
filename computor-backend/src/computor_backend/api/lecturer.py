@@ -51,7 +51,7 @@ lecturer_router = APIRouter()
 
 @lecturer_router.get("/courses/{course_id}", response_model=CourseGet)
 def lecturer_get_courses_endpoint(
-    course_id: UUID | str,
+    course_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):
@@ -69,7 +69,7 @@ def lecturer_list_courses_endpoint(
 
 @lecturer_router.get("/course-contents/{course_content_id}", response_model=CourseContentLecturerGet)
 def lecturer_get_course_contents_endpoint(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):
@@ -95,7 +95,7 @@ def lecturer_list_course_contents_endpoint(
     response_model=AssignExampleResponse
 )
 def assign_example_to_course_content(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     request: AssignExampleRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
@@ -156,7 +156,7 @@ def assign_example_to_course_content(
     response_model=DeploymentGet
 )
 def get_course_content_deployment(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
@@ -223,7 +223,7 @@ def get_course_content_deployment(
     response_model=UnassignExampleResponse
 )
 def unassign_example_from_course_content(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)
 ):
@@ -260,7 +260,7 @@ def unassign_example_from_course_content(
     response_model=ContentValidationGet
 )
 def validate_course_content_batch(
-    course_id: UUID | str,
+    course_id: UUID,
     request: ContentValidationCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db)

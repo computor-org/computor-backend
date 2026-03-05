@@ -77,7 +77,7 @@ async def create_message(
 
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
-    id: UUID | str,
+    id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -118,7 +118,7 @@ async def list_messages(
 
 @messages_router.patch("/{id}", response_model=MessageGet)
 async def update_message(
-    id: UUID | str,
+    id: UUID,
     payload: MessageUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -150,7 +150,7 @@ async def update_message(
 
 @messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_message(
-    id: UUID | str,
+    id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -173,7 +173,7 @@ async def delete_message(
 
 @messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_read(
-    id: UUID | str,
+    id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
@@ -195,7 +195,7 @@ async def mark_message_read(
 
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_unread(
-    id: UUID | str,
+    id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
@@ -208,7 +208,7 @@ async def mark_message_unread(
 
 @messages_router.get("/{id}/audit")
 async def get_message_audit(
-    id: UUID | str,
+    id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):

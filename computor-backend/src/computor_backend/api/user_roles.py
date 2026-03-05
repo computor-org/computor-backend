@@ -40,8 +40,8 @@ async def list_user_roles(
 @user_roles_router.get("/users/{user_id}/roles/{role_id}", response_model=UserRoleGet)
 async def get_user_role_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    user_id: UUID | str,
-    role_id: UUID | str,
+    user_id: UUID,
+    role_id: UUID,
     db: Session = Depends(get_db)
 ):
     """Get a specific user role by user_id and role_id."""
@@ -60,8 +60,8 @@ async def create_user_role(
 @user_roles_router.delete("/users/{user_id}/roles/{role_id}", response_model=dict)
 async def delete_user_role_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    user_id: UUID | str,
-    role_id: UUID | str,
+    user_id: UUID,
+    role_id: UUID,
     db: Session = Depends(get_db)
 ):
     """Delete a user role."""

@@ -28,7 +28,7 @@ organization_router = CrudRouter(OrganizationInterface)
 @organization_router.router.patch("/{organization_id}/token", status_code=201)
 def patch_organizations_token(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    organization_id: UUID | str,
+    organization_id: UUID,
     payload: OrganizationUpdateTokenUpdate,
     params: OrganizationUpdateTokenQuery = Depends(),
     db: Session = Depends(get_db)

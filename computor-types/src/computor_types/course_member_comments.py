@@ -50,7 +50,7 @@ class CourseMemberCommentInterface(EntityInterface):
 
 # Simplified DTOs for API endpoints (matching the local definitions in course_member_comments.py)
 class CommentCreate(BaseModel):
-    course_member_id: UUID | str
+    course_member_id: UUID
     message: str
 
 class CommentUpdate(BaseModel):

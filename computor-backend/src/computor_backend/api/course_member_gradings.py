@@ -113,7 +113,7 @@ Returns full course content hierarchy with detailed submission progress.
 """,
 )
 async def get_course_member_gradings_endpoint(
-    course_member_id: UUID | str,
+    course_member_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseMemberGradingsQuery = Depends(),
     db: Session = Depends(get_db),

@@ -58,8 +58,8 @@ tutor_router = APIRouter()
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 async def tutor_get_course_contents_endpoint(
-    course_content_id: UUID | str,
-    course_member_id: UUID | str,
+    course_content_id: UUID,
+    course_member_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):
@@ -68,7 +68,7 @@ async def tutor_get_course_contents_endpoint(
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 async def tutor_list_course_contents_endpoint(
-    course_member_id: UUID | str,
+    course_member_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
     cache: Cache = Depends(get_cache)
@@ -78,8 +78,8 @@ async def tutor_list_course_contents_endpoint(
 
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
 async def tutor_update_course_contents_endpoint(
-    course_content_id: UUID | str,
-    course_member_id: UUID | str,
+    course_content_id: UUID,
+    course_member_id: UUID,
     grade_data: TutorGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -100,7 +100,7 @@ async def tutor_update_course_contents_endpoint(
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 def tutor_get_courses_endpoint(
-    course_id: UUID | str,
+    course_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):
@@ -118,7 +118,7 @@ def tutor_list_courses_endpoint(
 
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members_endpoint(
-    course_member_id: UUID | str,
+    course_member_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
@@ -140,7 +140,7 @@ def tutor_list_course_members_endpoint(
 
 @tutor_router.get("/submission-groups/{submission_group_id}", response_model=TutorSubmissionGroupGet)
 def tutor_get_submission_group_endpoint(
-    submission_group_id: UUID | str,
+    submission_group_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache)
@@ -171,7 +171,7 @@ def tutor_list_submission_groups_endpoint(
 ## Helper function to get example version for a course content
 
 async def _get_example_version_for_course_content(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Principal,
     db: Session,
     cache: Cache,
@@ -255,7 +255,7 @@ async def _get_example_version_for_course_content(
     responses={200: {"content": {"application/zip": {}}}},
 )
 async def download_course_content_reference(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
@@ -365,7 +365,7 @@ async def download_course_content_reference(
     responses={200: {"content": {"application/zip": {}}}},
 )
 async def download_course_content_description(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
     cache: Cache = Depends(get_cache),
@@ -472,7 +472,7 @@ from computor_types.tutor_tests import (
 
 
 async def _check_tutor_permission_for_course_content(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Principal,
     db: Session,
     cache: Cache = None,
@@ -523,7 +523,7 @@ async def _check_tutor_permission_for_course_content(
     response_model=TutorTestCreateResponse,
 )
 async def create_tutor_test(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     file: UploadFile = File(..., description="ZIP file containing tutor's code"),
     config: Optional[str] = Form(None, description="Optional JSON configuration"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,

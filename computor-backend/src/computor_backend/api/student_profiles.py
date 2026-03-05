@@ -37,7 +37,7 @@ async def list_student_profiles(
 @student_profile_router.get("/{id}", response_model=StudentProfileGet)
 async def get_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     db: Session = Depends(get_db)
 ):
     """Get a student profile by ID - users can only get their own, admins/_user_manager can get any"""
@@ -55,7 +55,7 @@ async def create_student_profile(
 @student_profile_router.patch("/{id}", response_model=StudentProfileGet)
 async def update_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     data: StudentProfileUpdate,
     db: Session = Depends(get_db)
 ):
@@ -65,7 +65,7 @@ async def update_student_profile(
 @student_profile_router.delete("/{id}", status_code=204)
 async def delete_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     db: Session = Depends(get_db)
 ):
     """Delete a student profile - users can only delete their own, admins/_user_manager can delete any"""

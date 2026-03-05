@@ -53,7 +53,7 @@ async def create_comment(
 
 @router.patch("/{course_member_comment_id}", response_model=list[CourseMemberCommentList])
 async def update_comment(
-    course_member_comment_id: UUID | str,
+    course_member_comment_id: UUID,
     payload: CommentUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -68,7 +68,7 @@ async def update_comment(
 
 @router.delete("/{course_member_comment_id}", response_model=list[CourseMemberCommentList])
 async def delete_comment(
-    course_member_comment_id: UUID | str,
+    course_member_comment_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):

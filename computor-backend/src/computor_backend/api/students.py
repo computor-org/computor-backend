@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 async def student_get_course_content_endpoint(
-    course_content_id: UUID | str,
+    course_content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):
@@ -65,7 +65,7 @@ def student_list_courses_endpoint(
 
 @student_router.get("/courses/{course_id}", response_model=CourseStudentGet)
 def student_get_course_endpoint(
-    course_id: UUID | str,
+    course_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     cache: Cache = Depends(get_cache)
 ):

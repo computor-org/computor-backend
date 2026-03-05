@@ -67,7 +67,7 @@ class CrudRouter:
     def get(self):
         async def route(
                 permissions: Annotated[Principal, Depends(get_current_principal)], 
-                id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                id: UUID, cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ) -> self.dto.get:
             # Check cache first
@@ -121,7 +121,7 @@ class CrudRouter:
         async def route(
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
-                id: UUID | str,
+                id: UUID,
                 entity: self.dto.update,
                 cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
@@ -144,7 +144,7 @@ class CrudRouter:
         async def route(
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
-                id: UUID | str,
+                id: UUID,
                 cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ):
@@ -177,7 +177,7 @@ class CrudRouter:
             async def route(
                     background_tasks: BackgroundTasks, 
                     permissions: Annotated[Principal, Depends(get_current_principal)], 
-                    id: UUID | str, db: Session = Depends(get_db)
+                    id: UUID, db: Session = Depends(get_db)
             ):
 
                 if len(self.on_archived) > 0:

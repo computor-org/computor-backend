@@ -39,7 +39,7 @@ async def list_profiles_endpoint(
 @profile_router.get("/{id}", response_model=ProfileGet)
 async def get_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     db: Session = Depends(get_db)
 ):
     """Get a profile by ID - users can only get their own, admins/_user_manager can get any."""
@@ -61,7 +61,7 @@ async def create_profile_endpoint(
 @profile_router.patch("/{id}", response_model=ProfileGet)
 async def update_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     data: ProfileUpdate,
     db: Session = Depends(get_db)
 ):
@@ -74,7 +74,7 @@ async def update_profile_endpoint(
 @profile_router.delete("/{id}", status_code=204)
 async def delete_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    id: UUID | str,
+    id: UUID,
     db: Session = Depends(get_db)
 ):
     """Delete a profile - users can only delete their own, admins/_user_manager can delete any."""

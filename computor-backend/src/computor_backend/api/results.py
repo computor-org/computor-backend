@@ -46,7 +46,7 @@ async def list_results(
 @result_router.get("/{result_id}", response_model=ResultGet)
 async def get_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    result_id: UUID | str,
+    result_id: UUID,
     db: Session = Depends(get_db),
 ) -> ResultGet:
     # Get the base result from database
@@ -97,7 +97,7 @@ async def create_result(
 
 @result_router.patch("/{result_id}", response_model=ResultGet)
 async def update_result(
-    result_id: UUID | str,
+    result_id: UUID,
     payload: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
@@ -156,7 +156,7 @@ async def update_result(
 
 @result_router.delete("/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(
-    result_id: UUID | str,
+    result_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -165,7 +165,7 @@ async def delete_result(
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
 async def result_status(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    result_id: UUID | str,
+    result_id: UUID,
     db: Session = Depends(get_db),
 ):
     """Get the current status of a test result."""
@@ -182,7 +182,7 @@ from typing import List
 
 @result_router.get("/{result_id}/artifacts", response_model=List[ResultArtifactListItem])
 async def list_result_artifacts_endpoint(
-    result_id: UUID | str,
+    result_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> List[ResultArtifactListItem]:
@@ -226,7 +226,7 @@ async def list_result_artifacts_endpoint(
     responses={200: {"content": {"application/zip": {}}}},
 )
 async def download_result_artifacts(
-    result_id: UUID | str,
+    result_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
@@ -278,7 +278,7 @@ async def download_result_artifacts(
 
 @result_router.post("/{result_id}/artifacts/upload", status_code=status.HTTP_201_CREATED)
 async def upload_result_artifacts(
-    result_id: UUID | str,
+    result_id: UUID,
     file: Annotated[bytes, File()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
