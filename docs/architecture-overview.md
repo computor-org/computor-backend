@@ -2,15 +2,27 @@
 
 ## 🏗️ Architecture: Modular Multi-Package System
 
-The Computor platform is structured as a **monorepo with 4 independent packages**, providing clean separation of concerns and reusable components.
+The Computor platform is structured as a **monorepo with multiple independent packages**, providing clean separation of concerns and reusable components.
 
 ```
-/home/theta/computor/computor-fullstack/
+computor-fullstack/
 │
-├── computor-types/          # 📦 Pure Pydantic DTOs
-├── computor-client/         # 📦 Auto-generated HTTP client
+├── computor-types/          # 📦 Pure Pydantic DTOs (shared data contracts)
+├── computor-testing/        # 📦 Test execution framework (Python, Octave, R, Julia, C, Fortran, Document)
+├── computor-client/         # 📦 Auto-generated Python HTTP client
 ├── computor-cli/            # 📦 Command-line interface
-└── src/computor_backend/    # 📦 FastAPI server
+├── computor-backend/        # 📦 FastAPI server (REST API + business logic)
+├── computor-utils/          # 📦 Shared Python utility functions
+├── computor-web/            # 📦 Next.js web frontend
+├── computor-coder/          # Coder workspace deployment (templates + scripts)
+│
+├── data/                    # Configuration data (auth plugins, Keycloak)
+├── docker/                  # Dockerfiles and container configs
+├── docs/                    # Project documentation
+├── ops/                     # Operations (environments, deployment configs)
+├── plugins/                 # Authentication plugins
+├── scripts/                 # Utility scripts and git hooks
+└── tests/                   # Integration / end-to-end tests
 ```
 
 ---
@@ -29,19 +41,56 @@ Pure Pydantic DTO package with zero backend dependencies.
 ### Key Components
 - **EntityInterface Pattern**: Base class defining CRUD operations and endpoints
 - **DTOs**: Request/response models (Create, Get, List, Update, Query)
-- **58 Interface Files**: Organizations, Users, Courses, Assignments, Submissions, etc.
+- **Test & Report Models**: Source of truth for `test.yaml` and `testSummary.json` formats
+- **Meta Models**: Source of truth for `meta.yaml` format (old + new)
+- **Deployment Configs**: GitLab, organization/course hierarchy configs
 
 ### Notable Features
 - No SQLAlchemy dependencies (pure Pydantic)
 - `get_all_dtos()` function for auto-discovery
-- Type-checking blocks for forward references
-- Independent, installable package
+- TypeScript interfaces and JSON schemas auto-generated via `bash generate.sh`
 
 ### Dependencies
 ```toml
 dependencies = [
     "pydantic>=2.0",
     "email-validator>=2.0",
+]
+```
+
+---
+
+## 📦 Package 1b: computor-testing
+
+**Location**: `computor-testing/`
+
+Test execution framework for evaluating student code submissions.
+
+### Purpose
+- Execute tests defined in `test.yaml` against student submissions
+- Support multiple languages: Python, Octave/MATLAB, R, Julia, C, Fortran, Document analysis
+- Produce standardized test reports (`testSummary.json`)
+
+### Key Components
+- **Language backends**: `ctbackends/` — one backend per language (Python, Octave, R, Julia, C, Fortran, Document)
+- **Core framework**: `ctcore/` — test orchestration, model re-exports, utilities
+- **CLI**: `computor-tester` command for running tests locally or in CI
+
+### Model Dependency
+All Pydantic models are imported from `computor-types` (source of truth):
+```python
+# ctcore/models.py is a pure re-export shim
+from computor_types.testing import ComputorTestSuite, ComputorTest, ...
+from computor_types.testing_report import ComputorReport, ...
+from computor_types.codeability_meta import CodeAbilityMeta, ...
+```
+
+### Dependencies
+```toml
+dependencies = [
+    "computor-types>=0.1.0",
+    "pyyaml>=6.0",
+    # ... language-specific dependencies
 ]
 ```
 
@@ -131,9 +180,9 @@ dependencies = [
 
 ---
 
-## 📦 Package 4: computor_backend
+## 📦 Package 4: computor-backend
 
-**Location**: `src/computor_backend/`
+**Location**: `computor-backend/src/computor_backend/`
 
 FastAPI server providing REST API and business logic.
 
@@ -222,12 +271,30 @@ async def get_artifact_endpoint(
 #### 8. **Authentication** (`auth/` and `plugins/`)
 - Built-in local authentication (username/password with Bearer tokens)
 - Plugin-based authentication system for external providers
-- SSO providers (Keycloak, GitLab) available as plugins (coming soon)
+- SSO providers (Keycloak, GitLab) available as plugins
+
+#### 9. **Coder Integration** (`coder/`)
+- Coder workspace API client and service layer
+- Schema definitions for workspace provisioning
+- Configuration and exception handling
+
+#### 10. **Code Generation** (`generator/`)
+- TypeScript type generation from Pydantic models
+- Client generation, validator generation
+- OpenAPI schema generation
+
+#### 11. **Supporting Modules**
+- **`exceptions/`** - Structured error handling and error registry
+- **`interfaces/`** - Internal interface definitions
+- **`middleware/`** - FastAPI middleware (CORS, logging, etc.)
+- **`custom_types/`** - Custom type definitions
 
 ### Runtime Configuration
 - **`settings.py`**: Environment-based configuration
 - **`database.py`**: SQLAlchemy session management
 - **`redis_cache.py`**: Redis caching client
+- **`minio_client.py`**: MinIO object storage client
+- **`gitlab_utils.py`**: GitLab API utilities
 
 ### Import Pattern
 ```python
@@ -251,6 +318,75 @@ dependencies = [
     # ... many more
 ]
 ```
+
+---
+
+## 📦 Package 5: computor-utils
+
+**Location**: `computor-utils/src/computor_utils/`
+
+Shared Python utility functions used across packages.
+
+### Purpose
+- Reusable utilities shared between backend and other Python packages
+- VSIX extension metadata parsing
+- Deployment mapping utilities
+
+### Key Components
+- **`vsix_utils.py`** - VSIX package metadata parsing for VS Code extensions
+- **`deployment_mapping/`** - `DeploymentMapper`, `DeploymentMappingConfig`, `FieldTransformer`
+
+### Dependencies
+```toml
+dependencies = [
+    "computor-types>=0.1.0",
+]
+```
+
+---
+
+## 📦 Package 6: computor-web
+
+**Location**: `computor-web/`
+
+Next.js web frontend for the Computor platform.
+
+### Purpose
+- Web-based user interface for students, tutors, and administrators
+- Communicates with the backend via REST API
+
+### Tech Stack
+- **Framework**: Next.js with TypeScript
+- **Styling**: PostCSS (Tailwind CSS)
+- **Linting**: ESLint
+
+### Key Directories
+- **`src/api/`** - API client layer
+- **`src/components/`** - React components
+- **`src/contexts/`** - React context providers
+- **`src/generated/`** - Auto-generated TypeScript types and clients
+- **`src/interfaces/`** - TypeScript interface definitions
+- **`src/services/`** - Frontend service layer
+- **`src/types/`** - TypeScript type definitions
+- **`src/utils/`** - Utility functions
+- **`src/config/`** - Configuration
+
+---
+
+## 📂 computor-coder
+
+**Location**: `computor-coder/`
+
+Coder workspace deployment configuration (not a Python package).
+
+### Purpose
+- Terraform templates for provisioning Coder workspaces
+- Workspace creation scripts and tooling
+
+### Key Components
+- **`deployment/templates/`** - Terraform templates (Python, MATLAB, etc.)
+- **`deployment/create-user.sh`** - User creation helper
+- **`deployment/generate-secret.sh`** - Secret generation
 
 ---
 
@@ -323,10 +459,11 @@ Data access layer abstraction (in `repositories/`)
 ### 3. **Business Logic Separation**
 Thin API endpoints, fat business logic layer (in `business_logic/`)
 
-### 4. **Auto-Code Generation**
-- Python clients from `EntityInterface`
-- TypeScript types from Pydantic models
-- OpenAPI schema generation
+### 4. **Auto-Code Generation** (`bash generate.sh`)
+- TypeScript interfaces from Pydantic models (`generate.sh types`)
+- JSON schemas for `meta.yaml` and `test.yaml` (`generate.sh schemas`)
+- TypeScript API clients (`generate.sh clients`)
+- Python HTTP clients from `EntityInterface` (`generate.sh python-client`)
 
 ### 5. **Dependency Injection**
 FastAPI dependencies for auth, database, services
@@ -339,8 +476,9 @@ FastAPI dependencies for auth, database, services
 - **computor-types**: 58 files, ~500KB
 - **computor-client**: 26 files, ~50KB (18K lines auto-generated)
 - **computor-cli**: 18 files, ~80KB
-- **computor_backend**: ~200 files, ~2MB
-- **Total**: ~300 files, ~25,000 lines of code
+- **computor-backend**: ~200 files, ~2MB
+- **computor-utils**: Shared utilities
+- **computor-web**: Next.js frontend
 
 ### API Coverage
 - **25 auto-generated clients** for entity types
@@ -348,27 +486,6 @@ FastAPI dependencies for auth, database, services
 - **15+ Temporal workflows**
 
 ---
-
-## 🚀 Deployment
-
-### Development Setup
-```bash
-# Install all packages
-pip install -e computor-types/
-pip install -e computor-client/
-pip install -e computor-cli/
-pip install -e src/
-
-# Start services
-bash startup.sh        # Docker services
-bash api.sh            # Backend API
-```
-
-### Production Considerations
-- All 4 packages publishable to PyPI
-- Docker Compose orchestration
-- Environment-based configuration
-- Alembic migrations for database schema
 
 ---
 
@@ -387,8 +504,8 @@ bash api.sh            # Backend API
 ## 📚 Documentation
 
 - **CLAUDE.md**: Project overview and developer guide
-- **REFACTORING_COMPLETE_FINAL.md**: Complete refactoring summary
-- **docs/guideline.md**: Backend development guidelines
+- **docs/developer-guide/**: Detailed developer guides (getting started, code organization, backend architecture, etc.)
+- **docs/developer-guideline.md**: Backend development guidelines
 - **Package READMEs**: Installation and usage for each package
 
 ---
