@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from computor_types.example import ExampleVersionList
 
-from .base import BaseEntityGet, EntityInterface, ListQuery
+from .base import BaseEntityGet
 
 if TYPE_CHECKING:
     from .example import ExampleVersionGet
@@ -120,14 +120,6 @@ class CourseContentDeploymentList(BaseModel):
     def cast_source_identifier(cls, v):
         return cls._cast_ltree(v)
 
-class CourseContentDeploymentQuery(ListQuery):
-    """Query parameters for deployments."""
-    course_content_id: Optional[str] = None
-    example_version_id: Optional[str] = None
-    deployment_status: Optional[str] = None
-    deployed: Optional[bool] = None  # True for deployed_at IS NOT NULL
-    failed: Optional[bool] = None  # True for status='failed'
-
 # Deployment History DTOs
 
 class DeploymentHistoryCreate(BaseModel):
@@ -202,21 +194,3 @@ class DeploymentSummary(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
-# Interface definitions
-
-
-class CourseContentDeploymentInterface(EntityInterface):
-    """Interface for CourseContentDeployment entity."""
-    create = CourseContentDeploymentCreate
-    get = CourseContentDeploymentGet
-    list = CourseContentDeploymentList
-    update = CourseContentDeploymentUpdate
-    query = CourseContentDeploymentQuery
-
-class DeploymentHistoryInterface(EntityInterface):
-    """Interface for DeploymentHistory entity (read-only)."""
-    create = DeploymentHistoryCreate
-    get = DeploymentHistoryGet
-    list = DeploymentHistoryList
-    update = None  # History is immutable
-    query = ListQuery  # Use base query
