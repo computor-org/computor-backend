@@ -53,6 +53,10 @@ from computor_types.testing import (
 # VERSION_REGEX from codeability_meta (the canonical source)
 from computor_types.codeability_meta import VERSION_REGEX
 
+# Person model from codeability_meta (source of truth)
+# Re-exported as ComputorPerson for backward compatibility
+from computor_types.codeability_meta import CodeAbilityPerson as ComputorPerson
+
 # Report models
 from computor_types.testing_report import (
     ComputorReport,
@@ -63,7 +67,7 @@ from computor_types.testing_report import (
 )
 
 # =============================================================================
-# Meta.yaml models (local — will be migrated to computor-types in Phase 3)
+# Meta.yaml models (new format — coexists with old CodeAbilityMeta in computor-types)
 # =============================================================================
 
 
@@ -81,12 +85,6 @@ class ComputorMaterial(ComputorBase):
         min_length=1,
         description="URL to the resource"
     )
-
-
-class ComputorPerson(ComputorBase):
-    name: Optional[str] = Field(min_length=1, default=None)
-    email: Optional[str] = Field(min_length=1, default=None)
-    affiliation: Optional[str] = Field(min_length=1, default=None)
 
 
 class ExecutionBackendSettings(BaseModel):
