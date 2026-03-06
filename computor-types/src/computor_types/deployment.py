@@ -6,7 +6,7 @@ example assignments to course content.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, List, Dict, Any, Literal
+from typing import TYPE_CHECKING, Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from computor_types.example import ExampleVersionList
@@ -15,46 +15,8 @@ from .base import BaseEntityGet
 
 if TYPE_CHECKING:
     from .example import ExampleVersionGet
-    from .course_contents import CourseContentGet
 
 # Deployment DTOs
-
-class DeploymentMetadata(BaseModel):
-    """Metadata stored with deployments."""
-    workflow_id: Optional[str] = Field(None, description="Temporal workflow ID")
-    files_deployed: Optional[List[str]] = Field(None, description="List of files deployed")
-    git_commit: Optional[str] = Field(None, description="Git commit hash")
-    error_details: Optional[Dict[str, Any]] = Field(None, description="Error details if deployment failed")
-    migrated_properties: Optional[Dict[str, Any]] = Field(None, description="Properties migrated from old schema")
-    
-    model_config = ConfigDict(extra='allow')
-
-class CourseContentDeploymentCreate(BaseModel):
-    """Create a new deployment (typically done automatically)."""
-    course_content_id: str = Field(description="Course content to deploy to")
-    example_version_id: str = Field(description="Example version to deploy")
-    deployment_status: Literal["pending", "deploying", "deployed", "failed", "unassigned"] = Field(
-        default="pending",
-        description="Initial deployment status"
-    )
-    deployment_message: Optional[str] = Field(None, description="Optional message")
-    deployment_metadata: Optional[DeploymentMetadata] = Field(None, description="Additional metadata")
-    
-    model_config = ConfigDict(use_enum_values=True)
-
-class CourseContentDeploymentUpdate(BaseModel):
-    """Update deployment status."""
-    deployment_status: Optional[Literal["pending", "deploying", "deployed", "failed", "unassigned"]] = None
-    deployment_message: Optional[str] = None
-    deployed_at: Optional[datetime] = None
-    last_attempt_at: Optional[datetime] = None
-    deployment_path: Optional[str] = None
-    deployment_metadata: Optional[DeploymentMetadata] = None
-    # Optional source identity updates (rare)
-    example_identifier: Optional[str] = None
-    version_tag: Optional[str] = None
-    
-    model_config = ConfigDict(use_enum_values=True)
 
 class CourseContentDeploymentGet(BaseEntityGet):
     """Get deployment details."""
@@ -73,11 +35,10 @@ class CourseContentDeploymentGet(BaseEntityGet):
     version_identifier: Optional[str] = None
     deployment_metadata: Optional[Dict[str, Any]] = None
     workflow_id: Optional[str] = None  # Current/last Temporal workflow ID
-    
+
     # Relationships (optionally loaded)
     example_version: Optional['ExampleVersionGet'] = None
-    #course_content: Optional['CourseContentGet'] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
     @staticmethod
@@ -105,7 +66,7 @@ class CourseContentDeploymentList(BaseModel):
     version_identifier: Optional[str]
 
     example_version: Optional['ExampleVersionList'] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
     @staticmethod
@@ -122,27 +83,6 @@ class CourseContentDeploymentList(BaseModel):
 
 # Deployment History DTOs
 
-class DeploymentHistoryCreate(BaseModel):
-    """Create a deployment history entry."""
-    deployment_id: str
-    action: Literal[
-        "assigned",
-        "reassigned",
-        "deploying",
-        "deployed",
-        "failed",
-        "unassigned",
-        "updated",
-        "migrated",
-    ]
-    example_version_id: Optional[str] = None
-    example_identifier: Optional[str] = None
-    version_tag: Optional[str] = None
-    previous_example_version_id: Optional[str] = None
-    workflow_id: Optional[str] = None
-    
-    model_config = ConfigDict(use_enum_values=True)
-
 class DeploymentHistoryGet(BaseModel):
     """Get deployment history entry."""
     id: str
@@ -155,21 +95,11 @@ class DeploymentHistoryGet(BaseModel):
     workflow_id: Optional[str]
     created_at: datetime
     created_by: Optional[str]
-    
+
     # Relationships
     example_version: Optional['ExampleVersionGet'] = None
     previous_example_version: Optional['ExampleVersionGet'] = None
-    
-    model_config = ConfigDict(from_attributes=True)
 
-class DeploymentHistoryList(BaseModel):
-    """List view of deployment history."""
-    id: str
-    deployment_id: str
-    action: str
-    created_at: datetime
-    workflow_id: Optional[str]
-    
     model_config = ConfigDict(from_attributes=True)
 
 # Aggregate DTOs for API responses
@@ -178,7 +108,7 @@ class DeploymentWithHistory(BaseModel):
     """Deployment with its full history."""
     deployment: CourseContentDeploymentGet
     history: List[DeploymentHistoryGet]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 class DeploymentSummary(BaseModel):
@@ -188,9 +118,8 @@ class DeploymentSummary(BaseModel):
     submittable_content: int = Field(description="Total submittable content (assignments)")
     deployments_total: int = Field(description="Total deployments")
     deployments_pending: int = Field(description="Deployments pending")
-    deployments_deployed: int = Field(description="Successfully deployed") 
+    deployments_deployed: int = Field(description="Successfully deployed")
     deployments_failed: int = Field(description="Failed deployments")
     last_deployment_at: Optional[datetime] = Field(None, description="Most recent deployment")
-    
-    model_config = ConfigDict(from_attributes=True)
 
+    model_config = ConfigDict(from_attributes=True)
