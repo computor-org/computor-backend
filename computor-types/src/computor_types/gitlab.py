@@ -11,7 +11,11 @@ GitLabConfig: Extends GitLabConfigGet WITH the token (for internal/write operati
 from typing import Optional
 from pydantic import Field
 
-from computor_types.deployments import BaseDeployment, RepositoryConfig
+from computor_types.deployments_refactored import BaseDeployment
+
+
+class RepositoryConfig(BaseDeployment):
+    settings: Optional[dict] = Field(default_factory=dict)
 
 
 class GitLabConfigGet(RepositoryConfig):
