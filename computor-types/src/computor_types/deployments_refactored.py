@@ -273,7 +273,12 @@ class CourseContentConfig(BaseDeployment):
     )
     example_version_tag: Optional[str] = Field(
         None,
-        description="Version tag of the example (e.g., 'v1.0', 'latest') - defaults to latest"
+        description=(
+            "Version tag of the example. Semantics: "
+            "null/missing = first-time assign only (skip if already deployed); "
+            "'latest' = always update to the latest available version; "
+            "'1.2.0' = update only if current version differs"
+        )
     )
     
     # Optional execution backend override (inherits from course if not specified)
