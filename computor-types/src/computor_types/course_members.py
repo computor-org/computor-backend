@@ -3,7 +3,7 @@ from typing import Optional
 
 
     
-from computor_types.deployments import GitLabConfigGet
+from computor_types.gitlab import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.users import UserList
 

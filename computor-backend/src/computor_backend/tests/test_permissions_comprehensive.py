@@ -114,36 +114,36 @@ def test_users():
     """Create test users with different roles"""
     return {
         'admin': MockPrincipal(
-            user_id='admin-user-id',
+            user_id='00000000-0000-0000-0000-000000000001',
             is_admin=True,
             roles=['system_admin']
         ),
         'student': MockPrincipal(
-            user_id='student-user-id',
+            user_id='00000000-0000-0000-0000-000000000002',
             is_admin=False,
             roles=['student'],
             course_roles={'course-123': '_student'}
         ),
         'tutor': MockPrincipal(
-            user_id='tutor-user-id',
+            user_id='00000000-0000-0000-0000-000000000003',
             is_admin=False,
             roles=['tutor'],
             course_roles={'course-123': '_tutor'}
         ),
         'lecturer': MockPrincipal(
-            user_id='lecturer-user-id',
+            user_id='00000000-0000-0000-0000-000000000004',
             is_admin=False,
             roles=['lecturer'],
             course_roles={'course-123': '_lecturer'}
         ),
         'maintainer': MockPrincipal(
-            user_id='maintainer-user-id',
+            user_id='00000000-0000-0000-0000-000000000005',
             is_admin=False,
             roles=['maintainer'],
             course_roles={'course-123': '_maintainer'}
         ),
         'unauthorized': MockPrincipal(
-            user_id='unauthorized-user-id',
+            user_id='00000000-0000-0000-0000-000000000006',
             is_admin=False,
             roles=[],
             course_roles={}
@@ -409,15 +409,15 @@ class TestUserEndpoints:
             assert response.status_code == expected_status
     
     @pytest.mark.parametrize("user_type,target_user,expected_status", [
-        ("admin", "any-user-id", [200, 404]),
-        ("student", "student-user-id", [200, 404]),  # Can view own profile
-        ("student", "other-user-id", [403, 404]),    # Cannot view others
-        ("unauthorized", "any-user-id", [403, 404]),
+        ("admin", "00000000-0000-0000-0000-000000000099", [200, 404]),
+        ("student", "own-id", [200, 404]),  # Can view own profile
+        ("student", "00000000-0000-0000-0000-000000000099", [403, 404]),    # Cannot view others
+        ("unauthorized", "00000000-0000-0000-0000-000000000099", [403, 404]),
     ])
     def test_get_user_profile(self, test_users, mock_db_session, user_type, target_user, expected_status):
         """Test GET /users/{user_id} with different permissions"""
         user = test_users[user_type]
-        if target_user == "student-user-id":
+        if target_user == "own-id":
             target_user = user.user_id  # Use actual user's ID
         
         app = create_test_app(user, mock_db_session)

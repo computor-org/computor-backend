@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList
 
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
-from computor_types.deployments import GitLabConfigGet
+from computor_types.gitlab import GitLabConfigGet
 from computor_types.base import EntityInterface, ListQuery
 
 from computor_types.custom_types import Ltree

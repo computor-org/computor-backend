@@ -4,7 +4,7 @@ from typing import Optional
 
     
 from computor_types.course_families import CourseFamilyGet
-from computor_types.deployments import GitLabConfig, GitLabConfigGet
+from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 from computor_types.custom_types import Ltree
