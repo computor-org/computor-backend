@@ -159,22 +159,8 @@ class UsersDeploymentConfig(BaseDeployment):
         return [user for user in self.users if user.get_primary_gitlab_account() is not None]
 
 # Repository Configuration Classes
-
-class GitLabConfig(BaseDeployment):
-    """GitLab repository configuration."""
-    url: Optional[str] = Field(None, description="GitLab instance URL")
-    token: Optional[str] = Field(None, description="GitLab API token")
-    parent: Optional[int] = Field(None, description="Parent group ID")
-    full_path: Optional[str] = Field(None, description="Full path in GitLab")
-    
-    # Enhanced GitLab properties (populated after creation)
-    group_id: Optional[int] = Field(None, description="GitLab group ID")
-    parent_id: Optional[int] = Field(None, description="Parent group ID")
-    namespace_id: Optional[int] = Field(None, description="Namespace ID")
-    namespace_path: Optional[str] = Field(None, description="Namespace path")
-    web_url: Optional[str] = Field(None, description="Web URL")
-    visibility: Optional[str] = Field(None, description="Visibility level")
-    last_synced_at: Optional[str] = Field(None, description="Last sync timestamp")
+# GitLabConfig: canonical definition in gitlab.py
+from computor_types.gitlab import GitLabConfig  # noqa: E402
 
 class GitHubConfig(BaseDeployment):
     """GitHub repository configuration (future support)."""

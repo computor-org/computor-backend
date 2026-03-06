@@ -52,24 +52,8 @@ class RepositoryConfig(BaseDeployment):
     settings: Optional[dict] = Field(default_factory=dict)
 
 
-class GitLabConfigGet(RepositoryConfig):
-    url: Optional[str] = None
-    full_path: Optional[str] = None
-    directory: Optional[str] = None
-    registry: Optional[str] = None
-    parent: Optional[int] = None
-    # Enhanced GitLab properties
-    group_id: Optional[int] = None
-    parent_id: Optional[int] = None
-    namespace_id: Optional[int] = None
-    namespace_path: Optional[str] = None
-    web_url: Optional[str] = None
-    visibility: Optional[str] = None
-    last_synced_at: Optional[str] = None
-
-
-class GitLabConfig(GitLabConfigGet):
-    token: Optional[str] = None
+# GitLab configs: canonical definitions in gitlab.py, re-exported here for backward compat
+from computor_types.gitlab import GitLabConfigGet, GitLabConfig  # noqa: E402
 
 
 class CourseExecutionBackendConfig(BaseDeployment):

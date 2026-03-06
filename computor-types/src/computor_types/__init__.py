@@ -100,11 +100,8 @@ from .auth import (
 )
 
 # Deployments
-from .deployments import (
-    GitLabConfig,
-    GitLabConfigGet,
-    BaseDeployment,
-)
+from .deployments import BaseDeployment
+from .gitlab import GitLabConfig, GitLabConfigGet
 
 # Exceptions
 from .exceptions import (
