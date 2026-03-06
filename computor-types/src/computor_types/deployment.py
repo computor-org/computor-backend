@@ -202,27 +202,6 @@ class DeploymentSummary(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
-class AssignExampleRequest(BaseModel):
-    """Request to assign an example to course content."""
-    # Either provide an existing ExampleVersion ID, or supply
-    # a source identifier/version_tag for custom assignments.
-    example_version_id: Optional[str] = Field(
-        None, description="Example version to assign (optional if providing identifier+version_tag)"
-    )
-    example_identifier: Optional[str] = Field(
-        None, description="Hierarchical identifier (ltree string) for the example source"
-    )
-    version_tag: Optional[str] = Field(
-        None, description="Version tag for the example source"
-    )
-    deployment_message: Optional[str] = Field(None, description="Optional message about this assignment")
-
-class DeployExampleRequest(BaseModel):
-    """Request to deploy assigned examples."""
-    course_id: str = Field(description="Course to deploy examples for")
-    content_ids: Optional[List[str]] = Field(None, description="Specific content IDs to deploy (all if None)")
-    force: bool = Field(False, description="Force re-deployment even if already deployed")
-
 # Interface definitions
 
 
