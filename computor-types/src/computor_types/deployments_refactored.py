@@ -8,45 +8,10 @@ The deprecated CodeAbility classes have been moved to codeability_meta.py
 and test-related enums should be in their own module.
 """
 
-import yaml
 from typing import Any, List, Optional, Dict
 from pydantic import BaseModel, Field
-from pydantic_yaml import to_yaml_str
 
-class BaseDeployment(BaseModel):
-    """Base class for all deployment configurations."""
-    
-    def get_deployment(self) -> str:
-        """Get YAML representation of the deployment configuration."""
-        return to_yaml_str(self, exclude_none=True, exclude_unset=True)
-
-    def write_deployment(self, filename: str) -> None:
-        """Write deployment configuration to a YAML file."""
-        with open(filename, "w") as file:
-            file.write(self.get_deployment())
-
-class DeploymentFactory:
-    """Factory for creating deployment configurations from YAML."""
-    
-    @staticmethod
-    def read_deployment_from_string(classname, yamlstring: str):
-        """Create deployment configuration from YAML string."""
-        return classname(**yaml.safe_load(yamlstring))
-
-    @staticmethod
-    def read_deployment_from_file(classname, filename: str):
-        """Create deployment configuration from YAML file."""
-        with open(filename, "r") as file:
-            if classname is not None:
-                return classname(**yaml.safe_load(file))
-            else:
-                return yaml.safe_load(file)
-    
-    @staticmethod
-    def read_deployment_from_file_raw(filename: str) -> dict:
-        """Read raw YAML data from file."""
-        with open(filename, "r") as file:
-            return yaml.safe_load(file)
+from .deployment_base import BaseDeployment, DeploymentFactory  # noqa: F401
 
 # User and Account Configuration Classes
 
@@ -160,7 +125,7 @@ class UsersDeploymentConfig(BaseDeployment):
 
 # Repository Configuration Classes
 # GitLabConfig: canonical definition in gitlab.py
-from computor_types.gitlab import GitLabConfig  # noqa: E402
+from .gitlab import GitLabConfig  # noqa: E402
 
 class GitHubConfig(BaseDeployment):
     """GitHub repository configuration (future support)."""

@@ -99,9 +99,9 @@ from .auth import (
     GLPAuthConfig,
 )
 
-# Deployments
-from .deployments_refactored import BaseDeployment
-from .gitlab import GitLabConfig, GitLabConfigGet
+# Deployments - imported lazily to avoid circular imports
+# Use: from computor_types.deployments_refactored import BaseDeployment
+# Use: from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 
 # Exceptions
 from .exceptions import (

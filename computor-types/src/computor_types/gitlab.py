@@ -11,7 +11,7 @@ GitLabConfig: Extends GitLabConfigGet WITH the token (for internal/write operati
 from typing import Optional
 from pydantic import Field
 
-from computor_types.deployments_refactored import BaseDeployment
+from .deployment_base import BaseDeployment
 
 
 class RepositoryConfig(BaseDeployment):
