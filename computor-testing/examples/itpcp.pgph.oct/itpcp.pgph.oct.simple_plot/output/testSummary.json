@@ -1,0 +1,137 @@
+{
+  "timestamp": "2026-03-07T11:50:23.044840+00:00",
+  "type": "octave",
+  "version": "1.0",
+  "name": "Simple Plot (Octave)",
+  "description": "Basic plotting test",
+  "status": "COMPLETED",
+  "result": "PASSED",
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+  },
+  "resultMessage": "Congratulations! All tests passed",
+  "duration": 0.7963001728057861,
+  "executionDuration": 0.31315047499992943,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.oct/itpcp.pgph.oct.simple_plot//test.yaml",
+    "specification": "/tmp/tmpkw9dqe_6.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.31315047499992943,
+    "executionDurationReference": 0.3720635759996185
+  },
+  "tests": [
+    {
+      "type": "exist",
+      "name": "Check file exists",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.02057957649230957,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "existence",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Data creation",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0
+      },
+      "setup": "run('simple_plot');",
+      "duration": 0.768897533416748,
+      "executionDuration": 0.31315047499992943,
+      "debug": {
+        "executionDurationStudent": 0.31315047499992943,
+        "executionDurationReference": 0.3720635759996185,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "x",
+          "result": "PASSED"
+        },
+        {
+          "name": "y_sin",
+          "result": "PASSED"
+        },
+        {
+          "name": "y_cos",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "structural",
+      "name": "Structural checks",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.004656553268432617,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "plot",
+          "result": "PASSED"
+        },
+        {
+          "name": "xlabel",
+          "result": "PASSED"
+        },
+        {
+          "name": "ylabel",
+          "result": "PASSED"
+        },
+        {
+          "name": "title",
+          "result": "PASSED"
+        }
+      ]
+    }
+  ]
+}

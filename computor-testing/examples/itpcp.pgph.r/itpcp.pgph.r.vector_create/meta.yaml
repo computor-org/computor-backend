@@ -1,0 +1,44 @@
+identifier: itpcp.pgph.r.vector_create
+version: '1.0'
+title: Creation of Vectors in R
+description: In this example you will learn how to create vectors in R using 
+  various methods including c(), seq(), rep(), and mathematical sequences. You 
+  will also learn about logarithmic and exponential sequences.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: R documentation
+    url: https://www.r-project.org/
+supportingMaterials:
+  - name: r-vector-creation
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/c.html
+  - name: r-seq-function
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/seq.html
+  - name: r-rep-function
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/rep.html
+license: CC BY-NC 4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - r
+  tags: []
+properties:
+  studentSubmissionFiles:
+    - vector_create.R
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.r
+    settings:
+      env: []
+    version: "4.0"
+  testDependencies: []

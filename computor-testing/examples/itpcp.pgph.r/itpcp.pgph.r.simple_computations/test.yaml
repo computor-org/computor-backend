@@ -1,0 +1,66 @@
+type: r
+name: Simple R Computations
+description: Tests for basic R operations
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      tests:
+        - name: simple_computations.R
+
+    - name: Basic arithmetic
+      type: variable
+      entryPoint: simple_computations.R
+      tests:
+        - name: a
+          value: 5
+        - name: b
+          value: 3
+        - name: sum_ab
+          value: 8
+        - name: diff_ab
+          value: 2
+        - name: prod_ab
+          value: 15
+        - name: div_ab
+
+    - name: Vector operations
+      type: variable
+      entryPoint: simple_computations.R
+      tests:
+        - name: x
+        - name: y
+        - name: z
+        - name: mean_x
+          value: 3.0
+        - name: sd_x
+
+    - name: Matrix operations
+      type: variable
+      entryPoint: simple_computations.R
+      tests:
+        - name: mat
+        - name: mat_sum
+          value: 45
+        - name: mat_mean
+          value: 5.0
+
+    - name: Logical operations
+      type: variable
+      entryPoint: simple_computations.R
+      tests:
+        - name: is_positive
+        - name: all_positive
+
+    - name: String operations
+      type: variable
+      entryPoint: simple_computations.R
+      tests:
+        - name: greeting
+          value: "Hello, R!"

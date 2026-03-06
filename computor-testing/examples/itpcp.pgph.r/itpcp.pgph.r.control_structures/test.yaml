@@ -1,0 +1,52 @@
+type: r
+name: Control Structures in R
+description: Tests for loops and conditionals
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: control_structures.R
+
+    - name: For loop results
+      type: variable
+      entryPoint: control_structures.R
+      successDependency: [exist_script]
+      tests:
+        - name: sum_for
+        - name: squares_for
+        - name: factorial_for
+
+    - name: While loop results
+      type: variable
+      entryPoint: control_structures.R
+      successDependency: [exist_script]
+      tests:
+        - name: sum_while
+        - name: count_while
+
+    - name: Conditional results
+      type: variable
+      entryPoint: control_structures.R
+      successDependency: [exist_script]
+      tests:
+        - name: grade_A
+        - name: grade_B
+        - name: grade_F
+        - name: abs_value
+
+    - name: Vectorized operations
+      type: variable
+      entryPoint: control_structures.R
+      successDependency: [exist_script]
+      tests:
+        - name: vec_ifelse
+        - name: vec_which
+        - name: vec_filter

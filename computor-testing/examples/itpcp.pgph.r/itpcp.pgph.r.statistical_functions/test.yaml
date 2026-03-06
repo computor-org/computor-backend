@@ -1,0 +1,57 @@
+type: r
+name: Statistical Functions in R
+description: Tests for statistical operations
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: statistical_functions.R
+
+    - name: Basic statistics
+      type: variable
+      entryPoint: statistical_functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: data_vec
+        - name: data_mean
+        - name: data_median
+        - name: data_sd
+        - name: data_var
+
+    - name: Range and quantiles
+      type: variable
+      entryPoint: statistical_functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: data_min
+        - name: data_max
+        - name: data_range
+        - name: data_quantiles
+        - name: data_iqr
+
+    - name: Correlation and covariance
+      type: variable
+      entryPoint: statistical_functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: x_data
+        - name: y_data
+        - name: correlation
+        - name: covariance
+
+    - name: Summary statistics
+      type: variable
+      entryPoint: statistical_functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: sorted_data
+        - name: unique_count
+        - name: freq_count

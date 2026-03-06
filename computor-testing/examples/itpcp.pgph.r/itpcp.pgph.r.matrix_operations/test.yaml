@@ -1,0 +1,58 @@
+type: r
+name: Matrix Operations in R
+description: Tests for matrix creation and operations
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: matrix_operations.R
+
+    - name: Matrix creation
+      type: variable
+      entryPoint: matrix_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: mat_zeros
+        - name: mat_ones
+        - name: mat_identity
+        - name: mat_diag
+        - name: mat_custom
+
+    - name: Matrix properties
+      type: variable
+      entryPoint: matrix_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: mat_nrow
+        - name: mat_ncol
+        - name: mat_dim
+        - name: mat_sum
+        - name: mat_mean
+
+    - name: Matrix operations
+      type: variable
+      entryPoint: matrix_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: mat_transpose
+        - name: mat_product
+        - name: mat_elementwise
+        - name: row_sums
+        - name: col_sums
+
+    - name: Linear algebra
+      type: variable
+      entryPoint: matrix_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: mat_det
+        - name: mat_inv
+        - name: linear_solve

@@ -1,0 +1,146 @@
+# Dependencies Schema for Computor Framework
+# This file documents the structure of dependencies.yaml
+#
+# The dependencies.yaml file should be placed at:
+#   - Collection level: itpcp.progphys/dependencies.yaml
+#   - Or system level: computor-testing/dependencies/dependencies.yaml
+#
+# The testing system will read this file to install required packages
+# either in Docker or locally.
+
+# =============================================================================
+# SCHEMA DEFINITION
+# =============================================================================
+
+python:
+  # Python version requirement
+  version: ">=3.10"
+
+  # Package manager to use: pip, conda, or poetry
+  manager: pip
+
+  # List of packages to install
+  packages:
+    # Simple format: just package name (latest version)
+    - numpy
+
+    # With version constraint
+    - name: matplotlib
+      version: ">=3.5"
+
+    # With extras
+    - name: scipy
+      version: ">=1.9"
+      extras: ["sparse"]
+
+    # From git repository
+    - name: custom-package
+      git: "https://github.com/user/repo.git"
+      branch: main
+
+    # From local path (for development)
+    - name: local-package
+      path: "./packages/local-package"
+
+r:
+  # R version requirement
+  version: ">=4.0"
+
+  # CRAN mirror to use
+  cran_mirror: "https://cloud.r-project.org/"
+
+  # User library path (for non-root installations)
+  lib_path: "~/.local/lib/R"
+
+  # List of packages to install
+  packages:
+    # Simple format
+    - jsonlite
+
+    # With version constraint
+    - name: ggplot2
+      version: ">=3.4"
+
+    # From GitHub
+    - name: custom-r-package
+      github: "user/repo"
+
+    # From Bioconductor
+    - name: biopackage
+      bioconductor: true
+
+octave:
+  # Octave version requirement
+  version: ">=6.0"
+
+  # Install from Octave Forge
+  forge: true
+
+  # List of packages to install
+  packages:
+    # Simple format (from Forge)
+    - signal
+    - statistics
+    - optim
+
+    # With specific version
+    - name: control
+      version: "3.4.0"
+
+    # From URL
+    - name: custom-package
+      url: "https://example.com/package.tar.gz"
+
+system:
+  # System packages (OS-level dependencies)
+  # These are often required for compiling R/Python packages
+
+  apt:
+    # Debian/Ubuntu packages
+    - build-essential
+    - libcurl4-openssl-dev
+    - libssl-dev
+    - libxml2-dev
+    - libfontconfig1-dev
+    - libharfbuzz-dev
+    - libfribidi-dev
+    - libfreetype6-dev
+    - libpng-dev
+    - libtiff5-dev
+    - libjpeg-dev
+
+  # Alternative package managers (for other distros)
+  yum:
+    - gcc
+    - gcc-c++
+    - libcurl-devel
+
+  brew:
+    # macOS packages
+    - openssl
+    - libxml2
+
+# =============================================================================
+# EXAMPLE: Minimal dependencies.yaml for a Python+R project
+# =============================================================================
+#
+# python:
+#   version: ">=3.10"
+#   packages:
+#     - numpy
+#     - matplotlib
+#     - scipy
+#     - pandas
+#
+# r:
+#   version: ">=4.0"
+#   packages:
+#     - jsonlite
+#     - ggplot2
+#     - dplyr
+#
+# system:
+#   apt:
+#     - libcurl4-openssl-dev
+#
+# =============================================================================

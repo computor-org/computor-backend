@@ -1,0 +1,44 @@
+type: r
+name: Data Frames in R
+description: Tests for data frame operations
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: data_frames.R
+
+    - name: Data frame creation
+      type: variable
+      entryPoint: data_frames.R
+      successDependency: [exist_script]
+      tests:
+        - name: df
+        - name: df_nrow
+        - name: df_ncol
+        - name: col_names
+
+    - name: Data frame access
+      type: variable
+      entryPoint: data_frames.R
+      successDependency: [exist_script]
+      tests:
+        - name: first_col
+        - name: first_row
+        - name: single_value
+
+    - name: Data frame operations
+      type: variable
+      entryPoint: data_frames.R
+      successDependency: [exist_script]
+      tests:
+        - name: filtered_df
+        - name: sorted_df
+        - name: col_mean

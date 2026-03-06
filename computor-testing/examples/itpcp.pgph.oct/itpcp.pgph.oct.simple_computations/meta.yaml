@@ -1,0 +1,29 @@
+version: "1.0"
+title: Simple Computations
+description: |
+  Basic arithmetic operations, roots, exponentials, logarithms and
+  trigonometric functions in Octave.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+license: CC-BY-SA-4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools: []
+  tags:
+    - octave
+    - arithmetic
+    - vectors
+    - element-wise operations
+    - trigonometric functions
+properties:
+  studentSubmissionFiles:
+    - simple_computations.m
+  executionBackendSlug: octave-itp

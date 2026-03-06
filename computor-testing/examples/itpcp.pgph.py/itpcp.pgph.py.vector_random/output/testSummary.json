@@ -1,0 +1,125 @@
+{
+  "timestamp": "2026-03-07T11:51:46.112193+00:00",
+  "type": "python",
+  "version": "1.0",
+  "name": "Python Test Suite",
+  "description": "Checks subtests and graphics",
+  "status": "COMPLETED",
+  "result": "FAILED",
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 1
+  },
+  "resultMessage": "Some or all tests failed",
+  "duration": 0.564284086227417,
+  "executionDuration": 0.14429450035095215,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.py/itpcp.pgph.py.vector_random//test.yaml",
+    "specification": "/tmp/tmp9mqm989f.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.14429450035095215,
+    "executionDurationReference": 0.0
+  },
+  "tests": [
+    {
+      "type": "variable",
+      "name": "random",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 6,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 6
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.5607600212097168,
+      "executionDuration": 0.14429450035095215,
+      "debug": {
+        "executionDurationStudent": 0.14429450035095215,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "rand1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `rand1` not found in reference"
+        },
+        {
+          "name": "rand2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `rand2` not found in reference"
+        },
+        {
+          "name": "i_min",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `i_min` not found in reference"
+        },
+        {
+          "name": "i_max",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `i_max` not found in reference"
+        },
+        {
+          "name": "rand_normal",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `rand_normal` not found in reference"
+        },
+        {
+          "name": "randint1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `randint1` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "structural",
+      "name": "structure",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.0012869834899902344,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "randint",
+          "status": "COMPLETED",
+          "result": "PASSED"
+        }
+      ]
+    }
+  ]
+}

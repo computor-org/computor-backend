@@ -1,0 +1,292 @@
+{
+  "timestamp": "2026-03-07T11:51:42.271970+00:00",
+  "type": "python",
+  "version": "1.0",
+  "name": "Python Test Suite",
+  "description": "Checks subtests and graphics",
+  "status": "COMPLETED",
+  "result": "FAILED",
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 1
+  },
+  "resultMessage": "Some or all tests failed",
+  "duration": 0.6746213436126709,
+  "executionDuration": 0.18230605125427246,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.py/itpcp.pgph.py.slogic//test.yaml",
+    "specification": "/tmp/tmp0j6li44h.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.18230605125427246,
+    "executionDurationReference": 0.0
+  },
+  "tests": [
+    {
+      "type": "variable",
+      "name": "variables",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 33,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 33
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.6686022281646729,
+      "executionDuration": 0.18230605125427246,
+      "debug": {
+        "executionDurationStudent": 0.18230605125427246,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "L1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L1` not found in reference"
+        },
+        {
+          "name": "L2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L2` not found in reference"
+        },
+        {
+          "name": "L3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L3` not found in reference"
+        },
+        {
+          "name": "L4",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L4` not found in reference"
+        },
+        {
+          "name": "L5",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L5` not found in reference"
+        },
+        {
+          "name": "L6",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L6` not found in reference"
+        },
+        {
+          "name": "L7",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L7` not found in reference"
+        },
+        {
+          "name": "L8",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `L8` not found in reference"
+        },
+        {
+          "name": "anz_L1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `anz_L1` not found in reference"
+        },
+        {
+          "name": "anz_L2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `anz_L2` not found in reference"
+        },
+        {
+          "name": "anz_L3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `anz_L3` not found in reference"
+        },
+        {
+          "name": "anz_L2_L4",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `anz_L2_L4` not found in reference"
+        },
+        {
+          "name": "w_L6",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `w_L6` not found in reference"
+        },
+        {
+          "name": "w_L5",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `w_L5` not found in reference"
+        },
+        {
+          "name": "w_L2_L5",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `w_L2_L5` not found in reference"
+        },
+        {
+          "name": "iz6",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `iz6` not found in reference"
+        },
+        {
+          "name": "is6",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `is6` not found in reference"
+        },
+        {
+          "name": "i6[0]",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `i6[0]` not found in reference"
+        },
+        {
+          "name": "M3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `M3` not found in reference"
+        },
+        {
+          "name": "M7",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `M7` not found in reference"
+        },
+        {
+          "name": "eines_L3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `eines_L3` not found in reference"
+        },
+        {
+          "name": "keines_L3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `keines_L3` not found in reference"
+        },
+        {
+          "name": "alle_L4",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `alle_L4` not found in reference"
+        },
+        {
+          "name": "nicht_alle_L4",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `nicht_alle_L4` not found in reference"
+        },
+        {
+          "name": "s1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `s1` not found in reference"
+        },
+        {
+          "name": "sm1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sm1` not found in reference"
+        },
+        {
+          "name": "Lsm1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `Lsm1` not found in reference"
+        },
+        {
+          "name": "Ssm1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `Ssm1` not found in reference"
+        },
+        {
+          "name": "s2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `s2` not found in reference"
+        },
+        {
+          "name": "sm2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sm2` not found in reference"
+        },
+        {
+          "name": "Lsm2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `Lsm2` not found in reference"
+        },
+        {
+          "name": "Ssm2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `Ssm2` not found in reference"
+        },
+        {
+          "name": "S3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `S3` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "structural",
+      "name": "structural",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.003919124603271484,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "for",
+          "status": "COMPLETED",
+          "result": "PASSED"
+        },
+        {
+          "name": "if",
+          "status": "COMPLETED",
+          "result": "PASSED"
+        }
+      ]
+    }
+  ]
+}

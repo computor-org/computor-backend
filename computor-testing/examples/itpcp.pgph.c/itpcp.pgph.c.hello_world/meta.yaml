@@ -1,0 +1,41 @@
+identifier: itpcp.pgph.c.hello_world
+version: '1.0'
+title: Hello World in C
+description: A simple Hello World program to introduce C programming basics.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: C programming tutorial
+    url: https://www.learn-c.org/
+supportingMaterials:
+  - name: printf documentation
+    url: https://en.cppreference.com/w/c/io/fprintf
+license: CC BY-NC 4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - c
+  tags:
+    - c
+    - hello-world
+    - basics
+properties:
+  studentSubmissionFiles:
+    - hello.c
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.c
+    settings:
+      compiler: gcc
+      flags: ["-Wall", "-Wextra"]
+    version: "13"

@@ -1,0 +1,57 @@
+type: r
+name: Functions in R
+description: Tests for function definition and usage
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: functions.R
+
+    - name: Basic function results
+      type: variable
+      entryPoint: functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: square_result
+          value: 25
+        - name: cube_result
+          value: 27
+        - name: add_result
+          value: 7
+
+    - name: Function with defaults
+      type: variable
+      entryPoint: functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: greet_default
+          value: "Hello, World!"
+        - name: greet_custom
+          value: "Hello, Alice!"
+
+    - name: Mathematical functions
+      type: variable
+      entryPoint: functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: factorial_result
+          value: 120
+        - name: fibonacci_result
+        - name: is_prime_7
+        - name: is_prime_8
+
+    - name: Vector functions
+      type: variable
+      entryPoint: functions.R
+      successDependency: [exist_script]
+      tests:
+        - name: vec_norm
+        - name: vec_normalized

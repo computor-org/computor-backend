@@ -1,0 +1,291 @@
+{
+  "timestamp": "2026-03-07T11:51:30.260253+00:00",
+  "type": "python",
+  "version": "1.0",
+  "name": "Python Test Suite",
+  "description": "Checks subtests and graphics",
+  "status": "COMPLETED",
+  "result": "SKIPPED",
+  "summary": {
+    "total": 7,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 7
+  },
+  "resultMessage": "Tests skipped",
+  "duration": 11.211681604385376,
+  "executionDuration": 10.70966911315918,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.py/itpcp.pgph.py.lambda//test.yaml",
+    "specification": "/tmp/tmpbolmc9j2.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 10.70966911315918,
+    "executionDurationReference": 0.0
+  },
+  "tests": [
+    {
+      "type": "variable",
+      "name": "vars",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 9,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 9
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 1.9808800220489502,
+      "executionDuration": 1.4934380054473877,
+      "debug": {
+        "executionDurationStudent": 1.4934380054473877,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "data",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `data` not found in reference"
+        },
+        {
+          "name": "sorted_y",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sorted_y` not found in reference"
+        },
+        {
+          "name": "sorted_r",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sorted_r` not found in reference"
+        },
+        {
+          "name": "l",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `l` not found in reference"
+        },
+        {
+          "name": "evens",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `evens` not found in reference"
+        },
+        {
+          "name": "U_0",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `U_0` not found in reference"
+        },
+        {
+          "name": "f",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `f` not found in reference"
+        },
+        {
+          "name": "T",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `T` not found in reference"
+        },
+        {
+          "name": "t",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `t` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func1",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "val1 = adder(5, 10)",
+      "duration": 1.5376243591308594,
+      "executionDuration": 1.5355234146118164,
+      "debug": {
+        "executionDurationStudent": 1.5355234146118164,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val1",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val1` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func2",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "make_double = calc_multiple(2)\nval2=make_double(6)",
+      "duration": 1.564549207687378,
+      "executionDuration": 1.5622317790985107,
+      "debug": {
+        "executionDurationStudent": 1.5622317790985107,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val2",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val2` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func3",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "val3=f_sin(np.pi/2)",
+      "duration": 1.4919636249542236,
+      "executionDuration": 1.489983320236206,
+      "debug": {
+        "executionDurationStudent": 1.489983320236206,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val3",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val3` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func4",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "val4=f_abssin(np.pi/2)",
+      "duration": 1.5811774730682373,
+      "executionDuration": 1.5791995525360107,
+      "debug": {
+        "executionDurationStudent": 1.5791995525360107,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val4",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val4` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func5",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "val5=f_square(np.pi/2)",
+      "duration": 1.5004255771636963,
+      "executionDuration": 1.4985153675079346,
+      "debug": {
+        "executionDurationStudent": 1.4985153675079346,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val5",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val5` not found in reference"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "func6",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 1,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1
+      },
+      "resultMessage": "Tests skipped",
+      "setup": "val6=f_saw(np.pi/2)",
+      "duration": 1.552797555923462,
+      "executionDuration": 1.5507776737213135,
+      "debug": {
+        "executionDurationStudent": 1.5507776737213135,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "val6",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `val6` not found in reference"
+        }
+      ]
+    }
+  ]
+}

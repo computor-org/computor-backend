@@ -1,0 +1,168 @@
+{
+  "timestamp": "2026-03-07T11:50:24.498557+00:00",
+  "type": "octave",
+  "version": "1.0",
+  "name": "Vector Operations (Octave)",
+  "description": "Vector and matrix operations test",
+  "status": "COMPLETED",
+  "result": "PASSED",
+  "summary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  "resultMessage": "Congratulations! All tests passed",
+  "duration": 1.0319678783416748,
+  "executionDuration": 0.3914608320001207,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.oct/itpcp.pgph.oct.vector_operations//test.yaml",
+    "specification": "/tmp/tmpbe2hfu9w.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.3914608320001207,
+    "executionDurationReference": 0.3716332390004027
+  },
+  "tests": [
+    {
+      "type": "exist",
+      "name": "Check file exists",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.021048784255981445,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "existence",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Vector creation",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "setup": "run('vector_operations');",
+      "duration": 0.34468698501586914,
+      "executionDuration": 0.13235291099999813,
+      "debug": {
+        "executionDurationStudent": 0.13235291099999813,
+        "executionDurationReference": 0.1314778060000208,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "v1",
+          "result": "PASSED"
+        },
+        {
+          "name": "v2",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Vector operations",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "setup": "run('vector_operations');",
+      "duration": 0.34164977073669434,
+      "executionDuration": 0.1401345740000579,
+      "debug": {
+        "executionDurationStudent": 0.1401345740000579,
+        "executionDurationReference": 0.1189391190000606,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "v_sum",
+          "result": "PASSED"
+        },
+        {
+          "name": "v_prod",
+          "result": "PASSED"
+        },
+        {
+          "name": "dot_product",
+          "result": "PASSED"
+        },
+        {
+          "name": "v_length",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Matrix operations",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0
+      },
+      "setup": "run('vector_operations');",
+      "duration": 0.32262682914733887,
+      "executionDuration": 0.11897334700006468,
+      "debug": {
+        "executionDurationStudent": 0.11897334700006468,
+        "executionDurationReference": 0.12121631400032129,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "M",
+          "result": "PASSED"
+        },
+        {
+          "name": "M_transpose",
+          "result": "PASSED"
+        },
+        {
+          "name": "M_det",
+          "result": "PASSED"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+name: Hello World Tests
+description: Test the Hello World Fortran program
+version: "1.0"
+properties:
+  timeout: 10.0
+  tests:
+    - name: "Basic Output Test"
+      type: stdout
+      entryPoint: hello.f90
+      tests:
+        - name: contains_hello
+          qualification: contains
+          value: "Hello"
+
+        - name: contains_world
+          qualification: contains
+          value: "World"
+
+        - name: contains_exclamation
+          qualification: contains
+          value: "!"
+
+    - name: "Exit Code Test"
+      type: exitcode
+      entryPoint: hello.f90
+      tests:
+        - name: exit_zero
+          expectedExitCode: 0
+
+    - name: "Structural Tests"
+      type: structural
+      entryPoint: hello.f90
+      tests:
+        - name: program
+
+        - name: print
+          allowedOccuranceRange: [1, 10]
+
+    - name: "Compilation Test"
+      type: compile
+      entryPoint: hello.f90
+      tests:
+        - name: compiles_successfully
+          value: true

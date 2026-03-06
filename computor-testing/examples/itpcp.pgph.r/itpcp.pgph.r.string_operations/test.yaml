@@ -1,0 +1,56 @@
+type: r
+name: String Operations in R
+description: Tests for string manipulation
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: string_operations.R
+
+    - name: Basic strings
+      type: variable
+      entryPoint: string_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: greeting
+          value: "Hello, World!"
+        - name: name
+          value: "R Programming"
+        - name: str_length
+
+    - name: String manipulation
+      type: variable
+      entryPoint: string_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: upper_str
+          value: "HELLO"
+        - name: lower_str
+          value: "hello"
+        - name: concat_str
+        - name: substr_result
+
+    - name: String search
+      type: variable
+      entryPoint: string_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: has_pattern
+        - name: pattern_pos
+        - name: replaced_str
+
+    - name: String splitting
+      type: variable
+      entryPoint: string_operations.R
+      successDependency: [exist_script]
+      tests:
+        - name: words
+        - name: word_count

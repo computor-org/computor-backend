@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-03-07T11:51:28.665515+00:00",
+  "type": "python",
+  "version": "1.0",
+  "name": "Python Test Suite",
+  "description": "Checks subtests and graphics",
+  "status": "COMPLETED",
+  "result": "SKIPPED",
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1
+  },
+  "resultMessage": "Tests skipped",
+  "duration": 0.5912272930145264,
+  "executionDuration": 0.18132638931274414,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.py/itpcp.pgph.py.dict_und_json//test.yaml",
+    "specification": "/tmp/tmpusng72cz.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.18132638931274414,
+    "executionDurationReference": 0.0
+  },
+  "tests": [
+    {
+      "type": "variable",
+      "name": "var",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 2,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 2
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.5888614654541016,
+      "executionDuration": 0.18132638931274414,
+      "debug": {
+        "executionDurationStudent": 0.18132638931274414,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "data[\"metadata\"]",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `data[\"metadata\"]` not found in reference"
+        },
+        {
+          "name": "data[\"results\"]",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `data[\"results\"]` not found in reference"
+        }
+      ]
+    }
+  ]
+}

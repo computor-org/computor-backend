@@ -1,0 +1,69 @@
+name: Calculator Tests
+description: Test the Fortran calculator program
+version: "1.0"
+properties:
+  timeout: 10.0
+  tests:
+    - name: "Addition Test"
+      type: stdout
+      entryPoint: calculator.f90
+      inputAnswers:
+        - "5 + 3"
+      tests:
+        - name: result_is_8
+          qualification: contains
+          value: "8.0"
+
+    - name: "Subtraction Test"
+      type: stdout
+      entryPoint: calculator.f90
+      inputAnswers:
+        - "10 - 4"
+      tests:
+        - name: result_is_6
+          qualification: contains
+          value: "6.0"
+
+    - name: "Multiplication Test"
+      type: stdout
+      entryPoint: calculator.f90
+      inputAnswers:
+        - "7 * 6"
+      tests:
+        - name: result_is_42
+          qualification: contains
+          value: "42.0"
+
+    - name: "Division Test"
+      type: stdout
+      entryPoint: calculator.f90
+      inputAnswers:
+        - "20 / 4"
+      tests:
+        - name: result_is_5
+          qualification: contains
+          value: "5.0"
+
+    - name: "Division by Zero Test"
+      type: stdout
+      entryPoint: calculator.f90
+      inputAnswers:
+        - "10 / 0"
+      tests:
+        - name: shows_error
+          qualification: contains
+          value: "Error"
+
+    - name: "Structural Tests"
+      type: structural
+      entryPoint: calculator.f90
+      tests:
+        - name: select
+        - name: implicit none
+
+    - name: "Compilation Test"
+      type: compile
+      entryPoint: calculator.f90
+      tests:
+        - name: compiles_successfully
+          value: true

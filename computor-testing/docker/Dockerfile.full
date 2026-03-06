@@ -1,0 +1,114 @@
+# Computor Testing Framework - Full Sandbox
+#
+# Complete container with all supported languages.
+# Use language-specific images for smaller footprint.
+#
+# Usage:
+#   docker build -f docker/Dockerfile.full -t ct-full .
+#
+#   docker run --rm \
+#     --user 1000:1000 \
+#     --read-only \
+#     --tmpfs /tmp:size=100M,mode=1777 \
+#     --tmpfs /sandbox:size=50M,mode=1777 \
+#     --network none \
+#     --memory 1g \
+#     --cpus 2 \
+#     --pids-limit 100 \
+#     --cap-drop ALL \
+#     --security-opt no-new-privileges:true \
+#     -v /path/to/submission:/sandbox/submission:ro \
+#     -v /path/to/tests:/sandbox/tests:ro \
+#     -v /path/to/output:/sandbox/output:rw \
+#     ct-full \
+#     pytester run -t /sandbox/submission -T /sandbox/tests/test.yaml
+
+FROM python:3.12-slim
+
+LABEL maintainer="Computor Testing Framework"
+LABEL description="Full sandbox with all supported languages"
+LABEL version="1.0"
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash sandbox
+
+# Install system dependencies for all languages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # C/C++
+    gcc \
+    g++ \
+    make \
+    cmake \
+    # Fortran
+    gfortran \
+    libblas-dev \
+    liblapack-dev \
+    # Octave
+    octave \
+    octave-control \
+    octave-image \
+    octave-io \
+    octave-signal \
+    octave-statistics \
+    # R
+    r-base \
+    r-base-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    # Julia dependencies
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install Julia
+RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-linux-x86_64.tar.gz \
+    && tar -xzf julia-1.10.0-linux-x86_64.tar.gz -C /opt \
+    && ln -s /opt/julia-1.10.0/bin/julia /usr/local/bin/julia \
+    && rm julia-1.10.0-linux-x86_64.tar.gz
+
+# Install R packages
+RUN R -e "install.packages(c('jsonlite', 'tidyverse'), repos='https://cloud.r-project.org/')"
+
+# Install Julia packages
+RUN julia -e 'using Pkg; Pkg.add(["JSON", "LinearAlgebra", "Statistics"]); Pkg.precompile()'
+
+# Install Python packages for student code
+RUN pip install --no-cache-dir \
+    numpy \
+    scipy \
+    matplotlib \
+    pandas \
+    sympy
+
+# Copy and install the testing framework
+WORKDIR /opt/ct-testing
+COPY computor-testing /opt/ct-testing/
+RUN pip install --no-cache-dir -e .
+
+# Create sandbox structure
+RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \
+    && chown -R sandbox:sandbox /sandbox
+
+# Copy Julia packages to sandbox user
+RUN cp -r /root/.julia /sandbox/.julia && chown -R sandbox:sandbox /sandbox/.julia
+
+# Environment
+ENV PATH=/usr/local/bin:/usr/bin:/bin
+ENV HOME=/sandbox
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV JULIA_DEPOT_PATH=/sandbox/.julia
+
+# Security: Remove network tools
+RUN rm -f /usr/bin/wget /usr/bin/curl 2>/dev/null || true
+
+WORKDIR /sandbox
+USER sandbox
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python3 -c "import testers; print('OK')" || exit 1
+
+CMD ["computor-test", "--help"]

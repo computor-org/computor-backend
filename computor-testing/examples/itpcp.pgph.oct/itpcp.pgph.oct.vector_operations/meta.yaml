@@ -1,0 +1,20 @@
+version: "1.0"
+title: Vector Operations
+description: Basic vector and matrix operations in Octave
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools: []
+  tags:
+    - octave
+    - vectors
+    - matrices
+properties:
+  studentSubmissionFiles:
+    - vector_operations.m
+  executionBackendSlug: octave-itp

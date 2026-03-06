@@ -1,0 +1,91 @@
+# Computor Testing Framework - Secure Sandbox Container
+#
+# This Dockerfile creates a minimal, secure container for running
+# untrusted student code with proper isolation.
+#
+# Usage:
+#   docker build -f Dockerfile.sandbox -t ct-sandbox .
+#
+#   docker run --rm \
+#     --user 1000:1000 \
+#     --read-only \
+#     --tmpfs /tmp:size=100M,mode=1777 \
+#     --tmpfs /sandbox:size=50M,mode=1777 \
+#     --network none \
+#     --memory 512m \
+#     --cpus 1 \
+#     --pids-limit 100 \
+#     --cap-drop ALL \
+#     --security-opt no-new-privileges:true \
+#     -v /path/to/submission:/sandbox/submission:ro \
+#     -v /path/to/tests:/sandbox/tests:ro \
+#     -v /path/to/output:/sandbox/output:rw \
+#     ct-sandbox \
+#     pytester run -t /sandbox/submission -T /sandbox/tests/test.yaml
+
+FROM python:3.12-slim
+
+LABEL maintainer="Computor Testing Framework"
+LABEL description="Secure sandbox for running untrusted student code"
+LABEL version="1.0"
+
+# Security: Create non-root user early
+RUN useradd -m -u 1000 -s /bin/bash sandbox
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # C/C++ compilers
+    gcc \
+    g++ \
+    # Octave
+    octave \
+    # R
+    r-base \
+    r-base-dev \
+    # Build tools
+    make \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install R packages needed for testing
+RUN R -e "install.packages('jsonlite', repos='https://cloud.r-project.org/')"
+
+# Copy and install the testing framework
+WORKDIR /opt/ct-testing
+COPY . /opt/ct-testing/
+
+# Install Python dependencies and the framework
+RUN pip install --no-cache-dir -e .
+
+# Create working directory structure
+RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \
+    && chown -R sandbox:sandbox /sandbox
+
+# Security: Set safe environment defaults
+ENV PATH=/usr/local/bin:/usr/bin:/bin
+ENV HOME=/sandbox
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONHASHSEED=0
+
+# Security: Remove potentially dangerous tools
+RUN rm -f /usr/bin/wget /usr/bin/curl 2>/dev/null || true
+
+# Security: Clear all sensitive environment variables
+RUN unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
+    DATABASE_URL REDIS_URL API_KEY SECRET_KEY 2>/dev/null || true
+
+# Set working directory
+WORKDIR /sandbox
+
+# Switch to non-root user
+USER sandbox
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python3 -c "import pytester; print('OK')" || exit 1
+
+# Default command - show help
+CMD ["pytester", "--help"]

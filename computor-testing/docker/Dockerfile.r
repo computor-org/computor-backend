@@ -1,0 +1,70 @@
+# Computor Testing Framework - R Sandbox
+#
+# Container for testing R code submissions.
+#
+# Usage:
+#   docker build -f docker/Dockerfile.r -t ct-r .
+#
+#   docker run --rm \
+#     --user 1000:1000 \
+#     --read-only \
+#     --tmpfs /tmp:size=100M,mode=1777 \
+#     --tmpfs /sandbox:size=50M,mode=1777 \
+#     --network none \
+#     --memory 512m \
+#     --cpus 1 \
+#     --pids-limit 100 \
+#     --cap-drop ALL \
+#     --security-opt no-new-privileges:true \
+#     -v /path/to/submission:/sandbox/submission:ro \
+#     -v /path/to/tests:/sandbox/tests:ro \
+#     -v /path/to/output:/sandbox/output:rw \
+#     ct-r \
+#     rtester run -t /sandbox/submission -T /sandbox/tests/test.yaml
+
+FROM python:3.12-slim
+
+LABEL maintainer="Computor Testing Framework"
+LABEL description="R sandbox for testing student code"
+LABEL language="r"
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash sandbox
+
+# Install R and development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    r-base \
+    r-base-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install common R packages
+RUN R -e "install.packages(c('jsonlite', 'tidyverse', 'ggplot2'), repos='https://cloud.r-project.org/')"
+
+# Copy and install the testing framework
+WORKDIR /opt/ct-testing
+COPY computor-testing /opt/ct-testing/
+RUN pip install --no-cache-dir -e .
+
+# Create sandbox structure
+RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \
+    && chown -R sandbox:sandbox /sandbox
+
+# Environment
+ENV PATH=/usr/local/bin:/usr/bin:/bin
+ENV HOME=/sandbox
+ENV LANG=C.UTF-8
+
+# Security: Remove network tools
+RUN rm -f /usr/bin/wget /usr/bin/curl 2>/dev/null || true
+
+WORKDIR /sandbox
+USER sandbox
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python3 -c "import testers; print('OK')" || exit 1
+
+CMD ["rtester", "--help"]

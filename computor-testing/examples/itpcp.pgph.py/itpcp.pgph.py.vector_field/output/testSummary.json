@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-03-07T11:51:44.058500+00:00",
+  "type": "python",
+  "version": "1.0",
+  "name": "Python Test Suite",
+  "description": "Checks subtests and graphics",
+  "status": "COMPLETED",
+  "result": "SKIPPED",
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1
+  },
+  "resultMessage": "Tests skipped",
+  "duration": 1.2496700286865234,
+  "executionDuration": 0.7661137580871582,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.py/itpcp.pgph.py.vector_field//test.yaml",
+    "specification": "/tmp/tmpg75vpxvm.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.7661137580871582,
+    "executionDurationReference": 0.0
+  },
+  "tests": [
+    {
+      "type": "variable",
+      "name": "variables",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 2,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 2
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 1.247588872909546,
+      "executionDuration": 0.7661137580871582,
+      "debug": {
+        "executionDurationStudent": 0.7661137580871582,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "v1_trans",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `v1_trans` not found in reference"
+        },
+        {
+          "name": "v2_trans",
+          "status": "SKIPPED",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `v2_trans` not found in reference"
+        }
+      ]
+    }
+  ]
+}

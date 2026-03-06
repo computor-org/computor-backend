@@ -1,0 +1,89 @@
+name: Simple Computations (Octave)
+description: CodeAbility TestSuite for Octave
+type: octave
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  ignoreClass: false
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  tests:
+
+    - type: exist
+      name: Checks existence of file simple_computations.m
+      file: simple_computations.m
+      id: exist_simple_computations
+      tests:
+        - name: existence
+
+    - type: variable
+      name: Initialization of basic variables
+      id: simple_computations
+      setUpCode: run('simple_computations');
+      successDependency: [exist_simple_computations]
+      tests:
+        - name: a
+        - name: b
+        - name: x
+        - name: y
+
+    - type: variable
+      name: Some arithmetic operations
+      id: "2"
+      setUpCodeDependency: simple_computations
+      successDependency: [exist_simple_computations]
+      tests:
+        - name: v_ax
+        - name: v_by
+        - name: sum_1
+        - name: sum_2
+        - name: sub_1
+        - name: prod_1
+        - name: quot_1
+        - name: quot_2
+        - name: pot_1
+        - name: pot_2
+
+    - type: variable
+      name: Roots, exponentials, and logarithm
+      id: "3"
+      setUpCodeDependency: simple_computations
+      successDependency: [exist_simple_computations]
+      tests:
+        - name: root_1
+        - name: root_2
+          relativeTolerance: 1e-15
+        - name: expo_1
+        - name: expo_2
+        - name: log_1
+        - name: log_2
+
+    - type: variable
+      name: Trigonometric functions
+      id: "4"
+      setUpCodeDependency: simple_computations
+      successDependency: [exist_simple_computations]
+      tests:
+        - name: trig_1
+        - name: trig_2
+        - name: trig_3
+        - name: trig_4
+
+    - type: structural
+      name: Structural test for file simple_computations.m
+      file: simple_computations.m
+      id: structural_simple_computations
+      successDependency: exist_simple_computations
+      tests:
+        - name: exp
+          allowedOccuranceRange: [1, 1]
+        - name: sqrt
+          allowedOccuranceRange: [1, 1]
+        - name: for
+          allowedOccuranceRange: [0, 0]
+        - name: while
+          allowedOccuranceRange: [0, 0]
+        - name: if
+          allowedOccuranceRange: [0, 0]

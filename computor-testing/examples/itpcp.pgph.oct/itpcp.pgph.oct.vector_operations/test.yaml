@@ -1,0 +1,45 @@
+name: Vector Operations (Octave)
+description: Vector and matrix operations test
+type: octave
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 1.0e-8
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  tests:
+
+    - type: exist
+      name: Check file exists
+      file: vector_operations.m
+      id: exist_check
+      tests:
+        - name: existence
+
+    - type: variable
+      name: Vector creation
+      setUpCode: run('vector_operations');
+      successDependency: [exist_check]
+      tests:
+        - name: v1
+        - name: v2
+
+    - type: variable
+      name: Vector operations
+      setUpCode: run('vector_operations');
+      successDependency: [exist_check]
+      tests:
+        - name: v_sum
+        - name: v_prod
+        - name: dot_product
+        - name: v_length
+
+    - type: variable
+      name: Matrix operations
+      setUpCode: run('vector_operations');
+      successDependency: [exist_check]
+      tests:
+        - name: M
+        - name: M_transpose
+        - name: M_det
