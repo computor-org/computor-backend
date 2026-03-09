@@ -3,7 +3,7 @@ from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Literal, Optional, List, TYPE_CHECKING
 
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
-from computor_types.deployments import GitLabConfigGet
+from computor_types.gitlab import GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.tasks import TaskStatus
 from computor_types.grading import SubmissionGroupGradingList, GradedByCourseMember

@@ -1,0 +1,75 @@
+type: python
+name: Python Test Suite
+description: Checks subtests and graphics
+version: '1.0'
+properties:
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  qualification: verifyEqual
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  allowedOccuranceRange:
+  - 0
+  - 0
+  occuranceType: NAME
+  typeCheck: true
+  shapeCheck: true
+  timeout: 180.0
+  tests:
+  - type: variable
+    name: vars
+    entryPoint: lambda.py
+    tests:
+    - name: data
+    - name: sorted_y
+    - name: sorted_r
+    - name: l
+    - name: evens
+    - name: U_0
+    - name: f
+    - name: T
+    - name: t
+  - type: variable
+    name: func1
+    entryPoint: lambda.py
+    setUpCode:
+    - val1 = adder(5, 10)
+    tests:
+    - name: val1
+  - type: variable
+    name: func2
+    entryPoint: lambda.py
+    setUpCode:
+    - 'make_double = calc_multiple(2)
+
+      val2=make_double(6)'
+    tests:
+    - name: val2
+  - type: variable
+    name: func3
+    entryPoint: lambda.py
+    setUpCode:
+    - val3=f_sin(np.pi/2)
+    tests:
+    - name: val3
+  - type: variable
+    name: func4
+    entryPoint: lambda.py
+    setUpCode:
+    - val4=f_abssin(np.pi/2)
+    tests:
+    - name: val4
+  - type: variable
+    name: func5
+    entryPoint: lambda.py
+    setUpCode:
+    - val5=f_square(np.pi/2)
+    tests:
+    - name: val5
+  - type: variable
+    name: func6
+    entryPoint: lambda.py
+    setUpCode:
+    - val6=f_saw(np.pi/2)
+    tests:
+    - name: val6

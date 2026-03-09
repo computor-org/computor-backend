@@ -1,0 +1,80 @@
+name: Vector Operations (Julia)
+description: CodeAbility TestSuite for Julia vector and matrix operations
+type: julia
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  ignoreClass: false
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  tests:
+
+    - type: exist
+      name: Checks existence of file vector_operations.jl
+      file: vector_operations.jl
+      id: exist_vector_operations
+      tests:
+        - name: existence
+
+    - type: variable
+      name: Vector creation
+      id: vector_creation
+      entryPoint: vector_operations.jl
+      successDependency: [exist_vector_operations]
+      tests:
+        - name: vec1
+        - name: vec2
+        - name: vec3
+        - name: vec4
+        - name: vec5
+
+    - type: variable
+      name: Vector operations
+      id: vector_ops
+      entryPoint: vector_operations.jl
+      successDependency: [exist_vector_operations]
+      tests:
+        - name: vec_sum
+        - name: vec_prod
+        - name: vec_mean
+        - name: vec_max
+        - name: vec_min
+        - name: vec_len
+
+    - type: variable
+      name: Element-wise operations
+      id: elem_ops
+      entryPoint: vector_operations.jl
+      successDependency: [exist_vector_operations]
+      tests:
+        - name: elem_add
+        - name: elem_mul
+        - name: elem_div
+        - name: elem_pow
+
+    - type: variable
+      name: Matrix creation and operations
+      id: matrix_ops
+      entryPoint: vector_operations.jl
+      successDependency: [exist_vector_operations]
+      tests:
+        - name: mat1
+        - name: mat_zeros
+        - name: mat_ones
+        - name: mat_eye
+        - name: mat_sum
+
+    - type: structural
+      name: Structural test for file vector_operations.jl
+      file: vector_operations.jl
+      id: structural_vector_operations
+      successDependency: exist_vector_operations
+      tests:
+        - name: sum
+          allowedOccuranceRange: [2, 0]
+        - name: zeros
+          allowedOccuranceRange: [2, 0]
+        - name: ones
+          allowedOccuranceRange: [2, 0]

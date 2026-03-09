@@ -1,0 +1,58 @@
+type: r
+name: Creation of Vectors in R
+description: Tests for vector creation operations
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 0.0001
+  timeout: 60
+
+  tests:
+    - name: Check script exists
+      type: exist
+      id: exist_script
+      tests:
+        - name: vector_create.R
+
+    - name: Simple vectors
+      type: variable
+      entryPoint: vector_create.R
+      successDependency: [exist_script]
+      id: simple_vectors
+      tests:
+        - name: zero
+        - name: one_vec
+        - name: five_vec
+        - name: irregular
+
+    - name: Sequences
+      type: variable
+      entryPoint: vector_create.R
+      successDependency: [exist_script]
+      tests:
+        - name: seq_1
+        - name: seq_2
+        - name: seq_3
+        - name: seq_by
+        - name: seq_len
+
+    - name: Logarithmic and exponential
+      type: variable
+      entryPoint: vector_create.R
+      successDependency: [exist_script]
+      tests:
+        - name: log_seq
+        - name: log_values
+        - name: exp_seq
+        - name: exp_values
+
+    - name: Mathematical operations
+      type: variable
+      entryPoint: vector_create.R
+      successDependency: [exist_script]
+      tests:
+        - name: pow_2
+        - name: log2_pow
+        - name: cumsum_vec
+        - name: factorial_vec

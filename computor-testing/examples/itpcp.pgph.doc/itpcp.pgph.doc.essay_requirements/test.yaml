@@ -1,0 +1,65 @@
+name: Essay Requirements Check
+description: Verifies that a student essay meets minimum requirements
+type: document
+version: "1.0"
+
+properties:
+  timeout: 30
+  tests:
+    # Check that required file exists
+    - type: exist
+      name: File Existence
+      tests:
+        - name: essay.md
+
+    # Check word count (minimum 500 words)
+    - type: wordcount
+      name: Word Count Check
+      file: essay.md
+      tests:
+        - name: minimum_words
+          allowedOccuranceRange: [500, 0]
+
+    # Check paragraph count (at least 5 paragraphs)
+    - type: paragraphcount
+      name: Paragraph Structure
+      file: essay.md
+      tests:
+        - name: paragraphs
+          allowedOccuranceRange: [5, 0]
+
+    # Check for required sections
+    - type: section
+      name: Required Sections
+      file: essay.md
+      tests:
+        - name: Introduction
+        - name: Methodology
+        - name: Results
+        - name: Conclusion
+
+    # Check for references (at least 3 links)
+    - type: linkcount
+      name: References
+      file: essay.md
+      tests:
+        - name: reference_links
+          allowedOccuranceRange: [3, 0]
+
+    # Ensure no TODO or FIXME markers remain
+    - type: keyword
+      name: No Placeholder Content
+      file: essay.md
+      tests:
+        - name: TODO
+          allowedOccuranceRange: [0, 0]
+        - name: FIXME
+          allowedOccuranceRange: [0, 0]
+
+    # Check vocabulary (at least 150 unique words)
+    - type: uniquewords
+      name: Vocabulary Check
+      file: essay.md
+      tests:
+        - name: unique_words
+          allowedOccuranceRange: [150, 0]

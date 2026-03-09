@@ -16,13 +16,6 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from computor_backend.generator.gitlab_builder import GitLabBuilder
-from computor_types.deployments import (
-    ComputorDeploymentConfig,
-    OrganizationConfig,
-    CourseFamilyConfig,
-    CourseConfig,
-    GitLabConfig
-)
 from computor_backend.model.organization import Organization
 from computor_backend.model.course import CourseFamily, Course
 from computor_backend.services.git_service import GitService

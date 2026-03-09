@@ -223,12 +223,6 @@ export interface OrFilter {
 }
 
 /**
- * Base class for all deployment configurations.
- */
-export interface BaseDeployment {
-}
-
-/**
  * User deployment configuration for creating users in the system.
  */
 export interface UserDeployment {
@@ -320,34 +314,6 @@ export interface UserAccountDeployment {
 export interface UsersDeploymentConfig {
   /** List of users to deploy */
   users: UserAccountDeployment[];
-}
-
-/**
- * GitLab repository configuration.
- */
-export interface GitLabConfig {
-  /** GitLab instance URL */
-  url?: string | null;
-  /** GitLab API token */
-  token?: string | null;
-  /** Parent group ID */
-  parent?: number | null;
-  /** Full path in GitLab */
-  full_path?: string | null;
-  /** GitLab group ID */
-  group_id?: number | null;
-  /** Parent group ID */
-  parent_id?: number | null;
-  /** Namespace ID */
-  namespace_id?: number | null;
-  /** Namespace path */
-  namespace_path?: string | null;
-  /** Web URL */
-  web_url?: string | null;
-  /** Visibility level */
-  visibility?: string | null;
-  /** Last sync timestamp */
-  last_synced_at?: string | null;
 }
 
 /**
@@ -891,6 +857,252 @@ export interface CodeAbilityMeta {
   properties?: CodeAbilityMetaProperties | null;
 }
 
+/**
+ * Reference material link (new format).
+ * 
+ * Uses 'name' instead of 'description' (cf. CodeAbilityLink).
+ * Used for courseMaterials and supportingMaterials in the new meta format.
+ */
+export interface ComputorMaterial {
+  /** Identifier/key for this material (e.g., 'mat2str', 'wiki-ASCII') */
+  name: string;
+  /** URL to the resource */
+  url: string;
+}
+
+/**
+ * Typed settings for execution backend configuration.
+ * 
+ * These settings can be specified in meta.yaml to override defaults.
+ * The hierarchy is: test.yaml > meta.yaml > tester default.
+ * 
+ * Uses extra='allow' to support language-specific settings not listed here.
+ */
+export interface ExecutionBackendSettings {
+  /** Execution timeout in seconds */
+  timeout?: number | null;
+  /** Compilation timeout in seconds (for compiled languages) */
+  compileTimeout?: number | null;
+  /** Memory limit in megabytes */
+  memoryLimitMB?: number | null;
+  /** CPU time limit in seconds */
+  cpuLimit?: number | null;
+  /** Maximum number of processes/threads */
+  maxProcesses?: number | null;
+  /** Environment variables (KEY=VALUE format) */
+  env?: string[] | null;
+  /** Compiler to use (gcc, g++, clang, gfortran, etc.) */
+  compiler?: string | null;
+  /** Compiler/interpreter flags */
+  flags?: string[] | null;
+}
+
+/**
+ * Execution backend configuration (new format).
+ * 
+ * Extends CourseExecutionBackendConfig with typed settings and optional version.
+ * 
+ * Example in meta.yaml:
+ * properties:
+ * executionBackend:
+ * slug: itpcp.exec.c
+ * version: "13"
+ * settings:
+ * timeout: 60
+ * memoryLimitMB: 256
+ * compiler: gcc
+ * flags: ["-Wall", "-Wextra"]
+ */
+export interface ExecutionBackend {
+  /** Backend identifier (e.g., 'itpcp.exec.mat', 'itpcp.exec.c') */
+  slug: string;
+  /** Backend/language version requirement */
+  version?: string | null;
+  /** Backend-specific settings (timeout, memory, etc.) */
+  settings?: ExecutionBackendSettings | null;
+}
+
+/**
+ * Content categorization for examples (new format).
+ * 
+ * Provides structured metadata for organizing, searching, and filtering.
+ * Replaces the flat 'keywords' field from the old format.
+ */
+export interface ContentMetadata {
+  /** Type of example: programming, mathematics, visualization, etc. */
+  types?: string[] | null;
+  /** Curricular classification: mathematics, computer_science, physics, etc. */
+  disciplines?: string[] | null;
+  /** Hierarchical topics in Ltree format (e.g., 'math.linear_equations') */
+  topics?: string[] | null;
+  /** Tools/languages used: matlab, octave, python, latex, etc. */
+  tools?: string[] | null;
+  /** Free-form tags for additional categorization (replaces keywords) */
+  tags?: string[] | null;
+}
+
+/**
+ * Properties section of meta.yaml (new format).
+ * 
+ * Similar to CodeAbilityMetaProperties but uses typed ExecutionBackend
+ * and simpler testDependencies (plain strings only).
+ */
+export interface ComputorMetaProperties {
+  studentSubmissionFiles?: string[] | null;
+  additionalFiles?: string[] | null;
+  testFiles?: string[] | null;
+  studentTemplates?: string[] | null;
+  /** Execution backend configuration */
+  executionBackend?: ExecutionBackend | null;
+  testDependencies?: string[] | null;
+}
+
+/**
+ * Meta.yaml schema for example/assignment metadata (new format).
+ * 
+ * This is the proposed evolution of CodeAbilityMeta:
+ * - 'slug' renamed to 'identifier'
+ * - 'links' renamed to 'courseMaterials' (using ComputorMaterial with 'name')
+ * - 'supportingMaterial' renamed to 'supportingMaterials' (plural)
+ * - 'keywords' replaced by 'content.tags' (structured ContentMetadata)
+ * - 'language' removed (now derived from content/index_*.md files)
+ * - Typed ExecutionBackendSettings instead of plain dict
+ * 
+ * The old format (CodeAbilityMeta) remains the primary production format.
+ */
+export interface ComputorMeta {
+  /** Unique identifier for this example (e.g., 'itpcp.pgph.mat.hello_world') */
+  identifier?: string | null;
+  /** Version of the meta format */
+  version?: string | null;
+  /** Human-readable title */
+  title?: string | null;
+  /** Detailed description of the content */
+  description?: string | null;
+  /** License information */
+  license?: string | null;
+  /** Content authors */
+  authors?: CodeAbilityPerson[] | null;
+  /** Content maintainers */
+  maintainers?: CodeAbilityPerson[] | null;
+  /** Lecture/course materials (presentations, tutorials, etc.) */
+  courseMaterials?: ComputorMaterial[] | null;
+  /** API references and documentation (function docs, etc.) */
+  supportingMaterials?: ComputorMaterial[] | null;
+  /** Content categorization (types, disciplines, topics, tools, tags) */
+  content?: ContentMetadata | null;
+  /** Assignment-specific properties */
+  properties?: ComputorMetaProperties | null;
+}
+
+/**
+ * Test count statistics.
+ */
+export interface ComputorReportSummary {
+  total?: number;
+  passed?: number;
+  failed?: number;
+  skipped?: number;
+}
+
+/**
+ * Common properties for test report entries.
+ */
+export interface ComputorReportProperties {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: ComputorReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+}
+
+/**
+ * Individual test result within a test collection.
+ */
+export interface ComputorReportSub {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: ComputorReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+}
+
+/**
+ * Test collection result containing individual test results.
+ */
+export interface ComputorReportMain {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: ComputorReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+  tests?: ComputorReportSub[] | null;
+}
+
+/**
+ * Top-level test report containing test collection results.
+ */
+export interface ComputorReport {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: ComputorReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+  tests?: ComputorReportMain[] | null;
+}
+
 export interface Repository {
   url: string;
   user?: string | null;
@@ -1072,68 +1284,16 @@ export interface ServiceTypeQuery {
   plugin_module?: string | null;
 }
 
-export interface GitlabGroupProjectConfig {
-  name?: string | null;
-  path: string;
+/**
+ * Base model for test specification models (strict: extra fields forbidden).
+ */
+export interface ComputorBase {
 }
 
-export interface CourseProjectsConfig {
-  tests: GitlabGroupProjectConfig;
-  student_template: GitlabGroupProjectConfig;
-  reference: GitlabGroupProjectConfig;
-  images: GitlabGroupProjectConfig;
-  documents: GitlabGroupProjectConfig;
-}
-
-export interface ApiConfig {
-  user: string;
-  password: string;
-  url: string;
-}
-
-export interface RepositoryConfig {
-  settings?: any | null;
-}
-
-export interface GitLabConfigGet {
-  settings?: any | null;
-  url?: string | null;
-  full_path?: string | null;
-  directory?: string | null;
-  registry?: string | null;
-  parent?: number | null;
-  group_id?: number | null;
-  parent_id?: number | null;
-  namespace_id?: number | null;
-  namespace_path?: string | null;
-  web_url?: string | null;
-  visibility?: string | null;
-  last_synced_at?: string | null;
-}
-
-export interface TypeConfig {
-  kind: string;
-  slug: string;
-  title: string;
-  color?: string | null;
-  description?: string | null;
-  properties?: any;
-}
-
-export interface CourseGroupConfig {
-  name: string;
-}
-
-export interface FileSourceConfig {
-  url: string;
-  token?: string | null;
-}
-
-export interface CourseSettingsConfig {
-  source?: FileSourceConfig | null;
-}
-
-export interface CodeAbilityTestCommon {
+/**
+ * Common properties for all test types.
+ */
+export interface ComputorTestCommon {
   failureMessage?: string | null;
   successMessage?: string | null;
   qualification?: QualificationEnum | null;
@@ -1141,10 +1301,16 @@ export interface CodeAbilityTestCommon {
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
   occuranceType?: string | null;
+  typeCheck?: boolean | null;
+  shapeCheck?: boolean | null;
+  ignoreClass?: boolean | null;
   verbosity?: number | null;
 }
 
-export interface CodeAbilityTestCollectionCommon {
+/**
+ * Common properties for test collections.
+ */
+export interface ComputorTestCollectionCommon {
   failureMessage?: string | null;
   successMessage?: string | null;
   qualification?: QualificationEnum | null;
@@ -1152,13 +1318,19 @@ export interface CodeAbilityTestCollectionCommon {
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
   occuranceType?: string | null;
+  typeCheck?: boolean | null;
+  shapeCheck?: boolean | null;
+  ignoreClass?: boolean | null;
   verbosity?: number | null;
   storeGraphicsArtifacts?: boolean | null;
   competency?: string | null;
   timeout?: number | null;
 }
 
-export interface CodeAbilityTest {
+/**
+ * Individual test case definition.
+ */
+export interface ComputorTest {
   failureMessage?: string | null;
   successMessage?: string | null;
   qualification?: QualificationEnum | null;
@@ -1166,15 +1338,32 @@ export interface CodeAbilityTest {
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
   occuranceType?: string | null;
+  typeCheck?: boolean | null;
+  shapeCheck?: boolean | null;
+  ignoreClass?: boolean | null;
   verbosity?: number | null;
   name: string;
   value?: any | null;
   evalString?: string | null;
   pattern?: string | null;
   countRequirement?: number | null;
+  stdin?: (string | string[]) | null;
+  expectedStdout?: (string | string[]) | null;
+  expectedStderr?: (string | string[]) | null;
+  expectedExitCode?: number | null;
+  lineNumber?: (number | number[]) | null;
+  ignoreWhitespace?: boolean | null;
+  ignoreCase?: boolean | null;
+  trimOutput?: boolean | null;
+  normalizeNewlines?: boolean | null;
+  numericTolerance?: number | null;
+  allowEmpty?: boolean | null;
 }
 
-export interface CodeAbilityTestCollection {
+/**
+ * Test collection (group of related tests).
+ */
+export interface ComputorTestCollection {
   failureMessage?: string | null;
   successMessage?: string | null;
   qualification?: QualificationEnum | null;
@@ -1182,6 +1371,9 @@ export interface CodeAbilityTestCollection {
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
   occuranceType?: string | null;
+  typeCheck?: boolean | null;
+  shapeCheck?: boolean | null;
+  ignoreClass?: boolean | null;
   verbosity?: number | null;
   storeGraphicsArtifacts?: boolean | null;
   competency?: string | null;
@@ -1197,10 +1389,22 @@ export interface CodeAbilityTestCollection {
   tearDownCode?: (string | string[]) | null;
   id?: string | null;
   file?: string | null;
-  tests: CodeAbilityTest[];
+  tests: ComputorTest[];
+  compiler?: string | null;
+  compilerFlags?: string[] | null;
+  linkerFlags?: string[] | null;
+  sourceFiles?: string[] | null;
+  executableName?: string | null;
+  workingDirectory?: string | null;
+  environment?: any | null;
+  memoryLimit?: number | null;
+  args?: string[] | null;
 }
 
-export interface CodeAbilityTestProperty {
+/**
+ * Test suite properties with defaults.
+ */
+export interface ComputorTestProperty {
   failureMessage?: string | null;
   successMessage?: string | null;
   qualification?: QualificationEnum | null;
@@ -1208,22 +1412,32 @@ export interface CodeAbilityTestProperty {
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
   occuranceType?: string | null;
+  typeCheck?: boolean | null;
+  shapeCheck?: boolean | null;
+  ignoreClass?: boolean | null;
   verbosity?: number | null;
   storeGraphicsArtifacts?: boolean | null;
   competency?: string | null;
   timeout?: number | null;
-  tests?: CodeAbilityTestCollection[];
+  resultMessage?: string | null;
+  tests?: ComputorTestCollection[];
 }
 
-export interface CodeAbilityTestSuite {
+/**
+ * Main test suite definition (test.yaml root).
+ */
+export interface ComputorTestSuite {
   type?: string | null;
   name?: string | null;
   description?: string | null;
   version?: string | null;
-  properties?: CodeAbilityTestProperty;
+  properties?: ComputorTestProperty;
 }
 
-export interface CodeAbilitySpecification {
+/**
+ * Specification for test execution directories.
+ */
+export interface ComputorSpecification {
   executionDirectory?: string | null;
   studentDirectory?: string | null;
   referenceDirectory?: string | null;
@@ -1235,158 +1449,6 @@ export interface CodeAbilitySpecification {
   outputName?: string | null;
   isLocalUsage?: boolean | null;
   studentTestCounter?: number | null;
-}
-
-export interface CodeAbilityMetaProperty {
-  studentSubmissionFiles?: string[] | null;
-  additionalFiles?: string[] | null;
-  testFiles?: string[] | null;
-  studentTemplates?: string[] | null;
-  executionBackend?: CourseExecutionBackendConfig | null;
-  maxTestRuns?: number | null;
-  maxSubmissions?: number | null;
-  maxGroupSize?: number | null;
-}
-
-export interface CodeAbilityReportSummary {
-  total?: number;
-  passed?: number;
-  failed?: number;
-  skipped?: number;
-}
-
-export interface CodeAbilityReleaseMeta {
-  version?: string | null;
-  kind?: MetaTypeEnum | null;
-  title?: string | null;
-  description?: string | null;
-  language?: LanguageEnum | null;
-  license?: string | null;
-  authors?: CodeAbilityPerson[] | null;
-  maintainers?: CodeAbilityPerson[] | null;
-  links?: CodeAbilityLink[] | null;
-  supportingMaterial?: CodeAbilityLink[] | null;
-  keywords?: string[] | null;
-  properties?: CodeAbilityMetaProperty | null;
-}
-
-export interface CodeAbilityCourseMeta {
-  version?: string | null;
-  kind?: MetaTypeEnum | null;
-  title?: string | null;
-  description?: string | null;
-  language?: LanguageEnum | null;
-  license?: string | null;
-  authors?: CodeAbilityPerson[] | null;
-  maintainers?: CodeAbilityPerson[] | null;
-  links?: CodeAbilityLink[] | null;
-  supportingMaterial?: CodeAbilityLink[] | null;
-  keywords?: string[] | null;
-  properties?: CodeAbilityMetaProperty | null;
-  contentTypes?: TypeConfig[] | null;
-  executionBackends?: CourseExecutionBackendConfig[] | null;
-}
-
-export interface CodeAbilityUnitMeta {
-  version?: string | null;
-  kind?: MetaTypeEnum | null;
-  title?: string | null;
-  description?: string | null;
-  language?: LanguageEnum | null;
-  license?: string | null;
-  authors?: CodeAbilityPerson[] | null;
-  maintainers?: CodeAbilityPerson[] | null;
-  links?: CodeAbilityLink[] | null;
-  supportingMaterial?: CodeAbilityLink[] | null;
-  keywords?: string[] | null;
-  properties?: CodeAbilityMetaProperty | null;
-  type: string;
-}
-
-export interface CodeAbilityReportProperties {
-  timestamp?: string | null;
-  type?: string | null;
-  version?: string | null;
-  name?: string | null;
-  description?: string | null;
-  status?: StatusEnum | null;
-  result?: ResultEnum | null;
-  summary?: CodeAbilityReportSummary | null;
-  statusMessage?: string | null;
-  resultMessage?: string | null;
-  details?: string | null;
-  setup?: string | null;
-  teardown?: string | null;
-  duration?: number | null;
-  executionDuration?: number | null;
-  environment?: any | null;
-  properties?: any | null;
-  debug?: any | null;
-}
-
-export interface CodeAbilityReportSub {
-  timestamp?: string | null;
-  type?: string | null;
-  version?: string | null;
-  name?: string | null;
-  description?: string | null;
-  status?: StatusEnum | null;
-  result?: ResultEnum | null;
-  summary?: CodeAbilityReportSummary | null;
-  statusMessage?: string | null;
-  resultMessage?: string | null;
-  details?: string | null;
-  setup?: string | null;
-  teardown?: string | null;
-  duration?: number | null;
-  executionDuration?: number | null;
-  environment?: any | null;
-  properties?: any | null;
-  debug?: any | null;
-}
-
-export interface CodeAbilityReportMain {
-  timestamp?: string | null;
-  type?: string | null;
-  version?: string | null;
-  name?: string | null;
-  description?: string | null;
-  status?: StatusEnum | null;
-  result?: ResultEnum | null;
-  summary?: CodeAbilityReportSummary | null;
-  statusMessage?: string | null;
-  resultMessage?: string | null;
-  details?: string | null;
-  setup?: string | null;
-  teardown?: string | null;
-  duration?: number | null;
-  executionDuration?: number | null;
-  environment?: any | null;
-  properties?: any | null;
-  debug?: any | null;
-  tests?: CodeAbilityReportSub[] | null;
-}
-
-export interface CodeAbilityReport {
-  timestamp?: string | null;
-  type?: string | null;
-  version?: string | null;
-  name?: string | null;
-  description?: string | null;
-  status?: StatusEnum | null;
-  result?: ResultEnum | null;
-  summary?: CodeAbilityReportSummary | null;
-  statusMessage?: string | null;
-  resultMessage?: string | null;
-  details?: string | null;
-  setup?: string | null;
-  teardown?: string | null;
-  duration?: number | null;
-  executionDuration?: number | null;
-  environment?: any | null;
-  properties?: any | null;
-  debug?: any | null;
-  tests?: CodeAbilityReportMain[] | null;
 }
 
 /**
@@ -2610,52 +2672,6 @@ export interface LanguageQuery {
 }
 
 /**
- * Metadata stored with deployments.
- */
-export interface DeploymentMetadata {
-  /** Temporal workflow ID */
-  workflow_id?: string | null;
-  /** List of files deployed */
-  files_deployed?: string[] | null;
-  /** Git commit hash */
-  git_commit?: string | null;
-  /** Error details if deployment failed */
-  error_details?: Record<string, any> | null;
-  /** Properties migrated from old schema */
-  migrated_properties?: Record<string, any> | null;
-}
-
-/**
- * Create a new deployment (typically done automatically).
- */
-export interface CourseContentDeploymentCreate {
-  /** Course content to deploy to */
-  course_content_id: string;
-  /** Example version to deploy */
-  example_version_id: string;
-  /** Initial deployment status */
-  deployment_status?: "pending" | "deploying" | "deployed" | "failed" | "unassigned";
-  /** Optional message */
-  deployment_message?: string | null;
-  /** Additional metadata */
-  deployment_metadata?: DeploymentMetadata | null;
-}
-
-/**
- * Update deployment status.
- */
-export interface CourseContentDeploymentUpdate {
-  deployment_status?: "pending" | "deploying" | "deployed" | "failed" | "unassigned" | null;
-  deployment_message?: string | null;
-  deployed_at?: string | null;
-  last_attempt_at?: string | null;
-  deployment_path?: string | null;
-  deployment_metadata?: DeploymentMetadata | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-}
-
-/**
  * Get deployment details.
  */
 export interface CourseContentDeploymentGet {
@@ -2699,32 +2715,6 @@ export interface CourseContentDeploymentList {
 }
 
 /**
- * Query parameters for deployments.
- */
-export interface CourseContentDeploymentQuery {
-  skip?: number | null;
-  limit?: number | null;
-  course_content_id?: string | null;
-  example_version_id?: string | null;
-  deployment_status?: string | null;
-  deployed?: boolean | null;
-  failed?: boolean | null;
-}
-
-/**
- * Create a deployment history entry.
- */
-export interface DeploymentHistoryCreate {
-  deployment_id: string;
-  action: "assigned" | "reassigned" | "deploying" | "deployed" | "failed" | "unassigned" | "updated" | "migrated";
-  example_version_id?: string | null;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  previous_example_version_id?: string | null;
-  workflow_id?: string | null;
-}
-
-/**
  * Get deployment history entry.
  */
 export interface DeploymentHistoryGet {
@@ -2740,17 +2730,6 @@ export interface DeploymentHistoryGet {
   created_by: string | null;
   example_version?: any | null;
   previous_example_version?: any | null;
-}
-
-/**
- * List view of deployment history.
- */
-export interface DeploymentHistoryList {
-  id: string;
-  deployment_id: string;
-  action: string;
-  created_at: string;
-  workflow_id: string | null;
 }
 
 /**
@@ -2780,32 +2759,6 @@ export interface DeploymentSummary {
   deployments_failed: number;
   /** Most recent deployment */
   last_deployment_at?: string | null;
-}
-
-/**
- * Request to assign an example to course content.
- */
-export interface AssignExampleRequest {
-  /** Example version to assign (optional if providing identifier+version_tag) */
-  example_version_id?: string | null;
-  /** Hierarchical identifier (ltree string) for the example source */
-  example_identifier?: string | null;
-  /** Version tag for the example source */
-  version_tag?: string | null;
-  /** Optional message about this assignment */
-  deployment_message?: string | null;
-}
-
-/**
- * Request to deploy assigned examples.
- */
-export interface DeployExampleRequest {
-  /** Course to deploy examples for */
-  course_id: string;
-  /** Specific content IDs to deploy (all if None) */
-  content_ids?: string[] | null;
-  /** Force re-deployment even if already deployed */
-  force?: boolean;
 }
 
 /**
@@ -3301,6 +3254,12 @@ export interface PasswordOperationResponse {
   username: string;
 }
 
+/**
+ * Base class for all deployment configurations.
+ */
+export interface BaseDeployment {
+}
+
 export interface ProfileCreate {
   /** Associated user ID */
   user_id: string;
@@ -3523,6 +3482,43 @@ export interface ContentValidationGet {
   validation_results: ContentValidationResult[];
 }
 
+export interface RepositoryConfig {
+  settings?: any | null;
+}
+
+export interface GitLabConfigGet {
+  settings?: any | null;
+  url?: string | null;
+  full_path?: string | null;
+  directory?: string | null;
+  registry?: string | null;
+  parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
+}
+
+export interface GitLabConfig {
+  settings?: any | null;
+  url?: string | null;
+  full_path?: string | null;
+  directory?: string | null;
+  registry?: string | null;
+  parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
+  token?: string | null;
+}
+
 /**
  * Metadata extracted from a VSIX manifest.
  */
@@ -3701,6 +3697,18 @@ export interface ExtensionPublishResponse {
 }
 
 /**
+ * Request to assign an example to a course content (assignment).
+ */
+export interface AssignExampleRequest {
+  /** ID of the example to assign (UUID) */
+  example_id?: string | null;
+  /** Identifier path of the example (e.g., 'itpcp.pgph.mat.function_time_formatter') */
+  example_identifier?: string | null;
+  /** Specific version tag using semantic versioning (e.g., '1.0.0', '2.1.3-beta') */
+  version_tag: string;
+}
+
+/**
  * Response after assigning an example.
  */
 export interface AssignExampleResponse {
@@ -3845,17 +3853,13 @@ export type GroupType = "fixed" | "dynamic";
 
 export type MergeMethod = "rebase_merge" | "merge" | "ff";
 
+export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp" | "matchesLine" | "containsLine" | "lineCount" | "regexpMultiline" | "numericOutput" | "exitCode";
+
+export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout" | "stderr" | "stdio" | "exitcode" | "compile" | "runtime" | "wordcount" | "paragraphcount" | "section" | "linkcount" | "keyword" | "uniquewords" | "linecount" | "charcount" | "sentencecount" | "headingcount" | "imagecount" | "codeblockcount" | "listitemcount" | "pattern";
+
 export type StatusEnum = "SCHEDULED" | "COMPLETED" | "TIMEDOUT" | "CRASHED" | "CANCELLED" | "SKIPPED" | "FAILED";
 
 export type ResultEnum = "PASSED" | "FAILED" | "SKIPPED";
-
-export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp";
-
-export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout";
-
-export type LanguageEnum = "de" | "en";
-
-export type MetaTypeEnum = "course" | "unit" | "assignment";
 
 export type ForceLevel = "none" | "old" | "all";
 

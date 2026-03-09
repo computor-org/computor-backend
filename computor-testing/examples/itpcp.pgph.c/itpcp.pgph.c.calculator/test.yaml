@@ -1,0 +1,77 @@
+name: Calculator Tests
+description: Test the simple calculator C program
+version: "1.0"
+properties:
+  timeout: 10.0
+  tests:
+    - name: "Basic Calculation (5 + 3)"
+      type: stdout
+      entryPoint: calculator.c
+      inputAnswers:
+        - "5"
+        - "3"
+      tests:
+        - name: sum_result
+          qualification: contains
+          pattern: "Sum: 8"
+
+        - name: difference_result
+          qualification: contains
+          pattern: "Difference: 2"
+
+        - name: product_result
+          qualification: contains
+          pattern: "Product: 15"
+
+        - name: quotient_result
+          qualification: contains
+          pattern: "Quotient: 1"
+
+    - name: "Negative Numbers (-10 + 5)"
+      type: stdout
+      entryPoint: calculator.c
+      inputAnswers:
+        - "-10"
+        - "5"
+      tests:
+        - name: negative_sum
+          qualification: contains
+          pattern: "Sum: -5"
+
+        - name: negative_diff
+          qualification: contains
+          pattern: "Difference: -15"
+
+    - name: "Numeric Output Extraction"
+      type: stdout
+      entryPoint: calculator.c
+      inputAnswers:
+        - "10"
+        - "2"
+      tests:
+        - name: numeric_sum
+          qualification: numericOutput
+          value: 12
+          pattern: "Sum: (\\d+)"
+
+    - name: "Exit Code"
+      type: exitcode
+      entryPoint: calculator.c
+      inputAnswers:
+        - "5"
+        - "3"
+      tests:
+        - name: exit_zero
+          expectedExitCode: 0
+
+    - name: "Structural Analysis"
+      type: structural
+      entryPoint: calculator.c
+      tests:
+        - name: main
+
+        - name: scanf
+          allowedOccuranceRange: [2, 10]
+
+        - name: printf
+          allowedOccuranceRange: [4, 20]

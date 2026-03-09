@@ -1,0 +1,43 @@
+identifier: itpcp.pgph.r.data_frames
+version: '1.0'
+title: Data Frames in R
+description: In this example you will learn how to work with data frames in R, 
+  which are the primary data structure for tabular data. You will learn about 
+  creating data frames, accessing columns and rows, filtering, and basic 
+  operations.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: R documentation
+    url: https://www.r-project.org/
+supportingMaterials:
+  - name: r-data-frame
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/data.frame.html
+  - name: r-subset-function
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/subset.html
+license: CC BY-NC 4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - r
+  tags: []
+properties:
+  studentSubmissionFiles:
+    - data_frames.R
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.r
+    settings:
+      env: []
+    version: "4.0"
+  testDependencies: []

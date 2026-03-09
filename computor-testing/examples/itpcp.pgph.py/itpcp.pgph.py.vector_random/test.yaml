@@ -1,0 +1,39 @@
+type: python
+name: Python Test Suite
+description: Checks subtests and graphics
+version: '1.0'
+properties:
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  qualification: verifyEqual
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  allowedOccuranceRange:
+  - 0
+  - 0
+  occuranceType: NAME
+  typeCheck: true
+  shapeCheck: true
+  timeout: 180.0
+  tests:
+  - type: variable
+    name: random
+    entryPoint: vector_random.py
+    id: random
+    tests:
+    - name: rand1
+    - name: rand2
+    - name: i_min
+    - name: i_max
+    - name: rand_normal
+    - name: randint1
+  - type: structural
+    name: structure
+    entryPoint: vector_random.py
+    id: structure
+    file: vector_random.py
+    tests:
+    - allowedOccuranceRange:
+      - 1
+      - 1
+      name: randint

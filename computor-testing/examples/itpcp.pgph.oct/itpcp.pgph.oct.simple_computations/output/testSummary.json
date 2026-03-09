@@ -1,0 +1,311 @@
+{
+  "timestamp": "2026-03-07T11:50:20.698202+00:00",
+  "type": "octave",
+  "version": "1.0",
+  "name": "Simple Computations (Octave)",
+  "description": "CodeAbility TestSuite for Octave",
+  "status": "COMPLETED",
+  "result": "FAILED",
+  "summary": {
+    "total": 6,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 3
+  },
+  "resultMessage": "Some or all tests failed",
+  "duration": 1.592787265777588,
+  "executionDuration": 0.6100143550002031,
+  "environment": {
+    "Python": "3.12.3",
+    "Platform": "Linux-6.17.0-14-generic-x86_64-with-glibc2.39",
+    "Packages": {
+      "pytest": "9.0.1",
+      "pluggy": "1.6.0"
+    },
+    "Plugins": {
+      "metadata": "3.1.1"
+    }
+  },
+  "properties": {
+    "test": "/home/theta/computor/computor-testing/computor-testing/examples/itpcp.pgph.oct/itpcp.pgph.oct.simple_computations//test.yaml",
+    "specification": "/tmp/tmp8g5isr87.yaml",
+    "pytestflags": "",
+    "exitcode": "0"
+  },
+  "debug": {
+    "executionDurationStudent": 0.6100143550002031,
+    "executionDurationReference": 0.6283813359996202
+  },
+  "tests": [
+    {
+      "type": "exist",
+      "name": "Checks existence of file simple_computations.m",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.0217893123626709,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "existence",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Initialization of basic variables",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "setup": "run('simple_computations');",
+      "duration": 0.32915759086608887,
+      "executionDuration": 0.11528813499990065,
+      "debug": {
+        "executionDurationStudent": 0.11528813499990065,
+        "executionDurationReference": 0.13170735299991065,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "a",
+          "result": "PASSED"
+        },
+        {
+          "name": "b",
+          "result": "PASSED"
+        },
+        {
+          "name": "x",
+          "result": "PASSED"
+        },
+        {
+          "name": "y",
+          "result": "PASSED"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Some arithmetic operations",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 10,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 10
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.43909478187561035,
+      "executionDuration": 0.1769857080003021,
+      "debug": {
+        "executionDurationStudent": 0.1769857080003021,
+        "executionDurationReference": 0.17338826300010624,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "v_ax",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `v_ax` not found in reference namespace"
+        },
+        {
+          "name": "v_by",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `v_by` not found in reference namespace"
+        },
+        {
+          "name": "sum_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sum_1` not found in reference namespace"
+        },
+        {
+          "name": "sum_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sum_2` not found in reference namespace"
+        },
+        {
+          "name": "sub_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `sub_1` not found in reference namespace"
+        },
+        {
+          "name": "prod_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `prod_1` not found in reference namespace"
+        },
+        {
+          "name": "quot_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `quot_1` not found in reference namespace"
+        },
+        {
+          "name": "quot_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `quot_2` not found in reference namespace"
+        },
+        {
+          "name": "pot_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `pot_1` not found in reference namespace"
+        },
+        {
+          "name": "pot_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `pot_2` not found in reference namespace"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Roots, exponentials, and logarithm",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 6,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 6
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.40877580642700195,
+      "executionDuration": 0.16322841000010158,
+      "debug": {
+        "executionDurationStudent": 0.16322841000010158,
+        "executionDurationReference": 0.16808582799967553,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "root_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `root_1` not found in reference namespace"
+        },
+        {
+          "name": "root_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `root_2` not found in reference namespace"
+        },
+        {
+          "name": "expo_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `expo_1` not found in reference namespace"
+        },
+        {
+          "name": "expo_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `expo_2` not found in reference namespace"
+        },
+        {
+          "name": "log_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `log_1` not found in reference namespace"
+        },
+        {
+          "name": "log_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `log_2` not found in reference namespace"
+        }
+      ]
+    },
+    {
+      "type": "variable",
+      "name": "Trigonometric functions",
+      "status": "COMPLETED",
+      "result": "SKIPPED",
+      "summary": {
+        "total": 4,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 4
+      },
+      "resultMessage": "Tests skipped",
+      "duration": 0.38564205169677734,
+      "executionDuration": 0.15451210199989873,
+      "debug": {
+        "executionDurationStudent": 0.15451210199989873,
+        "executionDurationReference": 0.15519989199992779,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "trig_1",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `trig_1` not found in reference namespace"
+        },
+        {
+          "name": "trig_2",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `trig_2` not found in reference namespace"
+        },
+        {
+          "name": "trig_3",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `trig_3` not found in reference namespace"
+        },
+        {
+          "name": "trig_4",
+          "result": "SKIPPED",
+          "resultMessage": "Skipped: Variable `trig_4` not found in reference namespace"
+        }
+      ]
+    },
+    {
+      "type": "structural",
+      "name": "Structural test for file simple_computations.m",
+      "status": "COMPLETED",
+      "result": "PASSED",
+      "summary": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "duration": 0.006323575973510742,
+      "executionDuration": 0.0,
+      "debug": {
+        "executionDurationStudent": 0,
+        "executionDurationReference": 0,
+        "lintingErrors": []
+      },
+      "tests": [
+        {
+          "name": "exp",
+          "result": "PASSED"
+        },
+        {
+          "name": "sqrt",
+          "result": "PASSED"
+        },
+        {
+          "name": "for",
+          "result": "PASSED"
+        },
+        {
+          "name": "while",
+          "result": "PASSED"
+        },
+        {
+          "name": "if",
+          "result": "PASSED"
+        }
+      ]
+    }
+  ]
+}

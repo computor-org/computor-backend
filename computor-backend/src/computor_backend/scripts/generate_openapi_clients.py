@@ -691,7 +691,7 @@ except Exception as e:
     'AccountGet': 'accounts',
     'AccountList': 'accounts',
     'AccountUpdate': 'accounts',
-    'AssignExampleRequest': 'deployment',
+    'AssignExampleRequest': 'lecturer_deployments',
     'BucketCreate': 'storage',
     'BucketInfo': 'storage',
     'CourseContentCreate': 'course_contents',

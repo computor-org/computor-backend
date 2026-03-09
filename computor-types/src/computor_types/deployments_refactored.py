@@ -8,45 +8,10 @@ The deprecated CodeAbility classes have been moved to codeability_meta.py
 and test-related enums should be in their own module.
 """
 
-import yaml
 from typing import Any, List, Optional, Dict
 from pydantic import BaseModel, Field
-from pydantic_yaml import to_yaml_str
 
-class BaseDeployment(BaseModel):
-    """Base class for all deployment configurations."""
-    
-    def get_deployment(self) -> str:
-        """Get YAML representation of the deployment configuration."""
-        return to_yaml_str(self, exclude_none=True, exclude_unset=True)
-
-    def write_deployment(self, filename: str) -> None:
-        """Write deployment configuration to a YAML file."""
-        with open(filename, "w") as file:
-            file.write(self.get_deployment())
-
-class DeploymentFactory:
-    """Factory for creating deployment configurations from YAML."""
-    
-    @staticmethod
-    def read_deployment_from_string(classname, yamlstring: str):
-        """Create deployment configuration from YAML string."""
-        return classname(**yaml.safe_load(yamlstring))
-
-    @staticmethod
-    def read_deployment_from_file(classname, filename: str):
-        """Create deployment configuration from YAML file."""
-        with open(filename, "r") as file:
-            if classname is not None:
-                return classname(**yaml.safe_load(file))
-            else:
-                return yaml.safe_load(file)
-    
-    @staticmethod
-    def read_deployment_from_file_raw(filename: str) -> dict:
-        """Read raw YAML data from file."""
-        with open(filename, "r") as file:
-            return yaml.safe_load(file)
+from .deployment_base import BaseDeployment, DeploymentFactory  # noqa: F401
 
 # User and Account Configuration Classes
 
@@ -159,22 +124,8 @@ class UsersDeploymentConfig(BaseDeployment):
         return [user for user in self.users if user.get_primary_gitlab_account() is not None]
 
 # Repository Configuration Classes
-
-class GitLabConfig(BaseDeployment):
-    """GitLab repository configuration."""
-    url: Optional[str] = Field(None, description="GitLab instance URL")
-    token: Optional[str] = Field(None, description="GitLab API token")
-    parent: Optional[int] = Field(None, description="Parent group ID")
-    full_path: Optional[str] = Field(None, description="Full path in GitLab")
-    
-    # Enhanced GitLab properties (populated after creation)
-    group_id: Optional[int] = Field(None, description="GitLab group ID")
-    parent_id: Optional[int] = Field(None, description="Parent group ID")
-    namespace_id: Optional[int] = Field(None, description="Namespace ID")
-    namespace_path: Optional[str] = Field(None, description="Namespace path")
-    web_url: Optional[str] = Field(None, description="Web URL")
-    visibility: Optional[str] = Field(None, description="Visibility level")
-    last_synced_at: Optional[str] = Field(None, description="Last sync timestamp")
+# GitLabConfig: canonical definition in gitlab.py
+from .gitlab import GitLabConfig  # noqa: E402
 
 class GitHubConfig(BaseDeployment):
     """GitHub repository configuration (future support)."""
@@ -322,7 +273,12 @@ class CourseContentConfig(BaseDeployment):
     )
     example_version_tag: Optional[str] = Field(
         None,
-        description="Version tag of the example (e.g., 'v1.0', 'latest') - defaults to latest"
+        description=(
+            "Version tag of the example. Semantics: "
+            "null/missing = first-time assign only (skip if already deployed); "
+            "'latest' = always update to the latest available version; "
+            "'1.2.0' = update only if current version differs"
+        )
     )
     
     # Optional execution backend override (inherits from course if not specified)

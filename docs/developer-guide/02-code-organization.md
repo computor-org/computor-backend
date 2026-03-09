@@ -4,14 +4,18 @@ This guide explains the directory structure and organization of the Computor cod
 
 ## Monorepo Structure
 
-Computor is organized as a **monorepo with 4 independent Python packages**:
+Computor is organized as a **monorepo with multiple independent Python packages**:
 
 ```
 computor-fullstack/
 ├── computor-types/          # Package 1: Pure Pydantic DTOs
-├── computor-client/         # Package 2: Auto-generated HTTP client
-├── computor-cli/            # Package 3: Command-line interface
-├── src/computor_backend/    # Package 4: FastAPI server
+├── computor-testing/        # Package 2: Test execution framework
+├── computor-client/         # Package 3: Auto-generated HTTP client
+├── computor-cli/            # Package 4: Command-line interface
+├── computor-backend/        # Package 5: FastAPI server
+├── computor-utils/          # Package 6: Shared utilities
+├── computor-web/            # Next.js web frontend
+├── computor-coder/          # Coder workspace deployment
 ├── docs/                    # Documentation
 ├── docker/                  # Docker configurations
 ├── scripts/                 # Utility scripts
@@ -32,13 +36,16 @@ computor-types/
     └── computor_types/
         ├── __init__.py      # Package exports, get_all_dtos()
         ├── base.py          # EntityInterface, BaseEntityGet, BaseEntityList
+        ├── testing.py       # test.yaml models (ComputorTestSuite, etc.)
+        ├── testing_report.py # testSummary.json models (ComputorReport, etc.)
+        ├── codeability_meta.py # meta.yaml models (CodeAbilityMeta, ComputorMeta)
+        ├── deployment_base.py  # BaseDeployment, DeploymentFactory
+        ├── deployments_refactored.py # Deployment hierarchy configs
+        ├── gitlab.py        # GitLabConfig, GitLabConfigGet
         ├── users.py         # User DTOs
         ├── organizations.py # Organization DTOs
         ├── courses.py       # Course DTOs
-        ├── submissions.py   # Submission DTOs
-        ├── artifacts.py     # Artifact DTOs
-        ├── results.py       # Result DTOs
-        └── ...              # 58 total files
+        └── ...              # 60+ total files
 ```
 
 ### Key Files
@@ -463,9 +470,12 @@ startup.sh                  # Start Docker services
 stop.sh                     # Stop Docker services
 migrations.sh               # Run Alembic migrations
 test.sh                     # Run tests
-generate_types.sh           # Generate TypeScript types
-generate_clients.sh         # Generate Python client
-generate_schema.sh          # Generate OpenAPI schema
+generate.sh                 # Unified code generation (types, schemas, clients)
+generate.sh types           # Generate TypeScript interfaces
+generate.sh schemas         # Generate JSON schemas (meta.yaml, test.yaml)
+generate.sh clients         # Generate TypeScript API clients
+generate.sh python-client   # Generate Python HTTP client
+generate.sh all             # Generate all artifacts
 ```
 
 ## File Naming Conventions

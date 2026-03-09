@@ -26,6 +26,8 @@ TARGETS:
     types           Generate TypeScript interfaces from Pydantic models
     clients         Generate TypeScript API client classes
     python-client   Generate Python HTTP client library
+    schemas         Generate JSON schemas for meta.yaml and test.yaml
+    constants       Generate TypeScript constants from Python constants
     error-codes     Generate error code definitions (TypeScript, JSON, Markdown)
     all             Generate all artifacts (default)
 
@@ -125,6 +127,27 @@ generate_python_client() {
     echo -e "📁 Check computor-client/src/computor_client/endpoints/ for the generated files\n"
 }
 
+# Function to generate JSON schemas (meta.yaml, test.yaml)
+generate_schemas() {
+    echo -e "${BLUE}📋 Generating JSON schemas for YAML validation...${NC}"
+
+    cd "${ROOT_DIR}" && \
+        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_json_schema.py"
+
+    echo -e "${GREEN}✅ JSON schemas generated successfully!${NC}"
+    echo -e "📁 Check computor-web/src/generated/schemas/ for the generated files\n"
+}
+
+# Function to generate TypeScript constants
+generate_constants() {
+    echo -e "${BLUE}📦 Generating TypeScript constants from Python...${NC}"
+
+    cd "${ROOT_DIR}" && \
+        "${PYTHON_BIN}" "${ROOT_DIR}/computor-backend/src/computor_backend/scripts/generate_typescript_constants.py"
+
+    echo -e "${GREEN}✅ TypeScript constants generated successfully!${NC}\n"
+}
+
 # Function to generate error codes
 generate_error_codes() {
     if [ "$SKIP_ERROR_CODES" = true ]; then
@@ -171,11 +194,19 @@ for target in "${TARGETS[@]}"; do
         python-client)
             generate_python_client
             ;;
+        schemas)
+            generate_schemas
+            ;;
+        constants)
+            generate_constants
+            ;;
         error-codes)
             generate_error_codes
             ;;
         all)
             generate_types
+            generate_schemas
+            generate_constants
             generate_clients
             generate_python_client
             if [ "$SKIP_ERROR_CODES" = false ]; then

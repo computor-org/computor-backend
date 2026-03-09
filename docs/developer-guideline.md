@@ -29,20 +29,6 @@ This guide provides comprehensive documentation for developers working on the Co
 ### Advanced Topics
 
 - **[Temporal Workflows](developer-guide/08-temporal-workflows.md)** - Async task orchestration and GitLab integration
-- **[Repository Pattern](developer-guide/09-repository-pattern.md)** - Data access layer and complex queries
-- **[API Development](developer-guide/10-api-development.md)** - Creating and extending REST endpoints
-- **[Testing Guide](developer-guide/11-testing-guide.md)** - Unit tests, integration tests, and test patterns
-
-### Integration & Tools
-
-- **[Type Generation](developer-guide/13-type-generation.md)** - TypeScript interface and client generation
-- **[CLI Usage](developer-guide/14-cli-usage.md)** - Command-line tools and utilities
-
-### Operations & Deployment
-
-- **[Configuration Management](developer-guide/15-configuration.md)** - Environment variables and settings
-- **[Docker & Services](developer-guide/16-docker-services.md)** - Docker Compose, service management
-- **[Troubleshooting](developer-guide/17-troubleshooting.md)** - Common issues and solutions
 
 ## Key Principles
 
@@ -51,9 +37,12 @@ This guide provides comprehensive documentation for developers working on the Co
 Computor uses a layered architecture with clear boundaries:
 
 - **computor-types**: Pure Pydantic DTOs (no dependencies)
+- **computor-testing**: Test execution framework (depends on types)
 - **computor-client**: HTTP client (depends on types only)
+- **computor-utils**: Shared utilities (depends on types only)
 - **computor-cli**: Command-line interface (depends on client and types)
-- **computor-backend**: FastAPI server (depends on types, uses all layers)
+- **computor-backend**: FastAPI server (depends on types, utils; uses all layers)
+- **computor-web**: Next.js frontend (consumes generated TypeScript types/clients)
 
 ### 2. Business Logic Separation
 
@@ -152,7 +141,7 @@ from computor_types.users import UserGet, UserCreate
 
 ### API Endpoints
 
-- **RESTful routes**: `/api/v1/{resource}`
+- **RESTful routes**: `/{resource}`
 - **ID parameters**: Use UUID strings
 - **Query parameters**: Use Pydantic models
 - **Response models**: Always specify `response_model`
@@ -160,71 +149,91 @@ from computor_types.users import UserGet, UserCreate
 ### Git Commit Messages
 
 ```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
+<type>: <subject>
 ```
 
-**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
+**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `update`
 
 **Example**:
 ```
-feat(submissions): add artifact grading endpoint
-
-Add new endpoint for tutors to grade student submission artifacts.
-Includes permission checks for tutor role and business logic validation.
-
-Refs: #123
+feat: add artifact grading endpoint
 ```
 
 ## Project Structure Overview
 
 ```
 computor-fullstack/
-├── computor-types/           # Pure Pydantic DTOs
+├── computor-types/           # 📦 Pure Pydantic DTOs (shared data contracts)
 │   └── src/computor_types/
 │       ├── base.py          # EntityInterface base class
+│       ├── testing.py       # test.yaml models (ComputorTestSuite)
+│       ├── testing_report.py # testSummary.json models (ComputorReport)
+│       ├── codeability_meta.py # meta.yaml models (CodeAbilityMeta)
+│       ├── deployments_refactored.py # Deployment configs
+│       ├── gitlab.py        # GitLab configs
 │       ├── users.py         # User DTOs
 │       ├── courses.py       # Course DTOs
 │       └── ...
 │
-├── computor-client/          # Auto-generated HTTP client
+├── computor-testing/         # 📦 Test execution framework
+│   ├── ctcore/              # Core framework, model re-exports
+│   ├── ctbackends/          # Language backends (Python, Octave, R, Julia, C, Fortran, Document)
+│   └── ...
+│
+├── computor-client/          # 📦 Auto-generated Python HTTP client
 │   └── src/computor_client/
 │       ├── client.py        # ComputorClient main class
 │       ├── endpoints/       # Generated endpoint clients
 │       └── exceptions.py
 │
-├── computor-cli/             # Command-line interface
+├── computor-cli/             # 📦 Command-line interface
 │   └── src/computor_cli/
 │       ├── main.py          # CLI entry point
 │       ├── commands/        # CLI command groups
 │       └── config.py
 │
-├── src/computor_backend/     # FastAPI backend server
-│   ├── api/                  # Thin API endpoints
-│   ├── business_logic/       # Fat business logic layer
-│   ├── model/                # SQLAlchemy ORM models
-│   ├── repositories/         # Data access layer
-│   ├── permissions/          # RBAC and access control
-│   ├── tasks/                # Temporal workflows
-│   ├── services/             # Infrastructure services
-│   ├── auth/                 # Keycloak admin client
-│   ├── plugins/              # Authentication plugins
-│   ├── database.py           # DB session management
-│   ├── settings.py           # Configuration
-│   └── server.py             # FastAPI app
+├── computor-backend/         # 📦 FastAPI backend server
+│   └── src/computor_backend/
+│       ├── api/              # Thin API endpoints
+│       ├── business_logic/   # Fat business logic layer
+│       ├── model/            # SQLAlchemy ORM models
+│       ├── repositories/     # Data access layer
+│       ├── permissions/      # RBAC and access control
+│       ├── tasks/            # Temporal workflows
+│       ├── services/         # Infrastructure services
+│       ├── auth/             # Auth providers (Keycloak, etc.)
+│       ├── plugins/          # Authentication plugins
+│       ├── coder/            # Coder workspace integration
+│       ├── generator/        # Code generation (TS types, clients)
+│       ├── exceptions/       # Structured error handling
+│       ├── middleware/       # FastAPI middleware
+│       ├── database.py       # DB session management
+│       ├── settings.py       # Configuration
+│       └── server.py         # FastAPI app
 │
+├── computor-utils/           # 📦 Shared Python utilities
+│   └── src/computor_utils/
+│       ├── vsix_utils.py    # VSIX metadata parsing
+│       └── deployment_mapping/
+│
+├── computor-web/             # 📦 Next.js web frontend
+│   └── src/
+│       ├── api/             # API client layer
+│       ├── components/      # React components
+│       ├── generated/       # Auto-generated TS types/clients
+│       └── ...
+│
+├── computor-coder/           # Coder workspace deployment
+│   └── deployment/
+│       └── templates/       # Terraform templates
+│
+├── data/                     # Configuration data (auth plugins)
+├── docker/                   # Dockerfiles
 ├── docs/                     # Documentation
-│   ├── architecture-overview.md
-│   ├── developer-guideline.md  # This file
-│   └── developer-guide/     # Detailed guides
-│
-├── docker/                   # Docker configurations
-├── scripts/                  # Utility scripts
-├── docker-compose-dev.yaml   # Development services
-└── docker-compose-prod.yaml  # Production services
+├── ops/                      # Operations & Docker Compose configs
+├── plugins/                  # Authentication plugins
+├── scripts/                  # Utility scripts and git hooks
+└── tests/                    # Integration / end-to-end tests
 ```
 
 ## Development Environment
@@ -238,30 +247,7 @@ computor-fullstack/
 
 ### Quick Setup
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd computor-fullstack
-
-# Create virtual environment
-python3.10 -m venv .venv
-source .venv/bin/activate
-
-# Install all packages in development mode
-pip install -e computor-types/
-pip install -e computor-client/
-pip install -e computor-cli/
-pip install -e computor-backend/
-
-# Start Docker services
-bash startup.sh
-
-# Run database migrations
-bash migrations.sh
-
-# Start backend API (creates admin user automatically on startup)
-bash api.sh
-```
+See [README.md](../README.md) for installation and setup instructions.
 
 ### Service URLs
 
@@ -279,8 +265,7 @@ bash api.sh
 2. Create SQLAlchemy model in `computor-backend/src/computor_backend/model/your_entity.py`
 3. Generate migration: `alembic revision --autogenerate -m "add your_entity"`
 4. Apply migration: `alembic upgrade head`
-5. Regenerate client: `bash generate.sh python-client`
-6. Regenerate TypeScript types: `bash generate.sh types`
+5. Regenerate artifacts: `bash generate.sh all` (types, schemas, clients)
 
 ### Creating an API Endpoint
 
@@ -307,7 +292,7 @@ bash api.sh
 
 ### Common Issues
 
-See [Troubleshooting Guide](developer-guide/17-troubleshooting.md) for solutions to common problems.
+See the [CLAUDE.md](../CLAUDE.md) Troubleshooting section for solutions to common problems.
 
 ## Contributing
 
@@ -324,11 +309,9 @@ See [Troubleshooting Guide](developer-guide/17-troubleshooting.md) for solutions
 Choose your path:
 
 - **Backend Developer**: Start with [Backend Architecture](developer-guide/04-backend-architecture.md)
-- **DevOps/Infrastructure**: Start with [Docker & Services](developer-guide/16-docker-services.md)
-- **API Consumer**: Start with [CLI Usage](developer-guide/14-cli-usage.md)
-- **Testing/QA**: Start with [Testing Guide](developer-guide/11-testing-guide.md)
+- **Architecture**: Start with [Architecture Overview](architecture-overview.md)
 
 ---
 
-**Last Updated**: 2025-10-23
+**Last Updated**: 2026-03-04
 **Maintainers**: Computor Development Team

@@ -1,0 +1,44 @@
+name: Functions (Julia)
+description: CodeAbility TestSuite for Julia function definitions
+type: julia
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  ignoreClass: false
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  tests:
+
+    - type: exist
+      name: Checks existence of file functions.jl
+      file: functions.jl
+      id: exist_functions
+      tests:
+        - name: existence
+
+    - type: variable
+      name: Function results
+      id: function_results
+      entryPoint: functions.jl
+      successDependency: [exist_functions]
+      tests:
+        - name: result_add
+        - name: result_square
+        - name: result_greet
+        - name: result_factorial
+        - name: result_area
+
+    - type: structural
+      name: Structural test for file functions.jl
+      file: functions.jl
+      id: structural_functions
+      successDependency: exist_functions
+      tests:
+        - name: function
+          allowedOccuranceRange: [5, 0]
+        - name: return
+          allowedOccuranceRange: [5, 0]
+        - name: "->"
+          allowedOccuranceRange: [1, 0]

@@ -1,0 +1,20 @@
+version: "1.0"
+title: Simple Plot
+description: Basic plotting with sine and cosine in Octave
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools: []
+  tags:
+    - octave
+    - plotting
+    - trigonometry
+properties:
+  studentSubmissionFiles:
+    - simple_plot.m
+  executionBackendSlug: octave-itp

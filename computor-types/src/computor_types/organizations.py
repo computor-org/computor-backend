@@ -9,7 +9,7 @@ from computor_types.custom_types import Ltree
 import re
 
 if TYPE_CHECKING:
-        from computor_types.deployments import GitLabConfig, GitLabConfigGet
+        from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 
 class OrganizationType(str,Enum):
     user = "user"
@@ -217,7 +217,7 @@ class OrganizationUpdateTokenUpdate(BaseModel):
     token: str = Field(..., description="Provider access token")
 
 # Import GitLabConfig after OrganizationProperties is defined to avoid circular import
-from computor_types.deployments import GitLabConfig, GitLabConfigGet
+from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 # Rebuild the models to resolve forward references
 OrganizationProperties.model_rebuild()
 OrganizationPropertiesGet.model_rebuild()

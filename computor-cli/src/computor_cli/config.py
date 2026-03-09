@@ -1,5 +1,5 @@
 from typing import Optional
-from computor_types.deployments import BaseDeployment
+from computor_types.deployments_refactored import BaseDeployment
 from computor_types.auth import BasicAuthConfig, GLPAuthConfig
 
 class CLIAuthConfig(BaseDeployment):

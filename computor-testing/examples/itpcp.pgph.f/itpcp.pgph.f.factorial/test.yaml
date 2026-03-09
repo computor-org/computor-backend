@@ -1,0 +1,70 @@
+name: Factorial Tests
+description: Test the Fortran factorial program
+version: "1.0"
+properties:
+  timeout: 10.0
+  tests:
+    - name: "Factorial of 0"
+      type: stdout
+      entryPoint: factorial.f90
+      inputAnswers:
+        - "0"
+      tests:
+        - name: result_is_1
+          qualification: contains
+          value: "1"
+
+    - name: "Factorial of 1"
+      type: stdout
+      entryPoint: factorial.f90
+      inputAnswers:
+        - "1"
+      tests:
+        - name: result_is_1
+          qualification: contains
+          value: "1"
+
+    - name: "Factorial of 5"
+      type: stdout
+      entryPoint: factorial.f90
+      inputAnswers:
+        - "5"
+      tests:
+        - name: result_is_120
+          qualification: contains
+          value: "120"
+
+    - name: "Factorial of 10"
+      type: stdout
+      entryPoint: factorial.f90
+      inputAnswers:
+        - "10"
+      tests:
+        - name: result_is_3628800
+          qualification: contains
+          value: "3628800"
+
+    - name: "Negative Input Test"
+      type: stdout
+      entryPoint: factorial.f90
+      inputAnswers:
+        - "-1"
+      tests:
+        - name: shows_error
+          qualification: contains
+          value: "Error"
+
+    - name: "Structural Tests"
+      type: structural
+      entryPoint: factorial.f90
+      tests:
+        - name: recursive
+        - name: function
+        - name: implicit none
+
+    - name: "Compilation Test"
+      type: compile
+      entryPoint: factorial.f90
+      tests:
+        - name: compiles_successfully
+          value: true

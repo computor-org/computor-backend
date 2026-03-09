@@ -1,0 +1,42 @@
+name: Simple Plot (Octave)
+description: Basic plotting test
+type: octave
+version: "1.0"
+
+properties:
+  relativeTolerance: 1.0e-10
+  absoluteTolerance: 1.0e-8
+  storeGraphicsArtifacts: true
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  tests:
+
+    - type: exist
+      name: Check file exists
+      file: simple_plot.m
+      id: exist_check
+      tests:
+        - name: existence
+
+    - type: variable
+      name: Data creation
+      setUpCode: run('simple_plot');
+      successDependency: [exist_check]
+      tests:
+        - name: x
+        - name: y_sin
+        - name: y_cos
+
+    - type: structural
+      name: Structural checks
+      file: simple_plot.m
+      successDependency: [exist_check]
+      tests:
+        - name: plot
+          allowedOccuranceRange: [1, 2]
+        - name: xlabel
+          allowedOccuranceRange: [1, 1]
+        - name: ylabel
+          allowedOccuranceRange: [1, 1]
+        - name: title
+          allowedOccuranceRange: [1, 1]

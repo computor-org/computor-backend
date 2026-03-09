@@ -1,0 +1,44 @@
+identifier: itpcp.pgph.r.simple_computations
+version: '1.0'
+title: Simple computations in R
+description: In this example you will learn how to perform simple computations 
+  using operators and predefined functions in R. You will learn about basic 
+  arithmetic operations, mathematical functions, and vector operations.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: R documentation
+    url: https://www.r-project.org/
+supportingMaterials:
+  - name: r-arithmetic-operators
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/Arithmetic.html
+  - name: r-math-functions
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/MathFun.html
+  - name: r-trigonometric
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/Trig.html
+license: CC BY-NC 4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - r
+  tags: []
+properties:
+  studentSubmissionFiles:
+    - simple_computations.R
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.r
+    settings:
+      env: []
+    version: "4.0"
+  testDependencies: []

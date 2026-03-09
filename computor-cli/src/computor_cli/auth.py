@@ -191,7 +191,7 @@ def authenticate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         from click import get_current_context
-        from computor_types.deployments import DeploymentFactory
+        from computor_types.deployments_refactored import DeploymentFactory
 
         ctx = get_current_context()
 

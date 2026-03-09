@@ -1,0 +1,48 @@
+name: Hello World Tests
+description: Test the Hello World C program
+version: "1.0"
+properties:
+  timeout: 10.0
+  tests:
+    - name: "Basic Output Test"
+      type: stdout
+      entryPoint: hello.c
+      tests:
+        - name: exact_output
+          qualification: matches
+          value: "Hello, World!"
+
+        - name: contains_hello
+          qualification: contains
+          pattern: "Hello"
+
+        - name: contains_world
+          qualification: contains
+          pattern: "World"
+
+        - name: ends_with_exclamation
+          qualification: endsWith
+          pattern: "!"
+
+    - name: "Exit Code Test"
+      type: exitcode
+      entryPoint: hello.c
+      tests:
+        - name: exit_zero
+          expectedExitCode: 0
+
+    - name: "Structural Tests"
+      type: structural
+      entryPoint: hello.c
+      tests:
+        - name: main
+
+        - name: printf
+          allowedOccuranceRange: [1, 10]
+
+    - name: "Compilation Test"
+      type: compile
+      entryPoint: hello.c
+      tests:
+        - name: compiles_successfully
+          value: true

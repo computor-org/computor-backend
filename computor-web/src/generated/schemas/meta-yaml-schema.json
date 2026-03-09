@@ -1,0 +1,413 @@
+{
+  "$defs": {
+    "CodeAbilityLink": {
+      "description": "Link to external resources.",
+      "properties": {
+        "description": {
+          "description": "Description of the link",
+          "minLength": 0,
+          "title": "Description",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of the link",
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "url"
+      ],
+      "title": "CodeAbilityLink",
+      "type": "object"
+    },
+    "CodeAbilityMetaProperties": {
+      "description": "Properties specific to assignment-level meta.",
+      "properties": {
+        "studentSubmissionFiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Files that students must submit",
+          "title": "Studentsubmissionfiles"
+        },
+        "additionalFiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Additional files provided to students",
+          "title": "Additionalfiles"
+        },
+        "testFiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Test files for automated grading",
+          "title": "Testfiles"
+        },
+        "studentTemplates": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Template files for student projects",
+          "title": "Studenttemplates"
+        },
+        "testDependencies": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/TestDependency"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints",
+          "title": "Testdependencies"
+        },
+        "executionBackend": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CourseExecutionBackendConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Execution backend configuration for this assignment"
+        }
+      },
+      "title": "CodeAbilityMetaProperties",
+      "type": "object"
+    },
+    "CodeAbilityPerson": {
+      "description": "Person information for authors/maintainers.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Full name",
+          "title": "Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Email address",
+          "title": "Email"
+        },
+        "affiliation": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Institutional affiliation",
+          "title": "Affiliation"
+        }
+      },
+      "title": "CodeAbilityPerson",
+      "type": "object"
+    },
+    "CourseExecutionBackendConfig": {
+      "description": "Configuration for course execution backend.",
+      "properties": {
+        "slug": {
+          "description": "Unique identifier for the execution backend",
+          "title": "Slug",
+          "type": "string"
+        },
+        "version": {
+          "description": "Version of the execution backend (e.g., 'r2024b', 'v1.0')",
+          "title": "Version",
+          "type": "string"
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Backend-specific settings",
+          "title": "Settings"
+        }
+      },
+      "required": [
+        "slug",
+        "version"
+      ],
+      "title": "CourseExecutionBackendConfig",
+      "type": "object"
+    },
+    "TestDependency": {
+      "description": "Represents a test dependency with slug and version constraint.",
+      "properties": {
+        "slug": {
+          "description": "Hierarchical slug of the dependency example (e.g., 'physics.math.vectors')",
+          "title": "Slug",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version.",
+          "title": "Version"
+        }
+      },
+      "required": [
+        "slug"
+      ],
+      "title": "TestDependency",
+      "type": "object"
+    }
+  },
+  "description": "Schema for meta.yaml files in Computor examples (auto-generated from codeability_meta.py)",
+  "properties": {
+    "version": {
+      "anyOf": [
+        {
+          "pattern": "^([1-9]\\d*|0)(\\.(([1-9]\\d*)|0)){0,3}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "1.0",
+      "description": "Version of the meta format",
+      "title": "Version"
+    },
+    "slug": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Unique identifier for the assignment",
+      "title": "Slug"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Human-readable title",
+      "title": "Title"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Detailed description of the content",
+      "title": "Description"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "en",
+      "description": "Primary language of the content (e.g., 'en', 'de', 'fr', etc.)",
+      "title": "Language"
+    },
+    "license": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "Not specified",
+      "description": "License information",
+      "title": "License"
+    },
+    "authors": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/CodeAbilityPerson"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Content authors",
+      "title": "Authors"
+    },
+    "maintainers": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/CodeAbilityPerson"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Content maintainers",
+      "title": "Maintainers"
+    },
+    "links": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/CodeAbilityLink"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Related links",
+      "title": "Links"
+    },
+    "supportingMaterial": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/CodeAbilityLink"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Supporting material links",
+      "title": "Supportingmaterial"
+    },
+    "keywords": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Keywords for categorization",
+      "title": "Keywords"
+    },
+    "properties": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodeAbilityMetaProperties"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Assignment-specific properties"
+    }
+  },
+  "title": "CodeAbility Meta Schema",
+  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

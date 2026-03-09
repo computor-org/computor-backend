@@ -1,0 +1,1204 @@
+{
+  "$defs": {
+    "ComputorTest": {
+      "additionalProperties": false,
+      "description": "Individual test case definition.",
+      "properties": {
+        "failureMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failuremessage"
+        },
+        "successMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Successmessage"
+        },
+        "qualification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QualificationEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "relativeTolerance": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relativetolerance"
+        },
+        "absoluteTolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolutetolerance"
+        },
+        "allowedOccuranceRange": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowedoccurancerange"
+        },
+        "occuranceType": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurancetype"
+        },
+        "typeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Typecheck"
+        },
+        "shapeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shapecheck"
+        },
+        "ignoreClass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignoreclass"
+        },
+        "verbosity": {
+          "anyOf": [
+            {
+              "maximum": 3,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verbosity"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "evalString": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evalstring"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pattern"
+        },
+        "countRequirement": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Countrequirement"
+        },
+        "stdin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdin"
+        },
+        "expectedStdout": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expectedstdout"
+        },
+        "expectedStderr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expectedstderr"
+        },
+        "expectedExitCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expectedexitcode"
+        },
+        "lineNumber": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linenumber"
+        },
+        "ignoreWhitespace": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignorewhitespace"
+        },
+        "ignoreCase": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignorecase"
+        },
+        "trimOutput": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trimoutput"
+        },
+        "normalizeNewlines": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalizenewlines"
+        },
+        "numericTolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numerictolerance"
+        },
+        "allowEmpty": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Allowempty"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ComputorTest",
+      "type": "object"
+    },
+    "ComputorTestCollection": {
+      "additionalProperties": false,
+      "description": "Test collection (group of related tests).",
+      "properties": {
+        "failureMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failuremessage"
+        },
+        "successMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Successmessage"
+        },
+        "qualification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QualificationEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "relativeTolerance": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relativetolerance"
+        },
+        "absoluteTolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolutetolerance"
+        },
+        "allowedOccuranceRange": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allowedoccurancerange"
+        },
+        "occuranceType": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurancetype"
+        },
+        "typeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Typecheck"
+        },
+        "shapeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shapecheck"
+        },
+        "ignoreClass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignoreclass"
+        },
+        "verbosity": {
+          "anyOf": [
+            {
+              "maximum": 3,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verbosity"
+        },
+        "storeGraphicsArtifacts": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storegraphicsartifacts"
+        },
+        "competency": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Competency"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TypeEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "variable"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "successDependency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Successdependency"
+        },
+        "setUpCodeDependency": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Setupcodedependency"
+        },
+        "entryPoint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint"
+        },
+        "inputAnswers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputanswers"
+        },
+        "setUpCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Setupcode"
+        },
+        "tearDownCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Teardowncode"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/ComputorTest"
+          },
+          "title": "Tests",
+          "type": "array"
+        },
+        "compiler": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compiler"
+        },
+        "compilerFlags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compilerflags"
+        },
+        "linkerFlags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linkerflags"
+        },
+        "sourceFiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourcefiles"
+        },
+        "executableName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executablename"
+        },
+        "workingDirectory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workingdirectory"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment"
+        },
+        "memoryLimit": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memorylimit"
+        },
+        "args": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Args"
+        }
+      },
+      "required": [
+        "name",
+        "tests"
+      ],
+      "title": "ComputorTestCollection",
+      "type": "object"
+    },
+    "ComputorTestProperty": {
+      "additionalProperties": false,
+      "description": "Test suite properties with defaults.",
+      "properties": {
+        "failureMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "Some or all tests failed",
+          "title": "Failuremessage"
+        },
+        "successMessage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "Congratulations! All tests passed",
+          "title": "Successmessage"
+        },
+        "qualification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QualificationEnum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "verifyEqual"
+        },
+        "relativeTolerance": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 1e-12,
+          "title": "Relativetolerance"
+        },
+        "absoluteTolerance": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0.0001,
+          "title": "Absolutetolerance"
+        },
+        "allowedOccuranceRange": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": [
+            0,
+            0
+          ],
+          "title": "Allowedoccurancerange"
+        },
+        "occuranceType": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "NAME",
+          "title": "Occurancetype"
+        },
+        "typeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Typecheck"
+        },
+        "shapeCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Shapecheck"
+        },
+        "ignoreClass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Ignoreclass"
+        },
+        "verbosity": {
+          "anyOf": [
+            {
+              "maximum": 3,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verbosity"
+        },
+        "storeGraphicsArtifacts": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storegraphicsartifacts"
+        },
+        "competency": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Competency"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 180.0,
+          "title": "Timeout"
+        },
+        "resultMessage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resultmessage"
+        },
+        "tests": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ComputorTestCollection"
+          },
+          "title": "Tests",
+          "type": "array"
+        }
+      },
+      "title": "ComputorTestProperty",
+      "type": "object"
+    },
+    "QualificationEnum": {
+      "description": "Qualification types for test comparisons.",
+      "enum": [
+        "verifyEqual",
+        "matches",
+        "contains",
+        "startsWith",
+        "endsWith",
+        "count",
+        "regexp",
+        "matchesLine",
+        "containsLine",
+        "lineCount",
+        "regexpMultiline",
+        "numericOutput",
+        "exitCode"
+      ],
+      "title": "QualificationEnum",
+      "type": "string"
+    },
+    "TypeEnum": {
+      "description": "Test types supported by the framework.",
+      "enum": [
+        "variable",
+        "graphics",
+        "structural",
+        "linting",
+        "exist",
+        "error",
+        "warning",
+        "help",
+        "stdout",
+        "stderr",
+        "stdio",
+        "exitcode",
+        "compile",
+        "runtime",
+        "wordcount",
+        "paragraphcount",
+        "section",
+        "linkcount",
+        "keyword",
+        "uniquewords",
+        "linecount",
+        "charcount",
+        "sentencecount",
+        "headingcount",
+        "imagecount",
+        "codeblockcount",
+        "listitemcount",
+        "pattern"
+      ],
+      "title": "TypeEnum",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Schema for test.yaml files in Computor examples (auto-generated from testing.py)",
+  "properties": {
+    "type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "generic",
+      "title": "Type"
+    },
+    "name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "Test Suite",
+      "title": "Name"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "Checks subtests and graphics",
+      "title": "Description"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "pattern": "^([1-9]\\d*|0)(\\.(([1-9]\\d*)|0)){0,3}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "1.0",
+      "title": "Version"
+    },
+    "properties": {
+      "$ref": "#/$defs/ComputorTestProperty",
+      "default": {
+        "failureMessage": "Some or all tests failed",
+        "successMessage": "Congratulations! All tests passed",
+        "qualification": "verifyEqual",
+        "relativeTolerance": 1e-12,
+        "absoluteTolerance": 0.0001,
+        "allowedOccuranceRange": [
+          0,
+          0
+        ],
+        "occuranceType": "NAME",
+        "typeCheck": true,
+        "shapeCheck": true,
+        "ignoreClass": false,
+        "verbosity": null,
+        "storeGraphicsArtifacts": null,
+        "competency": null,
+        "timeout": 180.0,
+        "resultMessage": null,
+        "tests": []
+      }
+    }
+  },
+  "title": "Computor Test Suite Schema",
+  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

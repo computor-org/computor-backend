@@ -1,0 +1,63 @@
+# Example dependencies.yaml for Computor Framework
+# This file defines all packages required by examples in the collection
+
+python:
+  version: ">=3.10"
+  manager: pip
+  packages:
+    # Core scientific computing
+    - numpy
+    - name: scipy
+      version: ">=1.9"
+    - name: matplotlib
+      version: ">=3.5"
+
+    # Data handling
+    - pandas
+
+    # Symbolic math
+    - sympy
+
+    # Uncertainty calculations
+    - uncertainties
+
+r:
+  version: ">=4.0"
+  cran_mirror: "https://cloud.r-project.org/"
+  lib_path: "~/.local/lib/R"
+  packages:
+    # Required for testing framework
+    - jsonlite
+
+    # Data manipulation
+    - dplyr
+    - tidyr
+
+    # Visualization
+    - ggplot2
+
+octave:
+  version: ">=6.0"
+  forge: true
+  packages:
+    - signal
+    - statistics
+    - optim
+    - control
+
+system:
+  apt:
+    # Build essentials
+    - build-essential
+    - gcc
+    - g++
+
+    # For R packages
+    - libcurl4-openssl-dev
+    - libssl-dev
+    - libxml2-dev
+
+    # For plotting
+    - libfontconfig1-dev
+    - libfreetype6-dev
+    - libpng-dev

@@ -1,0 +1,38 @@
+identifier: itpcp.pgph.py.dict_und_json
+version: '1.0'
+title: Dictionaries und JSON files
+description: Description of the Assignment
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: python
+    url: https://www.python.org/
+supportingMaterials:
+  - name: python
+    url: https://www.python.org/
+license: MIT
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - python
+  tags:
+    - python
+properties:
+  studentSubmissionFiles:
+    - generate_data.py
+  additionalFiles:
+    - data_file.json
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.py
+    settings: {}
+    version: <eb_py_version>

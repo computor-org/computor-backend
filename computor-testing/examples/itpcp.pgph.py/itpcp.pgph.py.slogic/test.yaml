@@ -1,0 +1,68 @@
+type: python
+name: Python Test Suite
+description: Checks subtests and graphics
+version: '1.0'
+properties:
+  failureMessage: Some or all tests failed
+  successMessage: Congratulations! All tests passed
+  qualification: verifyEqual
+  relativeTolerance: 1.0e-12
+  absoluteTolerance: 0.0001
+  allowedOccuranceRange:
+  - 0
+  - 0
+  occuranceType: NAME
+  typeCheck: true
+  shapeCheck: true
+  timeout: 180.0
+  tests:
+  - type: variable
+    name: variables
+    entryPoint: slogic.py
+    tests:
+    - name: L1
+    - name: L2
+    - name: L3
+    - name: L4
+    - name: L5
+    - name: L6
+    - name: L7
+    - name: L8
+    - name: anz_L1
+    - name: anz_L2
+    - name: anz_L3
+    - name: anz_L2_L4
+    - name: w_L6
+    - name: w_L5
+    - name: w_L2_L5
+    - name: iz6
+    - name: is6
+    - name: i6[0]
+    - name: M3
+    - name: M7
+    - name: eines_L3
+    - name: keines_L3
+    - name: alle_L4
+    - name: nicht_alle_L4
+    - name: s1
+    - name: sm1
+    - name: Lsm1
+    - name: Ssm1
+    - name: s2
+    - name: sm2
+    - name: Lsm2
+    - name: Ssm2
+    - name: S3
+  - type: structural
+    name: structural
+    entryPoint: slogic.py
+    file: slogic.py
+    tests:
+    - allowedOccuranceRange:
+      - 0
+      - 0
+      name: for
+    - allowedOccuranceRange:
+      - 0
+      - 0
+      name: if

@@ -1,0 +1,45 @@
+identifier: itpcp.pgph.r.matrix_operations
+version: '1.0'
+title: Matrix Operations in R
+description: In this example you will learn how to create and manipulate 
+  matrices in R. You will learn about matrix creation, transposition, 
+  multiplication, and various matrix operations like extracting rows, columns, 
+  and diagonals.
+authors:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+maintainers:
+  - name: <given_name> <family_name>
+    email: <email>
+    affiliation: <institute>
+courseMaterials:
+  - name: R documentation
+    url: https://www.r-project.org/
+supportingMaterials:
+  - name: r-matrix-function
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/matrix.html
+  - name: r-matrix-multiply
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/matmult.html
+  - name: r-transpose
+    url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/t.html
+license: CC BY-NC 4.0
+content:
+  types: []
+  disciplines: []
+  topics: []
+  tools:
+    - r
+  tags: []
+properties:
+  studentSubmissionFiles:
+    - matrix_operations.R
+  additionalFiles: []
+  testFiles: []
+  studentTemplates: []
+  executionBackend:
+    slug: itpcp.exec.r
+    settings:
+      env: []
+    version: "4.0"
+  testDependencies: []

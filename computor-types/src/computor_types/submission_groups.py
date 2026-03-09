@@ -4,7 +4,7 @@ from typing import Optional, List
 
 
     
-from computor_types.deployments import GitLabConfig
+from computor_types.gitlab import GitLabConfig
 from computor_types.base import EntityInterface, ListQuery, BaseEntityGet
 from computor_types.grading import GradingStatus
 

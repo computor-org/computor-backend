@@ -21,7 +21,6 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
 
-from computor_backend.model.example import Example as ExampleModel
 from computor_backend.custom_types import Ltree
 from computor_backend.exceptions import (
     BadRequestException,
@@ -32,23 +31,19 @@ from computor_backend.database import get_db
 from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
-    AssignExampleRequest,
     CourseContentDeploymentGet,
     DeploymentHistoryGet,
     DeploymentWithHistory,
     DeploymentSummary,
 )
 from computor_backend.api.api_builder import CrudRouter
-from computor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
+from computor_backend.model.course import CourseContent, Course
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.repositories import (
     CourseContentRepository,
     CourseContentDeploymentRepository,
-    ExampleVersionRepository,
 )
-from computor_backend.business_logic.lecturer_deployment import validate_reassignment_allowed
-from computor_types.validation import normalize_version
 from aiocache import BaseCache
 
 # Create the router
@@ -160,273 +155,6 @@ async def provision_submission_groups_wrapper(entity: CourseContentGet, permissi
 # course_content_router.on_created.append(event_wrapper)
 course_content_router.on_created.append(provision_submission_groups_wrapper)
 # course_content_router.on_updated.append(event_wrapper)
-
-# New deployment endpoints
-
-@course_content_router.router.post(
-    "/{content_id}/assign-example",
-    response_model=DeploymentWithHistory
-)
-async def assign_example_to_content(
-    content_id: str,
-    request: AssignExampleRequest,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
-    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
-):
-    """
-    Assign an example version to course content.
-
-    This creates or updates a deployment record, linking the example to the content.
-    Only submittable content (assignments) can have examples assigned.
-    """
-    # Initialize repositories with cache
-    content_repo = CourseContentRepository(db, get_cache())
-    deployment_repo = CourseContentDeploymentRepository(db, get_cache())
-    example_version_repo = ExampleVersionRepository(db, get_cache())
-
-    # Get course content
-    content = content_repo.get_by_id(str(content_id))
-    if not content:
-        raise NotFoundException(
-            error_code="CONTENT_001",
-            detail="Course content not found",
-            context={"course_content_id": str(content_id)}
-        )
-
-    # Check permissions on the course
-    if check_course_permissions(permissions, Course, "_lecturer", db).filter(
-        Course.id == content.course_id
-    ).first() is None:
-        raise ForbiddenException(
-            detail="Not authorized to modify this course content",
-            context={
-                "course_content_id": str(content_id),
-                "required_permission": "modify_content"
-            }
-        )
-
-    # Verify this is submittable content
-    content_type = db.query(CourseContentType).filter(
-        CourseContentType.id == content.course_content_type_id
-    ).first()
-
-    if not content_type:
-        raise NotFoundException(
-            error_code="CONTENT_002",
-            detail="Content type not configured",
-            context={"content_type_id": str(content.course_content_type_id)}
-        )
-
-    content_kind = db.query(CourseContentKind).filter(
-        CourseContentKind.id == content_type.course_content_kind_id
-    ).first()
-
-    if not content_kind or not content_kind.submittable:
-        raise BadRequestException(
-            error_code="CONTENT_003",
-            detail="Cannot assign examples to non-submittable content types",
-            context={
-                "content_type": content_kind.name if content_kind else "unknown",
-                "is_submittable": False
-            }
-        )
-    
-    # Resolve source: either by ExampleVersion ID, or resolve identifier+version_tag to a concrete ExampleVersion
-    example_version = None
-    src_identifier: Optional[str] = None
-    src_version_tag: Optional[str] = None
-
-    if request.example_version_id is not None:
-        example_version = example_version_repo.get_by_id(request.example_version_id)
-        if not example_version:
-            raise NotFoundException(
-                error_code="CONTENT_005",
-                detail="Example version not found",
-                context={"example_version_id": request.example_version_id}
-            )
-        if example_version.example:
-            src_identifier = str(example_version.example.identifier)
-        src_version_tag = example_version.version_tag
-    else:
-        # identifier + version_tag (may be 'latest')
-        if not request.example_identifier:
-            raise BadRequestException(
-                error_code="VAL_002",
-                detail="Either example_version_id or example_identifier must be provided",
-                context={
-                    "provided_version_id": request.example_version_id,
-                    "provided_identifier": request.example_identifier
-                }
-            )
-        src_identifier = request.example_identifier
-        requested_tag = (request.version_tag or '').strip() if request.version_tag else None
-
-        # Normalize version tag if provided (e.g., '1.2' -> '1.2.0')
-        if requested_tag and requested_tag.lower() != 'latest':
-            requested_tag = normalize_version(requested_tag)
-
-        # Try to resolve to Example/ExampleVersion from DB
-        example_row = db.query(ExampleModel).filter(ExampleModel.identifier == Ltree(src_identifier)).first()
-        if example_row:
-            # Determine concrete tag: resolve 'latest' or missing to newest version
-            if not requested_tag or requested_tag.lower() == 'latest':
-                latest_ev = example_version_repo.find_latest_version(example_row.id)
-                if not latest_ev:
-                    raise NotFoundException(
-                        error_code="CONTENT_005",
-                        detail="No versions found for example",
-                        context={"example_id": str(example_row.id)}
-                    )
-                example_version = latest_ev
-                src_version_tag = latest_ev.version_tag
-            else:
-                ev = example_version_repo.find_by_version_tag(example_row.id, requested_tag)
-                if not ev:
-                    raise NotFoundException(
-                        error_code="CONTENT_005",
-                        detail=f"Version '{requested_tag}' not found for example",
-                        context={
-                            "example_id": str(example_row.id),
-                            "requested_tag": requested_tag
-                        }
-                    )
-                example_version = ev
-                src_version_tag = ev.version_tag
-        else:
-            # Custom (non-library) source: require explicit non-'latest' tag
-            if not requested_tag or requested_tag.lower() == 'latest':
-                raise BadRequestException(
-                    error_code="VAL_003",
-                    detail="version_tag is required and cannot be 'latest' for non-library sources",
-                    context={
-                        "provided_tag": requested_tag,
-                        "source_type": "non-library"
-                    }
-                )
-            src_version_tag = requested_tag
-    
-    # Get or create deployment record
-    deployment = deployment_repo.find_by_content(str(content_id))
-    
-    if deployment:
-        # Update existing deployment (reassignment)
-        previous_version_id = deployment.example_version_id
-        new_example_version_id = str(example_version.id) if example_version else None
-        current_identifier = (
-            str(deployment.example_identifier)
-            if getattr(deployment, "example_identifier", None) is not None
-            else None
-        )
-        same_version = previous_version_id == new_example_version_id
-        same_identifier = current_identifier == (src_identifier or None)
-        same_version_tag = deployment.version_tag == src_version_tag
-
-        if same_version and same_identifier and same_version_tag:
-            # No-op assignment; only update message if it changed
-            new_message = request.deployment_message
-            if deployment.deployment_message != new_message:
-                deployment.deployment_message = new_message
-                deployment.updated_by = (
-                    permissions.user_id if hasattr(permissions, "user_id") else None
-                )
-                deployment.updated_at = datetime.utcnow()
-                db.commit()
-            db.refresh(deployment)
-            return _build_deployment_with_history(deployment, db)
-
-        # Validate reassignment using shared helper function
-        is_same_example, action = validate_reassignment_allowed(
-            existing_deployment=deployment,
-            new_example_identifier=src_identifier,
-            course_content_id=str(content_id)
-        )
-
-        # Update via repository
-        deployment = deployment_repo.update(
-            deployment.id,
-            {
-                "example_version_id": new_example_version_id,
-                "example_identifier": Ltree(src_identifier) if src_identifier else None,
-                "version_tag": src_version_tag,
-                "deployment_status": "pending",  # Reset to pending for redeployment
-                "deployment_message": request.deployment_message,
-                "updated_by": permissions.user_id if hasattr(permissions, 'user_id') else None,
-                "updated_at": datetime.utcnow()
-            }
-        )
-
-        history_entry = DeploymentHistory(
-            deployment_id=deployment.id,
-            action=action,
-            example_version_id=new_example_version_id,
-            example_identifier=Ltree(src_identifier) if src_identifier else None,
-            version_tag=src_version_tag,
-            previous_example_version_id=str(previous_version_id) if previous_version_id else None,
-            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
-        )
-        db.add(history_entry)
-        db.commit()
-
-    else:
-        # Create new deployment
-        deployment = CourseContentDeployment(
-            course_content_id=str(content_id),
-            example_version_id=str(example_version.id) if example_version else None,
-            example_identifier=Ltree(src_identifier) if src_identifier else None,
-            version_tag=src_version_tag,
-            deployment_status="pending",
-            deployment_message=request.deployment_message,
-            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None,
-            updated_by=permissions.user_id if hasattr(permissions, 'user_id') else None
-        )
-        # Create via repository
-        deployment = deployment_repo.create(deployment)
-
-        # Add initial history entry
-        history_entry = DeploymentHistory(
-            deployment_id=deployment.id,
-            action="assigned",
-            example_version_id=str(example_version.id) if example_version else None,
-            example_identifier=Ltree(src_identifier) if src_identifier else None,
-            version_tag=src_version_tag,
-            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
-        )
-        db.add(history_entry)
-        db.commit()
-
-    # Update course content's testing_service_id based on example's execution_backend
-    if example_version:
-        execution_backend_slug = example_version.get_execution_backend_slug()
-        if execution_backend_slug:
-            # Look up service by slug
-            from computor_backend.model.service import Service
-            service = db.query(Service).filter(
-                Service.slug == execution_backend_slug,
-                Service.enabled == True
-            ).first()
-
-            if service:
-                # Get the course content from the db session (not from repository)
-                content_db = db.query(CourseContent).filter(
-                    CourseContent.id == content_id
-                ).first()
-
-                if content_db and content_db.testing_service_id != service.id:
-                    # Update course content's testing_service_id
-                    content_db.testing_service_id = service.id
-                    content_db.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
-                    content_db.updated_at = datetime.utcnow()
-                    db.commit()
-                    logger.info(f"Updated testing_service_id for content {content_id} to service {execution_backend_slug}")
-            else:
-                logger.warning(f"Service not found for execution_backend slug: {execution_backend_slug}")
-
-    # Clear cache
-    if cache:
-        await cache.delete(f"course:{content.course_id}:deployments")
-
-    return _build_deployment_with_history(deployment, db)
 
 @course_content_router.router.delete(
     "/{content_id}/example",

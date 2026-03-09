@@ -99,11 +99,39 @@ from .auth import (
     GLPAuthConfig,
 )
 
-# Deployments
-from .deployments import (
-    GitLabConfig,
-    GitLabConfigGet,
-    BaseDeployment,
+# Deployments (imported from dependency-free base to avoid circular imports)
+from .deployment_base import BaseDeployment
+from .gitlab import GitLabConfig, GitLabConfigGet
+
+# Testing (test.yaml models)
+from .testing import (
+    ComputorTestSuite,
+    ComputorTestCollection,
+    ComputorTest,
+    ComputorTestProperty,
+    ComputorSpecification,
+    QualificationEnum,
+    TypeEnum,
+    StatusEnum,
+    ResultEnum,
+)
+
+# Testing reports (testSummary.json models)
+from .testing_report import (
+    ComputorReport,
+    ComputorReportMain,
+    ComputorReportSub,
+    ComputorReportSummary,
+)
+
+# Meta.yaml models
+from .codeability_meta import (
+    CodeAbilityMeta,
+    CodeAbilityMetaProperties,
+    CodeAbilityPerson,
+    CodeAbilityLink,
+    CourseExecutionBackendConfig,
+    TestDependency,
 )
 
 # Exceptions
@@ -160,28 +188,58 @@ from .cascade_deletion import (
 )
 
 __all__ = [
+    # Base
     "EntityInterface",
     "BaseEntityGet",
     "BaseEntityList",
     "ListQuery",
+    # Organizations
     "OrganizationInterface",
     "OrganizationType",
     "OrganizationCreate",
     "OrganizationGet",
+    # Course Families
     "CourseFamilyInterface",
     "CourseFamilyCreate",
     "CourseFamilyGet",
+    # Courses
     "CourseInterface",
     "CourseCreate",
     "CourseGet",
+    # Users
     "UserInterface",
     "UserCreate",
     "UserGet",
+    # Auth
     "BasicAuthConfig",
     "GLPAuthConfig",
+    # Deployments / GitLab
+    "BaseDeployment",
     "GitLabConfig",
     "GitLabConfigGet",
-    "BaseDeployment",
+    # Testing (test.yaml)
+    "ComputorTestSuite",
+    "ComputorTestCollection",
+    "ComputorTest",
+    "ComputorTestProperty",
+    "ComputorSpecification",
+    "QualificationEnum",
+    "TypeEnum",
+    "StatusEnum",
+    "ResultEnum",
+    # Testing reports
+    "ComputorReport",
+    "ComputorReportMain",
+    "ComputorReportSub",
+    "ComputorReportSummary",
+    # Meta.yaml
+    "CodeAbilityMeta",
+    "CodeAbilityMetaProperties",
+    "CodeAbilityPerson",
+    "CodeAbilityLink",
+    "CourseExecutionBackendConfig",
+    "TestDependency",
+    # Extensions
     "VsixManifestError",
     "VsixMetadata",
     "ExtensionInterface",

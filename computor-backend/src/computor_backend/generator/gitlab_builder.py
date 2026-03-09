@@ -24,9 +24,11 @@ from sqlalchemy.orm.attributes import flag_modified
 from computor_backend.api.exceptions import NotImplementedException
 from computor_backend.services.git_service import GitService
 
-from computor_types.deployments import (
-    ComputorDeploymentConfig,
-    GitLabConfig
+from computor_types.gitlab import GitLabConfig
+from computor_types.deployments_refactored import (
+    OrganizationConfig,
+    CourseFamilyConfig,
+    CourseConfig,
 )
 from computor_types.organizations import (
     OrganizationCreate,
@@ -109,16 +111,20 @@ class GitLabBuilder:
     
     def create_deployment_hierarchy(
         self,
-        deployment: ComputorDeploymentConfig,
+        org_config: OrganizationConfig,
+        family_config: CourseFamilyConfig,
+        course_config: CourseConfig,
         created_by_user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create the complete deployment hierarchy with GitLab groups and database entries.
-        
+
         Args:
-            deployment: Deployment configuration
+            org_config: Organization configuration
+            family_config: Course family configuration
+            course_config: Course configuration
             created_by_user_id: ID of the user creating the deployment
-            
+
         Returns:
             Dictionary with created entities and status
         """
@@ -131,80 +137,80 @@ class GitLabBuilder:
             "errors": [],
             "success": False
         }
-        
+
         try:
             # Start database transaction
             logger.info("Starting deployment hierarchy creation")
-            
+
             # Phase 1: Create Organization
             org_result = self._create_organization(
-                deployment,
+                org_config,
                 created_by_user_id
             )
-            
+
             if not org_result["success"]:
                 results["errors"].append(org_result["error"])
                 self.db.rollback()
                 return results
-            
+
             results["organization"] = org_result["organization"]
             if org_result.get("gitlab_created"):
                 results["gitlab_groups_created"].append(f"Organization: {org_result['gitlab_group'].full_path}")
             if org_result.get("db_created"):
                 results["database_entries_created"].append(f"Organization: {org_result['organization'].path}")
-            
+
             # Phase 2: Create CourseFamily
             family_result = self._create_course_family(
-                deployment,
+                family_config,
                 results["organization"],
                 created_by_user_id
             )
-            
+
             if not family_result["success"]:
                 results["errors"].append(family_result["error"])
                 self.db.rollback()
                 return results
-            
+
             results["course_family"] = family_result["course_family"]
             if family_result.get("gitlab_created"):
                 results["gitlab_groups_created"].append(f"CourseFamily: {family_result['gitlab_group'].full_path}")
             if family_result.get("db_created"):
                 results["database_entries_created"].append(f"CourseFamily: {family_result['course_family'].path}")
-            
+
             # Phase 3: Create Course
             course_result = self._create_course(
-                deployment,
+                course_config,
                 results["organization"],
                 results["course_family"],
                 created_by_user_id
             )
-            
+
             if not course_result["success"]:
                 results["errors"].append(course_result["error"])
                 self.db.rollback()
                 return results
-            
+
             results["course"] = course_result["course"]
             if course_result.get("gitlab_created"):
                 results["gitlab_groups_created"].append(f"Course: {course_result['gitlab_group'].full_path}")
             if course_result.get("db_created"):
                 results["database_entries_created"].append(f"Course: {course_result['course'].path}")
-            
+
             # Commit all changes
             self.db.commit()
             results["success"] = True
             logger.info("Successfully created deployment hierarchy")
-            
+
         except Exception as e:
             logger.error(f"Unexpected error creating deployment hierarchy: {e}")
             results["errors"].append(f"Unexpected error: {str(e)}")
             self.db.rollback()
-        
+
         return results
     
     def _create_organization(
         self,
-        deployment: ComputorDeploymentConfig,
+        org_config: OrganizationConfig,
         created_by_user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create organization with GitLab group and database entry."""
@@ -218,9 +224,9 @@ class GitLabBuilder:
         }
         
         try:
-            logger.info(f"Creating organization with path: {deployment.organization.path}")
+            logger.info(f"Creating organization with path: {org_config.path}")
             # Check if organization already exists in database
-            existing_org = self.org_repo.find_by_path(deployment.organization.path)
+            existing_org = self.org_repo.find_by_path(org_config.path)
             
             if existing_org:
                 logger.info(f"Organization already exists: {existing_org.path}")
@@ -233,16 +239,16 @@ class GitLabBuilder:
                         # Validate the GitLab group still exists
                         is_valid = self._validate_gitlab_group(
                             gitlab_config["group_id"],
-                            deployment.organization.path
+                            org_config.path
                         )
                         if not is_valid:
                             # Need to recreate GitLab group
                             logger.warning(f"GitLab group for organization {existing_org.path} no longer exists")
                             gitlab_group, _ = self._create_gitlab_group(
-                                deployment.organization.name,
-                                deployment.organization.path,
-                                deployment.organization.gitlab.parent,
-                                deployment.organization.description or ""
+                                org_config.name,
+                                org_config.path,
+                                org_config.gitlab.parent,
+                                org_config.description or ""
                             )
                             result["gitlab_group"] = gitlab_group
                             result["gitlab_created"] = True
@@ -261,10 +267,10 @@ class GitLabBuilder:
                     else:
                         # No group_id stored, create GitLab group
                         gitlab_group, _ = self._create_gitlab_group(
-                            deployment.organization.name,
-                            deployment.organization.path,
-                            deployment.organization.gitlab.parent,
-                            deployment.organization.description or ""
+                            org_config.name,
+                            org_config.path,
+                            org_config.gitlab.parent,
+                            org_config.description or ""
                         )
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
@@ -281,10 +287,10 @@ class GitLabBuilder:
                 else:
                     # No GitLab properties, create GitLab group
                     gitlab_group, _ = self._create_gitlab_group(
-                        deployment.organization.name,
-                        deployment.organization.path,
-                        deployment.organization.gitlab.parent,
-                        deployment.organization.description or ""
+                        org_config.name,
+                        org_config.path,
+                        org_config.gitlab.parent,
+                        org_config.description or ""
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
@@ -304,12 +310,12 @@ class GitLabBuilder:
             
             # Create new organization
             # First create GitLab group
-            logger.info(f"Creating new organization GitLab group with parent: {deployment.organization.gitlab.parent}")
+            logger.info(f"Creating new organization GitLab group with parent: {org_config.gitlab.parent}")
             gitlab_group, _ = self._create_gitlab_group(
-                deployment.organization.name,
-                deployment.organization.path,
-                deployment.organization.gitlab.parent,
-                deployment.organization.description or ""
+                org_config.name,
+                org_config.path,
+                org_config.gitlab.parent,
+                org_config.description or ""
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
@@ -320,9 +326,9 @@ class GitLabBuilder:
             # Create organization in database
             logger.info(f"Creating organization with gitlab_config: {gitlab_config}")
             org_data = OrganizationCreate(
-                title=deployment.organization.name,
-                description=deployment.organization.description,
-                path=deployment.organization.path,
+                title=org_config.name,
+                description=org_config.description,
+                path=org_config.path,
                 organization_type="organization",
                 properties=OrganizationProperties(gitlab=gitlab_config)
             )
@@ -358,7 +364,7 @@ class GitLabBuilder:
     
     def _create_course_family(
         self,
-        deployment: ComputorDeploymentConfig,
+        family_config: CourseFamilyConfig,
         organization: Organization,
         created_by_user_id: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -376,7 +382,7 @@ class GitLabBuilder:
             # Check if course family already exists
             existing_family = self.db.query(CourseFamily).filter(
                 CourseFamily.organization_id == organization.id,
-                CourseFamily.path == Ltree(deployment.courseFamily.path)
+                CourseFamily.path == Ltree(family_config.path)
             ).first()
             
             if existing_family:
@@ -403,15 +409,15 @@ class GitLabBuilder:
                     if gitlab_config.get("group_id"):
                         is_valid = self._validate_gitlab_group(
                             gitlab_config["group_id"],
-                            f"{parent_group.full_path}/{deployment.courseFamily.path}"
+                            f"{parent_group.full_path}/{family_config.path}"
                         )
                         if not is_valid:
                             # Recreate GitLab group
                             gitlab_group, _ = self._create_gitlab_group(
-                                deployment.courseFamily.name,
-                                deployment.courseFamily.path,
+                                family_config.name,
+                                family_config.path,
                                 parent_group_id,
-                                deployment.courseFamily.description or "",
+                                family_config.description or "",
                                 parent_group
                             )
                             result["gitlab_group"] = gitlab_group
@@ -431,10 +437,10 @@ class GitLabBuilder:
                     else:
                         # Create GitLab group
                         gitlab_group, _ = self._create_gitlab_group(
-                            deployment.courseFamily.name,
-                            deployment.courseFamily.path,
+                            family_config.name,
+                            family_config.path,
                             parent_group_id,
-                            deployment.courseFamily.description or "",
+                            family_config.description or "",
                             parent_group
                         )
                         result["gitlab_group"] = gitlab_group
@@ -456,10 +462,10 @@ class GitLabBuilder:
                 else:
                     # Create GitLab group
                     gitlab_group, _ = self._create_gitlab_group(
-                        deployment.courseFamily.name,
-                        deployment.courseFamily.path,
+                        family_config.name,
+                        family_config.path,
                         parent_group_id,
-                        deployment.courseFamily.description or "",
+                        family_config.description or "",
                         parent_group
                     )
                     result["gitlab_group"] = gitlab_group
@@ -505,10 +511,10 @@ class GitLabBuilder:
             
             # Create GitLab group
             gitlab_group, _ = self._create_gitlab_group(
-                deployment.courseFamily.name,
-                deployment.courseFamily.path,
+                family_config.name,
+                family_config.path,
                 parent_group_id,
-                deployment.courseFamily.description or "",
+                family_config.description or "",
                 parent_group
             )
             result["gitlab_group"] = gitlab_group
@@ -527,9 +533,9 @@ class GitLabBuilder:
 
             # Create course family in database
             family_data = CourseFamilyCreate(
-                title=deployment.courseFamily.name,
-                description=deployment.courseFamily.description or "",
-                path=deployment.courseFamily.path,
+                title=family_config.name,
+                description=family_config.description or "",
+                path=family_config.path,
                 organization_id=str(organization.id),
                 properties=CourseFamilyProperties(gitlab=gitlab_config)
             )
@@ -567,7 +573,7 @@ class GitLabBuilder:
     
     def _create_course(
         self,
-        deployment: ComputorDeploymentConfig,
+        course_config: CourseConfig,
         organization: Organization,
         course_family: CourseFamily,
         created_by_user_id: Optional[str] = None
@@ -586,7 +592,7 @@ class GitLabBuilder:
             # Check if course already exists
             existing_course = self.db.query(Course).filter(
                 Course.course_family_id == course_family.id,
-                Course.path == Ltree(deployment.course.path)
+                Course.path == Ltree(course_config.path)
             ).first()
             
             if existing_course:
@@ -613,15 +619,15 @@ class GitLabBuilder:
                     if gitlab_config.get("group_id"):
                         is_valid = self._validate_gitlab_group(
                             gitlab_config["group_id"],
-                            f"{parent_group.full_path}/{deployment.course.path}"
+                            f"{parent_group.full_path}/{course_config.path}"
                         )
                         if not is_valid:
                             # Recreate GitLab group
                             gitlab_group, _ = self._create_gitlab_group(
-                                deployment.course.name,
-                                deployment.course.path,
+                                course_config.name,
+                                course_config.path,
                                 parent_group_id,
-                                deployment.course.description or "",
+                                course_config.description or "",
                                 parent_group
                             )
                             result["gitlab_group"] = gitlab_group
@@ -641,10 +647,10 @@ class GitLabBuilder:
                     else:
                         # Create GitLab group
                         gitlab_group, _ = self._create_gitlab_group(
-                            deployment.course.name,
-                            deployment.course.path,
+                            course_config.name,
+                            course_config.path,
                             parent_group_id,
-                            deployment.course.description or "",
+                            course_config.description or "",
                             parent_group
                         )
                         result["gitlab_group"] = gitlab_group
@@ -662,10 +668,10 @@ class GitLabBuilder:
                 else:
                     # Create GitLab group
                     gitlab_group, _ = self._create_gitlab_group(
-                        deployment.course.name,
-                        deployment.course.path,
+                        course_config.name,
+                        course_config.path,
                         parent_group_id,
-                        deployment.course.description or "",
+                        course_config.description or "",
                         parent_group
                     )
                     result["gitlab_group"] = gitlab_group
@@ -686,8 +692,7 @@ class GitLabBuilder:
                     students_group_result = self._create_students_group(
                         course=existing_course,
                         parent_group=result["gitlab_group"],
-                        deployment=deployment
-                    )
+                        )
                     
                     if not students_group_result["success"]:
                         logger.warning(f"Failed to create students group: {students_group_result['error']}")
@@ -698,8 +703,7 @@ class GitLabBuilder:
                     tutors_group_result = self._create_tutors_group(
                         course=existing_course,
                         parent_group=result["gitlab_group"],
-                        deployment=deployment
-                    )
+                        )
                     
                     if not tutors_group_result["success"]:
                         logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
@@ -710,8 +714,7 @@ class GitLabBuilder:
                     projects_result = self._create_course_projects(
                         course=existing_course,
                         parent_group=result["gitlab_group"],
-                        deployment=deployment
-                    )
+                        )
                     
                     if not projects_result["success"]:
                         logger.warning(f"Failed to create course projects: {projects_result['error']}")
@@ -738,10 +741,10 @@ class GitLabBuilder:
             
             # Create GitLab group
             gitlab_group, _ = self._create_gitlab_group(
-                deployment.course.name,
-                deployment.course.path,
+                course_config.name,
+                course_config.path,
                 parent_group_id,
-                deployment.course.description or "",
+                course_config.description or "",
                 parent_group
             )
             result["gitlab_group"] = gitlab_group
@@ -752,9 +755,9 @@ class GitLabBuilder:
             
             # Create course in database
             course_data = CourseCreate(
-                title=deployment.course.name,
-                description=deployment.course.description or "",
-                path=deployment.course.path,
+                title=course_config.name,
+                description=course_config.description or "",
+                path=course_config.path,
                 course_family_id=str(course_family.id),
                 properties=CourseProperties(gitlab=gitlab_config)
             )
@@ -780,33 +783,30 @@ class GitLabBuilder:
             students_group_result = self._create_students_group(
                 course=new_course,
                 parent_group=gitlab_group,
-                deployment=deployment
             )
-            
+
             if not students_group_result["success"]:
                 logger.warning(f"Failed to create students group: {students_group_result['error']}")
                 # Don't fail the entire course creation, just log the warning
             else:
                 logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
-            
+
             # Create tutors group under the course
             tutors_group_result = self._create_tutors_group(
                 course=new_course,
                 parent_group=gitlab_group,
-                deployment=deployment
             )
-            
+
             if not tutors_group_result["success"]:
                 logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
                 # Don't fail the entire course creation, just log the warning
             else:
                 logger.info(f"Created tutors group: {tutors_group_result['gitlab_group'].full_path}")
-            
+
             # Create course projects (assignments, student-template, reference)
             projects_result = self._create_course_projects(
                 course=new_course,
                 parent_group=gitlab_group,
-                deployment=deployment
             )
             
             if not projects_result["success"]:
@@ -1131,7 +1131,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         parent_group: Group,
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Create students group under a course."""
         result = {
@@ -1203,7 +1202,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         parent_group: Group,
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Create tutors group under a course."""
         result = {
@@ -1275,7 +1273,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         parent_group: Group,
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Create course projects (student-template and assignments) under a course.
         
@@ -1539,7 +1536,6 @@ Documents are automatically synchronized and made available to students through 
     def initialize_course_projects_content(
         self,
         course: Course,
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Initialize course project (student-template only) with proper content structure."""
         result = {
@@ -1560,7 +1556,7 @@ Documents are automatically synchronized and made available to students through 
             # Only initialize student-template project
             if "student_template" in projects:
                 template_result = self._initialize_student_template_project(
-                    course, projects["student_template"], deployment
+                    course, projects["student_template"]
                 )
                 if template_result["success"]:
                     result["initialized_projects"].append("student-template")
@@ -1585,7 +1581,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         project_info: Dict[str, Any],
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Initialize assignments project with proper structure and meta.yaml."""
 
@@ -1595,7 +1590,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         project_info: Dict[str, Any],
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Initialize student template project with basic structure."""
         result = {"success": False, "error": None}
@@ -1668,7 +1662,6 @@ Documents are automatically synchronized and made available to students through 
         self,
         course: Course,
         project_info: Dict[str, Any],
-        deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Initialize reference project with instructor materials."""
         result = {"success": False, "error": None}
