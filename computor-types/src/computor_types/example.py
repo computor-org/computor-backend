@@ -12,6 +12,29 @@ from computor_types.custom_types import Ltree
 
 from .base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
+
+# --- Example file exclude patterns ---
+# Single source of truth for files/directories to exclude when packaging,
+# uploading, syncing, or diffing examples. Used by backend, VS Code extension,
+# and any other tooling that handles example file trees.
+
+EXAMPLE_EXCLUDE_PATTERNS: List[str] = [
+    '.git',
+    '.gitignore',
+    '.gitlab-ci.yml',
+    '.DS_Store',
+    'Thumbs.db',
+    '.env',
+    '.env.local',
+    'node_modules',
+    '__pycache__',
+    '*.pyc',
+    '.vscode',
+    '.idea',
+    '.computor-example.json',
+]
+
+
 class ExampleRepositoryCreate(BaseModel):
     """Create a new example repository."""
     name: str = Field(..., description="Human-readable name of the repository")
