@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { API_BASE_URL } from '@/src/utils/apiClient';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 
 interface CourseMember {
@@ -28,7 +29,7 @@ export default function TutorStudentsPage() {
   useEffect(() => {
     async function fetchStudents() {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tutors/course-members`, {
+        const response = await fetch(`${API_BASE_URL}/tutors/course-members`, {
           credentials: 'include',
         });
 

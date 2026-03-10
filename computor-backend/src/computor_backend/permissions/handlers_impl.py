@@ -308,28 +308,19 @@ class CourseFamilyPermissionHandler(PermissionHandler):
         
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            from sqlalchemy.orm import aliased
             from sqlalchemy import select
-            
-            cm_other = aliased(CourseMember)
-            
+
             subquery = CoursePermissionQueryBuilder.user_courses_subquery(
                 principal.user_id, min_role, db
             )
-            
-            query = (
-                db.query(self.entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(Course, cm_other.course_id == Course.id)
-                .outerjoin(self.entity, self.entity.id == Course.course_family_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
-                )
+
+            # Get course family IDs from courses the user is a member of
+            family_subquery = select(Course.course_family_id).where(
+                Course.id.in_(subquery)
             )
-            
-            return query
-        
+
+            return db.query(self.entity).filter(self.entity.id.in_(family_subquery))
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
@@ -486,27 +477,12 @@ class CourseContentPermissionHandler(PermissionHandler):
         
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            from sqlalchemy.orm import aliased
-            from sqlalchemy import select
-            
-            cm_other = aliased(CourseMember)
-            
             subquery = CoursePermissionQueryBuilder.user_courses_subquery(
                 principal.user_id, min_role, db
             )
-            
-            query = (
-                db.query(self.entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
-                )
-            )
-            
-            return query
-        
+
+            return db.query(self.entity).filter(self.entity.course_id.in_(subquery))
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 

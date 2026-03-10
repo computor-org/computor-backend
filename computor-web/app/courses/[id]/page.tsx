@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch } from '@/src/utils/apiClient';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseGet } from 'types/generated';
@@ -26,7 +26,7 @@ export default function CoursePage() {
     async function fetchCourseData() {
       try {
         // Fetch course details
-        const courseResponse = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`);
+        const courseResponse = await apiFetch(`${API_BASE_URL}/courses/${courseId}`);
 
         if (!courseResponse.ok) {
           throw new Error('Failed to fetch course');
@@ -36,7 +36,7 @@ export default function CoursePage() {
         setCourse(courseData);
 
         // Fetch course-specific views
-        const viewsResponse = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/user/views/${courseId}`);
+        const viewsResponse = await apiFetch(`${API_BASE_URL}/user/views/${courseId}`);
 
         if (viewsResponse.ok) {
           const viewsData = await viewsResponse.json();

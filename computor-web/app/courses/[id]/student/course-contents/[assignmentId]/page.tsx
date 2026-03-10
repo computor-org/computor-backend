@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { apiFetch } from '@/src/utils/apiClient';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseContentStudentGet } from 'types/generated';
@@ -28,7 +28,7 @@ export default function AssignmentDetailPage() {
     async function fetchAssignment() {
       try {
         const response = await apiFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/students/course-contents/${assignmentId}`
+          `${API_BASE_URL}/students/course-contents/${assignmentId}`
         );
 
         if (!response.ok) {

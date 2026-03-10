@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function TopBar() {
@@ -29,7 +29,7 @@ export default function TopBar() {
       async function fetchCourseTitle() {
         try {
           const response = await apiFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/courses/${currentCourseId}`
+            `${API_BASE_URL}/courses/${currentCourseId}`
           );
           if (response.ok) {
             const data = await response.json();

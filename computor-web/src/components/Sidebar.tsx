@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SubItem {
@@ -182,7 +182,7 @@ export default function Sidebar() {
       async function fetchCourseViews() {
         try {
           const response = await apiFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/user/views/${currentCourseId}`
+            `${API_BASE_URL}/user/views/${currentCourseId}`
           );
           if (response.ok) {
             const data = await response.json();
