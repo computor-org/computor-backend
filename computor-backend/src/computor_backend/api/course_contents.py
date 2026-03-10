@@ -11,8 +11,9 @@ from typing import Annotated, Optional, Dict, Any
 from datetime import datetime
 
 from fastapi import Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException
 )
-from computor_backend.database import get_db
+from computor_backend.database import get_db, set_db_user
 from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
@@ -531,3 +532,105 @@ async def get_content_deployment(
         deployment=deployment,
         history=history
     )
+
+
+class CourseContentMoveRequest(BaseModel):
+    """Request body for moving a course content (path change + position)."""
+    path: str
+    position: float
+
+
+@course_content_router.router.patch(
+    "/{content_id}/move",
+    response_model=CourseContentGet
+)
+async def move_course_content(
+    content_id: str,
+    move_request: CourseContentMoveRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+):
+    """
+    Move a course content to a new path and/or position.
+
+    Updates the content's path and position, and cascades the path change
+    to all descendants in a single transaction using ltree functions.
+    """
+    set_db_user(db, permissions.user_id)
+
+    content = db.query(CourseContent).filter(CourseContent.id == content_id).first()
+    if not content:
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": content_id}
+        )
+
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
+        raise ForbiddenException(
+            detail="Not authorized to modify this course content",
+            context={"course_content_id": content_id}
+        )
+
+    old_path = str(content.path)
+    new_path = move_request.path
+    course_id = str(content.course_id)
+
+    # Use raw SQL for all updates to bypass SQLAlchemy Ltree change detection issues.
+    # Cascade descendants first, then update the item itself.
+    if old_path != new_path:
+        db.execute(
+            text("""
+                UPDATE course_content
+                SET path = :new_path || subpath(path, nlevel(:old_path)),
+                    updated_at = now()
+                WHERE path <@ :old_path
+                  AND id != :content_id
+                  AND course_id = :course_id
+            """),
+            {
+                "new_path": new_path,
+                "old_path": old_path,
+                "content_id": content_id,
+                "course_id": course_id,
+            }
+        )
+
+    # Update the item itself via raw SQL
+    db.execute(
+        text("""
+            UPDATE course_content
+            SET path = :new_path,
+                position = :position,
+                updated_at = now()
+            WHERE id = :content_id
+              AND course_id = :course_id
+        """),
+        {
+            "new_path": new_path,
+            "position": move_request.position,
+            "content_id": content_id,
+            "course_id": course_id,
+        }
+    )
+
+    # Expire the ORM object so refresh picks up the raw SQL changes
+    db.expire(content)
+    db.commit()
+    db.refresh(content)
+
+    # Clear cache
+    if cache:
+        table_name = CourseContent.__tablename__
+        try:
+            if hasattr(cache, 'keys') and callable(cache.keys):
+                cache_keys = await cache.keys(f"{table_name}:*")
+                if cache_keys:
+                    await cache.delete(*cache_keys)
+        except Exception:
+            pass
+
+    return CourseContentGet(**content.__dict__)
