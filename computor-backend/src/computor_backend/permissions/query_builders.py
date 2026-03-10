@@ -120,12 +120,35 @@ class CoursePermissionQueryBuilder:
     def build_course_filtered_query(cls, entity: Type[Any], user_id: str,
                                    minimum_role: str, db: Session) -> Query:
         """Build a query filtered by course membership"""
-        subquery = cls.user_courses_subquery(user_id, minimum_role, db)
-
+        cm_other = aliased(CourseMember)
+        
+        # Check if entity is Course or has course_id
         if entity.__name__ == 'Course':
-            return db.query(entity).filter(entity.id.in_(subquery))
+            # For Course entity, use id field
+            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(entity, entity.id == cm_other.course_id)
+                .filter(
+                    cm_other.course_id.in_(subquery)
+                )
+            )
         else:
-            return db.query(entity).filter(entity.course_id.in_(subquery))
+            # For other entities with course_id field
+            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(entity, entity.course_id == cm_other.course_id)
+                .filter(
+                    cm_other.course_id.in_(subquery)
+                )
+            )
+        
+        return query
 
 
 class OrganizationPermissionQueryBuilder:
@@ -135,14 +158,22 @@ class OrganizationPermissionQueryBuilder:
     def filter_by_course_organization(cls, entity: Type[Any], user_id: str,
                                      minimum_role: str, db: Session) -> Query:
         """Filter organizations based on course membership"""
+        cm_other = aliased(CourseMember)
+        
         subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, minimum_role, db)
-
-        # Get organization IDs from courses the user is a member of
-        org_subquery = select(Course.organization_id).where(
-            Course.id.in_(subquery)
+        
+        query = (
+            db.query(entity)
+            .select_from(User)
+            .outerjoin(cm_other, cm_other.user_id == User.id)
+            .outerjoin(Course, cm_other.course_id == Course.id)
+            .outerjoin(entity, entity.id == Course.organization_id)
+            .filter(
+                cm_other.course_id.in_(subquery)
+            )
         )
-
-        return db.query(entity).filter(entity.id.in_(org_subquery))
+        
+        return query
 
 
 class UserPermissionQueryBuilder:
