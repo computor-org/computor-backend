@@ -153,3 +153,43 @@ export interface WSConnected {
   /** ID of the authenticated user */
   user_id: string;
 }
+
+/**
+ * Maintenance mode has been activated.
+ */
+export interface WSMaintenanceActivated {
+  type?: "maintenance:activated";
+  active?: boolean;
+  /** Maintenance message for users */
+  message: string;
+  /** ISO8601 timestamp of activation */
+  activated_at: string;
+}
+
+/**
+ * Maintenance mode has been deactivated.
+ */
+export interface WSMaintenanceDeactivated {
+  type?: "maintenance:deactivated";
+  active?: boolean;
+  message?: string;
+}
+
+/**
+ * Maintenance has been scheduled for a future time.
+ */
+export interface WSMaintenanceScheduled {
+  type?: "maintenance:scheduled";
+  /** ISO8601 datetime of planned maintenance */
+  scheduled_at: string;
+  /** Schedule message for users */
+  message: string;
+}
+
+/**
+ * Scheduled maintenance has been cancelled.
+ */
+export interface WSMaintenanceCancelled {
+  type?: "maintenance:cancelled";
+  message?: string;
+}

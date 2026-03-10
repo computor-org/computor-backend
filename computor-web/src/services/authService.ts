@@ -213,7 +213,9 @@ export class AuthService implements IAuthProviderWithLogin {
    * Note: Role will be determined after views are fetched
    */
   private transformUserData(userInfo: any, views?: string[]): AuthUser {
-    const role = this.determineRoleFromViews(views || []);
+    // Extract global role IDs from user_roles (e.g. _admin)
+    const globalRoles: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
+    const role = this.determineRole(globalRoles, views || []);
 
     return {
       id: userInfo.id || userInfo.user?.id,
@@ -222,26 +224,21 @@ export class AuthService implements IAuthProviderWithLogin {
       givenName: userInfo.given_name || userInfo.user?.given_name,
       familyName: userInfo.family_name || userInfo.user?.family_name,
       role,
-      permissions: this.mapViewsToPermissions(views || []),
+      permissions: this.mapViewsToPermissions(views || [], globalRoles),
       courses: [], // TODO: Fetch from user's course enrollments
     };
   }
 
   /**
-   * Determine user role from available views
+   * Determine user role from global roles and course views.
    *
-   * IMPORTANT: Views are course-specific roles (which perspectives user can access)
-   * - If user is student in any course → ['student']
-   * - If user is tutor in any course → ['student', 'tutor']
-   * - If user is lecturer/maintainer/owner → ['student', 'tutor', 'lecturer']
+   * Global roles (from user_roles): _admin, _user_manager, etc.
+   * Views (from course roles): student, tutor, lecturer
    *
-   * This determines the highest course role they have for UI display purposes.
-   * Global roles like 'admin' will be added later from backend.
+   * Priority: admin (global) > lecturer/tutor (course) > student (default)
    */
-  private determineRoleFromViews(views: string[]): 'admin' | 'lecturer' | 'student' {
-    // TODO: When global admin role is added to backend, check for it here
-    // For now, use highest course role available
-
+  private determineRole(globalRoles: string[], views: string[]): 'admin' | 'lecturer' | 'student' {
+    if (globalRoles.includes('_admin')) return 'admin';
     if (views.includes('lecturer')) return 'lecturer';
     if (views.includes('tutor')) return 'lecturer'; // Show as lecturer in UI
     return 'student'; // Default to student
@@ -250,8 +247,22 @@ export class AuthService implements IAuthProviderWithLogin {
   /**
    * Map views to permissions
    */
-  private mapViewsToPermissions(views: string[]): string[] {
+  private mapViewsToPermissions(views: string[], globalRoles: string[] = []): string[] {
     const permissions: string[] = [];
+
+    if (globalRoles.includes('_admin')) {
+      permissions.push(
+        'view_students',
+        'view_course_students',
+        'create_assignments',
+        'view_grades',
+        'manage_course',
+        'admin_access',
+        'manage_users',
+        'system_settings',
+        'view_audit'
+      );
+    }
 
     if (views.includes('lecturer')) {
       permissions.push(

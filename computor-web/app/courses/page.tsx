@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from '@/src/utils/apiClient';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseList } from 'types/generated';
@@ -21,7 +21,7 @@ export default function CoursesPage() {
 
     async function fetchCourses() {
       try {
-        const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL}/courses`);
+        const response = await apiFetch(`${API_BASE_URL}/courses`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch courses');

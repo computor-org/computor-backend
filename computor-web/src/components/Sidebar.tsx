@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SubItem {
@@ -39,6 +39,19 @@ const defaultNavigation: NavItem[] = [
       { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
       { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
       { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
+    ],
+  },
+];
+
+// Admin-only navigation items
+const adminNavigation: NavItem[] = [
+  {
+    id: 'system',
+    label: 'System',
+    path: '/admin',
+    icon: 'admin',
+    subItems: [
+      { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
     ],
   },
 ];
@@ -142,12 +155,14 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, views } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const isAdmin = user?.role === 'admin';
+
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
     const cMatch = pathname.match(/^\/courses\/([^/]+)/);
     const cId = cMatch ? cMatch[1] : null;
     const items = cId
       ? getViewNavigation(cId)
-      : defaultNavigation;
+      : [...defaultNavigation, ...adminNavigation];
     return computeAutoExpanded(items, pathname);
   });
   const [courseViews, setCourseViews] = useState<string[]>([]);
@@ -167,7 +182,7 @@ export default function Sidebar() {
       async function fetchCourseViews() {
         try {
           const response = await apiFetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/user/views/${currentCourseId}`
+            `${API_BASE_URL}/user/views/${currentCourseId}`
           );
           if (response.ok) {
             const data = await response.json();
@@ -189,7 +204,7 @@ export default function Sidebar() {
   useEffect(() => {
     const items = currentCourseId
       ? getViewNavigation(currentCourseId)
-      : defaultNavigation;
+      : [...defaultNavigation, ...(isAdmin ? adminNavigation : [])];
 
     const autoExpanded = computeAutoExpanded(items, pathname);
 
@@ -394,6 +409,7 @@ export default function Sidebar() {
       {/* Navigation - Main Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(defaultNavigation)}
+        {isAdmin && renderNavItems(adminNavigation)}
       </nav>
 
       {/* Footer - Logo & Version */}

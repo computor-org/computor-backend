@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '@/src/utils/apiClient';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 
 interface CourseStats {
@@ -23,7 +24,7 @@ export default function StudentDashboard() {
     async function fetchStats() {
       try {
         // Fetch student courses to calculate stats
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students/courses`, {
+        const response = await fetch(`${API_BASE_URL}/students/courses`, {
           credentials: 'include',
         });
 
@@ -31,7 +32,7 @@ export default function StudentDashboard() {
           const courses = await response.json();
 
           // Fetch course contents to count assignments
-          const contentsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students/course-contents`, {
+          const contentsResponse = await fetch(`${API_BASE_URL}/students/course-contents`, {
             credentials: 'include',
           });
 

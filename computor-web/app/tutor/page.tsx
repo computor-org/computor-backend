@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '@/src/utils/apiClient';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 
 interface TutorStats {
@@ -23,9 +24,9 @@ export default function TutorDashboard() {
     async function fetchStats() {
       try {
         const [coursesRes, studentsRes, groupsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/tutors/courses`, { credentials: 'include' }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/tutors/course-members`, { credentials: 'include' }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/tutors/submission-groups`, { credentials: 'include' }),
+          fetch(`${API_BASE_URL}/tutors/courses`, { credentials: 'include' }),
+          fetch(`${API_BASE_URL}/tutors/course-members`, { credentials: 'include' }),
+          fetch(`${API_BASE_URL}/tutors/submission-groups`, { credentials: 'include' }),
         ]);
 
         const courses = coursesRes.ok ? await coursesRes.json() : [];
