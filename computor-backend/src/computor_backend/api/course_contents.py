@@ -11,8 +11,9 @@ from typing import Annotated, Optional, Dict, Any
 from datetime import datetime
 
 from fastapi import Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException
 )
-from computor_backend.database import get_db
+from computor_backend.database import get_db, set_db_user
 from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
@@ -531,3 +532,195 @@ async def get_content_deployment(
         deployment=deployment,
         history=history
     )
+
+
+class CourseContentMoveRequest(BaseModel):
+    """Request body for moving a course content (path change + position)."""
+    path: str
+    position: float
+
+
+@course_content_router.router.patch(
+    "/{content_id}/move",
+    response_model=CourseContentGet
+)
+async def move_course_content(
+    content_id: str,
+    move_request: CourseContentMoveRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+):
+    """
+    Move a course content to a new path and/or position.
+
+    Updates the content's path and position, and cascades the path change
+    to all descendants in a single transaction using ltree functions.
+    """
+    set_db_user(db, permissions.user_id)
+
+    content = db.query(CourseContent).filter(CourseContent.id == content_id).first()
+    if not content:
+        raise NotFoundException(
+            error_code="CONTENT_001",
+            detail="Course content not found",
+            context={"course_content_id": content_id}
+        )
+
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
+        raise ForbiddenException(
+            detail="Not authorized to modify this course content",
+            context={"course_content_id": content_id}
+        )
+
+    old_path = str(content.path)
+    new_path = move_request.path
+    course_id = str(content.course_id)
+
+    # Prevent moving an item into its own descendant
+    if new_path.startswith(old_path + '.'):
+        raise BadRequestException(
+            detail="Cannot move an item into its own descendant",
+            context={"old_path": old_path, "new_path": new_path}
+        )
+
+    # Validate path format
+    import re
+    if not re.match(r'^[a-z0-9_]+(\.[a-z0-9_]+)*$', new_path):
+        raise BadRequestException(
+            detail="Invalid path format. Path must consist of lowercase alphanumeric segments separated by dots",
+            context={"path": new_path}
+        )
+
+    # Check for path collisions before executing the move
+    if old_path != new_path:
+        # Check if the new path already exists for a different content
+        collision = db.query(CourseContent).filter(
+            CourseContent.course_id == content.course_id,
+            CourseContent.path == Ltree(new_path),
+            CourseContent.id != content_id
+        ).first()
+        if collision:
+            raise BadRequestException(
+                detail=f"Path '{new_path}' already exists in this course",
+                context={
+                    "new_path": new_path,
+                    "conflicting_content_id": str(collision.id),
+                    "conflicting_content_title": collision.title
+                }
+            )
+
+        # Check if any descendant paths would collide after the move
+        descendants = db.execute(
+            text("""
+                SELECT path FROM course_content
+                WHERE path <@ :old_path
+                  AND id != :content_id
+                  AND course_id = :course_id
+            """),
+            {"old_path": old_path, "content_id": content_id, "course_id": course_id}
+        ).fetchall()
+
+        if descendants:
+            old_depth = old_path.count('.') + 1
+            new_descendant_paths = []
+            for row in descendants:
+                desc_path = str(row[0])
+                relative = desc_path.split('.')[old_depth:]
+                new_desc_path = new_path + '.' + '.'.join(relative)
+                new_descendant_paths.append(new_desc_path)
+
+            if new_descendant_paths:
+                placeholders = ', '.join(f':p{i}' for i in range(len(new_descendant_paths)))
+                params = {f'p{i}': p for i, p in enumerate(new_descendant_paths)}
+                params['content_id'] = content_id
+                params['course_id'] = course_id
+                params['old_path'] = old_path
+
+                collision_count = db.execute(
+                    text(f"""
+                        SELECT COUNT(*) FROM course_content
+                        WHERE course_id = :course_id
+                          AND path::text IN ({placeholders})
+                          AND NOT path <@ :old_path
+                    """),
+                    params
+                ).scalar()
+
+                if collision_count > 0:
+                    raise BadRequestException(
+                        detail=f"Moving this item would cause {collision_count} path collision(s) among its children",
+                        context={"old_path": old_path, "new_path": new_path}
+                    )
+
+    # Use raw SQL for all updates to bypass SQLAlchemy Ltree change detection issues.
+    # Cascade descendants first, then update the item itself.
+    if old_path != new_path:
+        db.execute(
+            text("""
+                UPDATE course_content
+                SET path = :new_path || subpath(path, nlevel(:old_path)),
+                    updated_at = now()
+                WHERE path <@ :old_path
+                  AND id != :content_id
+                  AND course_id = :course_id
+            """),
+            {
+                "new_path": new_path,
+                "old_path": old_path,
+                "content_id": content_id,
+                "course_id": course_id,
+            }
+        )
+
+    # Update the item itself via raw SQL
+    db.execute(
+        text("""
+            UPDATE course_content
+            SET path = :new_path,
+                position = :position,
+                updated_at = now()
+            WHERE id = :content_id
+              AND course_id = :course_id
+        """),
+        {
+            "new_path": new_path,
+            "position": move_request.position,
+            "content_id": content_id,
+            "course_id": course_id,
+        }
+    )
+
+    # Expire the ORM object so refresh picks up the raw SQL changes
+    db.expire(content)
+    db.commit()
+    db.refresh(content)
+
+    # Clear old-style Redis cache
+    if cache:
+        table_name = CourseContent.__tablename__
+        try:
+            if hasattr(cache, 'keys') and callable(cache.keys):
+                cache_keys = await cache.keys(f"{table_name}:*")
+                if cache_keys:
+                    await cache.delete(*cache_keys)
+        except Exception:
+            pass
+
+    # Invalidate lecturer/tutor user view caches for this course
+    try:
+        view_cache = get_cache()
+        view_cache.invalidate_user_views(
+            entity_type="lecturer_view",
+            entity_id=course_id
+        )
+        view_cache.invalidate_user_views(
+            entity_type="course_id",
+            entity_id=course_id
+        )
+    except Exception:
+        pass
+
+    return content
