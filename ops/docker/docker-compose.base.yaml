@@ -21,8 +21,11 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
       - "--entrypoints.web.address=:80"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic:/etc/traefik/dynamic:ro
     labels:
       - "traefik.enable=false"  # Traefik itself doesn't need to be routed
 

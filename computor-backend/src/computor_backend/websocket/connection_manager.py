@@ -132,9 +132,14 @@ class ConnectionManager:
 
         # Register our handler with pub/sub
         pubsub.register_handler("connection_manager", self._handle_pubsub_message)
+        pubsub.register_handler("maintenance", self._handle_maintenance_broadcast)
 
         # Start pub/sub listener
         await pubsub.start()
+
+        # Subscribe to the system maintenance broadcast channel
+        await pubsub.subscribe("system:maintenance")
+
         logger.info("ConnectionManager started")
 
     async def stop(self):
@@ -142,8 +147,9 @@ class ConnectionManager:
         logger.info("Stopping ConnectionManager...")
         self._running = False
 
-        # Unregister our handler
+        # Unregister our handlers
         pubsub.unregister_handler("connection_manager")
+        pubsub.unregister_handler("maintenance")
 
         # Stop pub/sub listener
         await pubsub.stop()
@@ -607,6 +613,31 @@ class ConnectionManager:
         # Execute all sends concurrently
         if send_tasks:
             await asyncio.gather(*send_tasks, return_exceptions=True)
+
+    async def broadcast_to_all(self, event: dict):
+        """
+        Broadcast an event to ALL connected users on this instance.
+        Uses concurrent sends for better performance.
+
+        Used for system-wide notifications like maintenance mode.
+
+        Args:
+            event: Event data to send
+        """
+        send_tasks = []
+        for user_id, connections in list(self._connections.items()):
+            for conn in list(connections):
+                send_tasks.append(self._send_with_timeout(conn, event, user_id))
+
+        if send_tasks:
+            results = await asyncio.gather(*send_tasks, return_exceptions=True)
+            success_count = sum(1 for r in results if r is True)
+            logger.info(f"Broadcast to all: {success_count}/{len(send_tasks)} successful")
+
+    async def _handle_maintenance_broadcast(self, channel: str, data: dict):
+        """Handle maintenance broadcasts from Redis pub/sub."""
+        if channel == "system:maintenance":
+            await self.broadcast_to_all(data)
 
     async def refresh_presence(self, user_id: str):
         """Refresh user's presence TTL."""

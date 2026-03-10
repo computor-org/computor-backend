@@ -129,6 +129,15 @@ for dir in documents courses course-contents defaults repositories; do
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/shared/$dir"
 done
 
+# Traefik dynamic config directory
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic"
+
+# Clear stale maintenance mode config (if services are starting, maintenance is over)
+if [ -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml" ]; then
+    echo -e "  ${YELLOW}Clearing stale maintenance mode config${NC}"
+    rm -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml"
+fi
+
 # Coder directories (if enabled)
 if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder"

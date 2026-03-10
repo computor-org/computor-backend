@@ -71,6 +71,7 @@ from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.workspace_roles import workspace_roles_router
+from computor_backend.api.maintenance import maintenance_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
 from computor_backend.websocket.connection_manager import manager as ws_manager
@@ -227,12 +228,21 @@ async def startup_logic():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from computor_backend.maintenance_scheduler import MaintenanceReminderScheduler
+
     await startup_logic()
 
     # Start WebSocket connection manager
     await ws_manager.start()
 
+    # Start maintenance reminder scheduler (depends on pub/sub from ws_manager)
+    maintenance_scheduler = MaintenanceReminderScheduler()
+    await maintenance_scheduler.start()
+
     yield
+
+    # Stop maintenance reminder scheduler
+    await maintenance_scheduler.stop()
 
     # Stop WebSocket connection manager
     await ws_manager.stop()
@@ -254,9 +264,13 @@ origins = [
     "http://localhost:8000",  # Backend (for docs)
 ]
 
-# Add upload size limiter middleware (should be before CORS)
-from computor_backend.middleware import UploadSizeLimiterMiddleware
+# Middleware order (last added = outermost = runs first):
+# 1. CORS (outermost) - ensures CORS headers on all responses including 503
+# 2. Maintenance - blocks non-GET for non-admins during maintenance
+# 3. Upload size limiter (innermost) - enforces body size limits
+from computor_backend.middleware import UploadSizeLimiterMiddleware, MaintenanceMiddleware
 app.add_middleware(UploadSizeLimiterMiddleware)
+app.add_middleware(MaintenanceMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -310,6 +324,13 @@ app.include_router(
     prefix="/system",
     tags=["system"],
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
+)
+
+app.include_router(
+    maintenance_router,
+    prefix="/system/maintenance",
+    tags=["system", "maintenance"],
+    dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
 )
 
 app.include_router(

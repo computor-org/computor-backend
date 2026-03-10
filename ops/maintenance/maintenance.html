@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="30">
+    <title>Computor - Maintenance</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: #1e293b;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #f8fafc;
+        }
+        .subtitle {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+        .message {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #f59e0b;
+            color: #0f172a;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .refresh-note {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-top: 1.5rem;
+        }
+        .refresh-btn {
+            color: #60a5fa;
+            cursor: pointer;
+            text-decoration: underline;
+            background: none;
+            border: none;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">&#9881;</div>
+        <h1>Scheduled Maintenance</h1>
+        <p class="subtitle">Computor is currently undergoing planned maintenance</p>
+        <div class="message">
+            <p>We are performing system updates to improve your experience.
+               The platform will be back online shortly.</p>
+        </div>
+        <span class="status-badge">Maintenance in Progress</span>
+        <p class="refresh-note">
+            This page will auto-refresh every 30 seconds.
+            <br>
+            <button class="refresh-btn" onclick="location.reload()">Refresh now</button>
+        </p>
+    </div>
+</body>
+</html>

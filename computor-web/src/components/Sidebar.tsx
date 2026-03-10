@@ -43,6 +43,19 @@ const defaultNavigation: NavItem[] = [
   },
 ];
 
+// Admin-only navigation items
+const adminNavigation: NavItem[] = [
+  {
+    id: 'system',
+    label: 'System',
+    path: '/admin',
+    icon: 'admin',
+    subItems: [
+      { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
+    ],
+  },
+];
+
 // Navigation structure for view-based navigation (when in course context)
 const getViewNavigation = (courseId: string): NavItem[] => [
   {
@@ -142,12 +155,14 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, views } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const isAdmin = user?.role === 'admin';
+
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
     const cMatch = pathname.match(/^\/courses\/([^/]+)/);
     const cId = cMatch ? cMatch[1] : null;
     const items = cId
       ? getViewNavigation(cId)
-      : defaultNavigation;
+      : [...defaultNavigation, ...adminNavigation];
     return computeAutoExpanded(items, pathname);
   });
   const [courseViews, setCourseViews] = useState<string[]>([]);
@@ -189,7 +204,7 @@ export default function Sidebar() {
   useEffect(() => {
     const items = currentCourseId
       ? getViewNavigation(currentCourseId)
-      : defaultNavigation;
+      : [...defaultNavigation, ...(isAdmin ? adminNavigation : [])];
 
     const autoExpanded = computeAutoExpanded(items, pathname);
 
@@ -394,6 +409,7 @@ export default function Sidebar() {
       {/* Navigation - Main Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(defaultNavigation)}
+        {isAdmin && renderNavItems(adminNavigation)}
       </nav>
 
       {/* Footer - Logo & Version */}

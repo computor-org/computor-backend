@@ -10,6 +10,7 @@ Namespaces:
 - message: Message events (new, update, delete)
 - typing: Typing indicators (start, stop, update)
 - read: Read receipts (mark, update)
+- maintenance: Maintenance mode notifications (activated, deactivated, scheduled, cancelled)
 """
 
 from pydantic import BaseModel, Field
@@ -148,6 +149,46 @@ class WSConnected(WSEventBase):
 
 
 # =============================================================================
+# Maintenance Events (Server -> Client)
+# =============================================================================
+
+class WSMaintenanceActivated(WSEventBase):
+    """Maintenance mode has been activated."""
+    type: Literal["maintenance:activated"] = "maintenance:activated"
+    active: bool = True
+    message: str = Field(..., description="Maintenance message for users")
+    activated_at: str = Field(..., description="ISO8601 timestamp of activation")
+
+
+class WSMaintenanceDeactivated(WSEventBase):
+    """Maintenance mode has been deactivated."""
+    type: Literal["maintenance:deactivated"] = "maintenance:deactivated"
+    active: bool = False
+    message: str = Field(default="Maintenance complete. Full service has been restored.")
+
+
+class WSMaintenanceScheduled(WSEventBase):
+    """Maintenance has been scheduled for a future time."""
+    type: Literal["maintenance:scheduled"] = "maintenance:scheduled"
+    scheduled_at: str = Field(..., description="ISO8601 datetime of planned maintenance")
+    message: str = Field(..., description="Schedule message for users")
+
+
+class WSMaintenanceCancelled(WSEventBase):
+    """Scheduled maintenance has been cancelled."""
+    type: Literal["maintenance:cancelled"] = "maintenance:cancelled"
+    message: str = Field(default="Scheduled maintenance has been cancelled.")
+
+
+class WSMaintenanceReminder(WSEventBase):
+    """Countdown reminder for upcoming scheduled maintenance."""
+    type: Literal["maintenance:reminder"] = "maintenance:reminder"
+    minutes_remaining: int = Field(..., description="Minutes until maintenance begins")
+    scheduled_at: str = Field(..., description="ISO8601 datetime of planned maintenance")
+    message: str = Field(..., description="Maintenance message for users")
+
+
+# =============================================================================
 # Union Types for Parsing
 # =============================================================================
 
@@ -174,6 +215,11 @@ ServerEvent = Union[
     WSPong,
     WSError,
     WSConnected,
+    WSMaintenanceActivated,
+    WSMaintenanceDeactivated,
+    WSMaintenanceScheduled,
+    WSMaintenanceCancelled,
+    WSMaintenanceReminder,
 ]
 
 

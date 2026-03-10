@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import MaintenanceBanner from './MaintenanceBanner';
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -40,6 +41,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
         <TopBar />
+        <MaintenanceBanner />
 
         {/* Page Content */}
         <main className="flex-1 p-6 overflow-y-auto">
