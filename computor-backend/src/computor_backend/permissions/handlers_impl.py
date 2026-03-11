@@ -444,21 +444,22 @@ class CourseContentPermissionHandler(PermissionHandler):
         "list": "_student",
         "create": "_lecturer",
         "update": "_lecturer",
-        "delete": "_lecturer"
+        "delete": "_lecturer",
+        "archive": "_lecturer"
     }
-    
+
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
+
         # Check course-based permissions
         if action in self.ACTION_ROLE_MAP:
             min_role = self.ACTION_ROLE_MAP[action]
-            # For create/update/delete, require course context to match the specific course
-            if action in ["create", "update", "delete"]:
+            # For create/update/delete/archive, require course context to match the specific course
+            if action in ["create", "update", "delete", "archive"]:
                 # Prefer explicit course_id from context, fallback to resource_id
                 course_id = (context or {}).get("course_id") or resource_id
                 if course_id:
