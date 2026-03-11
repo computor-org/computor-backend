@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from computor_backend.business_logic.crud import (
     archive_entity as archive_db,
+    unarchive_entity as unarchive_db,
     create_entity as create_db,
     filter_entities as filter_db,
     get_entity_by_id as get_id_db,
@@ -192,6 +193,17 @@ class CrudRouter:
         else:
             return None
 
+    def unarchive(self):
+        if hasattr(self.dto.model, "archived_at"):
+            async def route(
+                    permissions: Annotated[Principal, Depends(get_current_principal)],
+                    id: UUID | str, db: Session = Depends(get_db)
+            ):
+                return await unarchive_db(permissions, db, id, self.dto.model)
+            return route
+        else:
+            return None
+
     def filter(self):
         async def route(
                 permissions: Annotated[Principal, Depends(get_current_principal)], 
@@ -218,10 +230,16 @@ class CrudRouter:
                     status_code=status.HTTP_204_NO_CONTENT, name=f"{self.delete.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         archive_fun = self.archive()
-        
+
         if archive_fun != None:
-            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"], 
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"],
                 status_code=status.HTTP_204_NO_CONTENT, name=f"{archive_fun.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
+
+        unarchive_fun = self.unarchive()
+
+        if unarchive_fun != None:
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/unarchive", unarchive_fun, methods=["PATCH"],
+                status_code=status.HTTP_204_NO_CONTENT, name=f"Unarchive {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         # self.router.add_api_route("-filtered", self.filter(), methods=["GET"],
         #         status_code=status.HTTP_200_OK, name=f"{self.filter.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])

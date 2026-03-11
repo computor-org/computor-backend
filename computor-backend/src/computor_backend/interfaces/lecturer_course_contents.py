@@ -26,7 +26,15 @@ class CourseContentLecturerInterface(CourseContentLecturerInterfaceBase, Backend
         query = query.options(joinedload(CourseContent.deployment))
 
         if params is None:
+            # Default: exclude archived
+            query = query.filter(CourseContent.archived_at.is_(None))
             return query
+
+        # Lecturers can opt-in to see archived content via ?archived=true
+        if params.archived is True:
+            query = query.filter(CourseContent.archived_at.is_not(None))
+        else:
+            query = query.filter(CourseContent.archived_at.is_(None))
 
         if params.id is not None:
             query = query.filter(CourseContent.id == params.id)

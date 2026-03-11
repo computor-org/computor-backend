@@ -573,6 +573,62 @@ async def archive_entity(
     return await run_in_threadpool(_archive_entity)
 
 
+async def unarchive_entity(
+    permissions: Principal,
+    db: Session,
+    id: UUID | str | None,
+    db_type: Any,
+) -> dict:
+    """
+    Unarchive an entity by clearing the archived_at timestamp.
+
+    Args:
+        permissions: Current user's permission context
+        db: Database session
+        id: Entity ID to unarchive
+        db_type: SQLAlchemy model class
+
+    Returns:
+        Dict with {"ok": True} on success
+
+    Raises:
+        NotFoundException: If entity not found or user lacks permission
+        BadRequestException: If unarchiving violates constraints
+        InternalServerException: If unexpected database error occurs
+    """
+    def _unarchive_entity():
+        query = check_permissions(permissions, db_type, "archive", db)
+
+        try:
+            db_item = query.filter(db_type.id == id).first()
+
+            if not db_item:
+                raise NotFoundException(detail=f"{db_type.__name__} not found")
+
+            setattr(db_item, "archived_at", None)
+
+            db.commit()
+            db.refresh(db_item)
+        except NotFoundException:
+            raise
+        except exc.IntegrityError:
+            db.rollback()
+            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints.")
+        except exc.SQLAlchemyError as e:
+            db.rollback()
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            print(f"SQLAlchemyError in unarchive_entity: {error_msg}")
+            raise InternalServerException(detail="An unexpected database error occurred while unarchiving.")
+        except Exception as e:
+            db.rollback()
+            print(f"Unexpected error in unarchive_entity: {e}")
+            raise InternalServerException(detail="An unexpected error occurred while unarchiving.")
+
+        return {"ok": True}
+
+    return await run_in_threadpool(_unarchive_entity)
+
+
 async def filter_entities(
     permissions: Principal,
     db: Session,
