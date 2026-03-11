@@ -23,40 +23,6 @@ import type { TaskStatus } from './tasks';
 
 
 /**
- * Current maintenance status.
- */
-export interface MaintenanceStatusResponse {
-  active?: boolean;
-  message?: string;
-  activated_at?: string | null;
-  activated_by?: string | null;
-  scheduled_at?: string | null;
-  scheduled_by?: string | null;
-}
-
-/**
- * Request to activate maintenance mode.
- */
-export interface MaintenanceActivateRequest {
-  /** Message shown to users */
-  message?: string;
-  /** Broadcast maintenance notification via WebSocket */
-  notify_websocket?: boolean;
-}
-
-/**
- * Request to schedule maintenance.
- */
-export interface MaintenanceScheduleRequest {
-  /** ISO8601 datetime when maintenance will start */
-  scheduled_at: string;
-  /** Message shown to users */
-  message?: string;
-  /** Broadcast schedule notification via WebSocket */
-  notify_websocket?: boolean;
-}
-
-/**
  * Response with Coder session token.
  */
 export interface CoderSessionResponse {
@@ -1371,6 +1337,42 @@ export interface GitLabConfig {
   visibility?: string | null;
   last_synced_at?: string | null;
   token?: string | null;
+}
+
+/**
+ * Current maintenance status.
+ */
+export interface MaintenanceStatusGet {
+  active?: boolean;
+  message?: string;
+  activated_at?: string | null;
+  activated_by?: string | null;
+  activated_by_name?: string | null;
+  scheduled_at?: string | null;
+  scheduled_by?: string | null;
+  scheduled_by_name?: string | null;
+}
+
+/**
+ * Activate maintenance mode.
+ */
+export interface MaintenanceActivate {
+  /** Message shown to users */
+  message?: string;
+  /** Broadcast maintenance notification via WebSocket */
+  notify_websocket?: boolean;
+}
+
+/**
+ * Schedule future maintenance.
+ */
+export interface MaintenanceSchedule {
+  /** ISO8601 datetime when maintenance will start */
+  scheduled_at: string;
+  /** Message shown to users */
+  message?: string;
+  /** Broadcast schedule notification via WebSocket */
+  notify_websocket?: boolean;
 }
 
 /**
@@ -3903,4 +3905,4 @@ export type StatusEnum = "SCHEDULED" | "COMPLETED" | "TIMEDOUT" | "CRASHED" | "C
 
 export type ResultEnum = "PASSED" | "FAILED" | "SKIPPED";
 
-export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
+export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
