@@ -359,11 +359,11 @@ def _validate_course_content_deletion(entity, db: Session):
     from computor_backend.model.artifact import SubmissionArtifact
     from sqlalchemy import and_
 
-    # Find all descendants (including this course content)
+    # Find all descendants (including this course content) within the same course.
     # Ltree path matching: descendant.path <@ parent.path means "descendant is under parent"
-    # We use path @> entity.path to find "paths that contain entity.path"
     descendants = db.query(CourseContent).filter(
-        CourseContent.path.op('<@')(entity.path)  # Ltree descendant-of operator
+        CourseContent.course_id == entity.course_id,
+        CourseContent.path.op('<@')(entity.path)
     ).all()
 
     descendant_ids = [d.id for d in descendants]
@@ -381,16 +381,14 @@ def _validate_course_content_deletion(entity, db: Session):
 
     if has_submissions:
         if len(descendant_ids) == 1:
-            # Only this course content
             raise BadRequestException(
                 detail="Cannot delete this course content because students have already submitted work. "
-                       "Deletion would result in data loss."
+                       "Use archive instead to preserve student data."
             )
         else:
-            # Parent with descendants that have submissions
             raise BadRequestException(
                 detail=f"Cannot delete this course content because it contains {len(descendant_ids)-1} "
-                       f"descendant item(s) with student submissions. Deletion would result in data loss."
+                       f"descendant item(s) with student submissions. Use archive instead to preserve student data."
             )
 
 

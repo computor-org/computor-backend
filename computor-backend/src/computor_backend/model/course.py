@@ -246,11 +246,11 @@ class CourseContent(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     testing_service = relationship('Service', foreign_keys=[testing_service_id])
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
-    submission_groups = relationship('SubmissionGroup', back_populates='course_content')
+    submission_groups = relationship('SubmissionGroup', back_populates='course_content', passive_deletes=True)
     # Removed: submission_group_members - relationship removed as course_content_id was removed from SubmissionGroupMember
 
     # Deployment tracking - One-to-one relationship with CourseContentDeployment
-    deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False)
+    deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False, passive_deletes=True)
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(

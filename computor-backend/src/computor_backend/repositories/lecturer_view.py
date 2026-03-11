@@ -250,6 +250,8 @@ class LecturerViewRepository(ViewRepository):
 
             response_dict = {
                 **course_content.__dict__,
+                "has_deployment": course_content.has_deployment,
+                "deployment_status": course_content.deployment_status,
                 "repository": {
                     "url": gitlab_props.get("url") if isinstance(gitlab_props, dict) else None,
                     "full_path": gitlab_props.get("full_path") if isinstance(gitlab_props, dict) else None
