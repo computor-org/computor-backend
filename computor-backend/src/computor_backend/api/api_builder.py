@@ -173,22 +173,28 @@ class CrudRouter:
 
         return route
     
-    def archive(self):  
-        if hasattr(self.dto.model, "archived_at"):   
+    def archive(self):
+        if hasattr(self.dto.model, "archived_at"):
             async def route(
-                    background_tasks: BackgroundTasks, 
-                    permissions: Annotated[Principal, Depends(get_current_principal)], 
-                    id: UUID | str, db: Session = Depends(get_db)
+                    background_tasks: BackgroundTasks,
+                    permissions: Annotated[Principal, Depends(get_current_principal)],
+                    id: UUID | str,
+                    cache: Annotated[BaseCache, Depends(get_redis_client)],
+                    db: Session = Depends(get_db)
             ):
+                # Get entity before archiving for cache invalidation and callbacks
+                entity_archived = await get_id_db(permissions, db, id, self.dto)
 
-                if len(self.on_archived) > 0:
+                for task in self.on_archived:
+                    background_tasks.add_task(task, entity_archived, permissions)
 
-                    entity_archived = await get_id_db(permissions, db, id, self.dto)
+                result = await archive_db(permissions, db, id, self.dto.model)
 
-                    for task in self.on_archived:
-                        background_tasks.add_task(task, entity_archived, permissions)
+                # Invalidate caches
+                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
+                self._invalidate_user_views_for_entity(entity_archived, db)
 
-                return await archive_db(permissions, db, id, self.dto.model)
+                return result
             return route
         else:
             return None
@@ -197,9 +203,20 @@ class CrudRouter:
         if hasattr(self.dto.model, "archived_at"):
             async def route(
                     permissions: Annotated[Principal, Depends(get_current_principal)],
-                    id: UUID | str, db: Session = Depends(get_db)
+                    id: UUID | str,
+                    cache: Annotated[BaseCache, Depends(get_redis_client)],
+                    db: Session = Depends(get_db)
             ):
-                return await unarchive_db(permissions, db, id, self.dto.model)
+                # Get entity before unarchiving for cache invalidation
+                entity = await get_id_db(permissions, db, id, self.dto)
+
+                result = await unarchive_db(permissions, db, id, self.dto.model)
+
+                # Invalidate caches
+                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
+                self._invalidate_user_views_for_entity(entity, db)
+
+                return result
             return route
         else:
             return None
