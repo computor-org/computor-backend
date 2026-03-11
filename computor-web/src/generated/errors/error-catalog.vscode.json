@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-03-11T15:16:28.381179",
-  "error_count": 65,
+  "generated_at": "2026-03-11T16:21:57.157306",
+  "error_count": 66,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -442,6 +442,19 @@
         "plain": "Required deployment information is missing.",
         "markdown": "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured.",
         "html": "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_005": {
+      "code": "DEPLOY_005",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "error",
+      "title": "Duplicate Example in Course",
+      "message": {
+        "plain": "This example is already assigned to another content item in this course.",
+        "markdown": "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.",
+        "html": "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>"
       },
       "retry_after": null
     },

@@ -815,6 +815,27 @@ errors:
       - "Wait for proper deployment"
     documentation_url: "/docs/assignments#deployment"
 
+  - code: DEPLOY_005
+    http_status: 400
+    category: validation
+    severity: error
+    title: "Duplicate Example in Course"
+    message:
+      plain: "This example is already assigned to another content item in this course."
+      markdown: "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version."
+      html: "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>"
+    internal_description: "Attempted to assign an example that is already deployed to another course content in the same course"
+    affected_functions:
+      - "assign_example_to_content"
+      - "batch_validate_content"
+    common_causes:
+      - "Example already assigned to a different assignment in the same course"
+      - "Attempting to assign a different version of an already-used example"
+    resolution_steps:
+      - "Use a different example for this assignment"
+      - "Unassign the example from the other content first"
+    documentation_url: "/docs/assignments#deployment"
+
   # ============================================================================
   # SUBMISSION AND TESTING ERRORS (400, 404)
   # ============================================================================

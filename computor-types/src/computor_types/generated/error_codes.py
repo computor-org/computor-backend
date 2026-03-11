@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2026-03-11T15:16:28.382415
+Generated at: 2026-03-11T16:21:57.158205
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -46,6 +46,7 @@ class ErrorCode(str, Enum):
     DEPLOY_002 = "DEPLOY_002"  # Deployment Not Found
     DEPLOY_003 = "DEPLOY_003"  # Repository Not Configured
     DEPLOY_004 = "DEPLOY_004"  # Missing Deployment Information
+    DEPLOY_005 = "DEPLOY_005"  # Duplicate Example in Course
     SUBMIT_001 = "SUBMIT_001"  # Submission Artifact Not Found
     SUBMIT_002 = "SUBMIT_002"  # Submission Group Not Found
     SUBMIT_003 = "SUBMIT_003"  # Test Already Running
@@ -129,6 +130,7 @@ ERROR_CATEGORIES = {
     ErrorCode.DEPLOY_002: "not_found",
     ErrorCode.DEPLOY_003: "validation",
     ErrorCode.DEPLOY_004: "validation",
+    ErrorCode.DEPLOY_005: "validation",
     ErrorCode.SUBMIT_001: "not_found",
     ErrorCode.SUBMIT_002: "not_found",
     ErrorCode.SUBMIT_003: "validation",

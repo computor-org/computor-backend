@@ -1,8 +1,8 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** 2026-03-11 15:16:28
-**Total errors:** 65
+**Generated:** 2026-03-11 16:21:57
+**Total errors:** 66
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1619,6 +1619,33 @@ Deployment missing required fields (deployment_path, version_identifier)
 **Resolution Steps:**
 1. Contact instructor
 2. Wait for proper deployment
+
+---
+
+### DEPLOY_005 - Duplicate Example in Course
+
+**HTTP Status:** `400`  
+**Severity:** `error`  
+**Category:** `validation`  
+**Documentation:** [/docs/assignments#deployment](/docs/assignments#deployment)  
+
+**Description:**  
+Attempted to assign an example that is already deployed to another course content in the same course
+
+**User Message:**  
+> This example is already assigned to another content item in this course.
+
+**Affected Functions:**
+- `assign_example_to_content`
+- `batch_validate_content`
+
+**Common Causes:**
+- Example already assigned to a different assignment in the same course
+- Attempting to assign a different version of an already-used example
+
+**Resolution Steps:**
+1. Use a different example for this assignment
+2. Unassign the example from the other content first
 
 ---
 

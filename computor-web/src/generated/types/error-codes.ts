@@ -2,7 +2,7 @@
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: 2026-03-11T15:44:57.945673
+ * Generated at: 2026-03-11T16:21:57.155738
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -95,6 +95,7 @@ export const ErrorCodes = {
   DEPLOY_002: "DEPLOY_002", // Deployment Not Found
   DEPLOY_003: "DEPLOY_003", // Repository Not Configured
   DEPLOY_004: "DEPLOY_004", // Missing Deployment Information
+  DEPLOY_005: "DEPLOY_005", // Duplicate Example in Course
   SUBMIT_001: "SUBMIT_001", // Submission Artifact Not Found
   SUBMIT_002: "SUBMIT_002", // Submission Group Not Found
   SUBMIT_003: "SUBMIT_003", // Test Already Running
@@ -622,6 +623,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       plain: "Required deployment information is missing.",
       markdown: "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured.",
       html: "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/assignments#deployment",
+  },
+  DEPLOY_005: {
+    code: "DEPLOY_005",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.ERROR,
+    title: "Duplicate Example in Course",
+    message: {
+      plain: "This example is already assigned to another content item in this course.",
+      markdown: "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.",
+      html: "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>",
     },
     retryAfter: undefined,
     documentationUrl: "/docs/assignments#deployment",

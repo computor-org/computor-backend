@@ -237,7 +237,35 @@ def assign_example_to_content(
             }
         )
 
-    # 7. Check if deployment already exists
+    # 7. Check if this example is already assigned to another content in the same course
+    existing_in_course = db.query(CourseContentDeployment).join(
+        CourseContent, CourseContent.id == CourseContentDeployment.course_content_id
+    ).filter(
+        CourseContent.course_id == course_content.course_id,
+        CourseContentDeployment.example_identifier == example.identifier,
+        CourseContentDeployment.course_content_id != course_content_id,
+        CourseContentDeployment.deployment_status != 'unassigned',
+    ).first()
+
+    if existing_in_course:
+        conflicting_content = db.query(CourseContent).filter(
+            CourseContent.id == existing_in_course.course_content_id
+        ).first()
+        raise BadRequestException(
+            error_code="DEPLOY_005",
+            detail=f"Example '{example.identifier}' is already assigned to another "
+                   f"content in this course ('{conflicting_content.title if conflicting_content else 'unknown'}'). "
+                   f"Each example can only be assigned once per course, regardless of version.",
+            context={
+                "course_content_id": str(course_content_id),
+                "course_id": str(course_content.course_id),
+                "example_identifier": str(example.identifier),
+                "conflicting_content_id": str(existing_in_course.course_content_id),
+                "conflicting_content_title": conflicting_content.title if conflicting_content else None,
+            }
+        )
+
+    # 8. Check if deployment already exists
     existing_deployment = db.query(CourseContentDeployment).filter(
         CourseContentDeployment.course_content_id == course_content_id
     ).first()
@@ -601,6 +629,37 @@ def batch_validate_content(
         key = (str(version.example_id), version.version_tag)
         version_map[key] = version
 
+    # 5.5 Check for duplicate examples within the batch
+    batch_identifier_to_content = {}  # identifier -> first content_id that uses it
+    batch_duplicates = {}  # content_id -> conflicting content_id
+    for item in content_validations:
+        identifier = str(item['example_identifier'])
+        content_id = item['content_id']
+        if identifier in batch_identifier_to_content:
+            batch_duplicates[content_id] = batch_identifier_to_content[identifier]
+        else:
+            batch_identifier_to_content[identifier] = content_id
+
+    # 5.6 Check for duplicate examples against existing deployments in the course
+    content_ids_in_batch = {item['content_id'] for item in content_validations}
+    existing_deployments = db.query(
+        CourseContentDeployment.course_content_id,
+        CourseContentDeployment.example_identifier,
+    ).join(
+        CourseContent, CourseContent.id == CourseContentDeployment.course_content_id
+    ).filter(
+        CourseContent.course_id == course_id,
+        CourseContentDeployment.deployment_status != 'unassigned',
+        CourseContentDeployment.example_identifier.isnot(None),
+    ).all()
+
+    # Build map: identifier -> existing content_id (excluding content items in this batch)
+    existing_identifier_map = {}
+    for dep in existing_deployments:
+        dep_identifier = str(dep.example_identifier)
+        if str(dep.course_content_id) not in content_ids_in_batch:
+            existing_identifier_map[dep_identifier] = str(dep.course_content_id)
+
     # 6. Validate each content item
     validation_results = []
     total_issues = 0
@@ -656,8 +715,25 @@ def batch_validate_content(
                 'message': 'Cannot validate version - example does not exist'
             }
 
+        # Check for duplicate example in batch or existing deployments
+        duplicate_validation = None
+        if content_id in batch_duplicates:
+            duplicate_validation = {
+                'is_duplicate': True,
+                'message': f"Example '{example_identifier}' is used by multiple content items in this batch"
+            }
+        elif example_identifier in existing_identifier_map:
+            duplicate_validation = {
+                'is_duplicate': True,
+                'message': f"Example '{example_identifier}' is already assigned to another content in this course"
+            }
+
         # Determine overall validity
-        is_valid = example_validation['exists'] and version_validation['exists']
+        is_valid = (
+            example_validation['exists']
+            and version_validation['exists']
+            and duplicate_validation is None
+        )
 
         if not is_valid:
             total_issues += 1
@@ -670,16 +746,21 @@ def batch_validate_content(
                 messages.append(example_validation['message'])
             if not version_validation['exists']:
                 messages.append(version_validation['message'])
+            if duplicate_validation:
+                messages.append(duplicate_validation['message'])
             validation_message = '; '.join(messages)
 
         # Add result
-        validation_results.append({
+        result_entry = {
             'content_id': content_id,
             'valid': is_valid,
             'example_validation': example_validation,
             'version_validation': version_validation,
             'validation_message': validation_message
-        })
+        }
+        if duplicate_validation:
+            result_entry['duplicate_validation'] = duplicate_validation
+        validation_results.append(result_entry)
 
     # 7. Build response
     overall_valid = total_issues == 0
