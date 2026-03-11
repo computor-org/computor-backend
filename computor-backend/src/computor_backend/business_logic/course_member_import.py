@@ -28,91 +28,10 @@ async def trigger_post_create_for_member(
     """
     Trigger post-create hook for a single imported course member.
 
-    Provisions submission groups and triggers repository creation workflow.
-    Skips service accounts unless they are "agent.*" service types (actors).
-
-    Args:
-        course_member: Newly created course member
-        db: Database session
-        permissions: Optional principal for task tracking
-
-    Returns:
-        workflow_id if task was submitted successfully, None otherwise
+    Delegates to the shared course_member_post_create function.
     """
-    from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
-    from computor_backend.task_tracker import get_task_tracker
-    from computor_backend.model.service import Service
-    from computor_types.tasks import TaskSubmission
-
-    # Check if service account - only "agent.*" service types should get GitLab setup
-    if course_member.user and course_member.user.is_service:
-        service = db.query(Service).filter(Service.user_id == course_member.user_id).first()
-        is_agent = False
-        if service and service.service_type:
-            service_type_path = str(service.service_type.path)
-            is_agent = service_type_path.startswith("agent")
-
-        if not is_agent:
-            logger.info(f"Skipping post-create hooks for non-agent service account {course_member.user_id}")
-            return None
-
-        logger.info(f"Agent service account {course_member.user_id} - proceeding with GitLab setup")
-
-    # Step 1: Provision submission groups (fast, synchronous)
-    try:
-        provision_submission_groups_for_user(
-            user_id=course_member.user_id,
-            course_id=course_member.course_id,
-            db=db
-        )
-        logger.info(f"Provisioned submission groups for course member {course_member.id}")
-    except Exception as e:
-        logger.error(
-            f"Failed to provision submission groups for course member {course_member.id}: {e}"
-        )
-        # Don't fail the entire import if provisioning fails
-
-    # Step 2: Trigger repository creation workflow (asynchronous) with task tracking
-    try:
-        task_tracker = await get_task_tracker()
-
-        task_submission = TaskSubmission(
-            task_name="StudentRepositoryCreationWorkflow",
-            parameters={
-                "course_member_id": str(course_member.id),
-                "course_id": str(course_member.course_id),
-            },
-            queue="computor-tasks"
-        )
-
-        # Get organization_id from course for permission tracking
-        course = db.query(Course).filter(Course.id == course_member.course_id).first()
-        org_id = str(course.organization_id) if course and course.organization_id else None
-
-        # Determine created_by for task tracking
-        created_by = permissions.user_id if permissions else str(course_member.created_by or course_member.user_id)
-
-        workflow_id = await task_tracker.submit_and_track_task(
-            task_submission=task_submission,
-            created_by=created_by,
-            user_id=str(course_member.user_id),
-            course_id=str(course_member.course_id),
-            organization_id=org_id,
-            entity_type="course_member",
-            entity_id=str(course_member.id),
-            description=f"Creating repository for {course_member.user.email if course_member.user else 'course member'}"
-        )
-        logger.info(
-            f"Triggered repository creation workflow: {workflow_id} for course member {course_member.id}"
-        )
-        return workflow_id
-    except Exception as e:
-        logger.error(
-            f"Failed to trigger repository creation workflow: {e}",
-            exc_info=True
-        )
-        # Don't fail the entire import if workflow submission fails
-        return None
+    from computor_backend.business_logic.course_member_post_create import course_member_post_create
+    return await course_member_post_create(course_member, db, permissions)
 
 
 async def import_course_member(
