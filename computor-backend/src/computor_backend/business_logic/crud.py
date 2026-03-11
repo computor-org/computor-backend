@@ -381,14 +381,23 @@ def _validate_course_content_deletion(entity, db: Session):
 
     if has_submissions:
         if len(descendant_ids) == 1:
+            # Only this course content has submissions
             raise BadRequestException(
-                detail="Cannot delete this course content because students have already submitted work. "
-                       "Use archive instead to preserve student data."
+                error_code="CONTENT_006",
+                context={
+                    "course_content_id": str(entity.id),
+                    "course_id": str(entity.course_id),
+                }
             )
         else:
+            # Parent with descendants that have submissions
             raise BadRequestException(
-                detail=f"Cannot delete this course content because it contains {len(descendant_ids)-1} "
-                       f"descendant item(s) with student submissions. Use archive instead to preserve student data."
+                error_code="CONTENT_007",
+                context={
+                    "course_content_id": str(entity.id),
+                    "course_id": str(entity.course_id),
+                    "descendant_count": len(descendant_ids) - 1,
+                }
             )
 
 

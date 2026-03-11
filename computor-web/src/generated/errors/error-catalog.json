@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-03-10T13:16:52.744172",
-  "error_count": 63,
+  "generated_at": "2026-03-11T15:16:28.379679",
+  "error_count": 65,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -772,6 +772,60 @@
         "Verify version tag",
         "Check available versions",
         "Use 'latest' for most recent version"
+      ]
+    },
+    "CONTENT_006": {
+      "code": "CONTENT_006",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Student Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because students have already submitted work. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because students have already submitted work. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": null,
+      "internal_description": "Attempted to delete a course content that has SubmissionArtifacts linked via its SubmissionGroups",
+      "affected_functions": [
+        "_validate_course_content_deletion",
+        "delete_entity"
+      ],
+      "common_causes": [
+        "Students have submitted work for this assignment",
+        "Content is part of a running course"
+      ],
+      "resolution_steps": [
+        "Use archive instead of delete to preserve student data",
+        "If deletion is truly required, remove all submission artifacts first"
+      ]
+    },
+    "CONTENT_007": {
+      "code": "CONTENT_007",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Descendant Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": null,
+      "internal_description": "Attempted to delete a course content whose Ltree descendants have SubmissionArtifacts",
+      "affected_functions": [
+        "_validate_course_content_deletion",
+        "delete_entity"
+      ],
+      "common_causes": [
+        "Child assignments have student submissions",
+        "Content hierarchy includes active assignments"
+      ],
+      "resolution_steps": [
+        "Use archive instead of delete to preserve student data",
+        "If deletion is truly required, archive or remove descendant submissions first"
       ]
     },
     "VERSION_001": {

@@ -2,7 +2,7 @@
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: 2026-03-10T13:16:52.743730
+ * Generated at: 2026-03-11T15:16:28.379216
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -88,6 +88,8 @@ export const ErrorCodes = {
   CONTENT_003: "CONTENT_003", // Invalid Content Type Operation
   CONTENT_004: "CONTENT_004", // Example Not Found
   CONTENT_005: "CONTENT_005", // Example Version Not Found
+  CONTENT_006: "CONTENT_006", // Deletion Blocked by Student Submissions
+  CONTENT_007: "CONTENT_007", // Deletion Blocked by Descendant Submissions
   VERSION_001: "VERSION_001", // Example Version Already Exists
   DEPLOY_001: "DEPLOY_001", // Assignment Not Released
   DEPLOY_002: "DEPLOY_002", // Deployment Not Found
@@ -525,6 +527,34 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/api/examples#versions",
+  },
+  CONTENT_006: {
+    code: "CONTENT_006",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Deletion Blocked by Student Submissions",
+    message: {
+      plain: "Cannot delete this course content because students have already submitted work. Use archive instead.",
+      markdown: "**Deletion Blocked**\n\nThis course content cannot be deleted because students have already submitted work. Use **archive** instead to hide the content while preserving student data.",
+      html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: null,
+  },
+  CONTENT_007: {
+    code: "CONTENT_007",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Deletion Blocked by Descendant Submissions",
+    message: {
+      plain: "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
+      markdown: "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
+      html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: null,
   },
   VERSION_001: {
     code: "VERSION_001",

@@ -1,8 +1,8 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** 2026-03-10 13:16:52
-**Total errors:** 63
+**Generated:** 2026-03-11 15:16:28
+**Total errors:** 65
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1510,6 +1510,58 @@ Operation not supported for content type (e.g., examples on non-submittable)
 1. Check content type properties
 2. Use correct operation for content type
 3. Consult API documentation
+
+---
+
+### CONTENT_006 - Deletion Blocked by Student Submissions
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+Attempted to delete a course content that has SubmissionArtifacts linked via its SubmissionGroups
+
+**User Message:**  
+> Cannot delete this course content because students have already submitted work. Use archive instead.
+
+**Affected Functions:**
+- `_validate_course_content_deletion`
+- `delete_entity`
+
+**Common Causes:**
+- Students have submitted work for this assignment
+- Content is part of a running course
+
+**Resolution Steps:**
+1. Use archive instead of delete to preserve student data
+2. If deletion is truly required, remove all submission artifacts first
+
+---
+
+### CONTENT_007 - Deletion Blocked by Descendant Submissions
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+Attempted to delete a course content whose Ltree descendants have SubmissionArtifacts
+
+**User Message:**  
+> Cannot delete this course content because descendant items have student submissions. Use archive instead.
+
+**Affected Functions:**
+- `_validate_course_content_deletion`
+- `delete_entity`
+
+**Common Causes:**
+- Child assignments have student submissions
+- Content hierarchy includes active assignments
+
+**Resolution Steps:**
+1. Use archive instead of delete to preserve student data
+2. If deletion is truly required, archive or remove descendant submissions first
 
 ---
 
