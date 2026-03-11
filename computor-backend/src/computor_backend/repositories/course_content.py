@@ -853,6 +853,7 @@ def course_member_course_content_list_query(
         .filter(CourseMember.id == course_member_id) \
         .join(Course, Course.id == CourseMember.course_id) \
         .join(CourseContent, CourseContent.course_id == Course.id) \
+        .filter(CourseContent.archived_at.is_(None)) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
         .outerjoin(SubmissionGroup,
                    (SubmissionGroup.course_content_id == CourseContent.id) &
@@ -1067,6 +1068,7 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
     ).subquery()
 
     # Step 2: Get the actual latest artifact IDs with course_member mapping
+    # Exclude submission groups whose course content is archived
     latest_artifacts_query = db.query(
         CourseMember.id.label("course_member_id"),
         SubmissionArtifact.id.label("artifact_id")
@@ -1080,13 +1082,17 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
         SubmissionGroup,
         SubmissionGroup.id == SubmissionArtifact.submission_group_id
     ).join(
+        CourseContent,
+        CourseContent.id == SubmissionGroup.course_content_id
+    ).join(
         SubmissionGroupMember,
         SubmissionGroupMember.submission_group_id == SubmissionGroup.id
     ).join(
         CourseMember,
         CourseMember.id == SubmissionGroupMember.course_member_id
     ).filter(
-        SubmissionArtifact.submit == True
+        SubmissionArtifact.submit == True,
+        CourseContent.archived_at.is_(None),
     )
 
     if course_id:

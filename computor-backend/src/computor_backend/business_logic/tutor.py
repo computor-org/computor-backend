@@ -462,10 +462,15 @@ def list_tutor_submission_groups(
 
     tutor_course_id_list = [c.id for c in tutor_course_ids]
 
-    # Base query with member count
+    # Base query with member count, excluding archived course content
+    from computor_backend.model.course import CourseContent
     query = db.query(
         SubmissionGroup,
         func.count(SubmissionGroupMember.id).label('member_count')
+    ).join(
+        CourseContent, CourseContent.id == SubmissionGroup.course_content_id
+    ).filter(
+        CourseContent.archived_at.is_(None)
     ).outerjoin(
         SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id
     ).group_by(SubmissionGroup.id)
