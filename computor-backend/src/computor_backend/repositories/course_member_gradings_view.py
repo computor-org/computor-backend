@@ -7,6 +7,7 @@ providing aggregated progress data with hierarchical breakdowns.
 
 from typing import Optional, List, Dict, Any
 from uuid import UUID
+from collections import defaultdict
 from sqlalchemy.orm import Session
 import logging
 
@@ -242,7 +243,8 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         """
         Get grading statistics for all course members in a course.
 
-        This method leverages per-student caching for efficiency.
+        Uses a single bulk SQL query (get_course_level_stats_for_all_members)
+        instead of per-student queries. Results are cached at course level.
 
         Args:
             course_id: Course ID
@@ -256,13 +258,23 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             NotFoundException: If course not found
             ForbiddenException: If user lacks permissions
         """
-        # Verify course exists (need DB for this)
+        user_id = permissions.get_user_id()
+
+        # Try course-level cache first
+        cache_key = f"cm_grading_list:{course_id}"
+        cached = self._get_cached_view(
+            user_id=str(user_id),
+            view_type=cache_key,
+        )
+        if cached is not None:
+            return [CourseMemberGradingsList(**item) for item in cached]
+
+        # Cache miss — verify course exists
         course = self.db.query(Course).filter(Course.id == course_id).first()
         if course is None:
             raise NotFoundException(detail=f"Course {course_id} not found")
 
-        # Permission check: Tutor or higher role required
-        user_id = permissions.get_user_id()
+        # Permission check: Tutor or higher role required (once)
         has_course_perms = check_course_permissions(
             permissions, CourseMember, "_tutor", self.db
         ).filter(
@@ -276,26 +288,17 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                        "Tutor role or higher is required."
             )
 
-        # Initialize data repository
+        # Single bulk query: returns per-member, per-content-type stats
         data_repo = CourseMemberGradingsRepository(self.db)
-
-        # Get all course members
-        course_members = data_repo.get_all_course_members_with_students_role(course_id)
-
-        if not course_members:
-            return []
-
-        # Check if there are any submittable contents in the course
-        # If not, don't cache (as per decision: don't cache if no submittable content)
-        db_stats_check = data_repo.get_course_level_stats_for_all_members(
+        db_stats = data_repo.get_course_level_stats_for_all_members(
             course_id=course_id,
             path_prefix=None,
             course_content_type_id=None,
         )
 
-        if not db_stats_check:
-            # No submittable content - return empty stats without caching
-            logger.debug(f"No submittable content in course {course_id}, not caching")
+        if not db_stats:
+            # No submittable content — return members with empty stats
+            course_members = data_repo.get_all_course_members_with_students_role(course_id)
             return [
                 CourseMemberGradingsList(
                     course_member_id=member["course_member_id"],
@@ -314,77 +317,86 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 for member in course_members
             ]
 
-        # Process each member with caching
+        # Aggregate the flat per-member-per-type rows into per-member results
+        members_data: dict = {}  # course_member_id -> member info
+        members_ct: dict = defaultdict(list)  # course_member_id -> [content_type rows]
+
+        for row in db_stats:
+            mid = row["course_member_id"]
+            if mid not in members_data:
+                members_data[mid] = {
+                    "course_member_id": mid,
+                    "course_id": str(course_id),
+                    "user_id": row.get("user_id"),
+                    "username": row.get("username"),
+                    "given_name": row.get("given_name"),
+                    "family_name": row.get("family_name"),
+                    "student_id": row.get("student_id"),
+                }
+            members_ct[mid].append(row)
+
         results = []
-        for member in course_members:
-            member_id = member["course_member_id"]
+        for mid, member_info in members_data.items():
+            ct_rows = members_ct[mid]
 
-            # Try to get from cache first
-            cache_key = f"cm_grading:{member_id}"
-            cached_data = self._get_cached_view(
-                user_id=str(user_id),
-                view_type=cache_key
-            )
+            total_max = 0
+            total_submitted = 0
+            total_graded = 0
+            total_grade_sum = 0.0
+            latest_submission = None
+            by_content_type = []
 
-            if cached_data:
-                # Convert cached full data to list format (without nodes)
-                # IMPORTANT: Use member dict for user info (always fresh from DB query above)
-                list_item = CourseMemberGradingsList(
-                    course_member_id=cached_data["course_member_id"],
-                    course_id=cached_data["course_id"],
-                    user_id=member["user_id"],
-                    username=member["username"],
-                    given_name=member["given_name"],
-                    family_name=member["family_name"],
-                    student_id=member["student_id"],
-                    total_max_assignments=cached_data["total_max_assignments"],
-                    total_submitted_assignments=cached_data["total_submitted_assignments"],
-                    overall_progress_percentage=cached_data["overall_progress_percentage"],
-                    latest_submission_at=cached_data.get("latest_submission_at"),
-                    by_content_type=[ContentTypeGradingStats(**ct) for ct in cached_data["by_content_type"]],
-                )
-                results.append(list_item)
-            else:
-                # Cache MISS - calculate for this member
-                try:
-                    full_stats = await self.get_course_member_gradings(
-                        course_member_id=member_id,
-                        permissions=permissions,
-                        params=params,
-                    )
-                    # Convert to list format
-                    list_item = CourseMemberGradingsList(
-                        course_member_id=full_stats.course_member_id,
-                        course_id=full_stats.course_id,
-                        user_id=member["user_id"],
-                        username=member["username"],
-                        given_name=member["given_name"],
-                        family_name=member["family_name"],
-                        student_id=member["student_id"],
-                        total_max_assignments=full_stats.total_max_assignments,
-                        total_submitted_assignments=full_stats.total_submitted_assignments,
-                        overall_progress_percentage=full_stats.overall_progress_percentage,
-                        latest_submission_at=full_stats.latest_submission_at,
-                        by_content_type=full_stats.by_content_type,
-                    )
-                    results.append(list_item)
-                except Exception as e:
-                    logger.error(f"Error calculating stats for member {member_id}: {e}")
-                    # Return empty stats on error
-                    results.append(CourseMemberGradingsList(
-                        course_member_id=member_id,
-                        course_id=str(course_id),
-                        user_id=member["user_id"],
-                        username=member["username"],
-                        given_name=member["given_name"],
-                        family_name=member["family_name"],
-                        student_id=member["student_id"],
-                        total_max_assignments=0,
-                        total_submitted_assignments=0,
-                        overall_progress_percentage=0.0,
-                        latest_submission_at=None,
-                        by_content_type=[],
-                    ))
+            for ct_row in ct_rows:
+                max_a = ct_row["max_assignments"]
+                sub_a = ct_row["submitted_assignments"]
+                graded_a = ct_row.get("graded_assignments", 0) or 0
+                avg_g = ct_row.get("average_grading")
+                latest_at = ct_row.get("latest_submission_at")
+
+                total_max += max_a
+                total_submitted += sub_a
+                total_graded += graded_a
+                if avg_g is not None and graded_a > 0:
+                    total_grade_sum += avg_g * graded_a
+
+                if latest_at and (latest_submission is None or latest_at > latest_submission):
+                    latest_submission = latest_at
+
+                by_content_type.append(ContentTypeGradingStats(
+                    course_content_type_id=ct_row["content_type_id"],
+                    course_content_type_slug=ct_row["content_type_slug"],
+                    course_content_type_title=ct_row.get("content_type_title"),
+                    course_content_type_color=ct_row.get("content_type_color"),
+                    max_assignments=max_a,
+                    submitted_assignments=sub_a,
+                    progress_percentage=round((sub_a / max_a * 100) if max_a > 0 else 0.0, 2),
+                    graded_assignments=graded_a,
+                    average_grading=round(avg_g, 4) if avg_g is not None else None,
+                ))
+
+            overall_progress = round((total_submitted / total_max * 100) if total_max > 0 else 0.0, 2)
+            overall_avg = round(total_grade_sum / total_graded, 4) if total_graded > 0 else None
+
+            results.append(CourseMemberGradingsList(
+                **member_info,
+                total_max_assignments=total_max,
+                total_submitted_assignments=total_submitted,
+                overall_progress_percentage=overall_progress,
+                latest_submission_at=latest_submission,
+                overall_average_grading=overall_avg,
+                by_content_type=by_content_type,
+            ))
+
+        # Cache at course level
+        self._set_cached_view(
+            user_id=str(user_id),
+            view_type=cache_key,
+            data=[r.model_dump() for r in results],
+            related_ids={
+                'course_id': str(course_id),
+                'cm_grading_list': str(course_id),
+            }
+        )
 
         return results
 
