@@ -2,7 +2,7 @@
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: 2026-03-11T16:21:57.155738
+ * Generated at: 2026-03-12T09:41:25.568207
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -541,7 +541,7 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
     },
     retryAfter: undefined,
-    documentationUrl: null,
+    documentationUrl: undefined,
   },
   CONTENT_007: {
     code: "CONTENT_007",
@@ -555,7 +555,7 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
     },
     retryAfter: undefined,
-    documentationUrl: null,
+    documentationUrl: undefined,
   },
   VERSION_001: {
     code: "VERSION_001",

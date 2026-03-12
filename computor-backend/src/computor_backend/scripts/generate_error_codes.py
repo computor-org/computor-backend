@@ -143,7 +143,7 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       html: {json.dumps(error["message"].get("html"))},
     }},
     retryAfter: {error.get("retry_after") or "undefined"},
-    documentationUrl: {json.dumps(error.get("documentation_url"))},
+    documentationUrl: {json.dumps(error["documentation_url"]) if error.get("documentation_url") else "undefined"},
   }}{',' if i < len(errors) - 1 else ''}
 '''
 
