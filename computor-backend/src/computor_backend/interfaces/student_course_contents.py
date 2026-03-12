@@ -23,6 +23,9 @@ class CourseContentStudentInterface(CourseContentStudentInterfaceBase, BackendEn
     @staticmethod
     def search(db: Session, query, params: Optional[CourseContentStudentQuery]):
         """Apply search filters to course content query for students."""
+        # Students never see archived content
+        query = query.filter(CourseContent.archived_at.is_(None))
+
         if params is None:
             return query
 

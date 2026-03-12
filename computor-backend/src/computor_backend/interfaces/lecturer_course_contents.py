@@ -1,7 +1,7 @@
 """Backend Lecturer Course Content interface with search method."""
 
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func
 
 from computor_types.lecturer_course_contents import (
@@ -23,8 +23,16 @@ class CourseContentLecturerInterface(CourseContentLecturerInterfaceBase, Backend
     @staticmethod
     def search(db: Session, query, params: Optional[CourseContentLecturerQuery]):
         """Apply search filters to course content query for lecturers."""
+        query = query.options(joinedload(CourseContent.deployment))
+
         if params is None:
             return query
+
+        # Lecturers see all content by default; optionally filter by archived status
+        if params.archived is True:
+            query = query.filter(CourseContent.archived_at.is_not(None))
+        elif params.archived is False:
+            query = query.filter(CourseContent.archived_at.is_(None))
 
         if params.id is not None:
             query = query.filter(CourseContent.id == params.id)

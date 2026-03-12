@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-03-10T13:16:52.745195",
-  "error_count": 63,
+  "generated_at": "2026-03-11T16:21:57.157306",
+  "error_count": 66,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -354,6 +354,32 @@
       },
       "retry_after": null
     },
+    "CONTENT_006": {
+      "code": "CONTENT_006",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Student Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because students have already submitted work. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because students have already submitted work. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_007": {
+      "code": "CONTENT_007",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Descendant Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null
+    },
     "VERSION_001": {
       "code": "VERSION_001",
       "http_status": 409,
@@ -416,6 +442,19 @@
         "plain": "Required deployment information is missing.",
         "markdown": "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured.",
         "html": "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>"
+      },
+      "retry_after": null
+    },
+    "DEPLOY_005": {
+      "code": "DEPLOY_005",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "error",
+      "title": "Duplicate Example in Course",
+      "message": {
+        "plain": "This example is already assigned to another content item in this course.",
+        "markdown": "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.",
+        "html": "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>"
       },
       "retry_after": null
     },

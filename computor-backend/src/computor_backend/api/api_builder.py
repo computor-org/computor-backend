@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from computor_backend.business_logic.crud import (
     archive_entity as archive_db,
+    unarchive_entity as unarchive_db,
     create_entity as create_db,
     filter_entities as filter_db,
     get_entity_by_id as get_id_db,
@@ -172,22 +173,50 @@ class CrudRouter:
 
         return route
     
-    def archive(self):  
-        if hasattr(self.dto.model, "archived_at"):   
+    def archive(self):
+        if hasattr(self.dto.model, "archived_at"):
             async def route(
-                    background_tasks: BackgroundTasks, 
-                    permissions: Annotated[Principal, Depends(get_current_principal)], 
-                    id: UUID | str, db: Session = Depends(get_db)
+                    background_tasks: BackgroundTasks,
+                    permissions: Annotated[Principal, Depends(get_current_principal)],
+                    id: UUID | str,
+                    cache: Annotated[BaseCache, Depends(get_redis_client)],
+                    db: Session = Depends(get_db)
             ):
+                # Get entity before archiving for cache invalidation and callbacks
+                entity_archived = await get_id_db(permissions, db, id, self.dto)
 
-                if len(self.on_archived) > 0:
+                for task in self.on_archived:
+                    background_tasks.add_task(task, entity_archived, permissions)
 
-                    entity_archived = await get_id_db(permissions, db, id, self.dto)
+                result = await archive_db(permissions, db, id, self.dto.model)
 
-                    for task in self.on_archived:
-                        background_tasks.add_task(task, entity_archived, permissions)
+                # Invalidate caches
+                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
+                self._invalidate_user_views_for_entity(entity_archived, db)
 
-                return await archive_db(permissions, db, id, self.dto.model)
+                return result
+            return route
+        else:
+            return None
+
+    def unarchive(self):
+        if hasattr(self.dto.model, "archived_at"):
+            async def route(
+                    permissions: Annotated[Principal, Depends(get_current_principal)],
+                    id: UUID | str,
+                    cache: Annotated[BaseCache, Depends(get_redis_client)],
+                    db: Session = Depends(get_db)
+            ):
+                # Get entity before unarchiving for cache invalidation
+                entity = await get_id_db(permissions, db, id, self.dto)
+
+                result = await unarchive_db(permissions, db, id, self.dto.model)
+
+                # Invalidate caches
+                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
+                self._invalidate_user_views_for_entity(entity, db)
+
+                return result
             return route
         else:
             return None
@@ -218,10 +247,16 @@ class CrudRouter:
                     status_code=status.HTTP_204_NO_CONTENT, name=f"{self.delete.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         archive_fun = self.archive()
-        
+
         if archive_fun != None:
-            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"], 
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"],
                 status_code=status.HTTP_204_NO_CONTENT, name=f"{archive_fun.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
+
+        unarchive_fun = self.unarchive()
+
+        if unarchive_fun != None:
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/unarchive", unarchive_fun, methods=["PATCH"],
+                status_code=status.HTTP_204_NO_CONTENT, name=f"Unarchive {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
         # self.router.add_api_route("-filtered", self.filter(), methods=["GET"],
         #         status_code=status.HTTP_200_OK, name=f"{self.filter.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])

@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2026-03-10T13:16:52.746029
+Generated at: 2026-03-11T16:21:57.158205
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -39,11 +39,14 @@ class ErrorCode(str, Enum):
     CONTENT_003 = "CONTENT_003"  # Invalid Content Type Operation
     CONTENT_004 = "CONTENT_004"  # Example Not Found
     CONTENT_005 = "CONTENT_005"  # Example Version Not Found
+    CONTENT_006 = "CONTENT_006"  # Deletion Blocked by Student Submissions
+    CONTENT_007 = "CONTENT_007"  # Deletion Blocked by Descendant Submissions
     VERSION_001 = "VERSION_001"  # Example Version Already Exists
     DEPLOY_001 = "DEPLOY_001"  # Assignment Not Released
     DEPLOY_002 = "DEPLOY_002"  # Deployment Not Found
     DEPLOY_003 = "DEPLOY_003"  # Repository Not Configured
     DEPLOY_004 = "DEPLOY_004"  # Missing Deployment Information
+    DEPLOY_005 = "DEPLOY_005"  # Duplicate Example in Course
     SUBMIT_001 = "SUBMIT_001"  # Submission Artifact Not Found
     SUBMIT_002 = "SUBMIT_002"  # Submission Group Not Found
     SUBMIT_003 = "SUBMIT_003"  # Test Already Running
@@ -120,11 +123,14 @@ ERROR_CATEGORIES = {
     ErrorCode.CONTENT_003: "validation",
     ErrorCode.CONTENT_004: "not_found",
     ErrorCode.CONTENT_005: "not_found",
+    ErrorCode.CONTENT_006: "validation",
+    ErrorCode.CONTENT_007: "validation",
     ErrorCode.VERSION_001: "conflict",
     ErrorCode.DEPLOY_001: "not_found",
     ErrorCode.DEPLOY_002: "not_found",
     ErrorCode.DEPLOY_003: "validation",
     ErrorCode.DEPLOY_004: "validation",
+    ErrorCode.DEPLOY_005: "validation",
     ErrorCode.SUBMIT_001: "not_found",
     ErrorCode.SUBMIT_002: "not_found",
     ErrorCode.SUBMIT_003: "validation",

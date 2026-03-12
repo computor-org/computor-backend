@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from computor_types.submission_groups import SubmissionGroupInterface as SubmissionGroupInterfaceBase, SubmissionGroupQuery
 from computor_backend.interfaces.base import BackendEntityInterface
-from computor_backend.model.course import SubmissionGroup
+from computor_backend.model.course import SubmissionGroup, CourseContent
 
 class SubmissionGroupInterface(SubmissionGroupInterfaceBase, BackendEntityInterface):
     """Backend-specific SubmissionGroupInterface with model and API configuration."""
-    
+
     model = SubmissionGroup
     endpoint = "submission-groups"
     cache_ttl = 600
@@ -18,16 +18,20 @@ class SubmissionGroupInterface(SubmissionGroupInterfaceBase, BackendEntityInterf
     def search(db: Session, query, params: Optional[SubmissionGroupQuery]):
         """
         Apply search filters to submissiongroup query.
-        
+
         Args:
             db: Database session
             query: SQLAlchemy query object
             params: Query parameters
-            
+
         Returns:
             Filtered query object
         """
-        
+        # Exclude submission groups whose parent course content is archived
+        query = query.join(
+            CourseContent, CourseContent.id == SubmissionGroup.course_content_id
+        ).filter(CourseContent.archived_at.is_(None))
+
         if params is None:
             return query
 

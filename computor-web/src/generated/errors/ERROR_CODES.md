@@ -1,8 +1,8 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** 2026-03-10 13:16:52
-**Total errors:** 63
+**Generated:** 2026-03-11 16:21:57
+**Total errors:** 66
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1513,6 +1513,58 @@ Operation not supported for content type (e.g., examples on non-submittable)
 
 ---
 
+### CONTENT_006 - Deletion Blocked by Student Submissions
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+Attempted to delete a course content that has SubmissionArtifacts linked via its SubmissionGroups
+
+**User Message:**  
+> Cannot delete this course content because students have already submitted work. Use archive instead.
+
+**Affected Functions:**
+- `_validate_course_content_deletion`
+- `delete_entity`
+
+**Common Causes:**
+- Students have submitted work for this assignment
+- Content is part of a running course
+
+**Resolution Steps:**
+1. Use archive instead of delete to preserve student data
+2. If deletion is truly required, remove all submission artifacts first
+
+---
+
+### CONTENT_007 - Deletion Blocked by Descendant Submissions
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+Attempted to delete a course content whose Ltree descendants have SubmissionArtifacts
+
+**User Message:**  
+> Cannot delete this course content because descendant items have student submissions. Use archive instead.
+
+**Affected Functions:**
+- `_validate_course_content_deletion`
+- `delete_entity`
+
+**Common Causes:**
+- Child assignments have student submissions
+- Content hierarchy includes active assignments
+
+**Resolution Steps:**
+1. Use archive instead of delete to preserve student data
+2. If deletion is truly required, archive or remove descendant submissions first
+
+---
+
 ### DEPLOY_003 - Repository Not Configured
 
 **HTTP Status:** `400`  
@@ -1567,6 +1619,33 @@ Deployment missing required fields (deployment_path, version_identifier)
 **Resolution Steps:**
 1. Contact instructor
 2. Wait for proper deployment
+
+---
+
+### DEPLOY_005 - Duplicate Example in Course
+
+**HTTP Status:** `400`  
+**Severity:** `error`  
+**Category:** `validation`  
+**Documentation:** [/docs/assignments#deployment](/docs/assignments#deployment)  
+
+**Description:**  
+Attempted to assign an example that is already deployed to another course content in the same course
+
+**User Message:**  
+> This example is already assigned to another content item in this course.
+
+**Affected Functions:**
+- `assign_example_to_content`
+- `batch_validate_content`
+
+**Common Causes:**
+- Example already assigned to a different assignment in the same course
+- Attempting to assign a different version of an already-used example
+
+**Resolution Steps:**
+1. Use a different example for this assignment
+2. Unassign the example from the other content first
 
 ---
 

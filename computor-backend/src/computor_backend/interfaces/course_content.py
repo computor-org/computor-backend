@@ -147,7 +147,15 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
             Filtered query object
         """
         if params is None:
+            # Default: exclude archived
+            query = query.filter(CourseContent.archived_at.is_(None))
             return query
+
+        # archived=True shows only archived, otherwise exclude archived
+        if params.archived is True:
+            query = query.filter(CourseContent.archived_at.is_not(None))
+        else:
+            query = query.filter(CourseContent.archived_at.is_(None))
 
         if params.id is not None:
             query = query.filter(CourseContent.id == params.id)

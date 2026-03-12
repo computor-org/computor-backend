@@ -193,3 +193,16 @@ export interface WSMaintenanceCancelled {
   type?: "maintenance:cancelled";
   message?: string;
 }
+
+/**
+ * Countdown reminder for upcoming scheduled maintenance.
+ */
+export interface WSMaintenanceReminder {
+  type?: "maintenance:reminder";
+  /** Minutes until maintenance begins */
+  minutes_remaining: number;
+  /** ISO8601 datetime of planned maintenance */
+  scheduled_at: string;
+  /** Maintenance message for users */
+  message: string;
+}

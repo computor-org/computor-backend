@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-03-10T13:16:52.744172",
-  "error_count": 63,
+  "generated_at": "2026-03-11T16:21:57.156218",
+  "error_count": 66,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -774,6 +774,60 @@
         "Use 'latest' for most recent version"
       ]
     },
+    "CONTENT_006": {
+      "code": "CONTENT_006",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Student Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because students have already submitted work. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because students have already submitted work. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": null,
+      "internal_description": "Attempted to delete a course content that has SubmissionArtifacts linked via its SubmissionGroups",
+      "affected_functions": [
+        "_validate_course_content_deletion",
+        "delete_entity"
+      ],
+      "common_causes": [
+        "Students have submitted work for this assignment",
+        "Content is part of a running course"
+      ],
+      "resolution_steps": [
+        "Use archive instead of delete to preserve student data",
+        "If deletion is truly required, remove all submission artifacts first"
+      ]
+    },
+    "CONTENT_007": {
+      "code": "CONTENT_007",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Deletion Blocked by Descendant Submissions",
+      "message": {
+        "plain": "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
+        "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
+        "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": null,
+      "internal_description": "Attempted to delete a course content whose Ltree descendants have SubmissionArtifacts",
+      "affected_functions": [
+        "_validate_course_content_deletion",
+        "delete_entity"
+      ],
+      "common_causes": [
+        "Child assignments have student submissions",
+        "Content hierarchy includes active assignments"
+      ],
+      "resolution_steps": [
+        "Use archive instead of delete to preserve student data",
+        "If deletion is truly required, archive or remove descendant submissions first"
+      ]
+    },
     "VERSION_001": {
       "code": "VERSION_001",
       "http_status": 409,
@@ -912,6 +966,33 @@
       "resolution_steps": [
         "Contact instructor",
         "Wait for proper deployment"
+      ]
+    },
+    "DEPLOY_005": {
+      "code": "DEPLOY_005",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "error",
+      "title": "Duplicate Example in Course",
+      "message": {
+        "plain": "This example is already assigned to another content item in this course.",
+        "markdown": "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.",
+        "html": "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/assignments#deployment",
+      "internal_description": "Attempted to assign an example that is already deployed to another course content in the same course",
+      "affected_functions": [
+        "assign_example_to_content",
+        "batch_validate_content"
+      ],
+      "common_causes": [
+        "Example already assigned to a different assignment in the same course",
+        "Attempting to assign a different version of an already-used example"
+      ],
+      "resolution_steps": [
+        "Use a different example for this assignment",
+        "Unassign the example from the other content first"
       ]
     },
     "SUBMIT_001": {

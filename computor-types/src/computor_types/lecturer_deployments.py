@@ -51,6 +51,9 @@ class DeploymentGet(BaseModel):
     assigned_at: datetime
     deployed_at: Optional[datetime] = None
     deployment_path: Optional[str] = None
+    has_newer_version: bool = Field(
+        False, description="Whether a newer version of the assigned example exists"
+    )
 
     # Enriched data from joins
     example_title: Optional[str] = None

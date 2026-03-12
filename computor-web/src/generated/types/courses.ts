@@ -1142,6 +1142,7 @@ export interface CourseContentLecturerList {
   max_submissions?: number | null;
   testing_service_id?: string | null;
   is_submittable?: boolean;
+  archived_at?: string | null;
   has_deployment?: boolean | null;
   deployment_status?: string | null;
   course_content_type?: CourseContentTypeList | null;

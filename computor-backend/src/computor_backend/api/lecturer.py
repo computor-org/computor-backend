@@ -196,6 +196,15 @@ def get_course_content_deployment(
     if deployment.example_version and deployment.example_version.example:
         example = deployment.example_version.example
 
+    has_newer_version = False
+    if deployment.example_version:
+        from computor_backend.repositories.example_version_repo import ExampleVersionRepository
+        latest = ExampleVersionRepository(db).find_latest_version(
+            deployment.example_version.example_id
+        )
+        if latest and latest.version_number > deployment.example_version.version_number:
+            has_newer_version = True
+
     course_content = deployment.course_content
 
     return DeploymentGet(
@@ -210,6 +219,7 @@ def get_course_content_deployment(
         assigned_at=deployment.assigned_at,
         deployed_at=deployment.deployed_at,
         deployment_path=deployment.deployment_path,
+        has_newer_version=has_newer_version,
         example_title=example.title if example else None,
         example_directory=example.directory if example else None,
         example_description=example.description if example else None,

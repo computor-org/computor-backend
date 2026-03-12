@@ -359,11 +359,11 @@ def _validate_course_content_deletion(entity, db: Session):
     from computor_backend.model.artifact import SubmissionArtifact
     from sqlalchemy import and_
 
-    # Find all descendants (including this course content)
+    # Find all descendants (including this course content) within the same course.
     # Ltree path matching: descendant.path <@ parent.path means "descendant is under parent"
-    # We use path @> entity.path to find "paths that contain entity.path"
     descendants = db.query(CourseContent).filter(
-        CourseContent.path.op('<@')(entity.path)  # Ltree descendant-of operator
+        CourseContent.course_id == entity.course_id,
+        CourseContent.path.op('<@')(entity.path)
     ).all()
 
     descendant_ids = [d.id for d in descendants]
@@ -381,16 +381,23 @@ def _validate_course_content_deletion(entity, db: Session):
 
     if has_submissions:
         if len(descendant_ids) == 1:
-            # Only this course content
+            # Only this course content has submissions
             raise BadRequestException(
-                detail="Cannot delete this course content because students have already submitted work. "
-                       "Deletion would result in data loss."
+                error_code="CONTENT_006",
+                context={
+                    "course_content_id": str(entity.id),
+                    "course_id": str(entity.course_id),
+                }
             )
         else:
             # Parent with descendants that have submissions
             raise BadRequestException(
-                detail=f"Cannot delete this course content because it contains {len(descendant_ids)-1} "
-                       f"descendant item(s) with student submissions. Deletion would result in data loss."
+                error_code="CONTENT_007",
+                context={
+                    "course_content_id": str(entity.id),
+                    "course_id": str(entity.course_id),
+                    "descendant_count": len(descendant_ids) - 1,
+                }
             )
 
 
@@ -564,6 +571,62 @@ async def archive_entity(
         return {"ok": True}
 
     return await run_in_threadpool(_archive_entity)
+
+
+async def unarchive_entity(
+    permissions: Principal,
+    db: Session,
+    id: UUID | str | None,
+    db_type: Any,
+) -> dict:
+    """
+    Unarchive an entity by clearing the archived_at timestamp.
+
+    Args:
+        permissions: Current user's permission context
+        db: Database session
+        id: Entity ID to unarchive
+        db_type: SQLAlchemy model class
+
+    Returns:
+        Dict with {"ok": True} on success
+
+    Raises:
+        NotFoundException: If entity not found or user lacks permission
+        BadRequestException: If unarchiving violates constraints
+        InternalServerException: If unexpected database error occurs
+    """
+    def _unarchive_entity():
+        query = check_permissions(permissions, db_type, "archive", db)
+
+        try:
+            db_item = query.filter(db_type.id == id).first()
+
+            if not db_item:
+                raise NotFoundException(detail=f"{db_type.__name__} not found")
+
+            setattr(db_item, "archived_at", None)
+
+            db.commit()
+            db.refresh(db_item)
+        except NotFoundException:
+            raise
+        except exc.IntegrityError:
+            db.rollback()
+            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints.")
+        except exc.SQLAlchemyError as e:
+            db.rollback()
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            print(f"SQLAlchemyError in unarchive_entity: {error_msg}")
+            raise InternalServerException(detail="An unexpected database error occurred while unarchiving.")
+        except Exception as e:
+            db.rollback()
+            print(f"Unexpected error in unarchive_entity: {e}")
+            raise InternalServerException(detail="An unexpected error occurred while unarchiving.")
+
+        return {"ok": True}
+
+    return await run_in_threadpool(_unarchive_entity)
 
 
 async def filter_entities(

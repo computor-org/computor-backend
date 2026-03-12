@@ -2,7 +2,7 @@
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: 2026-03-10T13:16:52.743730
+ * Generated at: 2026-03-11T16:21:57.155738
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -88,11 +88,14 @@ export const ErrorCodes = {
   CONTENT_003: "CONTENT_003", // Invalid Content Type Operation
   CONTENT_004: "CONTENT_004", // Example Not Found
   CONTENT_005: "CONTENT_005", // Example Version Not Found
+  CONTENT_006: "CONTENT_006", // Deletion Blocked by Student Submissions
+  CONTENT_007: "CONTENT_007", // Deletion Blocked by Descendant Submissions
   VERSION_001: "VERSION_001", // Example Version Already Exists
   DEPLOY_001: "DEPLOY_001", // Assignment Not Released
   DEPLOY_002: "DEPLOY_002", // Deployment Not Found
   DEPLOY_003: "DEPLOY_003", // Repository Not Configured
   DEPLOY_004: "DEPLOY_004", // Missing Deployment Information
+  DEPLOY_005: "DEPLOY_005", // Duplicate Example in Course
   SUBMIT_001: "SUBMIT_001", // Submission Artifact Not Found
   SUBMIT_002: "SUBMIT_002", // Submission Group Not Found
   SUBMIT_003: "SUBMIT_003", // Test Already Running
@@ -526,6 +529,34 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     retryAfter: undefined,
     documentationUrl: "/docs/api/examples#versions",
   },
+  CONTENT_006: {
+    code: "CONTENT_006",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Deletion Blocked by Student Submissions",
+    message: {
+      plain: "Cannot delete this course content because students have already submitted work. Use archive instead.",
+      markdown: "**Deletion Blocked**\n\nThis course content cannot be deleted because students have already submitted work. Use **archive** instead to hide the content while preserving student data.",
+      html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because students have already submitted work. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: null,
+  },
+  CONTENT_007: {
+    code: "CONTENT_007",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Deletion Blocked by Descendant Submissions",
+    message: {
+      plain: "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
+      markdown: "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
+      html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: null,
+  },
   VERSION_001: {
     code: "VERSION_001",
     httpStatus: 409,
@@ -592,6 +623,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       plain: "Required deployment information is missing.",
       markdown: "**Missing Deployment Information**\n\nRequired deployment information (path, version, etc.) is missing. The assignment may not be properly configured.",
       html: "<strong>Missing Deployment Information</strong><p>Required deployment information is missing.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/assignments#deployment",
+  },
+  DEPLOY_005: {
+    code: "DEPLOY_005",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.ERROR,
+    title: "Duplicate Example in Course",
+    message: {
+      plain: "This example is already assigned to another content item in this course.",
+      markdown: "**Duplicate Example in Course**\n\nThis example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.",
+      html: "<strong>Duplicate Example in Course</strong><p>This example is already assigned to another content item in this course. Each example can only be assigned once per course, regardless of version.</p>",
     },
     retryAfter: undefined,
     documentationUrl: "/docs/assignments#deployment",

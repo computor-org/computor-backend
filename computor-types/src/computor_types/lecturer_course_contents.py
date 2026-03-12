@@ -68,6 +68,7 @@ class CourseContentLecturerList(BaseModel):
     max_submissions: Optional[int] = None
     testing_service_id: Optional[str] = None
     is_submittable: bool = False
+    archived_at: Optional[datetime] = None
     has_deployment: Optional[bool] = None
     deployment_status: Optional[str] = None
 
