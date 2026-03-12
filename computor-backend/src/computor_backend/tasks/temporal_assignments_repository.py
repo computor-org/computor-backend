@@ -44,15 +44,14 @@ async def generate_assignments_repository_activity(
     import git
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
-    from ..database import get_db
+    from ..database import SessionLocal
     from ..model.course import Course, CourseContent
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.example import ExampleVersion, Example
     from ..utils.docker_utils import transform_localhost_url
     from ..tasks.temporal_student_template_v2 import download_example_files
 
-    db_gen = next(get_db())
-    db = db_gen
+    db = SessionLocal()
 
     try:
         course = db.query(Course).filter(Course.id == course_id).first()
@@ -307,7 +306,7 @@ async def generate_assignments_repository_activity(
             return result
     finally:
         try:
-            db_gen.close()
+            db.close()
         except Exception:
             pass
 

@@ -496,15 +496,14 @@ async def generate_student_template_activity_v2(
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
     from ..utils.docker_utils import transform_localhost_url
-    from ..database import get_db
+    from ..database import SessionLocal
     from ..model.course import Course, CourseContent
     from ..model.example import Example, ExampleVersion, ExampleRepository
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.service import ServiceType
     from ..services.storage_service import StorageService
-    
-    db_gen = next(get_db())
-    db = db_gen
+
+    db = SessionLocal()
     
     try:
         # First, update all assigned deployments to 'deploying' status
@@ -1063,13 +1062,29 @@ async def generate_student_template_activity_v2(
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
-                        # Push to remote
+                        # Push to remote with retry on concurrent push conflicts
                         if 'origin' in [remote.name for remote in template_repo.remotes]:
-                            # The remote should already have auth URL if token was provided
-                            # Just push directly
-                            template_repo.git.push('origin', 'main')
-                            logger.info("Pushed changes to GitLab")
-                            git_push_successful = True
+                            max_push_attempts = 3
+                            for push_attempt in range(max_push_attempts):
+                                try:
+                                    template_repo.git.push('origin', 'main')
+                                    logger.info("Pushed changes to GitLab")
+                                    git_push_successful = True
+                                    break
+                                except git.GitCommandError as push_err:
+                                    err_msg = str(push_err).lower()
+                                    if 'non-fast-forward' in err_msg or 'fetch first' in err_msg or 'failed to push' in err_msg:
+                                        if push_attempt < max_push_attempts - 1:
+                                            logger.warning(
+                                                f"Push failed (attempt {push_attempt + 1}/{max_push_attempts}), "
+                                                f"pulling with rebase and retrying: {push_err}"
+                                            )
+                                            template_repo.git.pull('--rebase', 'origin', 'main')
+                                        else:
+                                            logger.error(f"Push failed after {max_push_attempts} attempts: {push_err}")
+                                            raise
+                                    else:
+                                        raise
                         else:
                             logger.warning("No remote 'origin' found, skipping push")
                             git_push_successful = True  # Consider successful if no remote
@@ -1202,7 +1217,7 @@ async def generate_student_template_activity_v2(
             "message": f"Failed to generate student template: {str(e)}"
         }
     finally:
-        db_gen.close()
+        db.close()
 
 
 @register_task
