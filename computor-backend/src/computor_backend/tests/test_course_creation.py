@@ -18,8 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from computor_backend.generator.gitlab_builder import GitLabBuilder
 from computor_backend.model.organization import Organization
 from computor_backend.model.course import CourseFamily, Course
-from computor_backend.services.git_service import GitService
-from ..custom_types import Ltree
+from computor_backend.custom_types import Ltree
 
 
 @patch('computor_backend.generator.gitlab_builder.flag_modified')
@@ -32,8 +31,7 @@ def test_course_family_refresh_fix(mock_flag_modified):
     # Create mock objects
     mock_db_session = Mock()
     mock_gitlab = Mock()
-    mock_git_service = Mock(spec=GitService)
-    
+
     # Mock GitLab client behavior
     mock_gitlab.auth = Mock()
     mock_gitlab.groups = Mock()
@@ -82,7 +80,6 @@ def test_course_family_refresh_fix(mock_flag_modified):
     builder = GitLabBuilder.__new__(GitLabBuilder)  # Create without __init__
     builder.db = mock_db_session
     builder.gitlab = mock_gitlab
-    builder.git_service = mock_git_service
     
     print("1️⃣ Testing CourseFamily GitLab properties update...")
     
