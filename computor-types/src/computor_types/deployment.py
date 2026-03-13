@@ -64,6 +64,7 @@ class CourseContentDeploymentList(BaseModel):
     assigned_at: datetime
     deployed_at: Optional[datetime]
     version_identifier: Optional[str]
+    has_newer_version: bool = False
 
     example_version: Optional['ExampleVersionList'] = None
 
