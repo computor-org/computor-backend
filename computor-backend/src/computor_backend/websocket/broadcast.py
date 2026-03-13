@@ -144,6 +144,66 @@ class WebSocketBroadcast:
         )
         logger.debug(f"Broadcast read:update to {channel} for message {message_id}")
 
+    async def cache_invalidated(
+        self,
+        tags: list[str],
+        course_id: Optional[str] = None,
+    ):
+        """
+        Broadcast cache invalidation signal to connected extensions.
+
+        When the backend invalidates cache tags, this broadcasts a cache:invalidated
+        event so extensions can clear matching local cache entries immediately
+        instead of waiting for TTL expiry.
+        """
+        channel = f"course:{course_id}" if course_id else "system"
+        await self.publish(channel, "cache:invalidated", {
+            "tags": tags,
+        })
+
+    async def entity_updated(
+        self,
+        entity_type: str,
+        entity_id: str,
+        data: dict,
+        course_id: Optional[str] = None,
+        course_content_id: Optional[str] = None,
+    ):
+        """
+        Broadcast a generic entity state change to relevant channels.
+
+        This is the general-purpose method for pushing real-time updates for any
+        entity type (deployments, submissions, course content, etc.) without
+        needing entity-specific broadcast methods.
+
+        Events are broadcast hierarchically: to the most specific channel first,
+        then to parent channels.
+
+        Args:
+            entity_type: Entity type identifier (e.g., "deployment", "submission")
+            entity_id: ID of the changed entity
+            data: Partial payload with changed fields
+            course_id: Course ID for course-level channel
+            course_content_id: Course content ID for content-level channel
+        """
+        channels: List[str] = []
+        if course_content_id:
+            channels.append(f"course_content:{course_content_id}")
+        if course_id:
+            channels.append(f"course:{course_id}")
+
+        if not channels:
+            logger.warning(f"No channel determined for entity update: {entity_type}:{entity_id}")
+            return
+
+        for channel in channels:
+            await self.publish(channel, "entity:updated", {
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "channel": channel,
+                "data": data,
+            })
+
     def _get_message_channels(self, message: MessageTargetProtocol) -> List[str]:
         """
         Determine all WebSocket channels for a message (hierarchical broadcasting).

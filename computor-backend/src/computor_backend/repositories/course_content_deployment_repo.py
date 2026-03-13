@@ -57,6 +57,7 @@ class CourseContentDeploymentRepository(BaseRepository[CourseContentDeployment])
         - course_content_deployment:version:{version_id} - Deployments using this version
         - course_content_deployment:status:{status} - Deployments with this status
         - course_content_deployment:example_identifier:{identifier} - Deployments of this example
+        - lecturer_view:{course_id} - Invalidate lecturer views for this course
         """
         tags = {
             f"course_content_deployment:{entity.id}",
@@ -66,6 +67,20 @@ class CourseContentDeploymentRepository(BaseRepository[CourseContentDeployment])
         if entity.course_content_id:
             tags.add(f"course_content_deployment:content:{entity.course_content_id}")
             tags.add(f"course_content:{entity.course_content_id}")
+
+            # Invalidate lecturer view caches via course_content -> course_id
+            try:
+                if entity.course_content and hasattr(entity.course_content, 'course_id'):
+                    tags.add(f"lecturer_view:{entity.course_content.course_id}")
+                else:
+                    from ..model.course import CourseContent
+                    cc = self.db.query(CourseContent.course_id).filter(
+                        CourseContent.id == str(entity.course_content_id)
+                    ).first()
+                    if cc:
+                        tags.add(f"lecturer_view:{cc.course_id}")
+            except Exception:
+                pass  # Best-effort; explicit invalidation at call sites is primary
 
         if entity.example_version_id:
             tags.add(f"course_content_deployment:version:{entity.example_version_id}")

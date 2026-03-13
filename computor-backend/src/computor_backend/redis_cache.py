@@ -92,3 +92,13 @@ def get_cache() -> Cache:
         ...     return org
     """
     return _cache
+
+
+def get_sync_redis_client() -> redis.Redis:
+    """
+    Get sync Redis client for direct access.
+
+    Use this for operations that need synchronous Redis access
+    (e.g., publishing cache invalidation from sync business logic).
+    """
+    return _sync_redis_client

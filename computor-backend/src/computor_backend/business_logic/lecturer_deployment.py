@@ -23,8 +23,39 @@ from computor_backend.exceptions import (
 )
 from computor_backend.custom_types.ltree import Ltree
 from computor_types.validation import SemanticVersion, normalize_version
+from computor_backend.redis_cache import get_cache
 
 logger = logging.getLogger(__name__)
+
+
+def _broadcast_cache_invalidation_sync(tags: list[str], course_id: str | None = None) -> None:
+    """Broadcast cache invalidation to extensions via direct Redis publish."""
+    try:
+        import json
+        from computor_backend.redis_cache import get_sync_redis_client
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        redis_client = get_sync_redis_client()
+        if redis_client:
+            channel = f"course:{course_id}" if course_id else "system"
+            redis_client.publish(
+                f"{CHANNEL_PREFIX}{channel}",
+                json.dumps({
+                    "type": "cache:invalidated",
+                    "channel": channel,
+                    "data": {"tags": tags}
+                })
+            )
+    except Exception as e:
+        logger.warning(f"Failed to broadcast cache invalidation: {e}")
+
+
+def _invalidate_lecturer_view_cache(course_id: str | UUID) -> None:
+    """Invalidate lecturer view caches for a course after deployment changes."""
+    cache = get_cache()
+    if cache:
+        cache.invalidate_tags(f"lecturer_view:{course_id}")
+        logger.debug(f"Invalidated lecturer_view cache for course {course_id}")
+    _broadcast_cache_invalidation_sync([f"lecturer_view:{course_id}"], str(course_id))
 
 
 def validate_reassignment_allowed(
@@ -312,6 +343,8 @@ def assign_example_to_content(
         db.commit()
         db.refresh(existing_deployment)
 
+        _invalidate_lecturer_view_cache(course_content.course_id)
+
         logger.info(
             f"{log_message} for content {course_content_id} "
             f"(status reset to pending for redeployment)"
@@ -348,6 +381,8 @@ def assign_example_to_content(
 
         db.commit()
         db.refresh(deployment)
+
+        _invalidate_lecturer_view_cache(course_content.course_id)
 
         logger.info(
             f"Assigned example {example_id} (v{version_tag}) to content {course_content_id}"
@@ -517,6 +552,8 @@ def unassign_example_from_content(
     deployment.updated_by = permissions.user_id
 
     db.commit()
+
+    _invalidate_lecturer_view_cache(course_content.course_id)
 
     logger.info(f"Unassigned example from content {course_content_id}")
 

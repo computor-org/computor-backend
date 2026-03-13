@@ -181,6 +181,17 @@ async def update_tutor_course_content_grade(
             cache.invalidate_tags(f"lecturer_view:{student_cm.course_id}")
             logger.info(f"Invalidated view caches for course {student_cm.course_id} after grading")
 
+        # Broadcast cache invalidation to connected extensions
+        from computor_backend.websocket.broadcast import ws_broadcast
+        await ws_broadcast.cache_invalidated(
+            [
+                f"student_view:{student_cm.course_id}",
+                f"tutor_view:{student_cm.course_id}",
+                f"lecturer_view:{student_cm.course_id}",
+            ],
+            course_id=str(student_cm.course_id),
+        )
+
     # 6) Return fresh data
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_result = course_member_course_content_query(

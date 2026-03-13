@@ -128,15 +128,27 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
                 if deployments:
                     # Collect unique course_content_ids to invalidate
                     tags_to_invalidate = set()
+                    course_content_ids = set()
                     for deployment in deployments:
                         if deployment.course_content_id:
                             tags_to_invalidate.add(f"course_content:{deployment.course_content_id}")
+                            course_content_ids.add(str(deployment.course_content_id))
 
-                    # Invalidate all affected course_content caches
+                    # Also invalidate lecturer view caches by finding course_ids
+                    if course_content_ids:
+                        from ..model.course import CourseContent
+                        course_ids = self.db.query(CourseContent.course_id).filter(
+                            CourseContent.id.in_(list(course_content_ids))
+                        ).distinct().all()
+                        for (course_id,) in course_ids:
+                            if course_id:
+                                tags_to_invalidate.add(f"lecturer_view:{course_id}")
+
+                    # Invalidate all affected caches
                     if tags_to_invalidate:
                         self.cache.invalidate_tags(*tags_to_invalidate)
                         logger.info(
-                            f"Invalidated {len(tags_to_invalidate)} course_content caches "
+                            f"Invalidated {len(tags_to_invalidate)} caches "
                             f"after creating example version {result.id} for example {example.identifier}"
                         )
 
@@ -180,14 +192,26 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
 
                 if deployments:
                     tags_to_invalidate = set()
+                    course_content_ids = set()
                     for deployment in deployments:
                         if deployment.course_content_id:
                             tags_to_invalidate.add(f"course_content:{deployment.course_content_id}")
+                            course_content_ids.add(str(deployment.course_content_id))
+
+                    # Also invalidate lecturer view caches by finding course_ids
+                    if course_content_ids:
+                        from ..model.course import CourseContent
+                        course_ids = self.db.query(CourseContent.course_id).filter(
+                            CourseContent.id.in_(list(course_content_ids))
+                        ).distinct().all()
+                        for (course_id,) in course_ids:
+                            if course_id:
+                                tags_to_invalidate.add(f"lecturer_view:{course_id}")
 
                     if tags_to_invalidate:
                         self.cache.invalidate_tags(*tags_to_invalidate)
                         logger.info(
-                            f"Invalidated {len(tags_to_invalidate)} course_content caches "
+                            f"Invalidated {len(tags_to_invalidate)} caches "
                             f"after updating example version {result.id}"
                         )
 

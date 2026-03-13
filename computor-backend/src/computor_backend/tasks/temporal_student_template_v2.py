@@ -489,6 +489,7 @@ async def generate_student_template_activity_v2(
     # Import all SQLAlchemy models and database dependencies inside activity
     import git
     import os
+    import json
     import tempfile
     import shutil
     from pathlib import Path
@@ -502,6 +503,62 @@ async def generate_student_template_activity_v2(
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.service import ServiceType
     from ..services.storage_service import StorageService
+    from ..redis_cache import get_redis_client
+
+    async def broadcast_deployment_status(
+        deployment_id: str,
+        course_content_id: str,
+        course_id: str,
+        status: str,
+        message: str | None = None,
+    ):
+        """Publish deployment status change directly to Redis for WebSocket distribution.
+
+        Temporal activities run in a worker process that does not share the API server's
+        WebSocket connection manager, so we publish directly to Redis pub/sub channels
+        that the API server's WebSocket layer is already subscribed to.
+        """
+        try:
+            redis_client = await get_redis_client()
+            payload = json.dumps({
+                "type": "entity:updated",
+                "entity_type": "deployment",
+                "entity_id": deployment_id,
+                "channel": f"course:{course_id}",
+                "data": {
+                    "deployment_status": status,
+                    "course_content_id": course_content_id,
+                    "deployment_message": message,
+                },
+            })
+            await redis_client.publish(f"ws:broadcast:course:{course_id}", payload)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast deployment status via WebSocket: {e}")
+
+    def invalidate_lecturer_cache(course_id: str):
+        """Invalidate lecturer view cache after deployment status changes."""
+        try:
+            from ..redis_cache import get_cache
+            cache = get_cache()
+            if cache:
+                cache.invalidate_tags(f"lecturer_view:{course_id}")
+                logger.debug(f"Invalidated lecturer_view cache for course {course_id}")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate lecturer view cache: {e}")
+
+    async def broadcast_cache_invalidation(tags: list[str], course_id: str | None = None):
+        """Publish cache invalidation event directly to Redis for WebSocket distribution."""
+        try:
+            redis_client = await get_redis_client()
+            channel = f"course:{course_id}" if course_id else "system"
+            payload = json.dumps({
+                "type": "cache:invalidated",
+                "channel": channel,
+                "data": {"tags": tags},
+            })
+            await redis_client.publish(f"ws:broadcast:{channel}", payload)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast cache invalidation: {e}")
 
     db = SessionLocal()
     
@@ -558,9 +615,20 @@ async def generate_student_template_activity_v2(
             db.add(history)
         
         db.commit()
-        
+        invalidate_lecturer_cache(course_id)
+        await broadcast_cache_invalidation([f"lecturer_view:{course_id}"], course_id)
+
+        # Broadcast deploying status to WebSocket subscribers
+        for deployment in deployments_to_process:
+            await broadcast_deployment_status(
+                str(deployment.id),
+                str(deployment.course_content_id),
+                course_id,
+                "deploying",
+            )
+
         logger.info(f"Updated {len(deployments_to_process)} deployments to 'deploying' status")
-        
+
         # Transform localhost URLs for Docker environments
         student_template_url = transform_localhost_url(student_template_url)
         logger.info(f"Using student template URL: {student_template_url}")
@@ -1141,7 +1209,41 @@ async def generate_student_template_activity_v2(
             
             # Now commit database changes
             db.commit()
-            
+            invalidate_lecturer_cache(course_id)
+            await broadcast_cache_invalidation([f"lecturer_view:{course_id}"], course_id)
+
+            # Broadcast final deployment statuses to WebSocket subscribers
+            if git_push_successful and processed_count > 0:
+                for content in successfully_processed:
+                    if content.deployment:
+                        await broadcast_deployment_status(
+                            str(content.deployment.id),
+                            str(content.id),
+                            course_id,
+                            "deployed",
+                        )
+            else:
+                for content in course_contents:
+                    if content.deployment and content.deployment.deployment_status == "failed":
+                        await broadcast_deployment_status(
+                            str(content.deployment.id),
+                            str(content.id),
+                            course_id,
+                            "failed",
+                            content.deployment.deployment_message,
+                        )
+
+            # Also broadcast failures that happened during individual content processing
+            for content in course_contents:
+                if content.deployment and content.deployment.deployment_status == "failed" and content not in successfully_processed:
+                    await broadcast_deployment_status(
+                        str(content.deployment.id),
+                        str(content.id),
+                        course_id,
+                        "failed",
+                        content.deployment.deployment_message,
+                    )
+
             # Do not generate assignments repository automatically; managed manually by lecturers
             assignments_result = None
             
@@ -1181,7 +1283,7 @@ async def generate_student_template_activity_v2(
             for deployment in failed_deployments:
                 deployment.deployment_status = "failed"
                 deployment.deployment_message = str(e)[:500]
-                
+
                 # Add failure history
                 history = DeploymentHistory(
                     deployment_id=deployment.id,
@@ -1190,8 +1292,20 @@ async def generate_student_template_activity_v2(
                     workflow_id=workflow_id,
                 )
                 db.add(history)
-            
+
             db.commit()
+            invalidate_lecturer_cache(course_id)
+            await broadcast_cache_invalidation([f"lecturer_view:{course_id}"], course_id)
+
+            # Broadcast failure status to WebSocket subscribers
+            for deployment in failed_deployments:
+                await broadcast_deployment_status(
+                    str(deployment.id),
+                    str(deployment.course_content_id),
+                    course_id,
+                    "failed",
+                    deployment.deployment_message,
+                )
         except Exception as db_error:
             logger.error(f"Failed to update deployment statuses: {db_error}")
         

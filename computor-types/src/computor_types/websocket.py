@@ -11,6 +11,7 @@ Namespaces:
 - typing: Typing indicators (start, stop, update)
 - read: Read receipts (mark, update)
 - maintenance: Maintenance mode notifications (activated, deactivated, scheduled, cancelled)
+- entity: Generic entity state change notifications (updated)
 """
 
 from pydantic import BaseModel, Field
@@ -189,6 +190,23 @@ class WSMaintenanceReminder(WSEventBase):
 
 
 # =============================================================================
+# Entity Events (Server -> Client)
+# =============================================================================
+
+class WSEntityUpdated(WSEventBase):
+    """Generic entity state change notification.
+
+    Used to push real-time updates for any entity type (deployments, submissions, etc.)
+    to subscribed clients without requiring entity-specific event types.
+    """
+    type: Literal["entity:updated"] = "entity:updated"
+    entity_type: str = Field(..., description="Entity type, e.g., 'deployment', 'course_content', 'submission'")
+    entity_id: str = Field(..., description="ID of the changed entity")
+    channel: str = Field(..., description="Channel this event was broadcast to, e.g., 'course:<uuid>'")
+    data: dict = Field(default_factory=dict, description="Partial payload with changed fields")
+
+
+# =============================================================================
 # Union Types for Parsing
 # =============================================================================
 
@@ -220,6 +238,7 @@ ServerEvent = Union[
     WSMaintenanceScheduled,
     WSMaintenanceCancelled,
     WSMaintenanceReminder,
+    WSEntityUpdated,
 ]
 
 
