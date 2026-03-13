@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 from computor_backend.model.course import Course, CourseContent, CourseContentType
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
@@ -776,4 +776,237 @@ def batch_validate_content(
         'total_validated': len(content_validations),
         'total_issues': total_issues,
         'validation_results': validation_results
+    }
+
+
+def _build_latest_version_map(db: Session, example_ids: list[str]) -> dict[str, tuple[int, str]]:
+    """
+    Batch-fetch the latest ExampleVersion for each example_id.
+
+    Returns:
+        dict mapping example_id (str) → (version_number, version_tag)
+    """
+    if not example_ids:
+        return {}
+
+    latest_subq = db.query(
+        ExampleVersion.example_id,
+        func.max(ExampleVersion.version_number).label('max_vn')
+    ).filter(
+        ExampleVersion.example_id.in_(example_ids)
+    ).group_by(ExampleVersion.example_id).subquery()
+
+    latest_versions = db.query(ExampleVersion).join(
+        latest_subq,
+        and_(
+            ExampleVersion.example_id == latest_subq.c.example_id,
+            ExampleVersion.version_number == latest_subq.c.max_vn
+        )
+    ).all()
+
+    return {
+        str(v.example_id): (v.version_number, v.version_tag)
+        for v in latest_versions
+    }
+
+
+def get_course_deployments(
+    course_id: str | UUID,
+    permissions: Principal,
+    db: Session
+) -> dict:
+    """
+    Get all deployments for a course with has_newer_version computed in batch.
+
+    Replaces N individual lecturerGetDeployment calls with a single query
+    plus one aggregation query for latest versions.
+
+    Returns:
+        Dictionary matching CourseDeploymentGet schema.
+    """
+    course_query = check_course_permissions(permissions, Course, "_lecturer", db)
+    course = course_query.filter(Course.id == course_id).first()
+
+    if not course:
+        raise ForbiddenException(
+            error_code="AUTHZ_003",
+            detail="You don't have permission to access deployments for this course",
+            context={"course_id": str(course_id)}
+        )
+
+    deployments = db.query(CourseContentDeployment).join(
+        CourseContent, CourseContent.id == CourseContentDeployment.course_content_id
+    ).options(
+        joinedload(CourseContentDeployment.example_version),
+        joinedload(CourseContentDeployment.course_content)
+    ).filter(
+        CourseContent.course_id == course_id,
+        CourseContentDeployment.deployment_status != 'unassigned'
+    ).all()
+
+    example_ids = list({
+        str(d.example_version.example_id)
+        for d in deployments
+        if d.example_version and d.example_version.example_id
+    })
+
+    latest_map = _build_latest_version_map(db, example_ids)
+
+    items = []
+    for d in deployments:
+        has_newer = False
+        latest_tag = None
+
+        if d.example_version:
+            eid = str(d.example_version.example_id)
+            latest = latest_map.get(eid)
+            if latest:
+                latest_vn, latest_vtag = latest
+                if latest_vn > d.example_version.version_number:
+                    has_newer = True
+                    latest_tag = latest_vtag
+
+        cc = d.course_content
+        items.append({
+            'course_content_id': str(d.course_content_id),
+            'example_id': str(d.example_version.example_id) if d.example_version else None,
+            'example_identifier': str(d.example_identifier) if d.example_identifier else None,
+            'version_tag': d.version_tag,
+            'deployment_status': d.deployment_status,
+            'deployed_at': d.deployed_at,
+            'has_newer_version': has_newer,
+            'latest_version_tag': latest_tag,
+            'course_content_title': cc.title if cc else None,
+            'course_content_path': str(cc.path) if cc else None,
+        })
+
+    logger.info(
+        f"Batch deployment listing for course {course_id}: "
+        f"{len(items)} deployments returned"
+    )
+
+    return {
+        'course_id': str(course_id),
+        'total': len(items),
+        'deployments': items
+    }
+
+
+def batch_upgrade_versions(
+    course_id: str | UUID,
+    course_content_ids: list[str],
+    permissions: Principal,
+    db: Session
+) -> dict:
+    """
+    Batch-upgrade multiple course contents to their latest example versions.
+
+    For each content ID, finds the latest version of the assigned example and
+    calls assign_example_to_content to bump the version (resets status to 'pending').
+
+    Returns:
+        Dictionary matching VersionUpgradeGet schema.
+    """
+    course_query = check_course_permissions(permissions, Course, "_lecturer", db)
+    course = course_query.filter(Course.id == course_id).first()
+
+    if not course:
+        raise ForbiddenException(
+            error_code="AUTHZ_003",
+            detail="You don't have permission to upgrade versions for this course",
+            context={"course_id": str(course_id)}
+        )
+
+    deployments = db.query(CourseContentDeployment).options(
+        joinedload(CourseContentDeployment.example_version)
+    ).filter(
+        CourseContentDeployment.course_content_id.in_(course_content_ids)
+    ).all()
+    deployment_map = {str(d.course_content_id): d for d in deployments}
+
+    example_ids = list({
+        str(d.example_version.example_id)
+        for d in deployments
+        if d.example_version and d.example_version.example_id
+    })
+    latest_map = _build_latest_version_map(db, example_ids)
+
+    results = []
+    upgraded = 0
+    skipped = 0
+    failed = 0
+
+    for content_id in course_content_ids:
+        dep = deployment_map.get(content_id)
+        if not dep or not dep.example_version:
+            results.append({
+                'course_content_id': content_id,
+                'success': False,
+                'error': 'No deployment or example version found'
+            })
+            failed += 1
+            continue
+
+        eid = str(dep.example_version.example_id)
+        latest = latest_map.get(eid)
+
+        if not latest:
+            results.append({
+                'course_content_id': content_id,
+                'success': False,
+                'error': 'No versions available for this example'
+            })
+            failed += 1
+            continue
+
+        latest_vn, latest_vtag = latest
+        current_tag = dep.version_tag
+
+        if latest_vn <= dep.example_version.version_number:
+            results.append({
+                'course_content_id': content_id,
+                'success': True,
+                'from_tag': current_tag,
+                'to_tag': current_tag,
+            })
+            skipped += 1
+            continue
+
+        try:
+            assign_example_to_content(
+                course_content_id=content_id,
+                example_id=None,
+                example_identifier=str(dep.example_identifier) if dep.example_identifier else None,
+                version_tag=latest_vtag,
+                permissions=permissions,
+                db=db
+            )
+            results.append({
+                'course_content_id': content_id,
+                'success': True,
+                'from_tag': current_tag,
+                'to_tag': latest_vtag,
+            })
+            upgraded += 1
+        except Exception as e:
+            results.append({
+                'course_content_id': content_id,
+                'success': False,
+                'from_tag': current_tag,
+                'error': str(e)[:500],
+            })
+            failed += 1
+
+    logger.info(
+        f"Batch version upgrade for course {course_id}: "
+        f"{len(course_content_ids)} requested, {upgraded} upgraded, "
+        f"{skipped} skipped, {failed} failed"
+    )
+
+    return {
+        'total_requested': len(course_content_ids),
+        'total_upgraded': upgraded,
+        'total_skipped': skipped,
+        'total_failed': failed,
+        'results': results
     }

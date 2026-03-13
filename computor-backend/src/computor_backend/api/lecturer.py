@@ -18,6 +18,9 @@ from computor_types.lecturer_deployments import (
     AssignExampleResponse,
     DeploymentGet,
     UnassignExampleResponse,
+    CourseDeploymentGet,
+    VersionUpgradeCreate,
+    VersionUpgradeGet,
 )
 from computor_types.lecturer_content_validation import (
     ContentValidationCreate,
@@ -42,6 +45,8 @@ from computor_backend.business_logic.lecturer_deployment import (
     get_deployment_for_content,
     unassign_example_from_content,
     batch_validate_content,
+    get_course_deployments,
+    batch_upgrade_versions,
 )
 from computor_backend.business_logic.lecturer_gitlab_sync import (
     sync_course_member_gitlab_permissions,
@@ -263,6 +268,64 @@ def unassign_example_from_course_content(
     )
 
     return UnassignExampleResponse(**result)
+
+
+# ============================================================================
+# Batch Deployment Endpoints
+# ============================================================================
+
+@lecturer_router.get(
+    "/courses/{course_id}/deployments",
+    response_model=CourseDeploymentGet
+)
+def get_course_deployments_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db)
+):
+    """
+    Get all deployments for a course with has_newer_version computed server-side.
+
+    Returns deployment info for every assigned course content in the course,
+    including whether a newer example version is available and its version tag.
+    Replaces N individual GET /deployment calls with a single batch query.
+
+    Returns:
+        CourseDeploymentGet with list of deployments
+    """
+    return CourseDeploymentGet(**get_course_deployments(
+        course_id=course_id,
+        permissions=permissions,
+        db=db
+    ))
+
+
+@lecturer_router.post(
+    "/courses/{course_id}/upgrade-versions",
+    response_model=VersionUpgradeGet
+)
+def batch_upgrade_versions_endpoint(
+    course_id: UUID | str,
+    request: VersionUpgradeCreate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db)
+):
+    """
+    Batch-upgrade multiple course contents to their latest example versions.
+
+    For each course content ID, finds the latest version of the assigned example
+    and re-assigns it (resetting deployment_status to 'pending').
+    Replaces 3 API calls per item with a single batch operation.
+
+    Returns:
+        VersionUpgradeGet with per-item results and summary counts
+    """
+    return VersionUpgradeGet(**batch_upgrade_versions(
+        course_id=course_id,
+        course_content_ids=request.course_content_ids,
+        permissions=permissions,
+        db=db
+    ))
 
 
 @lecturer_router.post(

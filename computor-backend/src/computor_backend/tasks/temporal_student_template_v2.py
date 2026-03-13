@@ -520,22 +520,7 @@ async def generate_student_template_activity_v2(
         # If a release selection is provided, restrict to selected contents; else fallback to status-based selection
         selected_course_content_ids: List[str] = []
         if release:
-            ids = release.get("course_content_ids") or []
-            if ids:
-                selected_course_content_ids = ids
-            elif release.get("parent_id"):
-                parent_id = release.get("parent_id")
-                include_desc = bool(release.get("include_descendants", True))
-                parent = db.query(CourseContent).filter(CourseContent.id == parent_id).first()
-                if parent:
-                    q = db.query(CourseContent).filter(CourseContent.course_id == course_id)
-                    if include_desc:
-                        q = q.filter(CourseContent.path.descendant_of(parent.path))
-                    else:
-                        q = q.filter(CourseContent.id == parent.id)
-                    selected_course_content_ids = [str(cc.id) for cc in q.all()]
-            elif release.get("all"):
-                selected_course_content_ids = [str(cc.id) for (cc,) in db.query(CourseContent.id).filter(CourseContent.course_id == course_id).all()]
+            selected_course_content_ids = release.get("course_content_ids") or []
 
         if selected_course_content_ids:
             deployments_to_process = db.query(CourseContentDeployment).join(CourseContent).filter(
