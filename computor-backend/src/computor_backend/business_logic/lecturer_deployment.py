@@ -14,6 +14,7 @@ from sqlalchemy import and_, or_
 from computor_backend.model.course import Course, CourseContent, CourseContentType
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
 from computor_backend.model.example import Example, ExampleVersion
+from computor_backend.model.service import Service
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.exceptions import (
@@ -101,6 +102,40 @@ def validate_semantic_version(version_str: str) -> SemanticVersion:
             detail=str(e),
             context={"version_string": version_str}
         )
+
+
+def _auto_link_testing_service(
+    course_content: CourseContent,
+    example_version: ExampleVersion,
+    permissions: Principal,
+    db: Session
+) -> None:
+    """
+    Auto-link testing service to course content based on example's execution backend slug.
+
+    Looks up the service by the slug extracted from the example version's meta.yaml
+    and sets course_content.testing_service_id if found.
+    """
+    execution_backend_slug = example_version.get_execution_backend_slug()
+    if not execution_backend_slug:
+        return
+
+    service = db.query(Service).filter(
+        Service.slug == execution_backend_slug,
+        Service.enabled == True,
+        Service.archived_at.is_(None)
+    ).first()
+
+    if service:
+        if course_content.testing_service_id != service.id:
+            course_content.testing_service_id = service.id
+            course_content.updated_by = permissions.user_id
+            course_content.updated_at = datetime.now(timezone.utc)
+            logger.info(
+                f"Linked testing service '{execution_backend_slug}' to course content {course_content.path}"
+            )
+    else:
+        logger.warning(f"Service not found for execution_backend slug: {execution_backend_slug}")
 
 
 def assign_example_to_content(
@@ -309,6 +344,9 @@ def assign_example_to_content(
         )
         db.add(history)
 
+        # Auto-link testing service based on example's execution backend
+        _auto_link_testing_service(course_content, example_version, permissions, db)
+
         db.commit()
         db.refresh(existing_deployment)
 
@@ -345,6 +383,9 @@ def assign_example_to_content(
             created_by=permissions.user_id
         )
         db.add(history)
+
+        # Auto-link testing service based on example's execution backend
+        _auto_link_testing_service(course_content, example_version, permissions, db)
 
         db.commit()
         db.refresh(deployment)

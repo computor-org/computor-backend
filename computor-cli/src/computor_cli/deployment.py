@@ -1008,8 +1008,20 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 content = SimpleNamespace(**existing_contents[0])
                 click.echo(f"    ℹ️  Content already exists: {content.title} ({full_path})")
 
-                # Only update description if explicitly provided in deployment, otherwise if empty use meta_yaml.description
-                # NOTE: testing_service_id is NOT set here - it's set automatically when an example is assigned
+                # Patch testing_service_id if missing and a service is available
+                if not getattr(content, 'testing_service_id', None) and deployed_services and is_submittable:
+                    # Find the first deployed service for this course
+                    for svc_ref in (getattr(course_config, 'services', None) or []):
+                        slug = svc_ref.slug if hasattr(svc_ref, 'slug') else svc_ref
+                        if slug in deployed_services:
+                            svc_id = deployed_services[slug]["id"]
+                            try:
+                                custom_client.update(f"course-contents/{content.id}", {"testing_service_id": svc_id})
+                                click.echo(f"      🔗 Linked testing service: {slug}")
+                            except Exception as e:
+                                click.echo(f"      ⚠️  Failed to link testing service: {e}")
+                            break
+
                 to_update = {}
                 if content_config.description is not None:
                     if content_config.description != getattr(content, 'description', None):
@@ -1047,8 +1059,16 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 effective_title = content_config.title or meta_title or ex_title or _humanize(fallback_seg)
                 effective_description = content_config.description if content_config.description is not None else meta_description
 
+                # Resolve testing_service_id from deployed services
+                resolved_testing_service_id = None
+                if is_submittable and deployed_services:
+                    for svc_ref in (getattr(course_config, 'services', None) or []):
+                        slug = svc_ref.slug if hasattr(svc_ref, 'slug') else svc_ref
+                        if slug in deployed_services:
+                            resolved_testing_service_id = deployed_services[slug]["id"]
+                            break
+
                 # Create the content
-                # NOTE: testing_service_id is NOT set here - it's set automatically when an example is assigned
                 content_create_data = {
                     "title": effective_title,
                     "description": effective_description,
@@ -1059,7 +1079,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     "max_group_size": content_config.max_group_size or 1,
                     "max_test_runs": content_config.max_test_runs,
                     "max_submissions": content_config.max_submissions,
-                    "testing_service_id": None,  # Will be set when example is assigned
+                    "testing_service_id": resolved_testing_service_id,
                     "properties": content_config.properties.model_dump() if content_config.properties else None
                 }
 
