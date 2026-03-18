@@ -6,13 +6,11 @@ from datetime import timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
-from sqlalchemy.orm import Session
-
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
-from ..database import get_db
+from ..database import SessionLocal
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
 
@@ -49,8 +47,7 @@ async def create_organization_activity(
         )
 
         # Create the builder and organization
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             result = builder._create_organization(org_config_obj, user_id)
@@ -74,10 +71,7 @@ async def create_organization_activity(
                     "error": result.get("error", "Unknown error occurred")
                 }
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in organization creation activity: {str(e)}")
@@ -101,8 +95,7 @@ async def create_course_family_activity(
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
 
     try:
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             org = db.query(Organization).filter(Organization.id == organization_id).first()
             if not org:
@@ -150,10 +143,7 @@ async def create_course_family_activity(
                     "error": result.get("error", "Unknown error occurred")
                 }
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course family creation activity: {str(e)}")
@@ -177,8 +167,7 @@ async def create_course_activity(
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
 
     try:
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()
             if not family:
@@ -231,10 +220,7 @@ async def create_course_activity(
                     "error": result.get("error", "Unknown error occurred")
                 }
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course creation activity: {str(e)}")
