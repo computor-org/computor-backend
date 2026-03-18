@@ -102,7 +102,6 @@ class TemporalWorker:
         self._shutdown = False
         self._heartbeat_interval = heartbeat_interval
         self._start_time: Optional[datetime] = None
-        self._tasks_processed = 0
 
     async def _heartbeat_loop(self):
         """Log periodic heartbeat to show worker is alive."""
@@ -112,7 +111,7 @@ class TemporalWorker:
                 uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
                 logger.info(
                     f"[HEARTBEAT] Worker alive - queues: {self.task_queues}, "
-                    f"uptime: {uptime}, tasks_processed: {self._tasks_processed}"
+                    f"uptime: {uptime}"
                 )
 
     async def start(self):
@@ -224,7 +223,7 @@ class TemporalWorker:
             await self.client.close()
 
         uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
-        logger.info(f"Workers shut down - uptime: {uptime}, tasks_processed: {self._tasks_processed}")
+        logger.info(f"Workers shut down - uptime: {uptime}")
 
 
 async def run_worker(queues: Optional[List[str]] = None):
