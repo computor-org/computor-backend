@@ -16,7 +16,7 @@ from gitlab.exceptions import GitlabGetError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from ..database import get_db
+from ..database import SessionLocal
 from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
@@ -437,7 +437,7 @@ async def create_student_repository(
     Returns:
         Dict containing repository information
     """
-    db = next(get_db())
+    db = SessionLocal()
     
     try:
         # Get course member and validate
@@ -632,7 +632,7 @@ async def create_team_repository(
     Returns:
         Dict containing repository information
     """
-    db = next(get_db())
+    db = SessionLocal()
     
     try:
         # Get course information
