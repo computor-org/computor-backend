@@ -1069,3 +1069,12 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
                 result=None,
                 error=str(e)
             )
+
+
+WORKFLOWS = [
+    GenerateStudentTemplateWorkflowV2,
+]
+
+ACTIVITIES = [
+    generate_student_template_activity_v2,
+]

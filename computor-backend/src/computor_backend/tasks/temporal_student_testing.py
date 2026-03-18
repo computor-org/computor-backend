@@ -800,3 +800,16 @@ class StudentTestingWorkflow(BaseWorkflow):
                     "test_job_id": job_id,
                 },
             )
+
+
+WORKFLOWS = [
+    StudentTestingWorkflow,
+]
+
+ACTIVITIES = [
+    fetch_example_version_with_dependencies,
+    fetch_submission_artifact,
+    execute_tests_activity,
+    commit_test_results_activity,
+    run_complete_student_test_activity,
+]

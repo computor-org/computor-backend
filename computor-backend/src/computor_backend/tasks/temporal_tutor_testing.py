@@ -462,3 +462,15 @@ class TutorTestingWorkflow(BaseWorkflow):
                     "test_id": test_id,
                 },
             )
+
+
+WORKFLOWS = [
+    TutorTestingWorkflow,
+]
+
+ACTIVITIES = [
+    fetch_tutor_test_input,
+    store_tutor_test_artifacts_activity,
+    store_tutor_test_result_to_minio,
+    run_tutor_test_activity,
+]

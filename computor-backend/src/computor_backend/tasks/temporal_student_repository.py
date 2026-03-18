@@ -896,3 +896,12 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={"error_details": str(e)}
             )
+
+WORKFLOWS = [
+    StudentRepositoryCreationWorkflow,
+]
+
+ACTIVITIES = [
+    create_student_repository,
+    create_team_repository,
+]

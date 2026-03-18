@@ -659,3 +659,17 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
                 error=error_msg,
                 metadata={"workflow_type": "deploy_computor_hierarchy"}
             )
+
+
+WORKFLOWS = [
+    CreateOrganizationWorkflow,
+    CreateCourseFamilyWorkflow,
+    CreateCourseWorkflow,
+    DeployComputorHierarchyWorkflow,
+]
+
+ACTIVITIES = [
+    create_organization_activity,
+    create_course_family_activity,
+    create_course_activity,
+]

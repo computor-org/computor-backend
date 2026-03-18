@@ -341,3 +341,12 @@ class GenerateAssignmentsRepositoryWorkflow(BaseWorkflow):
             return WorkflowResult(status="completed" if result.get('success') else "failed", result=result)
         except Exception as e:
             return WorkflowResult(status="failed", result=None, error=str(e))
+
+
+WORKFLOWS = [
+    GenerateAssignmentsRepositoryWorkflow,
+]
+
+ACTIVITIES = [
+    generate_assignments_repository_activity,
+]

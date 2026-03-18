@@ -470,3 +470,15 @@ async def discover_template_keys(
     """
     templates = _resolve_templates(requested, templates_dir)
     return [t["dir_name"] for t in templates]
+
+
+WORKFLOWS = [
+    BuildWorkspaceImagesWorkflow,
+    PushCoderTemplatesWorkflow,
+]
+
+ACTIVITIES = [
+    build_workspace_image,
+    discover_template_keys,
+    push_coder_template,
+]

@@ -302,3 +302,12 @@ class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
                 result=None,
                 error=f"Workflow error: {str(e)}"
             )
+
+
+WORKFLOWS = [
+    SyncDocumentsRepositoryWorkflow,
+]
+
+ACTIVITIES = [
+    sync_documents_repository_activity,
+]
