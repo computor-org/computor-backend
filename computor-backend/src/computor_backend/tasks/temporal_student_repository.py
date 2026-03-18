@@ -339,8 +339,8 @@ async def find_existing_repository(
         except:
             pass
         
-        # Method 2: List projects in namespace
-        for project in namespace_group.projects.list(all=True):
+        # Method 2: Search projects in namespace by name
+        for project in namespace_group.projects.list(search=repo_path, per_page=10):
             if project.path == repo_path:
                 return gitlab.projects.get(project.id)
                 
