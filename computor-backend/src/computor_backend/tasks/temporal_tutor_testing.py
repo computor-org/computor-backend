@@ -395,14 +395,12 @@ class TutorTestingWorkflow(BaseWorkflow):
         started_at = datetime.utcnow()
 
         try:
-            # API configuration from environment (same pattern as StudentTestingWorkflow)
-            api_url = os.environ.get("API_URL", "http://localhost:8000")
-            api_token = os.environ.get("API_TOKEN")
+            # API configuration - activities read from their own os.environ
+            # (workflows must not access os.environ for Temporal determinism)
             api_config = {
-                "url": api_url,
-                "token": api_token,
+                "url": "http://localhost:8000",
+                "token": None,
             }
-            workflow.logger.info(f"[API CONFIG] url={api_url}, token_present={bool(api_token)}")
 
             # Run test activity
             workflow.logger.info(f"[ACTIVITY START] run_tutor_test_activity for test_id={test_id}")
