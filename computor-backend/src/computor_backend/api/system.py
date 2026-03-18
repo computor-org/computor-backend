@@ -9,13 +9,11 @@ from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     ForbiddenException,
-    AdminRequiredException,
     TemporalServiceException,
-    InternalServerException,
 )
 from computor_backend.exceptions.exceptions import ComputorException
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.permissions.core import check_admin, check_course_permissions, check_course_family_permissions
+from computor_backend.permissions.core import check_admin, check_permissions, check_course_permissions, check_course_family_permissions
 from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
@@ -28,6 +26,7 @@ from computor_types.system import (
 from computor_backend.model.course import Course, CourseContent, CourseFamily
 from computor_backend.model.organization import Organization
 from computor_backend.tasks import get_task_executor, TaskSubmission
+from computor_backend.task_tracker import get_task_tracker
 from computor_backend.business_logic.release_validation import (
     validate_course_for_release,
     validate_course_contents_for_release
@@ -56,11 +55,7 @@ async def create_organization_async(
     """Create an organization asynchronously using Temporal workflows."""
 
     # Check permissions
-    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
-        raise ForbiddenException(
-            detail="Admin or organization manager permissions required to create organizations",
-            context={"operation": "create_organization"}
-        )
+    check_permissions(permissions, Organization, "create", db)
 
     # Convert to organization config format
     org_config = {
@@ -74,9 +69,9 @@ async def create_organization_async(
         )
     }
 
-    # Submit task using Temporal
+    # Submit task using Temporal and track for permission-aware polling
     try:
-        task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
         task_submission = TaskSubmission(
             task_name="create_organization",
             parameters={
@@ -88,7 +83,13 @@ async def create_organization_async(
             queue="computor-tasks"
         )
 
-        task_id = await task_executor.submit_task(task_submission)
+        task_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=permissions.user_id,
+            user_id=permissions.user_id,
+            entity_type="organization",
+            description=f"Create organization: {org_config['name']}"
+        )
     except ComputorException:
         raise
     except Exception as e:
@@ -113,11 +114,7 @@ async def create_course_family_async(
     """Create a course family asynchronously using Temporal workflows."""
 
     # Check permissions
-    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
-        raise ForbiddenException(
-            detail="Admin or organization manager permissions required to create course families",
-            context={"operation": "create_course_family"}
-        )
+    check_permissions(permissions, CourseFamily, "create", db)
 
     # Validate parent organization exists
     organization = db.query(Organization).filter(Organization.id == request.organization_id).first()
@@ -140,9 +137,9 @@ async def create_course_family_async(
         "has_gitlab": has_gitlab
     }
 
-    # Submit task using Temporal
+    # Submit task using Temporal and track for permission-aware polling
     try:
-        task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
         task_submission = TaskSubmission(
             task_name="create_course_family",
             parameters={
@@ -153,7 +150,14 @@ async def create_course_family_async(
             queue="computor-tasks"
         )
 
-        task_id = await task_executor.submit_task(task_submission)
+        task_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=permissions.user_id,
+            user_id=permissions.user_id,
+            organization_id=request.organization_id,
+            entity_type="course_family",
+            description=f"Create course family: {family_config['name']}"
+        )
     except ComputorException:
         raise
     except Exception as e:
@@ -178,11 +182,7 @@ async def create_course_async(
     """Create a course asynchronously using Temporal workflows."""
 
     # Check permissions
-    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
-        raise ForbiddenException(
-            detail="Admin or organization manager permissions required to create courses",
-            context={"operation": "create_course"}
-        )
+    check_permissions(permissions, Course, "create", db)
 
     # Validate parent course family exists
     course_family = db.query(CourseFamily).filter(CourseFamily.id == request.course_family_id).first()
@@ -205,9 +205,9 @@ async def create_course_async(
         "has_gitlab": has_gitlab
     }
 
-    # Submit task using Temporal
+    # Submit task using Temporal and track for permission-aware polling
     try:
-        task_executor = get_task_executor()
+        task_tracker = await get_task_tracker()
         task_submission = TaskSubmission(
             task_name="create_course",
             parameters={
@@ -218,7 +218,13 @@ async def create_course_async(
             queue="computor-tasks"
         )
 
-        task_id = await task_executor.submit_task(task_submission)
+        task_id = await task_tracker.submit_and_track_task(
+            task_submission=task_submission,
+            created_by=permissions.user_id,
+            user_id=permissions.user_id,
+            entity_type="course",
+            description=f"Create course: {course_config['name']}"
+        )
     except ComputorException:
         raise
     except Exception as e:

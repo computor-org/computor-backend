@@ -64,12 +64,8 @@ async def create_organization_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "organization_id": None,
-                    "status": "failed",
-                    "name": org_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Organization creation failed: {error_msg}")
         finally:
             db.close()
 
@@ -132,12 +128,8 @@ async def create_course_family_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "course_family_id": None,
-                    "status": "failed",
-                    "name": family_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Course family creation failed: {error_msg}")
         finally:
             db.close()
 
@@ -205,12 +197,8 @@ async def create_course_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "course_id": None,
-                    "status": "failed",
-                    "name": course_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Course creation failed: {error_msg}")
         finally:
             db.close()
 
