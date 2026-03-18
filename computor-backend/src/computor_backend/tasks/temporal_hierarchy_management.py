@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
 from .registry import register_task
 from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
@@ -105,8 +105,9 @@ async def create_course_family_activity(
                 raise ValueError("Organization missing GitLab configuration")
 
             # Decrypt the GitLab token
-            from computor_types.tokens import decrypt_api_key
-            gitlab_token = decrypt_api_key(encrypted_token)
+            gitlab_token = decrypt_gitlab_token(encrypted_token)
+            if not gitlab_token:
+                raise ValueError("Failed to decrypt GitLab token")
 
             # Build the CourseFamilyConfig directly
             family_config_obj = CourseFamilyConfig(
@@ -177,8 +178,9 @@ async def create_course_activity(
                 raise ValueError("Organization missing GitLab configuration")
 
             # Decrypt the GitLab token
-            from computor_types.tokens import decrypt_api_key
-            gitlab_token = decrypt_api_key(encrypted_token)
+            gitlab_token = decrypt_gitlab_token(encrypted_token)
+            if not gitlab_token:
+                raise ValueError("Failed to decrypt GitLab token")
 
             # Build the CourseConfig directly
             course_config_obj = CourseConfig(

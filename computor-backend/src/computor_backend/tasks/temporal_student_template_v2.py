@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -379,17 +379,9 @@ async def generate_student_template_activity_v2(
         gitlab_token = None
         if organization.properties and 'gitlab' in organization.properties:
             gitlab_config = organization.properties.get('gitlab', {})
-            encrypted_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
-            
-            if encrypted_token:
-                # Decrypt the GitLab token
-                from computor_types.tokens import decrypt_api_key
-                try:
-                    gitlab_token = decrypt_api_key(encrypted_token)
-                    logger.info(f"Using decrypted GitLab token from organization {organization.title}")
-                except Exception as e:
-                    logger.error(f"Failed to decrypt GitLab token for organization {organization.title}: {str(e)}")
-                    gitlab_token = None
+            gitlab_token = decrypt_gitlab_token(gitlab_config.get('token'))
+            if gitlab_token:
+                logger.info(f"Using decrypted GitLab token from organization {organization.title}")
         
         if not gitlab_token:
             logger.warning(f"No GitLab token found in organization {organization.title} properties")
@@ -399,21 +391,7 @@ async def generate_student_template_activity_v2(
             template_repo_path = os.path.join(temp_dir, "student-template")
             
             # Create authenticated URL if we have a token and it's HTTP
-            auth_url = student_template_url
-            if gitlab_token and 'http' in student_template_url:
-                from urllib.parse import urlparse, urlunparse
-                parsed = urlparse(student_template_url)
-                auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
-                if parsed.port:
-                    auth_netloc += f":{parsed.port}"
-                auth_url = urlunparse((
-                    parsed.scheme,
-                    auth_netloc,
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment
-                ))
+            auth_url = make_git_auth_url(student_template_url, gitlab_token) if gitlab_token else student_template_url
             
             # Try to clone existing repo or create new one
             try:

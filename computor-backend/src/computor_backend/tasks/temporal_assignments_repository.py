@@ -17,7 +17,7 @@ from pathlib import Path
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,7 @@ async def generate_assignments_repository_activity(
         org = course.organization
         gitlab_token = None
         if org and org.properties and 'gitlab' in org.properties:
-            from computor_types.tokens import decrypt_api_key
-            enc = org.properties['gitlab'].get('token')
-            if enc:
-                try:
-                    gitlab_token = decrypt_api_key(enc)
-                except Exception:
-                    gitlab_token = None
+            gitlab_token = decrypt_gitlab_token(org.properties['gitlab'].get('token'))
 
         # Determine assignments URL if not provided
         if not assignments_url:
@@ -127,14 +121,7 @@ async def generate_assignments_repository_activity(
             repo_path = os.path.join(temp_dir, 'assignments')
 
             # Authenticated URL if HTTP + token
-            auth_url = assignments_url
-            if gitlab_token and 'http' in assignments_url:
-                from urllib.parse import urlparse, urlunparse
-                parsed = urlparse(assignments_url)
-                auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
-                if parsed.port:
-                    auth_netloc += f":{parsed.port}"
-                auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            auth_url = make_git_auth_url(assignments_url, gitlab_token) if gitlab_token else assignments_url
 
             # Clone or initialize repository
             try:
