@@ -135,8 +135,8 @@ class TemporalTaskExecutor:
                 TaskStatus.QUEUED
             )
             
-            # Extract task name from workflow ID
-            task_name = task_id.split('-')[0] if '-' in task_id else "unknown"
+            # Extract task name from workflow type
+            task_name = description.workflow_type or "unknown"
             
             # Create shortened task ID for better display
             short_task_id = task_id.split('-')[-1] if '-' in task_id else task_id
