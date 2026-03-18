@@ -8,8 +8,12 @@ import logging
 from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
-    ForbiddenException
+    ForbiddenException,
+    AdminRequiredException,
+    TemporalServiceException,
+    InternalServerException,
 )
+from computor_backend.exceptions.exceptions import ComputorException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_admin, check_course_permissions, check_course_family_permissions
 from computor_backend.permissions.principal import Principal
@@ -51,24 +55,27 @@ async def create_organization_async(
 ):
     """Create an organization asynchronously using Temporal workflows."""
     
+    # Check permissions
+    if not permissions.is_admin:
+        raise AdminRequiredException(
+            detail="Admin permissions required to create organizations",
+            context={"operation": "create_organization"}
+        )
+
+    # Convert to organization config format
+    org_config = {
+        "name": request.organization.get("title", ""),
+        "path": request.organization.get("path", ""),
+        "description": request.organization.get("description", ""),
+        "gitlab": convert_to_gitlab_config(
+            request.gitlab,
+            request.parent_group_id,
+            request.organization.get("path", "")
+        )
+    }
+
+    # Submit task using Temporal
     try:
-        # Check permissions
-        if not permissions.is_admin:
-            raise NotFoundException("Insufficient permissions")
-        
-        # Convert to organization config format
-        org_config = {
-            "name": request.organization.get("title", ""),
-            "path": request.organization.get("path", ""),
-            "description": request.organization.get("description", ""),
-            "gitlab": convert_to_gitlab_config(
-                request.gitlab,
-                request.parent_group_id,
-                request.organization.get("path", "")
-            )
-        }
-        
-        # Submit task using Temporal
         task_executor = get_task_executor()
         task_submission = TaskSubmission(
             task_name="create_organization",
@@ -80,18 +87,22 @@ async def create_organization_async(
             },
             queue="computor-tasks"
         )
-        
+
         task_id = await task_executor.submit_task(task_submission)
-        
-        return TaskResponse(
-            task_id=task_id,
-            status="submitted",
-            message="Organization creation task submitted successfully"
-        )
-        
+    except ComputorException:
+        raise
     except Exception as e:
         logger.error(f"Error submitting organization creation task: {e}")
-        raise BadRequestException(f"Failed to submit organization creation task: {str(e)}")
+        raise TemporalServiceException(
+            detail=f"Failed to submit organization creation task: {str(e)}",
+            context={"operation": "create_organization"}
+        )
+
+    return TaskResponse(
+        task_id=task_id,
+        status="submitted",
+        message="Organization creation task submitted successfully"
+    )
 
 @system_router.post("/deploy/course-families", response_model=TaskResponse)
 async def create_course_family_async(
@@ -101,31 +112,36 @@ async def create_course_family_async(
 ):
     """Create a course family asynchronously using Temporal workflows."""
     
+    # Check permissions
+    if not permissions.is_admin:
+        raise AdminRequiredException(
+            detail="Admin permissions required to create course families",
+            context={"operation": "create_course_family"}
+        )
+
+    # Validate parent organization exists
+    organization = db.query(Organization).filter(Organization.id == request.organization_id).first()
+    if not organization:
+        raise NotFoundException(
+            detail=f"Organization with ID {request.organization_id} not found",
+            context={"organization_id": request.organization_id}
+        )
+
+    # Check if organization has GitLab integration
+    parent_gitlab_config = organization.properties.get("gitlab", {})
+    has_gitlab = bool(parent_gitlab_config.get("group_id"))
+
+    # Convert to course family config format
+    family_config = {
+        "name": request.course_family.get("title", ""),
+        "path": request.course_family.get("path", ""),
+        "description": request.course_family.get("description", ""),
+        "organization_id": request.organization_id,
+        "has_gitlab": has_gitlab
+    }
+
+    # Submit task using Temporal
     try:
-        # Check permissions
-        if not permissions.is_admin:
-            raise NotFoundException("Insufficient permissions")
-        
-        # Validate parent organization exists
-        organization = db.query(Organization).filter(Organization.id == request.organization_id).first()
-        if not organization:
-            raise NotFoundException(f"Organization with ID {request.organization_id} not found")
-        
-        # Check if organization has GitLab integration
-        parent_gitlab_config = organization.properties.get("gitlab", {})
-        has_gitlab = bool(parent_gitlab_config.get("group_id"))
-        
-        # Convert to course family config format
-        family_config = {
-            "name": request.course_family.get("title", ""),
-            "path": request.course_family.get("path", ""),
-            "description": request.course_family.get("description", ""),
-            "organization_id": request.organization_id,
-            "has_gitlab": has_gitlab
-        }
-        
-        # Submit task using Temporal
-        # The task will fetch GitLab credentials from the organization
         task_executor = get_task_executor()
         task_submission = TaskSubmission(
             task_name="create_course_family",
@@ -136,18 +152,22 @@ async def create_course_family_async(
             },
             queue="computor-tasks"
         )
-        
+
         task_id = await task_executor.submit_task(task_submission)
-        
-        return TaskResponse(
-            task_id=task_id,
-            status="submitted",
-            message="Course family creation task submitted successfully"
-        )
-        
+    except ComputorException:
+        raise
     except Exception as e:
         logger.error(f"Error submitting course family creation task: {e}")
-        raise BadRequestException(f"Failed to submit course family creation task: {str(e)}")
+        raise TemporalServiceException(
+            detail=f"Failed to submit course family creation task: {str(e)}",
+            context={"operation": "create_course_family", "organization_id": request.organization_id}
+        )
+
+    return TaskResponse(
+        task_id=task_id,
+        status="submitted",
+        message="Course family creation task submitted successfully"
+    )
 
 @system_router.post("/deploy/courses", response_model=TaskResponse)
 async def create_course_async(
@@ -157,31 +177,36 @@ async def create_course_async(
 ):
     """Create a course asynchronously using Temporal workflows."""
     
+    # Check permissions
+    if not permissions.is_admin:
+        raise AdminRequiredException(
+            detail="Admin permissions required to create courses",
+            context={"operation": "create_course"}
+        )
+
+    # Validate parent course family exists
+    course_family = db.query(CourseFamily).filter(CourseFamily.id == request.course_family_id).first()
+    if not course_family:
+        raise NotFoundException(
+            detail=f"Course family with ID {request.course_family_id} not found",
+            context={"course_family_id": request.course_family_id}
+        )
+
+    # Check if course family has GitLab integration
+    parent_gitlab_config = course_family.properties.get("gitlab", {})
+    has_gitlab = bool(parent_gitlab_config.get("group_id"))
+
+    # Convert to course config format
+    course_config = {
+        "name": request.course.get("title", ""),
+        "path": request.course.get("path", ""),
+        "description": request.course.get("description", ""),
+        "course_family_id": request.course_family_id,
+        "has_gitlab": has_gitlab
+    }
+
+    # Submit task using Temporal
     try:
-        # Check permissions
-        if not permissions.is_admin:
-            raise NotFoundException("Insufficient permissions")
-        
-        # Validate parent course family exists
-        course_family = db.query(CourseFamily).filter(CourseFamily.id == request.course_family_id).first()
-        if not course_family:
-            raise NotFoundException(f"Course family with ID {request.course_family_id} not found")
-        
-        # Check if course family has GitLab integration
-        parent_gitlab_config = course_family.properties.get("gitlab", {})
-        has_gitlab = bool(parent_gitlab_config.get("group_id"))
-        
-        # Convert to course config format
-        course_config = {
-            "name": request.course.get("title", ""),
-            "path": request.course.get("path", ""),
-            "description": request.course.get("description", ""),
-            "course_family_id": request.course_family_id,
-            "has_gitlab": has_gitlab
-        }
-        
-        # Submit task using Temporal
-        # The task will fetch GitLab credentials from the course family
         task_executor = get_task_executor()
         task_submission = TaskSubmission(
             task_name="create_course",
@@ -192,18 +217,22 @@ async def create_course_async(
             },
             queue="computor-tasks"
         )
-        
+
         task_id = await task_executor.submit_task(task_submission)
-        
-        return TaskResponse(
-            task_id=task_id,
-            status="submitted",
-            message="Course creation task submitted successfully"
-        )
-        
+    except ComputorException:
+        raise
     except Exception as e:
         logger.error(f"Error submitting course creation task: {e}")
-        raise BadRequestException(f"Failed to submit course creation task: {str(e)}")
+        raise TemporalServiceException(
+            detail=f"Failed to submit course creation task: {str(e)}",
+            context={"operation": "create_course", "course_family_id": request.course_family_id}
+        )
+
+    return TaskResponse(
+        task_id=task_id,
+        status="submitted",
+        message="Course creation task submitted successfully"
+    )
 
 @system_router.post(
     "/courses/{course_id}/generate-student-template",
