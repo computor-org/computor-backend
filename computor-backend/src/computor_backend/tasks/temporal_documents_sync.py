@@ -37,13 +37,12 @@ async def sync_documents_repository_activity(
         Dict with success status, synced file count, and any errors
     """
     import git
-    from ..database import get_db
+    from ..database import SessionLocal
     from ..model.course import CourseFamily
     from ..model.organization import Organization
     from ..settings import settings
     from ..utils.docker_utils import transform_localhost_url
-    db_gen = next(get_db())
-    db = db_gen
+    db = SessionLocal()
 
     result = {
         "success": False,
@@ -243,7 +242,7 @@ async def sync_documents_repository_activity(
         return result
 
     finally:
-        db_gen.close()
+        db.close()
 
 
 @register_task
