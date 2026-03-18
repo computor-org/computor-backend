@@ -8,7 +8,7 @@ from typing import Any, Dict
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, BaseActivity, WorkflowResult, WorkflowProgress
+from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 
 
