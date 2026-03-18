@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
 from temporalio.common import RetryPolicy
@@ -79,3 +79,15 @@ def make_git_auth_url(url: str, token: str) -> str:
         parsed.scheme, auth_netloc, parsed.path,
         parsed.params, parsed.query, parsed.fragment
     ))
+
+
+def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
+    """Extract (passed, failed, total) from test results dict."""
+    if "summary" in test_results:
+        s = test_results["summary"]
+        return s.get("passed", 0), s.get("failed", 0), s.get("total", 0)
+    return (
+        test_results.get("passed", 0),
+        test_results.get("failed", 0),
+        test_results.get("total", 0),
+    )

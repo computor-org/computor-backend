@@ -29,7 +29,7 @@ from temporalio.exceptions import ApplicationError
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
 from .registry import register_task
 
 # Reuse from student testing
@@ -422,14 +422,7 @@ class TutorTestingWorkflow(BaseWorkflow):
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
-            if "summary" in test_results:
-                passed = test_results["summary"]["passed"]
-                failed = test_results["summary"]["failed"]
-                total = test_results["summary"]["total"]
-            else:
-                passed = test_results.get("passed", 0)
-                failed = test_results.get("failed", 0)
-                total = test_results.get("total", 0)
+            passed, failed, total = extract_test_counts(test_results)
 
             workflow.logger.info(
                 f"[TUTOR TEST COMPLETE] test_id={test_id}, "

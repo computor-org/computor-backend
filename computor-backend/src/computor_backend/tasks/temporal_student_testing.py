@@ -23,7 +23,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
 from .registry import register_task
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_types.results import ResultUpdate
@@ -435,11 +435,8 @@ async def execute_tests_activity(
 
         # Calculate result value
         try:
-            if "summary" in test_results:
-                result_value = test_results["summary"]["passed"] / test_results["summary"]["total"]
-            else:
-                result_value = test_results.get("passed", 0) / max(test_results.get("total", 1), 1)
-            test_results["result_value"] = result_value
+            p, _, t = extract_test_counts(test_results)
+            test_results["result_value"] = p / max(t, 1)
         except Exception as e:
             logger.warning(f"Could not calculate result value: {e}")
             test_results["result_value"] = 0.0
@@ -772,14 +769,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
-            if "summary" in test_results:
-                passed = test_results["summary"]["passed"]
-                failed = test_results["summary"]["failed"]
-                total = test_results["summary"]["total"]
-            else:
-                passed = test_results.get("passed", 0)
-                failed = test_results.get("failed", 0)
-                total = test_results.get("total", 0)
+            passed, failed, total = extract_test_counts(test_results)
 
             workflow.logger.info(f"[TEST COMPLETE] result_id={result_id}, passed={passed}/{total}, duration={duration:.1f}s")
 
