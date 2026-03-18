@@ -17,6 +17,8 @@ POSTGRES_DB = os.environ.get("POSTGRES_DB")
 
 DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
+_statement_timeout_ms = int(os.environ.get("DB_STATEMENT_TIMEOUT_MS", "30000"))  # 30s default
+
 _engine = create_engine(
     DATABASE_URL,
     poolclass=QueuePool,
@@ -26,7 +28,8 @@ _engine = create_engine(
     pool_recycle=1800,     # 30 min - protects against idle disconnects
     pool_pre_ping=True,    # avoids stale connections
     pool_use_lifo=True,
-    future=True
+    future=True,
+    connect_args={"options": f"-c statement_timeout={_statement_timeout_ms}"},
 )
 
 SessionLocal: Callable[[], Session] = sessionmaker(
