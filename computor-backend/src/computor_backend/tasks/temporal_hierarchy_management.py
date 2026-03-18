@@ -75,12 +75,7 @@ async def create_organization_activity(
 
     except Exception as e:
         logger.exception(f"Exception in organization creation activity: {str(e)}")
-        return {
-            "organization_id": None,
-            "status": "failed",
-            "name": org_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 @activity.defn(name="create_course_family_activity")
@@ -147,12 +142,7 @@ async def create_course_family_activity(
 
     except Exception as e:
         logger.exception(f"Exception in course family creation activity: {str(e)}")
-        return {
-            "course_family_id": None,
-            "status": "failed",
-            "name": family_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 @activity.defn(name="create_course_activity")
@@ -224,12 +214,7 @@ async def create_course_activity(
 
     except Exception as e:
         logger.exception(f"Exception in course creation activity: {str(e)}")
-        return {
-            "course_id": None,
-            "status": "failed",
-            "name": course_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 # Workflows
