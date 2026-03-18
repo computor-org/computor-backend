@@ -54,11 +54,11 @@ async def create_organization_async(
     db: Session = Depends(get_db)
 ):
     """Create an organization asynchronously using Temporal workflows."""
-    
+
     # Check permissions
-    if not permissions.is_admin:
-        raise AdminRequiredException(
-            detail="Admin permissions required to create organizations",
+    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
+        raise ForbiddenException(
+            detail="Admin or organization manager permissions required to create organizations",
             context={"operation": "create_organization"}
         )
 
@@ -111,11 +111,11 @@ async def create_course_family_async(
     db: Session = Depends(get_db)
 ):
     """Create a course family asynchronously using Temporal workflows."""
-    
+
     # Check permissions
-    if not permissions.is_admin:
-        raise AdminRequiredException(
-            detail="Admin permissions required to create course families",
+    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
+        raise ForbiddenException(
+            detail="Admin or organization manager permissions required to create course families",
             context={"operation": "create_course_family"}
         )
 
@@ -176,11 +176,11 @@ async def create_course_async(
     db: Session = Depends(get_db)
 ):
     """Create a course asynchronously using Temporal workflows."""
-    
+
     # Check permissions
-    if not permissions.is_admin:
-        raise AdminRequiredException(
-            detail="Admin permissions required to create courses",
+    if not permissions.is_admin and "_organization_manager" not in permissions.roles:
+        raise ForbiddenException(
+            detail="Admin or organization manager permissions required to create courses",
             context={"operation": "create_course"}
         )
 
