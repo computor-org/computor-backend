@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -142,208 +142,6 @@ async def process_example_for_student_template_v2(
     except Exception as e:
         logger.error(f"Failed to process example content {course_content.path}: {e}")
         return {"success": False, "error": str(e)}
-
-
-async def generate_assignments_repository(
-    course_id: str,
-    assignments_url: str,
-    course_contents: List[Any],
-    course: Any,
-    organization: Any,
-    gitlab_token: str,
-    db: Any
-) -> Dict[str, Any]:
-    """
-    Generate assignments repository with full example content (unmodified).
-    This serves as the reference repository for lecturers and tutors.
-    
-    Args:
-        course_id: Course ID
-        assignments_url: GitLab URL for assignments repository
-        course_contents: List of course contents with deployments
-        course: Course model instance
-        organization: Organization model instance
-        gitlab_token: GitLab authentication token
-        db: Database session
-    
-    Returns:
-        Dict with success status and details
-    """
-    import git
-    import os
-    import tempfile
-    import shutil
-    from pathlib import Path
-    from datetime import datetime, timezone
-    from ..utils.docker_utils import transform_localhost_url
-    
-    try:
-        logger.info(f"Generating assignments repository for course {course_id}")
-        
-        # Transform URL for Docker environment
-        assignments_url = transform_localhost_url(assignments_url)
-        logger.info(f"Using assignments URL: {assignments_url}")
-        
-        # Create temporary directories
-        temp_dir = tempfile.mkdtemp(prefix='assignments-gen-')
-        assignments_repo_path = os.path.join(temp_dir, 'assignments')
-        
-        # Clone or create assignments repository
-        try:
-            if gitlab_token and 'http' in assignments_url:
-                from urllib.parse import urlparse, urlunparse
-                parsed = urlparse(assignments_url)
-                auth_netloc = f"oauth2:{gitlab_token}@{parsed.netloc}"
-                auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, 
-                                     parsed.params, parsed.query, parsed.fragment))
-                assignments_repo = git.Repo.clone_from(auth_url, assignments_repo_path)
-            else:
-                assignments_repo = git.Repo.clone_from(assignments_url, assignments_repo_path)
-                
-            logger.info(f"Successfully cloned assignments repository to {assignments_repo_path}")
-        except Exception as e:
-            logger.error(f"Failed to clone assignments repository: {e}")
-            return {"success": False, "error": f"Failed to clone repository: {str(e)}"}
-        
-        # Clear existing content except .git
-        for item in os.listdir(assignments_repo_path):
-            if item == '.git':
-                continue
-            item_path = os.path.join(assignments_repo_path, item)
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.remove(item_path)
-        
-        logger.info(f"Cleared existing content in assignments repository")
-        
-        processed_count = 0
-        errors = []
-        
-        # Process each course content with full example data
-        for content in course_contents:
-            try:
-                if not content.deployment or not content.deployment.example_version:
-                    logger.warning(f"CourseContent {content.path} has no deployment")
-                    continue
-                
-                example_version = content.deployment.example_version
-                example = example_version.example
-                
-                if not example:
-                    logger.warning(f"CourseContent {content.path} deployment has no example")
-                    continue
-                
-                logger.info(f"Processing assignment content: {content.path}, example: {example.identifier}")
-                
-                # Download example files from MinIO
-                example_files = await download_example_files(example.repository, example_version)
-                
-                # For assignments repository, copy ALL files unmodified to preserve full example
-                content_path_str = str(example.identifier)
-                assignment_path = Path(assignments_repo_path) / content_path_str
-                
-                # Create target directory
-                assignment_path.mkdir(parents=True, exist_ok=True)
-                
-                # Copy ALL files unmodified (including solutions, meta.yaml, tests, etc.)
-                for filename, file_content in example_files.items():
-                    file_path = assignment_path / filename
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_bytes(file_content)
-                
-                logger.info(f"Copied {len(example_files)} files to {content_path_str}")
-                processed_count += 1
-                
-            except Exception as e:
-                error_msg = f"Failed to process assignment content {content.path}: {str(e)}"
-                logger.error(error_msg)
-                errors.append(error_msg)
-        
-        # Create README for assignments repository
-        readme_content = f"""# Assignments Repository - {course.title}
-
-This repository contains the complete example content with solutions for course assignments.
-
-## Purpose
-- **Reference repository** for lecturers and tutors
-- Contains **full example content** including solutions, test files, and metadata
-- **Do not share** with students (contains solutions)
-
-## Usage
-- Lecturers: Edit and improve examples
-- Tutors: Reference for grading and student assistance
-- Generated automatically from Example Library
-
-## Contents
-"""
-        
-        # Add content listing
-        for content in course_contents:
-            if content.deployment and content.deployment.example_version:
-                example = content.deployment.example_version.example
-                if example:
-                    readme_content += f"- `{example.identifier}/` - {content.title}\n"
-        
-        readme_content += f"""
----
-*Last updated: {datetime.now(timezone.utc).isoformat()}*
-*Generated by Computor Example Library*
-"""
-        
-        readme_path = os.path.join(assignments_repo_path, 'README.md')
-        with open(readme_path, 'w', encoding='utf-8') as f:
-            f.write(readme_content)
-        
-        # Configure git for commits
-        git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
-        git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
-        assignments_repo.git.config('user.email', git_email)
-        assignments_repo.git.config('user.name', git_name)
-        
-        # Commit and push changes
-        assignments_repo.git.add('.')
-        if assignments_repo.is_dirty(untracked_files=True):
-            commit_message = f"Update assignments repository for {course.title}\n\n" \
-                           f"Processed {processed_count} examples from Example Library\n" \
-                           f"Generated: {datetime.now(timezone.utc).isoformat()}"
-            assignments_repo.index.commit(commit_message)
-            
-            # Push to remote
-            try:
-                if gitlab_token and 'http' in assignments_url:
-                    # Configure token for push
-                    from urllib.parse import urlparse, urlunparse
-                    parsed = urlparse(assignments_url)
-                    auth_netloc = f"oauth2:{gitlab_token}@{parsed.netloc}"
-                    auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path,
-                                         parsed.params, parsed.query, parsed.fragment))
-                    assignments_repo.remotes.origin.set_url(auth_url)
-                
-                assignments_repo.remotes.origin.push('main', force=True)
-                logger.info(f"Successfully pushed assignments repository with {processed_count} examples")
-            except Exception as push_error:
-                logger.error(f"Failed to push assignments repository: {push_error}")
-                return {"success": False, "error": f"Failed to push: {str(push_error)}"}
-        else:
-            logger.info("No changes to commit in assignments repository")
-        
-        # Clean up temporary directory
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        
-        return {
-            "success": True,
-            "processed_count": processed_count,
-            "errors": errors,
-            "message": f"Generated assignments repository with {processed_count} examples"
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to generate assignments repository: {str(e)}", exc_info=True)
-        return {
-            "success": False,
-            "error": str(e)
-        }
 
 
 async def download_example_files(repository: Any, version: Any) -> Dict[str, bytes]:
@@ -496,15 +294,14 @@ async def generate_student_template_activity_v2(
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
     from ..utils.docker_utils import transform_localhost_url
-    from ..database import get_db
+    from ..database import SessionLocal
     from ..model.course import Course, CourseContent
     from ..model.example import Example, ExampleVersion, ExampleRepository
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.service import ServiceType
     from ..services.storage_service import StorageService
-    
-    db_gen = next(get_db())
-    db = db_gen
+
+    db = SessionLocal()
     
     try:
         # First, update all assigned deployments to 'deploying' status
@@ -521,22 +318,7 @@ async def generate_student_template_activity_v2(
         # If a release selection is provided, restrict to selected contents; else fallback to status-based selection
         selected_course_content_ids: List[str] = []
         if release:
-            ids = release.get("course_content_ids") or []
-            if ids:
-                selected_course_content_ids = ids
-            elif release.get("parent_id"):
-                parent_id = release.get("parent_id")
-                include_desc = bool(release.get("include_descendants", True))
-                parent = db.query(CourseContent).filter(CourseContent.id == parent_id).first()
-                if parent:
-                    q = db.query(CourseContent).filter(CourseContent.course_id == course_id)
-                    if include_desc:
-                        q = q.filter(CourseContent.path.descendant_of(parent.path))
-                    else:
-                        q = q.filter(CourseContent.id == parent.id)
-                    selected_course_content_ids = [str(cc.id) for cc in q.all()]
-            elif release.get("all"):
-                selected_course_content_ids = [str(cc.id) for (cc,) in db.query(CourseContent.id).filter(CourseContent.course_id == course_id).all()]
+            selected_course_content_ids = release.get("course_content_ids") or []
 
         if selected_course_content_ids:
             deployments_to_process = db.query(CourseContentDeployment).join(CourseContent).filter(
@@ -556,15 +338,17 @@ async def generate_student_template_activity_v2(
             ).all()
         
         # Update all to 'deploying' and add history
+        # Capture previous statuses for broadcast
+        deploying_events = []
         for deployment in deployments_to_process:
-            # Track if this is a redeploy
-            was_deployed = deployment.deployment_status == "deployed"
-            
+            # Track previous status for broadcast
+            previous_status = deployment.deployment_status
+
             deployment.deployment_status = "deploying"
             deployment.last_attempt_at = datetime.now(timezone.utc)
             if workflow_id:
                 deployment.workflow_id = workflow_id
-            
+
             history = DeploymentHistory(
                 deployment_id=deployment.id,
                 action="deploying",
@@ -572,9 +356,31 @@ async def generate_student_template_activity_v2(
                 workflow_id=workflow_id,
             )
             db.add(history)
-        
+
+            deploying_events.append({
+                "deployment_id": str(deployment.id),
+                "course_content_id": str(deployment.course_content_id),
+                "previous_status": previous_status,
+                "version_tag": deployment.version_tag,
+                "example_identifier": str(deployment.example_identifier) if deployment.example_identifier else None,
+            })
+
         db.commit()
-        
+
+        # Broadcast deployment status changes after successful commit
+        from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+        for evt in deploying_events:
+            publish_deployment_status_changed(
+                course_id=str(course_id),
+                course_content_id=evt["course_content_id"],
+                deployment_id=evt["deployment_id"],
+                previous_status=evt["previous_status"],
+                new_status="deploying",
+                version_tag=evt["version_tag"],
+                example_identifier=evt["example_identifier"],
+                workflow_id=workflow_id,
+            )
+
         logger.info(f"Updated {len(deployments_to_process)} deployments to 'deploying' status")
         
         # Transform localhost URLs for Docker environments
@@ -597,17 +403,9 @@ async def generate_student_template_activity_v2(
         gitlab_token = None
         if organization.properties and 'gitlab' in organization.properties:
             gitlab_config = organization.properties.get('gitlab', {})
-            encrypted_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
-            
-            if encrypted_token:
-                # Decrypt the GitLab token
-                from computor_types.tokens import decrypt_api_key
-                try:
-                    gitlab_token = decrypt_api_key(encrypted_token)
-                    logger.info(f"Using decrypted GitLab token from organization {organization.title}")
-                except Exception as e:
-                    logger.error(f"Failed to decrypt GitLab token for organization {organization.title}: {str(e)}")
-                    gitlab_token = None
+            gitlab_token = decrypt_gitlab_token(gitlab_config.get('token'))
+            if gitlab_token:
+                logger.info(f"Using decrypted GitLab token from organization {organization.title}")
         
         if not gitlab_token:
             logger.warning(f"No GitLab token found in organization {organization.title} properties")
@@ -617,21 +415,7 @@ async def generate_student_template_activity_v2(
             template_repo_path = os.path.join(temp_dir, "student-template")
             
             # Create authenticated URL if we have a token and it's HTTP
-            auth_url = student_template_url
-            if gitlab_token and 'http' in student_template_url:
-                from urllib.parse import urlparse, urlunparse
-                parsed = urlparse(student_template_url)
-                auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
-                if parsed.port:
-                    auth_netloc += f":{parsed.port}"
-                auth_url = urlunparse((
-                    parsed.scheme,
-                    auth_netloc,
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment
-                ))
+            auth_url = make_git_auth_url(student_template_url, gitlab_token) if gitlab_token else student_template_url
             
             # Try to clone existing repo or create new one
             try:
@@ -1063,13 +847,29 @@ async def generate_student_template_activity_v2(
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
-                        # Push to remote
+                        # Push to remote with retry on concurrent push conflicts
                         if 'origin' in [remote.name for remote in template_repo.remotes]:
-                            # The remote should already have auth URL if token was provided
-                            # Just push directly
-                            template_repo.git.push('origin', 'main')
-                            logger.info("Pushed changes to GitLab")
-                            git_push_successful = True
+                            max_push_attempts = 3
+                            for push_attempt in range(max_push_attempts):
+                                try:
+                                    template_repo.git.push('origin', 'main')
+                                    logger.info("Pushed changes to GitLab")
+                                    git_push_successful = True
+                                    break
+                                except git.GitCommandError as push_err:
+                                    err_msg = str(push_err).lower()
+                                    if 'non-fast-forward' in err_msg or 'fetch first' in err_msg or 'failed to push' in err_msg:
+                                        if push_attempt < max_push_attempts - 1:
+                                            logger.warning(
+                                                f"Push failed (attempt {push_attempt + 1}/{max_push_attempts}), "
+                                                f"pulling with rebase and retrying: {push_err}"
+                                            )
+                                            template_repo.git.pull('--rebase', 'origin', 'main')
+                                        else:
+                                            logger.error(f"Push failed after {max_push_attempts} attempts: {push_err}")
+                                            raise
+                                    else:
+                                        raise
                         else:
                             logger.warning("No remote 'origin' found, skipping push")
                             git_push_successful = True  # Consider successful if no remote
@@ -1085,6 +885,9 @@ async def generate_student_template_activity_v2(
             
             # Now update deployment statuses based on git push result
             # Only update deployments that were marked as "deploying" at the start
+            # Collect status changes for broadcast after commit
+            final_status_events = []
+
             if git_push_successful and processed_count > 0:
                 # Get the final commit SHA from student-template repository
                 try:
@@ -1123,13 +926,22 @@ async def generate_student_template_activity_v2(
                             workflow_id=workflow_id,
                         )
                         db.add(history)
+
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "deployed",
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                            "deployed_at": content.deployment.deployed_at.isoformat() if content.deployment.deployed_at else None,
+                        })
             else:
                 # Git push failed - mark only the ones we're processing as failed
                 for content in course_contents:
                     if content.deployment and content.deployment.deployment_status == "deploying":
                         content.deployment.deployment_status = "failed"
                         content.deployment.deployment_message = "Git push failed"
-                        
+
                         # Add failure history entry
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
@@ -1138,10 +950,54 @@ async def generate_student_template_activity_v2(
                             workflow_id=workflow_id,
                         )
                         db.add(history)
-            
+
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "failed",
+                            "deployment_message": "Git push failed",
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                        })
+
+            # Also collect any content that was marked as failed during processing
+            # (directory resolution, file download, processing exceptions)
+            for content in course_contents:
+                if content.deployment and content.deployment.deployment_status == "failed":
+                    # Check if already in final_status_events to avoid duplicates
+                    already_tracked = any(
+                        e["deployment_id"] == str(content.deployment.id)
+                        for e in final_status_events
+                    )
+                    if not already_tracked:
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "failed",
+                            "deployment_message": content.deployment.deployment_message,
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                        })
+
             # Now commit database changes
             db.commit()
-            
+
+            # Broadcast all status changes after successful commit
+            from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+            for evt in final_status_events:
+                publish_deployment_status_changed(
+                    course_id=str(course_id),
+                    course_content_id=evt["course_content_id"],
+                    deployment_id=evt["deployment_id"],
+                    previous_status="deploying",
+                    new_status=evt["new_status"],
+                    version_tag=evt.get("version_tag"),
+                    example_identifier=evt.get("example_identifier"),
+                    deployment_message=evt.get("deployment_message"),
+                    deployed_at=evt.get("deployed_at"),
+                    workflow_id=workflow_id,
+                )
+
             # Do not generate assignments repository automatically; managed manually by lecturers
             assignments_result = None
             
@@ -1177,11 +1033,11 @@ async def generate_student_template_activity_v2(
                     CourseContentDeployment.deployment_status == "deploying"
                 )
             ).all()
-            
+
             for deployment in failed_deployments:
                 deployment.deployment_status = "failed"
                 deployment.deployment_message = str(e)[:500]
-                
+
                 # Add failure history
                 history = DeploymentHistory(
                     deployment_id=deployment.id,
@@ -1190,8 +1046,23 @@ async def generate_student_template_activity_v2(
                     workflow_id=workflow_id,
                 )
                 db.add(history)
-            
+
             db.commit()
+
+            # Broadcast failure events after successful commit
+            from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+            for deployment in failed_deployments:
+                publish_deployment_status_changed(
+                    course_id=str(course_id),
+                    course_content_id=str(deployment.course_content_id),
+                    deployment_id=str(deployment.id),
+                    previous_status="deploying",
+                    new_status="failed",
+                    deployment_message=str(e)[:500],
+                    version_tag=deployment.version_tag,
+                    example_identifier=str(deployment.example_identifier) if deployment.example_identifier else None,
+                    workflow_id=workflow_id,
+                )
         except Exception as db_error:
             logger.error(f"Failed to update deployment statuses: {db_error}")
         
@@ -1202,7 +1073,7 @@ async def generate_student_template_activity_v2(
             "message": f"Failed to generate student template: {str(e)}"
         }
     finally:
-        db_gen.close()
+        db.close()
 
 
 @register_task
@@ -1293,3 +1164,12 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
                 result=None,
                 error=str(e)
             )
+
+
+WORKFLOWS = [
+    GenerateStudentTemplateWorkflowV2,
+]
+
+ACTIVITIES = [
+    generate_student_template_activity_v2,
+]

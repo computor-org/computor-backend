@@ -11,6 +11,8 @@ Namespaces:
 - typing: Typing indicators (start, stop, update)
 - read: Read receipts (mark, update)
 - maintenance: Maintenance mode notifications (activated, deactivated, scheduled, cancelled)
+- deployment: Deployment state change notifications (status_changed, assigned, unassigned)
+- course: Course-level mutation notifications (content_updated)
 """
 
 from pydantic import BaseModel, Field
@@ -189,6 +191,65 @@ class WSMaintenanceReminder(WSEventBase):
 
 
 # =============================================================================
+# Deployment Events (Server -> Client)
+# =============================================================================
+
+class WSDeploymentStatusChanged(WSEventBase):
+    """Deployment status transition (e.g., pending -> deploying -> deployed/failed)."""
+    type: Literal["deployment:status_changed"] = "deployment:status_changed"
+    channel: str = Field(..., description="Channel (course:{course_id})")
+    course_id: str = Field(..., description="ID of the course")
+    course_content_id: str = Field(..., description="ID of the course content")
+    deployment_id: str = Field(..., description="ID of the deployment")
+    previous_status: str = Field(..., description="Status before the change")
+    new_status: str = Field(..., description="Status after the change")
+    version_tag: Optional[str] = Field(None, description="Semantic version tag")
+    example_identifier: Optional[str] = Field(None, description="Example identifier path")
+    deployment_message: Optional[str] = Field(None, description="Error or status message")
+    deployed_at: Optional[str] = Field(None, description="ISO8601 timestamp of deployment completion")
+    workflow_id: Optional[str] = Field(None, description="Temporal workflow ID")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+class WSDeploymentAssigned(WSEventBase):
+    """Example was assigned to course content by lecturer."""
+    type: Literal["deployment:assigned"] = "deployment:assigned"
+    channel: str = Field(..., description="Channel (course:{course_id})")
+    course_id: str = Field(..., description="ID of the course")
+    course_content_id: str = Field(..., description="ID of the course content")
+    deployment_id: str = Field(..., description="ID of the deployment")
+    example_identifier: Optional[str] = Field(None, description="Example identifier path")
+    version_tag: str = Field(..., description="Semantic version tag")
+    deployment_status: str = Field(..., description="Current deployment status")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+class WSDeploymentUnassigned(WSEventBase):
+    """Example was unassigned from course content by lecturer."""
+    type: Literal["deployment:unassigned"] = "deployment:unassigned"
+    channel: str = Field(..., description="Channel (course:{course_id})")
+    course_id: str = Field(..., description="ID of the course")
+    course_content_id: str = Field(..., description="ID of the course content")
+    previous_example_identifier: Optional[str] = Field(None, description="Previously assigned example identifier")
+    previous_version_tag: Optional[str] = Field(None, description="Previously assigned version tag")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+# =============================================================================
+# Course Events (Server -> Client)
+# =============================================================================
+
+class WSCourseContentUpdated(WSEventBase):
+    """Course content was created, updated, or deleted."""
+    type: Literal["course:content_updated"] = "course:content_updated"
+    channel: str = Field(..., description="Channel (course:{course_id})")
+    course_id: str = Field(..., description="ID of the course")
+    course_content_id: str = Field(..., description="ID of the course content")
+    change_type: str = Field(..., description="Type of change: created, updated, deleted, reordered")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+# =============================================================================
 # Union Types for Parsing
 # =============================================================================
 
@@ -220,6 +281,10 @@ ServerEvent = Union[
     WSMaintenanceScheduled,
     WSMaintenanceCancelled,
     WSMaintenanceReminder,
+    WSDeploymentStatusChanged,
+    WSDeploymentAssigned,
+    WSDeploymentUnassigned,
+    WSCourseContentUpdated,
 ]
 
 

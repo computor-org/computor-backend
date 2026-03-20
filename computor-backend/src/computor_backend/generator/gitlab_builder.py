@@ -1,28 +1,20 @@
 """
-New GitLab builder with integrated database operations and enhanced property storage.
+GitLab builder with integrated database operations and property storage.
 
-This module provides a clean implementation of GitLab group creation with:
-- Direct database access via repositories
-- Enhanced GitLab property storage
-- Proper error handling for both GitLab and database operations
-- Validation and synchronization of GitLab metadata
+Creates GitLab groups for the organization/course-family/course hierarchy
+and stores the corresponding metadata in database properties.
+Used by Temporal activities in temporal_hierarchy_management.py.
 """
 
 import logging
-import tempfile
-import os
-import yaml
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 from gitlab import Gitlab
 from gitlab.v4.objects import Group
-from gitlab.exceptions import GitlabCreateError, GitlabGetError, GitlabDeleteError
+from gitlab.exceptions import GitlabCreateError, GitlabGetError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
-
-from computor_backend.api.exceptions import NotImplementedException
-from computor_backend.services.git_service import GitService
 
 from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import (
@@ -45,21 +37,10 @@ from computor_types.courses import (
 from computor_backend.model.organization import Organization
 from computor_backend.model.course import CourseFamily, Course
 from computor_backend.repositories.organization import OrganizationRepository
-from computor_backend.services.git_service import GitService
 from ..custom_types import Ltree
 
 
 logger = logging.getLogger(__name__)
-
-
-class EnhancedGitLabConfig(GitLabConfig):
-    """Enhanced GitLab configuration with complete metadata."""
-    group_id: Optional[int] = None
-    namespace_id: Optional[int] = None
-    namespace_path: Optional[str] = None
-    # web_url is already defined in parent GitLabConfigGet
-    visibility: Optional[str] = None
-    last_synced_at: Optional[datetime] = None
 
 
 class GitLabBuilder:
@@ -75,21 +56,18 @@ class GitLabBuilder:
         db_session: Session,
         gitlab_url: str,
         gitlab_token: str,
-        git_service: Optional[GitService] = None
     ):
         """
         Initialize the GitLab builder.
-        
+
         Args:
             db_session: SQLAlchemy database session
             gitlab_url: GitLab instance URL
             gitlab_token: GitLab access token
-            git_service: Optional GitService for repository operations
         """
         self.db = db_session
         self.gitlab_url = gitlab_url  # Store original URL for database
         self.gitlab_token = gitlab_token
-        self.git_service = git_service
         
         # Transform URL for Docker environment if needed (API calls only)
         from ..utils.docker_utils import transform_localhost_url
@@ -108,106 +86,7 @@ class GitLabBuilder:
         
         # Initialize repositories
         self.org_repo = OrganizationRepository(db_session)
-    
-    def create_deployment_hierarchy(
-        self,
-        org_config: OrganizationConfig,
-        family_config: CourseFamilyConfig,
-        course_config: CourseConfig,
-        created_by_user_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Create the complete deployment hierarchy with GitLab groups and database entries.
 
-        Args:
-            org_config: Organization configuration
-            family_config: Course family configuration
-            course_config: Course configuration
-            created_by_user_id: ID of the user creating the deployment
-
-        Returns:
-            Dictionary with created entities and status
-        """
-        results = {
-            "organization": None,
-            "course_family": None,
-            "course": None,
-            "gitlab_groups_created": [],
-            "database_entries_created": [],
-            "errors": [],
-            "success": False
-        }
-
-        try:
-            # Start database transaction
-            logger.info("Starting deployment hierarchy creation")
-
-            # Phase 1: Create Organization
-            org_result = self._create_organization(
-                org_config,
-                created_by_user_id
-            )
-
-            if not org_result["success"]:
-                results["errors"].append(org_result["error"])
-                self.db.rollback()
-                return results
-
-            results["organization"] = org_result["organization"]
-            if org_result.get("gitlab_created"):
-                results["gitlab_groups_created"].append(f"Organization: {org_result['gitlab_group'].full_path}")
-            if org_result.get("db_created"):
-                results["database_entries_created"].append(f"Organization: {org_result['organization'].path}")
-
-            # Phase 2: Create CourseFamily
-            family_result = self._create_course_family(
-                family_config,
-                results["organization"],
-                created_by_user_id
-            )
-
-            if not family_result["success"]:
-                results["errors"].append(family_result["error"])
-                self.db.rollback()
-                return results
-
-            results["course_family"] = family_result["course_family"]
-            if family_result.get("gitlab_created"):
-                results["gitlab_groups_created"].append(f"CourseFamily: {family_result['gitlab_group'].full_path}")
-            if family_result.get("db_created"):
-                results["database_entries_created"].append(f"CourseFamily: {family_result['course_family'].path}")
-
-            # Phase 3: Create Course
-            course_result = self._create_course(
-                course_config,
-                results["organization"],
-                results["course_family"],
-                created_by_user_id
-            )
-
-            if not course_result["success"]:
-                results["errors"].append(course_result["error"])
-                self.db.rollback()
-                return results
-
-            results["course"] = course_result["course"]
-            if course_result.get("gitlab_created"):
-                results["gitlab_groups_created"].append(f"Course: {course_result['gitlab_group'].full_path}")
-            if course_result.get("db_created"):
-                results["database_entries_created"].append(f"Course: {course_result['course'].path}")
-
-            # Commit all changes
-            self.db.commit()
-            results["success"] = True
-            logger.info("Successfully created deployment hierarchy")
-
-        except Exception as e:
-            logger.error(f"Unexpected error creating deployment hierarchy: {e}")
-            results["errors"].append(f"Unexpected error: {str(e)}")
-            self.db.rollback()
-
-        return results
-    
     def _create_organization(
         self,
         org_config: OrganizationConfig,
@@ -1380,343 +1259,3 @@ Documents are automatically synchronized and made available to students through 
             result["error"] = str(e)
         
         return result
-    
-    def add_member_to_group(
-        self,
-        group_id: int,
-        user_id: int,
-        access_level: int = 30  # Developer access by default
-    ) -> Dict[str, Any]:
-        """Add a member to a GitLab group.
-        
-        Access levels:
-        - 10: Guest
-        - 20: Reporter  
-        - 30: Developer
-        - 40: Maintainer
-        - 50: Owner
-        """
-        result = {
-            "success": False,
-            "member": None,
-            "error": None
-        }
-        
-        try:
-            group = self.gitlab.groups.get(group_id)
-            member = group.members.create({
-                'user_id': user_id,
-                'access_level': access_level
-            })
-            
-            logger.info(f"Added user {user_id} to group {group.full_path} with access level {access_level}")
-            
-            result["member"] = member
-            result["success"] = True
-            
-        except GitlabCreateError as e:
-            if "Member already exists" in str(e):
-                logger.warning(f"User {user_id} is already a member of group {group_id}")
-                result["error"] = "Member already exists"
-                # Still consider this a success
-                result["success"] = True
-            else:
-                logger.error(f"Failed to add member to group: {e}")
-                result["error"] = str(e)
-        except Exception as e:
-            logger.error(f"Unexpected error adding member to group: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    def remove_member_from_group(
-        self,
-        group_id: int,
-        user_id: int
-    ) -> Dict[str, Any]:
-        """Remove a member from a GitLab group."""
-        result = {
-            "success": False,
-            "error": None
-        }
-        
-        try:
-            group = self.gitlab.groups.get(group_id)
-            group.members.delete(user_id)
-            
-            logger.info(f"Removed user {user_id} from group {group.full_path}")
-            
-            result["success"] = True
-            
-        except GitlabDeleteError as e:
-            logger.error(f"Failed to remove member from group: {e}")
-            result["error"] = str(e)
-        except Exception as e:
-            logger.error(f"Unexpected error removing member from group: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    def add_student_to_course(
-        self,
-        course: Course,
-        gitlab_user_id: int
-    ) -> Dict[str, Any]:
-        """Add a student to a course by adding them to the students group."""
-        result = {
-            "success": False,
-            "error": None
-        }
-        
-        try:
-            # Get students group info from course properties
-            if not course.properties or not course.properties.get("gitlab", {}).get("students_group"):
-                result["error"] = "Course does not have a students group configured"
-                return result
-            
-            students_group_id = course.properties["gitlab"]["students_group"]["group_id"]
-            
-            # Add member to students group with Developer access
-            add_result = self.add_member_to_group(
-                group_id=students_group_id,
-                user_id=gitlab_user_id,
-                access_level=30  # Developer access for students
-            )
-            
-            if add_result["success"]:
-                logger.info(f"Added student {gitlab_user_id} to course {course.path}")
-                result["success"] = True
-            else:
-                result["error"] = add_result["error"]
-            
-        except Exception as e:
-            logger.error(f"Error adding student to course: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    def add_lecturer_to_course(
-        self,
-        course: Course,
-        gitlab_user_id: int
-    ) -> Dict[str, Any]:
-        """Add a lecturer to a course by adding them to the main course group."""
-        result = {
-            "success": False,
-            "error": None
-        }
-        
-        try:
-            # Get course group info from properties
-            if not course.properties or not course.properties.get("gitlab", {}).get("group_id"):
-                result["error"] = "Course does not have a GitLab group configured"
-                return result
-            
-            course_group_id = course.properties["gitlab"]["group_id"]
-            
-            # Add member to course group with Maintainer access
-            add_result = self.add_member_to_group(
-                group_id=course_group_id,
-                user_id=gitlab_user_id,
-                access_level=40  # Maintainer access for lecturers
-            )
-            
-            if add_result["success"]:
-                logger.info(f"Added lecturer {gitlab_user_id} to course {course.path}")
-                result["success"] = True
-            else:
-                result["error"] = add_result["error"]
-            
-        except Exception as e:
-            logger.error(f"Error adding lecturer to course: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    def initialize_course_projects_content(
-        self,
-        course: Course,
-    ) -> Dict[str, Any]:
-        """Initialize course project (student-template only) with proper content structure."""
-        result = {
-            "success": False,
-            "initialized_projects": [],
-            "error": None
-        }
-        
-        try:
-            # Get course GitLab properties
-            gitlab_props = course.properties.get("gitlab", {})
-            projects = gitlab_props.get("projects", {})
-            
-            if not projects:
-                result["error"] = "Course has no GitLab projects configured"
-                return result
-            
-            # Only initialize student-template project
-            if "student_template" in projects:
-                template_result = self._initialize_student_template_project(
-                    course, projects["student_template"]
-                )
-                if template_result["success"]:
-                    result["initialized_projects"].append("student-template")
-                else:
-                    logger.warning(f"Failed to initialize student-template project: {template_result['error']}")
-            
-            result["success"] = len(result["initialized_projects"]) > 0
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize course projects content: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    # ===== DEPRECATED METHODS =====
-    # The following methods are no longer needed with the Example Library paradigm.
-    # Assignments and reference repositories are obsolete - examples are stored in MinIO
-    # and deployed directly to student-template repositories.
-    # These methods are kept for reference but should not be used.
-    
-    def _initialize_assignments_project(
-        self,
-        course: Course,
-        project_info: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Initialize assignments project with proper structure and meta.yaml."""
-
-        raise NotImplementedException()
-    
-    def _initialize_student_template_project(
-        self,
-        course: Course,
-        project_info: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Initialize student template project with basic structure."""
-        result = {"success": False, "error": None}
-        
-        try:
-            # For now, we'll create the structure locally and then describe what would be pushed
-            with tempfile.TemporaryDirectory() as temp_dir:
-                repo_path = os.path.join(temp_dir, "student-template")
-                os.makedirs(repo_path, exist_ok=True)
-                
-                # Create student template structure
-                assignments_dir = os.path.join(repo_path, "assignments")
-                os.makedirs(assignments_dir, exist_ok=True)
-                
-                # Create project README
-                readme_path = os.path.join(repo_path, "README.md")
-                if not os.path.exists(readme_path):
-                    with open(readme_path, 'w') as f:
-                        f.write(f"# {course.title} - Student Repository\n\n")
-                        f.write(f"Welcome to {course.title}!\n\n")
-                        f.write(f"This is your personal repository for course assignments.\n\n")
-                        f.write(f"## Getting Started\n\n")
-                        f.write(f"1. Clone this repository to your local machine\n")
-                        f.write(f"2. Complete assignments in the `assignments/` directory\n")
-                        f.write(f"3. Commit and push your solutions\n\n")
-                        f.write(f"## Structure\n\n")
-                        f.write(f"- `assignments/`: Your assignment solutions go here\n")
-                        f.write(f"- Each assignment should be in its own subdirectory\n")
-                
-                # Create assignments README
-                assignments_readme = os.path.join(assignments_dir, "README.md")
-                with open(assignments_readme, 'w') as f:
-                    f.write(f"# Assignments\n\n")
-                    f.write(f"This directory contains your assignment solutions.\n\n")
-                    f.write(f"Create a new directory for each assignment and put your solution files there.\n")
-                
-                # Create .gitignore for common development files
-                gitignore_path = os.path.join(repo_path, ".gitignore")
-                if not os.path.exists(gitignore_path):
-                    with open(gitignore_path, 'w') as f:
-                        f.write("# IDE files\n")
-                        f.write(".vscode/\n")
-                        f.write(".idea/\n")
-                        f.write("*.swp\n")
-                        f.write("*.swo\n")
-                        f.write("\n# OS files\n")
-                        f.write(".DS_Store\n")
-                        f.write("Thumbs.db\n")
-                        f.write("\n# Build artifacts\n")
-                        f.write("*.o\n")
-                        f.write("*.exe\n")
-                        f.write("__pycache__/\n")
-                        f.write("*.pyc\n")
-                
-                # Note: In full implementation, would commit and push:
-                # - git add .
-                # - git commit -m "Initialize student template with basic structure"
-                # - git push origin main
-                
-                result["success"] = True
-                logger.info(f"Initialized student template project for course {course.path}")
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize student template project: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    def _initialize_reference_project(
-        self,
-        course: Course,
-        project_info: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Initialize reference project with instructor materials."""
-        result = {"success": False, "error": None}
-        
-        try:
-            # For now, we'll create the structure locally and then describe what would be pushed
-            with tempfile.TemporaryDirectory() as temp_dir:
-                repo_path = os.path.join(temp_dir, "reference")
-                os.makedirs(repo_path, exist_ok=True)
-                
-                # Create reference structure
-                solutions_dir = os.path.join(repo_path, "solutions")
-                grading_dir = os.path.join(repo_path, "grading")
-                materials_dir = os.path.join(repo_path, "materials")
-                
-                os.makedirs(solutions_dir, exist_ok=True)
-                os.makedirs(grading_dir, exist_ok=True)
-                os.makedirs(materials_dir, exist_ok=True)
-                
-                # Create project README
-                readme_path = os.path.join(repo_path, "README.md")
-                if not os.path.exists(readme_path):
-                    with open(readme_path, 'w') as f:
-                        f.write(f"# {course.title} - Reference Materials\n\n")
-                        f.write(f"This repository contains instructor reference materials for {course.title}.\n\n")
-                        f.write(f"## Structure\n\n")
-                        f.write(f"- `solutions/`: Reference solutions for assignments\n")
-                        f.write(f"- `grading/`: Grading scripts and rubrics\n")
-                        f.write(f"- `materials/`: Additional course materials and resources\n")
-                        f.write(f"\n**Note**: This repository contains sensitive instructor materials. Keep access restricted.\n")
-                
-                # Create structure READMEs
-                for dir_path, dir_name, description in [
-                    (solutions_dir, "Solutions", "Reference solutions for course assignments"),
-                    (grading_dir, "Grading", "Automated grading scripts and rubrics"),
-                    (materials_dir, "Materials", "Additional course materials and resources")
-                ]:
-                    dir_readme = os.path.join(dir_path, "README.md")
-                    with open(dir_readme, 'w') as f:
-                        f.write(f"# {dir_name}\n\n")
-                        f.write(f"{description}.\n\n")
-                        f.write(f"Add files and subdirectories as needed for course content.\n")
-                
-                # Note: In full implementation, would commit and push:
-                # - git add .
-                # - git commit -m "Initialize reference project with instructor materials structure"
-                # - git push origin main
-                
-                result["success"] = True
-                logger.info(f"Initialized reference project for course {course.path}")
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize reference project: {e}")
-            result["error"] = str(e)
-        
-        return result
-    
-    # END OF DEPRECATED METHODS

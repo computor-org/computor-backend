@@ -10,6 +10,7 @@ This allows subscribers to listen at different levels of granularity.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from computor_backend.websocket.pubsub import pubsub
@@ -143,6 +144,100 @@ class WebSocketBroadcast:
             })
         )
         logger.debug(f"Broadcast read:update to {channel} for message {message_id}")
+
+    # =========================================================================
+    # Deployment events
+    # =========================================================================
+
+    async def deployment_status_changed(
+        self,
+        course_id: str,
+        course_content_id: str,
+        deployment_id: str,
+        previous_status: str,
+        new_status: str,
+        version_tag: Optional[str] = None,
+        example_identifier: Optional[str] = None,
+        deployment_message: Optional[str] = None,
+        deployed_at: Optional[str] = None,
+        workflow_id: Optional[str] = None,
+    ):
+        """Broadcast deployment status transition to course channel."""
+        channel = f"course:{course_id}"
+        await self.publish(channel, "deployment:status_changed", {
+            "channel": channel,
+            "course_id": course_id,
+            "course_content_id": course_content_id,
+            "deployment_id": deployment_id,
+            "previous_status": previous_status,
+            "new_status": new_status,
+            "version_tag": version_tag,
+            "example_identifier": example_identifier,
+            "deployment_message": deployment_message,
+            "deployed_at": deployed_at,
+            "workflow_id": workflow_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def deployment_assigned(
+        self,
+        course_id: str,
+        course_content_id: str,
+        deployment_id: str,
+        version_tag: str,
+        deployment_status: str,
+        example_identifier: Optional[str] = None,
+    ):
+        """Broadcast example assignment to course channel."""
+        channel = f"course:{course_id}"
+        await self.publish(channel, "deployment:assigned", {
+            "channel": channel,
+            "course_id": course_id,
+            "course_content_id": course_content_id,
+            "deployment_id": deployment_id,
+            "example_identifier": example_identifier,
+            "version_tag": version_tag,
+            "deployment_status": deployment_status,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def deployment_unassigned(
+        self,
+        course_id: str,
+        course_content_id: str,
+        previous_example_identifier: Optional[str] = None,
+        previous_version_tag: Optional[str] = None,
+    ):
+        """Broadcast example unassignment to course channel."""
+        channel = f"course:{course_id}"
+        await self.publish(channel, "deployment:unassigned", {
+            "channel": channel,
+            "course_id": course_id,
+            "course_content_id": course_content_id,
+            "previous_example_identifier": previous_example_identifier,
+            "previous_version_tag": previous_version_tag,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def course_content_updated(
+        self,
+        course_id: str,
+        course_content_id: str,
+        change_type: str,
+    ):
+        """Broadcast course content mutation to course channel."""
+        channel = f"course:{course_id}"
+        await self.publish(channel, "course:content_updated", {
+            "channel": channel,
+            "course_id": course_id,
+            "course_content_id": course_content_id,
+            "change_type": change_type,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    # =========================================================================
+    # Message channel resolution
+    # =========================================================================
 
     def _get_message_channels(self, message: MessageTargetProtocol) -> List[str]:
         """

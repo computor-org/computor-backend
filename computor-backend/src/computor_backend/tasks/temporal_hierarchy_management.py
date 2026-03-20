@@ -6,13 +6,11 @@ from datetime import timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
-from sqlalchemy.orm import Session
-
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
 from .registry import register_task
 from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
-from ..database import get_db
+from ..database import SessionLocal
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
 
@@ -49,8 +47,7 @@ async def create_organization_activity(
         )
 
         # Create the builder and organization
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             result = builder._create_organization(org_config_obj, user_id)
@@ -67,26 +64,14 @@ async def create_organization_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "organization_id": None,
-                    "status": "failed",
-                    "name": org_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Organization creation failed: {error_msg}")
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in organization creation activity: {str(e)}")
-        return {
-            "organization_id": None,
-            "status": "failed",
-            "name": org_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 @activity.defn(name="create_course_family_activity")
@@ -101,8 +86,7 @@ async def create_course_family_activity(
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
 
     try:
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             org = db.query(Organization).filter(Organization.id == organization_id).first()
             if not org:
@@ -117,8 +101,9 @@ async def create_course_family_activity(
                 raise ValueError("Organization missing GitLab configuration")
 
             # Decrypt the GitLab token
-            from computor_types.tokens import decrypt_api_key
-            gitlab_token = decrypt_api_key(encrypted_token)
+            gitlab_token = decrypt_gitlab_token(encrypted_token)
+            if not gitlab_token:
+                raise ValueError("Failed to decrypt GitLab token")
 
             # Build the CourseFamilyConfig directly
             family_config_obj = CourseFamilyConfig(
@@ -143,26 +128,14 @@ async def create_course_family_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "course_family_id": None,
-                    "status": "failed",
-                    "name": family_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Course family creation failed: {error_msg}")
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course family creation activity: {str(e)}")
-        return {
-            "course_family_id": None,
-            "status": "failed",
-            "name": family_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 @activity.defn(name="create_course_activity")
@@ -177,8 +150,7 @@ async def create_course_activity(
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
 
     try:
-        db_gen = get_db()
-        db = next(db_gen)
+        db = SessionLocal()
         try:
             family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()
             if not family:
@@ -198,8 +170,9 @@ async def create_course_activity(
                 raise ValueError("Organization missing GitLab configuration")
 
             # Decrypt the GitLab token
-            from computor_types.tokens import decrypt_api_key
-            gitlab_token = decrypt_api_key(encrypted_token)
+            gitlab_token = decrypt_gitlab_token(encrypted_token)
+            if not gitlab_token:
+                raise ValueError("Failed to decrypt GitLab token")
 
             # Build the CourseConfig directly
             course_config_obj = CourseConfig(
@@ -224,26 +197,14 @@ async def create_course_activity(
                     "db_created": result["db_created"]
                 }
             else:
-                return {
-                    "course_id": None,
-                    "status": "failed",
-                    "name": course_config.get("name"),
-                    "error": result.get("error", "Unknown error occurred")
-                }
+                error_msg = result.get("error", "Unknown error occurred")
+                raise RuntimeError(f"Course creation failed: {error_msg}")
         finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
+            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course creation activity: {str(e)}")
-        return {
-            "course_id": None,
-            "status": "failed",
-            "name": course_config.get("name"),
-            "error": str(e)
-        }
+        raise
 
 
 # Workflows
@@ -686,3 +647,17 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
                 error=error_msg,
                 metadata={"workflow_type": "deploy_computor_hierarchy"}
             )
+
+
+WORKFLOWS = [
+    CreateOrganizationWorkflow,
+    CreateCourseFamilyWorkflow,
+    CreateCourseWorkflow,
+    DeployComputorHierarchyWorkflow,
+]
+
+ACTIVITIES = [
+    create_organization_activity,
+    create_course_family_activity,
+    create_course_activity,
+]

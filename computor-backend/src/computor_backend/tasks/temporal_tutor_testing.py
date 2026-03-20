@@ -29,7 +29,7 @@ from temporalio.exceptions import ApplicationError
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
 from .registry import register_task
 
 # Reuse from student testing
@@ -395,14 +395,12 @@ class TutorTestingWorkflow(BaseWorkflow):
         started_at = datetime.utcnow()
 
         try:
-            # API configuration from environment (same pattern as StudentTestingWorkflow)
-            api_url = os.environ.get("API_URL", "http://localhost:8000")
-            api_token = os.environ.get("API_TOKEN")
+            # API configuration - activities read from their own os.environ
+            # (workflows must not access os.environ for Temporal determinism)
             api_config = {
-                "url": api_url,
-                "token": api_token,
+                "url": "http://localhost:8000",
+                "token": None,
             }
-            workflow.logger.info(f"[API CONFIG] url={api_url}, token_present={bool(api_token)}")
 
             # Run test activity
             workflow.logger.info(f"[ACTIVITY START] run_tutor_test_activity for test_id={test_id}")
@@ -424,14 +422,7 @@ class TutorTestingWorkflow(BaseWorkflow):
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
-            if "summary" in test_results:
-                passed = test_results["summary"]["passed"]
-                failed = test_results["summary"]["failed"]
-                total = test_results["summary"]["total"]
-            else:
-                passed = test_results.get("passed", 0)
-                failed = test_results.get("failed", 0)
-                total = test_results.get("total", 0)
+            passed, failed, total = extract_test_counts(test_results)
 
             workflow.logger.info(
                 f"[TUTOR TEST COMPLETE] test_id={test_id}, "
@@ -471,3 +462,15 @@ class TutorTestingWorkflow(BaseWorkflow):
                     "test_id": test_id,
                 },
             )
+
+
+WORKFLOWS = [
+    TutorTestingWorkflow,
+]
+
+ACTIVITIES = [
+    fetch_tutor_test_input,
+    store_tutor_test_artifacts_activity,
+    store_tutor_test_result_to_minio,
+    run_tutor_test_activity,
+]

@@ -10,6 +10,9 @@ import hashlib
 import base64
 from datetime import datetime, timedelta
 
+from computor_cli.auth import authenticate, get_computor_client
+from computor_cli.utils import run_async
+
 
 def generate_api_token():
     """
@@ -120,6 +123,162 @@ INSERT INTO api_token (
     click.echo("3. The token_hash is what gets stored in the database")
     click.echo("4. Users authenticate with: X-API-Token: <full_token>")
     click.echo("="*70 + "\n")
+
+
+@token.command()
+@click.option('--name', '-n', default=None, help='Human-readable token name')
+@click.option('--scopes', '-s', multiple=True, help='Token scopes (e.g., "read:courses", "execute:tests"). Repeatable.')
+@click.option('--user-id', '-u', default=None, help='User ID to create the token for (admin only, defaults to yourself)')
+@click.option('--expires-days', '-e', type=int, default=None, help='Token expiration in days (default: never)')
+@click.option('--description', '-d', default=None, help='Token description/purpose')
+@click.option('--quiet', '-q', is_flag=True, help='Output only the token string (for scripting)')
+@authenticate
+def create(name, scopes, user_id, expires_days, description, quiet, auth):
+    """
+    Create an API token via the backend API.
+
+    Requires an active login session (run 'computor login' first).
+    The token is generated server-side and shown only once.
+    Prompts for any field not provided via flags.
+
+    \b
+    Examples:
+        # Interactive — prompts for everything
+        computor token create
+
+        # With scopes and expiry
+        computor token create -n "worker" -s "execute:tests" -s "read:courses" -e 365
+
+        # For another user (admin only)
+        computor token create -n "service-token" -u <user-uuid> -s "execute:tests"
+
+        # Quiet mode (for scripts)
+        export TOKEN=$(computor token create -n "ci" -q)
+    """
+    if name is None:
+        name = click.prompt("Token name")
+
+    if not scopes:
+        scopes_input = click.prompt(
+            "Scopes (comma-separated, or empty for none)",
+            default="", show_default=False,
+        )
+        scopes = tuple(s.strip() for s in scopes_input.split(",") if s.strip()) if scopes_input else ()
+
+    if user_id is None and not quiet:
+        user_id_input = click.prompt("User ID (enter for yourself)", default="me", show_default=True)
+        user_id = None if user_id_input.lower() == "me" else user_id_input
+
+    if expires_days is None and not quiet:
+        expires_input = click.prompt("Expires in days (enter for never)", default="never", show_default=True)
+        expires_days = None if expires_input.lower() == "never" else int(expires_input)
+
+    if description is None and not quiet:
+        description = click.prompt("Description (optional)", default="", show_default=False) or None
+
+    from computor_types.api_tokens import ApiTokenCreate
+
+    expires_at = None
+    if expires_days is not None:
+        expires_at = datetime.utcnow() + timedelta(days=expires_days)
+
+    token_data = ApiTokenCreate(
+        name=name,
+        scopes=list(scopes),
+        user_id=user_id,
+        expires_at=expires_at,
+        description=description,
+    )
+
+    client = run_async(get_computor_client(auth))
+    try:
+        result = run_async(client.tokens.api_tokens(data=token_data))
+    except Exception as e:
+        click.secho(f"Error creating token: {e}", fg="red", err=True)
+        raise SystemExit(1)
+
+    if quiet:
+        click.echo(result.token)
+        return
+
+    click.echo()
+    click.echo("=" * 60)
+    click.echo("API Token Created")
+    click.echo("=" * 60)
+    click.secho(f"\n  {result.token}\n", fg="green", bold=True)
+    click.echo("=" * 60)
+    click.echo(f"  ID:       {result.id}")
+    click.echo(f"  Name:     {result.name}")
+    click.echo(f"  Prefix:   {result.token_prefix}")
+    click.echo(f"  User:     {result.user_id}")
+    click.echo(f"  Scopes:   {', '.join(result.scopes) if result.scopes else '(none)'}")
+    if result.expires_at:
+        click.echo(f"  Expires:  {result.expires_at.isoformat()}")
+    else:
+        click.echo(f"  Expires:  never")
+    click.echo("=" * 60)
+    click.echo("  Save this token now — it cannot be retrieved later.")
+    click.echo("=" * 60)
+    click.echo()
+
+
+@token.command()
+@authenticate
+def list_tokens(auth):
+    """
+    List your API tokens.
+
+    Shows all active tokens for the authenticated user.
+    """
+    client = run_async(get_computor_client(auth))
+    try:
+        tokens = run_async(client.tokens.get_api_tokens())
+    except Exception as e:
+        click.secho(f"Error listing tokens: {e}", fg="red", err=True)
+        raise SystemExit(1)
+
+    if not tokens:
+        click.echo("No API tokens found.")
+        return
+
+    click.echo(f"\n{'Name':<30} {'Prefix':<15} {'Scopes':<30} {'Expires':<20}")
+    click.echo("-" * 95)
+    for t in tokens:
+        expires = t.expires_at.strftime("%Y-%m-%d") if t.expires_at else "never"
+        scopes = ", ".join(t.scopes) if t.scopes else "(none)"
+        revoked = " [REVOKED]" if t.revoked_at else ""
+        click.echo(f"{t.name:<30} {t.token_prefix:<15} {scopes:<30} {expires:<20}{revoked}")
+    click.echo()
+
+
+@token.command()
+@click.argument('token_id')
+@click.option('--reason', '-r', default=None, help='Revocation reason')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation')
+@authenticate
+def revoke(token_id, reason, yes, auth):
+    """
+    Revoke an API token by ID.
+
+    The token will be immediately invalidated.
+
+    Example:
+        computor token revoke <token-uuid>
+    """
+    if not yes:
+        click.confirm(f"Revoke token {token_id}?", abort=True)
+
+    client = run_async(get_computor_client(auth))
+    try:
+        params = {}
+        if reason:
+            params["reason"] = reason
+        run_async(client.tokens.delete_api_tokens(token_id=token_id, **params))
+    except Exception as e:
+        click.secho(f"Error revoking token: {e}", fg="red", err=True)
+        raise SystemExit(1)
+
+    click.secho(f"Token {token_id} revoked.", fg="yellow")
 
 
 @token.command()

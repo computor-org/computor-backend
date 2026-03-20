@@ -27,62 +27,39 @@ from .temporal_client import (
     DEFAULT_TASK_QUEUE
 )
 
-# Import all workflows and activities
-from .temporal_examples import (
-    ExampleLongRunningWorkflow,
-    ExampleDataProcessingWorkflow,
-    ExampleErrorHandlingWorkflow,
-    simulate_processing_activity,
-    process_data_chunk_activity
+# Import all temporal modules — each exports WORKFLOWS and ACTIVITIES lists.
+# Adding a new workflow/activity only requires updating the defining module.
+from . import (
+    temporal_examples,
+    temporal_student_testing,
+    temporal_hierarchy_management,
+    temporal_student_template_v2,
+    temporal_assignments_repository,
+    temporal_documents_sync,
+    temporal_student_repository,
+    temporal_tutor_testing,
+    temporal_coder_setup,
 )
-from .temporal_student_testing import (
-    StudentTestingWorkflow,
-    fetch_example_version_with_dependencies,
-    fetch_submission_artifact,
-    execute_tests_activity,
-    commit_test_results_activity,
-    run_complete_student_test_activity
-)
-from .temporal_hierarchy_management import (
-    CreateOrganizationWorkflow,
-    CreateCourseFamilyWorkflow,
-    CreateCourseWorkflow,
-    DeployComputorHierarchyWorkflow,
-    create_organization_activity,
-    create_course_family_activity,
-    create_course_activity
-)
-from .temporal_student_template_v2 import (
-    GenerateStudentTemplateWorkflowV2,
-    generate_student_template_activity_v2
-)
-from .temporal_assignments_repository import (
-    GenerateAssignmentsRepositoryWorkflow,
-    generate_assignments_repository_activity
-)
-from .temporal_documents_sync import (
-    SyncDocumentsRepositoryWorkflow,
-    sync_documents_repository_activity
-)
-from .temporal_student_repository import (
-    StudentRepositoryCreationWorkflow,
-    create_student_repository,
-    create_team_repository
-)
-from .temporal_tutor_testing import (
-    TutorTestingWorkflow,
-    fetch_tutor_test_input,
-    store_tutor_test_artifacts_activity,
-    store_tutor_test_result_to_minio,
-    run_tutor_test_activity,
-)
-from .temporal_coder_setup import (
-    BuildWorkspaceImagesWorkflow,
-    PushCoderTemplatesWorkflow,
-    build_workspace_image,
-    discover_template_keys,
-    push_coder_template,
-)
+
+_TEMPORAL_MODULES = [
+    temporal_examples,
+    temporal_student_testing,
+    temporal_hierarchy_management,
+    temporal_student_template_v2,
+    temporal_assignments_repository,
+    temporal_documents_sync,
+    temporal_student_repository,
+    temporal_tutor_testing,
+    temporal_coder_setup,
+]
+
+
+def _collect_from_modules(attr: str) -> list:
+    """Collect WORKFLOWS or ACTIVITIES from all temporal modules."""
+    items = []
+    for mod in _TEMPORAL_MODULES:
+        items.extend(getattr(mod, attr, []))
+    return items
 
 
 class TemporalWorker:
@@ -102,7 +79,6 @@ class TemporalWorker:
         self._shutdown = False
         self._heartbeat_interval = heartbeat_interval
         self._start_time: Optional[datetime] = None
-        self._tasks_processed = 0
 
     async def _heartbeat_loop(self):
         """Log periodic heartbeat to show worker is alive."""
@@ -112,7 +88,7 @@ class TemporalWorker:
                 uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
                 logger.info(
                     f"[HEARTBEAT] Worker alive - queues: {self.task_queues}, "
-                    f"uptime: {uptime}, tasks_processed: {self._tasks_processed}"
+                    f"uptime: {uptime}"
                 )
 
     async def start(self):
@@ -120,57 +96,14 @@ class TemporalWorker:
         self._start_time = datetime.utcnow()
         logger.info(f"Starting Temporal worker for queues: {', '.join(self.task_queues)}")
         logger.info(f"Worker start time: {self._start_time.isoformat()}")
-        
+
         # Get client
         self.client = await get_temporal_client()
-        
-        # Define workflows and activities
-        workflows = [
-            ExampleLongRunningWorkflow,
-            ExampleDataProcessingWorkflow,
-            ExampleErrorHandlingWorkflow,
-            StudentTestingWorkflow,
-            CreateOrganizationWorkflow,
-            CreateCourseFamilyWorkflow,
-            CreateCourseWorkflow,
-            DeployComputorHierarchyWorkflow,
-            # DeployExamplesToCourseWorkflow,  # Deprecated - removed
-            GenerateStudentTemplateWorkflowV2,
-            GenerateAssignmentsRepositoryWorkflow,
-            SyncDocumentsRepositoryWorkflow,  # Documents repository sync
-            StudentRepositoryCreationWorkflow,  # Student repository forking
-            TutorTestingWorkflow,  # Tutor testing (ephemeral, no DB records)
-            BuildWorkspaceImagesWorkflow,  # Coder workspace image building
-            PushCoderTemplatesWorkflow,  # Coder template pushing
-        ]
-        
-        activities = [
-            simulate_processing_activity,
-            process_data_chunk_activity,
-            fetch_example_version_with_dependencies,  # Fetch and cache reference examples
-            fetch_submission_artifact,  # Fetch student submissions
-            execute_tests_activity,
-            commit_test_results_activity,
-            run_complete_student_test_activity,  # Complete test run (all steps on one worker)
-            create_organization_activity,
-            create_course_family_activity,
-            create_course_activity,
-            generate_student_template_activity_v2,  # Student template generation
-            generate_assignments_repository_activity,  # Assignments init/populate
-            sync_documents_repository_activity,  # Documents repository sync from GitLab
-            create_student_repository,  # Fork student-template for individual student
-            create_team_repository,  # Fork student-template for team
-            # Tutor testing activities (no Redis - API handles that)
-            fetch_tutor_test_input,
-            store_tutor_test_artifacts_activity,
-            store_tutor_test_result_to_minio,
-            run_tutor_test_activity,
-            # Coder setup activities (image build + template push)
-            build_workspace_image,
-            discover_template_keys,
-            push_coder_template,
-        ]
-        
+
+        # Collect workflows and activities from all temporal modules
+        workflows = _collect_from_modules("WORKFLOWS")
+        activities = _collect_from_modules("ACTIVITIES")
+
         # Create a worker for each task queue
         for task_queue in self.task_queues:
             logger.info(f"Creating worker for queue: {task_queue}")
@@ -202,7 +135,7 @@ class TemporalWorker:
             logger.error(f"Worker error: {e}", exc_info=True)
         finally:
             await self.shutdown()
-    
+
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}, shutting down workers...")
@@ -224,13 +157,13 @@ class TemporalWorker:
             await self.client.close()
 
         uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
-        logger.info(f"Workers shut down - uptime: {uptime}, tasks_processed: {self._tasks_processed}")
+        logger.info(f"Workers shut down - uptime: {uptime}")
 
 
 async def run_worker(queues: Optional[List[str]] = None):
     """
     Run a Temporal worker.
-    
+
     Args:
         queues: Optional list of queue names to process
     """
@@ -241,7 +174,7 @@ async def run_worker(queues: Optional[List[str]] = None):
 def main():
     """Main entry point for running a worker from command line."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Run Temporal worker")
     parser.add_argument(
         "--queues",
@@ -249,12 +182,12 @@ def main():
         help="Task queues to process (default: computor-tasks)",
         default=None
     )
-    
+
     args = parser.parse_args()
-    
+
     # Use specified queues or default
     queues = args.queues
-    
+
     # Run worker
     asyncio.run(run_worker(queues))
 

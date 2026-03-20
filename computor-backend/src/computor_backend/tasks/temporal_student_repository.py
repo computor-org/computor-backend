@@ -16,7 +16,7 @@ from gitlab.exceptions import GitlabGetError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from ..database import get_db
+from ..database import SessionLocal
 from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
@@ -339,8 +339,8 @@ async def find_existing_repository(
         except:
             pass
         
-        # Method 2: List projects in namespace
-        for project in namespace_group.projects.list(all=True):
+        # Method 2: Search projects in namespace by name
+        for project in namespace_group.projects.list(search=repo_path, per_page=10):
             if project.path == repo_path:
                 return gitlab.projects.get(project.id)
                 
@@ -437,7 +437,7 @@ async def create_student_repository(
     Returns:
         Dict containing repository information
     """
-    db = next(get_db())
+    db = SessionLocal()
     
     try:
         # Get course member and validate
@@ -632,7 +632,7 @@ async def create_team_repository(
     Returns:
         Dict containing repository information
     """
-    db = next(get_db())
+    db = SessionLocal()
     
     try:
         # Get course information
@@ -896,3 +896,12 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={"error_details": str(e)}
             )
+
+WORKFLOWS = [
+    StudentRepositoryCreationWorkflow,
+]
+
+ACTIVITIES = [
+    create_student_repository,
+    create_team_repository,
+]

@@ -15,7 +15,7 @@ from pathlib import Path
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -37,13 +37,12 @@ async def sync_documents_repository_activity(
         Dict with success status, synced file count, and any errors
     """
     import git
-    from ..database import get_db
+    from ..database import SessionLocal
     from ..model.course import CourseFamily
     from ..model.organization import Organization
     from ..settings import settings
     from ..utils.docker_utils import transform_localhost_url
-    db_gen = next(get_db())
-    db = db_gen
+    db = SessionLocal()
 
     result = {
         "success": False,
@@ -79,13 +78,7 @@ async def sync_documents_repository_activity(
         gitlab_url = gitlab_config.get("url")
 
         # Get encrypted token
-        gitlab_token = None
-        if gitlab_config.get("token"):
-            try:
-                from computor_types.tokens import decrypt_api_key
-                gitlab_token = decrypt_api_key(gitlab_config["token"])
-            except Exception as e:
-                logger.warning(f"Could not decrypt GitLab token: {e}")
+        gitlab_token = decrypt_gitlab_token(gitlab_config.get("token"))
 
         if not gitlab_url:
             result["error"] = "GitLab URL not configured for organization"
@@ -120,14 +113,7 @@ async def sync_documents_repository_activity(
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
         # Prepare authenticated URL if token available
-        auth_url = documents_url
-        if gitlab_token and 'http' in documents_url:
-            from urllib.parse import urlparse, urlunparse
-            parsed = urlparse(documents_url)
-            auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
-            if parsed.port:
-                auth_netloc += f":{parsed.port}"
-            auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+        auth_url = make_git_auth_url(documents_url, gitlab_token) if gitlab_token else documents_url
 
         # Define blacklist of files/directories to exclude from sync
         # These are sensitive or unnecessary files that should not be exposed
@@ -243,7 +229,7 @@ async def sync_documents_repository_activity(
         return result
 
     finally:
-        db_gen.close()
+        db.close()
 
 
 @register_task
@@ -316,3 +302,12 @@ class SyncDocumentsRepositoryWorkflow(BaseWorkflow):
                 result=None,
                 error=f"Workflow error: {str(e)}"
             )
+
+
+WORKFLOWS = [
+    SyncDocumentsRepositoryWorkflow,
+]
+
+ACTIVITIES = [
+    sync_documents_repository_activity,
+]

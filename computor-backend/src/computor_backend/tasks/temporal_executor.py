@@ -10,7 +10,6 @@ from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
 from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
 from .temporal_base import WorkflowResult
-from .base import BaseTask
 from .registry import task_registry
 from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
 
@@ -135,8 +134,8 @@ class TemporalTaskExecutor:
                 TaskStatus.QUEUED
             )
             
-            # Extract task name from workflow ID
-            task_name = task_id.split('-')[0] if '-' in task_id else "unknown"
+            # Extract task name from workflow type
+            task_name = description.workflow_type or "unknown"
             
             # Create shortened task ID for better display
             short_task_id = task_id.split('-')[-1] if '-' in task_id else task_id
@@ -316,36 +315,34 @@ class TemporalTaskExecutor:
             # Use Temporal's list_workflows API to get workflows
             from temporalio.client import WorkflowExecutionStatus
             
-            # Build query filter
+            # Build Temporal visibility query for server-side filtering
             query_parts = []
-            
-            # Note: Status filtering requires proper Temporal query syntax
-            # For now, we'll filter in Python after fetching results
-            status_filter = None
             if status:
-                status_mapping = {
-                    "PENDING": [WorkflowExecutionStatus.RUNNING],
-                    "STARTED": [WorkflowExecutionStatus.RUNNING], 
-                    "FINISHED": [WorkflowExecutionStatus.COMPLETED],
-                    "SUCCESS": [WorkflowExecutionStatus.COMPLETED],
-                    "FAILED": [WorkflowExecutionStatus.FAILED, WorkflowExecutionStatus.TIMED_OUT],
-                    "CANCELLED": [WorkflowExecutionStatus.CANCELED, WorkflowExecutionStatus.TERMINATED],
-                    "REVOKED": [WorkflowExecutionStatus.TERMINATED]
+                # Map our status names to Temporal ExecutionStatus values
+                temporal_status_mapping = {
+                    "PENDING": ["Running"],
+                    "STARTED": ["Running"],
+                    "FINISHED": ["Completed"],
+                    "SUCCESS": ["Completed"],
+                    "FAILED": ["Failed", "TimedOut"],
+                    "CANCELLED": ["Canceled", "Terminated"],
+                    "REVOKED": ["Terminated"],
                 }
-                status_filter = status_mapping.get(status.upper(), [])
-            
-            # Build query string
+                temporal_statuses = temporal_status_mapping.get(status.upper(), [])
+                if temporal_statuses:
+                    status_clauses = " OR ".join(
+                        f'ExecutionStatus = "{s}"' for s in temporal_statuses
+                    )
+                    query_parts.append(f"({status_clauses})")
+
             query = " AND ".join(query_parts) if query_parts else ""
-            
+
             # List workflows using Temporal's visibility API
             workflows = []
             async for workflow in client.list_workflows(
                 query=query or None,
-                page_size=min(limit * 2, 1000)  # Fetch more to account for filtering
+                page_size=min(limit + offset, 1000)
             ):
-                # Apply status filter if specified
-                if status_filter and workflow.status not in status_filter:
-                    continue
                 
                 # Convert to our TaskInfo format
                 status_value = self._status_mapping.get(workflow.status, TaskStatus.QUEUED).value

@@ -409,9 +409,13 @@ class TypeScriptGenerator:
             
             # Determine category
             category = 'common'  # default
-            
+
+            # WebSocket models take priority (module-level check prevents
+            # WSDeployment* being categorized as 'common' by the deployment rule)
+            if 'websocket' in module_name or model_name.startswith('ws'):
+                category = 'websocket'
             # Special handling for GitLab and deployment configs
-            if 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
+            elif 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
                 category = 'common'
             elif 'auth' in module_name or 'auth' in model_name or 'login' in model_name or 'token' in model_name:
                 category = 'auth'
@@ -431,8 +435,6 @@ class TypeScriptGenerator:
                 category = 'examples'
             elif 'message' in module_name or 'message' in model_name:
                 category = 'messages'
-            elif 'websocket' in module_name or model_name.startswith('ws'):
-                category = 'websocket'
 
             model_categories[category].append(model)
             model_to_category[model.__name__] = category
@@ -442,7 +444,9 @@ class TypeScriptGenerator:
             module_name = enum.__module__.lower() if hasattr(enum, '__module__') else ''
 
             category = 'common'
-            if 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
+            if 'websocket' in module_name or enum_name.startswith('ws'):
+                category = 'websocket'
+            elif 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
                 category = 'common'
             elif 'auth' in module_name or 'auth' in enum_name:
                 category = 'auth'
@@ -462,8 +466,6 @@ class TypeScriptGenerator:
                 category = 'examples'
             elif 'message' in module_name or 'message' in enum_name:
                 category = 'messages'
-            elif 'websocket' in module_name or enum_name.startswith('ws'):
-                category = 'websocket'
 
             enum_categories[category].append(enum)
             model_to_category[enum.__name__] = category

@@ -151,38 +151,3 @@ export interface ErrorMessageFormat {
   /** HTML formatted message */
   html?: string | null;
 }
-
-/**
- * New message created in a channel.
- */
-export interface WSMessageNew {
-  type?: "message:new";
-  /** Channel the message was posted to */
-  channel: string;
-  /** Message data (MessageGet serialized) */
-  data: any;
-}
-
-/**
- * Message was updated.
- */
-export interface WSMessageUpdate {
-  type?: "message:update";
-  /** Channel the message belongs to */
-  channel: string;
-  /** ID of the updated message */
-  message_id: string;
-  /** Updated message data (MessageGet serialized) */
-  data: any;
-}
-
-/**
- * Message was deleted.
- */
-export interface WSMessageDelete {
-  type?: "message:delete";
-  /** Channel the message belonged to */
-  channel: string;
-  /** ID of the deleted message */
-  message_id: string;
-}

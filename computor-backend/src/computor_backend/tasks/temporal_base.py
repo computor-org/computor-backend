@@ -2,22 +2,16 @@
 Base classes and interfaces for Temporal workflow and activity definitions.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Dict, Optional, List
-from temporalio import workflow, activity
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse, urlunparse
+
 from temporalio.common import RetryPolicy
 
-from computor_types.tasks import TaskStatus, TaskSubmission
-
-
-@dataclass
-class WorkflowProgress:
-    """Progress information for workflow execution."""
-    percentage: int
-    stage: str
-    metadata: Optional[Dict[str, Any]] = None
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,26 +26,26 @@ class WorkflowResult:
 class BaseWorkflow(ABC):
     """
     Abstract base class for Temporal workflows.
-    
+
     Workflows orchestrate the execution of activities and handle long-running processes.
     """
-    
+
     @classmethod
     @abstractmethod
     def get_name(cls) -> str:
         """Get the workflow name."""
         pass
-    
+
     @classmethod
     def get_task_queue(cls) -> str:
         """Get the default task queue for this workflow."""
         return "computor-tasks"
-    
+
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
         """Get the workflow execution timeout."""
         return timedelta(hours=1)
-    
+
     @classmethod
     def get_retry_policy(cls) -> RetryPolicy:
         """Get the retry policy for this workflow."""
@@ -63,74 +57,37 @@ class BaseWorkflow(ABC):
         )
 
 
-class BaseActivity(ABC):
-    """
-    Abstract base class for Temporal activities.
-    
-    Activities contain the actual business logic and can interact with external systems.
-    """
-    
-    @classmethod
-    @abstractmethod
-    def get_name(cls) -> str:
-        """Get the activity name."""
-        pass
-    
-    @classmethod
-    def get_start_to_close_timeout(cls) -> timedelta:
-        """Get the activity execution timeout."""
-        return timedelta(minutes=5)
-    
-    @classmethod
-    def get_retry_policy(cls) -> RetryPolicy:
-        """Get the retry policy for this activity."""
-        return RetryPolicy(
-            initial_interval=timedelta(seconds=1),
-            backoff_coefficient=2.0,
-            maximum_interval=timedelta(seconds=100),
-            maximum_attempts=3,
-        )
-    
-    @abstractmethod
-    async def execute(self, **kwargs) -> Any:
-        """
-        Execute the activity logic.
-        
-        Args:
-            **kwargs: Activity parameters
-            
-        Returns:
-            Activity result
-        """
-        pass
+def decrypt_gitlab_token(encrypted_token: Optional[str]) -> Optional[str]:
+    """Decrypt a GitLab token. Returns None if token is empty or decryption fails."""
+    if not encrypted_token:
+        return None
+    try:
+        from computor_types.tokens import decrypt_api_key
+        return decrypt_api_key(encrypted_token)
+    except Exception as e:
+        logger.warning(f"Could not decrypt GitLab token: {e}")
+        return None
 
 
-def create_activity_decorator(activity_class: type[BaseActivity]):
-    """
-    Create a Temporal activity decorator for a BaseActivity class.
-    
-    This helper function creates properly configured Temporal activities
-    from our BaseActivity classes.
-    """
-    @activity.defn(name=activity_class.get_name())
-    async def activity_wrapper(**kwargs):
-        instance = activity_class()
-        return await instance.execute(**kwargs)
-    
-    return activity_wrapper
+def make_git_auth_url(url: str, token: str) -> str:
+    """Insert oauth2 token into a git URL for authenticated clone/push."""
+    parsed = urlparse(url)
+    auth_netloc = f"oauth2:{token}@{parsed.hostname}"
+    if parsed.port:
+        auth_netloc += f":{parsed.port}"
+    return urlunparse((
+        parsed.scheme, auth_netloc, parsed.path,
+        parsed.params, parsed.query, parsed.fragment
+    ))
 
 
-def create_workflow_decorator(workflow_class: type[BaseWorkflow]):
-    """
-    Create a Temporal workflow decorator for a BaseWorkflow class.
-    
-    This helper function creates properly configured Temporal workflows
-    from our BaseWorkflow classes.
-    """
-    def decorator(run_method):
-        return workflow.defn(
-            name=workflow_class.get_name(),
-            sandboxed=False  # Python workflows can't be sandboxed
-        )(run_method)
-    
-    return decorator
+def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
+    """Extract (passed, failed, total) from test results dict."""
+    if "summary" in test_results:
+        s = test_results["summary"]
+        return s.get("passed", 0), s.get("failed", 0), s.get("total", 0)
+    return (
+        test_results.get("passed", 0),
+        test_results.get("failed", 0),
+        test_results.get("total", 0),
+    )

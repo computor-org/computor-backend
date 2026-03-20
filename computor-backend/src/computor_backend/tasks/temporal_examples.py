@@ -8,7 +8,7 @@ from typing import Any, Dict
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, BaseActivity, WorkflowResult, WorkflowProgress
+from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 
 
@@ -265,7 +265,7 @@ class ExampleErrorHandlingWorkflow(BaseWorkflow):
                 
                 # Wait before retry (max 60 seconds)
                 sleep_seconds = min(2 ** attempts, 60)
-                await asyncio.sleep(sleep_seconds)
+                await workflow.sleep(sleep_seconds)
         
         # Should not reach here
         return WorkflowResult(
@@ -273,3 +273,15 @@ class ExampleErrorHandlingWorkflow(BaseWorkflow):
             result=None,
             error="Unexpected workflow state"
         )
+
+
+WORKFLOWS = [
+    ExampleLongRunningWorkflow,
+    ExampleDataProcessingWorkflow,
+    ExampleErrorHandlingWorkflow,
+]
+
+ACTIVITIES = [
+    simulate_processing_activity,
+    process_data_chunk_activity,
+]
