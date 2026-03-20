@@ -99,7 +99,7 @@ def handle_api_exceptions(func):
   return wrapper
 
 @click.command()
-@click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
+@click.argument("table", type=click.Choice(AVAILABLE_DTO_DEFINITIONS))
 @click.option("--query", "-q", "query", type=(str, str), multiple=True)
 @authenticate
 @handle_api_exceptions
@@ -123,7 +123,7 @@ def list_entities(table, query, auth: CLIAuthConfig):
       click.echo(json.dumps(entity, indent=4))
 
 @click.command()
-@click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
+@click.argument("table", type=click.Choice(AVAILABLE_DTO_DEFINITIONS))
 def show_entities_query(table):
 
   query_class = GET_QUERY_CLASS(table)
@@ -135,8 +135,8 @@ def show_entities_query(table):
     click.echo(f"{click.style(field,fg='green')} - {info.annotation}")
 
 @click.command()
-@click.option("--table", "-t", type=click.Choice(AVAILABLE_DTO_DEFINITIONS), prompt="Type")
-@click.option("--id", "-i", prompt=True)
+@click.argument("table", type=click.Choice(AVAILABLE_DTO_DEFINITIONS))
+@click.argument("id")
 @authenticate
 @handle_api_exceptions
 def get_entity(table, id, auth: CLIAuthConfig):
