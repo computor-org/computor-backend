@@ -107,7 +107,8 @@ computor deployment <subcommand>
 
 ### Authentication
 - `computor login` - Authenticate with API
-- `computor profiles` - Manage authentication profiles
+- `computor logout` - Log out and remove active profile
+- `computor status` - Show currently active profile
 
 ### CRUD
 - `computor rest list` - List entities
@@ -153,9 +154,7 @@ Available entity types:
 
 ## Configuration
 
-The CLI stores authentication profiles in `~/.computor/`:
-- `active_profile.yaml` - Currently active profile
-- `profiles.yaml` - All saved profiles
+The CLI stores the active profile in `~/.computor/active_profile.yaml`.
 
 ### Profile Structure
 

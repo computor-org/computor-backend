@@ -1,7 +1,7 @@
 import click
 
 # Commands that work with computor-types/computor-client (NO backend dependency)
-from computor_cli.auth import change_profile, login
+from computor_cli.auth import login, logout, status
 from computor_cli.crud import rest
 from computor_cli.deployment import deployment
 from computor_cli.api_token_cli import token
@@ -38,8 +38,9 @@ def cli(ctx, profile):
     ctx.obj['PROFILE_PATH'] = profile
 
 # Available commands (no backend dependency)
-cli.add_command(change_profile, "profiles")
 cli.add_command(login, "login")
+cli.add_command(logout, "logout")
+cli.add_command(status, "status")
 cli.add_command(rest, "rest")
 cli.add_command(deployment, "deployment")
 cli.add_command(token, "token")

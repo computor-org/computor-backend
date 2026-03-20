@@ -1,20 +1,33 @@
 import os
 import click
-import yaml
 from functools import wraps
 from computor_cli.config import CLIAuthConfig
 
 HOME_DIR = os.path.expanduser("~") or os.environ.get("HOME") or os.environ.get("USERPROFILE")
-COMPUTOR_DIR = os.path.join(HOME_DIR,".computor")
+COMPUTOR_DIR = os.path.join(HOME_DIR, ".computor")
 AUTH_FILE = "active_profile.yaml"
-PROFILES_FILE = "profiles.yaml"
+
 
 def init_filesystem():
     if not os.path.exists(COMPUTOR_DIR):
-        os.makedirs(COMPUTOR_DIR,exist_ok=True)
+        os.makedirs(COMPUTOR_DIR, exist_ok=True)
 
-    if not os.path.exists(os.path.join(COMPUTOR_DIR,PROFILES_FILE)):
-        open(os.path.join(COMPUTOR_DIR,PROFILES_FILE), "x")
+
+def get_profile_path() -> str:
+    return os.path.join(COMPUTOR_DIR, AUTH_FILE)
+
+
+def read_active_profile() -> CLIAuthConfig | None:
+    from computor_types.deployments_refactored import DeploymentFactory
+
+    path = get_profile_path()
+    if not os.path.exists(path):
+        return None
+    try:
+        return DeploymentFactory.read_deployment_from_file(CLIAuthConfig, path)
+    except Exception:
+        return None
+
 
 def api_heartbeat(client) -> bool:
     try:
@@ -23,168 +36,83 @@ def api_heartbeat(client) -> bool:
             return True
     except Exception as e:
         click.echo(e)
-
     return False
 
-def read_auth_profiles() -> list[CLIAuthConfig]:
-    init_filesystem()
-
-    filename = os.path.join(COMPUTOR_DIR,PROFILES_FILE)
-
-    with open(filename, "r") as file:
-        objs = yaml.safe_load(file)
-
-        if objs == None:
-            return []
-
-        entities = []
-        for obj in objs:
-            entities.append(CLIAuthConfig(**obj))
-
-        return entities
-
-def write_auth_profiles(profiles: list[CLIAuthConfig]):
-    profiles_dict = []
-
-    for profile in profiles:
-        profiles_dict.append(profile.model_dump(exclude_unset=True))
-
-    filename = os.path.join(COMPUTOR_DIR,PROFILES_FILE)
-
-    with open(filename, "w") as file:
-        file.write(yaml.safe_dump(profiles_dict))
 
 @click.command()
-def change_profile():
-    profiles = read_auth_profiles()
+def status():
+    """Show the currently active profile."""
+    profile = read_active_profile()
+    if profile is None:
+        click.echo("Not logged in. Run 'computor login' to authenticate.")
+        return
 
-    profile_dict = {}
-    for idx, profile in enumerate(profiles):
-        idx_str = str(idx+1)
+    click.echo(f"API: {profile.api_url}")
+    if profile.basic is not None:
+        click.echo(f"Auth: basic (user: {profile.basic.username})")
+    elif profile.gitlab is not None:
+        click.echo(f"Auth: gitlab ({profile.gitlab.url})")
+    else:
+        click.echo("Auth: none")
 
-        if profile.gitlab != None:
-            click.echo(f"({idx_str}): {profile.gitlab.url}")
-        elif profile.basic != None:
-            click.echo(f"({idx_str}): {profile.basic.username}")
-        else:
-            continue
-
-        profile_dict[idx_str] = profile
-    
-    profile = click.prompt('Profile', type=click.Choice(profile_dict.keys()))
-
-    profile_dict[profile].write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
-
-    click.echo("Changed profile!")
 
 @click.command()
-@click.option("--auth-method", "-a", type=click.Choice(['basic', 'gitlab', 'github']), prompt="Auth method")
+@click.option("--auth-method", "-a", type=click.Choice(['basic', 'gitlab']), prompt="Auth method")
 @click.option("--base-url", "-b", prompt="API url")
 @click.option("--username", "-u")
 @click.option("--password", "-p")
 @click.option("--gitlab-host")
 @click.option("--gitlab-token")
-def login(auth_method,base_url,username,password,gitlab_host,gitlab_token):
-
+def login(auth_method, base_url, username, password, gitlab_host, gitlab_token):
+    """Authenticate with a Computor API server."""
     from httpx import Client
-
-    if base_url == None:
-        base_url = click.prompt('API url')
-
     from computor_types.auth import BasicAuthConfig, GLPAuthConfig
 
-    profiles = read_auth_profiles()
-
-    cli_auth_config = None
-
     if auth_method == 'basic':
-        username = username if username != None else click.prompt('Username')
-        password = password if password != None else click.prompt('Password', hide_input=True)
+        username = username if username is not None else click.prompt('Username')
+        password = password if password is not None else click.prompt('Password', hide_input=True)
 
-        basic_auth = (username,password)
-
-        client = Client(base_url=base_url,auth=basic_auth)
-
-        cli_auth_config = CLIAuthConfig(api_url=base_url, basic=BasicAuthConfig(username=username,password=password))
+        client = Client(base_url=base_url, auth=(username, password))
+        cli_auth_config = CLIAuthConfig(
+            api_url=base_url,
+            basic=BasicAuthConfig(username=username, password=password),
+        )
 
     elif auth_method == 'gitlab':
-        gitlab_host = gitlab_host if gitlab_host != None else click.prompt('Gitlab host')
-        gitlab_token = gitlab_token if gitlab_token != None else click.prompt('Token', hide_input=True)
+        gitlab_host = gitlab_host if gitlab_host is not None else click.prompt('Gitlab host')
+        gitlab_token = gitlab_token if gitlab_token is not None else click.prompt('Token', hide_input=True)
 
-        glp_auth = GLPAuthConfig(url=gitlab_host,token=gitlab_token)
-
+        glp_auth = GLPAuthConfig(url=gitlab_host, token=gitlab_token)
         client = Client(base_url=base_url)
 
         from base64 import b64encode
-
-        crypt = b64encode(bytes(glp_auth.model_dump_json(),encoding="utf-8"))
-        client.headers.update({"GLP-CREDS": str(crypt,"utf-8") })
+        crypt = b64encode(bytes(glp_auth.model_dump_json(), encoding="utf-8"))
+        client.headers.update({"GLP-CREDS": str(crypt, "utf-8")})
 
         cli_auth_config = CLIAuthConfig(api_url=base_url, gitlab=glp_auth)
 
-    elif auth_method == 'github':
-        click.echo("Not implemented yet")
-        return False
-
-    profile_exist = None
-    profile_override = False
-
-    for idx, pc in enumerate(profiles):
-        if cli_auth_config.api_url != pc.api_url:
-            continue
-
-        if cli_auth_config.basic != None and pc.basic != None:
-            if pc.basic.username == cli_auth_config.basic.username:
-                
-                if pc.basic.password != cli_auth_config.basic.password:
-                    profile_override = True
-                    profiles[idx].basic.password = cli_auth_config.basic.password
-
-                profile_exist = pc
-                break
-
-        elif cli_auth_config.gitlab != None and pc.gitlab != None:
-            if pc.gitlab.url == cli_auth_config.gitlab.url:
-
-                if pc.gitlab.token != cli_auth_config.gitlab.token:
-                    profile_override = True
-                    profiles[idx].gitlab.token = cli_auth_config.gitlab.token
-
-                profile_exist = pc
-                break
-        else:
-            continue
-
-    connection = api_heartbeat(client)
-
-    if profile_exist != None and profile_override == False:
-        click.echo("Changed profile!")
-        return True
-
-    elif profile_exist != None and profile_override == True and connection == True:
-        init_filesystem()
-
-        write_auth_profiles(profiles)
-
-        cli_auth_config.write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
-
-        click.echo("Updated profile!")
-        return True
-
-    if connection == True and cli_auth_config != None:
-        init_filesystem()
-
-        profiles.append(cli_auth_config)
-        write_auth_profiles(profiles)
-
-        cli_auth_config.write_deployment(os.path.join(COMPUTOR_DIR,AUTH_FILE))
-
-        click.echo("Authentication successful!")
-        return True
-
-    else:
+    if not api_heartbeat(client):
         click.echo("Authentication failed.")
         return False
+
+    init_filesystem()
+    cli_auth_config.write_deployment(get_profile_path())
+    clear_client_cache()
+
+    click.echo("Authentication successful!")
+    return True
+
+
+@click.command()
+def logout():
+    """Remove the active profile and log out."""
+    path = get_profile_path()
+    if os.path.exists(path):
+        os.remove(path)
+        clear_client_cache()
+        click.echo("Logged out.")
+    else:
+        click.echo("Not logged in.")
 
 
 def authenticate(func):
@@ -195,31 +123,25 @@ def authenticate(func):
 
         ctx = get_current_context()
 
-        # Check if custom profile path is provided via --profile or COMPUTOR_PROFILE env var
         custom_profile = None
         if ctx.obj and 'PROFILE_PATH' in ctx.obj:
             custom_profile = ctx.obj['PROFILE_PATH']
 
-        # Use custom profile if provided, otherwise use default
         if custom_profile:
             file = custom_profile
         else:
-            file = os.path.join(COMPUTOR_DIR, AUTH_FILE)
+            file = get_profile_path()
 
         if not os.path.exists(file):
             if custom_profile:
                 click.echo(f"Profile file not found: {custom_profile}")
-                click.echo("Please create the profile file or check the path.")
                 raise click.Abort()
             else:
-                click.echo("You are not logged in. Please login")
-                auth_method = click.prompt("Auth method", type=click.Choice(['basic', 'gitlab', 'github']))
-                ctx.invoke(login, auth_method=auth_method)
+                click.echo("Not logged in. Run 'computor login' to authenticate.")
+                raise click.Abort()
 
         auth: CLIAuthConfig = DeploymentFactory.read_deployment_from_file(CLIAuthConfig, file)
-
         kwargs["auth"] = auth
-
         return func(*args, **kwargs)
 
     return wrapper
