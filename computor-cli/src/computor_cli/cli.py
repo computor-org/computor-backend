@@ -1,14 +1,14 @@
 import click
 
 # Commands that work with computor-types/computor-client (NO backend dependency)
-from computor_cli.auth import change_profile, login
+from computor_cli.auth import login, logout, status
 from computor_cli.crud import rest
 from computor_cli.deployment import deployment
 from computor_cli.api_token_cli import token
 from computor_cli.documents import documents
 from computor_cli.service_cli import service
 from computor_cli.delete import delete
-from computor_cli.chat import chat
+from computor_cli.grading import grading
 
 # Commands that require computor_backend (DISABLED - use backend directly for these)
 # from computor_cli.admin import admin
@@ -38,15 +38,16 @@ def cli(ctx, profile):
     ctx.obj['PROFILE_PATH'] = profile
 
 # Available commands (no backend dependency)
-cli.add_command(change_profile, "profiles")
 cli.add_command(login, "login")
+cli.add_command(logout, "logout")
+cli.add_command(status, "status")
 cli.add_command(rest, "rest")
 cli.add_command(deployment, "deployment")
 cli.add_command(token, "token")
 cli.add_command(documents, "documents")
 cli.add_command(service, "service")
 cli.add_command(delete, "delete")
-cli.add_command(chat, "chat")
+cli.add_command(grading, "grading")
 
 # Backend-dependent commands (commented out - use from backend package instead)
 # cli.add_command(admin, "admin")

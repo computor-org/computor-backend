@@ -19,7 +19,7 @@ class ApiTokenCreate(BaseModel):
     """
     name: str = Field(..., min_length=1, max_length=255, description="Human-readable token name")
     description: Optional[str] = Field(None, description="Token description/purpose")
-    user_id: str = Field(..., description="User ID that owns this token")
+    user_id: Optional[str] = Field(None, description="User ID that owns this token (defaults to the authenticated user)")
     scopes: List[str] = Field(default_factory=list, description="Token scopes (e.g., ['read:courses', 'write:results'])")
     expires_at: Optional[datetime] = Field(None, description="Token expiration date (null = never expires)")
     properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")

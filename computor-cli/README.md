@@ -27,11 +27,14 @@ pip install -e computor-cli/
 ### Login
 
 ```bash
-# Basic authentication
-computor login --auth-method basic --base-url http://localhost:8000
+# Credentials auth (stores username/password, uses bearer token per request)
+computor login -a credentials -b http://localhost:8000 -u admin
 
-# GitLab SSO
-computor login --auth-method gitlab --base-url http://localhost:8000
+# Token auth — paste an existing API token
+computor login -a token -b http://localhost:8000 -t ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Token auth — create a token via one-time credential login
+computor login -a token -b http://localhost:8000 -u admin
 ```
 
 ### CRUD Operations
@@ -107,7 +110,8 @@ computor deployment <subcommand>
 
 ### Authentication
 - `computor login` - Authenticate with API
-- `computor profiles` - Manage authentication profiles
+- `computor logout` - Log out and remove active profile
+- `computor status` - Show currently active profile
 
 ### CRUD
 - `computor rest list` - List entities
@@ -153,26 +157,22 @@ Available entity types:
 
 ## Configuration
 
-The CLI stores authentication profiles in `~/.computor/`:
-- `active_profile.yaml` - Currently active profile
-- `profiles.yaml` - All saved profiles
+The CLI stores the active profile in `~/.computor/active_profile.yaml`.
 
 ### Profile Structure
 
+Credentials auth:
 ```yaml
 api_url: http://localhost:8000
-basic:
+credentials:
   username: admin
   password: secret
 ```
 
-Or for GitLab auth:
-
+Token auth:
 ```yaml
 api_url: http://localhost:8000
-gitlab:
-  url: https://gitlab.com
-  token: glpat-xxxxxxxxxxxx
+token: ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Development

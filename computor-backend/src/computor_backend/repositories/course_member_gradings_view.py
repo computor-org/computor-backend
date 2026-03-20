@@ -126,19 +126,20 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             .first()
         )
 
-        # Permission check: Tutor or higher role required
-        has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_tutor", self.db
-        ).filter(
-            CourseMember.course_id == course_id,
-            CourseMember.user_id == user_id
-        ).first()
+        # Permission check: Admin bypasses, otherwise tutor or higher role required
+        if not permissions.is_admin:
+            has_course_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", self.db
+            ).filter(
+                CourseMember.course_id == course_id,
+                CourseMember.user_id == user_id
+            ).first()
 
-        if not has_course_perms:
-            raise ForbiddenException(
-                detail="You don't have permission to view this course member's grading statistics. "
-                       "Tutor role or higher is required."
-            )
+            if not has_course_perms:
+                raise ForbiddenException(
+                    detail="You don't have permission to view this course member's grading statistics. "
+                           "Tutor role or higher is required."
+                )
 
         # Initialize data repository
         data_repo = CourseMemberGradingsRepository(self.db)
@@ -274,19 +275,20 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if course is None:
             raise NotFoundException(detail=f"Course {course_id} not found")
 
-        # Permission check: Tutor or higher role required (once)
-        has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_tutor", self.db
-        ).filter(
-            CourseMember.course_id == course_id,
-            CourseMember.user_id == user_id
-        ).first()
+        # Permission check: Admin bypasses, otherwise tutor or higher role required
+        if not permissions.is_admin:
+            has_course_perms = check_course_permissions(
+                permissions, CourseMember, "_tutor", self.db
+            ).filter(
+                CourseMember.course_id == course_id,
+                CourseMember.user_id == user_id
+            ).first()
 
-        if not has_course_perms:
-            raise ForbiddenException(
-                detail="You don't have permission to view course member grading statistics. "
-                       "Tutor role or higher is required."
-            )
+            if not has_course_perms:
+                raise ForbiddenException(
+                    detail="You don't have permission to view course member grading statistics. "
+                           "Tutor role or higher is required."
+                )
 
         # Single bulk query: returns per-member, per-content-type stats
         data_repo = CourseMemberGradingsRepository(self.db)
