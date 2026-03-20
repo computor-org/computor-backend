@@ -1513,19 +1513,17 @@ def _ensure_example_repository(repo_name: str, auth: CLIAuthConfig):
 
     async def _find_or_create_repo():
         async with httpx.AsyncClient(base_url=auth.api_url) as http_client:
-            # Authenticate first
-            if auth.credentials:
+            # Authenticate
+            if auth.token:
+                http_client.headers.update({"X-API-Token": auth.token})
+            elif auth.credentials:
                 auth_response = await http_client.post(
                     "/auth/login",
                     json={"username": auth.credentials.username, "password": auth.credentials.password}
                 )
                 auth_response.raise_for_status()
-                token = auth_response.json()["access_token"]
-                http_client.headers.update({"Authorization": f"Bearer {token}"})
-            elif auth.api_token:
-                http_client.headers.update({"X-API-Token": auth.api_token.token})
-            else:
-                raise RuntimeError("No authentication method configured")
+                bearer = auth_response.json()["access_token"]
+                http_client.headers.update({"Authorization": f"Bearer {bearer}"})
 
             # Search for existing repository
             click.echo(f"    🔍 Searching for repository: {repo_name}")

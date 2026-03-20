@@ -27,11 +27,14 @@ pip install -e computor-cli/
 ### Login
 
 ```bash
-# Username/password (bearer token flow)
-computor login --auth-method credentials --base-url http://localhost:8000
+# Credentials auth (stores username/password, uses bearer token per request)
+computor login -a credentials -b http://localhost:8000 -u admin
 
-# API token
-computor login --auth-method token --base-url http://localhost:8000
+# Token auth — paste an existing API token
+computor login -a token -b http://localhost:8000 -t ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Token auth — create a token via one-time credential login
+computor login -a token -b http://localhost:8000 -u admin
 ```
 
 ### CRUD Operations
@@ -158,6 +161,7 @@ The CLI stores the active profile in `~/.computor/active_profile.yaml`.
 
 ### Profile Structure
 
+Credentials auth:
 ```yaml
 api_url: http://localhost:8000
 credentials:
@@ -165,12 +169,10 @@ credentials:
   password: secret
 ```
 
-Or with an API token:
-
+Token auth:
 ```yaml
 api_url: http://localhost:8000
-api_token:
-  token: ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+token: ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Development

@@ -1,7 +1,7 @@
 import os
 import click
 from functools import wraps
-from computor_cli.config import CLIAuthConfig, CredentialsAuth, ApiTokenAuth
+from computor_cli.config import CLIAuthConfig, CredentialsAuth
 
 HOME_DIR = os.path.expanduser("~") or os.environ.get("HOME") or os.environ.get("USERPROFILE")
 COMPUTOR_DIR = os.path.join(HOME_DIR, ".computor")
@@ -29,8 +29,8 @@ def read_active_profile() -> CLIAuthConfig | None:
         return None
 
 
-def _heartbeat_credentials(base_url: str, username: str, password: str) -> bool:
-    """Test credentials by calling POST /auth/login (bearer token flow)."""
+def _verify_credentials(base_url: str, username: str, password: str) -> bool:
+    """Test credentials via POST /auth/login."""
     from httpx import Client
 
     try:
@@ -42,8 +42,8 @@ def _heartbeat_credentials(base_url: str, username: str, password: str) -> bool:
         return False
 
 
-def _heartbeat_api_token(base_url: str, token: str) -> bool:
-    """Test an API token by calling GET /user with the X-API-Token header."""
+def _verify_token(base_url: str, token: str) -> bool:
+    """Verify an API token via GET /user with X-API-Token header."""
     from httpx import Client
 
     try:
@@ -55,6 +55,42 @@ def _heartbeat_api_token(base_url: str, token: str) -> bool:
         return False
 
 
+def _create_token_with_credentials(base_url: str, username: str, password: str) -> str | None:
+    """Login with credentials, create an API token, and return it."""
+    from httpx import Client
+
+    try:
+        with Client(base_url=base_url) as client:
+            login_resp = client.post("/auth/login", json={"username": username, "password": password})
+            if login_resp.status_code != 200:
+                click.echo("Login failed: invalid credentials.")
+                return None
+
+            bearer_token = login_resp.json()["access_token"]
+
+            client.headers.update({"Authorization": f"Bearer {bearer_token}"})
+            token_resp = client.post("/api-tokens", json={
+                "name": f"cli-{username}",
+                "description": "Created by computor CLI login",
+            })
+            if token_resp.status_code != 201:
+                click.echo(f"Failed to create API token: {token_resp.text}")
+                return None
+
+            return token_resp.json()["token"]
+
+    except Exception as e:
+        click.echo(e)
+        return None
+
+
+def _save_profile(config: CLIAuthConfig):
+    """Save profile to disk."""
+    init_filesystem()
+    config.write_deployment(get_profile_path())
+    clear_client_cache()
+
+
 @click.command()
 def status():
     """Show the currently active profile."""
@@ -63,11 +99,11 @@ def status():
         click.echo("Not logged in. Run 'computor login' to authenticate.")
         return
 
-    click.echo(f"API: {profile.api_url}")
+    click.echo(f"API:  {profile.api_url}")
     if profile.credentials is not None:
         click.echo(f"Auth: credentials (user: {profile.credentials.username})")
-    elif profile.api_token is not None:
-        click.echo(f"Auth: api-token ({profile.api_token.token[:8]}...)")
+    elif profile.token is not None:
+        click.echo(f"Auth: token ({profile.token[:12]}...)")
     else:
         click.echo("Auth: none")
 
@@ -77,41 +113,61 @@ def status():
 @click.option("--base-url", "-b", prompt="API url")
 @click.option("--username", "-u")
 @click.option("--password", "-p")
-@click.option("--token", "-t")
+@click.option("--token", "-t", help="Existing API token (for token auth method)")
 def login(auth_method, base_url, username, password, token):
-    """Authenticate with a Computor API server."""
+    """Authenticate with a Computor API server.
+
+    \b
+    Auth methods:
+      credentials  - Store username/password, authenticate via bearer token per request
+      token        - Store an API token, either by pasting one (--token) or by
+                     logging in with credentials (--username) to create one
+    """
 
     if auth_method == "credentials":
         username = username if username is not None else click.prompt("Username")
         password = password if password is not None else click.prompt("Password", hide_input=True)
 
-        if not _heartbeat_credentials(base_url, username, password):
+        if not _verify_credentials(base_url, username, password):
             click.echo("Authentication failed.")
             return False
 
-        config = CLIAuthConfig(
+        _save_profile(CLIAuthConfig(
             api_url=base_url,
             credentials=CredentialsAuth(username=username, password=password),
-        )
+        ))
+        click.echo("Authentication successful!")
+        return True
 
     elif auth_method == "token":
-        token = token if token is not None else click.prompt("API token", hide_input=True)
+        if token is None and username is None:
+            method = click.prompt(
+                "Provide a token or create one with credentials?",
+                type=click.Choice(["paste", "create"]),
+            )
+            if method == "paste":
+                token = click.prompt("API token", hide_input=True)
+            else:
+                username = click.prompt("Username")
 
-        if not _heartbeat_api_token(base_url, token):
-            click.echo("Authentication failed.")
-            return False
+        if token is not None:
+            if not _verify_token(base_url, token):
+                click.echo("Authentication failed: invalid token.")
+                return False
 
-        config = CLIAuthConfig(
-            api_url=base_url,
-            api_token=ApiTokenAuth(token=token),
-        )
+            _save_profile(CLIAuthConfig(api_url=base_url, token=token))
+            click.echo("Authentication successful!")
+            return True
+        else:
+            password = password if password is not None else click.prompt("Password", hide_input=True)
 
-    init_filesystem()
-    config.write_deployment(get_profile_path())
-    clear_client_cache()
+            token = _create_token_with_credentials(base_url, username, password)
+            if token is None:
+                return False
 
-    click.echo("Authentication successful!")
-    return True
+            _save_profile(CLIAuthConfig(api_url=base_url, token=token))
+            click.echo("Authentication successful! API token created and saved.")
+            return True
 
 
 @click.command()
@@ -157,39 +213,34 @@ def authenticate(func):
 
     return wrapper
 
-# Global cache for authenticated clients (keyed by API URL + auth type)
+# Global cache for authenticated clients
 _client_cache = {}
 
 
 async def get_computor_client(auth: CLIAuthConfig, force_new: bool = False):
-    """
-    Create and authenticate a ComputorClient instance (async).
-
-    Clients are cached per API URL and authentication credentials to avoid
-    repeated login requests that can trigger rate limiting.
-    """
+    """Create and return an authenticated ComputorClient."""
     from computor_client import ComputorClient
 
-    if auth.credentials is not None:
+    if auth.token is not None:
+        cache_key = f"{auth.api_url}:token:{auth.token[:8]}"
+    elif auth.credentials is not None:
         cache_key = f"{auth.api_url}:credentials:{auth.credentials.username}"
-    elif auth.api_token is not None:
-        cache_key = f"{auth.api_url}:token:{auth.api_token.token[:8]}"
     else:
         cache_key = auth.api_url
 
     if not force_new and cache_key in _client_cache:
         return _client_cache[cache_key]
 
-    if auth.credentials is not None:
+    if auth.token is not None:
+        client = ComputorClient(
+            base_url=auth.api_url,
+            headers={"X-API-Token": auth.token},
+        )
+    elif auth.credentials is not None:
         client = ComputorClient(base_url=auth.api_url)
         await client.login(
             username=auth.credentials.username,
             password=auth.credentials.password,
-        )
-    elif auth.api_token is not None:
-        client = ComputorClient(
-            base_url=auth.api_url,
-            headers={"X-API-Token": auth.api_token.token},
         )
     else:
         raise NotImplementedError("No authentication method configured")
@@ -199,6 +250,6 @@ async def get_computor_client(auth: CLIAuthConfig, force_new: bool = False):
 
 
 def clear_client_cache():
-    """Clear the cached clients. Useful when authentication credentials change."""
+    """Clear the cached clients."""
     global _client_cache
     _client_cache = {}

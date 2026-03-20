@@ -8,11 +8,7 @@ class CredentialsAuth(BaseModel):
     password: str
 
 
-class ApiTokenAuth(BaseModel):
-    token: str
-
-
 class CLIAuthConfig(BaseDeployment):
     api_url: str
     credentials: Optional[CredentialsAuth] = None
-    api_token: Optional[ApiTokenAuth] = None
+    token: Optional[str] = None
