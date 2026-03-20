@@ -32,11 +32,11 @@ def grading():
     pass
 
 
-@grading.command("list")
+@grading.command("course")
 @click.option("--course-id", "-c", help="Course ID (prompts for selection if omitted)")
 @authenticate
-def list_gradings(course_id, auth: CLIAuthConfig):
-    """List grading statistics for all members in a course."""
+def grading_course(course_id, auth: CLIAuthConfig):
+    """Show grading statistics for all members in a course."""
     client = run_async(get_computor_client(auth))
 
     if course_id is None:
@@ -54,11 +54,11 @@ def list_gradings(course_id, auth: CLIAuthConfig):
         click.echo(entry.model_dump_json(indent=4))
 
 
-@grading.command("get")
+@grading.command("member")
 @click.argument("course_member_id")
 @authenticate
-def get_grading(course_member_id, auth: CLIAuthConfig):
-    """Get detailed grading statistics for a specific course member."""
+def grading_member(course_member_id, auth: CLIAuthConfig):
+    """Show detailed grading statistics for a specific course member."""
     client = run_async(get_computor_client(auth))
 
     grading = run_async(client.course_member_gradings.get(course_member_id))
