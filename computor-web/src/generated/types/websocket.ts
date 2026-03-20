@@ -99,6 +99,41 @@ export interface WSChannelError {
 }
 
 /**
+ * New message created in a channel.
+ */
+export interface WSMessageNew {
+  type?: "message:new";
+  /** Channel the message was posted to */
+  channel: string;
+  /** Message data (MessageGet serialized) */
+  data: any;
+}
+
+/**
+ * Message was updated.
+ */
+export interface WSMessageUpdate {
+  type?: "message:update";
+  /** Channel the message belongs to */
+  channel: string;
+  /** ID of the updated message */
+  message_id: string;
+  /** Updated message data (MessageGet serialized) */
+  data: any;
+}
+
+/**
+ * Message was deleted.
+ */
+export interface WSMessageDelete {
+  type?: "message:delete";
+  /** Channel the message belonged to */
+  channel: string;
+  /** ID of the deleted message */
+  message_id: string;
+}
+
+/**
  * Typing status update for a user in a channel.
  */
 export interface WSTypingUpdate {
@@ -205,4 +240,94 @@ export interface WSMaintenanceReminder {
   scheduled_at: string;
   /** Maintenance message for users */
   message: string;
+}
+
+/**
+ * Deployment status transition (e.g., pending -> deploying -> deployed/failed).
+ */
+export interface WSDeploymentStatusChanged {
+  type?: "deployment:status_changed";
+  /** Channel (course:{course_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** ID of the course content */
+  course_content_id: string;
+  /** ID of the deployment */
+  deployment_id: string;
+  /** Status before the change */
+  previous_status: string;
+  /** Status after the change */
+  new_status: string;
+  /** Semantic version tag */
+  version_tag?: string | null;
+  /** Example identifier path */
+  example_identifier?: string | null;
+  /** Error or status message */
+  deployment_message?: string | null;
+  /** ISO8601 timestamp of deployment completion */
+  deployed_at?: string | null;
+  /** Temporal workflow ID */
+  workflow_id?: string | null;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}
+
+/**
+ * Example was assigned to course content by lecturer.
+ */
+export interface WSDeploymentAssigned {
+  type?: "deployment:assigned";
+  /** Channel (course:{course_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** ID of the course content */
+  course_content_id: string;
+  /** ID of the deployment */
+  deployment_id: string;
+  /** Example identifier path */
+  example_identifier?: string | null;
+  /** Semantic version tag */
+  version_tag: string;
+  /** Current deployment status */
+  deployment_status: string;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}
+
+/**
+ * Example was unassigned from course content by lecturer.
+ */
+export interface WSDeploymentUnassigned {
+  type?: "deployment:unassigned";
+  /** Channel (course:{course_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** ID of the course content */
+  course_content_id: string;
+  /** Previously assigned example identifier */
+  previous_example_identifier?: string | null;
+  /** Previously assigned version tag */
+  previous_version_tag?: string | null;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}
+
+/**
+ * Course content was created, updated, or deleted.
+ */
+export interface WSCourseContentUpdated {
+  type?: "course:content_updated";
+  /** Channel (course:{course_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** ID of the course content */
+  course_content_id: string;
+  /** Type of change: created, updated, deleted, reordered */
+  change_type: string;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
 }

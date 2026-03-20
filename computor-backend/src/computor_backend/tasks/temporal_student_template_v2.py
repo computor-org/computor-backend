@@ -338,15 +338,17 @@ async def generate_student_template_activity_v2(
             ).all()
         
         # Update all to 'deploying' and add history
+        # Capture previous statuses for broadcast
+        deploying_events = []
         for deployment in deployments_to_process:
-            # Track if this is a redeploy
-            was_deployed = deployment.deployment_status == "deployed"
-            
+            # Track previous status for broadcast
+            previous_status = deployment.deployment_status
+
             deployment.deployment_status = "deploying"
             deployment.last_attempt_at = datetime.now(timezone.utc)
             if workflow_id:
                 deployment.workflow_id = workflow_id
-            
+
             history = DeploymentHistory(
                 deployment_id=deployment.id,
                 action="deploying",
@@ -354,9 +356,31 @@ async def generate_student_template_activity_v2(
                 workflow_id=workflow_id,
             )
             db.add(history)
-        
+
+            deploying_events.append({
+                "deployment_id": str(deployment.id),
+                "course_content_id": str(deployment.course_content_id),
+                "previous_status": previous_status,
+                "version_tag": deployment.version_tag,
+                "example_identifier": str(deployment.example_identifier) if deployment.example_identifier else None,
+            })
+
         db.commit()
-        
+
+        # Broadcast deployment status changes after successful commit
+        from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+        for evt in deploying_events:
+            publish_deployment_status_changed(
+                course_id=str(course_id),
+                course_content_id=evt["course_content_id"],
+                deployment_id=evt["deployment_id"],
+                previous_status=evt["previous_status"],
+                new_status="deploying",
+                version_tag=evt["version_tag"],
+                example_identifier=evt["example_identifier"],
+                workflow_id=workflow_id,
+            )
+
         logger.info(f"Updated {len(deployments_to_process)} deployments to 'deploying' status")
         
         # Transform localhost URLs for Docker environments
@@ -861,6 +885,9 @@ async def generate_student_template_activity_v2(
             
             # Now update deployment statuses based on git push result
             # Only update deployments that were marked as "deploying" at the start
+            # Collect status changes for broadcast after commit
+            final_status_events = []
+
             if git_push_successful and processed_count > 0:
                 # Get the final commit SHA from student-template repository
                 try:
@@ -899,13 +926,22 @@ async def generate_student_template_activity_v2(
                             workflow_id=workflow_id,
                         )
                         db.add(history)
+
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "deployed",
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                            "deployed_at": content.deployment.deployed_at.isoformat() if content.deployment.deployed_at else None,
+                        })
             else:
                 # Git push failed - mark only the ones we're processing as failed
                 for content in course_contents:
                     if content.deployment and content.deployment.deployment_status == "deploying":
                         content.deployment.deployment_status = "failed"
                         content.deployment.deployment_message = "Git push failed"
-                        
+
                         # Add failure history entry
                         history = DeploymentHistory(
                             deployment_id=content.deployment.id,
@@ -914,10 +950,54 @@ async def generate_student_template_activity_v2(
                             workflow_id=workflow_id,
                         )
                         db.add(history)
-            
+
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "failed",
+                            "deployment_message": "Git push failed",
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                        })
+
+            # Also collect any content that was marked as failed during processing
+            # (directory resolution, file download, processing exceptions)
+            for content in course_contents:
+                if content.deployment and content.deployment.deployment_status == "failed":
+                    # Check if already in final_status_events to avoid duplicates
+                    already_tracked = any(
+                        e["deployment_id"] == str(content.deployment.id)
+                        for e in final_status_events
+                    )
+                    if not already_tracked:
+                        final_status_events.append({
+                            "course_content_id": str(content.id),
+                            "deployment_id": str(content.deployment.id),
+                            "new_status": "failed",
+                            "deployment_message": content.deployment.deployment_message,
+                            "version_tag": content.deployment.version_tag,
+                            "example_identifier": str(content.deployment.example_identifier) if content.deployment.example_identifier else None,
+                        })
+
             # Now commit database changes
             db.commit()
-            
+
+            # Broadcast all status changes after successful commit
+            from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+            for evt in final_status_events:
+                publish_deployment_status_changed(
+                    course_id=str(course_id),
+                    course_content_id=evt["course_content_id"],
+                    deployment_id=evt["deployment_id"],
+                    previous_status="deploying",
+                    new_status=evt["new_status"],
+                    version_tag=evt.get("version_tag"),
+                    example_identifier=evt.get("example_identifier"),
+                    deployment_message=evt.get("deployment_message"),
+                    deployed_at=evt.get("deployed_at"),
+                    workflow_id=workflow_id,
+                )
+
             # Do not generate assignments repository automatically; managed manually by lecturers
             assignments_result = None
             
@@ -953,11 +1033,11 @@ async def generate_student_template_activity_v2(
                     CourseContentDeployment.deployment_status == "deploying"
                 )
             ).all()
-            
+
             for deployment in failed_deployments:
                 deployment.deployment_status = "failed"
                 deployment.deployment_message = str(e)[:500]
-                
+
                 # Add failure history
                 history = DeploymentHistory(
                     deployment_id=deployment.id,
@@ -966,8 +1046,23 @@ async def generate_student_template_activity_v2(
                     workflow_id=workflow_id,
                 )
                 db.add(history)
-            
+
             db.commit()
+
+            # Broadcast failure events after successful commit
+            from computor_backend.websocket.event_publisher import publish_deployment_status_changed
+            for deployment in failed_deployments:
+                publish_deployment_status_changed(
+                    course_id=str(course_id),
+                    course_content_id=str(deployment.course_content_id),
+                    deployment_id=str(deployment.id),
+                    previous_status="deploying",
+                    new_status="failed",
+                    deployment_message=str(e)[:500],
+                    version_tag=deployment.version_tag,
+                    example_identifier=str(deployment.example_identifier) if deployment.example_identifier else None,
+                    workflow_id=workflow_id,
+                )
         except Exception as db_error:
             logger.error(f"Failed to update deployment statuses: {db_error}")
         

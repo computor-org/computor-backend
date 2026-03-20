@@ -539,6 +539,7 @@ def unassign_example_from_content(
     # Store info for response
     previous_example_id = deployment.example_version_id
     previous_version_tag = deployment.version_tag
+    previous_example_identifier = str(deployment.example_identifier) if deployment.example_identifier else None
 
     # Create history entry before marking as unassigned
     history = DeploymentHistory(
@@ -563,8 +564,10 @@ def unassign_example_from_content(
 
     return {
         'course_content_id': str(course_content_id),
+        'course_id': str(course_content.course_id),
         'previous_example_id': str(previous_example_id) if previous_example_id else None,
         'previous_version_tag': previous_version_tag,
+        'previous_example_identifier': previous_example_identifier,
         'message': 'Example successfully unassigned from course content'
     }
 

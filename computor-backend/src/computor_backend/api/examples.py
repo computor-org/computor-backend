@@ -243,6 +243,37 @@ def _encode_for_response(filename: str, data: bytes, content_type: Optional[str]
     ctype = content_type or _guess_content_type(filename, True)
     return f"data:{ctype};base64,{b64}"
 
+def _invalidate_lecturer_caches_for_example(example: Example, db: Session) -> None:
+    """
+    Invalidate lecturer view caches for all courses that deploy this example.
+
+    When a new example version is uploaded, courses deploying that example
+    need their cached has_newer_version recomputed. This finds all affected
+    course IDs and invalidates their lecturer view caches.
+    """
+    from ..model.deployment import CourseContentDeployment
+    from ..model.course import CourseContent
+
+    try:
+        cache = get_cache()
+        # Find all course_ids with active deployments of this example
+        course_ids = db.query(CourseContent.course_id).join(
+            CourseContentDeployment,
+            CourseContentDeployment.course_content_id == CourseContent.id
+        ).filter(
+            CourseContentDeployment.example_identifier == example.identifier,
+            CourseContentDeployment.deployment_status != 'unassigned',
+        ).distinct().all()
+
+        for (course_id,) in course_ids:
+            cid = str(course_id)
+            cache.invalidate_user_views(entity_type="course_id", entity_id=cid)
+            cache.invalidate_tags(f"lecturer_view:{cid}")
+            logger.info(f"Invalidated lecturer cache for course {cid} after example version change")
+    except Exception as e:
+        logger.warning(f"Failed to invalidate lecturer caches for example {example.id}: {e}")
+
+
 # ==============================================================================
 # Example Endpoints
 # ==============================================================================
@@ -312,8 +343,11 @@ async def create_version(
         created_by=permissions.user_id,
     )
 
-    # Create via repository (cache invalidation automatic)
+    # Create via repository (cache invalidation automatic for example version caches)
     db_version = version_repo.create(db_version)
+
+    # Invalidate lecturer view caches for courses deploying this example
+    _invalidate_lecturer_caches_for_example(example, db)
 
     return db_version
 
@@ -718,7 +752,10 @@ async def upload_example(
         repository_id=repository.id
     )
 
-    # Cache invalidation is automatic via repository
+    # Cache invalidation is automatic via repository for example version caches.
+    # Additionally, invalidate lecturer view caches for all courses that have
+    # deployments using this example, so has_newer_version gets recomputed.
+    _invalidate_lecturer_caches_for_example(example, db)
 
     return version
 

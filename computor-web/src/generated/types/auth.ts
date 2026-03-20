@@ -251,8 +251,8 @@ export interface ApiTokenCreate {
   name: string;
   /** Token description/purpose */
   description?: string | null;
-  /** User ID that owns this token */
-  user_id: string;
+  /** User ID that owns this token (defaults to the authenticated user) */
+  user_id?: string | null;
   /** Token scopes (e.g., ['read:courses', 'write:results']) */
   scopes?: string[];
   /** Token expiration date (null = never expires) */

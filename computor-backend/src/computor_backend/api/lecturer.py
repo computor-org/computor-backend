@@ -51,6 +51,7 @@ from computor_backend.business_logic.lecturer_deployment import (
 from computor_backend.business_logic.lecturer_gitlab_sync import (
     sync_course_member_gitlab_permissions,
 )
+from computor_backend.websocket.broadcast import ws_broadcast
 
 lecturer_router = APIRouter()
 
@@ -99,11 +100,12 @@ def lecturer_list_course_contents_endpoint(
     "/course-contents/{course_content_id}/assign-example",
     response_model=AssignExampleResponse
 )
-def assign_example_to_course_content(
+async def assign_example_to_course_content(
     course_content_id: UUID | str,
     request: AssignExampleRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """
     Assign an example to a course content (assignment).
@@ -138,6 +140,22 @@ def assign_example_to_course_content(
         version_tag=request.version_tag,
         permissions=permissions,
         db=db
+    )
+
+    # Invalidate cached lecturer views for this course
+    course_content = deployment.course_content
+    course_id = str(course_content.course_id)
+    cache.invalidate_user_views(entity_type="course_id", entity_id=course_id)
+    cache.invalidate_tags(f"lecturer_view:{course_id}")
+
+    # Broadcast deployment assignment event
+    await ws_broadcast.deployment_assigned(
+        course_id=course_id,
+        course_content_id=str(deployment.course_content_id),
+        deployment_id=str(deployment.id),
+        version_tag=deployment.version_tag,
+        deployment_status=deployment.deployment_status,
+        example_identifier=str(deployment.example_identifier) if deployment.example_identifier else None,
     )
 
     # Get the actual example_id for the response (might have been resolved from identifier)
@@ -237,10 +255,11 @@ def get_course_content_deployment(
     "/course-contents/{course_content_id}/deployment",
     response_model=UnassignExampleResponse
 )
-def unassign_example_from_course_content(
+async def unassign_example_from_course_content(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """
     Unassign an example from a course content (assignment).
@@ -265,6 +284,18 @@ def unassign_example_from_course_content(
         course_content_id=course_content_id,
         permissions=permissions,
         db=db
+    )
+
+    # Invalidate cached lecturer views for this course
+    cache.invalidate_user_views(entity_type="course_id", entity_id=result['course_id'])
+    cache.invalidate_tags(f"lecturer_view:{result['course_id']}")
+
+    # Broadcast deployment unassignment event
+    await ws_broadcast.deployment_unassigned(
+        course_id=result['course_id'],
+        course_content_id=result['course_content_id'],
+        previous_example_identifier=result.get('previous_example_identifier'),
+        previous_version_tag=result.get('previous_version_tag'),
     )
 
     return UnassignExampleResponse(**result)
@@ -304,11 +335,12 @@ def get_course_deployments_endpoint(
     "/courses/{course_id}/upgrade-versions",
     response_model=VersionUpgradeGet
 )
-def batch_upgrade_versions_endpoint(
+async def batch_upgrade_versions_endpoint(
     course_id: UUID | str,
     request: VersionUpgradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """
     Batch-upgrade multiple course contents to their latest example versions.
@@ -320,12 +352,30 @@ def batch_upgrade_versions_endpoint(
     Returns:
         VersionUpgradeGet with per-item results and summary counts
     """
-    return VersionUpgradeGet(**batch_upgrade_versions(
+    result = batch_upgrade_versions(
         course_id=course_id,
         course_content_ids=request.course_content_ids,
         permissions=permissions,
         db=db
-    ))
+    )
+
+    # Invalidate cached lecturer views for this course
+    cache.invalidate_user_views(entity_type="course_id", entity_id=str(course_id))
+    cache.invalidate_tags(f"lecturer_view:{str(course_id)}")
+
+    # Broadcast status change for each upgraded item
+    for item in result.get('results', []):
+        if item.get('success') and item.get('from_tag') != item.get('to_tag'):
+            await ws_broadcast.deployment_status_changed(
+                course_id=str(course_id),
+                course_content_id=item['course_content_id'],
+                deployment_id="",  # Not available in batch result
+                previous_status="pending",
+                new_status="pending",
+                version_tag=item.get('to_tag'),
+            )
+
+    return VersionUpgradeGet(**result)
 
 
 @lecturer_router.post(

@@ -2747,6 +2747,7 @@ export interface CourseContentDeploymentList {
   assigned_at: string;
   deployed_at: string | null;
   version_identifier: string | null;
+  has_newer_version?: boolean;
   example_version?: ExampleVersionList | null;
 }
 
