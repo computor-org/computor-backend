@@ -154,6 +154,7 @@ def get_entity(table, id, auth: CLIAuthConfig):
 
 @click.group()
 def rest():
+    """List, get, and query API entities."""
     pass
 
 rest.add_command(list_entities,"list")
