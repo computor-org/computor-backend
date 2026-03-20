@@ -1,8 +1,18 @@
 from typing import Optional
+from pydantic import BaseModel
 from computor_types.deployments_refactored import BaseDeployment
-from computor_types.auth import BasicAuthConfig, GLPAuthConfig
+
+
+class CredentialsAuth(BaseModel):
+    username: str
+    password: str
+
+
+class ApiTokenAuth(BaseModel):
+    token: str
+
 
 class CLIAuthConfig(BaseDeployment):
     api_url: str
-    gitlab: Optional[GLPAuthConfig] = None
-    basic: Optional[BasicAuthConfig] = None
+    credentials: Optional[CredentialsAuth] = None
+    api_token: Optional[ApiTokenAuth] = None

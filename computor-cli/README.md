@@ -27,11 +27,11 @@ pip install -e computor-cli/
 ### Login
 
 ```bash
-# Basic authentication
-computor login --auth-method basic --base-url http://localhost:8000
+# Username/password (bearer token flow)
+computor login --auth-method credentials --base-url http://localhost:8000
 
-# GitLab SSO
-computor login --auth-method gitlab --base-url http://localhost:8000
+# API token
+computor login --auth-method token --base-url http://localhost:8000
 ```
 
 ### CRUD Operations
@@ -160,18 +160,17 @@ The CLI stores the active profile in `~/.computor/active_profile.yaml`.
 
 ```yaml
 api_url: http://localhost:8000
-basic:
+credentials:
   username: admin
   password: secret
 ```
 
-Or for GitLab auth:
+Or with an API token:
 
 ```yaml
 api_url: http://localhost:8000
-gitlab:
-  url: https://gitlab.com
-  token: glpat-xxxxxxxxxxxx
+api_token:
+  token: ctp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Development
