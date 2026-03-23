@@ -2,6 +2,7 @@
 Pydantic DTOs for cascade deletion operations.
 
 These models define request/response types for bulk deletion of:
+- Users (and all related data)
 - Organizations (and all descendant data)
 - Course Families (and all descendant courses)
 - Courses (and all course-specific data)
@@ -22,6 +23,16 @@ class ForceLevel(str, Enum):
 
 class EntityDeleteCount(BaseModel):
     """Count of deleted entities by type."""
+    # User-specific counts
+    users: int = 0
+    accounts: int = 0
+    profiles: int = 0
+    sessions: int = 0
+    user_roles: int = 0
+    user_groups: int = 0
+    api_tokens: int = 0
+    message_reads: int = 0
+    # Course/org counts
     courses: int = 0
     course_families: int = 0
     course_members: int = 0

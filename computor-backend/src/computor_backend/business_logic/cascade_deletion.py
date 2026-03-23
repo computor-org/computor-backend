@@ -1,5 +1,5 @@
 """
-Business logic for cascade deletion of organizations, course families, courses, and examples.
+Business logic for cascade deletion of users, organizations, course families, courses, and examples.
 
 This module provides functions to delete entities and all their descendants,
 including proper handling of RESTRICT constraints and MinIO storage cleanup.
@@ -25,6 +25,13 @@ from computor_types.cascade_deletion import (
     ForceLevel,
 )
 from ..model import (
+    User,
+    Account,
+    Profile,
+    StudentProfile,
+    Session as SessionModel,
+    UserRole,
+    UserGroup,
     Organization,
     CourseFamily,
     Course,
@@ -37,13 +44,15 @@ from ..model import (
     CourseMemberComment,
     Result,
     Message,
-    StudentProfile,
+    MessageRead,
     ExampleRepository,
     Example,
     ExampleVersion,
     ExampleDependency,
     CourseContentDeployment,
     DeploymentHistory,
+    Service,
+    ApiToken,
 )
 from ..model.artifact import (
     SubmissionArtifact,
@@ -1011,5 +1020,291 @@ async def delete_examples_by_pattern(
         storage_objects_deleted=storage_deleted,
         deployment_references_orphaned=total_deployment_refs,
         examples=previews,
+        errors=errors
+    )
+
+
+# =============================================================================
+# User Cascade Deletion
+# =============================================================================
+
+
+def count_user_entities(db: Session, user_id: str) -> EntityDeleteCount:
+    """
+    Count all entities that would be deleted for a user.
+
+    Args:
+        db: Database session
+        user_id: The user ID
+
+    Returns:
+        EntityDeleteCount with counts of each entity type
+    """
+    counts = EntityDeleteCount()
+
+    # Count direct user relations (handled by CASCADE)
+    counts.accounts = db.query(Account).filter(Account.user_id == user_id).count()
+    counts.profiles = db.query(Profile).filter(Profile.user_id == user_id).count()
+    counts.student_profiles = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).count()
+    counts.sessions = db.query(SessionModel).filter(SessionModel.user_id == user_id).count()
+    counts.user_roles = db.query(UserRole).filter(UserRole.user_id == user_id).count()
+    counts.user_groups = db.query(UserGroup).filter(UserGroup.user_id == user_id).count()
+    counts.api_tokens = db.query(ApiToken).filter(ApiToken.user_id == user_id).count()
+
+    # Count course members and their RESTRICT children
+    course_member_ids = [
+        str(m.id) for m in
+        db.query(CourseMember.id).filter(CourseMember.user_id == user_id).all()
+    ]
+    counts.course_members = len(course_member_ids)
+
+    if course_member_ids:
+        # SubmissionGrade where this user's CourseMember graded
+        counts.submission_grades = db.query(SubmissionGrade).filter(
+            SubmissionGrade.graded_by_course_member_id.in_(course_member_ids)
+        ).count()
+
+        # SubmissionReview where this user's CourseMember reviewed
+        counts.submission_reviews = db.query(SubmissionReview).filter(
+            SubmissionReview.reviewer_course_member_id.in_(course_member_ids)
+        ).count()
+
+        # Results owned by this user's CourseMember
+        result_ids = [
+            str(r.id) for r in
+            db.query(Result.id).filter(Result.course_member_id.in_(course_member_ids)).all()
+        ]
+        counts.results = len(result_ids)
+
+        if result_ids:
+            counts.result_artifacts = db.query(ResultArtifact).filter(
+                ResultArtifact.result_id.in_(result_ids)
+            ).count()
+
+        # SubmissionGroupMember for this user's CourseMember
+        counts.submission_group_members = db.query(SubmissionGroupMember).filter(
+            SubmissionGroupMember.course_member_id.in_(course_member_ids)
+        ).count()
+
+        # CourseMemberComment where user is transmitter or receiver
+        counts.course_member_comments = db.query(CourseMemberComment).filter(
+            or_(
+                CourseMemberComment.transmitter_id.in_(course_member_ids),
+                CourseMemberComment.course_member_id.in_(course_member_ids)
+            )
+        ).count()
+
+    # Count messages authored by or targeted to this user
+    counts.messages = db.query(Message).filter(
+        or_(
+            Message.author_id == user_id,
+            Message.user_id == user_id
+        )
+    ).count()
+
+    # Count message reads by this user
+    counts.message_reads = db.query(MessageRead).filter(
+        MessageRead.reader_user_id == user_id
+    ).count()
+
+    return counts
+
+
+async def delete_user_cascade(
+    db: Session,
+    user_id: str,
+    storage: StorageService | None = None,
+    dry_run: bool = False
+) -> CascadeDeleteResult:
+    """
+    Delete a user and all their related data.
+
+    Deletion order (bottom-up to handle RESTRICT constraints):
+
+    Phase 1: Clear CourseMember RESTRICT children
+      1. SubmissionGrade (RESTRICT on graded_by_course_member_id)
+      2. SubmissionReview (RESTRICT on reviewer_course_member_id)
+      3. ResultArtifact (for MinIO cleanup + counting)
+      4. Result (RESTRICT on course_member_id)
+      5. SubmissionGroupMember (RESTRICT on course_member_id)
+      6. CourseMemberComment (transmitter/receiver)
+
+    Phase 2: Delete Messages
+      7. MessageRead where user is reader
+      8. Message where user is author or target
+
+    Phase 3: Delete User (CASCADE handles the rest)
+      9. User deletion triggers CASCADE for:
+         Account, Profile, StudentProfile, Session,
+         UserRole, UserGroup, CourseMember (now safe), ApiToken
+
+    BLOCKED if user has a Service account (RESTRICT constraint).
+    Audit columns (created_by/updated_by) are SET NULL by the database.
+
+    Args:
+        db: Database session
+        user_id: The user ID to delete
+        storage: Optional storage service for MinIO cleanup
+        dry_run: If True, only return counts without deleting
+
+    Returns:
+        CascadeDeleteResult with deletion counts
+    """
+    if storage is None:
+        storage = get_storage_service()
+
+    # Verify user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return CascadeDeleteResult(
+            dry_run=dry_run,
+            entity_type="user",
+            entity_id=str(user_id),
+            deleted_counts=EntityDeleteCount(),
+            errors=[f"User not found: {user_id}"]
+        )
+
+    # Check RESTRICT: Service account blocks deletion
+    service = db.query(Service).filter(Service.user_id == user_id).first()
+    if service:
+        return CascadeDeleteResult(
+            dry_run=dry_run,
+            entity_type="user",
+            entity_id=str(user_id),
+            deleted_counts=EntityDeleteCount(),
+            errors=[
+                f"Cannot delete user: has service account '{service.slug}' (id: {service.id}). "
+                f"Delete the service account first."
+            ]
+        )
+
+    # Count entities
+    counts = count_user_entities(db, user_id)
+
+    if dry_run:
+        return CascadeDeleteResult(
+            dry_run=True,
+            entity_type="user",
+            entity_id=str(user_id),
+            deleted_counts=counts,
+            minio_objects_deleted=0,
+            errors=[]
+        )
+
+    # Collect IDs for MinIO cleanup before deletion
+    course_member_ids = [
+        str(m.id) for m in
+        db.query(CourseMember.id).filter(CourseMember.user_id == user_id).all()
+    ]
+
+    # Collect submission group IDs where user is a member (for artifact cleanup)
+    submission_group_ids = []
+    if course_member_ids:
+        sgm_rows = db.query(SubmissionGroupMember.submission_group_id).filter(
+            SubmissionGroupMember.course_member_id.in_(course_member_ids)
+        ).all()
+        submission_group_ids = [str(r.submission_group_id) for r in sgm_rows]
+
+    artifact_storage_info = collect_artifact_storage_info(db, submission_group_ids)
+
+    # Collect result IDs for MinIO cleanup
+    result_ids = []
+    if course_member_ids:
+        result_rows = db.query(Result.id).filter(
+            Result.course_member_id.in_(course_member_ids)
+        ).all()
+        result_ids = [str(r.id) for r in result_rows]
+
+    errors = []
+    minio_deleted = 0
+
+    try:
+        # Phase 1: Clear CourseMember RESTRICT children
+        if course_member_ids:
+            # 1. SubmissionGrade (RESTRICT on graded_by_course_member_id)
+            db.query(SubmissionGrade).filter(
+                SubmissionGrade.graded_by_course_member_id.in_(course_member_ids)
+            ).delete(synchronize_session=False)
+
+            # 2. SubmissionReview (RESTRICT on reviewer_course_member_id)
+            db.query(SubmissionReview).filter(
+                SubmissionReview.reviewer_course_member_id.in_(course_member_ids)
+            ).delete(synchronize_session=False)
+
+            # 3. ResultArtifact (for cleanup)
+            if result_ids:
+                db.query(ResultArtifact).filter(
+                    ResultArtifact.result_id.in_(result_ids)
+                ).delete(synchronize_session=False)
+
+            # 4. Result (RESTRICT on course_member_id)
+            db.query(Result).filter(
+                Result.course_member_id.in_(course_member_ids)
+            ).delete(synchronize_session=False)
+
+            # 5. SubmissionGroupMember (RESTRICT on course_member_id)
+            db.query(SubmissionGroupMember).filter(
+                SubmissionGroupMember.course_member_id.in_(course_member_ids)
+            ).delete(synchronize_session=False)
+
+            # 6. CourseMemberComment (transmitter/receiver)
+            db.query(CourseMemberComment).filter(
+                or_(
+                    CourseMemberComment.transmitter_id.in_(course_member_ids),
+                    CourseMemberComment.course_member_id.in_(course_member_ids)
+                )
+            ).delete(synchronize_session=False)
+
+        # Phase 2: Delete Messages
+        # MessageRead where user is the reader (for messages by other users)
+        db.query(MessageRead).filter(
+            MessageRead.reader_user_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Messages where user is author or target
+        # (MessageRead CASCADE from Message handles reads on these messages)
+        db.query(Message).filter(
+            or_(
+                Message.author_id == user_id,
+                Message.user_id == user_id
+            )
+        ).delete(synchronize_session=False)
+
+        # Phase 3: Delete User
+        # CASCADE handles: Account, Profile, StudentProfile, Session,
+        #   UserRole, UserGroup, CourseMember (now safe), ApiToken
+        db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+
+        db.commit()
+        counts.users = 1
+
+        logger.info(f"Deleted user {user_id} and all related data")
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting user {user_id}: {e}")
+        errors.append(f"Database error: {str(e)}")
+        return CascadeDeleteResult(
+            dry_run=False,
+            entity_type="user",
+            entity_id=str(user_id),
+            deleted_counts=EntityDeleteCount(),
+            errors=errors
+        )
+
+    # Clean up MinIO storage (after successful DB commit)
+    try:
+        minio_deleted += await cleanup_submission_artifacts_batch(artifact_storage_info, storage)
+        minio_deleted += await cleanup_results_batch(result_ids, storage)
+    except Exception as e:
+        logger.warning(f"MinIO cleanup error for user {user_id}: {e}")
+        errors.append(f"MinIO cleanup warning: {str(e)}")
+
+    return CascadeDeleteResult(
+        dry_run=False,
+        entity_type="user",
+        entity_id=str(user_id),
+        deleted_counts=counts,
+        minio_objects_deleted=minio_deleted,
         errors=errors
     )

@@ -5,15 +5,20 @@ import logging
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
+from computor_types.cascade_deletion import CascadeDeleteResult
 from computor_types.course_member_accounts import (
     CourseMemberProviderAccountUpdate,
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
 from computor_types.users import UserGet, UserPassword
+from computor_backend.exceptions.exceptions import ForbiddenException, NotFoundException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from fastapi import APIRouter, Depends
+from computor_backend.business_logic.cascade_deletion import delete_user_cascade
+from computor_backend.services.storage_service import get_storage_service
+from computor_backend.model.auth import User as UserModel
+from fastapi import APIRouter, Depends, Query
 
 # Import business logic
 from computor_backend.business_logic.users import (
@@ -118,4 +123,39 @@ async def register_current_user_course_account(
         provider_access_token=payload.provider_access_token,
         permissions=permissions,
         db=db,
+    )
+
+
+@user_router.delete(
+    "/{user_id}",
+    response_model=CascadeDeleteResult,
+)
+async def delete_user_endpoint(
+    user_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    dry_run: bool = Query(
+        default=False,
+        description="If true, only returns preview of what would be deleted"
+    ),
+) -> CascadeDeleteResult:
+    """Delete a user and all their related data. Admin only."""
+    if not permissions.is_admin:
+        raise ForbiddenException("User deletion requires admin permissions")
+
+    # Prevent self-deletion
+    if str(user_id) == str(permissions.user_id):
+        raise ForbiddenException("Cannot delete your own account")
+
+    # Verify user exists
+    user = db.query(UserModel).filter(UserModel.id == str(user_id)).first()
+    if not user:
+        raise NotFoundException(f"User not found: {user_id}")
+
+    storage = get_storage_service()
+    return await delete_user_cascade(
+        db=db,
+        user_id=str(user_id),
+        storage=storage,
+        dry_run=dry_run,
     )

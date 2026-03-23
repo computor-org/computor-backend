@@ -44,8 +44,73 @@ def confirm_deletion(entity_type: str, entity_id: str, counts: dict, force: bool
 
 @click.group()
 def delete():
-    """Delete commands for organizations, courses, and examples."""
+    """Delete commands for users, organizations, courses, and examples."""
     pass
+
+
+@delete.command("user")
+@click.argument("user_id")
+@click.option("--dry-run", is_flag=True, default=False, help="Preview what would be deleted without actually deleting")
+@click.option("--force", "-f", is_flag=True, default=False, help="Skip confirmation prompt")
+@authenticate
+@handle_api_exceptions
+def delete_user(user_id: str, dry_run: bool, force: bool, auth: CLIAuthConfig):
+    """
+    Delete a user and ALL their related data.
+
+    This permanently removes the user and all associated data including:
+    course memberships, submissions, grades, results,
+    messages, sessions, accounts, profiles, and API tokens.
+
+    BLOCKED if user has a service account - delete the service first.
+    This is a permanent, irreversible operation.
+    """
+    client = run_async(get_computor_client(auth))
+
+    # First, do a dry-run to get preview
+    params = {"dry_run": "true"}
+    response = run_async(
+        client._http.delete(f"/user/{user_id}", params=params)
+    )
+    response.raise_for_status()
+    preview = response.json()
+
+    # Check for errors (like service account block)
+    if preview.get("errors"):
+        click.echo(f"\n{click.style('Cannot delete user:', fg='red')}")
+        for error in preview["errors"]:
+            click.echo(f"  - {error}")
+        return
+
+    if dry_run:
+        click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - Preview of deletion for user {user_id}:")
+        click.echo(f"\nEntities that would be deleted:")
+        click.echo(format_counts(preview.get("deleted_counts", {})))
+        click.echo(f"\nUse without --dry-run to perform actual deletion.")
+        return
+
+    # Show preview and ask for confirmation
+    if not confirm_deletion("user", user_id, preview.get("deleted_counts", {}), force):
+        click.echo("Aborted.")
+        return
+
+    # Perform actual deletion
+    params = {"dry_run": "false"}
+    response = run_async(
+        client._http.delete(f"/user/{user_id}", params=params)
+    )
+    response.raise_for_status()
+    result = response.json()
+
+    click.echo(f"\n{click.style('SUCCESS', fg='green', bold=True)} - Deleted user {user_id}")
+    click.echo(f"\nDeleted entities:")
+    click.echo(format_counts(result.get("deleted_counts", {})))
+    click.echo(f"\nMinIO objects deleted: {result.get('minio_objects_deleted', 0)}")
+
+    if result.get("errors"):
+        click.echo(f"\n{click.style('Warnings:', fg='yellow')}")
+        for error in result["errors"]:
+            click.echo(f"  - {error}")
 
 
 @delete.command("organization")
