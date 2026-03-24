@@ -45,8 +45,8 @@ def create_message_with_author(
         ForbiddenException: If trying to write to read-only target or lacking permissions
     """
     # Enforce author_id from current user
-    if not payload.title or not payload.content:
-        raise BadRequestException(detail="Title and content are required")
+    if not payload.content:
+        raise BadRequestException(detail="Content is required")
 
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id

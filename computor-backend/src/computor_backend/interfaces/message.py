@@ -17,17 +17,19 @@ from computor_backend.model.message import Message, MessageRead
 TAG_PATTERN = re.compile(r'#(\S+)')
 
 
-def extract_tags_from_title(title: str) -> list[str]:
+def extract_tags_from_title(title: Optional[str]) -> list[str]:
     """Extract tags from title. A tag is # followed by non-whitespace.
 
     Examples: "#ai" -> ["ai"], "#ai-help #review" -> ["ai-help", "review"]
 
     Args:
-        title: Message title string
+        title: Message title string (None returns empty list)
 
     Returns:
         List of tag strings (without the # prefix)
     """
+    if not title:
+        return []
     return TAG_PATTERN.findall(title)
 
 

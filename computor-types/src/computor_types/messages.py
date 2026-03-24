@@ -53,7 +53,7 @@ class MessageCreate(BaseModel):
     # author_id is always the current user; set in API
     parent_id: Optional[str] = None
     level: int = Field(default=0)
-    title: str
+    title: Optional[str] = Field(None, description="Message title (optional, used for tags like #ai)")
     content: str
 
     # Targets (at least one should be provided, or none for global)
@@ -73,7 +73,7 @@ class MessageUpdate(BaseModel):
 
 class MessageGet(BaseEntityGet):
     id: str
-    title: str
+    title: Optional[str] = None
     content: str
     level: int
     parent_id: Optional[str] = None
@@ -124,7 +124,7 @@ class MessageGet(BaseEntityGet):
 
 class MessageList(BaseEntityList):
     id: str
-    title: str
+    title: Optional[str] = None
     content: str
     level: int
     parent_id: Optional[str] = None
