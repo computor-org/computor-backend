@@ -2,7 +2,6 @@
 from uuid import UUID
 from typing import Optional, Tuple, List, Dict, Any
 from sqlalchemy.orm import Session
-from starlette.concurrency import run_in_threadpool
 
 from computor_backend.api.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from computor_backend.permissions.principal import Principal
@@ -613,7 +612,7 @@ def mark_message_as_unread(
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
 
 
-async def list_messages_with_filters(
+def list_messages_with_filters(
     permissions: Principal,
     db: Session,
     params: MessageQuery,
@@ -645,20 +644,15 @@ async def list_messages_with_filters(
         reader_user_id=str(permissions.user_id) if permissions.user_id else None
     )
 
-    # Execute paginated query in threadpool
-    def _get_paginated_results():
-        total = query.order_by(None).count()
+    total = query.order_by(None).count()
 
-        paginated_query = query
-        if params.limit is not None:
-            paginated_query = paginated_query.limit(params.limit)
-        if params.skip is not None:
-            paginated_query = paginated_query.offset(params.skip)
+    paginated_query = query
+    if params.limit is not None:
+        paginated_query = paginated_query.limit(params.limit)
+    if params.skip is not None:
+        paginated_query = paginated_query.offset(params.skip)
 
-        results = paginated_query.all()
-        return results, total
-
-    results, total = await run_in_threadpool(_get_paginated_results)
+    results = paginated_query.all()
 
     # Convert to MessageList DTOs
     items = [MessageList.model_validate(entity, from_attributes=True) for entity in results]

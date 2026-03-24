@@ -112,7 +112,7 @@ async def list_messages(
         params.tags = tags
 
     # Use custom list function that supports user-specific filtering
-    items, total = await list_messages_with_filters(permissions, db, params)
+    items, total = list_messages_with_filters(permissions, db, params)
     items = list_messages_with_read_status(items, permissions, db)
     response.headers["X-Total-Count"] = str(total)
     return items
