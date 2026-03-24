@@ -681,8 +681,6 @@ def get_message_thread(
     Raises:
         BadRequestException: If message not found
     """
-    from sqlalchemy import text
-
     # Walk up to root
     start_message = db.query(Message).filter(
         Message.id == message_id,
