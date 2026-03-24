@@ -14,7 +14,7 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
+from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageQuery, MessageThread, MessageUpdate
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -24,6 +24,7 @@ from computor_backend.repositories import MessageRepository
 from computor_backend.business_logic.messages import (
     create_message_with_author,
     get_message_with_read_status,
+    get_message_thread,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_message_as_read,
@@ -205,6 +206,24 @@ async def mark_message_unread(
     await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_unread(id, permissions, db, cache)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@messages_router.get("/{id}/thread", response_model=MessageThread)
+async def get_message_thread_endpoint(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Get the full conversation thread for a message.
+
+    Walks up to the root message, then returns all messages in the thread
+    ordered by created_at. Useful for agents that need conversation context
+    for follow-up detection.
+    """
+    # Verify user has access to the message
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    return get_message_thread(id, permissions, db)
+
 
 @messages_router.get("/{id}/audit")
 async def get_message_audit(

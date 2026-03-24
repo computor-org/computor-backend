@@ -218,6 +218,22 @@ class MessageQuery(ListQuery):
     )
 
 
+class MessageThread(BaseModel):
+    """Full conversation thread for a message.
+
+    Returns all messages sharing the same root, ordered by created_at.
+    Used by agents to get full conversation context for follow-up detection.
+    """
+    root_message_id: str = Field(..., description="ID of the root message in the thread")
+    messages: list[MessageList] = Field(
+        default_factory=list,
+        description="All messages in the thread, ordered by created_at ascending"
+    )
+    total: int = Field(0, description="Total number of messages in the thread")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MessageInterface(EntityInterface):
     create = MessageCreate
     get = MessageGet
