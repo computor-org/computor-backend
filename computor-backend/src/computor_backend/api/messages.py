@@ -95,7 +95,7 @@ async def list_messages(
     # Explicit Query parameter for tags list - FastAPI doesn't parse List[str] from Pydantic Field
     tags: Optional[List[str]] = Query(
         None,
-        description="Filter by tags in title (e.g., tags=ai::request&tags=priority::high)"
+        description="Filter by tags in title (e.g., tags=ai&tags=review). Without # prefix."
     ),
 ):
     """List messages with read status.
@@ -103,9 +103,9 @@ async def list_messages(
     Supports filtering by:
     - unread: True = unread only, False = read only, None = all
     - created_after/created_before: Datetime boundaries
-    - tags: List of tags in format "scope::value" to filter by (in title)
+    - tags: List of tags to filter by in title (e.g., "ai", "ai-help", "review")
     - tags_match_all: True = must match ALL tags, False = match ANY tag
-    - tag_scope: Wildcard scope filter (e.g., "ai" matches any #ai::* tag)
+    - tag_scope: Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
     """
     # Merge the explicit tags parameter into params (FastAPI doesn't parse List from Pydantic Field)
     if tags is not None:

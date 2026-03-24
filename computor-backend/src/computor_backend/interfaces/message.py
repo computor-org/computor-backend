@@ -13,44 +13,52 @@ from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.message import Message, MessageRead
 
 
-# Regex pattern for tags: #scope::value (alphanumeric, hyphens, underscores)
-TAG_PATTERN = re.compile(r'#([a-zA-Z0-9_-]+)::([a-zA-Z0-9_-]+)')
+# Regex pattern for tags: #<non-whitespace> (e.g., #ai, #ai-help, #ai::request)
+TAG_PATTERN = re.compile(r'#(\S+)')
 
 
-def extract_tags_from_title(title: str) -> list[tuple[str, str]]:
-    """Extract tags from title in format #scope::value.
+def extract_tags_from_title(title: str) -> list[str]:
+    """Extract tags from title. A tag is # followed by non-whitespace.
+
+    Examples: "#ai" -> ["ai"], "#ai-help #review" -> ["ai-help", "review"]
 
     Args:
         title: Message title string
 
     Returns:
-        List of (scope, value) tuples
+        List of tag strings (without the # prefix)
     """
     return TAG_PATTERN.findall(title)
 
 
 def build_tag_filter(tag: str) -> str:
-    """Build a SQL LIKE pattern for a tag.
+    """Build a SQL LIKE pattern for an exact tag match.
+
+    The tag string is matched as-is after the # prefix.
+    E.g., tag="ai" matches "#ai" in title, tag="ai-help" matches "#ai-help".
 
     Args:
-        tag: Tag in format "scope::value"
+        tag: Tag string without # prefix (e.g., "ai", "ai-help", "ai::request")
 
     Returns:
-        Pattern for LIKE query (e.g., "%#ai::request%")
+        Pattern for LIKE query (e.g., "%#ai%")
     """
     return f"%#{tag}%"
 
 
-def build_tag_scope_filter(scope: str) -> str:
-    """Build a SQL LIKE pattern for a tag scope wildcard.
+def build_tag_prefix_filter(prefix: str) -> str:
+    """Build a SQL LIKE pattern for a tag prefix match.
+
+    Matches any tag that starts with the given prefix.
+    E.g., prefix="ai" matches "#ai", "#ai-help", "#ai-response", "#ai::anything".
 
     Args:
-        scope: Tag scope (e.g., "ai" to match any #ai::* tag)
+        prefix: Tag prefix without # (e.g., "ai" to match any #ai* tag)
 
     Returns:
-        Pattern for LIKE query (e.g., "%#ai::%")
+        Pattern for LIKE query (e.g., "%#ai%")
     """
-    return f"%#{scope}::%"
+    return f"%#{prefix}%"
 
 
 class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
@@ -161,8 +169,8 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
                 # OR logic: match ANY tag
                 query = query.filter(or_(*tag_conditions))
 
-        # Tag scope wildcard filter
+        # Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response, etc.)
         if params.tag_scope is not None:
-            query = query.filter(Message.title.ilike(build_tag_scope_filter(params.tag_scope)))
+            query = query.filter(Message.title.ilike(build_tag_prefix_filter(params.tag_scope)))
 
         return query

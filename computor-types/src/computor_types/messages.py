@@ -206,15 +206,15 @@ class MessageQuery(ListQuery):
         None, description="Filter by read status: True = unread only, False = read only, None = all"
     )
 
-    # Tag filtering (tags in title with format #scope::value)
+    # Tag filtering (tags in title: #<tag> where tag is any non-whitespace string)
     tags: Optional[List[str]] = Field(
-        None, description="Filter by tags in title (e.g., ['ai::request', 'priority::high'])"
+        None, description="Filter by tags in title (e.g., ['ai', 'ai-help', 'review']). Without # prefix."
     )
     tags_match_all: Optional[bool] = Field(
         True, description="True = must match ALL tags (AND), False = match ANY tag (OR)"
     )
     tag_scope: Optional[str] = Field(
-        None, description="Filter by tag scope prefix (e.g., 'ai' matches any #ai::* tag)"
+        None, description="Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.)"
     )
 
 
