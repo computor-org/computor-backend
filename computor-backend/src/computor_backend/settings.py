@@ -27,7 +27,7 @@ class BackendSettings:
         self.WS_TYPING_TTL = int(os.environ.get("WS_TYPING_TTL", "5"))  # seconds
         self.WS_HANDLER_TIMEOUT = int(os.environ.get("WS_HANDLER_TIMEOUT", "5"))  # seconds per handler
         self.WS_PING_INTERVAL = int(os.environ.get("WS_PING_INTERVAL", "25"))  # client-side ping interval
-        self.WS_SEND_TIMEOUT = int(os.environ.get("WS_SEND_TIMEOUT", "2"))  # seconds for send operations
+        self.WS_SEND_TIMEOUT = int(os.environ.get("WS_SEND_TIMEOUT", "10"))  # seconds for send operations
 
     def __new__(cls):
         if cls._instance is None:

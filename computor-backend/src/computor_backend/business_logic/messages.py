@@ -2,7 +2,6 @@
 from uuid import UUID
 from typing import Optional, Tuple, List, Dict, Any
 from sqlalchemy.orm import Session
-from starlette.concurrency import run_in_threadpool
 
 from computor_backend.api.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from computor_backend.permissions.principal import Principal
@@ -12,7 +11,7 @@ from computor_backend.model.course import CourseMember, SubmissionGroup, Submiss
 from computor_backend.model.auth import User
 from computor_types.messages import (
     MessageCreate, MessageGet, MessageList, MessageQuery,
-    MessageAuthor, MessageAuthorCourseMember
+    MessageAuthor, MessageAuthorCourseMember, MessageThread
 )
 from computor_backend.cache import Cache
 
@@ -46,8 +45,8 @@ def create_message_with_author(
         ForbiddenException: If trying to write to read-only target or lacking permissions
     """
     # Enforce author_id from current user
-    if not payload.title or not payload.content:
-        raise BadRequestException(detail="Title and content are required")
+    if not payload.content:
+        raise BadRequestException(detail="Content is required")
 
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
@@ -613,7 +612,7 @@ def mark_message_as_unread(
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
 
 
-async def list_messages_with_filters(
+def list_messages_with_filters(
     permissions: Principal,
     db: Session,
     params: MessageQuery,
@@ -645,22 +644,89 @@ async def list_messages_with_filters(
         reader_user_id=str(permissions.user_id) if permissions.user_id else None
     )
 
-    # Execute paginated query in threadpool
-    def _get_paginated_results():
-        total = query.order_by(None).count()
+    total = query.order_by(None).count()
 
-        paginated_query = query
-        if params.limit is not None:
-            paginated_query = paginated_query.limit(params.limit)
-        if params.skip is not None:
-            paginated_query = paginated_query.offset(params.skip)
+    paginated_query = query
+    if params.limit is not None:
+        paginated_query = paginated_query.limit(params.limit)
+    if params.skip is not None:
+        paginated_query = paginated_query.offset(params.skip)
 
-        results = paginated_query.all()
-        return results, total
-
-    results, total = await run_in_threadpool(_get_paginated_results)
+    results = paginated_query.all()
 
     # Convert to MessageList DTOs
     items = [MessageList.model_validate(entity, from_attributes=True) for entity in results]
 
     return items, total
+
+
+def get_message_thread(
+    message_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> MessageThread:
+    """Get the full conversation thread for a message.
+
+    Walks up the parent chain to find the root message, then fetches
+    all descendants of that root. Returns all messages ordered by created_at.
+
+    Args:
+        message_id: Any message ID in the thread
+        permissions: Current user permissions
+        db: Database session
+
+    Returns:
+        MessageThread with root_message_id and all messages in order
+
+    Raises:
+        BadRequestException: If message not found
+    """
+    # Walk up to root
+    start_message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.archived_at.is_(None),
+    ).first()
+
+    if not start_message:
+        raise BadRequestException(detail=f"Message {message_id} not found")
+
+    # Walk up the parent chain to find the root
+    root = start_message
+    while root.parent_id is not None:
+        parent = db.query(Message).filter(Message.id == root.parent_id).first()
+        if parent is None:
+            break
+        root = parent
+
+    root_id = str(root.id)
+
+    # Use recursive CTE to get all descendants of the root
+    # This is efficient and handles arbitrary nesting depth
+    cte = (
+        db.query(Message.id)
+        .filter(Message.id == root_id)
+        .cte(name="thread", recursive=True)
+    )
+    cte = cte.union_all(
+        db.query(Message.id)
+        .filter(Message.parent_id == cte.c.id)
+    )
+
+    # Fetch all thread messages, ordered chronologically
+    thread_messages = (
+        db.query(Message)
+        .filter(Message.id.in_(db.query(cte.c.id)))
+        .filter(Message.archived_at.is_(None))
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    # Enrich with read status and author info
+    items = [MessageList.model_validate(msg, from_attributes=True) for msg in thread_messages]
+    enriched = list_messages_with_read_status(items, permissions, db)
+
+    return MessageThread(
+        root_message_id=root_id,
+        messages=enriched,
+        total=len(enriched),
+    )

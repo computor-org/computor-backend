@@ -13,6 +13,7 @@ from computor_types.messages import (
     MessageCreate,
     MessageGet,
     MessageList,
+    MessageThread,
     MessageUpdate,
 )
 
@@ -98,6 +99,15 @@ class MessagesClient:
         """Mark Message Unread"""
         await self._http.delete(f"/messages/{id}/reads", params=kwargs)
         return
+
+    async def thread(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> MessageThread:
+        """Get Message Thread"""
+        response = await self._http.get(f"/messages/{id}/thread", params=kwargs)
+        return MessageThread.model_validate(response.json())
 
     async def audit(
         self,

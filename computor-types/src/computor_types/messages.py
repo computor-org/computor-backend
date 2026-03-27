@@ -53,7 +53,7 @@ class MessageCreate(BaseModel):
     # author_id is always the current user; set in API
     parent_id: Optional[str] = None
     level: int = Field(default=0)
-    title: str
+    title: Optional[str] = Field(None, description="Message title (optional, used for tags like #ai)")
     content: str
 
     # Targets (at least one should be provided, or none for global)
@@ -73,7 +73,7 @@ class MessageUpdate(BaseModel):
 
 class MessageGet(BaseEntityGet):
     id: str
-    title: str
+    title: Optional[str] = None
     content: str
     level: int
     parent_id: Optional[str] = None
@@ -124,7 +124,7 @@ class MessageGet(BaseEntityGet):
 
 class MessageList(BaseEntityList):
     id: str
-    title: str
+    title: Optional[str] = None
     content: str
     level: int
     parent_id: Optional[str] = None
@@ -206,16 +206,32 @@ class MessageQuery(ListQuery):
         None, description="Filter by read status: True = unread only, False = read only, None = all"
     )
 
-    # Tag filtering (tags in title with format #scope::value)
+    # Tag filtering (tags in title: #<tag> where tag is any non-whitespace string)
     tags: Optional[List[str]] = Field(
-        None, description="Filter by tags in title (e.g., ['ai::request', 'priority::high'])"
+        None, description="Filter by tags in title (e.g., ['ai', 'ai-help', 'review']). Without # prefix."
     )
     tags_match_all: Optional[bool] = Field(
         True, description="True = must match ALL tags (AND), False = match ANY tag (OR)"
     )
     tag_scope: Optional[str] = Field(
-        None, description="Filter by tag scope prefix (e.g., 'ai' matches any #ai::* tag)"
+        None, description="Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.)"
     )
+
+
+class MessageThread(BaseModel):
+    """Full conversation thread for a message.
+
+    Returns all messages sharing the same root, ordered by created_at.
+    Used by agents to get full conversation context for follow-up detection.
+    """
+    root_message_id: str = Field(..., description="ID of the root message in the thread")
+    messages: list[MessageList] = Field(
+        default_factory=list,
+        description="All messages in the thread, ordered by created_at ascending"
+    )
+    total: int = Field(0, description="Total number of messages in the thread")
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageInterface(EntityInterface):

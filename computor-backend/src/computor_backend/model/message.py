@@ -40,7 +40,7 @@ class Message(Base):
     level = Column(Integer, nullable=False)
 
     # Content
-    title = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=True)
     content = Column(String(16384), nullable=False)
 
     # Targets (all nullable; if ALL are NULL = global message visible to all users)
