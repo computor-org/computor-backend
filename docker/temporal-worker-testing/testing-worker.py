@@ -4,10 +4,10 @@ Unified Testing Worker Startup Script
 
 This script:
 1. Fetches service configuration from the Computor API
-2. Clones/updates the computor-testing repository from GitLab
-3. Installs the computor-testing framework
-4. Sets up language-specific test execution environments
-5. Starts the Temporal worker for unified multi-language testing
+2. Sets up language-specific test execution environments
+3. Starts the Temporal worker for unified multi-language testing
+
+computor-testing is installed at Docker build time from the monorepo.
 
 Supports: Python, Octave, R, Julia, C/C++, Fortran, Document analysis
 """
@@ -18,7 +18,6 @@ import sys
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from computor_types.repositories import Repository
 from computor_types.services import ServiceGet
 from computor_client.http import AsyncHTTPClient
 
@@ -404,7 +403,7 @@ def main():
     print("=" * 80)
 
     # Step 0: Fetch configuration from API
-    print("\n[0/4] Fetching service configuration...")
+    print("\n[0/2] Fetching service configuration...")
     service_config = asyncio.run(fetch_service_config())
 
     if service_config:
@@ -419,73 +418,11 @@ def main():
     language = get_service_language(service_config, config)
     print(f"  Primary language: {language}")
 
-    # Get environment configuration (with API config as override)
-    TESTING_FRAMEWORK_URL = os.getenv("TESTING_FRAMEWORK_URL")
-    TESTING_FRAMEWORK_TOKEN = os.getenv("TESTING_FRAMEWORK_TOKEN")
-    TESTING_FRAMEWORK_VERSION = os.getenv("TESTING_FRAMEWORK_VERSION") or "main"
+    # computor-testing is installed at Docker build time
+    framework_package_path = "/home/worker/computor-testing"
 
-    if not TESTING_FRAMEWORK_URL:
-        print("WARNING: TESTING_FRAMEWORK_URL not set, using default")
-        TESTING_FRAMEWORK_URL = "https://gitlab.tugraz.at/codeability/testing-frameworks/computor-testing"
-
-    if TESTING_FRAMEWORK_TOKEN is None:
-        print("WARNING: No TESTING_FRAMEWORK_TOKEN available.")
-        print("         Public repository access only.")
-
-    framework_repo_path = os.path.abspath("/home/worker/computor-testing")
-    # The actual package is in a subdirectory (monorepo structure)
-    framework_package_path = os.path.join(framework_repo_path, "computor-testing")
-
-    # Step 1: Clone or update computor-testing repository
-    print("\n[1/4] Fetching computor-testing framework...")
-    print(f"  URL: {TESTING_FRAMEWORK_URL}")
-    print(f"  Version: {TESTING_FRAMEWORK_VERSION}")
-    print(f"  Target: {framework_repo_path}")
-
-    try:
-        result = Repository(
-            url=TESTING_FRAMEWORK_URL,
-            token=TESTING_FRAMEWORK_TOKEN,
-            branch=TESTING_FRAMEWORK_VERSION
-        ).clone_or_fetch(framework_repo_path)
-        print(f"  ✓ {result}")
-    except Exception as e:
-        print(f"  ✗ FAILED: git clone/fetch failed [{str(e)}]")
-        print("\nContinuing without computor-testing framework...")
-        print("Worker will only support legacy testing backends.")
-
-    # Step 2: Install computor-testing framework
-    if os.path.exists(framework_package_path) and os.path.exists(os.path.join(framework_package_path, "pyproject.toml")):
-        print("\n[2/4] Installing computor-testing framework...")
-        print(f"  Package path: {framework_package_path}")
-
-        # Install computor-testing framework in worker Python (3.10)
-        cmd = f"pip install --user {framework_package_path}"
-        print(f"  Command: {cmd}")
-        result = subprocess.run(cmd, cwd=framework_package_path, shell=True)
-
-        if result.returncode == 0:
-            print("\n  ✓ computor-testing installed successfully (worker environment)")
-
-            # Verify installation
-            verify_cmd = "computor-test --version"
-            verify_result = subprocess.run(verify_cmd, shell=True, capture_output=True, text=True)
-            if verify_result.returncode == 0:
-                print(f"  ✓ computor-test CLI available: {verify_result.stdout.strip()}")
-            else:
-                print("  ⚠ computor-test CLI not found in PATH")
-        else:
-            print(f"\n  ✗ Installation failed (exit code: {result.returncode})")
-            print("\nContinuing without computor-testing framework...")
-    else:
-        print("\n[2/4] Skipping computor-testing installation (not available)")
-        print(f"  Checked path: {framework_package_path}")
-        print(f"  Path exists: {os.path.exists(framework_package_path)}")
-        if os.path.exists(framework_package_path):
-            print(f"  Contents: {os.listdir(framework_package_path)}")
-
-    # Step 3: Set up language-specific environment
-    print(f"\n[3/4] Setting up test execution environment for {language}...")
+    # Step 1: Set up language-specific environment
+    print(f"\n[1/2] Setting up test execution environment for {language}...")
     setup_language_environment(language, config, framework_package_path)
 
     # Also set up any additional languages specified in config
@@ -494,8 +431,8 @@ def main():
             print(f"\n  Also setting up {lang_key} (found in config)...")
             setup_language_environment(lang_key, config, framework_package_path)
 
-    # Step 4: Start Temporal worker
-    print("\n[4/4] Starting Temporal worker...")
+    # Step 2: Start Temporal worker
+    print("\n[2/2] Starting Temporal worker...")
 
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing

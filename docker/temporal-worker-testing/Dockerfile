@@ -62,6 +62,7 @@ ADD computor-types /home/worker/computor-types
 ADD computor-utils /home/worker/computor-utils
 ADD computor-client /home/worker/computor-client
 ADD computor-backend /home/worker/computor-backend
+ADD computor-testing /home/worker/computor-testing
 
 # Change ownership
 RUN chown -R worker:worker /home/worker
@@ -77,8 +78,8 @@ RUN pip install --user /home/worker/computor-client
 # Install computor-backend with all dependencies
 RUN pip install --user /home/worker/computor-backend
 
-# Create directory for computor-testing installation (will be cloned at runtime)
-RUN mkdir -p /home/worker/computor-testing
+# Install computor-testing framework
+RUN pip install --user /home/worker/computor-testing
 
 # Add src to PYTHONPATH so imports work
 ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH
@@ -94,7 +95,6 @@ RUN mkdir -p /home/worker/.local/lib/R/library
 COPY docker/temporal-worker-testing/testing-worker.py /home/worker/testing-worker.py
 
 # Entry point runs the startup script which:
-# 1. Clones/updates computor-testing repository
-# 2. Installs computor-testing framework
-# 3. Starts the temporal worker
+# 1. Sets up language-specific environments
+# 2. Starts the temporal worker
 ENTRYPOINT ["python", "/home/worker/testing-worker.py"]

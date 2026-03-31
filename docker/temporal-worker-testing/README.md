@@ -30,11 +30,6 @@ PYTHON_TEST_VERSION=3.13
 # Additional Python packages (comma-separated)
 # Example: pandas,scikit-learn,requests,beautifulsoup4
 PYTHON_TEST_REQUIREMENTS=
-
-# Computor-testing framework source
-TESTING_FRAMEWORK_URL=https://your-gitlab-instance/.../computor-testing.git
-TESTING_FRAMEWORK_TOKEN=glpat-xxxxx
-TESTING_FRAMEWORK_VERSION=main
 ```
 
 ### Base Dependencies
@@ -67,12 +62,13 @@ services:
 
 ## Startup Sequence
 
-1. Clone/update computor-testing framework
-2. Install framework in worker Python (3.10)
-3. Create test execution venv (Python 3.13)
-4. Install base dependencies from requirements.txt
-5. Install additional configured requirements
-6. Start Temporal worker
+1. Fetch service configuration from API
+2. Create test execution venv (Python 3.13)
+3. Install base dependencies from requirements.txt
+4. Install additional configured requirements
+5. Start Temporal worker
+
+Note: computor-testing is installed at Docker build time from the monorepo.
 
 ## Development
 
