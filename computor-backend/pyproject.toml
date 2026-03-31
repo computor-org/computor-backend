@@ -9,7 +9,7 @@ description = "Backend API and services for Computor platform"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Computor Team", email = "team@computor.dev"}
+    {name = "Maximilian Mandlez", email = "maximilian.mandlez@tugraz.at"},
 ]
 keywords = ["computor", "backend", "api", "fastapi"]
 classifiers = [
@@ -71,9 +71,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/computor/computor-backend"
-Documentation = "https://docs.computor.dev/backend"
-Repository = "https://github.com/computor/computor-backend"
+Homepage = "https://github.com/computor-org/computor-backend"
+Documentation = "https://github.com/computor-org/computor-backend/tree/main/docs"
+Repository = "https://github.com/computor-org/computor-backend"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

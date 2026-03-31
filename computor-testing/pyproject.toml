@@ -35,6 +35,11 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
+[project.urls]
+Homepage = "https://github.com/computor-org/computor-backend"
+Documentation = "https://github.com/computor-org/computor-backend/tree/main/docs"
+Repository = "https://github.com/computor-org/computor-backend"
+
 [project.scripts]
 # Unified CLI
 computor-test = "testers.cli:cli"

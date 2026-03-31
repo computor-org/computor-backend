@@ -8,6 +8,10 @@ version = "0.1.0"
 description = "Command-line interface for Computor platform"
 readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Maximilian Mandlez", email = "maximilian.mandlez@tugraz.at"},
+]
 dependencies = [
     "computor-types>=0.1.0",
     "computor-client>=0.1.0",
@@ -20,6 +24,11 @@ dependencies = [
 
 [project.scripts]
 computor = "computor_cli.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/computor-org/computor-backend"
+Documentation = "https://github.com/computor-org/computor-backend/tree/main/docs"
+Repository = "https://github.com/computor-org/computor-backend"
 
 [project.optional-dependencies]
 dev = [
