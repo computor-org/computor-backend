@@ -139,6 +139,7 @@ DEFAULTS = {
         "occuranceType": "NAME",
         "typeCheck": True,
         "shapeCheck": True,
+        "equalNaN": True,
         "ignoreClass": False,
     },
     "meta": {
@@ -182,6 +183,7 @@ class ComputorTestCommon(BaseModel):
     )
     typeCheck: Optional[bool] = Field(default=None)
     shapeCheck: Optional[bool] = Field(default=None)
+    equalNaN: Optional[bool] = Field(default=None)
     ignoreClass: Optional[bool] = Field(default=None)
     verbosity: Optional[int] = Field(ge=0, le=3, default=None)
 
@@ -285,6 +287,7 @@ class ComputorTestProperty(ComputorBase, ComputorTestCollectionCommon):
     )
     typeCheck: Optional[bool] = Field(default=DEFAULTS["properties"]["typeCheck"])
     shapeCheck: Optional[bool] = Field(default=DEFAULTS["properties"]["shapeCheck"])
+    equalNaN: Optional[bool] = Field(default=DEFAULTS["properties"]["equalNaN"])
     ignoreClass: Optional[bool] = Field(default=DEFAULTS["properties"]["ignoreClass"])
     timeout: Optional[float] = Field(ge=0, default=DEFAULTS["properties"]["timeout"])
     tests: List[ComputorTestCollection] = Field(default=[])

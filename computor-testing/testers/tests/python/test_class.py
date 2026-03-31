@@ -374,6 +374,7 @@ class TestComputorPython:
                 absolute_tolerance=sub.absoluteTolerance,
                 type_check=sub.typeCheck,
                 shape_check=sub.shapeCheck,
+                equal_nan=sub.equalNaN,
                 count_requirement=sub.countRequirement,
             )
 

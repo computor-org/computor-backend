@@ -245,6 +245,7 @@ class TestComputorOctave:
                 type_check=sub.typeCheck,
                 shape_check=sub.shapeCheck,
                 ignore_class=sub.ignoreClass,
+                equal_nan=sub.equalNaN,
                 count_requirement=sub.countRequirement,
             )
 
