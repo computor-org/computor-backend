@@ -481,3 +481,10 @@ See [dependencies/README.md](dependencies/README.md) for full documentation.
 ## License
 
 See LICENSE file.
+
+## Acknowledgements
+
+This project is built on top of [catester](https://github.com/trigonal-mike/catester),
+which is licensed under the MIT License.
+
+Copyright (c) trigonal-mike
