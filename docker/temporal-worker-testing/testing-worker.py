@@ -120,21 +120,16 @@ def setup_python_environment(config: Dict[str, Any], framework_package_path: str
     """
     Set up Python test execution environment.
 
-    Creates a virtual environment with the specified Python version
-    and installs required packages.
+    The base test venv (Python 3.13 + numpy/scipy/etc.) is pre-built at
+    Docker image build time. This function only installs additional
+    requirements from the API config or environment variables.
     """
     python_config = config.get("python", {})
-    python_version = python_config.get("version", "3.13")
     requirements = python_config.get("requirements", [])
     pip_index_url = python_config.get("pip_index_url")
     environment = python_config.get("environment", {})
 
-    # Environment variables override API config if set
-    env_python_version = os.getenv("PYTHON_TEST_VERSION")
     env_requirements = os.getenv("PYTHON_TEST_REQUIREMENTS", "")
-
-    if env_python_version:
-        python_version = env_python_version
 
     # Merge requirements
     if isinstance(requirements, str):
@@ -145,66 +140,26 @@ def setup_python_environment(config: Dict[str, Any], framework_package_path: str
 
     test_venv_path = "/home/worker/test-venv"
 
-    print(f"  Python version: {python_version}")
-    print(f"  Additional requirements: {requirements_list if requirements_list else '(none)'}")
-
-    # Create venv with specified Python version
-    python_executable = f"python{python_version}"
-    venv_create = subprocess.run(
-        f"{python_executable} -m venv {test_venv_path}",
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-
-    if venv_create.returncode != 0:
-        print(f"  ⚠ Failed to create test venv: {venv_create.stderr}")
-        print(f"  Tests will run in worker Python (3.10) instead")
-        return
-
-    print(f"  ✓ Created venv at {test_venv_path} (Python {python_version})")
-
-    # Install base testing dependencies from computor-testing requirements.txt
-    print("  Installing base test dependencies (numpy, scipy, matplotlib, etc.)...")
-    requirements_path = os.path.join(framework_package_path, "requirements.txt")
-
-    pip_cmd_base = f"{test_venv_path}/bin/pip"
-    if pip_index_url:
-        pip_cmd_base += f" --index-url {pip_index_url}"
-
-    if os.path.exists(requirements_path):
-        pip_install = subprocess.run(
-            f"{pip_cmd_base} install -r {requirements_path}",
-            shell=True
+    # Verify pre-built venv exists (created at Docker build time)
+    if not os.path.exists(f"{test_venv_path}/bin/python"):
+        print(f"  ⚠ Pre-built test venv not found at {test_venv_path}, creating now...")
+        python_executable = "python3.13"
+        venv_create = subprocess.run(
+            f"{python_executable} -m venv {test_venv_path}",
+            shell=True,
+            capture_output=True,
+            text=True
         )
-        if pip_install.returncode == 0:
-            print("  ✓ Base dependencies installed")
-        else:
-            print("  ⚠ Failed to install base dependencies")
-    else:
-        print("  ⚠ requirements.txt not found, skipping base dependencies")
+        if venv_create.returncode != 0:
+            print(f"  ⚠ Failed to create test venv: {venv_create.stderr}")
+            print(f"  Tests will run in worker Python (3.10) instead")
+            return
 
-    # Install additional requirements if specified
-    if requirements_list:
-        print(f"  Installing additional requirements: {requirements_list}")
-        pip_install_extra = subprocess.run(
-            f"{pip_cmd_base} install {' '.join(requirements_list)}",
-            shell=True
-        )
-        if pip_install_extra.returncode == 0:
-            print("  ✓ Additional requirements installed")
-        else:
-            print("  ⚠ Failed to install some additional requirements")
-
-    # Verify numpy in test venv
-    numpy_check = subprocess.run(
-        f"{test_venv_path}/bin/python -c 'import numpy; print(numpy.__version__)'",
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-    if numpy_check.returncode == 0:
-        print(f"  ✓ numpy available in test venv: {numpy_check.stdout.strip()}")
+        # Install base dependencies since venv was missing
+        requirements_path = os.path.join(framework_package_path, "requirements.txt")
+        pip_cmd = f"{test_venv_path}/bin/pip"
+        if os.path.exists(requirements_path):
+            subprocess.run(f"{pip_cmd} install -r {requirements_path}", shell=True)
 
     # Verify Python version in test venv
     version_check = subprocess.run(
@@ -215,6 +170,33 @@ def setup_python_environment(config: Dict[str, Any], framework_package_path: str
     )
     if version_check.returncode == 0:
         print(f"  ✓ Test venv Python: {version_check.stdout.strip()}")
+
+    # Verify numpy in test venv
+    numpy_check = subprocess.run(
+        f"{test_venv_path}/bin/python -c 'import numpy; print(numpy.__version__)'",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    if numpy_check.returncode == 0:
+        print(f"  ✓ numpy available: {numpy_check.stdout.strip()}")
+
+    # Install additional requirements from API config (if any)
+    if requirements_list:
+        print(f"  Installing additional requirements: {requirements_list}")
+        pip_cmd_base = f"{test_venv_path}/bin/pip"
+        if pip_index_url:
+            pip_cmd_base += f" --index-url {pip_index_url}"
+        pip_install_extra = subprocess.run(
+            f"{pip_cmd_base} install {' '.join(requirements_list)}",
+            shell=True
+        )
+        if pip_install_extra.returncode == 0:
+            print("  ✓ Additional requirements installed")
+        else:
+            print("  ⚠ Failed to install some additional requirements")
+    else:
+        print("  ✓ Using pre-built test venv (no additional requirements)")
 
     # Set environment variable for PyExecutor to use test venv Python
     os.environ["PYTHON_TEST_EXECUTABLE"] = f"{test_venv_path}/bin/python"

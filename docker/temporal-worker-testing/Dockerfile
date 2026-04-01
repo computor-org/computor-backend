@@ -91,6 +91,13 @@ ENV PATH=/home/worker/.local/bin:$PATH
 ENV R_LIBS_USER=/home/worker/.local/lib/R/library
 RUN mkdir -p /home/worker/.local/lib/R/library
 
+# Pre-build Python 3.13 test venv with base testing dependencies at build time
+# This avoids slow installs at container startup
+RUN python3.13 -m venv /home/worker/test-venv && \
+    /home/worker/test-venv/bin/pip install --upgrade pip && \
+    /home/worker/test-venv/bin/pip install -r /home/worker/computor-testing/requirements.txt
+ENV PYTHON_TEST_EXECUTABLE=/home/worker/test-venv/bin/python
+
 # Copy the testing worker startup script
 COPY docker/temporal-worker-testing/testing-worker.py /home/worker/testing-worker.py
 
