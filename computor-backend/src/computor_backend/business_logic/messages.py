@@ -56,18 +56,27 @@ def create_message_with_author(
     primary_target_fields = ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']
     set_targets = [k for k in primary_target_fields if model_dump.get(k)]
 
-    # If parent_id is set, inherit target from parent message
+    # If parent_id is set, inherit target from parent message and validate scope match
     if model_dump.get('parent_id'):
         from computor_backend.model.message import Message
         parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
         if not parent_message:
             raise BadRequestException(detail=f"Parent message {model_dump['parent_id']} not found")
 
+        # Validate: if the client explicitly set a target, it must match the parent's
+        for field in primary_target_fields:
+            client_value = model_dump.get(field)
+            parent_value = getattr(parent_message, field, None)
+            if client_value and parent_value and str(client_value) != str(parent_value):
+                raise BadRequestException(
+                    detail=f"Reply scope mismatch: {field} must match the parent message "
+                           f"(expected {parent_value}, got {client_value})"
+                )
+
         # Inherit target fields from parent
         for field in primary_target_fields:
             parent_value = getattr(parent_message, field, None)
             if parent_value is not None:
-                # Don't override if user explicitly set a target (will be caught by validation below)
                 if field not in model_dump or model_dump[field] is None:
                     model_dump[field] = parent_value
 
@@ -80,8 +89,9 @@ def create_message_with_author(
     primary_target = None
     if 'submission_group_id' in set_targets:
         primary_target = 'submission_group_id'
-        # Remove course_id from set_targets - it's allowed as hierarchical context
-        set_targets = [t for t in set_targets if t != 'course_id']
+        # Remove hierarchical context fields - course_content_id and course_id
+        # are auto-populated from the submission group
+        set_targets = [t for t in set_targets if t not in ('course_id', 'course_content_id')]
     elif 'course_content_id' in set_targets:
         primary_target = 'course_content_id'
         set_targets = [t for t in set_targets if t != 'course_id']
@@ -113,12 +123,15 @@ def create_message_with_author(
         submission_group_id = model_dump['submission_group_id']
         _check_submission_group_write_permission(permissions, submission_group_id, db)
 
-        # Populate course_id from submission group for hierarchical broadcasting
+        # Populate course_content_id and course_id from submission group for hierarchical broadcasting
         submission_group = db.query(SubmissionGroup).filter(
             SubmissionGroup.id == submission_group_id
         ).first()
-        if submission_group and submission_group.course_id:
-            model_dump['course_id'] = str(submission_group.course_id)
+        if submission_group:
+            if submission_group.course_content_id:
+                model_dump['course_content_id'] = str(submission_group.course_content_id)
+            if submission_group.course_id:
+                model_dump['course_id'] = str(submission_group.course_id)
 
     # course_content_id: Check if user has submission group with that content
     if model_dump.get('course_content_id') and not model_dump.get('submission_group_id'):
