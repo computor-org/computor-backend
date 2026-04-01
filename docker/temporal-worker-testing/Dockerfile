@@ -62,6 +62,7 @@ ADD computor-types /home/worker/computor-types
 ADD computor-utils /home/worker/computor-utils
 ADD computor-client /home/worker/computor-client
 ADD computor-backend /home/worker/computor-backend
+ADD computor-testing /home/worker/computor-testing
 
 # Change ownership
 RUN chown -R worker:worker /home/worker
@@ -77,8 +78,8 @@ RUN pip install --user /home/worker/computor-client
 # Install computor-backend with all dependencies
 RUN pip install --user /home/worker/computor-backend
 
-# Create directory for computor-testing installation (will be cloned at runtime)
-RUN mkdir -p /home/worker/computor-testing
+# Install computor-testing framework
+RUN pip install --user /home/worker/computor-testing
 
 # Add src to PYTHONPATH so imports work
 ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH
@@ -90,11 +91,17 @@ ENV PATH=/home/worker/.local/bin:$PATH
 ENV R_LIBS_USER=/home/worker/.local/lib/R/library
 RUN mkdir -p /home/worker/.local/lib/R/library
 
+# Pre-build Python 3.13 test venv with base testing dependencies at build time
+# This avoids slow installs at container startup
+RUN python3.13 -m venv /home/worker/test-venv && \
+    /home/worker/test-venv/bin/pip install --upgrade pip && \
+    /home/worker/test-venv/bin/pip install -r /home/worker/computor-testing/requirements.txt
+ENV PYTHON_TEST_EXECUTABLE=/home/worker/test-venv/bin/python
+
 # Copy the testing worker startup script
 COPY docker/temporal-worker-testing/testing-worker.py /home/worker/testing-worker.py
 
 # Entry point runs the startup script which:
-# 1. Clones/updates computor-testing repository
-# 2. Installs computor-testing framework
-# 3. Starts the temporal worker
+# 1. Sets up language-specific environments
+# 2. Starts the temporal worker
 ENTRYPOINT ["python", "/home/worker/testing-worker.py"]

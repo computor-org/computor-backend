@@ -97,10 +97,6 @@ services:
       - TEMPORAL_NAMESPACE=default
       - API_URL=${API_URL}
       - API_TOKEN=${TESTING_WORKER_TOKEN}
-      # Computor-testing framework configuration
-      - TESTING_FRAMEWORK_URL=${TESTING_FRAMEWORK_URL}
-      - TESTING_FRAMEWORK_TOKEN=${TESTING_FRAMEWORK_TOKEN}
-      - TESTING_FRAMEWORK_VERSION=${TESTING_FRAMEWORK_VERSION}
       # Default testing configuration (can be overridden by service.config)
       - TESTING_EXECUTABLE=computor-test
       # Python test execution environment

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Computor Team", email = "team@computor.dev"}
+    {name = "Maximilian Mandlez", email = "maximilian.mandlez@tugraz.at"},
 ]
 keywords = ["computor", "client", "http", "api", "async", "httpx"]
 classifiers = [
@@ -43,10 +43,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/computor/computor-client"
-Documentation = "https://docs.computor.dev/client"
-Repository = "https://github.com/computor/computor-client"
-Changelog = "https://github.com/computor/computor-client/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/computor-org/computor-backend"
+Documentation = "https://github.com/computor-org/computor-backend/tree/main/docs"
+Repository = "https://github.com/computor-org/computor-backend"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
