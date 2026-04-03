@@ -33,34 +33,37 @@ def extract_tags_from_title(title: Optional[str]) -> list[str]:
     return TAG_PATTERN.findall(title)
 
 
-def build_tag_filter(tag: str) -> str:
-    """Build a SQL LIKE pattern for an exact tag match.
+def build_tag_regex(tag: str) -> str:
+    """Build a PostgreSQL regex for an exact standalone tag match.
 
-    The tag string is matched as-is after the # prefix.
-    E.g., tag="ai" matches "#ai" in title, tag="ai-help" matches "#ai-help".
+    Matches #<tag> as a standalone token: preceded by whitespace or
+    start-of-string, followed by whitespace, punctuation, or end-of-string.
+    Does NOT match longer tags (e.g., "ai" won't match "#ai-response").
 
     Args:
-        tag: Tag string without # prefix (e.g., "ai", "ai-help", "ai::request")
+        tag: Tag string without # prefix (e.g., "ai", "ai-help")
 
     Returns:
-        Pattern for LIKE query (e.g., "%#ai%")
+        PostgreSQL regex pattern (e.g., "(^|\\s)#ai([\\s,.]|$)")
     """
-    return f"%#{tag}%"
+    escaped = re.escape(tag)
+    return f"(^|\\s)#{escaped}([\\s,;.!?]|$)"
 
 
-def build_tag_prefix_filter(prefix: str) -> str:
-    """Build a SQL LIKE pattern for a tag prefix match.
+def build_tag_prefix_regex(prefix: str) -> str:
+    """Build a PostgreSQL regex for a tag prefix match.
 
     Matches any tag that starts with the given prefix.
-    E.g., prefix="ai" matches "#ai", "#ai-help", "#ai-response", "#ai::anything".
+    E.g., prefix="ai" matches "#ai", "#ai-help", "#ai-response".
 
     Args:
         prefix: Tag prefix without # (e.g., "ai" to match any #ai* tag)
 
     Returns:
-        Pattern for LIKE query (e.g., "%#ai%")
+        PostgreSQL regex pattern (e.g., "(^|\\s)#ai")
     """
-    return f"%#{prefix}%"
+    escaped = re.escape(prefix)
+    return f"(^|\\s)#{escaped}"
 
 
 class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
@@ -161,9 +164,9 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
                 # Read only: MessageRead record exists for this user
                 query = query.filter(read_exists)
 
-        # Tag filtering
+        # Tag filtering (exact standalone match using PostgreSQL regex)
         if params.tags is not None and len(params.tags) > 0:
-            tag_conditions = [Message.title.ilike(build_tag_filter(tag)) for tag in params.tags]
+            tag_conditions = [Message.title.op('~')(build_tag_regex(tag)) for tag in params.tags]
             if params.tags_match_all:
                 # AND logic: must match ALL tags
                 query = query.filter(and_(*tag_conditions))
@@ -173,6 +176,6 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
 
         # Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response, etc.)
         if params.tag_scope is not None:
-            query = query.filter(Message.title.ilike(build_tag_prefix_filter(params.tag_scope)))
+            query = query.filter(Message.title.op('~')(build_tag_prefix_regex(params.tag_scope)))
 
         return query
