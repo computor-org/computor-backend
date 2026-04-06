@@ -37,7 +37,7 @@ from gitlab import Gitlab
 from fastapi import Depends, Request
 from fastapi.security.utils import get_authorization_scheme_param
 
-from computor_backend.database import get_db
+from computor_backend.database import get_db_session
 from computor_backend.gitlab_utils import gitlab_current_user
 from computor_types.auth import GLPAuthConfig
 from computor_types.tokens import decrypt_api_key  # TODO: Remove after migration complete
@@ -472,7 +472,7 @@ async def get_current_principal(
 
     # Cache miss or non-cacheable auth - create DB connection
     logger.debug(f"Principal cache MISS, creating DB connection")
-    with next(get_db()) as db:
+    with get_db_session() as db:
         # Route to appropriate authentication method
         if isinstance(credentials, ApiTokenCredentials):
             auth_result = await AuthenticationService.authenticate_api_token(
@@ -538,7 +538,7 @@ async def get_current_principal_optional(
         return None
 
     try:
-        with next(get_db()) as db:
+        with get_db_session() as db:
             # Route to appropriate authentication method
             if isinstance(credentials, HTTPBasicCredentials):
                 auth_result = AuthenticationService.authenticate_basic(
@@ -612,7 +612,7 @@ def get_permissions_from_mockup(user_id: str) -> Principal:
     """
     
     try:
-        with next(get_db()) as db:
+        with get_db_session() as db:
             results = (
                 db.query(User.id, UserRole.role_id)
                 .select_from(User)

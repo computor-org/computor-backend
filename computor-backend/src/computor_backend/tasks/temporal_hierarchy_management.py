@@ -10,7 +10,7 @@ from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
 from .registry import register_task
 from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
-from ..database import SessionLocal
+from ..database import get_db_session
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
 
@@ -47,8 +47,7 @@ async def create_organization_activity(
         )
 
         # Create the builder and organization
-        db = SessionLocal()
-        try:
+        with get_db_session() as db:
             builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             result = builder._create_organization(org_config_obj, user_id)
 
@@ -66,8 +65,6 @@ async def create_organization_activity(
             else:
                 error_msg = result.get("error", "Unknown error occurred")
                 raise RuntimeError(f"Organization creation failed: {error_msg}")
-        finally:
-            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in organization creation activity: {str(e)}")
@@ -86,8 +83,7 @@ async def create_course_family_activity(
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
 
     try:
-        db = SessionLocal()
-        try:
+        with get_db_session() as db:
             org = db.query(Organization).filter(Organization.id == organization_id).first()
             if not org:
                 raise ValueError(f"Organization {organization_id} not found")
@@ -130,8 +126,6 @@ async def create_course_family_activity(
             else:
                 error_msg = result.get("error", "Unknown error occurred")
                 raise RuntimeError(f"Course family creation failed: {error_msg}")
-        finally:
-            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course family creation activity: {str(e)}")
@@ -150,8 +144,7 @@ async def create_course_activity(
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
 
     try:
-        db = SessionLocal()
-        try:
+        with get_db_session() as db:
             family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()
             if not family:
                 raise ValueError(f"Course family {course_family_id} not found")
@@ -199,8 +192,6 @@ async def create_course_activity(
             else:
                 error_msg = result.get("error", "Unknown error occurred")
                 raise RuntimeError(f"Course creation failed: {error_msg}")
-        finally:
-            db.close()
 
     except Exception as e:
         logger.exception(f"Exception in course creation activity: {str(e)}")

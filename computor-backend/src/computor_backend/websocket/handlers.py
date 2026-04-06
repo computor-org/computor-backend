@@ -11,7 +11,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from computor_backend.database import get_db
+from computor_backend.database import get_db_session
 from computor_backend.model.auth import User
 from computor_backend.websocket.connection_manager import Connection, manager, ws_metrics
 from computor_backend.websocket.pubsub import pubsub, typing_tracker, CHANNEL_PREFIX
@@ -98,7 +98,7 @@ async def handle_subscribe(connection: Connection, event: WSChannelSubscribe):
 
     Validates permissions and subscribes to requested channels.
     """
-    with next(get_db()) as db:
+    with get_db_session() as db:
         subscribed, failed = await manager.subscribe(
             connection, event.channels, db
         )
@@ -218,7 +218,7 @@ async def handle_read_mark(connection: Connection, event: WSReadMark):
 
     # Mark message as read in database
     try:
-        with next(get_db()) as db:
+        with get_db_session() as db:
             cache = get_cache()
             mark_message_as_read(message_id, connection.principal, db, cache)
         logger.info(f"Message {message_id} marked as read by user {user_id}")
@@ -263,7 +263,7 @@ async def handle_ping(connection: Connection):
 
 async def _get_user_display_name(user_id: str) -> Optional[str]:
     """Get user's display name from database."""
-    with next(get_db()) as db:
+    with get_db_session() as db:
         user = db.query(User).filter(User.id == user_id).first()
         if user:
             if user.given_name and user.family_name:

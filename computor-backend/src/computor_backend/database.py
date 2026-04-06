@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 from typing import Generator, Callable, TYPE_CHECKING
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
@@ -76,6 +77,16 @@ def _get_db(user_id: str | None = None) -> Generator[Session, None, None]:
     finally:
         # Always close the session
         db.close()
+
+
+get_db_session = contextmanager(_get_db)
+"""Context manager for non-FastAPI code (startup, websockets, temporal tasks).
+
+Usage:
+    with get_db_session() as db:
+        ...
+    # commit/rollback/close handled automatically
+"""
 
 
 def get_db(user_id: str | None = None) -> Generator[Session, None, None]:
