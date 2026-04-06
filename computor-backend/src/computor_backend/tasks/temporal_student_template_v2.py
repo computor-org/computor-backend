@@ -1019,9 +1019,9 @@ async def generate_student_template_activity_v2(
             
             return result
             
-    except Exception as e:
+      except Exception as e:
         logger.error(f"Failed to generate student template: {str(e)}", exc_info=True)
-        
+
         # Mark all 'deploying' deployments as failed
         try:
             failed_deployments = db.query(CourseContentDeployment).join(
@@ -1064,7 +1064,7 @@ async def generate_student_template_activity_v2(
                 )
         except Exception as db_error:
             logger.error(f"Failed to update deployment statuses: {db_error}")
-        
+
         return {
             "success": False,
             "processed_count": 0,
