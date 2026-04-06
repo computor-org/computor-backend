@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy_utils import Ltree
-from database import get_db
+from database import get_db_session
 from model.auth import User
 from model.service import Service, ApiToken, ServiceType
 from utils.api_token import generate_api_token, prepare_predefined_token
@@ -317,10 +317,7 @@ def main():
         print()
 
     # Get database session
-    db_gen = next(get_db())
-    db = db_gen
-
-    try:
+    with get_db_session() as db:
         # Get admin user (created by initialize_system_data.py)
         admin_user = db.query(User).filter(User.username == "admin").first()
         if not admin_user:
@@ -402,8 +399,6 @@ def main():
         traceback.print_exc()
         db.rollback()
         return 1
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":

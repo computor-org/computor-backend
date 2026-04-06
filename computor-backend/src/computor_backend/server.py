@@ -20,7 +20,7 @@ from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
-from computor_backend.database import get_db
+from computor_backend.database import get_db_session
 
 from computor_backend.interfaces import (
     AccountInterface,
@@ -167,7 +167,7 @@ async def init_admin_user(db: Session):
 
 async def startup_logic():
 
-    with next(get_db()) as db:
+    with get_db_session() as db:
         db_apply_roles("_user_manager",claims_user_manager(),db)
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
         db_apply_roles("_workspace_user",claims_workspace_user(),db)

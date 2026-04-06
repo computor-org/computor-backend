@@ -28,7 +28,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException
 )
-from computor_backend.database import get_db, set_db_user
+from computor_backend.database import get_db, get_db_session, set_db_user
 from computor_types.course_contents import CourseContentGet
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
@@ -112,7 +112,7 @@ def _build_deployment_with_history(
 # # Note: Background task hooks should create their own sessions, not receive them as params
 # async def event_wrapper(entity: CourseContentGet, permissions: Principal):
 #     try:
-#         with next(get_db(permissions.user_id)) as db:
+#         with get_db_session(permissions.user_id) as db:
 #             await mirror_entity_to_filesystem(str(entity.id), CourseContentInterface, db)
 #     except Exception as e:
 #         print(e)
@@ -136,7 +136,7 @@ async def provision_submission_groups_wrapper(entity: CourseContentGet, permissi
 
         # Create a fresh database session for this background task
         # This ensures proper connection lifecycle management
-        with next(get_db(permissions.user_id)) as db:
+        with get_db_session(permissions.user_id) as db:
             created_count = provision_submission_groups_for_course_content(
                 course_content_id=str(entity.id),
                 db=db

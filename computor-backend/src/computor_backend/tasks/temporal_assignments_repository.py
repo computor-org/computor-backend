@@ -44,16 +44,14 @@ async def generate_assignments_repository_activity(
     import git
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
-    from ..database import SessionLocal
+    from ..database import get_db_session
     from ..model.course import Course, CourseContent
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.example import ExampleVersion, Example
     from ..utils.docker_utils import transform_localhost_url
     from ..tasks.temporal_student_template_v2 import download_example_files
 
-    db = SessionLocal()
-
-    try:
+    with get_db_session() as db:
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
             return {"success": False, "error": f"Course {course_id} not found"}
@@ -291,11 +289,6 @@ async def generate_assignments_repository_activity(
             }
             logger.info(f"Assignments repository generation completed: {result}")
             return result
-    finally:
-        try:
-            db.close()
-        except Exception:
-            pass
 
 
 @register_task

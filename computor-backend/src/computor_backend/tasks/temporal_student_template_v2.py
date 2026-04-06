@@ -294,16 +294,15 @@ async def generate_student_template_activity_v2(
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
     from ..utils.docker_utils import transform_localhost_url
-    from ..database import SessionLocal
+    from ..database import get_db_session
     from ..model.course import Course, CourseContent
     from ..model.example import Example, ExampleVersion, ExampleRepository
     from ..model.deployment import CourseContentDeployment, DeploymentHistory
     from ..model.service import ServiceType
     from ..services.storage_service import StorageService
 
-    db = SessionLocal()
-    
-    try:
+    with get_db_session() as db:
+      try:
         # First, update all assigned deployments to 'deploying' status
         # Determine which deployment statuses to process
         if force_redeploy:
@@ -1072,8 +1071,6 @@ async def generate_student_template_activity_v2(
             "errors": [str(e)],
             "message": f"Failed to generate student template: {str(e)}"
         }
-    finally:
-        db.close()
 
 
 @register_task

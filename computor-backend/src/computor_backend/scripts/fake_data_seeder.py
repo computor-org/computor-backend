@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) 
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
-from database import get_db
+from database import get_db_session
 from model.auth import User, Account, StudentProfile
 from model.organization import Organization
 from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseContent, CourseContentType, CourseContentKind, SubmissionGroup, SubmissionGroupMember
@@ -629,7 +629,7 @@ def main():
     parser.add_argument('--count', type=int, default=50, help='Number of users to create')
     args = parser.parse_args()
     
-    with next(get_db()) as session:
+    with get_db_session() as session:
         try:
             if args.clear:
                 clear_fake_data(session)

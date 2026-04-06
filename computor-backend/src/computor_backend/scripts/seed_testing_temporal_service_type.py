@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.orm import Session
 from sqlalchemy_utils import Ltree
-from database import get_db
+from database import get_db_session
 from model.auth import User
 from model.service import ServiceType
 
@@ -80,10 +80,7 @@ def main():
     print("=" * 60)
 
     # Get database session
-    db_gen = next(get_db())
-    db = db_gen
-
-    try:
+    with get_db_session() as db:
         # Get admin user
         admin_user = db.query(User).filter(User.username == "admin").first()
         if not admin_user:
@@ -115,8 +112,6 @@ def main():
         traceback.print_exc()
         db.rollback()
         return 1
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":

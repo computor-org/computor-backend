@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import WebSocket, WebSocketException, status
 
-from computor_backend.database import get_db
+from computor_backend.database import get_db_session
 from computor_backend.model.role import UserRole
 from computor_backend.permissions.auth import (
     AuthenticationResult,
@@ -80,7 +80,7 @@ async def _authenticate_api_token(token: str) -> Principal:
         WebSocketAuthError: If authentication fails
     """
     try:
-        with next(get_db()) as db:
+        with get_db_session() as db:
             auth_result = await AuthenticationService.authenticate_api_token(token, db)
             principal = PrincipalBuilder.build(auth_result, db)
 
@@ -127,7 +127,7 @@ async def _authenticate_sso_token(token: str) -> Principal:
             raise WebSocketAuthError(4001, "Invalid session data")
 
         # Get user roles from database
-        with next(get_db()) as db:
+        with get_db_session() as db:
             results = (
                 db.query(UserRole.role_id)
                 .filter(UserRole.user_id == user_id)

@@ -16,7 +16,7 @@ from gitlab.exceptions import GitlabGetError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from ..database import SessionLocal
+from ..database import get_db_session
 from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
@@ -437,9 +437,8 @@ async def create_student_repository(
     Returns:
         Dict containing repository information
     """
-    db = SessionLocal()
-    
-    try:
+    with get_db_session() as db:
+      try:
         # Get course member and validate
         course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
         if not course_member:
@@ -608,11 +607,9 @@ async def create_student_repository(
             "submission_groups_updated": updated_submission_groups
         }
             
-    except Exception as e:
+      except Exception as e:
         logger.error(f"Failed to create student repository: {e}")
         raise e
-    finally:
-        db.close()
 
 
 @activity.defn(name="create_team_repository")
@@ -632,9 +629,8 @@ async def create_team_repository(
     Returns:
         Dict containing repository information
     """
-    db = SessionLocal()
-    
-    try:
+    with get_db_session() as db:
+      try:
         # Get course information
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
@@ -814,11 +810,9 @@ async def create_team_repository(
             "team_size": len(team_members)
         }
         
-    except Exception as e:
+      except Exception as e:
         logger.error(f"Failed to create team repository: {e}")
         raise e
-    finally:
-        db.close()
 
 
 @register_task
