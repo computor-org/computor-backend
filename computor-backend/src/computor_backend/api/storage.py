@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, UploadFile, Query, Response
@@ -300,9 +301,9 @@ async def copy_object(
     custom_metadata = None
     if metadata:
         try:
-            custom_metadata = eval(metadata)  # Simple parsing for demo, use json.loads in production
-        except:
-            raise BadRequestException("Invalid metadata format")
+            custom_metadata = json.loads(metadata)
+        except (json.JSONDecodeError, Exception):
+            raise BadRequestException("Invalid metadata format. Must be valid JSON")
     
     # Copy object
     result = await storage_service.copy_object(
