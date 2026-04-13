@@ -78,7 +78,7 @@ def check_file_exists(directory: str, pattern: str) -> Tuple[bool, List[str]]:
     return False, []
 
 
-def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value", equal_nan=True):
+def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     """
     Compare two values with tolerance. Raises AssertionError on mismatch.
 
@@ -88,7 +88,6 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value", e
         rel_tol: Relative tolerance (default: 1e-9)
         abs_tol: Absolute tolerance (default: 1e-12)
         name: Variable name for error messages
-        equal_nan: Whether to treat NaN == NaN as True (default: True)
     """
     rel_tol = rel_tol if rel_tol is not None else 1e-9
     abs_tol = abs_tol if abs_tol is not None else 1e-12
@@ -111,10 +110,10 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value", e
             )
 
         if np.issubdtype(expected.dtype, np.number):
-            if not np.allclose(actual, expected, rtol=rel_tol, atol=abs_tol, equal_nan=equal_nan):
+            if not np.allclose(actual, expected, rtol=rel_tol, atol=abs_tol, equal_nan=True):
                 raise AssertionError(f"Array values differ for '{name}'")
         else:
-            if not np.array_equal(actual, expected, equal_nan=equal_nan):
+            if not np.array_equal(actual, expected):
                 raise AssertionError(f"Array values differ for '{name}'")
         return
 
@@ -129,7 +128,7 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value", e
         actual_nan = isinstance(actual, float) and np.isnan(actual)
         expected_nan = isinstance(expected, float) and np.isnan(expected)
         if actual_nan or expected_nan:
-            if equal_nan and actual_nan and expected_nan:
+            if actual_nan and expected_nan:
                 return
             raise AssertionError(
                 f"NaN mismatch for '{name}': "
@@ -176,7 +175,7 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value", e
             )
 
         for i, (a, e) in enumerate(zip(actual, expected)):
-            compare_values(a, e, rel_tol, abs_tol, f"{name}[{i}]", equal_nan)
+            compare_values(a, e, rel_tol, abs_tol, f"{name}[{i}]")
         return
 
     # Handle dicts
@@ -459,7 +458,6 @@ def compare_variable_by_qualification(
     type_check: bool = False,
     shape_check: bool = False,
     ignore_class: bool = False,
-    equal_nan: bool = True,
     count_requirement=None,
 ):
     """
@@ -493,7 +491,7 @@ def compare_variable_by_qualification(
             _check_shape_common(val_student, ref, name)
 
         # Value comparison
-        compare_values(val_student, ref, relative_tolerance, absolute_tolerance, name, equal_nan)
+        compare_values(val_student, ref, relative_tolerance, absolute_tolerance, name)
 
     elif qualification == QualificationEnum.matches:
         assert str(val_student) == pattern, \
@@ -1337,7 +1335,6 @@ class InterpretedTestClass(BaseTestClass):
             type_check=sub.typeCheck,
             shape_check=sub.shapeCheck,
             ignore_class=getattr(sub, 'ignoreClass', False),
-            equal_nan=getattr(sub, 'equalNaN', True),
             count_requirement=sub.countRequirement,
         )
 
