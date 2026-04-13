@@ -236,7 +236,12 @@ async def _get_example_version_for_course_content(
         raise NotFoundException(detail=f"Example version {example_version_id} not found")
 
     example = version.example
+    if not example:
+        raise NotFoundException(detail=f"Example not found for version {example_version_id}")
+
     repository = example.repository
+    if not repository:
+        raise NotFoundException(detail=f"Repository not found for example {example.id}")
 
     # Only support MinIO/S3 repositories
     if repository.source_type == "git":
