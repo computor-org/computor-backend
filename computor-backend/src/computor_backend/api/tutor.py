@@ -969,14 +969,29 @@ async def download_tutor_test_artifacts(
 async def download_tutor_test_input(
     test_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis = Depends(get_redis_client),
 ):
     """
     Download tutor test input files as a ZIP.
 
     Used by the testing worker to fetch the tutor's uploaded code
     for test execution.
+
+    **Permissions**: Only the test owner or admin can download input.
     """
+    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
     from computor_backend.services.tutor_test_storage import download_tutor_test_input_as_zip
+
+    # Check test exists and permissions
+    metadata = await get_tutor_test_metadata(redis, test_id)
+
+    if not metadata:
+        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+
+    user_id = permissions.get_user_id()
+    if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
+        if not permissions.is_admin:
+            raise ForbiddenException(detail="You don't have access to this test")
 
     zip_data = await download_tutor_test_input_as_zip(test_id)
 
