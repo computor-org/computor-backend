@@ -229,7 +229,16 @@ class Principal(BaseModel):
                     highest_role = user_role
 
         return highest_role
-    
+
+    def has_any_course_role(self, required_role: str) -> bool:
+        """Check if user has the required role in any course."""
+        if self.is_admin:
+            return True
+        for course_id in self.claims.dependent.get("course", {}):
+            if self.has_course_role(course_id, required_role):
+                return True
+        return False
+
     def get_courses_with_role(self, minimum_role: str) -> Set[str]:
         """Get all course IDs where user has at least the minimum role"""
         if self.is_admin:

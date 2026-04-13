@@ -45,6 +45,8 @@ async def upload_file(
 ):
     """Upload a file to storage with security validation"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "create"):
         raise ForbiddenException("You don't have permission to upload files")
     
@@ -129,6 +131,8 @@ async def download_file(
 ):
     """Download a file from storage"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "get"):
         raise ForbiddenException("You don't have permission to download files")
     
@@ -158,6 +162,8 @@ async def list_objects(
 ):
     """List objects in storage with optional filtering"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage","list"):
         raise ForbiddenException("You don't have permission to list files")
     
@@ -213,6 +219,8 @@ async def get_object_info(
 ):
     """Get metadata for a specific object"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "get"):
         raise ForbiddenException("You don't have permission to view file info")
     
@@ -252,6 +260,8 @@ async def delete_object(
 ):
     """Delete an object from storage"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "delete"):
         raise ForbiddenException("You don't have permission to delete files")
     
@@ -281,6 +291,8 @@ async def copy_object(
 ):
     """Copy an object within or between buckets"""
     # Check permissions
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "create"):
         raise ForbiddenException("You don't have permission to copy files")
     
@@ -315,6 +327,8 @@ async def generate_presigned_url(
 ):
     """Generate a presigned URL for direct object access"""
     # Check permissions based on method
+    if not permissions.has_any_course_role("_tutor"):
+        raise ForbiddenException("Requires tutor role or higher to access storage")
     if request.method == "GET" and not permissions.permitted("storage", "get"):
         raise ForbiddenException("You don't have permission to generate download URLs")
     elif request.method in ["PUT", "POST"] and not permissions.permitted("storage", "create"):
