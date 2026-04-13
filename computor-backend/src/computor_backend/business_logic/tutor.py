@@ -252,6 +252,9 @@ def get_tutor_course_member(
         CourseMember.id == course_member_id
     ).first()
 
+    if course_member is None:
+        raise NotFoundException(detail=f"Course member {course_member_id} not found")
+
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_results = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id).all()
 
