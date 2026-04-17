@@ -123,8 +123,7 @@ def compare_values(actual: Any, expected: Any,
                    relative_tolerance: float = 1e-12,
                    absolute_tolerance: float = 0.0001,
                    type_check: bool = True,
-                   shape_check: bool = True,
-                   equal_nan: bool = True) -> tuple[bool, str]:
+                   shape_check: bool = True) -> tuple[bool, str]:
     """
     Compare two values with tolerance for numeric types.
 
@@ -166,11 +165,11 @@ def compare_values(actual: Any, expected: Any,
             return False, f"Shape mismatch: {actual.shape} vs {expected.shape}"
 
         if np.issubdtype(expected.dtype, np.number):
-            if np.allclose(actual, expected, rtol=relative_tolerance, atol=absolute_tolerance, equal_nan=equal_nan):
+            if np.allclose(actual, expected, rtol=relative_tolerance, atol=absolute_tolerance, equal_nan=True):
                 return True, "Arrays are equal within tolerance"
             return False, "Array values differ"
         else:
-            if np.array_equal(actual, expected, equal_nan=equal_nan):
+            if np.array_equal(actual, expected):
                 return True, "Arrays are equal"
             return False, "Array values differ"
 
@@ -183,7 +182,7 @@ def compare_values(actual: Any, expected: Any,
         actual_nan = np.isnan(actual) if isinstance(actual, (float, np.floating)) else False
         expected_nan = np.isnan(expected) if isinstance(expected, (float, np.floating)) else False
         if actual_nan or expected_nan:
-            if equal_nan and actual_nan and expected_nan:
+            if actual_nan and expected_nan:
                 return True, "Both values are NaN"
             return False, f"NaN mismatch: actual={'NaN' if actual_nan else actual}, expected={'NaN' if expected_nan else expected}"
 
@@ -214,7 +213,7 @@ def compare_values(actual: Any, expected: Any,
 
         for i, (a, e) in enumerate(zip(actual, expected)):
             is_equal, msg = compare_values(a, e, relative_tolerance, absolute_tolerance,
-                                          type_check, shape_check, equal_nan)
+                                          type_check, shape_check)
             if not is_equal:
                 return False, f"Element {i}: {msg}"
 
