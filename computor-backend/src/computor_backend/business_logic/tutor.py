@@ -3,7 +3,7 @@ import logging
 from uuid import UUID
 from typing import List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from computor_backend.api.exceptions import ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
@@ -246,9 +246,14 @@ def get_tutor_course_member(
 ) -> TutorCourseMemberGet:
     """Get a course member with unreviewed course contents."""
 
-    course_member = check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
+    course_member = check_course_permissions(permissions, CourseMember, "_tutor", db).options(
+        joinedload(CourseMember.user)
+    ).filter(
         CourseMember.id == course_member_id
     ).first()
+
+    if course_member is None:
+        raise NotFoundException(detail=f"Course member {course_member_id} not found")
 
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_results = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id).all()
@@ -291,6 +296,7 @@ def list_tutor_course_members(
         .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
 
     query = course_course_member_list_query(db)
+    query = query.options(joinedload(CourseMember.user))
     query = CourseMemberInterface.search(db, query, params)
 
     if permissions.is_admin != True:
