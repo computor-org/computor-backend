@@ -1080,13 +1080,20 @@ def get_unreviewed_submission_count_per_member(
     if course_member_ids is not None and len(course_member_ids) == 0:
         return {}
 
-    # Step 1: Get the latest artifact per submission group (submit=True)
+    # Step 1: Get the latest artifact per submission group (submit=True),
+    # scoped to the course when known. Without this scope the query aggregates
+    # every submitted artifact in the system.
     latest_artifact_subquery = db.query(
         SubmissionArtifact.submission_group_id,
         func.max(SubmissionArtifact.created_at).label("latest_created_at")
     ).filter(
         SubmissionArtifact.submit == True
-    ).group_by(
+    )
+    if course_id:
+        latest_artifact_subquery = latest_artifact_subquery.join(
+            SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id
+        ).filter(SubmissionGroup.course_id == course_id)
+    latest_artifact_subquery = latest_artifact_subquery.group_by(
         SubmissionArtifact.submission_group_id
     ).subquery()
 
@@ -1120,7 +1127,8 @@ def get_unreviewed_submission_count_per_member(
 
     if course_id:
         latest_artifacts_query = latest_artifacts_query.filter(
-            CourseMember.course_id == course_id
+            CourseMember.course_id == course_id,
+            SubmissionGroup.course_id == course_id,
         )
 
     if course_member_ids is not None:
@@ -1130,27 +1138,23 @@ def get_unreviewed_submission_count_per_member(
 
     latest_artifacts = latest_artifacts_query.subquery()
 
-    # Step 3: For each artifact, get the latest grade's status (using window function)
-    # We need to find artifacts where:
-    # - No grades exist, OR
-    # - The latest grade has status = 0
-
-    # Subquery for latest grade status per artifact
-    latest_grade_per_artifact = db.query(
+    # Step 3: For each artifact, get the latest grade's status. Use DISTINCT ON
+    # (a Postgres-specific shortcut) instead of a window function because it lets
+    # the planner stop at the first row per artifact_id rather than ranking every
+    # grade in the database. Scoped to the requested course when known.
+    latest_grade_q = db.query(
         SubmissionGrade.artifact_id,
         SubmissionGrade.status.label("latest_grade_status"),
-        func.row_number().over(
-            partition_by=SubmissionGrade.artifact_id,
-            order_by=SubmissionGrade.graded_at.desc()
-        ).label("rn")
-    ).subquery()
-
-    # Get only the latest grade per artifact (rn = 1)
-    latest_grade = db.query(
-        latest_grade_per_artifact.c.artifact_id,
-        latest_grade_per_artifact.c.latest_grade_status
-    ).filter(
-        latest_grade_per_artifact.c.rn == 1
+    ).distinct(SubmissionGrade.artifact_id)
+    if course_id:
+        latest_grade_q = latest_grade_q.join(
+            SubmissionArtifact, SubmissionArtifact.id == SubmissionGrade.artifact_id
+        ).join(
+            SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id
+        ).filter(SubmissionGroup.course_id == course_id)
+    latest_grade = latest_grade_q.order_by(
+        SubmissionGrade.artifact_id,
+        SubmissionGrade.graded_at.desc(),
     ).subquery()
 
     # Step 4: Count artifacts that are "unreviewed"
