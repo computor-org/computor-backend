@@ -25,6 +25,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
     get_message_with_read_status,
     get_message_thread,
+    invalidate_tutor_lecturer_views_for_message,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_message_as_read,
@@ -61,6 +62,9 @@ async def create_message(
     db_message = message_repo.get_by_id_optional(str(message.id))
     if db_message:
         create_message_audit(db_message, permissions, db)
+        # Invalidate tutor/lecturer course views so unread_message_count badges
+        # reflect the new message without waiting for the 3-min TTL.
+        invalidate_tutor_lecturer_views_for_message(db_message, db, cache)
 
     # Enrich message with author info before broadcasting
     enriched_message = get_message_with_read_status(message.id, message, permissions, db)
@@ -154,18 +158,23 @@ async def delete_message(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
 ):
     """Soft delete a message (preserves thread structure)."""
     # Verify user has access and get message for broadcast
     message = await get_id_db(permissions, db, id, MessageInterface)
 
     # Soft delete with audit
-    soft_delete_message(
+    deleted = soft_delete_message(
         message_id=id,
         principal=permissions,
         db=db,
         reason="user_request"
     )
+
+    # Invalidate tutor/lecturer course views so unread_message_count drops for
+    # other users who hadn't yet read this message.
+    invalidate_tutor_lecturer_views_for_message(deleted, db, cache)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
     await ws_broadcast.message_deleted(message, str(id))
