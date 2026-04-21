@@ -290,12 +290,25 @@ def list_tutor_course_members(
 ) -> List[TutorCourseMemberList]:
     """List course members for tutors."""
 
+    reader_user_id = str(permissions.get_user_id_or_throw())
+    course_id = params.course_id if params and hasattr(params, 'course_id') else None
+
+    # Cache-first: mirror TutorViewRepository's query-view caching so the heavy
+    # aggregations below only run on miss. The grading flow already invalidates
+    # the `tutor_view:{course_id}` tag on new grades, so stale data self-heals.
+    view_repo = TutorViewRepository(cache=cache, user_id=reader_user_id)
+    cached = view_repo._get_cached_query_view(
+        user_id=reader_user_id,
+        view_type="tutor:course_members",
+        params=params,
+    )
+    if cached is not None:
+        return [TutorCourseMemberList.model_validate(item) for item in cached]
+
     subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \
         .join(Course, Course.id == CourseMember.course_id) \
         .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
-
-    course_id = params.course_id if params and hasattr(params, 'course_id') else None
 
     query = course_course_member_list_query(db, course_id=course_id)
     query = query.join(User, User.id == CourseMember.user_id)
@@ -316,7 +329,6 @@ def list_tutor_course_members(
 
     # Get unreviewed submission counts for course members
     # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
-    reader_user_id = str(permissions.get_user_id_or_throw())
     unreviewed_counts = get_unreviewed_submission_count_per_member(
         db, course_id, course_member_ids=member_ids
     )
@@ -332,6 +344,20 @@ def list_tutor_course_members(
         tutor_course_member.ungraded_submissions_count = unreviewed_counts.get(str(course_member.id), 0)
         tutor_course_member.unread_message_count = unread_message_counts.get(str(course_member.id), 0)
         response_list.append(tutor_course_member)
+
+    # Tag with `tutor_view:{course_id}` so existing grade-invalidation hooks clear
+    # this entry when a grade is updated (see update_tutor_course_content_grade).
+    related_ids: dict = {}
+    if course_id:
+        related_ids['tutor_view'] = str(course_id)
+    view_repo._set_cached_query_view(
+        user_id=reader_user_id,
+        view_type="tutor:course_members",
+        params=params,
+        data=view_repo._serialize_dto_list(response_list),
+        ttl=view_repo.get_default_ttl(),
+        related_ids=related_ids or None,
+    )
 
     return response_list
 
