@@ -913,7 +913,7 @@ def course_member_course_content_list_query(
     return query
 
 
-def course_course_member_list_query(db: Session):
+def course_course_member_list_query(db: Session, course_id: Optional[str] = None):
     """
     Query to get course members with their latest submission result dates.
 
@@ -922,6 +922,10 @@ def course_course_member_list_query(db: Session):
 
     Args:
         db: Database session
+        course_id: Optional course ID to scope the latest-result aggregation to.
+            When provided, the inner subquery is restricted to results belonging
+            to course members of that course — critical for performance as the
+            global `result` table grows.
 
     Returns:
         Query object that returns tuples of (CourseMember, latest_result_date)
@@ -939,8 +943,14 @@ def course_course_member_list_query(db: Session):
             Result.status == 0,  # FINISHED status
             SubmissionArtifact.submit == True,  # Only official submissions
             Result.test_system_id.isnot(None)  # Only completed tests
-        ) \
-        .group_by(Result.course_content_id, CourseMember.id).subquery()
+        )
+
+    if course_id is not None:
+        latest_result_subquery = latest_result_subquery.filter(CourseMember.course_id == course_id)
+
+    latest_result_subquery = latest_result_subquery.group_by(
+        Result.course_content_id, CourseMember.id
+    ).subquery()
 
     latest_result_per_member = db.query(
         latest_result_subquery.c.course_member_id,
@@ -955,6 +965,9 @@ def course_course_member_list_query(db: Session):
     ) \
         .select_from(CourseMember) \
         .outerjoin(latest_result_per_member, latest_result_per_member.c.course_member_id == CourseMember.id)
+
+    if course_id is not None:
+        course_member_results = course_member_results.filter(CourseMember.course_id == course_id)
 
     return course_member_results
 

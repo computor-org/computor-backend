@@ -295,7 +295,9 @@ def list_tutor_course_members(
         .join(Course, Course.id == CourseMember.course_id) \
         .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
 
-    query = course_course_member_list_query(db)
+    course_id = params.course_id if params and hasattr(params, 'course_id') else None
+
+    query = course_course_member_list_query(db, course_id=course_id)
     query = query.join(User, User.id == CourseMember.user_id)
     query = query.options(contains_eager(CourseMember.user))
     query = CourseMemberInterface.search(db, query, params)
@@ -309,8 +311,6 @@ def list_tutor_course_members(
 
     # Get unreviewed submission counts for course members
     # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
-    # Extract course_id from params if available
-    course_id = params.course_id if params and hasattr(params, 'course_id') else None
     reader_user_id = str(permissions.get_user_id_or_throw())
     unreviewed_counts = get_unreviewed_submission_count_per_member(db, course_id)
     unread_message_counts = get_unread_message_count_per_member(db, course_id, reader_user_id)
