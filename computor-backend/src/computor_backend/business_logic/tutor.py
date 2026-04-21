@@ -298,11 +298,14 @@ def list_tutor_course_members(
     query = course_course_member_list_query(db)
     query = query.options(joinedload(CourseMember.user))
     query = CourseMemberInterface.search(db, query, params)
+    query = query.join(User, User.id == CourseMember.user_id)
 
-    if permissions.is_admin != True:
+    if not permissions.is_admin:
         query = query.join(Course, Course.id == CourseMember.course_id).filter(
             Course.id.in_([r.id for r in subquery])
-        ).join(User, User.id == CourseMember.user_id).order_by(User.family_name).all()
+        )
+
+    query = query.order_by(User.family_name).all()
 
     # Get unreviewed submission counts for course members
     # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
