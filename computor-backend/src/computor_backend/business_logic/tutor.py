@@ -320,7 +320,15 @@ def list_tutor_course_members(
             Course.id.in_([r.id for r in subquery])
         )
 
-    query = query.order_by(User.family_name).all()
+    query = query.order_by(User.family_name)
+
+    # Apply pagination only when the caller explicitly sets skip/limit,
+    # so the default "return all members for a course" behaviour is preserved.
+    fields_set = getattr(params, '__pydantic_fields_set__', set()) if params else set()
+    if 'limit' in fields_set or 'skip' in fields_set:
+        query = query.offset(params.skip or 0).limit(params.limit)
+
+    query = query.all()
 
     # Restrict the count aggregations to the exact members we're about to return.
     # This turns a course-wide scan into a pruned lookup (matters a lot when a tutor
