@@ -3,7 +3,7 @@ import logging
 from uuid import UUID
 from typing import List, Optional
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from computor_backend.api.exceptions import ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
@@ -296,9 +296,9 @@ def list_tutor_course_members(
         .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
 
     query = course_course_member_list_query(db)
-    query = query.options(joinedload(CourseMember.user))
-    query = CourseMemberInterface.search(db, query, params)
     query = query.join(User, User.id == CourseMember.user_id)
+    query = query.options(contains_eager(CourseMember.user))
+    query = CourseMemberInterface.search(db, query, params)
 
     if not permissions.is_admin:
         query = query.join(Course, Course.id == CourseMember.course_id).filter(
