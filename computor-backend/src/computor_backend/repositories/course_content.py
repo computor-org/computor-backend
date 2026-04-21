@@ -1047,7 +1047,11 @@ def get_ungraded_submission_count_per_member(db: Session, course_id: Optional[st
     return {str(row[0]): row[1] for row in ungraded_counts}
 
 
-def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[str] = None):
+def get_unreviewed_submission_count_per_member(
+    db: Session,
+    course_id: Optional[str] = None,
+    course_member_ids: Optional[list] = None,
+):
     """
     Get count of unreviewed latest submission artifacts per course member.
 
@@ -1062,6 +1066,9 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
     Args:
         db: Database session
         course_id: Optional course ID to filter by
+        course_member_ids: Optional list of course member IDs to restrict the
+            aggregation to. Passing a known member set turns a course-wide scan
+            into a targeted lookup. If empty, returns `{}` without querying.
 
     Returns:
         Dictionary mapping course_member_id -> count of unreviewed submissions
@@ -1069,6 +1076,9 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
     from sqlalchemy import func, and_, or_
     from sqlalchemy.sql import expression
     from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
+
+    if course_member_ids is not None and len(course_member_ids) == 0:
+        return {}
 
     # Step 1: Get the latest artifact per submission group (submit=True)
     latest_artifact_subquery = db.query(
@@ -1111,6 +1121,11 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
     if course_id:
         latest_artifacts_query = latest_artifacts_query.filter(
             CourseMember.course_id == course_id
+        )
+
+    if course_member_ids is not None:
+        latest_artifacts_query = latest_artifacts_query.filter(
+            CourseMember.id.in_(course_member_ids)
         )
 
     latest_artifacts = latest_artifacts_query.subquery()
@@ -1158,7 +1173,12 @@ def get_unreviewed_submission_count_per_member(db: Session, course_id: Optional[
     return {str(row[0]): row[1] for row in unreviewed_counts}
 
 
-def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = None, reader_user_id: Optional[str] = None):
+def get_unread_message_count_per_member(
+    db: Session,
+    course_id: Optional[str] = None,
+    reader_user_id: Optional[str] = None,
+    course_member_ids: Optional[list] = None,
+):
     """
     Get count of unread messages per course member.
 
@@ -1171,6 +1191,9 @@ def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = 
         db: Database session
         course_id: Optional course ID to filter by
         reader_user_id: The user ID of the person viewing (tutor). Messages unread by this user are counted.
+        course_member_ids: Optional list of course member IDs to restrict the
+            aggregation to. Passing a known member set prunes the join early.
+            If empty, returns `{}` without querying.
 
     Returns:
         Dictionary mapping course_member_id -> count of unread messages
@@ -1179,6 +1202,9 @@ def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = 
     from computor_backend.model.message import Message, MessageRead
 
     if reader_user_id is None:
+        return {}
+
+    if course_member_ids is not None and len(course_member_ids) == 0:
         return {}
 
     # Base query: count messages per course_member via submission_group
@@ -1207,6 +1233,9 @@ def get_unread_message_count_per_member(db: Session, course_id: Optional[str] = 
     # Filter by course if provided
     if course_id:
         query = query.filter(CourseMember.course_id == course_id)
+
+    if course_member_ids is not None:
+        query = query.filter(CourseMember.id.in_(course_member_ids))
 
     query = query.group_by(CourseMember.id)
 

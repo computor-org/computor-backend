@@ -309,11 +309,20 @@ def list_tutor_course_members(
 
     query = query.order_by(User.family_name).all()
 
+    # Restrict the count aggregations to the exact members we're about to return.
+    # This turns a course-wide scan into a pruned lookup (matters a lot when a tutor
+    # filters by course_group_id, or for admins viewing a slice of members).
+    member_ids = [cm.id for cm, _ in query]
+
     # Get unreviewed submission counts for course members
     # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
     reader_user_id = str(permissions.get_user_id_or_throw())
-    unreviewed_counts = get_unreviewed_submission_count_per_member(db, course_id)
-    unread_message_counts = get_unread_message_count_per_member(db, course_id, reader_user_id)
+    unreviewed_counts = get_unreviewed_submission_count_per_member(
+        db, course_id, course_member_ids=member_ids
+    )
+    unread_message_counts = get_unread_message_count_per_member(
+        db, course_id, reader_user_id, course_member_ids=member_ids
+    )
 
     response_list = []
 
