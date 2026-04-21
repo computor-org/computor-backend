@@ -3,7 +3,7 @@ import logging
 from uuid import UUID
 from typing import List, Optional
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from computor_backend.api.exceptions import ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
@@ -290,27 +290,59 @@ def list_tutor_course_members(
 ) -> List[TutorCourseMemberList]:
     """List course members for tutors."""
 
+    reader_user_id = str(permissions.get_user_id_or_throw())
+    course_id = params.course_id if params and hasattr(params, 'course_id') else None
+
+    # Cache-first: mirror TutorViewRepository's query-view caching so the heavy
+    # aggregations below only run on miss. The grading flow already invalidates
+    # the `tutor_view:{course_id}` tag on new grades, so stale data self-heals.
+    view_repo = TutorViewRepository(cache=cache, user_id=reader_user_id)
+    cached = view_repo._get_cached_query_view(
+        user_id=reader_user_id,
+        view_type="tutor:course_members",
+        params=params,
+    )
+    if cached is not None:
+        return [TutorCourseMemberList.model_validate(item) for item in cached]
+
     subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \
         .join(Course, Course.id == CourseMember.course_id) \
         .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
 
-    query = course_course_member_list_query(db)
-    query = query.options(joinedload(CourseMember.user))
+    query = course_course_member_list_query(db, course_id=course_id)
+    query = query.join(User, User.id == CourseMember.user_id)
+    query = query.options(contains_eager(CourseMember.user))
     query = CourseMemberInterface.search(db, query, params)
 
-    if permissions.is_admin != True:
+    if not permissions.is_admin:
         query = query.join(Course, Course.id == CourseMember.course_id).filter(
             Course.id.in_([r.id for r in subquery])
-        ).join(User, User.id == CourseMember.user_id).order_by(User.family_name).all()
+        )
+
+    query = query.order_by(User.family_name)
+
+    # Apply pagination only when the caller explicitly sets skip/limit,
+    # so the default "return all members for a course" behaviour is preserved.
+    fields_set = getattr(params, '__pydantic_fields_set__', set()) if params else set()
+    if 'limit' in fields_set or 'skip' in fields_set:
+        query = query.offset(params.skip or 0).limit(params.limit)
+
+    query = query.all()
+
+    # Restrict the count aggregations to the exact members we're about to return.
+    # This turns a course-wide scan into a pruned lookup (matters a lot when a tutor
+    # filters by course_group_id, or for admins viewing a slice of members).
+    member_ids = [cm.id for cm, _ in query]
 
     # Get unreviewed submission counts for course members
     # "unreviewed" = latest submission has no grades OR latest grade has status = NOT_REVIEWED
-    # Extract course_id from params if available
-    course_id = params.course_id if params and hasattr(params, 'course_id') else None
-    reader_user_id = str(permissions.get_user_id_or_throw())
-    unreviewed_counts = get_unreviewed_submission_count_per_member(db, course_id)
-    unread_message_counts = get_unread_message_count_per_member(db, course_id, reader_user_id)
+    unreviewed_counts = get_unreviewed_submission_count_per_member(
+        db, course_id, course_member_ids=member_ids
+    )
+    unread_message_counts = get_unread_message_count_per_member(
+        db, course_id, reader_user_id, course_member_ids=member_ids
+    )
 
     response_list = []
 
@@ -320,6 +352,20 @@ def list_tutor_course_members(
         tutor_course_member.ungraded_submissions_count = unreviewed_counts.get(str(course_member.id), 0)
         tutor_course_member.unread_message_count = unread_message_counts.get(str(course_member.id), 0)
         response_list.append(tutor_course_member)
+
+    # Tag with `tutor_view:{course_id}` so existing grade-invalidation hooks clear
+    # this entry when a grade is updated (see update_tutor_course_content_grade).
+    related_ids: dict = {}
+    if course_id:
+        related_ids['tutor_view'] = str(course_id)
+    view_repo._set_cached_query_view(
+        user_id=reader_user_id,
+        view_type="tutor:course_members",
+        params=params,
+        data=view_repo._serialize_dto_list(response_list),
+        ttl=view_repo.get_default_ttl(),
+        related_ids=related_ids or None,
+    )
 
     return response_list
 

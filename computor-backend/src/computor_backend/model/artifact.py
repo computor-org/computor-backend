@@ -143,6 +143,8 @@ class SubmissionGrade(Base):
         Index('submission_grade_artifact_idx', 'artifact_id'),
         Index('submission_grade_grader_idx', 'graded_by_course_member_id'),
         Index('submission_grade_graded_at_idx', 'graded_at'),
+        Index('submission_grade_artifact_graded_at_idx', 'artifact_id',
+              text('graded_at DESC')),
     )
 
     # Primary key and versioning
