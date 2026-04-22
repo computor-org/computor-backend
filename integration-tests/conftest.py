@@ -37,6 +37,11 @@ def _load_env_file(path: Path) -> None:
 
 _load_env_file(IT_ROOT / ".env.integration")
 
+# Fixtures published to every test via plugin registration.
+pytest_plugins = [
+    "fixtures.api",
+]
+
 
 @pytest.fixture(scope="session")
 def it_env() -> dict[str, str]:
