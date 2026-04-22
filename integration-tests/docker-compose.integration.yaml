@@ -1,0 +1,285 @@
+# Integration-test stack: backend + Temporal + Postgres + Redis + MinIO + GitLab CE.
+#
+# Deliberately self-contained (no `include:` of ops/docker/*) so the test stack
+# stays insulated from dev/prod compose evolution. Uses named volumes (no host
+# bind mounts) so `docker compose down -v` wipes everything cleanly.
+#
+# Deliberately excluded (out of scope for issue #106):
+#   - MATLAB testing worker (licensed base image)
+#   - Coder workspace services (huge surface area; blows up test runtime)
+#   - computor-web (frontend)
+# `CODER_ENABLED=false` is hard-wired on the API container.
+#
+# Invoke from this directory:
+#   docker compose -f docker-compose.integration.yaml --env-file .env.integration up -d
+# Or use the Makefile: `make up`.
+
+name: computor-integration-test
+
+networks:
+  computor-it:
+    name: computor-it
+    driver: bridge
+
+volumes:
+  postgres-data:
+  temporal-postgres-data:
+  redis-data:
+  minio-data:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:
+  shared-data:
+
+services:
+
+  # ---- Infrastructure -----------------------------------------------------
+
+  postgres:
+    image: postgres:16
+    networks: [computor-it]
+    ports:
+      - "${IT_POSTGRES_PORT:-15432}:5432"
+    environment:
+      TZ: UTC
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-it-postgres-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-computor}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    networks: [computor-it]
+    ports:
+      - "${IT_REDIS_PORT:-16379}:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-it-redis-pass}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-it-redis-pass}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal-postgres:
+    image: postgres:16
+    networks: [computor-it]
+    environment:
+      TZ: UTC
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.27.0
+    networks: [computor-it]
+    ports:
+      - "${IT_TEMPORAL_PORT:-17233}:7233"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig.yaml
+    volumes:
+      - ../docker/temporal/dynamicconfig.yaml:/etc/temporal/config/dynamicconfig.yaml:ro
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    networks: [computor-it]
+    ports:
+      - "${IT_TEMPORAL_UI_PORT:-18088}:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+
+  minio:
+    image: minio/minio:latest
+    networks: [computor-it]
+    ports:
+      - "${IT_MINIO_API_PORT:-19000}:9000"
+      - "${IT_MINIO_CONSOLE_PORT:-19001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---- GitLab -------------------------------------------------------------
+  # Long boot (~3-5 min cold). Template: /Users/theta/computor/gitlab-server/docker-compose.yaml.
+  # Host ports differ from the standalone dev GitLab to avoid collisions.
+  #
+  # external_url: a later milestone (M4) will decide how API + host tests
+  # address GitLab with a single URL. For M1 we use `http://localhost:<port>`
+  # and only host-side access is tested.
+  gitlab:
+    image: gitlab/gitlab-ce:${GITLAB_CE_VERSION:-16.5.0-ce.0}
+    networks: [computor-it]
+    hostname: gitlab
+    ports:
+      - "${IT_GITLAB_HTTP_PORT:-8085}:80"
+      - "${IT_GITLAB_HTTPS_PORT:-8444}:443"
+      - "${IT_GITLAB_SSH_PORT:-2224}:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:${IT_GITLAB_HTTP_PORT:-8085}'
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMeIntegration1!}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${IT_GITLAB_SSH_PORT:-2224}
+        prometheus_monitoring['enable'] = false
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+    shm_size: '256m'
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/-/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s
+
+  # ---- Backend ------------------------------------------------------------
+
+  api:
+    build:
+      context: ../
+      dockerfile: docker/api/Dockerfile
+    image: computor-api:integration
+    networks: [computor-it]
+    ports:
+      - "${IT_API_PORT:-18000}:8000"
+    command: ["sh", "startup.bash"]
+    environment:
+      TZ: UTC
+      RUNNING_IN_DOCKER: "true"
+      API_ADMIN_USER: ${API_ADMIN_USER:-admin}
+      API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD:-it-admin-pass}
+      API_LOCAL_STORAGE_DIR: /home/uvicorn/shared
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-it-postgres-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-computor}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-it-redis-pass}
+      DEBUG_MODE: ${DEBUG_MODE:-development}
+      TOKEN_SECRET: ${TOKEN_SECRET:-it-token-secret-change-me}
+      AUTH_SECRET: ${AUTH_SECRET:-it-auth-secret-change-me}
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      TEMPORAL_NAMESPACE: default
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_MAX_UPLOAD_SIZE: ${MINIO_MAX_UPLOAD_SIZE:-20971520}
+      CODER_ENABLED: "false"
+    volumes:
+      - shared-data:/home/uvicorn/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ---- Temporal workers ---------------------------------------------------
+  # MATLAB worker deliberately omitted (out of scope per issue #106).
+  # Coder worker also omitted — Coder is not tested in this suite.
+
+  temporal-worker:
+    build:
+      context: ../
+      dockerfile: docker/temporal-worker-dev/Dockerfile
+    image: computor-temporal-worker:integration
+    networks: [computor-it]
+    environment:
+      TZ: UTC
+      RUNNING_IN_DOCKER: "true"
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      TEMPORAL_NAMESPACE: default
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-it-postgres-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-computor}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-it-redis-pass}
+      DEBUG_MODE: ${DEBUG_MODE:-development}
+      TOKEN_SECRET: ${TOKEN_SECRET:-it-token-secret-change-me}
+      SYSTEM_GIT_EMAIL: worker@computor.integration
+      SYSTEM_GIT_NAME: Computor IT Worker
+      PYTHONPATH: /home/worker/computor-backend/src
+      API_URL: http://api:8000
+      API_ADMIN_USER: ${API_ADMIN_USER:-admin}
+      API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD:-it-admin-pass}
+      API_LOCAL_STORAGE_DIR: /home/worker/shared
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SECURE: "false"
+    volumes:
+      - shared-data:/home/worker/shared
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+      - minio
+
+  temporal-worker-testing:
+    build:
+      context: ../
+      dockerfile: docker/temporal-worker-testing/Dockerfile
+    image: computor-temporal-worker-testing:integration
+    networks: [computor-it]
+    command: ["--queues=testing"]
+    environment:
+      TZ: UTC
+      RUNNING_IN_DOCKER: "true"
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      TEMPORAL_NAMESPACE: default
+      API_URL: http://api:8000
+      API_TOKEN: ${TESTING_WORKER_TOKEN:-it-worker-token-change-me}
+      TESTING_EXECUTABLE: computor-test
+      PYTHON_TEST_VERSION: ${PYTHON_TEST_VERSION:-3.13}
+    depends_on:
+      - temporal
+      - postgres
+      - redis
