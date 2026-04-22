@@ -7,7 +7,7 @@ from computor_backend.api.exceptions import BadRequestException, NotImplementedE
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import MessageRead, Message
-from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember
+from computor_backend.model.course import CourseContent, CourseMember, SubmissionGroup, SubmissionGroupMember
 from computor_backend.model.auth import User
 from computor_types.messages import (
     MessageCreate, MessageGet, MessageList, MessageQuery,
@@ -483,6 +483,48 @@ def list_messages_with_read_status(
         })
         for item in items
     ]
+
+
+def invalidate_tutor_lecturer_views_for_message(
+    message: Message,
+    db: Session,
+    cache: Optional[Cache] = None,
+) -> None:
+    """
+    Clear cached tutor and lecturer course views affected by a message create/delete.
+
+    Every tutor's `unread_message_count` badge for a course member depends on the
+    set of non-archived messages scoped to that member's submission group. When a
+    new message is posted (or soft-deleted), that set changes, so every tutor's
+    cached view for the course must be invalidated.
+
+    Resolves the effective course_id via the message's scope hierarchy when
+    `message.course_id` itself is NULL (submission-group-scoped messages):
+        submission_group.course_id -> course_content.course_id
+
+    Note: this is a no-op for read/unread state changes — those are per-user and
+    are handled by `_invalidate_message_cache`.
+    """
+    if cache is None or message is None:
+        return
+
+    course_id = message.course_id
+
+    if course_id is None and message.submission_group_id:
+        course_id = db.query(SubmissionGroup.course_id).filter(
+            SubmissionGroup.id == message.submission_group_id
+        ).scalar()
+
+    if course_id is None and message.course_content_id:
+        course_id = db.query(CourseContent.course_id).filter(
+            CourseContent.id == message.course_content_id
+        ).scalar()
+
+    if course_id is None:
+        return
+
+    cache.invalidate_tags(f"tutor_view:{course_id}")
+    cache.invalidate_tags(f"lecturer_view:{course_id}")
 
 
 def _invalidate_message_cache(
