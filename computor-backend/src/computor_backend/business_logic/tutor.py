@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
-from computor_backend.api.exceptions import ForbiddenException, NotFoundException
+from computor_backend.api.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal, allowed_course_role_ids
 from computor_backend.cache import Cache
@@ -293,6 +293,12 @@ def list_tutor_course_members(
     reader_user_id = str(permissions.get_user_id_or_throw())
     course_id = params.course_id if params and hasattr(params, 'course_id') else None
 
+    # Require course_id: the endpoint answers "who are the members of this course
+    # through a tutor lens". Without a course there is no natural scope — the query
+    # would otherwise fall back to a global aggregation across every course.
+    if course_id is None:
+        raise BadRequestException(detail="'course_id' query parameter is required")
+
     # Cache-first: mirror TutorViewRepository's query-view caching so the heavy
     # aggregations below only run on miss. The grading flow already invalidates
     # the `tutor_view:{course_id}` tag on new grades, so stale data self-heals.
@@ -500,6 +506,12 @@ def list_tutor_submission_groups(
     """
     from sqlalchemy import func, exists, and_
     from sqlalchemy.orm import joinedload
+
+    # Require course_id: tutor/lecturer/student views always operate within a single
+    # course context. Without a course filter the query scans every submission group
+    # a tutor has access to — unbounded for admins.
+    if not params.course_id:
+        raise BadRequestException(detail="'course_id' query parameter is required")
 
     # Get courses where user is a tutor
     tutor_course_ids = db.query(Course.id).select_from(User).filter(
