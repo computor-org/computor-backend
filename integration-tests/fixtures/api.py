@@ -43,8 +43,21 @@ def admin_basic_client(
 def admin_login(
     anonymous_client: httpx.Client, admin_credentials: dict[str, str]
 ) -> dict[str, object]:
-    """POST /auth/login with admin creds; returns the parsed response body."""
-    r = anonymous_client.post("/auth/login", json=admin_credentials)
+    """POST /auth/login with admin creds; returns the parsed response body.
+
+    The ``/auth/login`` endpoint rate-limits at 5/min per username.
+    Developers iterate fast — retry once after a short backoff if we trip
+    the limiter rather than forcing a full clock-wait.
+    """
+    import time
+
+    for attempt in range(3):
+        r = anonymous_client.post("/auth/login", json=admin_credentials)
+        if r.status_code == 429 and attempt < 2:
+            time.sleep(15)
+            continue
+        r.raise_for_status()
+        return r.json()
     r.raise_for_status()
     return r.json()
 

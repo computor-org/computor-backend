@@ -45,6 +45,7 @@ pytest_plugins = [
     "fixtures.users",
     "fixtures.clients",
     "fixtures.permission_matrix",
+    "reporting",
 ]
 
 

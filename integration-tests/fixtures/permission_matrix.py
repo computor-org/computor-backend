@@ -173,6 +173,40 @@ def call(
     return client.request(row.method, resolve_path(row, ids), **kwargs)
 
 
+def check_matrix_row(
+    row: MatrixRow,
+    client: httpx.Client,
+    ids: dict[str, str],
+    role: str,
+    record_property=None,
+) -> None:
+    """Shared assertion body for the per-role matrix tests.
+
+    Also records a ``matrix_observation`` test property so the markdown
+    reporter (see ``conftest.py``) can render the endpoint × role cross
+    tab from a single source.
+    """
+    expected = row.expected_for(role)
+    if expected == UNSET:
+        pytest.skip(f"matrix cell not asserted for {role}")
+    r = call(client, row, ids)
+    if record_property is not None:
+        record_property(
+            "matrix_observation",
+            {
+                "role": role,
+                "method": row.method,
+                "path": row.path,
+                "expected": expected,
+                "observed": r.status_code,
+            },
+        )
+    assert r.status_code == expected, (
+        f"{row.method} {r.request.url}: expected {expected}, got "
+        f"{r.status_code} — body={r.text[:200]}"
+    )
+
+
 @pytest.fixture(scope="session")
 def matrix_ids(
     target_organization: dict, target_course_family: dict, target_course: dict
