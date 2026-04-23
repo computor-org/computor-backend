@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from computor_backend.model import Base
 
+# Markdown test-report generator (see reporting.py next to this file).
+pytest_plugins = [
+    "computor_backend.tests.reporting",
+]
+
 # Import specific fixtures from fixtures.py to make them available to all tests
 from computor_backend.tests.fixtures import (
     test_db,
