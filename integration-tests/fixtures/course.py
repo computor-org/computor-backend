@@ -24,6 +24,7 @@ COURSE_FAMILY_PATH = "intro-to-programming"
 COURSE_FAMILY_TITLE = "Intro to Programming"
 COURSE_PATH = "py-fall-2099"
 COURSE_TITLE = "Python Fall 2099"
+COURSE_GROUP_TITLE = "Default Group"
 
 
 def _find_by_path(client: httpx.Client, resource: str, path: str) -> dict | None:
@@ -117,4 +118,30 @@ def target_course(
     # Re-fetch through the API so the returned dict matches the CourseGet shape.
     r = admin_client.get(f"/courses/{course_id}")
     r.raise_for_status()
+    return r.json()
+
+
+@pytest.fixture(scope="session")
+def target_course_group(
+    admin_client: httpx.Client, target_course: dict
+) -> dict:
+    """Default course group for student memberships.
+
+    The ``course_member`` table has a CHECK constraint requiring
+    ``course_group_id`` to be non-null when ``course_role_id = '_student'``,
+    so students need a group to land in.
+    """
+    existing = admin_client.get(
+        "/course-groups", params={"course_id": target_course["id"]}
+    )
+    existing.raise_for_status()
+    for item in existing.json():
+        if item.get("course_id") == target_course["id"] and item.get("title") == COURSE_GROUP_TITLE:
+            return item
+
+    r = admin_client.post(
+        "/course-groups",
+        json={"course_id": target_course["id"], "title": COURSE_GROUP_TITLE},
+    )
+    assert r.status_code in (200, 201), r.text
     return r.json()

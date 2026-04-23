@@ -84,7 +84,11 @@ def _ensure_password(client: httpx.Client, username: str, password: str) -> None
 
 
 def _ensure_course_member(
-    client: httpx.Client, user_id: str, course_id: str, course_role_id: str
+    client: httpx.Client,
+    user_id: str,
+    course_id: str,
+    course_role_id: str,
+    course_group_id: str | None = None,
 ) -> dict:
     listing = client.get(
         "/course-members", params={"user_id": user_id, "course_id": course_id}
@@ -94,14 +98,16 @@ def _ensure_course_member(
         if item.get("user_id") == user_id and item.get("course_id") == course_id:
             return item
 
-    r = client.post(
-        "/course-members",
-        json={
-            "user_id": user_id,
-            "course_id": course_id,
-            "course_role_id": course_role_id,
-        },
-    )
+    body: dict = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "course_role_id": course_role_id,
+    }
+    # DB CHECK: students require course_group_id. Non-students are fine
+    # either way.
+    if course_group_id is not None:
+        body["course_group_id"] = course_group_id
+    r = client.post("/course-members", json=body)
     assert r.status_code in (200, 201), r.text
     return r.json()
 
@@ -113,7 +119,10 @@ def role_password() -> str:
 
 @pytest.fixture(scope="session")
 def seed_role_users(
-    admin_client: httpx.Client, target_course: dict, role_password: str
+    admin_client: httpx.Client,
+    target_course: dict,
+    target_course_group: dict,
+    role_password: str,
 ) -> dict[str, dict]:
     """Create the five role-bearing users, set their passwords, and assign
     them into the target course with the appropriate course role.
@@ -131,6 +140,9 @@ def seed_role_users(
             user_id=user["id"],
             course_id=target_course["id"],
             course_role_id=spec.course_role,
+            course_group_id=(
+                target_course_group["id"] if spec.course_role == "_student" else None
+            ),
         )
         # Stash the spec too so the client fixtures can look up usernames
         # without re-importing SEED_USERS.
