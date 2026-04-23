@@ -40,6 +40,11 @@ _load_env_file(IT_ROOT / ".env.integration")
 # Fixtures published to every test via plugin registration.
 pytest_plugins = [
     "fixtures.api",
+    "fixtures.db",
+    "fixtures.course",
+    "fixtures.users",
+    "fixtures.clients",
+    "fixtures.permission_matrix",
 ]
 
 

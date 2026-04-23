@@ -20,6 +20,11 @@ dependencies = [
   "requests>=2.31",
 ]
 
+[tool.setuptools]
+# Explicit package list; setuptools flat-layout auto-discovery errors out on
+# the sibling top-level packages otherwise.
+packages = ["fixtures", "helpers"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["suites"]
