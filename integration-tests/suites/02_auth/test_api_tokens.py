@@ -42,7 +42,7 @@ def test_api_token_authenticates_via_x_api_token_header(
     api_base_url: str, admin_api_token: dict[str, object], admin_credentials: dict[str, str]
 ) -> None:
     with api_token_client(api_base_url, admin_api_token["token"]) as c:  # type: ignore[arg-type]
-        r = c.get("/users")
+        r = c.get("/user")
     assert r.status_code == 200, r.text
     assert r.json()["username"] == admin_credentials["username"]
 
@@ -71,11 +71,11 @@ def test_api_token_revocation_invalidates_token(
     assert delete.status_code == 204, delete.text
 
     with api_token_client(api_base_url, created["token"]) as c:
-        r = c.get("/users")
+        r = c.get("/user")
     assert r.status_code == 401
 
 
 def test_bad_api_token_rejected(api_base_url: str) -> None:
     with api_token_client(api_base_url, "ctp_obviously-not-a-real-token") as c:
-        r = c.get("/users")
+        r = c.get("/user")
     assert r.status_code == 401

@@ -38,6 +38,10 @@ def test_login_unknown_user_returns_401(anonymous_client: httpx.Client) -> None:
     assert r.status_code == 401, r.text
 
 
-def test_login_missing_fields_returns_422(anonymous_client: httpx.Client) -> None:
+def test_login_missing_fields_returns_validation_error(anonymous_client: httpx.Client) -> None:
+    # Backend normalises Pydantic validation errors to 400 (VAL_001) via its
+    # custom exception handler — not the FastAPI default 422.
     r = anonymous_client.post("/auth/login", json={})
-    assert r.status_code == 422, r.text
+    assert r.status_code == 400, r.text
+    body = r.json()
+    assert body.get("error_code") == "VAL_001"

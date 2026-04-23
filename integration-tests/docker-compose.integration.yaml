@@ -101,10 +101,11 @@ services:
       temporal-postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "tctl", "cluster", "health"]
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   temporal-ui:
     image: temporalio/ui:latest
@@ -147,7 +148,10 @@ services:
     networks: [computor-it]
     hostname: gitlab
     ports:
-      - "${IT_GITLAB_HTTP_PORT:-8085}:80"
+      # external_url sets both the listen port inside the container AND the
+      # URL GitLab advertises. Keep host port == container port so both the
+      # in-container healthcheck and the host-side tests agree.
+      - "${IT_GITLAB_HTTP_PORT:-8085}:${IT_GITLAB_HTTP_PORT:-8085}"
       - "${IT_GITLAB_HTTPS_PORT:-8444}:443"
       - "${IT_GITLAB_SSH_PORT:-2224}:22"
     environment:
@@ -155,6 +159,7 @@ services:
         external_url 'http://localhost:${IT_GITLAB_HTTP_PORT:-8085}'
         gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMeIntegration1!}'
         gitlab_rails['gitlab_shell_ssh_port'] = ${IT_GITLAB_SSH_PORT:-2224}
+        gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0']
         prometheus_monitoring['enable'] = false
     volumes:
       - gitlab-config:/etc/gitlab
@@ -162,7 +167,7 @@ services:
       - gitlab-data:/var/opt/gitlab
     shm_size: '256m'
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost/-/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:${IT_GITLAB_HTTP_PORT:-8085}/-/health"]
       interval: 15s
       timeout: 10s
       retries: 40
@@ -256,11 +261,16 @@ services:
       MINIO_SECURE: "false"
     volumes:
       - shared-data:/home/worker/shared
+    restart: unless-stopped
     depends_on:
-      - temporal
-      - postgres
-      - redis
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   temporal-worker-testing:
     build:
@@ -279,7 +289,11 @@ services:
       API_TOKEN: ${TESTING_WORKER_TOKEN:-it-worker-token-change-me}
       TESTING_EXECUTABLE: computor-test
       PYTHON_TEST_VERSION: ${PYTHON_TEST_VERSION:-3.13}
+    restart: unless-stopped
     depends_on:
-      - temporal
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy

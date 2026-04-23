@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 import requests
@@ -87,14 +88,15 @@ def get_root_user_id(base: str, oauth_token: str) -> int:
 
 
 def create_pat(base: str, oauth_token: str, user_id: int) -> str:
-    # GitLab 16+ requires an expiry; one year out is plenty for a test stack.
+    # GitLab 16 caps PAT expiry at ~1 year out; pick the max allowed.
+    expiry = (date.today() + timedelta(days=364)).isoformat()
     r = requests.post(
         f"{base}/api/v4/users/{user_id}/personal_access_tokens",
         headers={"Authorization": f"Bearer {oauth_token}"},
         json={
             "name": TOKEN_NAME,
             "scopes": TOKEN_SCOPES,
-            "expires_at": "2099-12-31",
+            "expires_at": expiry,
         },
         timeout=30,
     )

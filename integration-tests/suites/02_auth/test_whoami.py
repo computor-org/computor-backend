@@ -1,6 +1,6 @@
-"""GET /users (current user) — returns admin when authed, 401 when not.
+"""GET /user (current user) — returns admin when authed, 401 when not.
 
-`/users` without an ID is the "whoami" endpoint in this API.
+`/user` (singular) is the whoami endpoint; `/users` is the CRUD list.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ pytestmark = pytest.mark.auth
 def test_whoami_with_bearer_token(
     admin_client: httpx.Client, admin_credentials: dict[str, str]
 ) -> None:
-    r = admin_client.get("/users")
+    r = admin_client.get("/user")
     assert r.status_code == 200, r.text
     user = r.json()
     assert user["username"] == admin_credentials["username"]
@@ -23,13 +23,13 @@ def test_whoami_with_bearer_token(
 def test_whoami_with_basic_auth(
     admin_basic_client: httpx.Client, admin_credentials: dict[str, str]
 ) -> None:
-    r = admin_basic_client.get("/users")
+    r = admin_basic_client.get("/user")
     assert r.status_code == 200, r.text
     assert r.json()["username"] == admin_credentials["username"]
 
 
 def test_whoami_anonymous_returns_401(anonymous_client: httpx.Client) -> None:
-    r = anonymous_client.get("/users")
+    r = anonymous_client.get("/user")
     assert r.status_code == 401
 
 
@@ -39,5 +39,5 @@ def test_whoami_with_bogus_bearer_returns_401(
     with httpx.Client(
         base_url=api_base_url, headers={"Authorization": "Bearer not-a-real-token"}
     ) as c:
-        r = c.get("/users")
+        r = c.get("/user")
     assert r.status_code == 401
