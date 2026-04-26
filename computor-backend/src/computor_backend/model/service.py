@@ -96,6 +96,11 @@ class ServiceType(Base):
     # Status
     enabled = Column(Boolean, nullable=False, server_default=text("true"))
 
+    # Whether services of this type need a workspace/environment (e.g. a GitLab
+    # repository fork) provisioned for their course members. When False, the
+    # CourseMember post-create hook skips workspace provisioning entirely.
+    requires_workspace = Column(Boolean, nullable=False, server_default=text("false"))
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
