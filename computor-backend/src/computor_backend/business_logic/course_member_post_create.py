@@ -25,8 +25,16 @@ def _should_skip_service_account(course_member: CourseMember, db: Session) -> bo
     """
     Determine whether to skip post-create hooks for a service account.
 
-    Regular service accounts are skipped. Agent service accounts (service_type
-    path starting with "agent") are NOT skipped — they need GitLab setup.
+    Service accounts are skipped unless their ServiceType has
+    ``requires_workspace=True``, in which case workspace provisioning
+    (e.g. a GitLab repo fork) proceeds normally.
+
+    The User is fetched by ``user_id`` directly rather than via the
+    ``course_member.user`` relationship, because in the import path the
+    CourseMember is only ``flush()``-ed (not committed) when this runs
+    and the relationship is not reliably populated. Going through the
+    relationship caused the import path to incorrectly treat service
+    users as non-service and trigger GitLab provisioning.
 
     Args:
         course_member: The course member to check
@@ -35,24 +43,25 @@ def _should_skip_service_account(course_member: CourseMember, db: Session) -> bo
     Returns:
         True if this is a service account that should be skipped
     """
-    if not course_member.user or not course_member.user.is_service:
-        return False
-
+    from computor_backend.model.auth import User
     from computor_backend.model.service import Service
 
+    user = db.query(User).filter(User.id == course_member.user_id).first()
+    if not user or not user.is_service:
+        return False
+
     service = db.query(Service).filter(Service.user_id == course_member.user_id).first()
-    if service and service.service_type:
-        service_type_path = str(service.service_type.path)
-        if service_type_path.startswith("agent"):
-            logger.info(
-                f"Agent service account {course_member.user_id} — "
-                "proceeding with post-create hooks"
-            )
-            return False
+    if service and service.service_type and service.service_type.requires_workspace:
+        logger.info(
+            f"Service account {course_member.user_id} has service_type "
+            f"'{service.service_type.path}' with requires_workspace=True — "
+            "proceeding with post-create hooks"
+        )
+        return False
 
     logger.info(
-        f"Skipping post-create hooks for non-agent service account "
-        f"{course_member.user_id}"
+        f"Skipping post-create hooks for service account {course_member.user_id} "
+        "(service type does not require workspace provisioning)"
     )
     return True
 

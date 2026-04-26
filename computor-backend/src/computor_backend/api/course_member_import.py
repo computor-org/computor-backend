@@ -68,6 +68,35 @@ async def import_member(
         if result.success:
             db.commit()
             logger.info(f"Member import successful: {request.email}")
+
+            # Invalidate user view caches the same way the CrudRouter does
+            # for course_member writes — otherwise the target user's cached
+            # student/tutor/lecturer list_courses (tagged only by user:<uid>,
+            # not by course_id) will keep hiding the new membership until
+            # TTL expiry.
+            try:
+                from computor_backend.cache import get_cache
+
+                cache = get_cache()
+                cm = result.course_member or {}
+                target_user_id = cm.get("user_id")
+                target_course_id = cm.get("course_id")
+                if target_user_id:
+                    cache.invalidate_user_views(user_id=str(target_user_id))
+                if target_course_id:
+                    cache.invalidate_user_views(
+                        entity_type="course_id",
+                        entity_id=str(target_course_id),
+                    )
+                    for view_tag in ("student_view", "tutor_view", "lecturer_view"):
+                        cache.invalidate_user_views(
+                            entity_type=view_tag,
+                            entity_id=str(target_course_id),
+                        )
+            except Exception as cache_err:
+                logger.warning(
+                    f"View cache invalidation after member import failed: {cache_err}"
+                )
         else:
             db.rollback()
             logger.warning(f"Member import failed: {result.message}")
