@@ -2,6 +2,7 @@
 import logging
 from typing import Optional, Tuple
 from uuid import UUID
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from computor_backend.model.auth import User, StudentProfile
@@ -251,14 +252,24 @@ def _find_or_create_user(
     """
     from computor_backend.utils.username_generation import generate_username_from_names
 
-    # Try to find by email
-    user = db.query(User).filter(User.email == email).first()
+    # Email may be stored in mixed case from other code paths (e.g. the
+    # deployment CLI creating a service user passes the YAML value through
+    # unchanged). Compare case-insensitively so we don't silently spawn a
+    # duplicate row — which would bypass is_service and trigger workspace
+    # provisioning for what is really a service account.
+    normalized_email = email.strip().lower()
+
+    user = db.query(User).filter(func.lower(User.email) == normalized_email).first()
 
     if user:
         return user, False
 
     # Also check student profiles in case the email is stored there
-    student_profile = db.query(StudentProfile).filter(StudentProfile.student_email == email).first()
+    student_profile = (
+        db.query(StudentProfile)
+        .filter(func.lower(StudentProfile.student_email) == normalized_email)
+        .first()
+    )
     if student_profile:
         return student_profile.user, False
 
@@ -267,10 +278,10 @@ def _find_or_create_user(
         username = generate_username_from_names(given_name, family_name, db)
     else:
         # Fallback to email-based generation
-        username = _generate_username_from_email(email, db)
+        username = _generate_username_from_email(normalized_email, db)
 
     new_user = User(
-        email=email,
+        email=normalized_email,
         username=username,
         given_name=given_name.strip() if given_name else None,
         family_name=family_name.strip() if family_name else None,
@@ -278,7 +289,9 @@ def _find_or_create_user(
     db.add(new_user)
     db.flush()  # Flush to get the auto-generated ID
 
-    logger.info(f"Created new user: {email} with username {username} (strategy: {username_strategy})")
+    logger.info(
+        f"Created new user: {normalized_email} with username {username} (strategy: {username_strategy})"
+    )
     return new_user, True
 
 

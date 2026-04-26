@@ -23,6 +23,14 @@ class ServiceTypeBase(BaseModel):
     icon: Optional[str] = Field(None, max_length=255, description="Icon identifier")
     color: Optional[str] = Field(None, max_length=7, description="Hex color for UI (e.g., #FF5733)")
     enabled: bool = Field(True, description="Whether this service type is enabled")
+    requires_workspace: bool = Field(
+        False,
+        description=(
+            "Whether services of this type need a workspace (e.g. a GitLab "
+            "repository) provisioned for their course members. When False, "
+            "the CourseMember post-create hook skips workspace provisioning."
+        ),
+    )
     properties: Optional[dict] = Field(default_factory=dict, description="Additional properties")
 
     @field_validator('path')
@@ -77,6 +85,10 @@ class ServiceTypeUpdate(BaseModel):
     icon: Optional[str] = Field(None, max_length=255)
     color: Optional[str] = Field(None, max_length=7)
     enabled: Optional[bool] = None
+    requires_workspace: Optional[bool] = Field(
+        None,
+        description="Whether services of this type need a workspace provisioned for their course members.",
+    )
     properties: Optional[dict] = None
 
     @field_validator('color')
@@ -151,6 +163,10 @@ class ServiceTypeGet(BaseEntityGet):
     icon: Optional[str] = Field(None, description="Icon identifier")
     color: Optional[str] = Field(None, description="Hex color")
     enabled: bool = Field(..., description="Enabled status")
+    requires_workspace: bool = Field(
+        False,
+        description="Whether services of this type need a workspace provisioned for their course members.",
+    )
     properties: dict = Field(default_factory=dict, description="Additional properties")
     version: int = Field(..., description="Version number")
 
