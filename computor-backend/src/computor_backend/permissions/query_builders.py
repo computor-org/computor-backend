@@ -119,36 +119,23 @@ class CoursePermissionQueryBuilder:
     @classmethod
     def build_course_filtered_query(cls, entity: Type[Any], user_id: str,
                                    minimum_role: str, db: Session) -> Query:
-        """Build a query filtered by course membership"""
-        cm_other = aliased(CourseMember)
-        
-        # Check if entity is Course or has course_id
+        """Build a query filtered by course membership.
+
+        The query needs only to restrict the entity to those whose course
+        is in the principal's accessible-courses subquery. The previous
+        implementation joined ``User`` → ``course_member`` → ``entity``
+        which produced one duplicate row per other member of the same
+        course. That duplication corrupted ``query.count()`` (X-Total-Count)
+        and made ``LIMIT`` chop off legitimate rows whenever the result
+        set contained more dup rows than the limit (e.g. a 304-member
+        course shadowing a freshly created 1-member course at the
+        default limit of 100).
+        """
+        subquery = cls.user_courses_subquery(user_id, minimum_role, db)
+
         if entity.__name__ == 'Course':
-            # For Course entity, use id field
-            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
-            query = (
-                db.query(entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(entity, entity.id == cm_other.course_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
-                )
-            )
-        else:
-            # For other entities with course_id field
-            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
-            query = (
-                db.query(entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(entity, entity.course_id == cm_other.course_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
-                )
-            )
-        
-        return query
+            return db.query(entity).filter(entity.id.in_(subquery))
+        return db.query(entity).filter(entity.course_id.in_(subquery))
 
 
 class OrganizationPermissionQueryBuilder:
@@ -157,23 +144,23 @@ class OrganizationPermissionQueryBuilder:
     @classmethod
     def filter_by_course_organization(cls, entity: Type[Any], user_id: str,
                                      minimum_role: str, db: Session) -> Query:
-        """Filter organizations based on course membership"""
-        cm_other = aliased(CourseMember)
-        
-        subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, minimum_role, db)
-        
-        query = (
-            db.query(entity)
-            .select_from(User)
-            .outerjoin(cm_other, cm_other.user_id == User.id)
-            .outerjoin(Course, cm_other.course_id == Course.id)
-            .outerjoin(entity, entity.id == Course.organization_id)
-            .filter(
-                cm_other.course_id.in_(subquery)
-            )
+        """Filter organizations to those owning a course the user can access.
+
+        Same duplicate-rows pitfall as ``build_course_filtered_query`` —
+        joining via ``User`` multiplied each org row by the number of
+        users in its courses. We only need orgs whose id appears as
+        ``Course.organization_id`` for some accessible course.
+        """
+        course_subquery = CoursePermissionQueryBuilder.user_courses_subquery(
+            user_id, minimum_role, db
         )
-        
-        return query
+
+        org_id_subquery = (
+            select(Course.organization_id)
+            .where(Course.id.in_(course_subquery))
+        )
+
+        return db.query(entity).filter(entity.id.in_(org_id_subquery))
 
 
 class UserPermissionQueryBuilder:
