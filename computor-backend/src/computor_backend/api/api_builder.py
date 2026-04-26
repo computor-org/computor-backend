@@ -311,8 +311,31 @@ class CrudRouter:
             # Determine entity type and extract relevant IDs
             table_name = self.dto.model.__tablename__
 
+            # Handle CourseMember specifically: course membership changes
+            # affect the *target user's* role-aware list views (e.g. student
+            # list_courses), which are tagged with user:<uid> and
+            # view:<type>:<params_hash> — *not* with course_id. Invalidating
+            # only by course_id (the generic course_id branch below) misses
+            # them entirely. Clear the affected user's views and the
+            # course-scoped role-view tags so other users observing the
+            # roster also refresh.
+            if table_name == "course_member":
+                if hasattr(entity, 'user_id') and entity.user_id is not None:
+                    cache.invalidate_user_views(user_id=str(entity.user_id))
+                if hasattr(entity, 'course_id') and entity.course_id is not None:
+                    course_id = str(entity.course_id)
+                    cache.invalidate_user_views(
+                        entity_type="course_id",
+                        entity_id=course_id,
+                    )
+                    for view_tag in ("student_view", "tutor_view", "lecturer_view"):
+                        cache.invalidate_user_views(
+                            entity_type=view_tag,
+                            entity_id=course_id,
+                        )
+
             # Handle CourseContent specifically
-            if table_name == "course_content" and hasattr(entity, 'course_id'):
+            elif table_name == "course_content" and hasattr(entity, 'course_id'):
                 # Invalidate all lecturer views for this course
                 # This uses the 'lecturer_view:course_id' tag set in LecturerViewRepository
                 cache.invalidate_user_views(
