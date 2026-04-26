@@ -83,6 +83,92 @@ class CourseFamily(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     organization = relationship('Organization', back_populates='course_families')
     courses = relationship('Course', back_populates='course_family')
+    course_family_members = relationship(
+        'CourseFamilyMember',
+        back_populates='course_family',
+        cascade='all, delete-orphan',
+    )
+
+
+class CourseFamilyRole(Base):
+    """Per-course-family role analogous to CourseRole.
+
+    Role IDs are scoped to this table; built-in roles seeded via
+    migration: ``_owner``, ``_manager``.
+    """
+    __tablename__ = 'course_family_role'
+    __table_args__ = (
+        CheckConstraint("(NOT builtin) OR ((id)::text ~ '^_'::text)"),
+        CheckConstraint(
+            "(builtin AND computor_valid_slug(SUBSTRING(id FROM 2))) "
+            "OR ((NOT builtin) AND computor_valid_slug((id)::text))"
+        ),
+    )
+
+    id = Column(String(255), primary_key=True)
+    title = Column(String(255))
+    description = Column(String(4096))
+    builtin = Column(Boolean, nullable=False, server_default=text("false"))
+
+    course_family_members = relationship(
+        'CourseFamilyMember', back_populates='course_family_role'
+    )
+
+
+class CourseFamilyMember(Base):
+    """Membership linking a user to a course_family with a scoped role.
+
+    Independent of ``organization_member`` and ``course_member`` — does
+    not cascade up or down. Used for write/admin authorization on the
+    course_family. Read visibility continues to use course-membership
+    cascade.
+    """
+    __tablename__ = 'course_family_member'
+    __table_args__ = (
+        Index(
+            'course_family_member_user_family_key',
+            'user_id', 'course_family_id',
+            unique=True,
+        ),
+    )
+
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
+    version = Column(BigInteger, server_default=text("0"))
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
+    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
+    properties = Column(JSONB)
+
+    user_id = Column(
+        ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'),
+        nullable=False,
+    )
+    course_family_id = Column(
+        ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'),
+        nullable=False,
+        index=True,
+    )
+    course_family_role_id = Column(
+        ForeignKey(
+            'course_family_role.id', ondelete='RESTRICT', onupdate='RESTRICT'
+        ),
+        nullable=False,
+    )
+
+    user = relationship('User', foreign_keys=[user_id])
+    course_family = relationship(
+        'CourseFamily', back_populates='course_family_members'
+    )
+    course_family_role = relationship(
+        'CourseFamilyRole', back_populates='course_family_members'
+    )
+    created_by_user = relationship('User', foreign_keys=[created_by])
+    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
 class Course(Base):

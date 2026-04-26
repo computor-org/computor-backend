@@ -52,7 +52,12 @@ import logging
 
 # Import refactored permission components
 from computor_backend.permissions.principal import Principal, build_claims
-from computor_backend.permissions.core import db_get_claims, db_get_course_claims
+from computor_backend.permissions.core import (
+    db_get_claims,
+    db_get_course_claims,
+    db_get_organization_claims,
+    db_get_course_family_claims,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -311,9 +316,12 @@ class PrincipalBuilder:
         # Get user claims from database
         claim_values = db_get_claims(auth_result.user_id, db)
 
-        # Get course-specific claims
-        course_claims = db_get_course_claims(auth_result.user_id, db)
-        claim_values.extend(course_claims)
+        # Get scoped claims (course / organization / course_family). Each
+        # emits ``("permissions", "<scope>:<role>:<scope_id>")`` tuples
+        # which build_claims files under Claims.dependent[<scope>].
+        claim_values.extend(db_get_course_claims(auth_result.user_id, db))
+        claim_values.extend(db_get_organization_claims(auth_result.user_id, db))
+        claim_values.extend(db_get_course_family_claims(auth_result.user_id, db))
 
         # Convert API token scopes to claims (if present)
         # API token scopes use the same format as claims: "resource:action" or "resource:action:resource_id"

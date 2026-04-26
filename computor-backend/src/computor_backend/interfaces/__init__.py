@@ -39,6 +39,10 @@ from computor_backend.interfaces.submission_group_members import SubmissionGroup
 from computor_backend.interfaces.submission_groups import SubmissionGroupInterface
 from computor_backend.interfaces.course_groups import CourseGroupInterface
 from computor_backend.interfaces.course_roles import CourseRoleInterface
+from computor_backend.interfaces.organization_roles import OrganizationRoleInterface
+from computor_backend.interfaces.organization_member import OrganizationMemberInterface
+from computor_backend.interfaces.course_family_roles import CourseFamilyRoleInterface
+from computor_backend.interfaces.course_family_member import CourseFamilyMemberInterface
 from computor_backend.interfaces.course_content_types import CourseContentTypeInterface
 from computor_backend.interfaces.course_content_kind import CourseContentKindInterface
 from computor_backend.interfaces.languages import LanguageInterface
@@ -71,6 +75,10 @@ __all__ = [
     "SubmissionGroupInterface",
     "CourseGroupInterface",
     "CourseRoleInterface",
+    "OrganizationRoleInterface",
+    "OrganizationMemberInterface",
+    "CourseFamilyRoleInterface",
+    "CourseFamilyMemberInterface",
     "CourseContentTypeInterface",
     "CourseContentKindInterface",
     "LanguageInterface",

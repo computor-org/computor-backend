@@ -1,11 +1,13 @@
 from .base import Base, metadata
 from .auth import User, Account, Profile, StudentProfile, Session
 from .language import Language
-from .organization import Organization
+from .organization import Organization, OrganizationRole, OrganizationMember
 from .course import (
     CourseContentKind,
     CourseRole,
     CourseFamily,
+    CourseFamilyRole,
+    CourseFamilyMember,
     Course,
     CourseContentType,
     CourseGroup,
@@ -57,10 +59,14 @@ __all__ = [
     'Language',
     # Organization
     'Organization',
+    'OrganizationRole',
+    'OrganizationMember',
     # Course models
     'CourseContentKind',
     'CourseRole',
     'CourseFamily',
+    'CourseFamilyRole',
+    'CourseFamilyMember',
     'Course',
     'CourseContentType',
     'CourseGroup',
