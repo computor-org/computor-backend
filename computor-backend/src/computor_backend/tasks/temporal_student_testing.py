@@ -157,6 +157,31 @@ async def fetch_example_version_with_dependencies(
             else:
                 logger.info(f"Dependency {dep_identifier} ({dep_version_id}) already cached")
 
+            # Publish the dep under its identifier next to the reference example
+            # cache. Both the reference (cached at /tmp/examples/<ref_version_id>/)
+            # and the student run (with deps mirrored next to studentDirectory)
+            # rely on resolving sibling `../<dep_identifier>/` imports, so the
+            # examples cache must expose deps by identifier — not just by
+            # version id.
+            if dep_identifier:
+                dep_alias_path = os.path.join(target_base_dir, dep_identifier)
+                try:
+                    if os.path.islink(dep_alias_path) or os.path.exists(dep_alias_path):
+                        # Repoint stale alias only if it does not already match.
+                        if os.path.realpath(dep_alias_path) != os.path.realpath(dep_cache_path):
+                            if os.path.islink(dep_alias_path) or os.path.isfile(dep_alias_path):
+                                os.unlink(dep_alias_path)
+                            else:
+                                shutil.rmtree(dep_alias_path)
+                            os.symlink(dep_cache_path, dep_alias_path)
+                    else:
+                        os.symlink(dep_cache_path, dep_alias_path)
+                except OSError:
+                    # Symlinks may be unsupported (e.g. some Windows configs);
+                    # fall back to a copy so the layout is still correct.
+                    if not os.path.isdir(dep_alias_path):
+                        shutil.copytree(dep_cache_path, dep_alias_path)
+
             dependencies_info.append({
                 "example_id": dep.get("example_id"),
                 "version_id": dep_version_id,
@@ -637,19 +662,10 @@ async def run_complete_student_test_activity(
             student_path = submission_data["submission_path"]
             logger.info(f"Student submission at: {student_path}")
 
-            # Step 2.5: Copy dependencies next to student submission
-            # This allows sys.path.append("../dep_identifier/") to work from student code
-            dependencies = reference_data.get("dependencies", [])
-            if dependencies:
-                student_parent = os.path.dirname(student_path)
-                for dep in dependencies:
-                    dep_identifier = dep.get("identifier")
-                    dep_source = dep.get("path")
-                    if dep_identifier and dep_source and os.path.exists(dep_source):
-                        dep_dest = os.path.join(student_parent, dep_identifier)
-                        if not os.path.exists(dep_dest):
-                            shutil.copytree(dep_source, dep_dest)
-                            logger.info(f"Copied dependency: {dep_source} -> {dep_dest}")
+            # Test dependencies are mirrored next to studentDirectory and
+            # referenceDirectory by BaseTester._stage_test_dependencies, using
+            # the identifier-aliased paths in the examples cache produced by
+            # fetch_example_version_with_dependencies.
 
             # Step 3: Execute tests
             logger.info("Executing tests")
