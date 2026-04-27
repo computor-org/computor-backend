@@ -653,109 +653,94 @@ async def run_complete_student_test_activity(
     logger.info(f"[ACTIVITY API CONFIG] url={api_url}, token_present={bool(api_token)}")
 
     # Create temporary work directory for this test run.
-    # Set COMPUTOR_TEST_KEEP_WORKDIR=1 to skip cleanup so the layout can be
-    # inspected after the activity finishes (debugging only).
-    keep_workdir = os.environ.get("COMPUTOR_TEST_KEEP_WORKDIR") == "1"
-    if keep_workdir:
-        work_dir = tempfile.mkdtemp(prefix=f"test_{result_id}_")
-        logger.warning(
-            f"COMPUTOR_TEST_KEEP_WORKDIR=1 — preserving work dir at {work_dir}"
-        )
-        cleanup_ctx = None
-    else:
-        cleanup_ctx = tempfile.TemporaryDirectory(prefix=f"test_{result_id}_")
-        work_dir = cleanup_ctx.name
-
-    try:
-        # Step 1: Fetch reference example with dependencies (cached)
-        example_version_id = test_job.get("example_version_id")
-        if not example_version_id:
-            raise ApplicationError("Missing example_version_id in test_job")
-
-        logger.info(f"Fetching reference example version {example_version_id}")
-        reference_data = await fetch_example_version_with_dependencies(
-            example_version_id=example_version_id,
-            api_config=api_config,
-            target_base_dir=EXAMPLE_CACHE_DIR,
-        )
-
-        reference_path = reference_data["main_path"]
-        logger.info(f"Reference example at: {reference_path}")
-
-        # Step 2: Fetch student submission
-        artifact_id = test_job.get("artifact_id")
-        if not artifact_id:
-            raise ApplicationError("Missing artifact_id in test_job")
-
-        student_dir = os.path.join(work_dir, "student")
-        logger.info(f"Fetching student submission {artifact_id}")
-        submission_data = await fetch_submission_artifact(
-            artifact_id=artifact_id,
-            api_config=api_config,
-            target_dir=student_dir,
-        )
-
-        student_path = submission_data["submission_path"]
-        logger.info(f"Student submission at: {student_path}")
-
-        # Test dependencies are mirrored next to studentDirectory and
-        # referenceDirectory by BaseTester._stage_test_dependencies, using
-        # the identifier-aliased paths in the examples cache produced by
-        # fetch_example_version_with_dependencies.
-
-        # Step 3: Execute tests
-        logger.info("Executing tests")
-        store_graphics_artifacts = test_job.get("store_graphics_artifacts", True)
-        test_results = await execute_tests_activity(
-            reference_path=reference_path,
-            student_path=student_path,
-            test_config=test_job,
-            service_config=service_config,
-            service_type_config=service_type_config,
-            work_dir=work_dir,
-            store_graphics_artifacts=store_graphics_artifacts,
-        )
-
-        logger.info(f"Test execution completed: {test_results}")
-
-        # Step 3.5: Store any generated artifacts via API
-        artifacts_path = os.path.join(work_dir, "artifacts")
-        if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
-            logger.info(f"Found artifacts to store in {artifacts_path}")
-            await store_test_artifacts(result_id, artifacts_path, api_config)
-        else:
-            logger.info("No artifacts generated during test execution")
-
-        # Step 4: Commit results
-        logger.info("Committing results to API")
-        await commit_test_results_activity(result_id, test_results, api_config)
-
-        return test_results
-
-    except Exception as e:
-        logger.error(f"Complete student test failed: {e}")
-
-        # Try to update result status to FAILED
+    # TemporaryDirectory cleans up automatically — submissions are not cached.
+    with tempfile.TemporaryDirectory(prefix=f"test_{result_id}_") as work_dir:
         try:
-            await commit_test_results_activity(
-                result_id,
-                {
-                    "passed": 0,
-                    "failed": 1,
-                    "total": 1,
-                    "error": str(e),
-                    "result_value": 0.0,
-                },
-                api_config,
+            # Step 1: Fetch reference example with dependencies (cached)
+            example_version_id = test_job.get("example_version_id")
+            if not example_version_id:
+                raise ApplicationError("Missing example_version_id in test_job")
+
+            logger.info(f"Fetching reference example version {example_version_id}")
+            reference_data = await fetch_example_version_with_dependencies(
+                example_version_id=example_version_id,
+                api_config=api_config,
+                target_base_dir=EXAMPLE_CACHE_DIR,
             )
-        except Exception:
-            pass  # Best effort
 
-        raise ApplicationError(message=str(e))
+            reference_path = reference_data["main_path"]
+            logger.info(f"Reference example at: {reference_path}")
 
-    finally:
-        if cleanup_ctx is not None:
-            cleanup_ctx.cleanup()
+            # Step 2: Fetch student submission
+            artifact_id = test_job.get("artifact_id")
+            if not artifact_id:
+                raise ApplicationError("Missing artifact_id in test_job")
+
+            student_dir = os.path.join(work_dir, "student")
+            logger.info(f"Fetching student submission {artifact_id}")
+            submission_data = await fetch_submission_artifact(
+                artifact_id=artifact_id,
+                api_config=api_config,
+                target_dir=student_dir,
+            )
+
+            student_path = submission_data["submission_path"]
+            logger.info(f"Student submission at: {student_path}")
+
+            # Test dependencies are mirrored next to studentDirectory and
+            # referenceDirectory by BaseTester._stage_test_dependencies, using
+            # the identifier-aliased paths in the examples cache produced by
+            # fetch_example_version_with_dependencies.
+
+            # Step 3: Execute tests
+            logger.info("Executing tests")
+            store_graphics_artifacts = test_job.get("store_graphics_artifacts", True)
+            test_results = await execute_tests_activity(
+                reference_path=reference_path,
+                student_path=student_path,
+                test_config=test_job,
+                service_config=service_config,
+                service_type_config=service_type_config,
+                work_dir=work_dir,
+                store_graphics_artifacts=store_graphics_artifacts,
+            )
+
+            logger.info(f"Test execution completed: {test_results}")
+
+            # Step 3.5: Store any generated artifacts via API
+            artifacts_path = os.path.join(work_dir, "artifacts")
+            if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
+                logger.info(f"Found artifacts to store in {artifacts_path}")
+                await store_test_artifacts(result_id, artifacts_path, api_config)
+            else:
+                logger.info("No artifacts generated during test execution")
+
+            # Step 4: Commit results
+            logger.info("Committing results to API")
+            await commit_test_results_activity(result_id, test_results, api_config)
+
+            return test_results
+
+        except Exception as e:
+            logger.error(f"Complete student test failed: {e}")
+
+            # Try to update result status to FAILED
+            try:
+                await commit_test_results_activity(
+                    result_id,
+                    {
+                        "passed": 0,
+                        "failed": 1,
+                        "total": 1,
+                        "error": str(e),
+                        "result_value": 0.0,
+                    },
+                    api_config,
+                )
+            except Exception:
+                pass  # Best effort
+
+            raise ApplicationError(message=str(e))
 
 
 # ============================================================================
