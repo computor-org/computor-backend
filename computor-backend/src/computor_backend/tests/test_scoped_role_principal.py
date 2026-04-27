@@ -4,11 +4,25 @@ Covers the generic ``has_scope_role`` / ``get_scoped_ids_with_role``
 helpers and the back-compat course/organization/course_family wrappers
 introduced for organization and course_family scoped roles.
 
-No DB or HTTP. Pure ``Principal`` + claim-string round-tripping.
+The ``TestScopeMemberCustomPermissions`` block exercises the
+``make_scope_member_custom_permissions`` factory used to plug an
+update-payload-aware permission check into the CRUD layer for
+OrganizationMember / CourseFamilyMember.
+
+No DB. Pure ``Principal`` + claim-string round-tripping plus a small
+in-memory SQLite session for the custom-permissions tests.
 """
 
-import pytest
+from types import SimpleNamespace
 
+import pytest
+from sqlalchemy import Column, String, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.permissions.handlers_impl import (
+    make_scope_member_custom_permissions,
+)
 from computor_backend.permissions.principal import (
     Principal,
     build_claims,
@@ -159,3 +173,134 @@ class TestCourseBackCompat:
         )
         assert p.get_courses_with_role("_student") == {"c1", "c2"}
         assert p.get_courses_with_role("_lecturer") == {"c1"}
+
+
+# ---------------------------------------------------------------------------
+# UPDATE-time custom permissions (the role-escalation guard)
+# ---------------------------------------------------------------------------
+
+
+class TestScopeMemberCustomPermissions:
+    """Cover ``make_scope_member_custom_permissions`` against a fake model.
+
+    A tiny SQLAlchemy declarative model on an in-memory SQLite database
+    stands in for ``OrganizationMember`` / ``CourseFamilyMember`` — the
+    helper is generic over scope, so any model with ``id``, scope_fk
+    and role_fk columns exercises the same code path.
+    """
+
+    @pytest.fixture
+    def session_with_member(self):
+        Base = declarative_base()
+
+        class FakeMember(Base):
+            __tablename__ = "fake_member"
+            id = Column(String, primary_key=True)
+            scope_id = Column(String, nullable=False)
+            role_id = Column(String, nullable=False)
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        SessionLocal = sessionmaker(bind=engine)
+        db = SessionLocal()
+
+        # Two existing rows on the same scope: one developer, one owner.
+        db.add(FakeMember(id="row-dev", scope_id="o1", role_id="_developer"))
+        db.add(FakeMember(id="row-owner", scope_id="o1", role_id="_owner"))
+        db.commit()
+
+        custom_permissions = make_scope_member_custom_permissions(
+            FakeMember,
+            scope="organization",
+            scope_fk="scope_id",
+            role_fk="role_id",
+        )
+
+        try:
+            yield db, FakeMember, custom_permissions
+        finally:
+            db.close()
+
+    def test_admin_passes_through(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        admin = Principal(user_id="a1", is_admin=True)
+        # Promoting a developer to _owner is allowed for admin.
+        payload = SimpleNamespace(role_id="_owner")
+        q = custom(admin, db, "row-dev", payload)
+        # Returned query reaches both rows (filtering to id happens later).
+        assert q.count() == 2
+
+    def test_manager_can_edit_developer_to_manager(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        mgr = _principal("organization:_manager:o1")
+        payload = SimpleNamespace(role_id="_manager")
+        # Should succeed — manager promoting developer to manager is OK.
+        q = custom(mgr, db, "row-dev", payload)
+        assert q is not None
+
+    def test_manager_cannot_promote_to_owner(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        mgr = _principal("organization:_manager:o1")
+        payload = SimpleNamespace(role_id="_owner")
+        with pytest.raises(ForbiddenException):
+            custom(mgr, db, "row-dev", payload)
+
+    def test_manager_cannot_modify_owner_row(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        mgr = _principal("organization:_manager:o1")
+        payload = SimpleNamespace(role_id="_developer")
+        # Even if the new role is harmless, manager cannot touch an _owner row.
+        with pytest.raises(ForbiddenException):
+            custom(mgr, db, "row-owner", payload)
+
+    def test_owner_can_promote_to_owner(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        owner = _principal("organization:_owner:o1")
+        payload = SimpleNamespace(role_id="_owner")
+        q = custom(owner, db, "row-dev", payload)
+        assert q is not None
+
+    def test_owner_can_modify_owner_row(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        owner = _principal("organization:_owner:o1")
+        payload = SimpleNamespace(role_id="_manager")
+        q = custom(owner, db, "row-owner", payload)
+        assert q is not None
+
+    def test_developer_blocked_outright(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        dev = _principal("organization:_developer:o1")
+        payload = SimpleNamespace(role_id="_developer")
+        with pytest.raises(ForbiddenException):
+            custom(dev, db, "row-dev", payload)
+
+    def test_principal_with_no_scope_role_blocked(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        outsider = _principal("organization:_owner:other-scope")
+        payload = SimpleNamespace(role_id="_developer")
+        with pytest.raises(ForbiddenException):
+            custom(outsider, db, "row-dev", payload)
+
+    def test_missing_row_returns_empty_query(self, session_with_member):
+        db, FakeMember, custom = session_with_member
+        admin = Principal(user_id="a", is_admin=True)
+        # Non-existent id — handler returns an empty query rather than raising
+        # so the CRUD layer can yield NotFoundException.
+        q = custom(admin, db, "nope", SimpleNamespace(role_id="_owner"))
+        assert q.count() == 2  # admin shortcut returns full query unchanged
+        # And for a non-admin, the row-not-found path yields empty:
+        mgr = _principal("organization:_manager:o1")
+        q = custom(mgr, db, "nope", SimpleNamespace(role_id="_developer"))
+        assert q.first() is None
+
+    def test_payload_without_role_change_still_checks_current_role(
+        self, session_with_member
+    ):
+        # A manager touching an _owner row without changing the role must
+        # still be blocked — the row-restriction rule applies regardless of
+        # whether the payload includes a role change.
+        db, FakeMember, custom = session_with_member
+        mgr = _principal("organization:_manager:o1")
+        payload = SimpleNamespace()  # no role_id attribute
+        with pytest.raises(ForbiddenException):
+            custom(mgr, db, "row-owner", payload)

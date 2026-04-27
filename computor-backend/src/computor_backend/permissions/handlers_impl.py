@@ -992,14 +992,13 @@ class _ScopeMemberPermissionHandler(PermissionHandler):
 
     A user always sees their own membership row regardless of role.
 
-    Note: for ``update``, this handler restricts which rows are visible
-    to the update query but does NOT inspect the *new* role payload —
-    that means a manager can in theory promote an existing manager/
-    developer membership to ``_owner`` via PATCH. Tightening that would
-    require either a custom-permissions hook with payload access or
-    moving the role-change rule into the business-logic layer. Tracked
-    as a follow-up; the seam to do it is the ``custom_permissions``
-    attribute on ``BackendEntityInterface``.
+    The ``UPDATE`` path uses a ``custom_permissions`` callable
+    (``make_scope_member_custom_permissions`` below) to additionally
+    inspect the new-role payload — this prevents a manager from
+    promoting an existing membership to ``_owner`` via PATCH, which
+    the row-level filter alone would not catch. ``DELETE`` does not
+    need the extra hook because ``build_query`` already excludes
+    ``_owner`` rows from a manager's deletable set.
     """
 
     SCOPE: str = ""
@@ -1104,3 +1103,66 @@ class CourseFamilyMemberPermissionHandler(_ScopeMemberPermissionHandler):
     SCOPE = "course_family"
     SCOPE_FK = "course_family_id"
     ROLE_FK = "course_family_role_id"
+
+
+def make_scope_member_custom_permissions(
+    model: type, scope: str, scope_fk: str, role_fk: str
+):
+    """Return a ``custom_permissions`` callable for a scoped member entity.
+
+    The build_query filter already restricts which rows a principal can
+    delete (a ``_manager`` cannot see ``_owner`` rows), but UPDATE goes
+    through ``custom_permissions`` and the row-level filter alone does
+    not inspect the *new* role being assigned. This callable closes
+    that gap by examining the request payload:
+
+    * Reject the update if the row does not exist (NotFound -> empty).
+    * Require the principal to have at least ``_manager`` on the scope.
+    * Reject if the row is currently ``_owner`` and the principal is
+      not ``_owner`` (a manager cannot demote an owner).
+    * Reject if the payload tries to set the role to ``_owner`` and the
+      principal is not ``_owner`` (a manager cannot promote to owner).
+
+    Returns a passthrough query that the CRUD layer narrows to ``id``.
+    """
+
+    def custom_permissions(
+        principal: Principal,
+        db: Session,
+        id,
+        entity,
+    ) -> Query:
+        if principal.is_admin:
+            return db.query(model)
+
+        row = db.query(model).filter(model.id == id).first()
+        if row is None:
+            return db.query(model).filter(model.id == id)
+
+        scope_id = str(getattr(row, scope_fk))
+        current_role = getattr(row, role_fk)
+
+        if not principal.has_scope_role(scope, scope_id, "_manager"):
+            raise ForbiddenException(
+                detail=(
+                    f"You need at least _manager on this {scope} to modify "
+                    "its memberships."
+                )
+            )
+
+        is_scope_owner = principal.has_scope_role(scope, scope_id, "_owner")
+
+        if current_role == "_owner" and not is_scope_owner:
+            raise ForbiddenException(
+                detail="Only an _owner of this scope can modify an _owner membership."
+            )
+
+        new_role = getattr(entity, role_fk, None)
+        if new_role is not None and new_role == "_owner" and not is_scope_owner:
+            raise ForbiddenException(
+                detail="Only an _owner of this scope can grant the _owner role."
+            )
+
+        return db.query(model)
+
+    return custom_permissions

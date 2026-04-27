@@ -10,6 +10,21 @@ from computor_types.course_family_members import (
 )
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseFamilyMember
+from computor_backend.permissions.handlers_impl import (
+    make_scope_member_custom_permissions,
+)
+
+
+# See organization_member.py for the rationale: UPDATE must inspect
+# the new-role payload to prevent a ``_manager`` from PATCHing an
+# existing member to ``_owner`` (privilege escalation that the row-
+# level filter alone does not catch).
+custom_permissions_course_family_member = make_scope_member_custom_permissions(
+    CourseFamilyMember,
+    scope="course_family",
+    scope_fk="course_family_id",
+    role_fk="course_family_role_id",
+)
 
 
 class CourseFamilyMemberInterface(
@@ -20,6 +35,7 @@ class CourseFamilyMemberInterface(
     model = CourseFamilyMember
     endpoint = "course-family-members"
     cache_ttl = 300
+    custom_permissions = custom_permissions_course_family_member
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseFamilyMemberQuery]):
