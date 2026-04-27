@@ -41,6 +41,9 @@ EXAMPLE_CACHE_DIR = os.environ.get("EXAMPLE_CACHE_DIR", "/tmp/examples")
 # Storage and Caching Activities
 # ============================================================================
 
+VERSION_MARKER_FILENAME = ".example_version_id"
+
+
 def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
     """
     Save example files to disk, handling base64-encoded content.
@@ -75,6 +78,41 @@ def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
                 f.write(content)
 
 
+def _cached_version_matches(cache_path: str, expected_version_id: str) -> bool:
+    """Return True if cache_path is non-empty and its version marker matches.
+
+    A missing marker is treated as a stale cache so legacy directories get
+    rewritten with the current version_id.
+    """
+    if not os.path.isdir(cache_path) or not os.listdir(cache_path):
+        return False
+    marker_path = os.path.join(cache_path, VERSION_MARKER_FILENAME)
+    if not os.path.isfile(marker_path):
+        return False
+    try:
+        with open(marker_path, "r") as f:
+            return f.read().strip() == str(expected_version_id)
+    except OSError:
+        return False
+
+
+def _cache_example(
+    cache_path: str,
+    version_id: str,
+    files: Dict[str, Any],
+) -> None:
+    """Wipe `cache_path` and rewrite it with `files`, then stamp the version.
+
+    Used to keep `/tmp/examples/<identifier>/` aligned with the requested
+    version — no stale content from an older example_version sticks around.
+    """
+    if os.path.isdir(cache_path):
+        shutil.rmtree(cache_path)
+    _save_example_files(cache_path, files)
+    with open(os.path.join(cache_path, VERSION_MARKER_FILENAME), "w") as f:
+        f.write(str(version_id))
+
+
 @activity.defn(name="fetch_example_version_with_dependencies")
 async def fetch_example_version_with_dependencies(
     example_version_id: str,
@@ -85,12 +123,15 @@ async def fetch_example_version_with_dependencies(
     Fetch an example version and all its dependencies from the API/MinIO.
 
     Uses local caching to avoid re-downloading the same example version.
-    Each example_version is cached under its own version_id directory.
+    Each example is cached under its identifier with a version_id marker so
+    the testing engine can resolve sibling `../<identifier>/` imports while
+    still being able to detect a stale cache and refetch on version change.
 
     Cache structure:
-        /tmp/examples/{version_id}/         <- main example files
-        /tmp/examples/{dep1_version_id}/    <- dependency 1 files
-        /tmp/examples/{dep2_version_id}/    <- dependency 2 files
+        /tmp/examples/{main_identifier}/    <- main example files
+        /tmp/examples/{dep1_identifier}/    <- dependency 1 files
+        /tmp/examples/{dep2_identifier}/    <- dependency 2 files
+        Each directory contains a .example_version_id marker file.
 
     Args:
         example_version_id: UUID of the ExampleVersion to fetch
@@ -104,16 +145,6 @@ async def fetch_example_version_with_dependencies(
     """
     logger.info(f"Fetching example version {example_version_id}")
 
-    # Cache path: /tmp/examples/{example_version_id}/
-    cache_path = os.path.join(target_base_dir, example_version_id)
-
-    # Check if already cached (directory exists with files)
-    if os.path.isdir(cache_path) and os.listdir(cache_path):
-        logger.info(f"Example version {example_version_id} found in cache at {cache_path}")
-        # We still need to fetch dependency info from API to know their paths
-        # But we can skip downloading files that are already cached
-
-    # Fetch from API (needed for dependency resolution even if main is cached)
     base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
     api_token = api_config.get("token")
     if not api_token:
@@ -135,18 +166,27 @@ async def fetch_example_version_with_dependencies(
 
         download_data = response.json()
         main_identifier = download_data.get("identifier") or download_data.get("directory")
+        if not main_identifier:
+            raise ApplicationError(
+                f"Example version {example_version_id} response missing identifier"
+            )
 
-        # Cache main example if not already cached
-        if not os.path.isdir(cache_path) or not os.listdir(cache_path):
-            logger.info(f"Caching main example {example_version_id} at {cache_path}")
-            _save_example_files(cache_path, download_data.get("files", {}))
+        # Cache main example by identifier, refetching when the version marker
+        # does not match (or is missing on legacy cache entries).
+        cache_path = os.path.join(target_base_dir, main_identifier)
+        if _cached_version_matches(cache_path, example_version_id):
+            logger.info(
+                f"Main example {main_identifier} ({example_version_id}) already cached at {cache_path}"
+            )
         else:
-            logger.info(f"Main example {example_version_id} already cached")
+            logger.info(
+                f"Caching main example {main_identifier} ({example_version_id}) at {cache_path}"
+            )
+            _cache_example(cache_path, example_version_id, download_data.get("files", {}))
 
-        # Cache dependencies by identifier so the reference run can resolve
-        # sibling `../<dep_identifier>/` imports out of the examples cache.
-        # The dep is just another example — it may already be on disk because
-        # it is itself an assignment that has been fetched before.
+        # Cache dependencies by identifier — same scheme as the main example —
+        # so the reference run can resolve sibling `../<dep_identifier>/`
+        # imports out of the examples cache.
         dependencies_info = []
         for dep in download_data.get("dependencies", []):
             dep_version_id = dep.get("version_id")
@@ -157,11 +197,15 @@ async def fetch_example_version_with_dependencies(
 
             dep_cache_path = os.path.join(target_base_dir, dep_identifier)
 
-            if not os.path.isdir(dep_cache_path) or not os.listdir(dep_cache_path):
-                logger.info(f"Caching dependency {dep_identifier} ({dep_version_id}) at {dep_cache_path}")
-                _save_example_files(dep_cache_path, dep.get("files", {}))
+            if _cached_version_matches(dep_cache_path, dep_version_id):
+                logger.info(
+                    f"Dependency {dep_identifier} ({dep_version_id}) already cached"
+                )
             else:
-                logger.info(f"Dependency {dep_identifier} ({dep_version_id}) already cached")
+                logger.info(
+                    f"Caching dependency {dep_identifier} ({dep_version_id}) at {dep_cache_path}"
+                )
+                _cache_example(dep_cache_path, dep_version_id, dep.get("files", {}))
 
             dependencies_info.append({
                 "example_id": dep.get("example_id"),
