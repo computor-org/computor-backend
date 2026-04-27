@@ -8,6 +8,7 @@ Provides common functionality for all language testers, including:
 """
 
 import os
+import shutil
 import sys
 import tempfile
 from abc import ABC
@@ -151,6 +152,11 @@ class BaseTester(ABC):
         if target:
             spec.studentDirectory = os.path.abspath(target)
 
+        # Stage test dependencies (declared in meta.yaml) as siblings
+        # of the student/reference directories so the entry script's
+        # relative `sys.path.append("../<dep>/")` imports resolve.
+        self._stage_test_dependencies(testroot, spec)
+
         # Write temporary specification file
         spec_data = spec.model_dump()
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
@@ -188,6 +194,85 @@ class BaseTester(ABC):
             # Clean up temp file
             if os.path.exists(temp_spec):
                 os.unlink(temp_spec)
+
+    def _stage_test_dependencies(
+        self,
+        testroot: str,
+        spec: ComputorSpecification,
+    ) -> None:
+        """Copy each meta.yaml `testDependencies` directory next to
+        student/reference dirs so relative imports resolve.
+
+        Source lookup: each entry is a directory name (or `../<name>` /
+        `<name>/` form) found at `<testroot>/../<name>/` — the convention
+        is that test dependencies are sibling example directories.
+        """
+        meta = None
+        for candidate in (testroot, spec.referenceDirectory, spec.studentDirectory):
+            if not candidate:
+                continue
+            meta_path = os.path.join(candidate, "meta.yaml")
+            if not os.path.exists(meta_path):
+                continue
+            try:
+                with open(meta_path) as f:
+                    meta = yaml.safe_load(f) or {}
+                break
+            except Exception as e:
+                print(f"Warning: failed to read {meta_path}: {e}", file=sys.stderr)
+
+        if meta is None:
+            return
+
+        deps = []
+        props = meta.get("properties")
+        if isinstance(props, dict) and props.get("testDependencies"):
+            deps = props["testDependencies"]
+        elif meta.get("testDependencies"):
+            deps = meta["testDependencies"]
+
+        if not deps:
+            return
+
+        examples_root = os.path.dirname(os.path.abspath(testroot))
+
+        target_parents = []
+        for d in (spec.studentDirectory, spec.referenceDirectory):
+            if not d:
+                continue
+            parent = os.path.dirname(os.path.abspath(d))
+            if parent not in target_parents:
+                target_parents.append(parent)
+
+        for dep in deps:
+            if not isinstance(dep, str) or not dep.strip():
+                continue
+            dep_name = os.path.basename(dep.rstrip("/").rstrip(os.sep))
+            if not dep_name or dep_name in (".", ".."):
+                continue
+
+            src = os.path.join(examples_root, dep_name)
+            if not os.path.isdir(src):
+                print(
+                    f"Warning: testDependency `{dep_name}` not found at {src}",
+                    file=sys.stderr,
+                )
+                continue
+
+            for parent in target_parents:
+                dest = os.path.join(parent, dep_name)
+                if os.path.abspath(dest) == os.path.abspath(src):
+                    continue
+                if os.path.exists(dest):
+                    continue
+                try:
+                    shutil.copytree(src, dest)
+                except Exception as e:
+                    print(
+                        f"Warning: failed to stage testDependency "
+                        f"{src} -> {dest}: {e}",
+                        file=sys.stderr,
+                    )
 
     def _print_header(
         self,
