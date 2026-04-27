@@ -334,6 +334,31 @@ class CrudRouter:
                             entity_id=course_id,
                         )
 
+            # Same shape as course_member: when an organization_member
+            # row is created/updated/deleted the affected user's scoped
+            # claims change, so all of their cached list_courses /
+            # course-detail views are stale until TTL. Clear by user_id;
+            # the org_id tag flushes any current/future caches that get
+            # tagged with the org's id.
+            elif table_name == "organization_member":
+                if hasattr(entity, 'user_id') and entity.user_id is not None:
+                    cache.invalidate_user_views(user_id=str(entity.user_id))
+                if hasattr(entity, 'organization_id') and entity.organization_id is not None:
+                    cache.invalidate_user_views(
+                        entity_type="organization_id",
+                        entity_id=str(entity.organization_id),
+                    )
+
+            # Same as organization_member but scoped to course_family.
+            elif table_name == "course_family_member":
+                if hasattr(entity, 'user_id') and entity.user_id is not None:
+                    cache.invalidate_user_views(user_id=str(entity.user_id))
+                if hasattr(entity, 'course_family_id') and entity.course_family_id is not None:
+                    cache.invalidate_user_views(
+                        entity_type="course_family_id",
+                        entity_id=str(entity.course_family_id),
+                    )
+
             # Handle CourseContent specifically
             elif table_name == "course_content" and hasattr(entity, 'course_id'):
                 # Invalidate all lecturer views for this course

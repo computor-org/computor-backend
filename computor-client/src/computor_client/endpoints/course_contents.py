@@ -31,15 +31,6 @@ class CourseContentsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def assign_example(
-        self,
-        content_id: str,
-        **kwargs: Any,
-    ) -> DeploymentWithHistory:
-        """Assign Example To Content"""
-        response = await self._http.post(f"/course-contents/{content_id}/assign-example", params=kwargs)
-        return DeploymentWithHistory.model_validate(response.json())
-
     async def example(
         self,
         content_id: str,
@@ -75,6 +66,15 @@ class CourseContentsClient:
         """Get Content Deployment"""
         response = await self._http.get(f"/course-contents/{content_id}/deployment", params=kwargs)
         return DeploymentWithHistory.model_validate(response.json())
+
+    async def move(
+        self,
+        content_id: str,
+        **kwargs: Any,
+    ) -> CourseContentGet:
+        """Move Course Content"""
+        response = await self._http.patch(f"/course-contents/{content_id}/move", params=kwargs)
+        return CourseContentGet.model_validate(response.json())
 
     async def create(
         self,
@@ -137,5 +137,14 @@ class CourseContentsClient:
     ) -> None:
         """Route Course-Contents"""
         response = await self._http.patch(f"/course-contents/{id}/archive", params=kwargs)
+        return
+
+    async def unarchive(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Unarchive Course-Contents"""
+        response = await self._http.patch(f"/course-contents/{id}/unarchive", params=kwargs)
         return
 

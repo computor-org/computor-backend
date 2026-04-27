@@ -28,6 +28,29 @@ export interface CourseContentMoveRequest {
   position: number;
 }
 
+export interface CourseFamilyRoleGet {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  builtin?: boolean;
+}
+
+export interface CourseFamilyRoleList {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  builtin?: boolean;
+}
+
+export interface CourseFamilyRoleQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  builtin?: boolean | null;
+}
+
 /**
  * Repository information for course content in lecturer view.
  */
@@ -644,6 +667,51 @@ export interface CourseContentStudentQuery {
   nlevel?: number | null;
   descendants?: string | null;
   ascendants?: string | null;
+}
+
+export interface CourseFamilyMemberCreate {
+  id?: string | null;
+  properties?: any | null;
+  user_id: string;
+  course_family_id: string;
+  course_family_role_id: string;
+}
+
+export interface CourseFamilyMemberGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  properties?: any | null;
+  user_id: string;
+  course_family_id: string;
+  course_family_role_id: string;
+  user?: UserList | null;
+}
+
+export interface CourseFamilyMemberList {
+  id: string;
+  user_id: string;
+  course_family_id: string;
+  course_family_role_id: string;
+  user?: UserList | null;
+}
+
+export interface CourseFamilyMemberUpdate {
+  properties?: any | null;
+  course_family_role_id?: string | null;
+}
+
+export interface CourseFamilyMemberQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  user_id?: string | null;
+  course_family_id?: string | null;
+  course_family_role_id?: string | null;
 }
 
 /**

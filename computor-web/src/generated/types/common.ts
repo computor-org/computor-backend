@@ -1155,6 +1155,8 @@ export interface ServiceTypeBase {
   color?: string | null;
   /** Whether this service type is enabled */
   enabled?: boolean;
+  /** Whether services of this type need a workspace (e.g. a GitLab repository) provisioned for their course members. When False, the CourseMember post-create hook skips workspace provisioning. */
+  requires_workspace?: boolean;
   /** Additional properties */
   properties?: any | null;
 }
@@ -1181,6 +1183,8 @@ export interface ServiceTypeCreate {
   color?: string | null;
   /** Whether this service type is enabled */
   enabled?: boolean;
+  /** Whether services of this type need a workspace (e.g. a GitLab repository) provisioned for their course members. When False, the CourseMember post-create hook skips workspace provisioning. */
+  requires_workspace?: boolean;
   /** Additional properties */
   properties?: any | null;
 }
@@ -1197,6 +1201,8 @@ export interface ServiceTypeUpdate {
   icon?: string | null;
   color?: string | null;
   enabled?: boolean | null;
+  /** Whether services of this type need a workspace provisioned for their course members. */
+  requires_workspace?: boolean | null;
   properties?: any | null;
 }
 
@@ -1256,6 +1262,8 @@ export interface ServiceTypeGet {
   color?: string | null;
   /** Enabled status */
   enabled: boolean;
+  /** Whether services of this type need a workspace provisioned for their course members. */
+  requires_workspace?: boolean;
   /** Additional properties */
   properties?: any;
   /** Version number */

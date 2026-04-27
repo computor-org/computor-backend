@@ -113,3 +113,43 @@ class SystemClient:
         response = await self._http.get(f"/system/hierarchy/status/{workflow_id}", params=kwargs)
         return response.json()
 
+    async def maintenance_status(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Maintenance Status"""
+        response = await self._http.get(f"/system/maintenance/status", params=kwargs)
+        return response.json()
+
+    async def maintenance_activate(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Activate Maintenance"""
+        response = await self._http.post(f"/system/maintenance/activate", params=kwargs)
+        return response.json()
+
+    async def maintenance_deactivate(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Deactivate Maintenance"""
+        response = await self._http.post(f"/system/maintenance/deactivate", params=kwargs)
+        return response.json()
+
+    async def maintenance_schedule(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Schedule Maintenance"""
+        response = await self._http.post(f"/system/maintenance/schedule", params=kwargs)
+        return response.json()
+
+    async def delete_maintenance_schedule(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        """Cancel Scheduled Maintenance"""
+        await self._http.delete(f"/system/maintenance/schedule", params=kwargs)
+        return
+

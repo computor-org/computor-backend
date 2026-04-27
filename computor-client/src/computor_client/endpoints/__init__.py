@@ -11,6 +11,8 @@ from computor_client.endpoints.course_content_kinds import CourseContentKindsCli
 from computor_client.endpoints.course_content_types import CourseContentTypesClient
 from computor_client.endpoints.course_contents import CourseContentsClient
 from computor_client.endpoints.course_families import CourseFamiliesClient
+from computor_client.endpoints.course_family_members import CourseFamilyMembersClient
+from computor_client.endpoints.course_family_roles import CourseFamilyRolesClient
 from computor_client.endpoints.course_groups import CourseGroupsClient
 from computor_client.endpoints.course_member_comments import CourseMemberCommentsClient
 from computor_client.endpoints.course_member_gradings import CourseMemberGradingsClient
@@ -25,6 +27,8 @@ from computor_client.endpoints.groups import GroupsClient
 from computor_client.endpoints.languages import LanguagesClient
 from computor_client.endpoints.lecturers import LecturersClient
 from computor_client.endpoints.messages import MessagesClient
+from computor_client.endpoints.organization_members import OrganizationMembersClient
+from computor_client.endpoints.organization_roles import OrganizationRolesClient
 from computor_client.endpoints.organizations import OrganizationsClient
 from computor_client.endpoints.profiles import ProfilesClient
 from computor_client.endpoints.results import ResultsClient
@@ -46,6 +50,7 @@ from computor_client.endpoints.tokens import TokensClient
 from computor_client.endpoints.tutors import TutorsClient
 from computor_client.endpoints.user import UserClient
 from computor_client.endpoints.users import UsersClient
+from computor_client.endpoints.workspaces import WorkspacesClient
 
 __all__ = [
     "AccountsClient",
@@ -54,6 +59,8 @@ __all__ = [
     "CourseContentTypesClient",
     "CourseContentsClient",
     "CourseFamiliesClient",
+    "CourseFamilyMembersClient",
+    "CourseFamilyRolesClient",
     "CourseGroupsClient",
     "CourseMemberCommentsClient",
     "CourseMemberGradingsClient",
@@ -68,6 +75,8 @@ __all__ = [
     "LanguagesClient",
     "LecturersClient",
     "MessagesClient",
+    "OrganizationMembersClient",
+    "OrganizationRolesClient",
     "OrganizationsClient",
     "ProfilesClient",
     "ResultsClient",
@@ -89,4 +98,5 @@ __all__ = [
     "TutorsClient",
     "UserClient",
     "UsersClient",
+    "WorkspacesClient",
 ]

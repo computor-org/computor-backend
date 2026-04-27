@@ -15,7 +15,8 @@ import type { MessageAuthor, MessageAuthorCourseMember } from './auth';
 export interface MessageCreate {
   parent_id?: string | null;
   level?: number;
-  title: string;
+  /** Message title (optional, used for tags like #ai) */
+  title?: string | null;
   content: string;
   /** Organization-level message */
   organization_id?: string | null;
@@ -48,7 +49,7 @@ export interface MessageGet {
   created_by?: string | null;
   updated_by?: string | null;
   id: string;
-  title: string;
+  title?: string | null;
   content: string;
   level: number;
   parent_id?: string | null;
@@ -82,7 +83,7 @@ export interface MessageList {
   /** Update timestamp */
   updated_at?: string | null;
   id: string;
-  title: string;
+  title?: string | null;
   content: string;
   level: number;
   parent_id?: string | null;
@@ -132,12 +133,27 @@ export interface MessageQuery {
   created_before?: string | null;
   /** Filter by read status: True = unread only, False = read only, None = all */
   unread?: boolean | null;
-  /** Filter by tags in title (e.g., ['ai::request', 'priority::high']) */
+  /** Filter by tags in title (e.g., ['ai', 'ai-help', 'review']). Without # prefix. */
   tags?: string[] | null;
   /** True = must match ALL tags (AND), False = match ANY tag (OR) */
   tags_match_all?: boolean | null;
-  /** Filter by tag scope prefix (e.g., 'ai' matches any #ai::* tag) */
+  /** Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.) */
   tag_scope?: string | null;
+}
+
+/**
+ * Full conversation thread for a message.
+ * 
+ * Returns all messages sharing the same root, ordered by created_at.
+ * Used by agents to get full conversation context for follow-up detection.
+ */
+export interface MessageThread {
+  /** ID of the root message in the thread */
+  root_message_id: string;
+  /** All messages in the thread, ordered by created_at ascending */
+  messages?: MessageList[];
+  /** Total number of messages in the thread */
+  total?: number;
 }
 
 /**

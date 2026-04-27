@@ -59,6 +59,14 @@ class SubmissionsClient:
             return [SubmissionArtifactList.model_validate(item) for item in data]
         return []
 
+    async def artifacts_download(
+        self,
+        **kwargs: Any,
+    ) -> bytes:
+        """Download Latest Submission"""
+        response = await self._http.get(f"/submissions/artifacts/download", params=kwargs)
+        return response.content
+
     async def get_missions_artifacts_artifact_id(
         self,
         artifact_id: str,
@@ -77,14 +85,6 @@ class SubmissionsClient:
         """Update Submission Artifact"""
         response = await self._http.patch(f"/submissions/artifacts/{artifact_id}", json_data=data, params=kwargs)
         return SubmissionArtifactGet.model_validate(response.json())
-
-    async def artifacts_download(
-        self,
-        **kwargs: Any,
-    ) -> bytes:
-        """Download Latest Submission"""
-        response = await self._http.get(f"/submissions/artifacts/download", params=kwargs)
-        return response.content
 
     async def get_artifacts_download(
         self,
@@ -118,6 +118,17 @@ class SubmissionsClient:
         return []
 
     async def grades(
+        self,
+        **kwargs: Any,
+    ) -> List[SubmissionGradeList]:
+        """List Grades"""
+        response = await self._http.get(f"/submissions/grades", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [SubmissionGradeList.model_validate(item) for item in data]
+        return []
+
+    async def patch_grades(
         self,
         grade_id: str,
         data: Union[SubmissionGradeUpdate, Dict[str, Any]],

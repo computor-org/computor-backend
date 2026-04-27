@@ -157,6 +157,14 @@ class AuthenticationClient:
         response = await self._http.post(f"/auth/refresh", json_data=data, params=kwargs)
         return TokenRefreshResponse.model_validate(response.json())
 
+    async def auth_verify_coder_access(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Verify Coder Access"""
+        response = await self._http.get(f"/auth/verify-coder-access", params=kwargs)
+        return response.json()
+
     async def password_status(
         self,
         **kwargs: Any,
