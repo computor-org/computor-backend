@@ -143,44 +143,25 @@ async def fetch_example_version_with_dependencies(
         else:
             logger.info(f"Main example {example_version_id} already cached")
 
-        # Process dependencies - each cached under its own version_id
+        # Cache dependencies by identifier so the reference run can resolve
+        # sibling `../<dep_identifier>/` imports out of the examples cache.
+        # The dep is just another example — it may already be on disk because
+        # it is itself an assignment that has been fetched before.
         dependencies_info = []
         for dep in download_data.get("dependencies", []):
             dep_version_id = dep.get("version_id")
             dep_identifier = dep.get("identifier") or dep.get("directory")
-            dep_cache_path = os.path.join(target_base_dir, dep_version_id)
+            if not dep_identifier:
+                logger.warning(f"Skipping dependency without identifier: {dep_version_id}")
+                continue
 
-            # Cache dependency if not already cached
+            dep_cache_path = os.path.join(target_base_dir, dep_identifier)
+
             if not os.path.isdir(dep_cache_path) or not os.listdir(dep_cache_path):
                 logger.info(f"Caching dependency {dep_identifier} ({dep_version_id}) at {dep_cache_path}")
                 _save_example_files(dep_cache_path, dep.get("files", {}))
             else:
                 logger.info(f"Dependency {dep_identifier} ({dep_version_id}) already cached")
-
-            # Publish the dep under its identifier next to the reference example
-            # cache. Both the reference (cached at /tmp/examples/<ref_version_id>/)
-            # and the student run (with deps mirrored next to studentDirectory)
-            # rely on resolving sibling `../<dep_identifier>/` imports, so the
-            # examples cache must expose deps by identifier — not just by
-            # version id.
-            if dep_identifier:
-                dep_alias_path = os.path.join(target_base_dir, dep_identifier)
-                try:
-                    if os.path.islink(dep_alias_path) or os.path.exists(dep_alias_path):
-                        # Repoint stale alias only if it does not already match.
-                        if os.path.realpath(dep_alias_path) != os.path.realpath(dep_cache_path):
-                            if os.path.islink(dep_alias_path) or os.path.isfile(dep_alias_path):
-                                os.unlink(dep_alias_path)
-                            else:
-                                shutil.rmtree(dep_alias_path)
-                            os.symlink(dep_cache_path, dep_alias_path)
-                    else:
-                        os.symlink(dep_cache_path, dep_alias_path)
-                except OSError:
-                    # Symlinks may be unsupported (e.g. some Windows configs);
-                    # fall back to a copy so the layout is still correct.
-                    if not os.path.isdir(dep_alias_path):
-                        shutil.copytree(dep_cache_path, dep_alias_path)
 
             dependencies_info.append({
                 "example_id": dep.get("example_id"),
