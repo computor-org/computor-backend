@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    BigInteger, CheckConstraint, Column, DateTime, 
+    BigInteger, Boolean, CheckConstraint, Column, DateTime,
     Enum, ForeignKey, Index, String, text, Computed
 , func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -60,3 +60,87 @@ class Organization(Base):
     courses = relationship('Course', back_populates='organization', uselist=True, lazy='select')
     example_repositories = relationship('ExampleRepository', back_populates='organization', uselist=True, lazy='select')
     student_profiles = relationship('StudentProfile', back_populates='organization', uselist=True, lazy='select')
+    organization_members = relationship(
+        'OrganizationMember',
+        back_populates='organization',
+        cascade='all, delete-orphan',
+    )
+
+
+class OrganizationRole(Base):
+    """Per-organization role analogous to CourseRole.
+
+    Role IDs are scoped to this table (no clash with course_role / role).
+    Built-in roles seeded via migration: ``_owner``, ``_manager``.
+    """
+    __tablename__ = 'organization_role'
+    __table_args__ = (
+        CheckConstraint("(NOT builtin) OR ((id)::text ~ '^_'::text)"),
+        CheckConstraint(
+            "(builtin AND computor_valid_slug(SUBSTRING(id FROM 2))) "
+            "OR ((NOT builtin) AND computor_valid_slug((id)::text))"
+        ),
+    )
+
+    id = Column(String(255), primary_key=True)
+    title = Column(String(255))
+    description = Column(String(4096))
+    builtin = Column(Boolean, nullable=False, server_default=text("false"))
+
+    organization_members = relationship(
+        'OrganizationMember', back_populates='organization_role'
+    )
+
+
+class OrganizationMember(Base):
+    """Membership linking a user to an organization with a scoped role.
+
+    Independent of ``course_member`` — does not cascade up or down. Used
+    for write/admin authorization (create/update/delete on the org and
+    descendants where applicable). Read visibility for organizations
+    continues to use the course-membership cascade.
+    """
+    __tablename__ = 'organization_member'
+    __table_args__ = (
+        Index(
+            'organization_member_user_org_key',
+            'user_id', 'organization_id',
+            unique=True,
+        ),
+    )
+
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
+    version = Column(BigInteger, server_default=text("0"))
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
+    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
+    properties = Column(JSONB)
+
+    user_id = Column(
+        ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'),
+        nullable=False,
+    )
+    organization_id = Column(
+        ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'),
+        nullable=False,
+        index=True,
+    )
+    organization_role_id = Column(
+        ForeignKey('organization_role.id', ondelete='RESTRICT', onupdate='RESTRICT'),
+        nullable=False,
+    )
+
+    user = relationship('User', foreign_keys=[user_id])
+    organization = relationship(
+        'Organization', back_populates='organization_members'
+    )
+    organization_role = relationship(
+        'OrganizationRole', back_populates='organization_members'
+    )
+    created_by_user = relationship('User', foreign_keys=[created_by])
+    updated_by_user = relationship('User', foreign_keys=[updated_by])

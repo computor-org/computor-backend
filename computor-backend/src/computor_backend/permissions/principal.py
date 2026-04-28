@@ -6,10 +6,48 @@ from computor_backend.api.exceptions import NotFoundException
 from functools import lru_cache
 
 
-class CourseRoleHierarchy:
-    """Manages course role hierarchy and inheritance"""
+class ScopedRoleHierarchy:
+    """Generic per-scope role hierarchy.
 
-    # Default hierarchy - can be made configurable later
+    A scope is e.g. ``course``, ``organization``, ``course_family``.
+    For each scope we maintain a mapping of ``role -> [roles that
+    satisfy this role]`` (the role itself plus any higher role) and a
+    numeric level mapping for comparisons.
+
+    The class is intentionally minimal so the same machinery powers
+    course roles, organization roles, and course-family roles.
+    """
+
+    def __init__(
+        self,
+        hierarchy: Dict[str, List[str]],
+        levels: Dict[str, int],
+    ) -> None:
+        self.hierarchy = hierarchy
+        self.levels = levels
+
+    @lru_cache(maxsize=128)
+    def get_allowed_roles(self, role: str) -> List[str]:
+        """Roles that meet or exceed the given role (incl. the role itself)."""
+        return self.hierarchy.get(role, [])
+
+    def has_role_permission(self, user_role: str, required_role: str) -> bool:
+        return user_role in self.get_allowed_roles(required_role)
+
+    def get_role_level(self, role: str) -> int:
+        return self.levels.get(role, 0)
+
+    def can_assign_role(self, assigner_role: str, target_role: str) -> bool:
+        return self.get_role_level(assigner_role) >= self.get_role_level(target_role)
+
+
+# Course role hierarchy — kept for back-compat under its previous name.
+# ``CourseRoleHierarchy`` (legacy class name) and ``course_role_hierarchy``
+# (legacy module-level instance) remain importable from existing call
+# sites; both are now backed by the generic ``ScopedRoleHierarchy``.
+class CourseRoleHierarchy(ScopedRoleHierarchy):
+    """Backwards-compatible course-role hierarchy."""
+
     DEFAULT_HIERARCHY = {
         "_owner": ["_owner"],
         "_maintainer": ["_maintainer", "_owner"],
@@ -17,8 +55,6 @@ class CourseRoleHierarchy:
         "_tutor": ["_tutor", "_lecturer", "_maintainer", "_owner"],
         "_student": ["_student", "_tutor", "_lecturer", "_maintainer", "_owner"],
     }
-
-    # Numeric levels for role comparison (higher = more privilege)
     ROLE_LEVELS = {
         "_owner": 5,
         "_maintainer": 4,
@@ -27,31 +63,48 @@ class CourseRoleHierarchy:
         "_student": 1,
     }
 
-    def __init__(self, hierarchy: Optional[Dict[str, List[str]]] = None):
-        self.hierarchy = hierarchy or self.DEFAULT_HIERARCHY
+    def __init__(self, hierarchy: Optional[Dict[str, List[str]]] = None) -> None:
+        super().__init__(
+            hierarchy=hierarchy or self.DEFAULT_HIERARCHY,
+            levels=self.ROLE_LEVELS,
+        )
 
-    @lru_cache(maxsize=128)
-    def get_allowed_roles(self, role: str) -> List[str]:
-        """Get all roles that meet or exceed the given role"""
-        return self.hierarchy.get(role, [])
 
-    def has_role_permission(self, user_role: str, required_role: str) -> bool:
-        """Check if user_role has permission for required_role"""
-        return user_role in self.get_allowed_roles(required_role)
+# Per-scope hierarchies. Three-level: owner > manager > developer.
+#   developer → can read & edit the scope; cannot assign roles
+#   manager   → can edit and assign roles except _owner
+#   owner     → full control: edit, delete/archive, assign any role
+# No cross-scope inheritance.
+_SCOPE_HIERARCHY = {
+    "_owner": ["_owner"],
+    "_manager": ["_manager", "_owner"],
+    "_developer": ["_developer", "_manager", "_owner"],
+}
+_SCOPE_LEVELS = {"_owner": 3, "_manager": 2, "_developer": 1}
 
-    def get_role_level(self, role: str) -> int:
-        """Get numeric level for a role (higher = more privilege)."""
-        return self.ROLE_LEVELS.get(role, 0)
+organization_role_hierarchy = ScopedRoleHierarchy(
+    hierarchy=_SCOPE_HIERARCHY,
+    levels=_SCOPE_LEVELS,
+)
 
-    def can_assign_role(self, assigner_role: str, target_role: str) -> bool:
-        """Check if assigner can assign target role (must have equal or higher level)."""
-        assigner_level = self.get_role_level(assigner_role)
-        target_level = self.get_role_level(target_role)
-        return assigner_level >= target_level
+course_family_role_hierarchy = ScopedRoleHierarchy(
+    hierarchy=_SCOPE_HIERARCHY,
+    levels=_SCOPE_LEVELS,
+)
 
 
 # Global instance - can be configured at startup
 course_role_hierarchy = CourseRoleHierarchy()
+
+
+# Map scope name -> hierarchy. Keep in sync with the keys used in
+# ``Claims.dependent`` and the claim-emission code in
+# ``permissions/core.py::db_get_*_claims``.
+SCOPE_HIERARCHIES: Dict[str, ScopedRoleHierarchy] = {
+    "course": course_role_hierarchy,
+    "organization": organization_role_hierarchy,
+    "course_family": course_family_role_hierarchy,
+}
 
 
 class Claims(BaseModel):
@@ -179,25 +232,82 @@ class Principal(BaseModel):
             return True
         return self.claims.has_dependent_permission(resource, resource_id, action)
     
-    def has_course_role(self, course_id: str, required_role: str) -> bool:
-        """Check if user has required role in a course"""
+    def has_scope_role(
+        self, scope: str, scope_id: str, required_role: str
+    ) -> bool:
+        """Generic per-scope role check.
+
+        ``scope`` is one of the keys in ``SCOPE_HIERARCHIES`` (currently
+        ``"course"``, ``"organization"``, ``"course_family"``). Admins
+        always pass. Returns False for unknown scopes.
+        """
         if self.is_admin:
             return True
 
-        if "course" not in self.claims.dependent:
+        hierarchy = SCOPE_HIERARCHIES.get(scope)
+        if hierarchy is None:
             return False
 
-        if course_id not in self.claims.dependent["course"]:
+        scope_claims = self.claims.dependent.get(scope)
+        if not scope_claims:
             return False
 
-        user_roles = self.claims.dependent["course"][course_id]
+        user_roles = scope_claims.get(scope_id)
+        if not user_roles:
+            return False
 
-        # Check if any of the user's roles in this course meet the requirement
         for user_role in user_roles:
-            if user_role.startswith("_") and course_role_hierarchy.has_role_permission(user_role, required_role):
+            if user_role.startswith("_") and hierarchy.has_role_permission(
+                user_role, required_role
+            ):
                 return True
-
         return False
+
+    def get_scoped_ids_with_role(
+        self, scope: str, minimum_role: str
+    ) -> Set[str]:
+        """Return scope_ids where the principal has at least ``minimum_role``.
+
+        For admins this returns an empty set — callers treat that as a
+        sentinel meaning "no filtering needed" (admin sees everything).
+        """
+        if self.is_admin:
+            return set()
+
+        hierarchy = SCOPE_HIERARCHIES.get(scope)
+        if hierarchy is None:
+            return set()
+
+        scope_claims = self.claims.dependent.get(scope)
+        if not scope_claims:
+            return set()
+
+        allowed = set(hierarchy.get_allowed_roles(minimum_role))
+        result: Set[str] = set()
+        for scope_id, user_roles in scope_claims.items():
+            for ur in user_roles:
+                if ur in allowed:
+                    result.add(scope_id)
+                    break
+        return result
+
+    def has_course_role(self, course_id: str, required_role: str) -> bool:
+        """Check if user has required role in a course."""
+        return self.has_scope_role("course", course_id, required_role)
+
+    def has_organization_role(
+        self, organization_id: str, required_role: str
+    ) -> bool:
+        """Check if user has at least required_role on an organization."""
+        return self.has_scope_role("organization", organization_id, required_role)
+
+    def has_course_family_role(
+        self, course_family_id: str, required_role: str
+    ) -> bool:
+        """Check if user has at least required_role on a course family."""
+        return self.has_scope_role(
+            "course_family", course_family_id, required_role
+        )
 
     def get_highest_course_role(self, course_id: str) -> Optional[str]:
         """Get the user's highest privilege role in a course.
@@ -240,24 +350,16 @@ class Principal(BaseModel):
         return False
 
     def get_courses_with_role(self, minimum_role: str) -> Set[str]:
-        """Get all course IDs where user has at least the minimum role"""
-        if self.is_admin:
-            return set()  # Admin has access to all, return empty to avoid filtering
-        
-        course_ids = set()
-        
-        if "course" not in self.claims.dependent:
-            return course_ids
-        
-        allowed_roles = course_role_hierarchy.get_allowed_roles(minimum_role)
-        
-        for course_id, user_roles in self.claims.dependent["course"].items():
-            for user_role in user_roles:
-                if user_role in allowed_roles:
-                    course_ids.add(course_id)
-                    break
-        
-        return course_ids
+        """Get all course IDs where user has at least the minimum role."""
+        return self.get_scoped_ids_with_role("course", minimum_role)
+
+    def get_organizations_with_role(self, minimum_role: str) -> Set[str]:
+        """Get all organization IDs where user has at least minimum_role."""
+        return self.get_scoped_ids_with_role("organization", minimum_role)
+
+    def get_course_families_with_role(self, minimum_role: str) -> Set[str]:
+        """Get all course_family IDs where user has at least minimum_role."""
+        return self.get_scoped_ids_with_role("course_family", minimum_role)
     
     def permitted(self, resource: str, action: str | List[str], 
                  resource_id: Optional[str] = None, 

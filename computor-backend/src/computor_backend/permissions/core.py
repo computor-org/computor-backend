@@ -16,7 +16,9 @@ from computor_backend.permissions.handlers_impl import (
     StudentProfilePermissionHandler,
     CoursePermissionHandler,
     OrganizationPermissionHandler,
+    OrganizationMemberPermissionHandler,
     CourseFamilyPermissionHandler,
+    CourseFamilyMemberPermissionHandler,
     CourseContentTypePermissionHandler,
     CourseContentPermissionHandler,
     CourseMemberPermissionHandler,
@@ -39,10 +41,15 @@ from computor_backend.model.auth import User, Account, Profile, StudentProfile, 
 from computor_backend.model.course import (
     Course, CourseFamily, CourseMember, CourseContent,
     CourseContentType, CourseContentKind, CourseRole, CourseGroup,
+    CourseFamilyRole, CourseFamilyMember,
     CourseMemberComment,
     SubmissionGroup, SubmissionGroupMember
 )
-from computor_backend.model.organization import Organization
+from computor_backend.model.organization import (
+    Organization,
+    OrganizationRole,
+    OrganizationMember,
+)
 from computor_backend.model.result import Result
 from computor_backend.model.message import Message
 from computor_backend.model.artifact import (
@@ -82,8 +89,14 @@ def initialize_permission_handlers():
     
     # Read-only entities
     permission_registry.register(CourseRole, ReadOnlyPermissionHandler(CourseRole))
+    permission_registry.register(OrganizationRole, ReadOnlyPermissionHandler(OrganizationRole))
+    permission_registry.register(CourseFamilyRole, ReadOnlyPermissionHandler(CourseFamilyRole))
     permission_registry.register(CourseContentKind, ReadOnlyPermissionHandler(CourseContentKind))
     permission_registry.register(Language, ReadOnlyPermissionHandler(Language))
+
+    # Scoped membership entities
+    permission_registry.register(OrganizationMember, OrganizationMemberPermissionHandler(OrganizationMember))
+    permission_registry.register(CourseFamilyMember, CourseFamilyMemberPermissionHandler(CourseFamilyMember))
     
     # Example entities (lecturer-only access)
     permission_registry.register(Example, ExamplePermissionHandler(Example))
@@ -321,8 +334,50 @@ def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMI
             ("permissions", f"{Example.__tablename__}:upload"),
             ("permissions", f"{Example.__tablename__}:download"),
         ])
-    
+
     return course_claims
+
+
+def db_get_organization_claims(user_id: str, db: Session) -> List[tuple]:
+    """Synthesize organization-scoped role claims for a user.
+
+    Emits one claim per ``organization_member`` row, in the form
+    ``("permissions", f"organization:<role>:<org_id>")`` — the same
+    shape as ``course:<role>:<course_id>`` so ``build_claims`` files it
+    under ``Claims.dependent["organization"]``.
+    """
+    rows = (
+        db.query(
+            OrganizationMember.organization_id,
+            OrganizationMember.organization_role_id,
+        )
+        .filter(OrganizationMember.user_id == user_id)
+        .all()
+    )
+    return [
+        ("permissions", f"organization:{role_id}:{org_id}")
+        for org_id, role_id in rows
+    ]
+
+
+def db_get_course_family_claims(user_id: str, db: Session) -> List[tuple]:
+    """Synthesize course_family-scoped role claims for a user.
+
+    Emits one claim per ``course_family_member`` row, in the form
+    ``("permissions", f"course_family:<role>:<family_id>")``.
+    """
+    rows = (
+        db.query(
+            CourseFamilyMember.course_family_id,
+            CourseFamilyMember.course_family_role_id,
+        )
+        .filter(CourseFamilyMember.user_id == user_id)
+        .all()
+    )
+    return [
+        ("permissions", f"course_family:{role_id}:{family_id}")
+        for family_id, role_id in rows
+    ]
 
 
 def db_get_roles_claims(user_id: str, db: Session) -> tuple:

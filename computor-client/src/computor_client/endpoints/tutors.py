@@ -197,3 +197,30 @@ class TutorsClient:
         response = await self._http.get(f"/tutors/tests/{test_id}/artifacts/download", params=kwargs)
         return response.content
 
+    async def tests_input_download(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> bytes:
+        """Download Tutor Test Input"""
+        response = await self._http.get(f"/tutors/tests/{test_id}/input/download", params=kwargs)
+        return response.content
+
+    async def tests_results(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Submit Tutor Test Results"""
+        response = await self._http.post(f"/tutors/tests/{test_id}/results", params=kwargs)
+        return response.json()
+
+    async def tests_artifacts_upload(
+        self,
+        test_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Upload Tutor Test Artifacts"""
+        response = await self._http.post(f"/tutors/tests/{test_id}/artifacts/upload", params=kwargs)
+        return response.json()
+

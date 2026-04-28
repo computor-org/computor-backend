@@ -37,6 +37,10 @@ from computor_backend.interfaces import (
     SubmissionGroupInterface,
     CourseGroupInterface,
     CourseRoleInterface,
+    OrganizationRoleInterface,
+    OrganizationMemberInterface,
+    CourseFamilyRoleInterface,
+    CourseFamilyMemberInterface,
     CourseContentTypeInterface,
     CourseContentKindInterface,
     LanguageInterface,
@@ -292,6 +296,10 @@ course_family_router.register_routes(app)
 CrudRouter(CourseGroupInterface).register_routes(app)
 CrudRouter(CourseMemberInterface).register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
+LookUpRouter(OrganizationRoleInterface).register_routes(app)
+LookUpRouter(CourseFamilyRoleInterface).register_routes(app)
+CrudRouter(OrganizationMemberInterface).register_routes(app)
+CrudRouter(CourseFamilyMemberInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
 LookUpRouter(LanguageInterface).register_routes(app)
 CrudRouter(ExampleRepositoryInterface).register_routes(app)

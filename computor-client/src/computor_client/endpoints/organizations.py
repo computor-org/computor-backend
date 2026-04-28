@@ -110,3 +110,12 @@ class OrganizationsClient:
         response = await self._http.patch(f"/organizations/{id}/archive", params=kwargs)
         return
 
+    async def unarchive(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Unarchive Organizations"""
+        response = await self._http.patch(f"/organizations/{id}/unarchive", params=kwargs)
+        return
+

@@ -237,99 +237,181 @@ class CoursePermissionHandler(PermissionHandler):
 
 
 class OrganizationPermissionHandler(PermissionHandler):
-    """Permission handler for Organization entity"""
-    
-    ACTION_ROLE_MAP = {
-        "get": "_student",
-        "list": "_student",
-        "update": None,  # Only through general permission
-        "create": None,  # Only through general permission
-        "delete": None   # Only through general permission
+    """Permission handler for Organization entity.
+
+    Read visibility is *additive*: a principal sees an organization if
+    any of these is true (admin / general permission shortcut aside) —
+
+    - they are a member of any course inside the org (existing behavior,
+      kept for back-compat: course role cascade UP for read only); or
+    - they are an OrganizationMember with any scoped role on the org.
+
+    Write actions (``update`` / ``delete``) require an explicit scoped
+    role on the org itself (or admin / general permission). Scoped
+    roles do NOT cascade between scopes — being an org ``_owner`` does
+    not grant any course_family or course privilege.
+    """
+
+    # Course-membership cascade only powers the read filter.
+    READ_COURSE_ROLE = "_student"
+
+    ACTION_ORG_ROLE_MAP = {
+        # update / archive / delete: developer can edit, owner-only deletes.
+        "update": "_developer",
+        "archive": "_owner",
+        "delete": "_owner",
     }
-    
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+
+    def can_perform_action(
+        self,
+        principal: Principal,
+        action: str,
+        resource_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> bool:
         if self.check_admin(principal):
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
-        # Users can view organizations of courses they're in
-        if action in ["get", "list"]:
-            return True  # Will be filtered by query
-        
+
+        if action in ("get", "list"):
+            return True  # build_query applies the actual filter
+
+        min_org_role = self.ACTION_ORG_ROLE_MAP.get(action)
+        if min_org_role and resource_id:
+            return principal.has_organization_role(resource_id, min_org_role)
+
         return False
-    
+
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
             return db.query(self.entity)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
-        
-        min_role = self.ACTION_ROLE_MAP.get(action)
-        if min_role:
-            return OrganizationPermissionQueryBuilder.filter_by_course_organization(
-                self.entity, principal.user_id, min_role, db
+
+        if action in ("get", "list"):
+            # Visible if course-cascade OR org_member: union of two id sets.
+            from sqlalchemy import or_
+
+            course_subquery = (
+                CoursePermissionQueryBuilder.user_courses_subquery(
+                    principal.user_id, self.READ_COURSE_ROLE, db
+                )
             )
-        
+            from computor_backend.model.course import Course as _Course
+
+            org_via_course = (
+                db.query(_Course.organization_id)
+                .filter(_Course.id.in_(course_subquery))
+            )
+
+            org_via_member_ids = principal.get_scoped_ids_with_role(
+                "organization", "_developer"
+            )
+            # _developer is the lowest scoped role; hierarchy includes
+            # _manager and _owner.
+
+            return db.query(self.entity).filter(
+                or_(
+                    self.entity.id.in_(org_via_course),
+                    self.entity.id.in_(org_via_member_ids)
+                    if org_via_member_ids
+                    else False,
+                )
+            )
+
+        min_org_role = self.ACTION_ORG_ROLE_MAP.get(action)
+        if min_org_role:
+            org_ids = principal.get_scoped_ids_with_role("organization", min_org_role)
+            if not org_ids:
+                # Empty filter → empty result, not a 403.
+                return db.query(self.entity).filter(self.entity.id.in_([]))
+            return db.query(self.entity).filter(self.entity.id.in_(org_ids))
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
 class CourseFamilyPermissionHandler(PermissionHandler):
-    """Permission handler for CourseFamily entity"""
-    
-    ACTION_ROLE_MAP = {
-        "get": "_student",
-        "list": "_student",
-        "update": None,  # Only through general permission
-        "create": None,  # Only through general permission
-        "delete": None   # Only through general permission
+    """Permission handler for CourseFamily entity.
+
+    Symmetric to ``OrganizationPermissionHandler``. Read visibility is
+    additive (course-membership cascade UP, plus explicit scoped role
+    on the family). Write actions need an explicit scoped role on the
+    family itself.
+    """
+
+    READ_COURSE_ROLE = "_student"
+
+    ACTION_FAMILY_ROLE_MAP = {
+        "update": "_developer",
+        "archive": "_owner",
+        "delete": "_owner",
     }
-    
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+
+    def can_perform_action(
+        self,
+        principal: Principal,
+        action: str,
+        resource_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> bool:
         if self.check_admin(principal):
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
-        if action in ["get", "list"]:
-            return True  # Will be filtered by query
-        
+
+        if action in ("get", "list"):
+            return True
+
+        min_family_role = self.ACTION_FAMILY_ROLE_MAP.get(action)
+        if min_family_role and resource_id:
+            return principal.has_course_family_role(resource_id, min_family_role)
+
         return False
-    
+
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
             return db.query(self.entity)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
-        
-        min_role = self.ACTION_ROLE_MAP.get(action)
-        if min_role:
-            from sqlalchemy.orm import aliased
-            from sqlalchemy import select
-            
-            cm_other = aliased(CourseMember)
-            
-            subquery = CoursePermissionQueryBuilder.user_courses_subquery(
-                principal.user_id, min_role, db
+
+        if action in ("get", "list"):
+            from sqlalchemy import or_
+
+            course_subquery = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, self.READ_COURSE_ROLE, db
             )
-            
-            query = (
-                db.query(self.entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(Course, cm_other.course_id == Course.id)
-                .outerjoin(self.entity, self.entity.id == Course.course_family_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
+            family_via_course = (
+                db.query(Course.course_family_id)
+                .filter(Course.id.in_(course_subquery))
+            )
+
+            family_via_member_ids = principal.get_scoped_ids_with_role(
+                "course_family", "_developer"
+            )
+
+            return db.query(self.entity).filter(
+                or_(
+                    self.entity.id.in_(family_via_course),
+                    self.entity.id.in_(family_via_member_ids)
+                    if family_via_member_ids
+                    else False,
                 )
             )
-            
-            return query
-        
+
+        min_family_role = self.ACTION_FAMILY_ROLE_MAP.get(action)
+        if min_family_role:
+            family_ids = principal.get_scoped_ids_with_role(
+                "course_family", min_family_role
+            )
+            if not family_ids:
+                return db.query(self.entity).filter(self.entity.id.in_([]))
+            return db.query(self.entity).filter(self.entity.id.in_(family_ids))
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
@@ -886,3 +968,201 @@ class MessagePermissionHandler(PermissionHandler):
             )
 
         return query
+
+
+class _ScopeMemberPermissionHandler(PermissionHandler):
+    """Shared logic for OrganizationMember / CourseFamilyMember handlers.
+
+    Subclasses set:
+
+    * ``SCOPE``  — the claim namespace, e.g. ``"organization"`` /
+      ``"course_family"``;
+    * ``SCOPE_FK`` — column on the entity pointing to the parent scope,
+      e.g. ``"organization_id"``;
+    * ``ROLE_FK`` — column on the entity holding the assigned role,
+      e.g. ``"organization_role_id"``.
+
+    Permission model:
+
+    * ``_developer``  → read scope only; cannot read/write members.
+    * ``_manager``    → read all members of the scope; create / update /
+                        delete members whose role is **not** ``_owner``.
+                        A manager cannot grant or revoke ``_owner``.
+    * ``_owner``      → full CRUD on members, including ``_owner`` rows.
+
+    A user always sees their own membership row regardless of role.
+
+    The ``UPDATE`` path uses a ``custom_permissions`` callable
+    (``make_scope_member_custom_permissions`` below) to additionally
+    inspect the new-role payload — this prevents a manager from
+    promoting an existing membership to ``_owner`` via PATCH, which
+    the row-level filter alone would not catch. ``DELETE`` does not
+    need the extra hook because ``build_query`` already excludes
+    ``_owner`` rows from a manager's deletable set.
+    """
+
+    SCOPE: str = ""
+    SCOPE_FK: str = ""
+    ROLE_FK: str = ""
+
+    def can_perform_action(
+        self,
+        principal: Principal,
+        action: str,
+        resource_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> bool:
+        if self.check_admin(principal):
+            return True
+        if self.check_general_permission(principal, action):
+            return True
+
+        if action == "create":
+            ctx = context or {}
+            scope_id = ctx.get(self.SCOPE_FK)
+            target_role = ctx.get(self.ROLE_FK)
+            if not scope_id or not target_role:
+                return False
+            scope_id = str(scope_id)
+            # Owner can assign any role.
+            if principal.has_scope_role(self.SCOPE, scope_id, "_owner"):
+                return True
+            # Manager can assign anything except _owner.
+            if (
+                principal.has_scope_role(self.SCOPE, scope_id, "_manager")
+                and target_role != "_owner"
+            ):
+                return True
+            return False
+
+        if action in ("update", "delete") and resource_id:
+            # build_query applies the row-level restriction.
+            return True
+
+        if action in ("list", "get"):
+            return True
+
+        return False
+
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        from sqlalchemy import and_, or_
+
+        scope_fk = getattr(self.entity, self.SCOPE_FK)
+        role_fk = getattr(self.entity, self.ROLE_FK)
+
+        if self.check_admin(principal):
+            return db.query(self.entity)
+        if self.check_general_permission(principal, action):
+            return db.query(self.entity)
+
+        owner_scopes = principal.get_scoped_ids_with_role(self.SCOPE, "_owner")
+        manager_scopes = principal.get_scoped_ids_with_role(self.SCOPE, "_manager")
+        # Restrict manager-only set to scopes where principal is NOT owner,
+        # so each filter clause stays well-defined.
+        manager_only_scopes = manager_scopes - owner_scopes
+
+        if action in ("update", "delete"):
+            clauses = []
+            if owner_scopes:
+                # Owners can edit any row in their scopes.
+                clauses.append(scope_fk.in_(owner_scopes))
+            if manager_only_scopes:
+                # Managers can edit non-_owner rows only.
+                clauses.append(
+                    and_(
+                        scope_fk.in_(manager_only_scopes),
+                        role_fk != "_owner",
+                    )
+                )
+            if not clauses:
+                return db.query(self.entity).filter(self.entity.id.in_([]))
+            return db.query(self.entity).filter(or_(*clauses))
+
+        if action in ("list", "get"):
+            # Members of the scope visible to anyone with at least
+            # _manager (they need to see the roster). Plus the user's
+            # own membership row.
+            visible_scopes = owner_scopes | manager_only_scopes
+            user_filter = self.entity.user_id == principal.user_id
+            if visible_scopes:
+                return db.query(self.entity).filter(
+                    or_(scope_fk.in_(visible_scopes), user_filter)
+                )
+            return db.query(self.entity).filter(user_filter)
+
+        raise ForbiddenException(detail={"entity": self.resource_name})
+
+
+class OrganizationMemberPermissionHandler(_ScopeMemberPermissionHandler):
+    SCOPE = "organization"
+    SCOPE_FK = "organization_id"
+    ROLE_FK = "organization_role_id"
+
+
+class CourseFamilyMemberPermissionHandler(_ScopeMemberPermissionHandler):
+    SCOPE = "course_family"
+    SCOPE_FK = "course_family_id"
+    ROLE_FK = "course_family_role_id"
+
+
+def make_scope_member_custom_permissions(
+    model: type, scope: str, scope_fk: str, role_fk: str
+):
+    """Return a ``custom_permissions`` callable for a scoped member entity.
+
+    The build_query filter already restricts which rows a principal can
+    delete (a ``_manager`` cannot see ``_owner`` rows), but UPDATE goes
+    through ``custom_permissions`` and the row-level filter alone does
+    not inspect the *new* role being assigned. This callable closes
+    that gap by examining the request payload:
+
+    * Reject the update if the row does not exist (NotFound -> empty).
+    * Require the principal to have at least ``_manager`` on the scope.
+    * Reject if the row is currently ``_owner`` and the principal is
+      not ``_owner`` (a manager cannot demote an owner).
+    * Reject if the payload tries to set the role to ``_owner`` and the
+      principal is not ``_owner`` (a manager cannot promote to owner).
+
+    Returns a passthrough query that the CRUD layer narrows to ``id``.
+    """
+
+    def custom_permissions(
+        principal: Principal,
+        db: Session,
+        id,
+        entity,
+    ) -> Query:
+        if principal.is_admin:
+            return db.query(model)
+
+        row = db.query(model).filter(model.id == id).first()
+        if row is None:
+            return db.query(model).filter(model.id == id)
+
+        scope_id = str(getattr(row, scope_fk))
+        current_role = getattr(row, role_fk)
+
+        if not principal.has_scope_role(scope, scope_id, "_manager"):
+            raise ForbiddenException(
+                detail=(
+                    f"You need at least _manager on this {scope} to modify "
+                    "its memberships."
+                )
+            )
+
+        is_scope_owner = principal.has_scope_role(scope, scope_id, "_owner")
+
+        if current_role == "_owner" and not is_scope_owner:
+            raise ForbiddenException(
+                detail="Only an _owner of this scope can modify an _owner membership."
+            )
+
+        new_role = getattr(entity, role_fk, None)
+        if new_role is not None and new_role == "_owner" and not is_scope_owner:
+            raise ForbiddenException(
+                detail="Only an _owner of this scope can grant the _owner role."
+            )
+
+        return db.query(model)
+
+    return custom_permissions

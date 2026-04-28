@@ -22,6 +22,7 @@ from computor_types.lecturer_course_contents import (
     CourseContentLecturerList,
 )
 from computor_types.lecturer_deployments import (
+    AssignExampleRequest,
     AssignExampleResponse,
     DeploymentGet,
     UnassignExampleResponse,
@@ -85,10 +86,11 @@ class LecturersClient:
     async def course_contents_assign_example(
         self,
         course_content_id: str,
+        data: Union[AssignExampleRequest, Dict[str, Any]],
         **kwargs: Any,
     ) -> AssignExampleResponse:
         """Assign Example To Course Content"""
-        response = await self._http.post(f"/lecturers/course-contents/{course_content_id}/assign-example", params=kwargs)
+        response = await self._http.post(f"/lecturers/course-contents/{course_content_id}/assign-example", json_data=data, params=kwargs)
         return AssignExampleResponse.model_validate(response.json())
 
     async def course_contents_deployment(
@@ -108,6 +110,24 @@ class LecturersClient:
         """Unassign Example From Course Content"""
         await self._http.delete(f"/lecturers/course-contents/{course_content_id}/deployment", params=kwargs)
         return
+
+    async def courses_deployments(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Course Deployments Endpoint"""
+        response = await self._http.get(f"/lecturers/courses/{course_id}/deployments", params=kwargs)
+        return response.json()
+
+    async def courses_upgrade_versions(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Batch Upgrade Versions Endpoint"""
+        response = await self._http.post(f"/lecturers/courses/{course_id}/upgrade-versions", params=kwargs)
+        return response.json()
 
     async def courses_validate(
         self,
