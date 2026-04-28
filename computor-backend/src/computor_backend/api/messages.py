@@ -47,7 +47,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
     get_message_with_read_status,
     get_message_thread,
-    invalidate_tutor_lecturer_views_for_message,
+    invalidate_dashboard_views_for_message,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_message_as_read,
@@ -86,7 +86,7 @@ async def create_message(
         create_message_audit(db_message, permissions, db)
         # Invalidate tutor/lecturer course views so unread_message_count badges
         # reflect the new message without waiting for the 3-min TTL.
-        invalidate_tutor_lecturer_views_for_message(db_message, db, cache)
+        invalidate_dashboard_views_for_message(db_message, db, cache)
 
     # Enrich message with author info before broadcasting
     enriched_message = get_message_with_read_status(message.id, message, permissions, db)
@@ -202,7 +202,7 @@ async def delete_message(
 
     # Invalidate tutor/lecturer course views so unread_message_count drops for
     # other users who hadn't yet read this message.
-    invalidate_tutor_lecturer_views_for_message(deleted, db, cache)
+    invalidate_dashboard_views_for_message(deleted, db, cache)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
     await _safe_broadcast(

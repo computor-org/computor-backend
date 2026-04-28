@@ -702,46 +702,116 @@ def _elevated_user_ids(db: Session, course_id) -> set[str]:
     return {str(r[0]) for r in rows}
 
 
-def invalidate_tutor_lecturer_views_for_message(
+def invalidate_dashboard_views_for_message(
     message: Message,
     db: Session,
     cache: Optional[Cache] = None,
 ) -> None:
-    """
-    Clear cached tutor and lecturer course views affected by a message create/delete.
+    """Clear cached student/tutor/lecturer dashboard views affected by a
+    message create/delete.
 
-    Every tutor's `unread_message_count` badge for a course member depends on the
-    set of non-archived messages scoped to that member's submission group. When a
-    new message is posted (or soft-deleted), that set changes, so every tutor's
-    cached view for the course must be invalidated.
+    Every dashboard's ``unread_message_count`` badge depends on the set
+    of non-archived messages visible to the viewer. When a message is
+    posted (or soft-deleted) we have to bust the per-course view tags
+    so the next fetch recomputes the badge.
 
-    Resolves the effective course_id via the message's scope hierarchy when
-    `message.course_id` itself is NULL (submission-group-scoped messages):
-        submission_group.course_id -> course_content.course_id
+    Scope -> affected courses:
 
-    Note: this is a no-op for read/unread state changes — those are per-user and
-    are handled by `_invalidate_message_cache`.
+    * ``submission_group``, ``course_content``, ``course_group``,
+      ``course_member`` -> single course (resolved via lookup if the
+      message itself doesn't carry ``course_id``)
+    * ``course`` -> the course itself
+    * ``course_family`` -> every course in that family (cascade)
+    * ``organization`` -> every course in that org (cascade)
+    * ``user_id`` -> none (direct chat doesn't surface in course
+      dashboards)
+    * global -> none (global posts don't refresh per-course badges; the
+      inbox sidebar handles them via the ``user:<id>`` WS channel)
+
+    For each affected course, three tags are busted:
+    ``tutor_view:<id>``, ``lecturer_view:<id>``, ``student_view:<id>``.
+
+    Read/unread state changes are per-user and handled separately by
+    ``_invalidate_message_cache``.
     """
     if cache is None or message is None:
         return
 
-    course_id = message.course_id
+    for course_id in _affected_course_ids_for_message(message, db):
+        invalidate_course_dashboards(course_id, cache)
 
-    if course_id is None and message.submission_group_id:
-        course_id = db.query(SubmissionGroup.course_id).filter(
+
+# Back-compat alias — older imports still resolve. Remove once all
+# call sites use the new name.
+invalidate_tutor_lecturer_views_for_message = invalidate_dashboard_views_for_message
+
+
+def invalidate_course_dashboards(course_id, cache: Optional[Cache] = None) -> None:
+    """Bust the three dashboard view caches for a course.
+
+    Called from message create/delete (via
+    ``invalidate_dashboard_views_for_message``) and from CourseMember
+    create/update so role changes are immediately reflected in any
+    cached dashboards (otherwise a freshly-promoted tutor would see
+    the old student-level view until TTL expires).
+    """
+    if cache is None or course_id is None:
+        return
+    cid = str(course_id)
+    cache.invalidate_tags(f"tutor_view:{cid}")
+    cache.invalidate_tags(f"lecturer_view:{cid}")
+    cache.invalidate_tags(f"student_view:{cid}")
+
+
+def _affected_course_ids_for_message(message: Message, db: Session) -> set[str]:
+    """Resolve the set of courses whose dashboards a message affects.
+
+    Centralised here so the invalidator and any future broadcast/cache
+    helpers share the same scope -> courses mapping. Returns string IDs;
+    callers don't need to care whether the message had ``course_id`` set
+    directly or whether it was resolved via a parent scope.
+    """
+    if message.course_id:
+        return {str(message.course_id)}
+
+    if message.submission_group_id:
+        cid = db.query(SubmissionGroup.course_id).filter(
             SubmissionGroup.id == message.submission_group_id
         ).scalar()
+        return {str(cid)} if cid else set()
 
-    if course_id is None and message.course_content_id:
-        course_id = db.query(CourseContent.course_id).filter(
+    if message.course_content_id:
+        cid = db.query(CourseContent.course_id).filter(
             CourseContent.id == message.course_content_id
         ).scalar()
+        return {str(cid)} if cid else set()
 
-    if course_id is None:
-        return
+    if message.course_group_id:
+        cid = db.query(CourseGroup.course_id).filter(
+            CourseGroup.id == message.course_group_id
+        ).scalar()
+        return {str(cid)} if cid else set()
 
-    cache.invalidate_tags(f"tutor_view:{course_id}")
-    cache.invalidate_tags(f"lecturer_view:{course_id}")
+    if message.course_member_id:
+        cid = db.query(CourseMember.course_id).filter(
+            CourseMember.id == message.course_member_id
+        ).scalar()
+        return {str(cid)} if cid else set()
+
+    if message.course_family_id:
+        rows = db.query(Course.id).filter(
+            Course.course_family_id == message.course_family_id
+        ).all()
+        return {str(r[0]) for r in rows}
+
+    if message.organization_id:
+        rows = db.query(Course.id).filter(
+            Course.organization_id == message.organization_id
+        ).all()
+        return {str(r[0]) for r in rows}
+
+    # user_id (direct chat) and global — no per-course dashboards to bust.
+    return set()
 
 
 def _invalidate_message_cache(
@@ -819,6 +889,18 @@ def _invalidate_message_cache(
     if message.user_id:
         # Invalidate user-specific entity tags
         cache.invalidate_tags(f"user:{message.user_id}")
+
+    if message.course_family_id:
+        # Course-family scope — bust both the entity tag (any cached
+        # family-keyed view) and the dashboard tags of every course
+        # inside that family, since the unread badge for those courses
+        # depends on family-scoped messages too.
+        cache.invalidate_tags(f"course_family:{message.course_family_id}")
+        cache.invalidate_tags(f"course_family_id:{message.course_family_id}")
+
+    if message.organization_id:
+        cache.invalidate_tags(f"organization:{message.organization_id}")
+        cache.invalidate_tags(f"organization_id:{message.organization_id}")
 
 
 def mark_message_as_read(
