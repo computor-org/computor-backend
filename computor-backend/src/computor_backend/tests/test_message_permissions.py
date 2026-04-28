@@ -367,6 +367,36 @@ class TestReplyInheritance:
 # ---------------------------------------------------------------------------
 
 
+class TestAdminBypass:
+    """Admin must be able to post to every targeted scope without holding
+    a course / scoped role. Scope rules apply only to non-admin users.
+
+    Regression guard: the DB-based write helpers (course / course_group /
+    course_content / submission_group) used to call straight into a
+    CourseMember query that returned False for admins (admins have no
+    course memberships) and 403'd them. We now short-circuit on
+    ``is_admin`` before the DB hits.
+    """
+
+    @pytest.mark.parametrize(
+        "field,target_id",
+        [
+            ("course_id", "c-1"),
+            ("course_content_id", "cc-1"),
+            ("course_group_id", "cg-1"),
+            ("submission_group_id", "sg-1"),
+        ],
+    )
+    def test_admin_bypasses_db_based_write_checks(self, field, target_id):
+        admin = _principal(is_admin=True)
+        # No DB stubbing — the helper must short-circuit BEFORE issuing
+        # any query, so a bare MagicMock() session is fine.
+        result = create_message_with_author(
+            _payload(**{field: target_id}), admin, db=MagicMock()
+        )
+        assert result[field] == target_id
+
+
 class TestInvariants:
     def test_empty_content_rejected(self):
         p = _principal(is_admin=True)

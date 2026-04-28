@@ -202,6 +202,9 @@ def _check_course_group_write_permission(
     db: Session,
 ) -> None:
     """Course-group messages: course role >= _lecturer in the group's course."""
+    if getattr(permissions, "is_admin", False):
+        return
+
     course_group = db.query(CourseGroup).filter(CourseGroup.id == course_group_id).first()
     if not course_group:
         raise ForbiddenException(detail="Course group not found")
@@ -234,6 +237,9 @@ def _check_submission_group_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     # Check if user is a submission group member
     is_member = db.query(
         db.query(SubmissionGroupMember.id)
@@ -284,6 +290,9 @@ def _check_course_content_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     from computor_backend.model.course import CourseContent
 
     # Get the course_content to find the course
@@ -322,6 +331,9 @@ def _check_course_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     # Check if user has _lecturer or higher role in the course
     has_lecturer_role = db.query(
         db.query(CourseMember.id)
