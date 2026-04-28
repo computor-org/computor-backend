@@ -3,7 +3,7 @@
  * Endpoint: /course-contents
  */
 
-import type { AssignExampleRequest, AvailableTeam, CourseContentCreate, CourseContentGet, CourseContentList, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory, LeaveTeamResponse, TeamCreate, TeamResponse } from 'types/generated';
+import type { AvailableTeam, CourseContentCreate, CourseContentGet, CourseContentList, CourseContentMoveRequest, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory, LeaveTeamResponse, TeamCreate, TeamResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -73,19 +73,6 @@ export class CourseContentsClient extends BaseEndpointClient {
   }
 
   /**
-   * Assign Example To Content
-   * Assign an example version to course content.
-   * This creates or updates a deployment record, linking the example to the content.
-   * Only submittable content (assignments) can have examples assigned.
-   */
-  async assignExampleToContentCourseContentsContentIdAssignExamplePost({ contentId, userId, body }: { contentId: string; userId?: string | null; body: AssignExampleRequest }): Promise<DeploymentWithHistory> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<DeploymentWithHistory>(this.buildPath(contentId, 'assign-example'), body, { params: queryParams });
-  }
-
-  /**
    * Get Content Deployment
    * Get deployment information for specific course content.
    * Returns deployment record with full history if exists.
@@ -108,6 +95,19 @@ export class CourseContentsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.delete<Record<string, unknown> & Record<string, string>>(this.buildPath(contentId, 'example'), { params: queryParams });
+  }
+
+  /**
+   * Move Course Content
+   * Move a course content to a new path and/or position.
+   * Updates the content's path and position, and cascades the path change
+   * to all descendants in a single transaction using ltree functions.
+   */
+  async moveCourseContentCourseContentsContentIdMovePatch({ contentId, userId, body }: { contentId: string; userId?: string | null; body: CourseContentMoveRequest }): Promise<CourseContentGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<CourseContentGet>(this.buildPath(contentId, 'move'), body, { params: queryParams });
   }
 
   /**
@@ -199,5 +199,15 @@ export class CourseContentsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.patch<void>(this.buildPath(id, 'archive'), { params: queryParams });
+  }
+
+  /**
+   * Unarchive Course-Contents
+   */
+  async unarchiveCourseContentsCourseContentsIdUnarchivePatch({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<void>(this.buildPath(id, 'unarchive'), { params: queryParams });
   }
 }

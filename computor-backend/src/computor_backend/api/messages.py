@@ -1,8 +1,30 @@
+import logging
 from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status, Query
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+
+async def _safe_broadcast(coro, *, op: str, message_id: str | None = None):
+    """Run a WS broadcast without ever failing the surrounding REST call.
+
+    The HTTP write (create / update / delete / mark-read) is the source of
+    truth. Live broadcast is best-effort: a Redis blip, a transient DB
+    error in the audience query, or any other broadcast-side failure must
+    not turn a successful 201/204 into a 500. We log loudly so the
+    failure is visible without bleeding into the API response.
+    """
+    try:
+        await coro
+    except Exception as exc:
+        logger.warning(
+            "WS broadcast failed (op=%s message_id=%s): %s",
+            op, message_id, exc,
+            exc_info=True,
+        )
 
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
@@ -25,7 +47,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
     get_message_with_read_status,
     get_message_thread,
-    invalidate_tutor_lecturer_views_for_message,
+    invalidate_dashboard_views_for_message,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_message_as_read,
@@ -64,7 +86,7 @@ async def create_message(
         create_message_audit(db_message, permissions, db)
         # Invalidate tutor/lecturer course views so unread_message_count badges
         # reflect the new message without waiting for the 3-min TTL.
-        invalidate_tutor_lecturer_views_for_message(db_message, db, cache)
+        invalidate_dashboard_views_for_message(db_message, db, cache)
 
     # Enrich message with author info before broadcasting
     enriched_message = get_message_with_read_status(message.id, message, permissions, db)
@@ -76,7 +98,10 @@ async def create_message(
     broadcast_data = enriched_message.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_created(enriched_message, broadcast_data)
+    await _safe_broadcast(
+        ws_broadcast.message_created(enriched_message, broadcast_data, db=db),
+        op="message:new", message_id=str(message.id),
+    )
 
     return enriched_message
 
@@ -149,7 +174,10 @@ async def update_message(
     broadcast_data = message_get.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_updated(message_get, broadcast_data, str(id))
+    await _safe_broadcast(
+        ws_broadcast.message_updated(message_get, broadcast_data, str(id), db=db),
+        op="message:update", message_id=str(id),
+    )
 
     return message_get
 
@@ -174,10 +202,13 @@ async def delete_message(
 
     # Invalidate tutor/lecturer course views so unread_message_count drops for
     # other users who hadn't yet read this message.
-    invalidate_tutor_lecturer_views_for_message(deleted, db, cache)
+    invalidate_dashboard_views_for_message(deleted, db, cache)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
-    await ws_broadcast.message_deleted(message, str(id))
+    await _safe_broadcast(
+        ws_broadcast.message_deleted(message, str(id), db=db),
+        op="message:delete", message_id=str(id),
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -193,13 +224,12 @@ async def mark_message_read(
     message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_read(id, permissions, db, cache)
 
-    # Broadcast read:update via WebSocket for submission_group messages
-    if message.submission_group_id:
-        await ws_broadcast.read_updated(
-            channel=f"submission_group:{message.submission_group_id}",
-            message_id=str(id),
-            user_id=str(permissions.user_id)
-        )
+    # Broadcast read:update across the message's scope channel and the
+    # reader's own user channel (so other tabs/devices stay in sync).
+    await _safe_broadcast(
+        ws_broadcast.read_updated(message, str(id), str(permissions.user_id), is_read=True),
+        op="read:update", message_id=str(id),
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -212,8 +242,14 @@ async def mark_message_unread(
 ):
     """Mark a message as unread."""
     # Ensure user has visibility on the message
-    await get_id_db(permissions, db, id, MessageInterface)
+    message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_unread(id, permissions, db, cache)
+
+    await _safe_broadcast(
+        ws_broadcast.read_updated(message, str(id), str(permissions.user_id), is_read=False),
+        op="read:update", message_id=str(id),
+    )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.get("/{id}/thread", response_model=MessageThread)

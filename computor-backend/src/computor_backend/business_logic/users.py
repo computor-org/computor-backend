@@ -30,6 +30,7 @@ from computor_types.course_member_accounts import CourseMemberReadinessStatus
 from computor_types.course_members import CourseMemberProperties
 from computor_types.courses import CourseProperties
 from computor_types.organizations import OrganizationProperties
+from computor_types.users import UserScopes
 from computor_types.tokens import decrypt_api_key, encrypt_api_key  # TODO: Remove after migration
 from computor_types.password_utils import (
     create_password_hash,
@@ -57,6 +58,37 @@ def get_current_user(user_id: str, db: Session) -> User:
     except Exception as e:
         logger.error(f"Error fetching user: {e}")
         raise NotFoundException()
+
+
+def get_user_scopes_from_principal(principal: Principal) -> UserScopes:
+    """Project the registered scope namespaces off ``principal.claims``.
+
+    Pure transformation — claims are already resolved when the principal
+    was built, so no DB hit is needed. Only the three currently-registered
+    namespaces are surfaced (``organization``, ``course_family``,
+    ``course``); other entries in ``claims.dependent`` are ignored.
+
+    For admins, the per-scope maps are returned empty — admins have no
+    explicit per-scope claims and the client should treat ``is_admin``
+    as a "has every role on every scope" sentinel (matching what the
+    server's ``has_scope_role`` does).
+    """
+    dependent = principal.claims.dependent if principal.claims else {}
+    return UserScopes(
+        is_admin=bool(getattr(principal, "is_admin", False)),
+        organization={
+            scope_id: sorted(roles)
+            for scope_id, roles in dependent.get("organization", {}).items()
+        },
+        course_family={
+            scope_id: sorted(roles)
+            for scope_id, roles in dependent.get("course_family", {}).items()
+        },
+        course={
+            scope_id: sorted(roles)
+            for scope_id, roles in dependent.get("course", {}).items()
+        },
+    )
 
 
 def set_user_password(

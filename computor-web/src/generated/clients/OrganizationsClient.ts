@@ -90,6 +90,16 @@ export class OrganizationsClient extends BaseEndpointClient {
   }
 
   /**
+   * Unarchive Organizations
+   */
+  async unarchiveOrganizationsOrganizationsIdUnarchivePatch({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<void>(this.buildPath(id, 'unarchive'), { params: queryParams });
+  }
+
+  /**
    * Delete organization and all descendant data
    * Delete an organization and ALL its descendant data including:
    * - All course families and their courses

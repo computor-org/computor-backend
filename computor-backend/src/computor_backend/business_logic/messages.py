@@ -7,8 +7,32 @@ from computor_backend.api.exceptions import BadRequestException, NotImplementedE
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import MessageRead, Message
-from computor_backend.model.course import CourseContent, CourseMember, SubmissionGroup, SubmissionGroupMember
+from computor_backend.model.course import (
+    Course,
+    CourseContent,
+    CourseFamilyMember,
+    CourseGroup,
+    CourseMember,
+    SubmissionGroup,
+    SubmissionGroupMember,
+)
+from computor_backend.model.organization import OrganizationMember
+from computor_backend.model.role import UserRole
 from computor_backend.model.auth import User
+
+
+# Most-specific to least-specific. Mirrors the hierarchy comment on
+# ``model.message.Message`` and powers single-target enforcement on create.
+MESSAGE_TARGET_FIELDS = (
+    'user_id',
+    'course_member_id',
+    'submission_group_id',
+    'course_content_id',
+    'course_group_id',
+    'course_id',
+    'course_family_id',
+    'organization_id',
+)
 from computor_types.messages import (
     MessageCreate, MessageGet, MessageList, MessageQuery,
     MessageAuthor, MessageAuthorCourseMember, MessageThread
@@ -21,50 +45,54 @@ def create_message_with_author(
     permissions: Principal,
     db: Session,
 ) -> dict:
-    """Create a message with enforced author_id and defaults.
+    """Create a message with enforced author_id and scope-based permission checks.
 
-    Permission rules per target:
-    - user_id: NOT IMPLEMENTED - throws NotImplementedException
-    - course_member_id: NOT IMPLEMENTED - throws NotImplementedException
-    - submission_group_id: Writeable by submission_group_members and non-_student course roles
-    - course_group_id: Read-only - throws ForbiddenException on create
-    - course_content_id: LECTURER+ ONLY - requires _lecturer, _maintainer, or _owner role
-    - course_id: LECTURER+ ONLY - requires _lecturer, _maintainer, or _owner role
+    Single-target rule: each message has exactly one target column set; every
+    other target column is explicitly nulled out before persistence. This is
+    what keeps the read filter in ``MessagePermissionHandler`` honest —
+    visibility per target type cannot leak across scopes (e.g. a
+    submission-group message must not become readable to all course members
+    just because the create path also stamped ``course_id``).
 
-    Args:
-        payload: Message creation data
-        permissions: Current user permissions
-        db: Database session
+    Replies inherit their parent's target so a thread always lives in one
+    scope.
 
-    Returns:
-        Dictionary with model_dump ready for create_db
+    Write rules per primary target (read rules live in
+    ``MessagePermissionHandler.build_query``):
+
+    +-----------------------+--------------------------------------------------+
+    | None (global)         | admin only on write; everyone can read           |
+    | user_id               | direct chat — implemented but currently disabled |
+    |                       | (raises NotImplementedException)                 |
+    | course_member_id      | not implemented yet (raises NotImplementedException) |
+    | submission_group_id   | submission_group_member OR course role >= _tutor |
+    | course_content_id     | course role >= _lecturer                         |
+    | course_group_id       | course role >= _lecturer                         |
+    | course_id             | course role >= _lecturer                         |
+    | course_family_id      | scoped course_family role >= _manager (admin OK) |
+    | organization_id       | scoped organization role >= _manager (admin OK)  |
+    +-----------------------+--------------------------------------------------+
 
     Raises:
-        BadRequestException: If title or content missing
-        NotImplementedException: If user_id or course_member_id target
-        ForbiddenException: If trying to write to read-only target or lacking permissions
+        BadRequestException: If content missing or reply scope mismatch.
+        NotImplementedException: For not-yet-enabled targets (user_id,
+            course_member_id).
+        ForbiddenException: If the principal lacks the role required for
+            the target's scope.
     """
-    # Enforce author_id from current user
     if not payload.content:
         raise BadRequestException(detail="Content is required")
 
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
-    # Validate target fields - messages should have a primary scope
-    # Primary target fields (the most specific level)
-    primary_target_fields = ['user_id', 'course_member_id', 'submission_group_id', 'course_group_id', 'course_content_id', 'course_id']
-    set_targets = [k for k in primary_target_fields if model_dump.get(k)]
-
-    # If parent_id is set, inherit target from parent message and validate scope match
     if model_dump.get('parent_id'):
-        from computor_backend.model.message import Message
         parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
         if not parent_message:
             raise BadRequestException(detail=f"Parent message {model_dump['parent_id']} not found")
 
-        # Validate: if the client explicitly set a target, it must match the parent's
-        for field in primary_target_fields:
+        # If the client set a target, it must match the parent's same field.
+        for field in MESSAGE_TARGET_FIELDS:
             client_value = model_dump.get(field)
             parent_value = getattr(parent_message, field, None)
             if client_value and parent_value and str(client_value) != str(parent_value):
@@ -73,90 +101,126 @@ def create_message_with_author(
                            f"(expected {parent_value}, got {client_value})"
                 )
 
-        # Inherit target fields from parent
-        for field in primary_target_fields:
+        # Inherit any target the client didn't specify.
+        for field in MESSAGE_TARGET_FIELDS:
             parent_value = getattr(parent_message, field, None)
-            if parent_value is not None:
-                if field not in model_dump or model_dump[field] is None:
-                    model_dump[field] = parent_value
+            if parent_value is not None and not model_dump.get(field):
+                model_dump[field] = parent_value
 
-        # Recalculate set_targets after inheriting from parent
-        set_targets = [k for k in primary_target_fields if model_dump.get(k)]
+    # Most-specific set field wins; everything else is nulled.
+    primary_target = next((f for f in MESSAGE_TARGET_FIELDS if model_dump.get(f)), None)
+    for field in MESSAGE_TARGET_FIELDS:
+        if field != primary_target:
+            model_dump[field] = None
 
-    # Determine the PRIMARY target (most specific)
-    # Hierarchy from most specific to least: submission_group > course_content > course_group > course > course_family > organization
-    # Allow course_id alongside more specific targets (for hierarchical context)
-    primary_target = None
-    if 'submission_group_id' in set_targets:
-        primary_target = 'submission_group_id'
-        # Remove hierarchical context fields - course_content_id and course_id
-        # are auto-populated from the submission group
-        set_targets = [t for t in set_targets if t not in ('course_id', 'course_content_id')]
-    elif 'course_content_id' in set_targets:
-        primary_target = 'course_content_id'
-        set_targets = [t for t in set_targets if t != 'course_id']
-    elif 'course_group_id' in set_targets:
-        primary_target = 'course_group_id'
-        set_targets = [t for t in set_targets if t != 'course_id']
-    elif 'course_id' in set_targets:
-        primary_target = 'course_id'
+    if primary_target is None:
+        _check_global_write_permission(permissions)
+    elif primary_target == 'user_id':
+        _check_user_message_write_permission(permissions, model_dump['user_id'], db)
+    elif primary_target == 'course_member_id':
+        raise NotImplementedException(
+            detail="Course member messages (course_member_id target) are not implemented yet"
+        )
+    elif primary_target == 'submission_group_id':
+        _check_submission_group_write_permission(permissions, model_dump['submission_group_id'], db)
+    elif primary_target == 'course_content_id':
+        _check_course_content_write_permission(permissions, model_dump['course_content_id'], db)
+    elif primary_target == 'course_group_id':
+        _check_course_group_write_permission(permissions, model_dump['course_group_id'], db)
+    elif primary_target == 'course_id':
+        _check_course_write_permission(permissions, model_dump['course_id'], db)
+    elif primary_target == 'course_family_id':
+        _check_course_family_write_permission(permissions, model_dump['course_family_id'])
+    elif primary_target == 'organization_id':
+        _check_organization_write_permission(permissions, model_dump['organization_id'])
 
-    if len(set_targets) == 0:
-        # Allow user-only message by setting user_id to current user if nothing else provided
-        model_dump['user_id'] = permissions.user_id
-        set_targets = ['user_id']
-    elif len(set_targets) > 1:
-        raise BadRequestException(detail=f"Only ONE target field should be set, but got: {', '.join(set_targets)}. Please specify only one of: user_id, course_member_id, submission_group_id, course_group_id, course_content_id, or course_id.")
-
-    # Check target-specific write permissions
-    if model_dump.get('user_id'):
-        raise NotImplementedException(detail="Direct user messages (user_id target) are not implemented")
-
-    if model_dump.get('course_member_id'):
-        raise NotImplementedException(detail="Course member messages (course_member_id target) are not implemented")
-
-    if model_dump.get('course_group_id'):
-        raise ForbiddenException(detail="Cannot create messages directly to course_group_id (read-only target)")
-
-    # submission_group_id: Check if user is a member or has elevated role
-    if model_dump.get('submission_group_id'):
-        submission_group_id = model_dump['submission_group_id']
-        _check_submission_group_write_permission(permissions, submission_group_id, db)
-
-        # Populate course_content_id and course_id from submission group for hierarchical broadcasting
-        submission_group = db.query(SubmissionGroup).filter(
-            SubmissionGroup.id == submission_group_id
-        ).first()
-        if submission_group:
-            if submission_group.course_content_id:
-                model_dump['course_content_id'] = str(submission_group.course_content_id)
-            if submission_group.course_id:
-                model_dump['course_id'] = str(submission_group.course_id)
-
-    # course_content_id: Check if user has submission group with that content
-    if model_dump.get('course_content_id') and not model_dump.get('submission_group_id'):
-        course_content_id = model_dump['course_content_id']
-        _check_course_content_write_permission(permissions, course_content_id, db)
-
-        # Populate course_id from course content for hierarchical broadcasting
-        from computor_backend.model.course import CourseContent
-        course_content = db.query(CourseContent).filter(
-            CourseContent.id == course_content_id
-        ).first()
-        if course_content and course_content.course_id:
-            model_dump['course_id'] = str(course_content.course_id)
-
-    # course_id: Only check write permission if course_id was the PRIMARY target
-    # (not derived from submission_group_id or course_content_id)
-    if 'course_id' in set_targets:
-        course_id = model_dump['course_id']
-        _check_course_write_permission(permissions, course_id, db)
-
-    # Default level
     if 'level' not in model_dump or model_dump['level'] is None:
         model_dump['level'] = 0
 
     return model_dump
+
+
+def _check_global_write_permission(permissions: Principal) -> None:
+    """Global messages (no target set) are admin-only."""
+    if not getattr(permissions, 'is_admin', False):
+        raise ForbiddenException(
+            detail="Only administrators can create global messages"
+        )
+
+
+def _check_user_message_write_permission(
+    permissions: Principal,
+    user_id: str,
+    db: Session,
+) -> None:
+    """Direct user-to-user message (one-on-one chat).
+
+    The handler path is wired end-to-end (visibility, audit, broadcast)
+    but creation is intentionally disabled until the product side
+    settles on rate-limiting / abuse handling. To enable: drop the raise
+    below — the rest of the path is already correct.
+
+    Intended rules when enabled:
+    - recipient must exist
+    - author must not message themselves
+    - no role required (this is a direct chat)
+    """
+    raise NotImplementedException(
+        detail="Direct user-to-user messages are not implemented yet"
+    )
+
+
+def _check_organization_write_permission(
+    permissions: Principal,
+    organization_id: str,
+) -> None:
+    """Organization messages: scoped role >= _manager (admin bypass).
+
+    ``_developer`` is intentionally excluded — org-level announcements are
+    a higher-trust action than ordinary org administration.
+    """
+    if not permissions.has_organization_role(organization_id, "_manager"):
+        raise ForbiddenException(
+            detail="Requires organization _manager or _owner role to post organization messages"
+        )
+
+
+def _check_course_family_write_permission(
+    permissions: Principal,
+    course_family_id: str,
+) -> None:
+    """Course-family messages: scoped role >= _manager (admin bypass)."""
+    if not permissions.has_course_family_role(course_family_id, "_manager"):
+        raise ForbiddenException(
+            detail="Requires course_family _manager or _owner role to post course family messages"
+        )
+
+
+def _check_course_group_write_permission(
+    permissions: Principal,
+    course_group_id: str,
+    db: Session,
+) -> None:
+    """Course-group messages: course role >= _lecturer in the group's course."""
+    if getattr(permissions, "is_admin", False):
+        return
+
+    course_group = db.query(CourseGroup).filter(CourseGroup.id == course_group_id).first()
+    if not course_group:
+        raise ForbiddenException(detail="Course group not found")
+
+    has_lecturer_role = db.query(
+        db.query(CourseMember.id)
+        .filter(
+            CourseMember.course_id == course_group.course_id,
+            CourseMember.user_id == permissions.user_id,
+            CourseMember.course_role_id.in_(["_lecturer", "_maintainer", "_owner"]),
+        )
+        .exists()
+    ).scalar()
+
+    if not has_lecturer_role:
+        raise ForbiddenException()
 
 
 def _check_submission_group_write_permission(
@@ -173,6 +237,9 @@ def _check_submission_group_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     # Check if user is a submission group member
     is_member = db.query(
         db.query(SubmissionGroupMember.id)
@@ -223,6 +290,9 @@ def _check_course_content_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     from computor_backend.model.course import CourseContent
 
     # Get the course_content to find the course
@@ -261,6 +331,9 @@ def _check_course_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
+    if getattr(permissions, "is_admin", False):
+        return
+
     # Check if user has _lecturer or higher role in the course
     has_lecturer_role = db.query(
         db.query(CourseMember.id)
@@ -485,46 +558,260 @@ def list_messages_with_read_status(
     ]
 
 
-def invalidate_tutor_lecturer_views_for_message(
+_ELEVATED_COURSE_ROLES = ("_tutor", "_lecturer", "_maintainer", "_owner")
+
+
+def get_message_recipient_user_ids(message: Message, db: Session) -> set[str]:
+    """Compute the set of user_ids that have read access to ``message``.
+
+    Inverse of ``MessagePermissionHandler.build_query`` — given a stored
+    Message row, return everyone who can see it. Used by the WS broadcast
+    layer to fan messages out to per-user inbox channels (``user:<id>``).
+
+    Single-target invariant: each message has at most one target column
+    set, so the per-scope branches below are mutually exclusive.
+
+    Returns an empty set for global messages (no targets) — the broadcast
+    layer publishes those to the dedicated ``global`` channel, which every
+    connected client is auto-subscribed to.
+
+    Always includes:
+    - the author (so they see their own posts on their inbox)
+    - every system admin (admins bypass scope checks; their inbox should
+      reflect everything)
+    """
+    user_ids: set[str] = set()
+
+    if message.author_id:
+        user_ids.add(str(message.author_id))
+
+    admin_rows = db.query(UserRole.user_id).filter(UserRole.role_id == "_admin").all()
+    user_ids.update(str(r[0]) for r in admin_rows)
+
+    if message.user_id:
+        user_ids.add(str(message.user_id))
+        return user_ids
+
+    if message.course_member_id:
+        cm = db.query(CourseMember).filter(CourseMember.id == message.course_member_id).first()
+        if cm:
+            user_ids.add(str(cm.user_id))
+            user_ids.update(_elevated_user_ids(db, cm.course_id))
+        return user_ids
+
+    if message.submission_group_id:
+        sg = db.query(SubmissionGroup).filter(
+            SubmissionGroup.id == message.submission_group_id
+        ).first()
+        if sg:
+            member_rows = (
+                db.query(CourseMember.user_id)
+                .join(
+                    SubmissionGroupMember,
+                    SubmissionGroupMember.course_member_id == CourseMember.id,
+                )
+                .filter(SubmissionGroupMember.submission_group_id == sg.id)
+                .all()
+            )
+            user_ids.update(str(r[0]) for r in member_rows)
+            user_ids.update(_elevated_user_ids(db, sg.course_id))
+        return user_ids
+
+    if message.course_group_id:
+        cg = db.query(CourseGroup).filter(CourseGroup.id == message.course_group_id).first()
+        if cg:
+            member_rows = (
+                db.query(CourseMember.user_id)
+                .filter(CourseMember.course_group_id == cg.id)
+                .all()
+            )
+            user_ids.update(str(r[0]) for r in member_rows)
+            user_ids.update(_elevated_user_ids(db, cg.course_id))
+        return user_ids
+
+    if message.course_content_id:
+        cc = db.query(CourseContent).filter(
+            CourseContent.id == message.course_content_id
+        ).first()
+        if cc:
+            member_rows = (
+                db.query(CourseMember.user_id)
+                .filter(CourseMember.course_id == cc.course_id)
+                .all()
+            )
+            user_ids.update(str(r[0]) for r in member_rows)
+        return user_ids
+
+    if message.course_id:
+        member_rows = (
+            db.query(CourseMember.user_id)
+            .filter(CourseMember.course_id == message.course_id)
+            .all()
+        )
+        user_ids.update(str(r[0]) for r in member_rows)
+        return user_ids
+
+    if message.course_family_id:
+        member_rows = (
+            db.query(CourseMember.user_id)
+            .join(Course, Course.id == CourseMember.course_id)
+            .filter(Course.course_family_id == message.course_family_id)
+            .all()
+        )
+        user_ids.update(str(r[0]) for r in member_rows)
+        scoped_rows = (
+            db.query(CourseFamilyMember.user_id)
+            .filter(CourseFamilyMember.course_family_id == message.course_family_id)
+            .all()
+        )
+        user_ids.update(str(r[0]) for r in scoped_rows)
+        return user_ids
+
+    if message.organization_id:
+        member_rows = (
+            db.query(CourseMember.user_id)
+            .join(Course, Course.id == CourseMember.course_id)
+            .filter(Course.organization_id == message.organization_id)
+            .all()
+        )
+        user_ids.update(str(r[0]) for r in member_rows)
+        scoped_rows = (
+            db.query(OrganizationMember.user_id)
+            .filter(OrganizationMember.organization_id == message.organization_id)
+            .all()
+        )
+        user_ids.update(str(r[0]) for r in scoped_rows)
+        return user_ids
+
+    # Global — recipient set is "everyone connected", which the broadcast
+    # layer handles via the dedicated ``global`` channel. Returning an
+    # empty set here avoids fanning out N-thousand publishes per message.
+    return set()
+
+
+def _elevated_user_ids(db: Session, course_id) -> set[str]:
+    """User IDs holding ``_tutor`` or higher in ``course_id``."""
+    rows = (
+        db.query(CourseMember.user_id)
+        .filter(
+            CourseMember.course_id == course_id,
+            CourseMember.course_role_id.in_(_ELEVATED_COURSE_ROLES),
+        )
+        .all()
+    )
+    return {str(r[0]) for r in rows}
+
+
+def invalidate_dashboard_views_for_message(
     message: Message,
     db: Session,
     cache: Optional[Cache] = None,
 ) -> None:
-    """
-    Clear cached tutor and lecturer course views affected by a message create/delete.
+    """Clear cached student/tutor/lecturer dashboard views affected by a
+    message create/delete.
 
-    Every tutor's `unread_message_count` badge for a course member depends on the
-    set of non-archived messages scoped to that member's submission group. When a
-    new message is posted (or soft-deleted), that set changes, so every tutor's
-    cached view for the course must be invalidated.
+    Every dashboard's ``unread_message_count`` badge depends on the set
+    of non-archived messages visible to the viewer. When a message is
+    posted (or soft-deleted) we have to bust the per-course view tags
+    so the next fetch recomputes the badge.
 
-    Resolves the effective course_id via the message's scope hierarchy when
-    `message.course_id` itself is NULL (submission-group-scoped messages):
-        submission_group.course_id -> course_content.course_id
+    Scope -> affected courses:
 
-    Note: this is a no-op for read/unread state changes — those are per-user and
-    are handled by `_invalidate_message_cache`.
+    * ``submission_group``, ``course_content``, ``course_group``,
+      ``course_member`` -> single course (resolved via lookup if the
+      message itself doesn't carry ``course_id``)
+    * ``course`` -> the course itself
+    * ``course_family`` -> every course in that family (cascade)
+    * ``organization`` -> every course in that org (cascade)
+    * ``user_id`` -> none (direct chat doesn't surface in course
+      dashboards)
+    * global -> none (global posts don't refresh per-course badges; the
+      inbox sidebar handles them via the ``user:<id>`` WS channel)
+
+    For each affected course, three tags are busted:
+    ``tutor_view:<id>``, ``lecturer_view:<id>``, ``student_view:<id>``.
+
+    Read/unread state changes are per-user and handled separately by
+    ``_invalidate_message_cache``.
     """
     if cache is None or message is None:
         return
 
-    course_id = message.course_id
+    for course_id in _affected_course_ids_for_message(message, db):
+        invalidate_course_dashboards(course_id, cache)
 
-    if course_id is None and message.submission_group_id:
-        course_id = db.query(SubmissionGroup.course_id).filter(
+
+# Back-compat alias — older imports still resolve. Remove once all
+# call sites use the new name.
+invalidate_tutor_lecturer_views_for_message = invalidate_dashboard_views_for_message
+
+
+def invalidate_course_dashboards(course_id, cache: Optional[Cache] = None) -> None:
+    """Bust the three dashboard view caches for a course.
+
+    Called from message create/delete (via
+    ``invalidate_dashboard_views_for_message``) and from CourseMember
+    create/update so role changes are immediately reflected in any
+    cached dashboards (otherwise a freshly-promoted tutor would see
+    the old student-level view until TTL expires).
+    """
+    if cache is None or course_id is None:
+        return
+    cid = str(course_id)
+    cache.invalidate_tags(f"tutor_view:{cid}")
+    cache.invalidate_tags(f"lecturer_view:{cid}")
+    cache.invalidate_tags(f"student_view:{cid}")
+
+
+def _affected_course_ids_for_message(message: Message, db: Session) -> set[str]:
+    """Resolve the set of courses whose dashboards a message affects.
+
+    Centralised here so the invalidator and any future broadcast/cache
+    helpers share the same scope -> courses mapping. Returns string IDs;
+    callers don't need to care whether the message had ``course_id`` set
+    directly or whether it was resolved via a parent scope.
+    """
+    if message.course_id:
+        return {str(message.course_id)}
+
+    if message.submission_group_id:
+        cid = db.query(SubmissionGroup.course_id).filter(
             SubmissionGroup.id == message.submission_group_id
         ).scalar()
+        return {str(cid)} if cid else set()
 
-    if course_id is None and message.course_content_id:
-        course_id = db.query(CourseContent.course_id).filter(
+    if message.course_content_id:
+        cid = db.query(CourseContent.course_id).filter(
             CourseContent.id == message.course_content_id
         ).scalar()
+        return {str(cid)} if cid else set()
 
-    if course_id is None:
-        return
+    if message.course_group_id:
+        cid = db.query(CourseGroup.course_id).filter(
+            CourseGroup.id == message.course_group_id
+        ).scalar()
+        return {str(cid)} if cid else set()
 
-    cache.invalidate_tags(f"tutor_view:{course_id}")
-    cache.invalidate_tags(f"lecturer_view:{course_id}")
+    if message.course_member_id:
+        cid = db.query(CourseMember.course_id).filter(
+            CourseMember.id == message.course_member_id
+        ).scalar()
+        return {str(cid)} if cid else set()
+
+    if message.course_family_id:
+        rows = db.query(Course.id).filter(
+            Course.course_family_id == message.course_family_id
+        ).all()
+        return {str(r[0]) for r in rows}
+
+    if message.organization_id:
+        rows = db.query(Course.id).filter(
+            Course.organization_id == message.organization_id
+        ).all()
+        return {str(r[0]) for r in rows}
+
+    # user_id (direct chat) and global — no per-course dashboards to bust.
+    return set()
 
 
 def _invalidate_message_cache(
@@ -602,6 +889,18 @@ def _invalidate_message_cache(
     if message.user_id:
         # Invalidate user-specific entity tags
         cache.invalidate_tags(f"user:{message.user_id}")
+
+    if message.course_family_id:
+        # Course-family scope — bust both the entity tag (any cached
+        # family-keyed view) and the dashboard tags of every course
+        # inside that family, since the unread badge for those courses
+        # depends on family-scoped messages too.
+        cache.invalidate_tags(f"course_family:{message.course_family_id}")
+        cache.invalidate_tags(f"course_family_id:{message.course_family_id}")
+
+    if message.organization_id:
+        cache.invalidate_tags(f"organization:{message.organization_id}")
+        cache.invalidate_tags(f"organization_id:{message.organization_id}")
 
 
 def mark_message_as_read(

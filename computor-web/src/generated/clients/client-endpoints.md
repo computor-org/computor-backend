@@ -81,9 +81,9 @@
 | `createCourseContentsCourseContentsPost` | POST | `/course-contents` | `CourseContentCreate` | `CourseContentGet` |
 | `getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet` | GET | `/course-contents/courses/{course_id}/deployment-summary` | — | `DeploymentSummary` |
 | `getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet` | GET | `/course-contents/deployment/{content_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `assignExampleToContentCourseContentsContentIdAssignExamplePost` | POST | `/course-contents/{content_id}/assign-example` | `AssignExampleRequest` | `DeploymentWithHistory` |
 | `getContentDeploymentCourseContentsContentIdDeploymentGet` | GET | `/course-contents/{content_id}/deployment` | — | `DeploymentWithHistory | null` |
 | `unassignExampleFromContentCourseContentsContentIdExampleDelete` | DELETE | `/course-contents/{content_id}/example` | — | `Record<string, unknown> & Record<string, string>` |
+| `moveCourseContentCourseContentsContentIdMovePatch` | PATCH | `/course-contents/{content_id}/move` | `CourseContentMoveRequest` | `CourseContentGet` |
 | `getAvailableTeamsCourseContentsCourseContentIdSubmissionGroupsAvailableGet` | GET | `/course-contents/{course_content_id}/submission-groups/available` | — | `AvailableTeam[]` |
 | `leaveMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamDelete` | DELETE | `/course-contents/{course_content_id}/submission-groups/my-team` | — | `LeaveTeamResponse` |
 | `getMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamGet` | GET | `/course-contents/{course_content_id}/submission-groups/my-team` | — | `TeamResponse` |
@@ -92,6 +92,7 @@
 | `getCourseContentsCourseContentsIdGet` | GET | `/course-contents/{id}` | — | `CourseContentGet` |
 | `updateCourseContentsCourseContentsIdPatch` | PATCH | `/course-contents/{id}` | `CourseContentUpdate` | `CourseContentGet` |
 | `routeCourseContentsCourseContentsIdArchivePatch` | PATCH | `/course-contents/{id}/archive` | — | `void` |
+| `unarchiveCourseContentsCourseContentsIdUnarchivePatch` | PATCH | `/course-contents/{id}/unarchive` | — | `void` |
 
 ## CourseFamiliesClient
 - Base path: `/course-families`
@@ -105,6 +106,27 @@
 | `deleteCourseFamiliesCourseFamiliesIdDelete` | DELETE | `/course-families/{id}` | — | `void` |
 | `getCourseFamiliesCourseFamiliesIdGet` | GET | `/course-families/{id}` | — | `CourseFamilyGet` |
 | `updateCourseFamiliesCourseFamiliesIdPatch` | PATCH | `/course-families/{id}` | `CourseFamilyUpdate` | `CourseFamilyGet` |
+
+## CourseFamilyMembersClient
+- Base path: `/course-family-members`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listCourseFamilyMembersCourseFamilyMembersGet` | GET | `/course-family-members` | — | `CourseFamilyMemberList[]` |
+| `createCourseFamilyMembersCourseFamilyMembersPost` | POST | `/course-family-members` | `CourseFamilyMemberCreate` | `CourseFamilyMemberGet` |
+| `deleteCourseFamilyMembersCourseFamilyMembersIdDelete` | DELETE | `/course-family-members/{id}` | — | `void` |
+| `getCourseFamilyMembersCourseFamilyMembersIdGet` | GET | `/course-family-members/{id}` | — | `CourseFamilyMemberGet` |
+| `updateCourseFamilyMembersCourseFamilyMembersIdPatch` | PATCH | `/course-family-members/{id}` | `CourseFamilyMemberUpdate` | `CourseFamilyMemberGet` |
+
+## CourseFamilyRolesClient
+- Base path: `/course-family-roles`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listCourseFamilyRolesCourseFamilyRolesGet` | GET | `/course-family-roles` | — | `CourseFamilyRoleList[]` |
+| `getCourseFamilyRolesCourseFamilyRolesIdGet` | GET | `/course-family-roles/{id}` | — | `CourseFamilyRoleGet` |
 
 ## CourseGroupsClient
 - Base path: `/course-groups`
@@ -276,6 +298,8 @@
 | `syncMemberGitlabPermissionsEndpointLecturersCourseMembersCourseMemberIdSyncGitlabPost` | POST | `/lecturers/course-members/{course_member_id}/sync-gitlab` | `GitLabSyncRequest` | `GitLabSyncResult` |
 | `lecturerListCoursesEndpointLecturersCoursesGet` | GET | `/lecturers/courses` | — | `CourseList[]` |
 | `lecturerGetCoursesEndpointLecturersCoursesCourseIdGet` | GET | `/lecturers/courses/{course_id}` | — | `CourseGet` |
+| `getCourseDeploymentsEndpointLecturersCoursesCourseIdDeploymentsGet` | GET | `/lecturers/courses/{course_id}/deployments` | — | `CourseDeploymentGet` |
+| `batchUpgradeVersionsEndpointLecturersCoursesCourseIdUpgradeVersionsPost` | POST | `/lecturers/courses/{course_id}/upgrade-versions` | `VersionUpgradeCreate` | `VersionUpgradeGet` |
 | `validateCourseContentBatchLecturersCoursesCourseIdValidatePost` | POST | `/lecturers/courses/{course_id}/validate` | `ContentValidationCreate` | `ContentValidationGet` |
 
 ## MessagesClient
@@ -292,6 +316,7 @@
 | `getMessageAuditMessagesIdAuditGet` | GET | `/messages/{id}/audit` | — | `void` |
 | `markMessageUnreadMessagesIdReadsDelete` | DELETE | `/messages/{id}/reads` | — | `void` |
 | `markMessageReadMessagesIdReadsPost` | POST | `/messages/{id}/reads` | — | `void` |
+| `getMessageThreadEndpointMessagesIdThreadGet` | GET | `/messages/{id}/thread` | — | `MessageThread` |
 
 ## MiscClient
 - Base path: `/`
@@ -300,6 +325,27 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `getStatusHeadHead` | HEAD | `/` | — | `void` |
+
+## OrganizationMembersClient
+- Base path: `/organization-members`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listOrganizationMembersOrganizationMembersGet` | GET | `/organization-members` | — | `OrganizationMemberList[]` |
+| `createOrganizationMembersOrganizationMembersPost` | POST | `/organization-members` | `OrganizationMemberCreate` | `OrganizationMemberGet` |
+| `deleteOrganizationMembersOrganizationMembersIdDelete` | DELETE | `/organization-members/{id}` | — | `void` |
+| `getOrganizationMembersOrganizationMembersIdGet` | GET | `/organization-members/{id}` | — | `OrganizationMemberGet` |
+| `updateOrganizationMembersOrganizationMembersIdPatch` | PATCH | `/organization-members/{id}` | `OrganizationMemberUpdate` | `OrganizationMemberGet` |
+
+## OrganizationRolesClient
+- Base path: `/organization-roles`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listOrganizationRolesOrganizationRolesGet` | GET | `/organization-roles` | — | `OrganizationRoleList[]` |
+| `getOrganizationRolesOrganizationRolesIdGet` | GET | `/organization-roles/{id}` | — | `OrganizationRoleGet` |
 
 ## OrganizationsClient
 - Base path: `/organizations`
@@ -313,6 +359,7 @@
 | `getOrganizationsOrganizationsIdGet` | GET | `/organizations/{id}` | — | `OrganizationGet` |
 | `updateOrganizationsOrganizationsIdPatch` | PATCH | `/organizations/{id}` | `OrganizationUpdate` | `OrganizationGet` |
 | `routeOrganizationsOrganizationsIdArchivePatch` | PATCH | `/organizations/{id}/archive` | — | `void` |
+| `unarchiveOrganizationsOrganizationsIdUnarchivePatch` | PATCH | `/organizations/{id}/unarchive` | — | `void` |
 | `deleteOrganizationEndpointOrganizationsOrganizationIdDelete` | DELETE | `/organizations/{organization_id}` | — | `CascadeDeleteResult` |
 | `patchOrganizationsTokenOrganizationsOrganizationIdTokenPatch` | PATCH | `/organizations/{organization_id}/token` | `OrganizationUpdateTokenUpdate` | `void` |
 
@@ -512,6 +559,11 @@
 | `createOrganizationAsyncSystemDeployOrganizationsPost` | POST | `/system/deploy/organizations` | `OrganizationTaskRequest` | `TaskResponse` |
 | `createHierarchySystemHierarchyCreatePost` | POST | `/system/hierarchy/create` | `Record<string, unknown> & Record<string, unknown>` | `Record<string, unknown> & Record<string, unknown>` |
 | `getHierarchyStatusSystemHierarchyStatusWorkflowIdGet` | GET | `/system/hierarchy/status/{workflow_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `activateMaintenanceSystemMaintenanceActivatePost` | POST | `/system/maintenance/activate` | `MaintenanceActivate` | `void` |
+| `deactivateMaintenanceSystemMaintenanceDeactivatePost` | POST | `/system/maintenance/deactivate` | — | `void` |
+| `cancelScheduledMaintenanceSystemMaintenanceScheduleDelete` | DELETE | `/system/maintenance/schedule` | — | `void` |
+| `scheduleMaintenanceSystemMaintenanceSchedulePost` | POST | `/system/maintenance/schedule` | `MaintenanceSchedule` | `void` |
+| `getMaintenanceStatusSystemMaintenanceStatusGet` | GET | `/system/maintenance/status` | — | `MaintenanceStatusGet` |
 
 ## TasksClient
 - Base path: `/tasks`
@@ -572,6 +624,9 @@
 | `getTutorTestEndpointTutorsTestsTestIdGet` | GET | `/tutors/tests/{test_id}` | — | `TutorTestGet` |
 | `listTutorTestArtifactsEndpointTutorsTestsTestIdArtifactsGet` | GET | `/tutors/tests/{test_id}/artifacts` | — | `TutorTestArtifactList` |
 | `downloadTutorTestArtifactsTutorsTestsTestIdArtifactsDownloadGet` | GET | `/tutors/tests/{test_id}/artifacts/download` | — | `void` |
+| `uploadTutorTestArtifactsTutorsTestsTestIdArtifactsUploadPost` | POST | `/tutors/tests/{test_id}/artifacts/upload` | — | `void` |
+| `downloadTutorTestInputTutorsTestsTestIdInputDownloadGet` | GET | `/tutors/tests/{test_id}/input/download` | — | `void` |
+| `submitTutorTestResultsTutorsTestsTestIdResultsPost` | POST | `/tutors/tests/{test_id}/results` | `Record<string, unknown> & Record<string, unknown>` | `void` |
 | `getTutorTestStatusEndpointTutorsTestsTestIdStatusGet` | GET | `/tutors/tests/{test_id}/status` | — | `TutorTestStatus` |
 
 ## UserClient
@@ -584,6 +639,7 @@
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
 | `setUserPasswordEndpointUserPasswordPost` | POST | `/user/password` | `UserPassword` | `void` |
+| `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
 | `getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet` | GET | `/user/views/{course_id}` | — | `string[]` |
 
@@ -610,6 +666,7 @@
 | `getUsersUsersIdGet` | GET | `/users/{id}` | — | `UserGet` |
 | `updateUsersUsersIdPatch` | PATCH | `/users/{id}` | `UserUpdate` | `UserGet` |
 | `routeUsersUsersIdArchivePatch` | PATCH | `/users/{id}/archive` | — | `void` |
+| `unarchiveUsersUsersIdUnarchivePatch` | PATCH | `/users/{id}/unarchive` | — | `void` |
 
 ## WorkspacesClient
 - Base path: `/workspaces`

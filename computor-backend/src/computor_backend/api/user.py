@@ -10,7 +10,7 @@ from computor_types.course_member_accounts import (
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
-from computor_types.users import UserGet, UserPassword
+from computor_types.users import UserGet, UserPassword, UserScopes
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from fastapi import APIRouter, Depends
@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends
 # Import business logic
 from computor_backend.business_logic.users import (
     get_current_user,
+    get_user_scopes_from_principal,
     set_user_password,
     get_course_views_for_user,
     get_course_views_for_user_by_course,
@@ -51,6 +52,28 @@ def set_user_password_endpoint(
         permissions=permissions,
         db=db,
     )
+
+@user_router.get(
+    "/scopes",
+    response_model=UserScopes,
+)
+async def get_current_user_scopes(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+):
+    """Per-scope role memberships for the current user.
+
+    Returns ``is_admin`` plus three maps (``organization``,
+    ``course_family``, ``course``) keyed by scope_id, each listing the
+    role labels the user holds on that scope. The client can use this
+    to pre-gate UI against the same authorization data the server uses
+    internally — e.g. only show the "Post organization message" button
+    on orgs where the user has ``_owner``/``_manager``.
+
+    Admins receive empty maps with ``is_admin=true``; treat that as
+    "every role on every scope".
+    """
+    return get_user_scopes_from_principal(permissions)
+
 
 @user_router.get(
     "/views",

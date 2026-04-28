@@ -98,6 +98,14 @@ class UserClient:
         response = await self._http.post(f"/user/password", json_data=data, params=kwargs)
         return
 
+    async def scopes(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Current User Scopes"""
+        response = await self._http.get(f"/user/scopes", params=kwargs)
+        return response.json()
+
     async def views(
         self,
         **kwargs: Any,

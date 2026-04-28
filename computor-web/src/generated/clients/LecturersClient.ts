@@ -3,7 +3,7 @@
  * Endpoint: /lecturers
  */
 
-import type { AssignExampleRequest, AssignExampleResponse, ContentValidationCreate, ContentValidationGet, CourseContentLecturerGet, CourseContentLecturerList, CourseGet, CourseList, DeploymentGet, GitLabSyncRequest, GitLabSyncResult, UnassignExampleResponse } from 'types/generated';
+import type { AssignExampleRequest, AssignExampleResponse, ContentValidationCreate, ContentValidationGet, CourseContentLecturerGet, CourseContentLecturerList, CourseDeploymentGet, CourseGet, CourseList, DeploymentGet, GitLabSyncRequest, GitLabSyncResult, UnassignExampleResponse, VersionUpgradeCreate, VersionUpgradeGet } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -194,6 +194,38 @@ export class LecturersClient extends BaseEndpointClient {
    */
   async lecturerGetCoursesEndpointLecturersCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseGet> {
     return this.client.get<CourseGet>(this.buildPath('courses', courseId));
+  }
+
+  /**
+   * Get Course Deployments Endpoint
+   * Get all deployments for a course with has_newer_version computed server-side.
+   * Returns deployment info for every assigned course content in the course,
+   * including whether a newer example version is available and its version tag.
+   * Replaces N individual GET /deployment calls with a single batch query.
+   * Returns:
+   * CourseDeploymentGet with list of deployments
+   */
+  async getCourseDeploymentsEndpointLecturersCoursesCourseIdDeploymentsGet({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseDeploymentGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<CourseDeploymentGet>(this.buildPath('courses', courseId, 'deployments'), { params: queryParams });
+  }
+
+  /**
+   * Batch Upgrade Versions Endpoint
+   * Batch-upgrade multiple course contents to their latest example versions.
+   * For each course content ID, finds the latest version of the assigned example
+   * and re-assigns it (resetting deployment_status to 'pending').
+   * Replaces 3 API calls per item with a single batch operation.
+   * Returns:
+   * VersionUpgradeGet with per-item results and summary counts
+   */
+  async batchUpgradeVersionsEndpointLecturersCoursesCourseIdUpgradeVersionsPost({ courseId, userId, body }: { courseId: string | string; userId?: string | null; body: VersionUpgradeCreate }): Promise<VersionUpgradeGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<VersionUpgradeGet>(this.buildPath('courses', courseId, 'upgrade-versions'), body, { params: queryParams });
   }
 
   /**

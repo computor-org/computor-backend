@@ -22,153 +22,6 @@ export interface CourseMemberProviderAccountUpdate {
   provider_access_token?: string | null;
 }
 
-export interface AccountCreate {
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-}
-
-export interface AccountUpdate {
-  /** Authentication provider name */
-  provider?: string | null;
-  /** Type of authentication account */
-  type?: string | null;
-  /** Account ID from the provider */
-  provider_account_id?: string | null;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  provider?: string | null;
-  type?: string | null;
-  provider_account_id?: string | null;
-  user_id?: string | null;
-}
-
-/**
- * A user with their workspace roles.
- */
-export interface WorkspaceRoleUser {
-  user_id: string;
-  email: any;
-  username: any;
-  given_name: any;
-  family_name: any;
-  roles?: string[];
-}
-
-/**
- * User manager request to reset a user's password (sets to NULL).
- */
-export interface UserManagerResetPasswordRequest {
-  /** Target user ID to reset */
-  user_id: string;
-  /** User manager's own password for verification */
-  manager_password: string;
-}
-
-export interface UserGroupCreate {
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is a transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupUpdate {
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by user ID */
-  user_id?: string | null;
-  /** Filter by group ID */
-  group_id?: string | null;
-  /** Filter by transient status */
-  transient?: boolean | null;
-}
-
 export interface UserCreate {
   /** User ID (UUID will be generated if not provided) */
   id?: string | null;
@@ -273,6 +126,112 @@ export interface UserPassword {
   password_old?: string | null;
 }
 
+/**
+ * Per-scope role memberships for the current authenticated user.
+ * 
+ * Mirrors the scope-namespace slice of ``Principal.claims.dependent``
+ * so a client can pre-gate UI against the same data the backend uses
+ * for authorization. Each map is keyed by ``scope_id`` and lists every
+ * role label the user holds on that scope (a user can hold more than
+ * one role on the same scope).
+ * 
+ * Admins do not have explicit per-scope claims — instead ``is_admin``
+ * is true and the server bypasses scope checks entirely. Treat that as
+ * "every role on every scope".
+ */
+export interface UserScopes {
+  /** Whether the user is a system admin (bypasses all scope checks). */
+  is_admin: boolean;
+  /** organization_id -> [role labels held by the user on that organization]. */
+  organization?: Record<string, string[]>;
+  /** course_family_id -> [role labels held by the user on that course family]. */
+  course_family?: Record<string, string[]>;
+  /** course_id -> [role labels held by the user on that course]. */
+  course?: Record<string, string[]>;
+}
+
+export interface AccountCreate {
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+}
+
+export interface AccountUpdate {
+  /** Authentication provider name */
+  provider?: string | null;
+  /** Type of authentication account */
+  type?: string | null;
+  /** Account ID from the provider */
+  provider_account_id?: string | null;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  provider?: string | null;
+  type?: string | null;
+  provider_account_id?: string | null;
+  user_id?: string | null;
+}
+
+/**
+ * User manager request to reset a user's password (sets to NULL).
+ */
+export interface UserManagerResetPasswordRequest {
+  /** Target user ID to reset */
+  user_id: string;
+  /** User manager's own password for verification */
+  manager_password: string;
+}
+
 export interface UserRoleCreate {
   user_id: string;
   role_id: string;
@@ -303,4 +262,69 @@ export interface UserRoleQuery {
   limit?: number | null;
   user_id?: string | null;
   role_id?: string | null;
+}
+
+export interface UserGroupCreate {
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is a transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupUpdate {
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by user ID */
+  user_id?: string | null;
+  /** Filter by group ID */
+  group_id?: string | null;
+  /** Filter by transient status */
+  transient?: boolean | null;
+}
+
+/**
+ * A user with their workspace roles.
+ */
+export interface WorkspaceRoleUser {
+  user_id: string;
+  email: any;
+  username: any;
+  given_name: any;
+  family_name: any;
+  roles?: string[];
 }
