@@ -1,8 +1,30 @@
+import logging
 from typing import Annotated, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status, Query
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+
+async def _safe_broadcast(coro, *, op: str, message_id: str | None = None):
+    """Run a WS broadcast without ever failing the surrounding REST call.
+
+    The HTTP write (create / update / delete / mark-read) is the source of
+    truth. Live broadcast is best-effort: a Redis blip, a transient DB
+    error in the audience query, or any other broadcast-side failure must
+    not turn a successful 201/204 into a 500. We log loudly so the
+    failure is visible without bleeding into the API response.
+    """
+    try:
+        await coro
+    except Exception as exc:
+        logger.warning(
+            "WS broadcast failed (op=%s message_id=%s): %s",
+            op, message_id, exc,
+            exc_info=True,
+        )
 
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
@@ -76,7 +98,10 @@ async def create_message(
     broadcast_data = enriched_message.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_created(enriched_message, broadcast_data, db=db)
+    await _safe_broadcast(
+        ws_broadcast.message_created(enriched_message, broadcast_data, db=db),
+        op="message:new", message_id=str(message.id),
+    )
 
     return enriched_message
 
@@ -149,7 +174,10 @@ async def update_message(
     broadcast_data = message_get.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_updated(message_get, broadcast_data, str(id), db=db)
+    await _safe_broadcast(
+        ws_broadcast.message_updated(message_get, broadcast_data, str(id), db=db),
+        op="message:update", message_id=str(id),
+    )
 
     return message_get
 
@@ -177,7 +205,10 @@ async def delete_message(
     invalidate_tutor_lecturer_views_for_message(deleted, db, cache)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
-    await ws_broadcast.message_deleted(message, str(id), db=db)
+    await _safe_broadcast(
+        ws_broadcast.message_deleted(message, str(id), db=db),
+        op="message:delete", message_id=str(id),
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -195,11 +226,9 @@ async def mark_message_read(
 
     # Broadcast read:update across the message's scope channel and the
     # reader's own user channel (so other tabs/devices stay in sync).
-    await ws_broadcast.read_updated(
-        message,
-        str(id),
-        str(permissions.user_id),
-        is_read=True,
+    await _safe_broadcast(
+        ws_broadcast.read_updated(message, str(id), str(permissions.user_id), is_read=True),
+        op="read:update", message_id=str(id),
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -216,11 +245,9 @@ async def mark_message_unread(
     message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_unread(id, permissions, db, cache)
 
-    await ws_broadcast.read_updated(
-        message,
-        str(id),
-        str(permissions.user_id),
-        is_read=False,
+    await _safe_broadcast(
+        ws_broadcast.read_updated(message, str(id), str(permissions.user_id), is_read=False),
+        op="read:update", message_id=str(id),
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

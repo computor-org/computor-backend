@@ -381,34 +381,149 @@ class ConnectionManager:
         channel: str,
         db: Session,
     ) -> tuple[bool, str]:
-        """
-        Check if a user can subscribe to a channel.
+        """Check if a user can subscribe to a channel.
 
-        Args:
-            principal: User principal
-            channel: Channel name (format: "scope:id")
-            db: Database session
+        Mirrors the read-visibility rules in
+        ``MessagePermissionHandler.build_query`` so that what a client
+        can subscribe to matches what they would be allowed to read on
+        the REST list endpoint. Admins bypass per-scope checks.
 
-        Returns:
-            Tuple of (can_subscribe, reason_if_denied)
+        Special channels:
+        - ``global`` (no colon) is auto-subscribable by everyone — it is
+          the broadcast target for global messages.
+        - ``user:<own_id>`` is only subscribable by the owning user.
+          (The connect path auto-subscribes this; explicit subscribe is
+          allowed too for clients that are defensive about it.)
         """
+        # Admins can subscribe to anything.
+        if getattr(principal, "is_admin", False):
+            return True, ""
+
+        # ``global`` is a single-word channel (no colon).
+        if channel == "global":
+            return True, ""
+
         parts = channel.split(":", 1)
         if len(parts) != 2:
             return False, "Invalid channel format"
 
         scope, target_id = parts
 
+        if scope == "user":
+            if str(target_id) == str(principal.user_id):
+                return True, ""
+            return False, "Cannot subscribe to another user's inbox channel"
+
         if scope == "submission_group":
             return await self._can_access_submission_group(principal, target_id, db)
 
-        elif scope == "course":
+        if scope == "course":
             return await self._can_access_course(principal, target_id, db)
 
-        elif scope == "course_content":
+        if scope == "course_content":
             return await self._can_access_course_content(principal, target_id, db)
 
-        else:
-            return False, f"Unknown channel scope: {scope}"
+        if scope == "course_group":
+            return await self._can_access_course_group(principal, target_id, db)
+
+        if scope == "course_family":
+            return await self._can_access_course_family(principal, target_id, db)
+
+        if scope == "organization":
+            return await self._can_access_organization(principal, target_id, db)
+
+        return False, f"Unknown channel scope: {scope}"
+
+    async def _can_access_course_group(
+        self,
+        principal: Principal,
+        course_group_id: str,
+        db: Session,
+    ) -> tuple[bool, str]:
+        """Group members + course role >= ``_tutor`` (tutor escalation)."""
+        from computor_backend.model.course import CourseGroup
+
+        is_member = db.query(
+            db.query(CourseMember.id)
+            .filter(
+                CourseMember.user_id == principal.user_id,
+                CourseMember.course_group_id == course_group_id,
+            )
+            .exists()
+        ).scalar()
+        if is_member:
+            return True, ""
+
+        cg = db.query(CourseGroup).filter(CourseGroup.id == course_group_id).first()
+        if not cg:
+            return False, "Course group not found"
+
+        has_elevated = db.query(
+            db.query(CourseMember.id)
+            .filter(
+                CourseMember.course_id == cg.course_id,
+                CourseMember.user_id == principal.user_id,
+                CourseMember.course_role_id != "_student",
+            )
+            .exists()
+        ).scalar()
+        if has_elevated:
+            return True, ""
+
+        return False, "Not a member of this course group"
+
+    async def _can_access_course_family(
+        self,
+        principal: Principal,
+        course_family_id: str,
+        db: Session,
+    ) -> tuple[bool, str]:
+        """Scoped course_family role OR course-membership cascade."""
+        if principal.has_course_family_role(course_family_id, "_developer"):
+            return True, ""
+
+        # Cascade: any course in this family that the user is a member of.
+        from computor_backend.model.course import Course
+
+        has_course = db.query(
+            db.query(CourseMember.id)
+            .join(Course, Course.id == CourseMember.course_id)
+            .filter(
+                Course.course_family_id == course_family_id,
+                CourseMember.user_id == principal.user_id,
+            )
+            .exists()
+        ).scalar()
+        if has_course:
+            return True, ""
+
+        return False, "No access to this course family"
+
+    async def _can_access_organization(
+        self,
+        principal: Principal,
+        organization_id: str,
+        db: Session,
+    ) -> tuple[bool, str]:
+        """Scoped organization role OR course-membership cascade."""
+        if principal.has_organization_role(organization_id, "_developer"):
+            return True, ""
+
+        from computor_backend.model.course import Course
+
+        has_course = db.query(
+            db.query(CourseMember.id)
+            .join(Course, Course.id == CourseMember.course_id)
+            .filter(
+                Course.organization_id == organization_id,
+                CourseMember.user_id == principal.user_id,
+            )
+            .exists()
+        ).scalar()
+        if has_course:
+            return True, ""
+
+        return False, "No access to this organization"
 
     async def _can_access_submission_group(
         self,

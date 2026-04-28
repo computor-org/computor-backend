@@ -340,3 +340,98 @@ class TestAudienceDispatch:
         m = _msg(course_id="c-1")
         result = messages_bl.get_message_recipient_user_ids(m, db)
         assert {"u-1", "u-2", "u-3", "u-author"}.issubset(result)
+
+
+# ---------------------------------------------------------------------------
+# Channel subscribe authorization — _can_subscribe
+#
+# These cover the channel scopes that previously fell through to the
+# "Unknown channel scope" branch (course_group, course_family,
+# organization, user, global). Pure tests for the always-allow paths
+# (admin, global, user:<own_id>); the per-scope DB checks have minimal
+# coverage here — full coverage is dev-DB smoke testing territory.
+# ---------------------------------------------------------------------------
+
+
+class TestCanSubscribe:
+    def setup_method(self):
+        from computor_backend.websocket.connection_manager import ConnectionManager
+
+        self.mgr = ConnectionManager()
+
+    def test_admin_can_subscribe_to_anything(self):
+        from computor_backend.permissions.principal import Principal
+
+        admin = Principal(user_id="u-admin", is_admin=True)
+        cases = [
+            "global",
+            "user:u-other",
+            "submission_group:sg-1",
+            "course:c-1",
+            "course_content:cc-1",
+            "course_group:cg-1",
+            "course_family:f-1",
+            "organization:o-1",
+            "totally-unknown:foo",
+        ]
+        for ch in cases:
+            ok, reason = _run(self.mgr._can_subscribe(admin, ch, db=MagicMock()))
+            # Admin is allowed everywhere — even an unknown scope, because
+            # the admin short-circuit happens before scope dispatch.
+            assert ok, f"admin denied {ch}: {reason}"
+
+    def test_global_channel_open_to_everyone(self):
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        regular = Principal(
+            user_id="u-1", is_admin=False, claims=build_claims([])
+        )
+        ok, _ = _run(self.mgr._can_subscribe(regular, "global", db=MagicMock()))
+        assert ok
+
+    def test_user_channel_only_for_owning_user(self):
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        regular = Principal(
+            user_id="u-1", is_admin=False, claims=build_claims([])
+        )
+        ok, _ = _run(self.mgr._can_subscribe(regular, "user:u-1", db=MagicMock()))
+        assert ok
+
+        denied, reason = _run(self.mgr._can_subscribe(regular, "user:u-2", db=MagicMock()))
+        assert not denied
+        assert "another user" in reason.lower()
+
+    def test_invalid_format_rejected(self):
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        regular = Principal(
+            user_id="u-1", is_admin=False, claims=build_claims([])
+        )
+        # Bare scope without ID — not a valid channel.
+        denied, reason = _run(self.mgr._can_subscribe(regular, "course", db=MagicMock()))
+        assert not denied
+        assert "format" in reason.lower()
+
+    def test_organization_scope_routes_to_access_check(self):
+        # Holding an explicit org scoped role bypasses the cascade lookup.
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        org_dev = Principal(
+            user_id="u-1",
+            is_admin=False,
+            claims=build_claims([("permissions", "organization:_developer:o-1")]),
+        )
+        ok, _ = _run(self.mgr._can_subscribe(org_dev, "organization:o-1", db=MagicMock()))
+        assert ok
+
+    def test_course_family_scope_routes_to_access_check(self):
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        family_dev = Principal(
+            user_id="u-1",
+            is_admin=False,
+            claims=build_claims([("permissions", "course_family:_developer:f-1")]),
+        )
+        ok, _ = _run(self.mgr._can_subscribe(family_dev, "course_family:f-1", db=MagicMock()))
+        assert ok
