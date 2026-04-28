@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from text_unidecode import unidecode
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
@@ -184,6 +184,34 @@ class UserPassword(BaseModel):
     username: Optional[str] = Field(None, description="Target username (admin only, otherwise current user)")
     password: str = Field(..., description="New password")
     password_old: Optional[str] = Field(None, description="Old password (required for non-admin password changes)")
+
+
+class UserScopes(BaseModel):
+    """Per-scope role memberships for the current authenticated user.
+
+    Mirrors the scope-namespace slice of ``Principal.claims.dependent``
+    so a client can pre-gate UI against the same data the backend uses
+    for authorization. Each map is keyed by ``scope_id`` and lists every
+    role label the user holds on that scope (a user can hold more than
+    one role on the same scope).
+
+    Admins do not have explicit per-scope claims — instead ``is_admin``
+    is true and the server bypasses scope checks entirely. Treat that as
+    "every role on every scope".
+    """
+    is_admin: bool = Field(..., description="Whether the user is a system admin (bypasses all scope checks).")
+    organization: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="organization_id -> [role labels held by the user on that organization].",
+    )
+    course_family: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="course_family_id -> [role labels held by the user on that course family].",
+    )
+    course: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="course_id -> [role labels held by the user on that course].",
+    )
 
 
 class UserInterface(EntityInterface):

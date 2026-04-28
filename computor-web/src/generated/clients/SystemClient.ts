@@ -3,7 +3,7 @@
  * Endpoint: /system
  */
 
-import type { CourseFamilyTaskRequest, CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, OrganizationTaskRequest, TaskResponse } from 'types/generated';
+import type { CourseFamilyTaskRequest, CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, MaintenanceActivate, MaintenanceSchedule, MaintenanceStatusGet, OrganizationTaskRequest, TaskResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -127,5 +127,59 @@ export class SystemClient extends BaseEndpointClient {
    */
   async getHierarchyStatusSystemHierarchyStatusWorkflowIdGet({ workflowId }: { workflowId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
     return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('hierarchy', 'status', workflowId));
+  }
+
+  /**
+   * Activate Maintenance
+   * Activate maintenance mode immediately.
+   * Admin only. Blocks all mutating requests (POST/PUT/PATCH/DELETE) for non-admin users.
+   * GET requests, auth endpoints, and admin requests remain accessible.
+   */
+  async activateMaintenanceSystemMaintenanceActivatePost({ userId, body }: { userId?: string | null; body: MaintenanceActivate }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<void>(this.buildPath('maintenance', 'activate'), body, { params: queryParams });
+  }
+
+  /**
+   * Deactivate Maintenance
+   * Deactivate maintenance mode.
+   * Admin only. Immediately restores full service for all users.
+   */
+  async deactivateMaintenanceSystemMaintenanceDeactivatePost(): Promise<void> {
+    return this.client.post<void>(this.buildPath('maintenance', 'deactivate'));
+  }
+
+  /**
+   * Cancel Scheduled Maintenance
+   * Cancel scheduled maintenance.
+   */
+  async cancelScheduledMaintenanceSystemMaintenanceScheduleDelete(): Promise<void> {
+    return this.client.delete<void>(this.buildPath('maintenance', 'schedule'));
+  }
+
+  /**
+   * Schedule Maintenance
+   * Schedule future maintenance.
+   * Admin only. Sets a scheduled time and optionally notifies connected users.
+   * Does NOT activate maintenance mode -- that requires a separate activate call
+   * or can be triggered by the maintenance.sh script.
+   */
+  async scheduleMaintenanceSystemMaintenanceSchedulePost({ userId, body }: { userId?: string | null; body: MaintenanceSchedule }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<void>(this.buildPath('maintenance', 'schedule'), body, { params: queryParams });
+  }
+
+  /**
+   * Get Maintenance Status
+   * Get current maintenance status.
+   * Available to all authenticated users.
+   * Returns both active maintenance state and any scheduled maintenance.
+   */
+  async getMaintenanceStatusSystemMaintenanceStatusGet(): Promise<MaintenanceStatusGet> {
+    return this.client.get<MaintenanceStatusGet>(this.buildPath('maintenance', 'status'));
   }
 }

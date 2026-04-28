@@ -126,6 +126,30 @@ export interface UserPassword {
   password_old?: string | null;
 }
 
+/**
+ * Per-scope role memberships for the current authenticated user.
+ * 
+ * Mirrors the scope-namespace slice of ``Principal.claims.dependent``
+ * so a client can pre-gate UI against the same data the backend uses
+ * for authorization. Each map is keyed by ``scope_id`` and lists every
+ * role label the user holds on that scope (a user can hold more than
+ * one role on the same scope).
+ * 
+ * Admins do not have explicit per-scope claims — instead ``is_admin``
+ * is true and the server bypasses scope checks entirely. Treat that as
+ * "every role on every scope".
+ */
+export interface UserScopes {
+  /** Whether the user is a system admin (bypasses all scope checks). */
+  is_admin: boolean;
+  /** organization_id -> [role labels held by the user on that organization]. */
+  organization?: Record<string, string[]>;
+  /** course_family_id -> [role labels held by the user on that course family]. */
+  course_family?: Record<string, string[]>;
+  /** course_id -> [role labels held by the user on that course]. */
+  course?: Record<string, string[]>;
+}
+
 export interface AccountCreate {
   /** Authentication provider name */
   provider: string;
