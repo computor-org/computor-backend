@@ -231,6 +231,21 @@ class ConnectionManager:
         redis_client = await get_redis_client()
         await redis_client.setex(f"ws:presence:{user_id}", settings.WS_PRESENCE_TTL, "online")
 
+        # Auto-subscribe to the connection's personal inbox channel and
+        # the global broadcast channel. Both are always-allowed for the
+        # owning user (no permission check needed), so we bypass the
+        # ``subscribe()`` validation path. Done here so the inbox UI
+        # doesn't have to wait for an explicit ``channel:subscribe`` from
+        # the client before receiving its first event.
+        from computor_backend.websocket.broadcast import GLOBAL_CHANNEL
+
+        for auto_channel in (f"user:{user_id}", GLOBAL_CHANNEL):
+            connection.subscriptions.add(auto_channel)
+            if auto_channel not in self._channel_subscribers:
+                self._channel_subscribers[auto_channel] = set()
+            self._channel_subscribers[auto_channel].add(user_id)
+            await pubsub.subscribe(auto_channel)
+
         # Track metrics
         ws_metrics.connection_opened()
 

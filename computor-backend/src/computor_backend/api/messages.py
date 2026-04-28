@@ -76,7 +76,7 @@ async def create_message(
     broadcast_data = enriched_message.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_created(enriched_message, broadcast_data)
+    await ws_broadcast.message_created(enriched_message, broadcast_data, db=db)
 
     return enriched_message
 
@@ -149,7 +149,7 @@ async def update_message(
     broadcast_data = message_get.model_dump(mode="json")
     broadcast_data.pop("is_author", None)
     broadcast_data.pop("is_read", None)
-    await ws_broadcast.message_updated(message_get, broadcast_data, str(id))
+    await ws_broadcast.message_updated(message_get, broadcast_data, str(id), db=db)
 
     return message_get
 
@@ -177,7 +177,7 @@ async def delete_message(
     invalidate_tutor_lecturer_views_for_message(deleted, db, cache)
 
     # Broadcast to WebSocket subscribers (use DTO which has target fields)
-    await ws_broadcast.message_deleted(message, str(id))
+    await ws_broadcast.message_deleted(message, str(id), db=db)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -193,13 +193,14 @@ async def mark_message_read(
     message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_read(id, permissions, db, cache)
 
-    # Broadcast read:update via WebSocket for submission_group messages
-    if message.submission_group_id:
-        await ws_broadcast.read_updated(
-            channel=f"submission_group:{message.submission_group_id}",
-            message_id=str(id),
-            user_id=str(permissions.user_id)
-        )
+    # Broadcast read:update across the message's scope channel and the
+    # reader's own user channel (so other tabs/devices stay in sync).
+    await ws_broadcast.read_updated(
+        message,
+        str(id),
+        str(permissions.user_id),
+        is_read=True,
+    )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -212,8 +213,16 @@ async def mark_message_unread(
 ):
     """Mark a message as unread."""
     # Ensure user has visibility on the message
-    await get_id_db(permissions, db, id, MessageInterface)
+    message = await get_id_db(permissions, db, id, MessageInterface)
     mark_message_as_unread(id, permissions, db, cache)
+
+    await ws_broadcast.read_updated(
+        message,
+        str(id),
+        str(permissions.user_id),
+        is_read=False,
+    )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @messages_router.get("/{id}/thread", response_model=MessageThread)
