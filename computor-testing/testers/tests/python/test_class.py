@@ -13,6 +13,7 @@ import time
 import random
 import token
 import tokenize
+from contextlib import nullcontext
 import pytest
 import numpy as np
 
@@ -28,6 +29,7 @@ from ctcore.models import (
 from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, token_exchange
 from testers.executors.python import PyExecutor, PyExecutionError
+from testers.executors.isolation import isolated_student_workdir
 from ..test_base import (
     main_idx_by_dependency,
     check_success_dependencies,
@@ -247,27 +249,36 @@ def _execute_subprocess(
     _solution, where, script_path, _dir, timeout,
     variables_to_extract, setup_code, teardown_code, input_answers
 ):
-    """Execute Python code via subprocess."""
-    try:
-        # Reference solutions are lecturer-authored and trusted; skip the
-        # import deny-list for them so they can legitimately use ``os`` /
-        # ``pathlib`` etc. Student code still gets the check (the deny-list
-        # is the point — it stops the canonical "read the reference" exploit).
-        is_student = where == Solution.student
-        executor = PyExecutor(
-            working_dir=_dir,
-            timeout=timeout,
-            security_check=is_student,
-        )
-        start_time = time.time()
+    """Execute Python code via subprocess.
 
-        result = executor.execute_script(
-            script_path,
-            variables_to_extract=variables_to_extract,
-            setup_code=setup_code,
-            teardown_code=teardown_code,
-            input_answers=input_answers,
-        )
+    For student code, the subprocess is jailed to a copy of the student
+    dir living under ``$TMPDIR`` — no sibling reference dir to traverse
+    to. Reference solutions run in their original dir (they're trusted).
+    """
+    is_student = where == Solution.student
+
+    # Student code -> isolated copy; reference code -> original dir.
+    if is_student:
+        ctx = isolated_student_workdir(_dir, script_path)
+    else:
+        ctx = nullcontext((_dir, script_path))
+
+    try:
+        with ctx as (run_dir, run_script):
+            executor = PyExecutor(
+                working_dir=run_dir,
+                timeout=timeout,
+                security_check=is_student,
+            )
+            start_time = time.time()
+
+            result = executor.execute_script(
+                run_script,
+                variables_to_extract=variables_to_extract,
+                setup_code=setup_code,
+                teardown_code=teardown_code,
+                input_answers=input_answers,
+            )
 
         exec_time = time.time() - start_time
 
