@@ -467,8 +467,12 @@ async def download_submission_as_zip(
     # Check access permissions
     artifact = check_artifact_access(artifact_id, permissions, db)
 
-    # Get list of files from properties
-    files_included = artifact.properties.get("files_included", [])
+    # ``properties`` is nullable on submission_artifact and is sometimes
+    # absent for benchmark / test fixtures that didn't go through the full
+    # upload flow. Treat NULL the same as "no files" — raise a clean 404
+    # instead of letting an AttributeError become a 500 stack trace.
+    artifact_props = artifact.properties or {}
+    files_included = artifact_props.get("files_included", [])
     if not files_included:
         raise NotFoundException(detail="No files found in this submission")
 
