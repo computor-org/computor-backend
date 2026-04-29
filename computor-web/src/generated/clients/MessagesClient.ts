@@ -3,7 +3,7 @@
  * Endpoint: /messages
  */
 
-import type { MessageCreate, MessageGet, MessageList, MessageUpdate } from 'types/generated';
+import type { MessageCreate, MessageGet, MessageList, MessageThread, MessageUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -18,9 +18,9 @@ export class MessagesClient extends BaseEndpointClient {
    * Supports filtering by:
    * - unread: True = unread only, False = read only, None = all
    * - created_after/created_before: Datetime boundaries
-   * - tags: List of tags in format "scope::value" to filter by (in title)
+   * - tags: List of tags to filter by in title (e.g., "ai", "ai-help", "review")
    * - tags_match_all: True = must match ALL tags, False = match ANY tag
-   * - tag_scope: Wildcard scope filter (e.g., "ai" matches any #ai::* tag)
+   * - tag_scope: Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
    */
   async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseIdAllMessages, courseMemberId, createdAfter, createdBefore, id, limit, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseIdAllMessages?: boolean | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
     const queryParams: Record<string, unknown> = {
@@ -124,5 +124,19 @@ export class MessagesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<void>(this.buildPath(id, 'reads'), { params: queryParams });
+  }
+
+  /**
+   * Get Message Thread Endpoint
+   * Get the full conversation thread for a message.
+   * Walks up to the root message, then returns all messages in the thread
+   * ordered by created_at. Useful for agents that need conversation context
+   * for follow-up detection.
+   */
+  async getMessageThreadEndpointMessagesIdThreadGet({ id, userId }: { id: string | string; userId?: string | null }): Promise<MessageThread> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<MessageThread>(this.buildPath(id, 'thread'), { params: queryParams });
   }
 }

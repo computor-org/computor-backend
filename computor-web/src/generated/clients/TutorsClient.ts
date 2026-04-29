@@ -249,6 +249,37 @@ export class TutorsClient extends BaseEndpointClient {
   }
 
   /**
+   * Upload Tutor Test Artifacts
+   * Upload test artifacts as a ZIP archive.
+   * Used by the testing worker to upload generated artifacts (plots, figures,
+   * debug output) after test execution.
+   */
+  async uploadTutorTestArtifactsTutorsTestsTestIdArtifactsUploadPost({ testId }: { testId: string }): Promise<void> {
+    return this.client.post<void>(this.buildPath('tests', testId, 'artifacts', 'upload'));
+  }
+
+  /**
+   * Download Tutor Test Input
+   * Download tutor test input files as a ZIP.
+   * Used by the testing worker to fetch the tutor's uploaded code
+   * for test execution.
+   * **Permissions**: Only the test owner or admin can download input.
+   */
+  async downloadTutorTestInputTutorsTestsTestIdInputDownloadGet({ testId }: { testId: string }): Promise<void> {
+    return this.client.get<void>(this.buildPath('tests', testId, 'input', 'download'));
+  }
+
+  /**
+   * Submit Tutor Test Results
+   * Submit test results for a tutor test.
+   * Used by the testing worker to report results after test execution.
+   * Stores result.json in MinIO and updates Redis state.
+   */
+  async submitTutorTestResultsTutorsTestsTestIdResultsPost({ testId, body }: { testId: string; body: Record<string, unknown> & Record<string, unknown> }): Promise<void> {
+    return this.client.post<void>(this.buildPath('tests', testId, 'results'), body);
+  }
+
+  /**
    * Get Tutor Test Status Endpoint
    * Get quick status of a tutor test (for polling).
    * Use this endpoint to poll for completion status.

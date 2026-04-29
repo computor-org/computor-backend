@@ -826,15 +826,30 @@ class ExamplePermissionHandler(PermissionHandler):
 
 
 class MessagePermissionHandler(PermissionHandler):
-    """Permission handler for Message entity with multi-context visibility.
+    """Permission handler for Message entity with multi-scope visibility.
 
-    Visibility and write rules:
-    - user_id: Readable between user_id and author_id. Write not implemented.
-    - course_member_id: Readable between course_member_id and author_id. Write not implemented.
-    - submission_group_id: Read and write for submission_group_members and course roles except _student.
-    - course_group_id: Readable for course_members in the course_group. Write not allowed.
-    - course_content_id: Readable for submission_group_members with the course_content.
-    - course_id: Readable for all course_members in the course.
+    Read visibility per target (additive — author always sees own):
+
+    +-----------------------+-----------------------------------------------+
+    | user_id               | recipient or author                           |
+    | course_member_id      | course_member owner OR course role >= _tutor  |
+    | submission_group_id   | submission_group_member OR course role >=     |
+    |                       | _tutor in the containing course               |
+    | course_group_id       | course_group member OR course role >= _tutor  |
+    | course_content_id     | any course_member of the containing course    |
+    | course_id             | any course_member of that course              |
+    | course_family_id      | scoped course_family role OR course_member of |
+    |                       | any course inside the family (cascade)        |
+    | organization_id       | scoped organization role OR course_member of  |
+    |                       | any course inside the organization (cascade)  |
+    | (none — global)       | everyone (read); admin-only on the write side |
+    +-----------------------+-----------------------------------------------+
+
+    Write rules are enforced in ``business_logic.messages`` (create) and
+    ``business_logic.message_operations`` (update/delete: author only).
+    The build_query restriction below additionally blocks update/delete
+    of targets whose CREATE path is not implemented yet, so the audit
+    trail can't disagree with the create-side guard.
     """
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -858,7 +873,14 @@ class MessagePermissionHandler(PermissionHandler):
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         from sqlalchemy import or_, and_
         from computor_backend.permissions.query_builders import CoursePermissionQueryBuilder
-        from computor_backend.model.course import SubmissionGroupMember, CourseGroup, CourseMember, SubmissionGroup, CourseContent
+        from computor_backend.model.course import (
+            Course,
+            CourseContent,
+            CourseGroup,
+            CourseMember,
+            SubmissionGroup,
+            SubmissionGroupMember,
+        )
 
         base = db.query(self.entity)
 
@@ -867,20 +889,17 @@ class MessagePermissionHandler(PermissionHandler):
 
         filters = []
 
-        # Author can always access their own messages
+        # Author can always access their own messages.
         filters.append(self.entity.author_id == principal.user_id)
 
-        # user_id: Readable between user_id and author_id
-        # Messages where the user is the target user
+        # user_id target: recipient sees the message.
         filters.append(self.entity.user_id == principal.user_id)
 
-        # course_member_id: Readable between course_member_id's user and author_id
-        # Messages where the user owns the course member
+        # course_member_id target: the principal who owns the course_member.
         cm_ids_subq = db.query(CourseMember.id).filter(CourseMember.user_id == principal.user_id)
         filters.append(self.entity.course_member_id.in_(cm_ids_subq))
 
-        # submission_group_id: Readable for all submission_group_members and all course roles except _student
-        # Messages in submission groups the user belongs to
+        # submission_group_id target: members of the group.
         sgm_subq = (
             db.query(SubmissionGroupMember.submission_group_id)
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
@@ -888,8 +907,7 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.submission_group_id.in_(sgm_subq))
 
-        # course_group_id: Readable for all course_members in the course_group
-        # Messages in course groups the user belongs to
+        # course_group_id target: members of the group.
         cg_subq = (
             db.query(CourseMember.course_group_id)
             .filter(
@@ -899,9 +917,7 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.course_group_id.in_(cg_subq))
 
-        # course_content_id: Readable for all course members in courses containing the content
-        # Students can see course_content messages for any content in their enrolled courses
-        # (not just content where they have a submission group - units don't have submission groups)
+        # course_content_id target: any course_member of the containing course.
         user_course_contents_subq = (
             db.query(CourseContent.id)
             .join(CourseMember, CourseMember.course_id == CourseContent.course_id)
@@ -909,61 +925,100 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.course_content_id.in_(user_course_contents_subq))
 
-        # course_id: Readable for all course_members in the course
-        # Messages in courses the user is a member of
+        # course_id target: any course_member of that course.
         course_ids_subq = (
             db.query(CourseMember.course_id)
             .filter(CourseMember.user_id == principal.user_id)
         )
         filters.append(self.entity.course_id.in_(course_ids_subq))
 
-        # Tutors/lecturers: include messages in courses where principal has elevated role
-        # This provides additional access for non-student roles
-        permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(principal.user_id, "_tutor", db)
-        if permitted_courses is not None:
-            # Additional access for tutors/lecturers to all message types in their courses
+        # Course family / organization cascade: any course the principal is
+        # a member of cascades read access UP to its family and org. This
+        # mirrors OrganizationPermissionHandler / CourseFamilyPermissionHandler
+        # so that an org-level announcement reaches every student in any of
+        # its courses without requiring an explicit org-scoped role.
+        family_via_course_subq = (
+            db.query(Course.course_family_id)
+            .join(CourseMember, CourseMember.course_id == Course.id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.course_family_id.in_(family_via_course_subq))
 
-            # course_member_id messages in their courses
+        org_via_course_subq = (
+            db.query(Course.organization_id)
+            .join(CourseMember, CourseMember.course_id == Course.id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.organization_id.in_(org_via_course_subq))
+
+        # Explicit scoped-role visibility for org / family (additive on top of
+        # the cascade above). ``_developer`` is the lowest org/family role.
+        family_via_member_ids = principal.get_scoped_ids_with_role(
+            "course_family", "_developer"
+        )
+        if family_via_member_ids:
+            filters.append(self.entity.course_family_id.in_(family_via_member_ids))
+
+        org_via_member_ids = principal.get_scoped_ids_with_role(
+            "organization", "_developer"
+        )
+        if org_via_member_ids:
+            filters.append(self.entity.organization_id.in_(org_via_member_ids))
+
+        # Tutor / lecturer escalation: extra read access to all message
+        # types within courses where the principal has an elevated role.
+        permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(
+            principal.user_id, "_tutor", db
+        )
+        if permitted_courses is not None:
             filters.append(
                 self.entity.course_member_id.in_(
                     db.query(CourseMember.id).filter(CourseMember.course_id.in_(permitted_courses))
                 )
             )
-            # submission_group_id messages in their courses
             filters.append(
                 self.entity.submission_group_id.in_(
                     db.query(SubmissionGroup.id).filter(SubmissionGroup.course_id.in_(permitted_courses))
                 )
             )
-            # course_group_id messages in their courses
             filters.append(
                 self.entity.course_group_id.in_(
                     db.query(CourseGroup.id).filter(CourseGroup.course_id.in_(permitted_courses))
                 )
             )
-            # course_content_id messages in their courses
             filters.append(
                 self.entity.course_content_id.in_(
                     db.query(CourseContent.id).filter(CourseContent.course_id.in_(permitted_courses))
                 )
             )
-            # course_id messages in their courses (already covered above but kept for clarity)
-            filters.append(
-                self.entity.course_id.in_(permitted_courses)
+            filters.append(self.entity.course_id.in_(permitted_courses))
+
+        # Global messages (every target NULL) are readable by everyone —
+        # the write side is admin-only, but once posted they're a broadcast.
+        filters.append(
+            and_(
+                self.entity.user_id.is_(None),
+                self.entity.course_member_id.is_(None),
+                self.entity.submission_group_id.is_(None),
+                self.entity.course_content_id.is_(None),
+                self.entity.course_group_id.is_(None),
+                self.entity.course_id.is_(None),
+                self.entity.course_family_id.is_(None),
+                self.entity.organization_id.is_(None),
             )
+        )
 
         query = base.filter(or_(*filters))
 
-        # For update/delete, restrict to author only (non-admin)
-        # Additionally, check that the message target allows writing
+        # Update / delete: author only. Additionally block the targets whose
+        # CREATE path raises NotImplementedException, so a row that was never
+        # supposed to exist via the public API can't be quietly mutated.
         if action in ["update", "delete"]:
             query = query.filter(self.entity.author_id == principal.user_id)
-            # Prevent update/delete of messages with user_id or course_member_id targets
             query = query.filter(
                 and_(
                     self.entity.user_id.is_(None),
                     self.entity.course_member_id.is_(None),
-                    self.entity.course_group_id.is_(None)  # course_group_id is read-only
                 )
             )
 

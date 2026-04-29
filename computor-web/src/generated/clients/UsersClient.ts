@@ -80,4 +80,14 @@ export class UsersClient extends BaseEndpointClient {
     };
     return this.client.patch<void>(this.buildPath(id, 'archive'), { params: queryParams });
   }
+
+  /**
+   * Unarchive Users
+   */
+  async unarchiveUsersUsersIdUnarchivePatch({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<void>(this.buildPath(id, 'unarchive'), { params: queryParams });
+  }
 }

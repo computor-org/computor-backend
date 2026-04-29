@@ -19,13 +19,49 @@ logger = logging.getLogger(__name__)
 
 
 async def post_create_course_member(course_member: CourseMember, db: Session):
-    """
-    Post-create hook for CourseMember (CrudRouter).
+    """Post-create hook for CourseMember (CrudRouter).
 
-    Delegates to the shared course_member_post_create function.
+    Delegates to the shared ``course_member_post_create`` function and
+    additionally busts the course's dashboard caches so the freshly
+    added member's role is reflected in tutor/lecturer/student views
+    without waiting for TTL.
     """
     from computor_backend.business_logic.course_member_post_create import course_member_post_create
     await course_member_post_create(course_member, db)
+
+    from computor_backend.business_logic.messages import invalidate_course_dashboards
+    from computor_backend.redis_cache import get_cache
+
+    invalidate_course_dashboards(course_member.course_id, get_cache())
+
+
+async def post_update_course_member(
+    course_member: CourseMember,
+    old_course_member: CourseMember,
+    db: Session,
+) -> None:
+    """Post-update hook for CourseMember.
+
+    Bust dashboard caches when the change affects who sees what — i.e.
+    a role change (student promoted to tutor) or a group reassignment.
+    Other field updates (e.g. profile metadata) don't shift visibility,
+    so we skip the cache bust to avoid unnecessary invalidation churn.
+    """
+    role_changed = (
+        getattr(course_member, "course_role_id", None)
+        != getattr(old_course_member, "course_role_id", None)
+    )
+    group_changed = (
+        getattr(course_member, "course_group_id", None)
+        != getattr(old_course_member, "course_group_id", None)
+    )
+    if not (role_changed or group_changed):
+        return
+
+    from computor_backend.business_logic.messages import invalidate_course_dashboards
+    from computor_backend.redis_cache import get_cache
+
+    invalidate_course_dashboards(course_member.course_id, get_cache())
 
 
 def custom_permissions_course_member(
@@ -112,6 +148,7 @@ class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
     endpoint = "course-members"
     cache_ttl = 300
     post_create = post_create_course_member
+    post_update = post_update_course_member
     custom_permissions = custom_permissions_course_member
 
     @staticmethod
