@@ -494,7 +494,14 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         ).outerjoin(
             Result,
             (Result.course_content_id == latest_result_sub.c.course_content_id) &
-            (Result.created_at == latest_result_sub.c.latest_result_date)
+            (Result.created_at == latest_result_sub.c.latest_result_date) &
+            # Member-scope filter — without it, multiple ``result`` rows that
+            # share the exact ``created_at`` (bulk-inserted bench data, or two
+            # test runs that finish in the same microsecond) all match,
+            # producing a ~600× row blow-up that hangs SQLAlchemy ORM
+            # materialisation. Real users rarely tie timestamps so they don't
+            # hit this; bench-loaded test users do.
+            (Result.course_member_id == CourseMember.id)
         ) \
         .outerjoin(
             results_count_sub,
@@ -631,7 +638,14 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         ).outerjoin(
             Result,
             (Result.course_content_id == latest_result_sub.c.course_content_id) &
-            (Result.created_at == latest_result_sub.c.latest_result_date)
+            (Result.created_at == latest_result_sub.c.latest_result_date) &
+            # Member-scope filter — without it, multiple ``result`` rows that
+            # share the exact ``created_at`` (bulk-inserted bench data, or two
+            # test runs that finish in the same microsecond) all match,
+            # producing a ~600× row blow-up that hangs SQLAlchemy ORM
+            # materialisation. Real users rarely tie timestamps so they don't
+            # hit this; bench-loaded test users do.
+            (Result.course_member_id == CourseMember.id)
         ) \
         .outerjoin(
             results_count_sub,
@@ -741,7 +755,14 @@ def course_member_course_content_query(
         ).outerjoin(
             Result,
             (Result.course_content_id == latest_result_sub.c.course_content_id) &
-            (Result.created_at == latest_result_sub.c.latest_result_date)
+            (Result.created_at == latest_result_sub.c.latest_result_date) &
+            # Member-scope filter — without it, multiple ``result`` rows that
+            # share the exact ``created_at`` (bulk-inserted bench data, or two
+            # test runs that finish in the same microsecond) all match,
+            # producing a ~600× row blow-up that hangs SQLAlchemy ORM
+            # materialisation. Real users rarely tie timestamps so they don't
+            # hit this; bench-loaded test users do.
+            (Result.course_member_id == CourseMember.id)
         ) \
         .outerjoin(
             results_count_sub,
@@ -866,7 +887,14 @@ def course_member_course_content_list_query(
         ).outerjoin(
             Result,
             (Result.course_content_id == latest_result_sub.c.course_content_id) &
-            (Result.created_at == latest_result_sub.c.latest_result_date)
+            (Result.created_at == latest_result_sub.c.latest_result_date) &
+            # Member-scope filter — without it, multiple ``result`` rows that
+            # share the exact ``created_at`` (bulk-inserted bench data, or two
+            # test runs that finish in the same microsecond) all match,
+            # producing a ~600× row blow-up that hangs SQLAlchemy ORM
+            # materialisation. Real users rarely tie timestamps so they don't
+            # hit this; bench-loaded test users do.
+            (Result.course_member_id == CourseMember.id)
         ) \
         .outerjoin(
             results_count_sub,
