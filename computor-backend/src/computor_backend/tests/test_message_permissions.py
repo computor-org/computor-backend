@@ -367,6 +367,42 @@ class TestReplyInheritance:
 # ---------------------------------------------------------------------------
 
 
+class TestAuthorAutoRead:
+    """``mark_author_as_reader`` is the create-path shortcut that
+    eliminates the ``always-1-unread`` UX artefact for authors. It must
+    insert a MessageRead row keyed on the message and the author user,
+    and it must swallow IntegrityError on duplicate insert (idempotent
+    for races with a concurrent manual mark-read).
+    """
+
+    def test_inserts_message_read_row(self):
+        from computor_backend.business_logic import messages as messages_bl
+
+        db = MagicMock()
+        messages_bl.mark_author_as_reader("m-1", "u-author", db)
+
+        # MessageRead model was instantiated and added.
+        added = db.add.call_args[0][0]
+        assert added.message_id == "m-1"
+        assert added.reader_user_id == "u-author"
+        db.commit.assert_called_once()
+
+    def test_swallows_integrity_error_on_duplicate(self):
+        # If the author somehow already has a MessageRead row for the
+        # message (race condition with a manual mark-read), the create
+        # endpoint must NOT fail. The duplicate is silently ignored.
+        from sqlalchemy.exc import IntegrityError
+
+        from computor_backend.business_logic import messages as messages_bl
+
+        db = MagicMock()
+        db.commit.side_effect = IntegrityError("duplicate", {}, Exception())
+
+        # Should not raise — the create endpoint depends on this.
+        messages_bl.mark_author_as_reader("m-1", "u-author", db)
+        db.rollback.assert_called_once()
+
+
 class TestAdminBypass:
     """Admin must be able to post to every targeted scope without holding
     a course / scoped role. Scope rules apply only to non-admin users.

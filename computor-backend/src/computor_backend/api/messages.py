@@ -50,6 +50,7 @@ from computor_backend.business_logic.messages import (
     invalidate_dashboard_views_for_message,
     list_messages_with_read_status,
     list_messages_with_filters,
+    mark_author_as_reader,
     mark_message_as_read,
     mark_message_as_unread,
 )
@@ -78,6 +79,10 @@ async def create_message(
         author_id: str
     entity = _Create(**model_dump)
     message = await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
+
+    # Authors trivially "see" their own message — record the read state
+    # immediately so the inbox doesn't show their own posts as unread.
+    mark_author_as_reader(message.id, permissions.user_id, db)
 
     # Create audit log entry using repository
     message_repo = MessageRepository(db, cache)

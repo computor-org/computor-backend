@@ -349,6 +349,34 @@ def _check_course_write_permission(
         raise ForbiddenException()
 
 
+def mark_author_as_reader(
+    message_id: UUID | str,
+    author_id: UUID | str,
+    db: Session,
+) -> None:
+    """Stamp the message's author as having read it.
+
+    Without this, an author's inbox always shows their own freshly
+    posted message as unread. We sidestep ``mark_message_as_read``
+    deliberately here — that helper does cache invalidation that is
+    redundant inside the create flow (the dashboard caches are already
+    busted by ``invalidate_dashboard_views_for_message`` and the
+    author's WS clients learn about the new message via the per-user
+    inbox channel).
+
+    Idempotent: a duplicate insert is silently swallowed via rollback,
+    so the create path never fails because of a race with a manual
+    mark-read.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        db.add(MessageRead(message_id=message_id, reader_user_id=author_id))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+
+
 def get_message_with_read_status(
     message_id: UUID | str,
     message: MessageGet,
