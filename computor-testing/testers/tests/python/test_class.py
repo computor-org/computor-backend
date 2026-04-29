@@ -249,7 +249,16 @@ def _execute_subprocess(
 ):
     """Execute Python code via subprocess."""
     try:
-        executor = PyExecutor(working_dir=_dir, timeout=timeout)
+        # Reference solutions are lecturer-authored and trusted; skip the
+        # import deny-list for them so they can legitimately use ``os`` /
+        # ``pathlib`` etc. Student code still gets the check (the deny-list
+        # is the point — it stops the canonical "read the reference" exploit).
+        is_student = where == Solution.student
+        executor = PyExecutor(
+            working_dir=_dir,
+            timeout=timeout,
+            security_check=is_student,
+        )
         start_time = time.time()
 
         result = executor.execute_script(

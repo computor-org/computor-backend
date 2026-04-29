@@ -16,9 +16,15 @@ import numpy as np
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
 
-# Import sandbox security analysis
+# Import the AST-based deny-list. Student code goes through it before
+# being executed; reference (lecturer-authored) code is exempt. We use
+# ``check_dangerous_imports`` rather than ``analyze_python_security``
+# because the latter also flags ``open()`` and ``input()`` as dangerous
+# builtins — too noisy for student code that's just doing normal file
+# I/O on its own files (which Layer 1 filesystem isolation will keep
+# scoped to the student dir anyway).
 try:
-    from sandbox.security import analyze_python_security
+    from sandbox.security import check_dangerous_imports
     SANDBOX_AVAILABLE = True
 except ImportError:
     SANDBOX_AVAILABLE = False
@@ -27,6 +33,19 @@ except ImportError:
 class PyExecutionError(ExecutionError):
     """Exception raised when Python execution fails."""
     pass
+
+
+def _security_check_disabled_via_env() -> bool:
+    """Course-level escape hatch.
+
+    Some curricula legitimately teach ``os`` / ``pathlib`` / file I/O
+    and need the deny-list off everywhere. Set
+    ``COMPUTOR_TESTING_DISABLE_SECURITY_CHECK=1`` in the test runner's
+    environment to disable. Empty / unset / "0" / "false" leave the
+    default (on) untouched.
+    """
+    val = os.environ.get("COMPUTOR_TESTING_DISABLE_SECURITY_CHECK", "").strip().lower()
+    return val in {"1", "true", "yes", "on"}
 
 
 class PyExecutor(InterpretedExecutor):
@@ -49,22 +68,28 @@ class PyExecutor(InterpretedExecutor):
         working_dir: Optional[str] = None,
         timeout: Optional[float] = None,
         use_sandbox: bool = True,
-        security_check: bool = False,
+        security_check: bool = True,
         check_runtime: bool = False,  # Python is always available
     ):
-        """
-        Initialize the Python executor.
+        """Initialize the Python executor.
 
         Args:
             working_dir: Working directory for Python execution
             timeout: Timeout in seconds
             use_sandbox: Use sandboxed execution (recommended)
-            security_check: Pre-check code for dangerous patterns
+            security_check: Pre-check student code for dangerous patterns
+                (default True). Pass ``False`` for trusted code paths
+                (e.g. running the reference solution where the
+                instructor authored the script). The
+                ``COMPUTOR_TESTING_DISABLE_SECURITY_CHECK=1`` env var
+                disables it globally — for course-wide opt-out where
+                the curriculum legitimately requires ``os``/``pathlib``
+                etc.
             check_runtime: Check if Python runtime is available
         """
         super().__init__(working_dir, timeout, use_safe_env=True, check_runtime=check_runtime)
         self.use_sandbox = use_sandbox and SANDBOX_AVAILABLE
-        self.security_check = security_check
+        self.security_check = security_check and not _security_check_disabled_via_env()
 
     def _get_interpreter_command(self) -> List[str]:
         """
@@ -286,18 +311,26 @@ class PyExecutor(InterpretedExecutor):
         Returns:
             Dictionary with execution results and extracted variables
         """
-        # Security pre-check if enabled
+        # Security pre-check: AST-based deny-list for dangerous imports.
+        # Closes the "import os; open('../reference/solution.py')" exploit
+        # at the source. Defense in depth — Layer 1 filesystem isolation
+        # is the real fix, but this catches obvious attempts before they
+        # ever reach the subprocess.
         if self.security_check and SANDBOX_AVAILABLE:
-            full_path = script_path if os.path.isabs(script_path) else os.path.join(self.working_dir, script_path)
+            full_path = (
+                script_path
+                if os.path.isabs(script_path)
+                else os.path.join(self.working_dir, script_path)
+            )
             try:
                 with open(full_path, 'r') as f:
                     code = f.read()
-                report = analyze_python_security(code)
-                if not report.safe:
+                issues = check_dangerous_imports(code)
+                if issues:
                     return {
                         "status": "BLOCKED",
-                        "errors": [f"Security check failed: {issue.message}"
-                                  for issue in report.issues[:5]],
+                        "errors": [f"Security check failed: {i.message}"
+                                   for i in issues[:5]],
                         "warnings": [],
                         "variables": {},
                         "stdout": "",
@@ -305,8 +338,10 @@ class PyExecutor(InterpretedExecutor):
                         "traceback": {},
                         "exectime": 0,
                     }
-            except Exception:
-                pass  # Continue if security check fails
+            except (OSError, UnicodeDecodeError):
+                # Can't read the script — let the executor surface the
+                # error its own way rather than silently passing it.
+                pass
 
         # Convert input_answers list to string
         input_data = None
