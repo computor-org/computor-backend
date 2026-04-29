@@ -30,6 +30,11 @@ from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, token_exchange
 from testers.executors.python import PyExecutor, PyExecutionError
 from testers.executors.isolation import isolated_student_workdir
+try:
+    from sandbox.security import check_dangerous_imports
+except ImportError:  # sandbox is optional in dev installs
+    def check_dangerous_imports(_code):
+        return []
 from ..test_base import (
     main_idx_by_dependency,
     check_success_dependencies,
@@ -174,68 +179,120 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
 def _execute_graphics_inprocess(
     _solution, where, script_path, _dir, setup_code, teardown_code, main, plt
 ):
-    """Execute Python code in-process for graphics tests."""
+    """Execute Python code in-process for graphics tests.
+
+    Graphics tests need access to live ``matplotlib`` figure objects,
+    so we keep this in the test runner's own interpreter rather than
+    paying the cost of subprocess + figure serialisation. To make that
+    safe for student code we apply both sandbox layers here:
+
+    * Layer 2: the import deny-list runs against the script source
+      BEFORE we exec it. ``import os`` etc. → BLOCKED.
+    * Layer 1: the cwd / ``sys.path`` are pointed at a tmp copy of the
+      student dir, so even if the student finds another way to reach
+      ``open()``, the sibling reference dir is not on the parent chain.
+
+    Reference solutions are lecturer-authored and trusted — both layers
+    are skipped for them.
+    """
+    is_student = where == Solution.student
+    start_time = time.time()
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+    # ``namespace`` is initialised below once we know ``run_script`` —
+    # binding ``__file__`` to the ORIGINAL student path would let a
+    # student compute the sibling reference dir via string-slicing
+    # ``__file__`` and then ``open(...)`` it, even with ``os`` blocked
+    # by the deny-list.
+    namespace = None
+    old_stdout, old_stderr, old_cwd = sys.stdout, sys.stderr, os.getcwd()
+
+    # Student code -> isolated tmp dir; reference code -> original dir.
+    if is_student:
+        run_ctx = isolated_student_workdir(_dir, script_path)
+    else:
+        run_ctx = nullcontext((_dir, script_path))
+
     try:
-        start_time = time.time()
-        stdout_capture = io.StringIO()
-        stderr_capture = io.StringIO()
-        namespace = {'__file__': script_path}
-        old_stdout, old_stderr, old_cwd = sys.stdout, sys.stderr, os.getcwd()
-
-        try:
-            os.chdir(_dir)
-            if _dir not in sys.path:
-                sys.path.insert(0, _dir)
-            sys.stdout = stdout_capture
-            sys.stderr = stderr_capture
-
-            with open(script_path, 'r') as f:
-                code = f.read()
-            exec(compile(code, script_path, 'exec'), namespace)
-
-            for code in setup_code:
-                exec(code, namespace)
-            for code in teardown_code:
-                exec(code, namespace)
-
-            # Extract graphics objects
-            try:
-                from matplotlib import pyplot as plt_mod
-                namespace['plt'] = plt_mod
-            except ImportError:
-                pass
-
-            namespace["_graphics_object_"] = {}
-            for test in main.tests:
-                fun2eval = f"plt.{test.name}"
+        with run_ctx as (run_dir, run_script):
+            namespace = {'__file__': run_script}
+            # Layer 2 pre-flight for student code. ``check_dangerous_imports``
+            # is the same check the subprocess path uses, so behaviour
+            # stays consistent across the two paths.
+            if is_student:
                 try:
-                    namespace["_graphics_object_"][test.name] = eval(fun2eval, namespace)
-                except (AttributeError, NameError, SyntaxError, KeyError):
+                    with open(run_script, 'r') as f:
+                        student_source = f.read()
+                    issues = check_dangerous_imports(student_source)
+                except (OSError, UnicodeDecodeError):
+                    issues = []  # let exec surface the read error itself
+                if issues:
+                    _solution[where] = {
+                        "status": StatusEnum.failed,
+                        "errormsg": f"Security check failed: {issues[0].message}",
+                        "namespace": {}, "variables": {},
+                        "errors": [f"Security check failed: {i.message}"
+                                   for i in issues[:5]],
+                        "warnings": [],
+                        "traceback": {},
+                        "exectime": time.time() - start_time,
+                        "std": {"stdout": "", "stderr": ""},
+                    }
+                    return
+
+            try:
+                os.chdir(run_dir)
+                if run_dir not in sys.path:
+                    sys.path.insert(0, run_dir)
+                sys.stdout = stdout_capture
+                sys.stderr = stderr_capture
+
+                with open(run_script, 'r') as f:
+                    code = f.read()
+                exec(compile(code, run_script, 'exec'), namespace)
+
+                for code in setup_code:
+                    exec(code, namespace)
+                for code in teardown_code:
+                    exec(code, namespace)
+
+                # Extract graphics objects
+                try:
+                    from matplotlib import pyplot as plt_mod
+                    namespace['plt'] = plt_mod
+                except ImportError:
                     pass
 
-            _solution[where] = {
-                "status": StatusEnum.completed, "errormsg": "",
-                "namespace": namespace, "variables": namespace,
-                "errors": [], "warnings": [], "traceback": {},
-                "exectime": time.time() - start_time,
-                "setup_code": setup_code,
-                "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
-            }
-        except Exception as e:
-            import traceback as tb
-            _solution[where] = {
-                "status": StatusEnum.failed,
-                "errormsg": f"Execution failed: {e}",
-                "namespace": namespace, "variables": namespace,
-                "errors": [str(e)], "traceback": {"error": str(e)},
-                "exectime": time.time() - start_time,
-                "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
-            }
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
-            os.chdir(old_cwd)
-            if plt:
-                plt.close('all')
+                namespace["_graphics_object_"] = {}
+                for test in main.tests:
+                    fun2eval = f"plt.{test.name}"
+                    try:
+                        namespace["_graphics_object_"][test.name] = eval(fun2eval, namespace)
+                    except (AttributeError, NameError, SyntaxError, KeyError):
+                        pass
+
+                _solution[where] = {
+                    "status": StatusEnum.completed, "errormsg": "",
+                    "namespace": namespace, "variables": namespace,
+                    "errors": [], "warnings": [], "traceback": {},
+                    "exectime": time.time() - start_time,
+                    "setup_code": setup_code,
+                    "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
+                }
+            except Exception as e:
+                _solution[where] = {
+                    "status": StatusEnum.failed,
+                    "errormsg": f"Execution failed: {e}",
+                    "namespace": namespace, "variables": namespace,
+                    "errors": [str(e)], "traceback": {"error": str(e)},
+                    "exectime": time.time() - start_time,
+                    "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
+                }
+            finally:
+                sys.stdout, sys.stderr = old_stdout, old_stderr
+                os.chdir(old_cwd)
+                if plt:
+                    plt.close('all')
     except Exception as e:
         _solution[where] = {
             "status": StatusEnum.crashed, "errormsg": f"Unexpected error: {e}",
