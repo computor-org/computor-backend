@@ -119,6 +119,21 @@
           ],
           "default": null,
           "description": "Execution backend configuration for this assignment"
+        },
+        "additionalAllowedImports": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Imports the test runner's deny-list normally blocks but that this assignment legitimately needs (e.g. an exercise that teaches ``os.path.join``). Listed module names are subtracted from the per-language deny-list before the AST scan runs. Use the most-specific name that suffices: ``os`` rather than ``os.path``. Default is the empty list \u2014 the assignment runs under the standard deny-list.",
+          "title": "Additionalallowedimports"
         }
       },
       "title": "CodeAbilityMetaProperties",

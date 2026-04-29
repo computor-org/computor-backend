@@ -158,6 +158,18 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         None,
         description="Execution backend configuration for this assignment"
     )
+    additionalAllowedImports: Optional[List[str]] = Field(
+        default_factory=list,
+        description=(
+            "Imports the test runner's deny-list normally blocks but that "
+            "this assignment legitimately needs (e.g. an exercise that "
+            "teaches ``os.path.join``). Listed module names are subtracted "
+            "from the per-language deny-list before the AST scan runs. "
+            "Use the most-specific name that suffices: ``os`` rather than "
+            "``os.path``. Default is the empty list — the assignment runs "
+            "under the standard deny-list."
+        ),
+    )
     # Course-dependent fields removed - these belong to course configuration, not example metadata
     # maxTestRuns, maxSubmissions, maxGroupSize are course/term specific and should be
     # configured at the CourseContent or Course level, not in the example meta.yaml

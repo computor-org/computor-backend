@@ -3589,6 +3589,8 @@ export interface CodeAbilityMetaProperties {
   testDependencies?: string | TestDependency[] | null;
   /** Execution backend configuration for this assignment */
   executionBackend?: CourseExecutionBackendConfig | null;
+  /** Imports the test runner's deny-list normally blocks but that this assignment legitimately needs (e.g. an exercise that teaches ``os.path.join``). Listed module names are subtracted from the per-language deny-list before the AST scan runs. Use the most-specific name that suffices: ``os`` rather than ``os.path``. Default is the empty list — the assignment runs under the standard deny-list. */
+  additionalAllowedImports?: string[] | null;
 }
 
 /**
