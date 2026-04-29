@@ -10,8 +10,10 @@ from computor_types import get_all_dtos
 from computor_backend.interfaces import (
     AccountInterface,
     CourseFamilyInterface,
+    CourseFamilyMemberInterface,
     CourseInterface,
     OrganizationInterface,
+    OrganizationMemberInterface,
     RoleClaimInterface,
     UserRoleInterface,
     UserInterface,
@@ -68,6 +70,14 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     claims.extend(CourseInterface().claim_values())
     claims.extend(ExampleInterface().claim_values())
     claims.extend(ExtensionInterface().claim_values())
+    # Membership tables: managers need to be able to seat / promote /
+    # remove users on the orgs and families they manage. Without these
+    # claims, CrudRouter's create flow finds no permitting handler and
+    # falls through to the admin-only NotFoundException -> 404. Per-row
+    # safety still applies via _ScopeMemberPermissionHandler — managers
+    # can't grant _owner, can't touch other scopes, etc.
+    claims.extend(OrganizationMemberInterface().claim_values())
+    claims.extend(CourseFamilyMemberInterface().claim_values())
 
     # Add specific example permissions
     claims.extend([
