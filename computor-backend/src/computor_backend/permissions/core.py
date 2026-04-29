@@ -25,7 +25,8 @@ from computor_backend.permissions.handlers_impl import (
     ReadOnlyPermissionHandler,
     ResultPermissionHandler,
     MessagePermissionHandler,
-    ExamplePermissionHandler
+    ExamplePermissionHandler,
+    UserRolePermissionHandler,
 )
 
 # Import refactored Principal and related classes
@@ -107,7 +108,11 @@ def initialize_permission_handlers():
     # System entities - admin only by default
     permission_registry.register(Role, ReadOnlyPermissionHandler(Role))  # Roles are read-only lookup tables
     permission_registry.register(RoleClaim, ReadOnlyPermissionHandler(RoleClaim))  # Role claims are read-only
-    permission_registry.register(UserRole, ReadOnlyPermissionHandler(UserRole))  # UserRole associations are read-only
+    # UserRole is the global-role junction table. Reads are open;
+    # writes are gated by the ``user_role:<action>`` claim AND blocked
+    # for the ``_admin`` role itself so a non-admin _user_manager can't
+    # escalate themselves or anyone else.
+    permission_registry.register(UserRole, UserRolePermissionHandler(UserRole))
     permission_registry.register(Group, ReadOnlyPermissionHandler(Group))  # Groups are read-only lookup tables
     permission_registry.register(GroupClaim, ReadOnlyPermissionHandler(GroupClaim))  # Group claims are read-only
     permission_registry.register(UserGroup, UserPermissionHandler(UserGroup))  # UserGroup can be managed
