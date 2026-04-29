@@ -332,24 +332,32 @@ def latest_submission_grade_status_subquery(db: Session):
     )
 
 
-def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
-    """
-    Count unread messages per course content.
+def message_unread_subqueries(
+    reader_user_id: UUID | str | None,
+    db: Session,
+):
+    """Build per-content and per-submission-group unread-message counters
+    from a single shared scan.
 
-    Args:
-        reader_user_id: The user ID to check for unread messages
-        db: Database session
+    Previously ``message_unread_by_content_subquery`` and
+    ``message_unread_by_submission_group_subquery`` each issued their own
+    ``message ⟕ message_read`` scan with identical filters and only
+    different ``GROUP BY`` columns — Postgres ran the same outer join +
+    archived/author/read predicates twice per request (#119). This helper
+    runs the join once via a CTE and aggregates off it twice.
 
-    Returns:
-        Subquery with course_content_id and unread_count columns, or None if no user_id
+    Returns ``(content_unread_sub, submission_group_unread_sub)`` —
+    either may be ``None`` only when ``reader_user_id`` is ``None`` (in
+    which case both are ``None``).
     """
     if reader_user_id is None:
-        return None
+        return None, None
 
-    return (
+    cte = (
         db.query(
+            Message.id.label("message_id"),
             Message.course_content_id.label("course_content_id"),
-            func.count(Message.id).label("unread_count"),
+            Message.submission_group_id.label("submission_group_id"),
         )
         .outerjoin(
             MessageRead,
@@ -359,48 +367,47 @@ def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Se
             ),
         )
         .filter(Message.archived_at.is_(None))
-        .filter(Message.course_content_id.isnot(None))
-        .filter(Message.submission_group_id.is_(None))
         .filter(MessageRead.id.is_(None))
         .filter(Message.author_id != reader_user_id)
-        .group_by(Message.course_content_id)
+        .cte("unread_messages_for_reader")
+    )
+
+    content_unread = (
+        db.query(
+            cte.c.course_content_id.label("course_content_id"),
+            func.count(cte.c.message_id).label("unread_count"),
+        )
+        .filter(cte.c.course_content_id.isnot(None))
+        .filter(cte.c.submission_group_id.is_(None))
+        .group_by(cte.c.course_content_id)
         .subquery()
     )
+
+    submission_group_unread = (
+        db.query(
+            cte.c.submission_group_id.label("submission_group_id"),
+            func.count(cte.c.message_id).label("unread_count"),
+        )
+        .filter(cte.c.submission_group_id.isnot(None))
+        .group_by(cte.c.submission_group_id)
+        .subquery()
+    )
+
+    return content_unread, submission_group_unread
+
+
+# Backwards-compatibility shims. New code paths in this module use
+# ``message_unread_subqueries`` directly so both subqueries can share a
+# CTE; these wrappers keep the old per-aggregate names available for any
+# external caller that imported them directly.
+def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
+    content_sub, _ = message_unread_subqueries(reader_user_id, db)
+    return content_sub
 
 
 def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | None, db: Session):
-    """
-    Count unread messages per submission group.
-
-    Args:
-        reader_user_id: The user ID to check for unread messages
-        db: Database session
-
-    Returns:
-        Subquery with submission_group_id and unread_count columns, or None if no user_id
-    """
-    if reader_user_id is None:
-        return None
-
-    return (
-        db.query(
-            Message.submission_group_id.label("submission_group_id"),
-            func.count(Message.id).label("unread_count"),
-        )
-        .outerjoin(
-            MessageRead,
-            and_(
-                MessageRead.message_id == Message.id,
-                MessageRead.reader_user_id == reader_user_id,
-            ),
-        )
-        .filter(Message.archived_at.is_(None))
-        .filter(Message.submission_group_id.isnot(None))
-        .filter(MessageRead.id.is_(None))
-        .filter(Message.author_id != reader_user_id)
-        .group_by(Message.submission_group_id)
-        .subquery()
-    )
+    _, sg_sub = message_unread_subqueries(reader_user_id, db)
+    return sg_sub
 
 
 def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session) -> CourseMemberCourseContentQueryResult:
@@ -423,8 +430,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     latest_result_sub = latest_result_subquery(user_id, None, course_content_id, db)
     results_count_sub = results_count_subquery(user_id, None, course_content_id, db)
     submission_count_sub = submission_count_subquery(user_id, None, course_content_id, db)
-    content_unread_sub = message_unread_by_content_subquery(user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
@@ -561,8 +567,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_result_sub = latest_result_subquery(user_id, None, None, db)
     results_count_sub = results_count_subquery(user_id, None, None, db)
     submission_count_sub = submission_count_subquery(user_id, None, None, db)
-    content_unread_sub = message_unread_by_content_subquery(user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
@@ -697,8 +702,7 @@ def course_member_course_content_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, course_content_id, db)
     results_count_sub = results_count_subquery(None, course_member_id, course_content_id, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, course_content_id, db)
-    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(reader_user_id, db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -806,8 +810,7 @@ def course_member_course_content_list_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, None, db, True)
     results_count_sub = results_count_subquery(None, course_member_id, None, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, None, db)
-    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(reader_user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
