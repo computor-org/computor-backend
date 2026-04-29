@@ -748,28 +748,105 @@ class ResultPermissionHandler(PermissionHandler):
 
 class ReadOnlyPermissionHandler(PermissionHandler):
     """Permission handler for read-only entities like CourseRole, CourseContentKind"""
-    
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+
+    def can_perform_action(
+        self,
+        principal: Principal,
+        action: str,
+        resource_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> bool:
+        # ``context`` is accepted for signature parity with the base
+        # ``PermissionHandler.can_perform_action`` and the call site in
+        # ``business_logic/crud.py::create_entity`` — read-only entities
+        # don't actually consult it. Without this kwarg the create path
+        # raised a TypeError for any registered ReadOnly entity.
         if self.check_admin(principal):
             return True
-        
+
         # Everyone can read these entities
         if action in ["list", "get"]:
             return True
-        
+
         # Only admin can modify
         return self.check_general_permission(principal, action)
-    
+
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
             return db.query(self.entity)
-        
+
         if action in ["list", "get"]:
             return db.query(self.entity)
-        
+
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
-        
+
+        raise ForbiddenException(detail={"entity": self.resource_name})
+
+
+class UserRolePermissionHandler(PermissionHandler):
+    """Permission handler for the ``user_role`` junction table.
+
+    Reads are open (every authenticated user can list / get user-role
+    assignments). Writes are gated by the standard ``user_role:<action>``
+    claim — held by the ``_user_manager`` role today.
+
+    Critical extra rule: even with the claim, non-admins cannot
+    create / update / delete a row whose ``role_id`` is ``_admin``.
+    Without this, anyone with ``_user_manager`` could grant themselves
+    or others the ``_admin`` system role and escalate. Mirrors the
+    ``_manager``-can't-promote-to-``_owner`` pattern that landed for
+    scoped roles in PR #112.
+
+    The ``context`` dict that ``business_logic/crud.py::create_entity``
+    builds from the request payload includes ``role_id`` (any
+    ``*_id`` field is folded in), so the create path sees the target
+    role before it commits. The ``build_query`` path filters out admin
+    rows for non-admins so update / delete URLs that target an admin
+    row resolve to ``NotFound`` rather than succeed silently.
+    """
+
+    PROTECTED_ROLE_ID = "_admin"
+
+    def can_perform_action(
+        self,
+        principal: Principal,
+        action: str,
+        resource_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> bool:
+        if self.check_admin(principal):
+            return True
+
+        if action in ("list", "get"):
+            return True
+
+        # Writes require the general claim (typically held by
+        # ``_user_manager``).
+        if not self.check_general_permission(principal, action):
+            return False
+
+        # Even with the claim, only admins may grant ``_admin``.
+        if context and context.get("role_id") == self.PROTECTED_ROLE_ID:
+            return False
+
+        return True
+
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        if self.check_admin(principal):
+            return db.query(self.entity)
+
+        if action in ("list", "get"):
+            return db.query(self.entity)
+
+        if self.check_general_permission(principal, action):
+            # Filter out admin rows so non-admins targeting an
+            # admin assignment by (user_id, role_id) get a clean
+            # NotFound, not a successful update / delete.
+            return db.query(self.entity).filter(
+                self.entity.role_id != self.PROTECTED_ROLE_ID
+            )
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
