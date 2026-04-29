@@ -180,8 +180,9 @@ class Principal(BaseModel):
     """Enhanced Principal class with improved permission evaluation"""
     
     is_admin: bool = False
+    is_service: bool = False  # User.is_service (system / worker accounts)
     user_id: Optional[str] = None
-    
+
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
     

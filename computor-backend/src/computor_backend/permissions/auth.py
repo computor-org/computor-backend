@@ -334,11 +334,23 @@ class PrincipalBuilder:
         # Build structured claims
         claims = build_claims(claim_values)
 
+        # Surface ``User.is_service`` on the principal so endpoints can
+        # distinguish a worker / system account from a regular user
+        # without re-querying the DB. Used by worker-facing endpoints
+        # (e.g. tutor test ``input/download``) to bypass per-user
+        # ownership checks for the test-runner service account.
+        is_service = bool(
+            db.query(User.is_service)
+            .filter(User.id == auth_result.user_id)
+            .scalar()
+        )
+
         # Create Principal
         return Principal(
             user_id=auth_result.user_id,
             roles=auth_result.role_ids,
-            claims=claims
+            claims=claims,
+            is_service=is_service,
         )
     
     @staticmethod
