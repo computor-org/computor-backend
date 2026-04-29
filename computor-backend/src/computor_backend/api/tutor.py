@@ -976,13 +976,17 @@ async def download_tutor_test_input(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     redis = Depends(get_redis_client),
 ):
-    """
-    Download tutor test input files as a ZIP.
+    """Download tutor test input files as a ZIP.
 
-    Used by the testing worker to fetch the tutor's uploaded code
-    for test execution.
+    Called by the testing worker (service account, ``X-API-Token``)
+    to fetch the tutor's uploaded code for test execution. Service
+    accounts bypass the per-user ownership check because the worker
+    is never the same user as the tutor who created the test —
+    rejecting it here breaks the whole testing pipeline (workflow
+    can't fetch input → no artifacts → user later sees a confusing
+    404 on artifacts/download).
 
-    **Permissions**: Only the test owner or admin can download input.
+    **Permissions**: test owner, admin, or service account.
     """
     from computor_backend.services.tutor_test_state import get_tutor_test_metadata
     from computor_backend.services.tutor_test_storage import download_tutor_test_input_as_zip
@@ -995,7 +999,7 @@ async def download_tutor_test_input(
 
     user_id = permissions.get_user_id()
     if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):
-        if not permissions.is_admin:
+        if not (permissions.is_admin or permissions.is_service):
             raise ForbiddenException(detail="You don't have access to this test")
 
     zip_data = await download_tutor_test_input_as_zip(test_id)
