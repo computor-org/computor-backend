@@ -224,30 +224,13 @@ def results_count_subquery(
     return query.group_by(Result.course_content_id).subquery()
 
 
-def latest_grading_subquery(db: Session):
-    """
-    Latest grading per submission group using window function with deterministic ordering.
-
-    Returns columns: submission_group_id, status, grading, rn (rn=1 is latest).
-
-    NOTE: This needs to be migrated to use SubmissionGrade from artifact module
-    which is tied to artifacts, not submission groups directly.
-
-    Args:
-        db: Database session
-
-    Returns:
-        Subquery with grading information (currently returns empty results)
-    """
-    # Temporarily return an empty subquery to avoid errors
-    return db.query(
-        SubmissionGroup.id.label('submission_group_id'),
-        sa.literal(0).label('status'),
-        sa.literal(0.0).label('grading'),
-        sa.literal(datetime.now(timezone.utc)).label('created_at'),
-        SubmissionGroup.id.label('id'),
-        sa.literal(1).label('rn')
-    ).filter(sa.literal(False)).subquery()  # Always empty for now
+# NOTE: ``latest_grading_subquery`` was removed (#119). It always returned
+# zero rows (``.filter(sa.literal(False))``) and contributed columns
+# ``status`` / ``grading`` that were therefore always NULL — the mappers
+# overwrite them downstream from ``latest_submission_grade_status_subquery``
+# anyway. Callers now emit literal-NULL columns at the same positional
+# slots so ``CourseMemberCourseContentQueryResult.from_tuple`` keeps its
+# tuple layout unchanged.
 
 
 def latest_submission_grade_status_subquery(db: Session):
@@ -420,7 +403,6 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     latest_result_sub = latest_result_subquery(user_id, None, course_content_id, db)
     results_count_sub = results_count_subquery(user_id, None, course_content_id, db)
     submission_count_sub = submission_count_subquery(user_id, None, course_content_id, db)
-    latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
@@ -456,8 +438,11 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -491,10 +476,6 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
@@ -560,7 +541,6 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_result_sub = latest_result_subquery(user_id, None, None, db)
     results_count_sub = results_count_subquery(user_id, None, None, db)
     submission_count_sub = submission_count_subquery(user_id, None, None, db)
-    latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
@@ -596,8 +576,11 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -631,10 +614,6 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
@@ -698,7 +677,6 @@ def course_member_course_content_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, course_content_id, db)
     results_count_sub = results_count_subquery(None, course_member_id, course_content_id, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, course_content_id, db)
-    latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
 
@@ -719,8 +697,11 @@ def course_member_course_content_query(
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
     ) \
@@ -744,10 +725,6 @@ def course_member_course_content_query(
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         )
 
     if content_unread_sub is not None:
@@ -809,7 +786,6 @@ def course_member_course_content_list_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, None, db, True)
     results_count_sub = results_count_subquery(None, course_member_id, None, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, None, db)
-    latest_grading_sub = latest_grading_subquery(db)
     content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
     submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
@@ -842,8 +818,11 @@ def course_member_course_content_list_query(
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -872,10 +851,6 @@ def course_member_course_content_list_query(
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
