@@ -78,6 +78,255 @@ def check_file_exists(directory: str, pattern: str) -> Tuple[bool, List[str]]:
     return False, []
 
 
+# =============================================================================
+# Diff message formatters
+# -----------------------------------------------------------------------------
+# These produce the multi-line strings carried in AssertionError messages and
+# (via the pytest hook) into ``ComputorReportSub.statusMessage``. They are
+# string-only — no schema change — so any improvement here flows straight
+# through to the student's testSummary.json regardless of language tester.
+# =============================================================================
+
+
+# Cap on how many mismatching elements / characters we show in a single
+# message — beyond this we show "... and N more" to keep the output readable
+# without truncating the *truly* small mismatches.
+_MAX_DIFF_SAMPLES = 5
+_MAX_STR_LEN = 200
+
+
+def _format_scalar(value) -> str:
+    """Compact scalar formatter that handles NaN / inf cleanly."""
+    if isinstance(value, float):
+        if np.isnan(value):
+            return "NaN"
+        if np.isposinf(value):
+            return "+inf"
+        if np.isneginf(value):
+            return "-inf"
+        # Use g-format with enough digits to expose subtle off-by-eps issues.
+        return f"{value:.6g}"
+    return repr(value)
+
+
+def _shape_hint(actual_shape, expected_shape) -> str:
+    """Return a one-line hint when shapes look related but mismatched."""
+    if actual_shape == expected_shape:
+        return ""
+    a, e = tuple(actual_shape), tuple(expected_shape)
+    # Transposed 2D
+    if len(a) == 2 and len(e) == 2 and a == e[::-1]:
+        return "  hint: shapes look transposed — did you forget `.T` or transpose?"
+    # Reversed in any rank
+    if len(a) == len(e) and a == e[::-1] and len(a) > 1:
+        return "  hint: shapes are reversed — check axis order."
+    # Same total size: maybe needs reshape
+    try:
+        if int(np.prod(a)) == int(np.prod(e)):
+            return "  hint: total element count matches — try `.reshape({})`.".format(
+                tuple(e)
+            )
+    except Exception:  # noqa: BLE001 — defensive, formatting must never raise
+        pass
+    return ""
+
+
+def _format_array_diff(
+    actual: np.ndarray,
+    expected: np.ndarray,
+    name: str,
+    rel_tol: Optional[float],
+    abs_tol: Optional[float],
+) -> str:
+    """Build a multi-line diff message for two arrays known to differ.
+
+    Caller has already verified that ``np.allclose`` (numeric) or
+    ``np.array_equal`` (non-numeric) returned False — this only formats.
+    """
+    lines = [f"Variable `{name}` differs from expected:"]
+
+    # Shape / dtype
+    if actual.shape == expected.shape:
+        lines.append(f"  shape: {actual.shape}")
+    else:
+        lines.append(f"  shape: actual={actual.shape}  expected={expected.shape}")
+    if actual.dtype == expected.dtype:
+        lines.append(f"  dtype: {actual.dtype}")
+    else:
+        lines.append(f"  dtype: actual={actual.dtype}  expected={expected.dtype}")
+
+    if rel_tol is not None or abs_tol is not None:
+        lines.append(f"  tolerances: rel={rel_tol!r}  abs={abs_tol!r}")
+
+    # Only compute element-wise diff when shapes match — otherwise indices
+    # are not comparable.
+    if actual.shape != expected.shape:
+        hint = _shape_hint(actual.shape, expected.shape)
+        if hint:
+            lines.append(hint)
+        return "\n".join(lines)
+
+    is_numeric = np.issubdtype(actual.dtype, np.number) and np.issubdtype(
+        expected.dtype, np.number
+    )
+
+    if is_numeric:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            actual_f = actual.astype(np.float64, copy=False)
+            expected_f = expected.astype(np.float64, copy=False)
+            abs_diff = np.abs(actual_f - expected_f)
+
+            # NaN positions that disagree
+            actual_nan = np.isnan(actual_f)
+            expected_nan = np.isnan(expected_f)
+            nan_disagree = actual_nan ^ expected_nan
+            if np.any(nan_disagree):
+                idxs = list(zip(*np.where(nan_disagree)))[:_MAX_DIFF_SAMPLES]
+                lines.append(f"  NaN disagreement at {len(idxs)}+ positions:")
+                for idx in idxs:
+                    a_val = "NaN" if actual_nan[idx] else _format_scalar(actual_f[idx])
+                    e_val = "NaN" if expected_nan[idx] else _format_scalar(expected_f[idx])
+                    lines.append(f"    {idx}: actual={a_val:<14} expected={e_val}")
+
+            # Where both are finite, compute diffs. If finite values
+            # already agree (max diff is 0) we omit these lines —
+            # otherwise NaN-only mismatches are followed by an
+            # uninformative "max abs diff: 0" that just adds noise.
+            both_finite = np.isfinite(actual_f) & np.isfinite(expected_f)
+            if np.any(both_finite):
+                finite_abs = np.where(both_finite, abs_diff, 0.0)
+                max_abs = float(finite_abs.max())
+                if max_abs > 0:
+                    max_abs_idx = np.unravel_index(
+                        int(finite_abs.argmax()), finite_abs.shape
+                    )
+                    lines.append(
+                        f"  max abs diff: {max_abs:.6g} at index {max_abs_idx}"
+                    )
+
+                    # Relative diff is only meaningful where expected is non-zero.
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        rel = np.where(
+                            both_finite & (expected_f != 0),
+                            abs_diff / np.abs(expected_f),
+                            0.0,
+                        )
+                    if np.any(rel > 0):
+                        max_rel = float(rel.max())
+                        max_rel_idx = np.unravel_index(int(rel.argmax()), rel.shape)
+                        lines.append(
+                            f"  max rel diff: {max_rel:.6g} at index {max_rel_idx}"
+                        )
+
+            # Mismatching positions sample (numeric closeness)
+            close = np.isclose(
+                actual_f,
+                expected_f,
+                rtol=rel_tol if rel_tol is not None else 1e-9,
+                atol=abs_tol if abs_tol is not None else 1e-12,
+                equal_nan=True,
+            )
+            mismatch_mask = ~close & both_finite
+            mismatch_idxs = list(zip(*np.where(mismatch_mask)))
+            if mismatch_idxs:
+                shown = mismatch_idxs[:_MAX_DIFF_SAMPLES]
+                lines.append(f"  mismatching elements ({len(mismatch_idxs)} total):")
+                for idx in shown:
+                    a_val = _format_scalar(actual_f[idx])
+                    e_val = _format_scalar(expected_f[idx])
+                    lines.append(f"    {idx}: actual={a_val:<14} expected={e_val}")
+                if len(mismatch_idxs) > len(shown):
+                    lines.append(
+                        f"    ... and {len(mismatch_idxs) - len(shown)} more"
+                    )
+    else:
+        # Non-numeric: show first few unequal element pairs.
+        ne_mask = actual != expected
+        ne_idxs = list(zip(*np.where(np.asarray(ne_mask))))
+        shown = ne_idxs[:_MAX_DIFF_SAMPLES]
+        if shown:
+            lines.append(
+                f"  unequal elements ({len(ne_idxs)} total):"
+            )
+            for idx in shown:
+                lines.append(
+                    f"    {idx}: actual={actual[idx]!r:<20} expected={expected[idx]!r}"
+                )
+            if len(ne_idxs) > len(shown):
+                lines.append(f"    ... and {len(ne_idxs) - len(shown)} more")
+
+    return "\n".join(lines)
+
+
+def _format_scalar_diff(
+    actual,
+    expected,
+    name: str,
+    rel_tol: Optional[float],
+    abs_tol: Optional[float],
+) -> str:
+    """Build a multi-line diff message for two scalars known to differ."""
+    lines = [f"Variable `{name}` differs from expected:"]
+    lines.append(f"  expected: {_format_scalar(expected)}")
+    lines.append(f"  actual:   {_format_scalar(actual)}")
+    try:
+        abs_diff = abs(actual - expected)
+        lines.append(f"  abs diff: {_format_scalar(float(abs_diff))}")
+        if expected != 0:
+            rel_diff = abs_diff / abs(expected)
+            lines.append(f"  rel diff: {_format_scalar(float(rel_diff))}")
+        if rel_tol is not None or abs_tol is not None:
+            lines.append(f"  tolerances: rel={rel_tol!r}  abs={abs_tol!r}")
+    except Exception:  # noqa: BLE001 — never let formatting raise
+        pass
+    return "\n".join(lines)
+
+
+def _clip(s: str, max_len: int = _MAX_STR_LEN) -> str:
+    """Clip a string for inclusion in an error message."""
+    s = str(s)
+    if len(s) <= max_len:
+        return s
+    head = max_len - 16  # leave room for the "... <N more chars>" tail
+    return s[:head] + f"...<{len(s) - head} more chars>"
+
+
+def _first_diff_index(a: str, b: str) -> Optional[int]:
+    """Return the first index where two strings differ, or None if equal."""
+    n = min(len(a), len(b))
+    for i in range(n):
+        if a[i] != b[i]:
+            return i
+    if len(a) != len(b):
+        return n
+    return None
+
+
+def _format_pattern_diff(
+    actual_str: str,
+    pattern: str,
+    qualification: str,
+    name: str,
+) -> str:
+    """Build a multi-line diff message for the matches/contains/regex paths."""
+    lines = [f"Variable `{name}` failed `{qualification}` check:"]
+    lines.append(f"  pattern: {_clip(pattern)!r}")
+    lines.append(f"  actual:  {_clip(actual_str)!r}")
+    lines.append(f"  lengths: actual={len(actual_str)}  pattern={len(pattern)}")
+    if qualification == "matches":
+        idx = _first_diff_index(actual_str, pattern)
+        if idx is not None:
+            ctx_start = max(idx - 8, 0)
+            ctx_end_a = min(idx + 8, len(actual_str))
+            ctx_end_p = min(idx + 8, len(pattern))
+            lines.append(
+                f"  first diff at index {idx}: "
+                f"actual={actual_str[ctx_start:ctx_end_a]!r:<24} "
+                f"pattern={pattern[ctx_start:ctx_end_p]!r}"
+            )
+    return "\n".join(lines)
+
+
 def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     """
     Compare two values with tolerance. Raises AssertionError on mismatch.
@@ -105,16 +354,26 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         expected = np.asarray(expected)
 
         if actual.shape != expected.shape:
-            raise AssertionError(
-                f"Shape mismatch for '{name}': {actual.shape} vs {expected.shape}"
+            msg = (
+                f"Variable `{name}` has wrong shape:\n"
+                f"  expected: {expected.shape}\n"
+                f"  actual:   {actual.shape}"
             )
+            hint = _shape_hint(actual.shape, expected.shape)
+            if hint:
+                msg += "\n" + hint
+            raise AssertionError(msg)
 
         if np.issubdtype(expected.dtype, np.number):
             if not np.allclose(actual, expected, rtol=rel_tol, atol=abs_tol, equal_nan=True):
-                raise AssertionError(f"Array values differ for '{name}'")
+                raise AssertionError(
+                    _format_array_diff(actual, expected, name, rel_tol, abs_tol)
+                )
         else:
             if not np.array_equal(actual, expected):
-                raise AssertionError(f"Array values differ for '{name}'")
+                raise AssertionError(
+                    _format_array_diff(actual, expected, name, rel_tol, abs_tol)
+                )
         return
 
     # Handle numeric scalars
@@ -145,7 +404,9 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         if abs_diff <= abs_tol:
             return
 
-        raise AssertionError(f"Value mismatch for '{name}': {actual} vs {expected}")
+        raise AssertionError(
+            _format_scalar_diff(actual, expected, name, rel_tol, abs_tol)
+        )
 
     # Handle complex numbers
     if isinstance(expected, complex):
@@ -155,23 +416,48 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
             )
         if not (abs(actual.real - expected.real) <= abs_tol and
                 abs(actual.imag - expected.imag) <= abs_tol):
-            raise AssertionError(f"Value mismatch for '{name}': {actual} vs {expected}")
+            raise AssertionError(
+                _format_scalar_diff(actual, expected, name, rel_tol, abs_tol)
+            )
         return
 
     # Handle strings
     if isinstance(expected, str):
-        assert actual == expected, \
-            f"String mismatch for '{name}': '{actual}' vs '{expected}'"
+        if actual != expected:
+            actual_str = str(actual)
+            idx = _first_diff_index(actual_str, expected)
+            msg = (
+                f"Variable `{name}` differs from expected:\n"
+                f"  expected: {_clip(expected)!r}\n"
+                f"  actual:   {_clip(actual_str)!r}\n"
+                f"  lengths:  actual={len(actual_str)}  expected={len(expected)}"
+            )
+            if idx is not None:
+                ctx_start = max(idx - 8, 0)
+                ctx_end_a = min(idx + 8, len(actual_str))
+                ctx_end_e = min(idx + 8, len(expected))
+                msg += (
+                    f"\n  first diff at index {idx}: "
+                    f"actual={actual_str[ctx_start:ctx_end_a]!r}  "
+                    f"expected={expected[ctx_start:ctx_end_e]!r}"
+                )
+            raise AssertionError(msg)
         return
 
     # Handle lists/tuples
     if isinstance(expected, (list, tuple)):
         if not isinstance(actual, (list, tuple)):
-            raise AssertionError(f"Type mismatch for '{name}': expected list/tuple")
+            raise AssertionError(
+                f"Variable `{name}` has wrong type:\n"
+                f"  expected: {type(expected).__name__} (list/tuple)\n"
+                f"  actual:   {type(actual).__name__}"
+            )
 
         if len(actual) != len(expected):
             raise AssertionError(
-                f"Length mismatch for '{name}': {len(actual)} vs {len(expected)}"
+                f"Variable `{name}` has wrong length:\n"
+                f"  expected: {len(expected)}\n"
+                f"  actual:   {len(actual)}"
             )
 
         for i, (a, e) in enumerate(zip(actual, expected)):
@@ -181,19 +467,33 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     # Handle dicts
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
-            raise AssertionError(f"Type mismatch for '{name}': expected dict")
-
-        if set(actual.keys()) != set(expected.keys()):
             raise AssertionError(
-                f"Key mismatch for '{name}': {set(actual.keys())} vs {set(expected.keys())}"
+                f"Variable `{name}` has wrong type:\n"
+                f"  expected: dict\n"
+                f"  actual:   {type(actual).__name__}"
             )
+
+        actual_keys = set(actual.keys())
+        expected_keys = set(expected.keys())
+        if actual_keys != expected_keys:
+            missing = expected_keys - actual_keys
+            extra = actual_keys - expected_keys
+            msg = [f"Variable `{name}` has wrong keys:"]
+            if missing:
+                msg.append(f"  missing: {sorted(missing)!r}")
+            if extra:
+                msg.append(f"  extra:   {sorted(extra)!r}")
+            raise AssertionError("\n".join(msg))
 
         for key in expected:
             compare_values(actual[key], expected[key], rel_tol, abs_tol, f"{name}[{key!r}]")
         return
 
     # Default comparison
-    assert actual == expected, f"Value mismatch for '{name}': {actual} vs {expected}"
+    if actual != expected:
+        raise AssertionError(
+            _format_scalar_diff(actual, expected, name, rel_tol, abs_tol)
+        )
 
 
 # =============================================================================
@@ -494,31 +794,55 @@ def compare_variable_by_qualification(
         compare_values(val_student, ref, relative_tolerance, absolute_tolerance, name)
 
     elif qualification == QualificationEnum.matches:
-        assert str(val_student) == pattern, \
-            f"Variable `{name}` does not match pattern `{pattern}`"
+        actual_str = str(val_student)
+        if actual_str != pattern:
+            raise AssertionError(
+                _format_pattern_diff(actual_str, pattern, "matches", name)
+            )
 
     elif qualification == QualificationEnum.contains:
-        assert pattern in str(val_student), \
-            f"Variable `{name}` does not contain `{pattern}`"
+        actual_str = str(val_student)
+        if pattern not in actual_str:
+            raise AssertionError(
+                _format_pattern_diff(actual_str, pattern, "contains", name)
+            )
 
     elif qualification == QualificationEnum.startsWith:
-        assert str(val_student).startswith(pattern), \
-            f"Variable `{name}` does not start with `{pattern}`"
+        actual_str = str(val_student)
+        if not actual_str.startswith(pattern):
+            raise AssertionError(
+                _format_pattern_diff(actual_str, pattern, "startsWith", name)
+            )
 
     elif qualification == QualificationEnum.endsWith:
-        assert str(val_student).endswith(pattern), \
-            f"Variable `{name}` does not end with `{pattern}`"
+        actual_str = str(val_student)
+        if not actual_str.endswith(pattern):
+            raise AssertionError(
+                _format_pattern_diff(actual_str, pattern, "endsWith", name)
+            )
 
     elif qualification == QualificationEnum.regexp:
+        actual_str = str(val_student)
         try:
-            match = safe_regex_search(pattern, str(val_student))
+            match = safe_regex_search(pattern, actual_str)
         except RegexTimeoutError:
             pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
-        assert match, f"Variable `{name}` does not match regex `{pattern}`"
+        if not match:
+            raise AssertionError(
+                _format_pattern_diff(actual_str, pattern, "regexp", name)
+            )
 
     elif qualification == QualificationEnum.count:
-        assert str(val_student).count(pattern) == count_requirement, \
-            f"Variable `{name}` does not contain pattern `{pattern}` {count_requirement} times"
+        actual_str = str(val_student)
+        actual_count = actual_str.count(pattern)
+        if actual_count != count_requirement:
+            raise AssertionError(
+                f"Variable `{name}` failed `count` check:\n"
+                f"  pattern:  {_clip(pattern)!r}\n"
+                f"  expected: {count_requirement} occurrence(s)\n"
+                f"  actual:   {actual_count} occurrence(s)\n"
+                f"  in:       {_clip(actual_str)!r}"
+            )
 
     else:
         pytest.skip(f"Unsupported qualification: {qualification}")
@@ -549,15 +873,21 @@ def _check_shape_common(actual, expected, name: str):
         else:
             shape_expected = ()
         if shape_actual != shape_expected:
-            pytest.fail(
-                f"Variable `{name}` has incorrect shape: "
-                f"{shape_actual} vs {shape_expected}"
+            msg = (
+                f"Variable `{name}` has wrong shape:\n"
+                f"  expected: {shape_expected}\n"
+                f"  actual:   {shape_actual}"
             )
+            hint = _shape_hint(shape_actual, shape_expected)
+            if hint:
+                msg += "\n" + hint
+            pytest.fail(msg)
     elif hasattr(actual, '__len__') and hasattr(expected, '__len__'):
         if len(actual) != len(expected):
             pytest.fail(
-                f"Variable `{name}` has incorrect length: "
-                f"{len(actual)} vs {len(expected)}"
+                f"Variable `{name}` has wrong length:\n"
+                f"  expected: {len(expected)}\n"
+                f"  actual:   {len(actual)}"
             )
 
 
