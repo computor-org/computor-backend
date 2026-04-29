@@ -318,12 +318,15 @@ def _mock_db_returning_message(parent_message):
 
 class TestReplyInheritance:
     def test_reply_inherits_parent_target(self, monkeypatch):
+        # Use a conversational scope (submission_group) so the
+        # non-conversational reply guard doesn't fire — this test is
+        # specifically about target inheritance, not the reply policy.
         mocks = _stub_helpers(monkeypatch)
         parent = SimpleNamespace(
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
         )
-        parent.course_id = "c1"
+        parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
         p = _principal(is_admin=True)
 
@@ -331,9 +334,9 @@ class TestReplyInheritance:
             _payload(parent_id="m-parent"), p, db
         )
 
-        assert result["course_id"] == "c1"
-        # Inherited target dispatches to course helper, not global.
-        mocks["_check_course_write_permission"].assert_called_once()
+        assert result["submission_group_id"] == "sg1"
+        # Inherited target dispatches to the submission_group helper, not global.
+        mocks["_check_submission_group_write_permission"].assert_called_once()
         mocks["_check_global_write_permission"].assert_not_called()
 
     def test_reply_with_mismatched_target_rejected(self, monkeypatch):
@@ -342,13 +345,13 @@ class TestReplyInheritance:
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
         )
-        parent.course_id = "c1"
+        parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
         p = _principal(is_admin=True)
 
         with pytest.raises(BadRequestException):
             create_message_with_author(
-                _payload(parent_id="m-parent", course_id="c-other"),
+                _payload(parent_id="m-parent", submission_group_id="sg-other"),
                 p,
                 db,
             )
@@ -365,6 +368,89 @@ class TestReplyInheritance:
 # ---------------------------------------------------------------------------
 # Misc invariants
 # ---------------------------------------------------------------------------
+
+
+class TestNonConversationalReplyGuard:
+    """``parent_id`` replies are only meaningful on conversational scopes
+    (user / course_member / submission_group). Replying on broadcast
+    scopes (global / org / family / course / course_group / course_content)
+    would fan out a student's reply to the announcement audience — the
+    opposite of what an announcement is for. Server-side enforcement
+    mirrors the client-side reply policy.
+    """
+
+    def _mock_db_with_parent(self, parent_target_field, parent_target_id="t-1"):
+        """Build a mock db whose Message-by-id query returns a parent
+        with the given target column populated."""
+        parent = SimpleNamespace(
+            **{f: None for f in [
+                "user_id", "course_member_id", "submission_group_id",
+                "course_content_id", "course_group_id", "course_id",
+                "course_family_id", "organization_id",
+            ]},
+            id="m-parent",
+        )
+        if parent_target_field is not None:
+            setattr(parent, parent_target_field, parent_target_id)
+        db = MagicMock()
+        chain = MagicMock()
+        chain.first.return_value = parent
+        db.query.return_value.filter.return_value = chain
+        return db
+
+    @pytest.mark.parametrize("parent_target", [
+        "organization_id",
+        "course_family_id",
+        "course_id",
+        "course_group_id",
+        "course_content_id",
+    ])
+    def test_reply_to_announcement_scope_rejected(self, monkeypatch, parent_target):
+        # Replies inherit the parent's target during create_message_with_author;
+        # by the time the guard runs the resolved primary_target == parent_target.
+        _stub_helpers(monkeypatch)
+        db = self._mock_db_with_parent(parent_target)
+        admin = _principal(is_admin=True)
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(_payload(parent_id="m-parent"), admin, db)
+        assert "announcement-only" in str(exc.value.detail).lower() or \
+               "not allowed" in str(exc.value.detail).lower()
+
+    def test_reply_to_global_message_rejected(self, monkeypatch):
+        # A parent with NO target columns set is the global scope — same
+        # rule applies; non-conversational.
+        _stub_helpers(monkeypatch)
+        db = self._mock_db_with_parent(parent_target_field=None)
+        admin = _principal(is_admin=True)
+        with pytest.raises(BadRequestException):
+            create_message_with_author(_payload(parent_id="m-parent"), admin, db)
+
+    @pytest.mark.parametrize("parent_target", [
+        "user_id",
+        "course_member_id",
+        "submission_group_id",
+    ])
+    def test_reply_to_conversational_scope_does_not_fire_guard(
+        self, monkeypatch, parent_target
+    ):
+        # The three conversational scopes accept replies. The reply
+        # guard must not raise BadRequestException for them — what
+        # happens downstream (NotImplementedException for user_id /
+        # course_member_id, dispatch to the real helper for
+        # submission_group) is a separate concern.
+        _stub_helpers(monkeypatch)
+        db = self._mock_db_with_parent(parent_target)
+        admin = _principal(is_admin=True)
+        try:
+            create_message_with_author(_payload(parent_id="m-parent"), admin, db)
+        except BadRequestException as exc:
+            # The only acceptable BadRequest from this path would NOT
+            # mention the announcement-only / reply rule.
+            assert "announcement-only" not in str(exc.detail).lower()
+            assert "not allowed" not in str(exc.detail).lower()
+        except NotImplementedException:
+            # Expected for the user_id / course_member_id branches.
+            pass
 
 
 class TestAuthorAutoRead:

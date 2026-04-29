@@ -33,6 +33,18 @@ MESSAGE_TARGET_FIELDS = (
     'course_family_id',
     'organization_id',
 )
+
+
+# Scopes that support back-and-forth conversations (i.e. ``parent_id``
+# replies are meaningful). Everything else is broadcast / announcement
+# territory: a student replying to a course-wide announcement would
+# otherwise have their reply fan out to every course member, which is
+# the opposite of what announcements are for.
+CONVERSATIONAL_TARGET_FIELDS = frozenset({
+    'user_id',
+    'course_member_id',
+    'submission_group_id',
+})
 from computor_types.messages import (
     MessageCreate, MessageGet, MessageList, MessageQuery,
     MessageAuthor, MessageAuthorCourseMember, MessageThread
@@ -112,6 +124,21 @@ def create_message_with_author(
     for field in MESSAGE_TARGET_FIELDS:
         if field != primary_target:
             model_dump[field] = None
+
+    # Replies are only meaningful on conversational scopes. Allowing a
+    # reply on e.g. ``course_id`` would fan a student's reply out to
+    # every course member — that's the opposite of what an announcement
+    # scope is for. Mirrors the client-side reply policy shipped in the
+    # vscode extension.
+    if model_dump.get('parent_id') and primary_target not in CONVERSATIONAL_TARGET_FIELDS:
+        scope_label = primary_target or 'global'
+        raise BadRequestException(
+            detail=(
+                f"Replies are not allowed on {scope_label} messages — "
+                "those scopes are announcement-only. Conversational "
+                "scopes are: user, course_member, submission_group."
+            )
+        )
 
     if primary_target is None:
         _check_global_write_permission(permissions)
