@@ -224,30 +224,13 @@ def results_count_subquery(
     return query.group_by(Result.course_content_id).subquery()
 
 
-def latest_grading_subquery(db: Session):
-    """
-    Latest grading per submission group using window function with deterministic ordering.
-
-    Returns columns: submission_group_id, status, grading, rn (rn=1 is latest).
-
-    NOTE: This needs to be migrated to use SubmissionGrade from artifact module
-    which is tied to artifacts, not submission groups directly.
-
-    Args:
-        db: Database session
-
-    Returns:
-        Subquery with grading information (currently returns empty results)
-    """
-    # Temporarily return an empty subquery to avoid errors
-    return db.query(
-        SubmissionGroup.id.label('submission_group_id'),
-        sa.literal(0).label('status'),
-        sa.literal(0.0).label('grading'),
-        sa.literal(datetime.now(timezone.utc)).label('created_at'),
-        SubmissionGroup.id.label('id'),
-        sa.literal(1).label('rn')
-    ).filter(sa.literal(False)).subquery()  # Always empty for now
+# NOTE: ``latest_grading_subquery`` was removed (#119). It always returned
+# zero rows (``.filter(sa.literal(False))``) and contributed columns
+# ``status`` / ``grading`` that were therefore always NULL — the mappers
+# overwrite them downstream from ``latest_submission_grade_status_subquery``
+# anyway. Callers now emit literal-NULL columns at the same positional
+# slots so ``CourseMemberCourseContentQueryResult.from_tuple`` keeps its
+# tuple layout unchanged.
 
 
 def latest_submission_grade_status_subquery(db: Session):
@@ -270,83 +253,111 @@ def latest_submission_grade_status_subquery(db: Session):
     Returns:
         Subquery with latest submission grade status info
     """
-    # First, get the latest submission artifact per submission group
-    latest_artifact_subquery = db.query(
-        SubmissionArtifact.submission_group_id,
-        func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at")
-    ).filter(
-        SubmissionArtifact.submit == True
-    ).group_by(
-        SubmissionArtifact.submission_group_id
-    ).subquery()
-
-    # Then, for each latest artifact, get its latest grade
-    # Using a window function to rank grades by graded_at DESC
-    latest_grade_subquery = db.query(
-        SubmissionArtifact.submission_group_id,
-        SubmissionGrade.status,
-        func.row_number().over(
-            partition_by=SubmissionArtifact.submission_group_id,
-            order_by=SubmissionGrade.graded_at.desc()
-        ).label("rn")
-    ).select_from(SubmissionArtifact).join(
-        latest_artifact_subquery,
-        and_(
-            SubmissionArtifact.submission_group_id == latest_artifact_subquery.c.submission_group_id,
-            SubmissionArtifact.created_at == latest_artifact_subquery.c.latest_artifact_created_at
+    # Promote the "latest submitted artifact per submission_group"
+    # aggregation to a CTE. Previously this was a ``.subquery()`` referenced
+    # twice — once as the FROM in the outer return, and again inside the
+    # rank-grades subquery — which made SQLAlchemy inline the same
+    # ``SELECT submission_group_id, MAX(created_at) FROM submission_artifact
+    # WHERE submit=true GROUP BY ...`` block twice, forcing Postgres to
+    # compute the aggregation twice per request (#119). A CTE is materialised
+    # once and referenced N times.
+    latest_artifact_cte = (
+        db.query(
+            SubmissionArtifact.submission_group_id,
+            func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at"),
         )
-    ).join(
-        SubmissionGrade,
-        SubmissionGrade.artifact_id == SubmissionArtifact.id
-    ).filter(
-        SubmissionArtifact.submit == True
-    ).subquery()
+        .filter(SubmissionArtifact.submit == True)
+        .group_by(SubmissionArtifact.submission_group_id)
+        .cte("latest_artifact_per_group")
+    )
 
-    # Get only rn=1 (latest grade) per submission group
-    latest_grade_status = db.query(
-        latest_grade_subquery.c.submission_group_id,
-        latest_grade_subquery.c.status.label("latest_grade_status")
-    ).filter(
-        latest_grade_subquery.c.rn == 1
-    ).subquery()
+    # Rank grades for each (latest) artifact by graded_at DESC; the join
+    # uses the CTE above, so that aggregation is shared.
+    latest_grade_subquery = (
+        db.query(
+            SubmissionArtifact.submission_group_id,
+            SubmissionGrade.status,
+            func.row_number()
+            .over(
+                partition_by=SubmissionArtifact.submission_group_id,
+                order_by=SubmissionGrade.graded_at.desc(),
+            )
+            .label("rn"),
+        )
+        .select_from(SubmissionArtifact)
+        .join(
+            latest_artifact_cte,
+            and_(
+                SubmissionArtifact.submission_group_id
+                == latest_artifact_cte.c.submission_group_id,
+                SubmissionArtifact.created_at
+                == latest_artifact_cte.c.latest_artifact_created_at,
+            ),
+        )
+        .join(SubmissionGrade, SubmissionGrade.artifact_id == SubmissionArtifact.id)
+        .filter(SubmissionArtifact.submit == True)
+        .subquery()
+    )
 
-    # Now build the final subquery that includes all submission groups with submissions
-    # and marks whether they are unreviewed
-    return db.query(
-        latest_artifact_subquery.c.submission_group_id,
-        latest_grade_status.c.latest_grade_status,
-        # is_unreviewed: 1 if no grade (NULL) or status=0 (NOT_REVIEWED)
-        case(
-            (latest_grade_status.c.latest_grade_status.is_(None), 1),
-            (latest_grade_status.c.latest_grade_status == 0, 1),
-            else_=0
-        ).label("is_unreviewed")
-    ).select_from(
-        latest_artifact_subquery
-    ).outerjoin(
-        latest_grade_status,
-        latest_artifact_subquery.c.submission_group_id == latest_grade_status.c.submission_group_id
-    ).subquery()
+    # Pick the rn=1 row per submission_group (latest grade).
+    latest_grade_status = (
+        db.query(
+            latest_grade_subquery.c.submission_group_id,
+            latest_grade_subquery.c.status.label("latest_grade_status"),
+        )
+        .filter(latest_grade_subquery.c.rn == 1)
+        .subquery()
+    )
 
-
-def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
-    """
-    Count unread messages per course content.
-
-    Args:
-        reader_user_id: The user ID to check for unread messages
-        db: Database session
-
-    Returns:
-        Subquery with course_content_id and unread_count columns, or None if no user_id
-    """
-    if reader_user_id is None:
-        return None
-
+    # Final shape: every submission_group that has any submitted artifact,
+    # left-joined to its latest grade. ``is_unreviewed`` is 1 when no grade
+    # exists yet (NULL) or the latest grade status is NOT_REVIEWED.
     return (
         db.query(
+            latest_artifact_cte.c.submission_group_id,
+            latest_grade_status.c.latest_grade_status,
+            case(
+                (latest_grade_status.c.latest_grade_status.is_(None), 1),
+                (latest_grade_status.c.latest_grade_status == 0, 1),
+                else_=0,
+            ).label("is_unreviewed"),
+        )
+        .select_from(latest_artifact_cte)
+        .outerjoin(
+            latest_grade_status,
+            latest_artifact_cte.c.submission_group_id
+            == latest_grade_status.c.submission_group_id,
+        )
+        .subquery()
+    )
+
+
+def message_unread_subqueries(
+    reader_user_id: UUID | str | None,
+    db: Session,
+):
+    """Build per-content and per-submission-group unread-message counters
+    from a single shared scan.
+
+    Previously ``message_unread_by_content_subquery`` and
+    ``message_unread_by_submission_group_subquery`` each issued their own
+    ``message ⟕ message_read`` scan with identical filters and only
+    different ``GROUP BY`` columns — Postgres ran the same outer join +
+    archived/author/read predicates twice per request (#119). This helper
+    runs the join once via a CTE and aggregates off it twice.
+
+    Returns ``(content_unread_sub, submission_group_unread_sub)`` —
+    either may be ``None`` only when ``reader_user_id`` is ``None`` (in
+    which case both are ``None``).
+    """
+    if reader_user_id is None:
+        return None, None
+
+    cte = (
+        db.query(
+            Message.id.label("message_id"),
             Message.course_content_id.label("course_content_id"),
-            func.count(Message.id).label("unread_count"),
+            Message.submission_group_id.label("submission_group_id"),
         )
         .outerjoin(
             MessageRead,
@@ -356,48 +367,47 @@ def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Se
             ),
         )
         .filter(Message.archived_at.is_(None))
-        .filter(Message.course_content_id.isnot(None))
-        .filter(Message.submission_group_id.is_(None))
         .filter(MessageRead.id.is_(None))
         .filter(Message.author_id != reader_user_id)
-        .group_by(Message.course_content_id)
+        .cte("unread_messages_for_reader")
+    )
+
+    content_unread = (
+        db.query(
+            cte.c.course_content_id.label("course_content_id"),
+            func.count(cte.c.message_id).label("unread_count"),
+        )
+        .filter(cte.c.course_content_id.isnot(None))
+        .filter(cte.c.submission_group_id.is_(None))
+        .group_by(cte.c.course_content_id)
         .subquery()
     )
+
+    submission_group_unread = (
+        db.query(
+            cte.c.submission_group_id.label("submission_group_id"),
+            func.count(cte.c.message_id).label("unread_count"),
+        )
+        .filter(cte.c.submission_group_id.isnot(None))
+        .group_by(cte.c.submission_group_id)
+        .subquery()
+    )
+
+    return content_unread, submission_group_unread
+
+
+# Backwards-compatibility shims. New code paths in this module use
+# ``message_unread_subqueries`` directly so both subqueries can share a
+# CTE; these wrappers keep the old per-aggregate names available for any
+# external caller that imported them directly.
+def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
+    content_sub, _ = message_unread_subqueries(reader_user_id, db)
+    return content_sub
 
 
 def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | None, db: Session):
-    """
-    Count unread messages per submission group.
-
-    Args:
-        reader_user_id: The user ID to check for unread messages
-        db: Database session
-
-    Returns:
-        Subquery with submission_group_id and unread_count columns, or None if no user_id
-    """
-    if reader_user_id is None:
-        return None
-
-    return (
-        db.query(
-            Message.submission_group_id.label("submission_group_id"),
-            func.count(Message.id).label("unread_count"),
-        )
-        .outerjoin(
-            MessageRead,
-            and_(
-                MessageRead.message_id == Message.id,
-                MessageRead.reader_user_id == reader_user_id,
-            ),
-        )
-        .filter(Message.archived_at.is_(None))
-        .filter(Message.submission_group_id.isnot(None))
-        .filter(MessageRead.id.is_(None))
-        .filter(Message.author_id != reader_user_id)
-        .group_by(Message.submission_group_id)
-        .subquery()
-    )
+    _, sg_sub = message_unread_subqueries(reader_user_id, db)
+    return sg_sub
 
 
 def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session) -> CourseMemberCourseContentQueryResult:
@@ -420,9 +430,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     latest_result_sub = latest_result_subquery(user_id, None, course_content_id, db)
     results_count_sub = results_count_subquery(user_id, None, course_content_id, db)
     submission_count_sub = submission_count_subquery(user_id, None, course_content_id, db)
-    latest_grading_sub = latest_grading_subquery(db)
-    content_unread_sub = message_unread_by_content_subquery(user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
@@ -456,8 +464,11 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -491,10 +502,6 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
@@ -560,9 +567,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_result_sub = latest_result_subquery(user_id, None, None, db)
     results_count_sub = results_count_subquery(user_id, None, None, db)
     submission_count_sub = submission_count_subquery(user_id, None, None, db)
-    latest_grading_sub = latest_grading_subquery(db)
-    content_unread_sub = message_unread_by_content_subquery(user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
@@ -596,8 +601,11 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -631,10 +639,6 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
@@ -698,9 +702,7 @@ def course_member_course_content_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, course_content_id, db)
     results_count_sub = results_count_subquery(None, course_member_id, course_content_id, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, course_content_id, db)
-    latest_grading_sub = latest_grading_subquery(db)
-    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(reader_user_id, db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -719,8 +721,11 @@ def course_member_course_content_query(
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
     ) \
@@ -744,10 +749,6 @@ def course_member_course_content_query(
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         )
 
     if content_unread_sub is not None:
@@ -809,9 +810,7 @@ def course_member_course_content_list_query(
     latest_result_sub = latest_result_subquery(None, course_member_id, None, db, True)
     results_count_sub = results_count_subquery(None, course_member_id, None, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, None, db)
-    latest_grading_sub = latest_grading_subquery(db)
-    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
-    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+    content_unread_sub, submission_group_unread_sub = message_unread_subqueries(reader_user_id, db)
     latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
 
     content_unread_column = (
@@ -842,8 +841,11 @@ def course_member_course_content_list_query(
         Result,
         SubmissionGroup,
         submission_count_sub.c.submission_count,
-        latest_grading_sub.c.status,
-        latest_grading_sub.c.grading,
+        # Legacy column slots — see #119 note above. Kept as NULL so the
+        # tuple layout consumed by from_tuple stays stable; downstream
+        # mappers source the real values from latest_submission_grade_sub.
+        literal(None).label("status"),
+        literal(None).label("grading"),
         content_unread_column,
         submission_group_unread_column,
         latest_submission_grade_sub.c.latest_grade_status,
@@ -872,10 +874,6 @@ def course_member_course_content_list_query(
         ).outerjoin(
             submission_count_sub,
             CourseContent.id == submission_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.submission_group_id == SubmissionGroup.id)
-            & (latest_grading_sub.c.rn == 1)
         ).outerjoin(
             latest_submission_grade_sub,
             latest_submission_grade_sub.c.submission_group_id == SubmissionGroup.id
