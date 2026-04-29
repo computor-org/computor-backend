@@ -253,63 +253,83 @@ def latest_submission_grade_status_subquery(db: Session):
     Returns:
         Subquery with latest submission grade status info
     """
-    # First, get the latest submission artifact per submission group
-    latest_artifact_subquery = db.query(
-        SubmissionArtifact.submission_group_id,
-        func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at")
-    ).filter(
-        SubmissionArtifact.submit == True
-    ).group_by(
-        SubmissionArtifact.submission_group_id
-    ).subquery()
-
-    # Then, for each latest artifact, get its latest grade
-    # Using a window function to rank grades by graded_at DESC
-    latest_grade_subquery = db.query(
-        SubmissionArtifact.submission_group_id,
-        SubmissionGrade.status,
-        func.row_number().over(
-            partition_by=SubmissionArtifact.submission_group_id,
-            order_by=SubmissionGrade.graded_at.desc()
-        ).label("rn")
-    ).select_from(SubmissionArtifact).join(
-        latest_artifact_subquery,
-        and_(
-            SubmissionArtifact.submission_group_id == latest_artifact_subquery.c.submission_group_id,
-            SubmissionArtifact.created_at == latest_artifact_subquery.c.latest_artifact_created_at
+    # Promote the "latest submitted artifact per submission_group"
+    # aggregation to a CTE. Previously this was a ``.subquery()`` referenced
+    # twice — once as the FROM in the outer return, and again inside the
+    # rank-grades subquery — which made SQLAlchemy inline the same
+    # ``SELECT submission_group_id, MAX(created_at) FROM submission_artifact
+    # WHERE submit=true GROUP BY ...`` block twice, forcing Postgres to
+    # compute the aggregation twice per request (#119). A CTE is materialised
+    # once and referenced N times.
+    latest_artifact_cte = (
+        db.query(
+            SubmissionArtifact.submission_group_id,
+            func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at"),
         )
-    ).join(
-        SubmissionGrade,
-        SubmissionGrade.artifact_id == SubmissionArtifact.id
-    ).filter(
-        SubmissionArtifact.submit == True
-    ).subquery()
+        .filter(SubmissionArtifact.submit == True)
+        .group_by(SubmissionArtifact.submission_group_id)
+        .cte("latest_artifact_per_group")
+    )
 
-    # Get only rn=1 (latest grade) per submission group
-    latest_grade_status = db.query(
-        latest_grade_subquery.c.submission_group_id,
-        latest_grade_subquery.c.status.label("latest_grade_status")
-    ).filter(
-        latest_grade_subquery.c.rn == 1
-    ).subquery()
+    # Rank grades for each (latest) artifact by graded_at DESC; the join
+    # uses the CTE above, so that aggregation is shared.
+    latest_grade_subquery = (
+        db.query(
+            SubmissionArtifact.submission_group_id,
+            SubmissionGrade.status,
+            func.row_number()
+            .over(
+                partition_by=SubmissionArtifact.submission_group_id,
+                order_by=SubmissionGrade.graded_at.desc(),
+            )
+            .label("rn"),
+        )
+        .select_from(SubmissionArtifact)
+        .join(
+            latest_artifact_cte,
+            and_(
+                SubmissionArtifact.submission_group_id
+                == latest_artifact_cte.c.submission_group_id,
+                SubmissionArtifact.created_at
+                == latest_artifact_cte.c.latest_artifact_created_at,
+            ),
+        )
+        .join(SubmissionGrade, SubmissionGrade.artifact_id == SubmissionArtifact.id)
+        .filter(SubmissionArtifact.submit == True)
+        .subquery()
+    )
 
-    # Now build the final subquery that includes all submission groups with submissions
-    # and marks whether they are unreviewed
-    return db.query(
-        latest_artifact_subquery.c.submission_group_id,
-        latest_grade_status.c.latest_grade_status,
-        # is_unreviewed: 1 if no grade (NULL) or status=0 (NOT_REVIEWED)
-        case(
-            (latest_grade_status.c.latest_grade_status.is_(None), 1),
-            (latest_grade_status.c.latest_grade_status == 0, 1),
-            else_=0
-        ).label("is_unreviewed")
-    ).select_from(
-        latest_artifact_subquery
-    ).outerjoin(
-        latest_grade_status,
-        latest_artifact_subquery.c.submission_group_id == latest_grade_status.c.submission_group_id
-    ).subquery()
+    # Pick the rn=1 row per submission_group (latest grade).
+    latest_grade_status = (
+        db.query(
+            latest_grade_subquery.c.submission_group_id,
+            latest_grade_subquery.c.status.label("latest_grade_status"),
+        )
+        .filter(latest_grade_subquery.c.rn == 1)
+        .subquery()
+    )
+
+    # Final shape: every submission_group that has any submitted artifact,
+    # left-joined to its latest grade. ``is_unreviewed`` is 1 when no grade
+    # exists yet (NULL) or the latest grade status is NOT_REVIEWED.
+    return (
+        db.query(
+            latest_artifact_cte.c.submission_group_id,
+            latest_grade_status.c.latest_grade_status,
+            case(
+                (latest_grade_status.c.latest_grade_status.is_(None), 1),
+                (latest_grade_status.c.latest_grade_status == 0, 1),
+                else_=0,
+            ).label("is_unreviewed"),
+        )
+        .select_from(latest_artifact_cte)
+        .outerjoin(
+            latest_grade_status,
+            latest_artifact_cte.c.submission_group_id
+            == latest_grade_status.c.submission_group_id,
+        )
+        .subquery()
+    )
 
 
 def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
