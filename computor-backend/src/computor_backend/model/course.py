@@ -323,7 +323,23 @@ class CourseContent(Base):
     team_auto_assign_unmatched = Column(Boolean, nullable=True)  # Override course default
     team_lock_at_deadline = Column(Boolean, nullable=True)  # Override course default
     team_require_approval = Column(Boolean, nullable=True)  # Override course default
-    
+
+    # Denormalised: ``course_content_kind_id`` is reachable via
+    # ``course_content_type → course_content_kind``. Storing it directly
+    # here removes a per-row scalar-subquery (was a ``column_property``)
+    # — see #121. Kept in sync by a SQLAlchemy event listener
+    # (``before_insert`` / ``before_update``) at the bottom of this
+    # module: whenever ``course_content_type_id`` is set/changed, the
+    # listener pulls the type's kind and writes it (and ``is_submittable``).
+    course_content_kind_id = Column(
+        ForeignKey(
+            'course_content_kind.id', ondelete='RESTRICT', onupdate='CASCADE'
+        ),
+        nullable=False,
+        index=True,
+    )
+    is_submittable = Column(Boolean, nullable=False, server_default=text("false"))
+
 
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
@@ -338,24 +354,13 @@ class CourseContent(Base):
     # Deployment tracking - One-to-one relationship with CourseContentDeployment
     deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False, passive_deletes=True)
 
-    # Column property for course_content_kind_id
-    course_content_kind_id = column_property(
-        select(CourseContentKind.id)
-        .where(CourseContentKind.id == CourseContentType.course_content_kind_id, 
-               CourseContentType.id == course_content_type_id)
-        .scalar_subquery()
-    )
-    
-    # Column property for is_submittable - derived from CourseContentKind.submittable
-    is_submittable = column_property(
-        select(CourseContentKind.submittable)
-        .where(
-            CourseContentKind.id == CourseContentType.course_content_kind_id,
-            CourseContentType.id == course_content_type_id
-        )
-        .scalar_subquery()
-    )
-    
+    # ``course_content_kind_id`` and ``is_submittable`` are now real
+    # columns declared above (#121). They were previously
+    # ``column_property(scalar_subquery())`` definitions here that ran
+    # a per-row subquery via ``course_content_type → course_content_kind``
+    # for every materialised CourseContent — visible as ``SubPlan 2`` /
+    # ``SubPlan 3`` in EXPLAIN, with loops equal to the row count.
+
     # Column property for has_deployment - check if deployment exists
     @property 
     def has_deployment(self):
@@ -557,3 +562,74 @@ class CourseMemberComment(Base):
     course_member = relationship("CourseMember", foreign_keys=[course_member_id], back_populates="comments_received", lazy="select")
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
+
+
+# =============================================================================
+# Sync ``CourseContent.course_content_kind_id`` and ``is_submittable``
+# from the ``course_content_type → course_content_kind`` chain (#121).
+#
+# These two columns are denormalised — the source of truth lives on
+# ``course_content_type.course_content_kind_id`` and
+# ``course_content_kind.submittable``. The listeners below populate them
+# whenever a CourseContent is inserted or its ``course_content_type_id``
+# changes, so the columns stay correct without callers having to set
+# them explicitly. (Existing call sites already set
+# ``course_content_type_id`` and read ``course_content_kind_id`` /
+# ``is_submittable``; this listener bridges the two.)
+# =============================================================================
+
+from sqlalchemy import event as _sa_event, select as _sa_select
+
+
+def _sync_course_content_kind(connection, type_id):
+    """Look up ``(course_content_kind_id, is_submittable)`` for a given
+    ``course_content_type_id`` using the supplied connection. Returns
+    ``(None, None)`` if the type is missing — the FK constraint will
+    surface that case at flush time."""
+    if type_id is None:
+        return None, None
+    row = connection.execute(
+        _sa_select(
+            CourseContentType.course_content_kind_id,
+            CourseContentKind.submittable,
+        )
+        .select_from(CourseContentType)
+        .join(
+            CourseContentKind,
+            CourseContentKind.id == CourseContentType.course_content_kind_id,
+        )
+        .where(CourseContentType.id == type_id)
+    ).first()
+    if row is None:
+        return None, None
+    return row[0], bool(row[1])
+
+
+@_sa_event.listens_for(CourseContent, "before_insert")
+def _course_content_before_insert(mapper, connection, target):
+    kind_id, submittable = _sync_course_content_kind(
+        connection, target.course_content_type_id
+    )
+    if kind_id is not None:
+        target.course_content_kind_id = kind_id
+        target.is_submittable = submittable
+
+
+@_sa_event.listens_for(CourseContent, "before_update")
+def _course_content_before_update(mapper, connection, target):
+    # Only re-derive when ``course_content_type_id`` actually changed
+    # on this update. Otherwise leave the existing values alone —
+    # re-querying on every update would be wasteful and would also
+    # clobber explicit overrides if they ever exist.
+    from sqlalchemy import inspect as _sa_inspect
+
+    insp = _sa_inspect(target)
+    hist = insp.attrs.course_content_type_id.history
+    if not hist.has_changes():
+        return
+    kind_id, submittable = _sync_course_content_kind(
+        connection, target.course_content_type_id
+    )
+    if kind_id is not None:
+        target.course_content_kind_id = kind_id
+        target.is_submittable = submittable
