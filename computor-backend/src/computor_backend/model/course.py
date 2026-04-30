@@ -633,3 +633,21 @@ def _course_content_before_update(mapper, connection, target):
     if kind_id is not None:
         target.course_content_kind_id = kind_id
         target.is_submittable = submittable
+
+
+@_sa_event.listens_for(SubmissionGroup, "before_insert")
+def _submission_group_before_insert(mapper, connection, target):
+    # ``course_id`` is NOT NULL in the database but a SubmissionGroup is
+    # always scoped to a single CourseContent which already pins the
+    # course. Deriving it here lets ``POST /submission-groups`` accept
+    # the documented schema (``SubmissionGroupCreate`` does not list
+    # ``course_id``) instead of raising an opaque NOT-NULL violation.
+    if target.course_id is not None or target.course_content_id is None:
+        return
+    course_id = connection.execute(
+        _sa_select(CourseContent.course_id).where(
+            CourseContent.id == target.course_content_id
+        )
+    ).scalar()
+    if course_id is not None:
+        target.course_id = course_id

@@ -1,7 +1,10 @@
 import os
 from contextlib import contextmanager
 from typing import Generator, Callable, TYPE_CHECKING
+from uuid import UUID as _UUID
+
 from sqlalchemy import create_engine, text
+from sqlalchemy.dialects.postgresql import psycopg2 as _pg_psycopg2
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 import sqlalchemy.exc as sa_exc
@@ -9,6 +12,30 @@ from fastapi import Depends
 
 if TYPE_CHECKING:
     from computor_backend.permissions.principal import Principal
+
+
+# Patch SQLAlchemy 1.4's psycopg2 _PGUUID bind processor so it does not crash
+# when a Python ``uuid.UUID`` instance is passed for a UUID column.
+#
+# The stock processor unconditionally calls ``uuid.UUID(value)``; the stdlib
+# constructor in turn does ``hex.replace('urn:', '')`` on its first argument
+# which fails with ``AttributeError: 'UUID' object has no attribute 'replace'``
+# whenever ``value`` is already a ``uuid.UUID``. That happens any time the
+# caller hands the ORM a UUID object on INSERT (e.g. a FastAPI ``UUID`` path
+# parameter being stored as a foreign key) — see issue #244 path 4.
+def _patched_pguuid_bind_processor(self, dialect):
+    if not self.as_uuid and dialect.use_native_uuid:
+
+        def process(value):
+            if value is None or isinstance(value, _UUID):
+                return value
+            return _pg_psycopg2._python_UUID(value)
+
+        return process
+    return None
+
+
+_pg_psycopg2._PGUUID.bind_processor = _patched_pguuid_bind_processor
 
 POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.environ.get("POSTGRES_PORT", "5432")
