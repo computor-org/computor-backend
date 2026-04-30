@@ -5,14 +5,14 @@ from sqlalchemy import (
     Float, ForeignKey, ForeignKeyConstraint, Index, 
     Integer, String, text, select
 , func)
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, column_property, Mapped
 from sqlalchemy.ext.hybrid import hybrid_property
 try:
-    from ..custom_types import LtreeType
+    from ..custom_types import LtreeType, UUID
 except ImportError:
     # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+    from computor_backend.custom_types import LtreeType, UUID
 
 from .base import Base
 

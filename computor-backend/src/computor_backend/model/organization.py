@@ -2,13 +2,13 @@ from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime,
     Enum, ForeignKey, Index, String, text, Computed
 , func)
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 try:
-    from ..custom_types import LtreeType
+    from ..custom_types import LtreeType, UUID
 except ImportError:
     # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+    from computor_backend.custom_types import LtreeType, UUID
 
 from .base import Base
 

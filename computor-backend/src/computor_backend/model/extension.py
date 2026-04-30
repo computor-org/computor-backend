@@ -12,9 +12,14 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
+try:
+    from ..custom_types import UUID
+except ImportError:
+    # Fallback for Alembic context
+    from computor_backend.custom_types import UUID
 
 from .base import Base
 

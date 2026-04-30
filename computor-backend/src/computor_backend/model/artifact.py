@@ -2,9 +2,15 @@ from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float,
     ForeignKey, Index, Integer, String, text, LargeBinary, UniqueConstraint, func
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, Mapped
 from typing import TYPE_CHECKING, List
+
+try:
+    from ..custom_types import UUID
+except ImportError:
+    # Fallback for Alembic context
+    from computor_backend.custom_types import UUID
 
 from .base import Base
 
