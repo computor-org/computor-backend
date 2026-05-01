@@ -7,7 +7,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from computor_client.endpoints.accounts import AccountsClient
 from computor_client.endpoints.authentication import AuthenticationClient
-from computor_client.endpoints.coder import CoderClient
 from computor_client.endpoints.course_content_kinds import CourseContentKindsClient
 from computor_client.endpoints.course_content_types import CourseContentTypesClient
 from computor_client.endpoints.course_contents import CourseContentsClient
@@ -56,7 +55,6 @@ from computor_client.endpoints.workspaces import WorkspacesClient
 __all__ = [
     "AccountsClient",
     "AuthenticationClient",
-    "CoderClient",
     "CourseContentKindsClient",
     "CourseContentTypesClient",
     "CourseContentsClient",

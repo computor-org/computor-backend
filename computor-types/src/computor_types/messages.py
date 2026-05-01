@@ -174,11 +174,46 @@ class MessageList(BaseEntityList):
     model_config = ConfigDict(from_attributes=True)
 
 class MessageQuery(ListQuery):
+    """Query parameters for ``GET /messages``.
+
+    Target-id filters walk FK relations *down* to children: filtering by
+    ``course_id=X`` returns every message reachable through course X
+    (messages with ``course_id=X`` directly, plus messages on any
+    course_content / course_group / submission_group / course_member of
+    that course). Pair with ``scope=`` to restrict to a specific target
+    type, e.g. ``course_id=X & scope=submission_group`` for "every
+    submission-group message in course X".
+
+    Walk targets:
+
+    * ``organization_id`` → course_family, course, course_content,
+      course_group, submission_group, course_member of that organization.
+    * ``course_family_id`` → course, course_content, course_group,
+      submission_group, course_member of that course_family.
+    * ``course_id`` → course_content, course_group, submission_group,
+      course_member of that course.
+    * ``course_content_id`` → submission_group of that course_content.
+    * ``course_group_id`` → course_member of that course_group.
+    * ``submission_group_id`` → course_member of that submission_group
+      (via SubmissionGroupMember).
+
+    Strict targets (no children):
+
+    * ``course_member_id`` — direct messages to a course_member.
+    * ``user_id`` — direct messages to a user.
+
+    Permission filtering (``MessagePermissionHandler``) runs in addition
+    to these filters, so the walked set is always narrowed to what the
+    caller is actually allowed to read.
+    """
+
     id: Optional[str] = None
     parent_id: Optional[str] = None
     author_id: Optional[str] = None
 
-    # Target filters
+    # Target filters — parent ids walk down to children, leaf ids
+    # (``course_member_id``, ``user_id``) match strictly. See class
+    # docstring for the full hierarchy.
     organization_id: Optional[str] = None
     course_family_id: Optional[str] = None
     course_id: Optional[str] = None
@@ -188,8 +223,6 @@ class MessageQuery(ListQuery):
     course_member_id: Optional[str] = None
     user_id: Optional[str] = None
 
-    # Special parameter: when True, returns ALL messages related to the course (any target type)
-    course_id_all_messages: Optional[bool] = None
     # Filter by message scope (e.g., "global", "organization", "course", "course_content", "submission_group")
     scope: Optional[MessageScope] = None
 

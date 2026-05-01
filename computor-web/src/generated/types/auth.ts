@@ -20,6 +20,22 @@ export interface CoderLoginRequest {
   redirect_url?: string | null;
 }
 
+/**
+ * Query parameters for updating organization token.
+ */
+export interface OrganizationUpdateTokenQuery {
+  /** Token type (e.g., 'gitlab', 'github') */
+  type: string;
+}
+
+/**
+ * Payload for updating organization provider token.
+ */
+export interface OrganizationUpdateTokenUpdate {
+  /** Provider access token */
+  token: string;
+}
+
 export interface AuthConfig {
 }
 
@@ -183,39 +199,6 @@ export interface TokenRefreshResponse {
   refresh_token?: string | null;
 }
 
-export interface GradingAuthor {
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
-/**
- * Alternative authentication via external provider for password initialization.
- */
-export interface ProviderAuthCredentials {
-  /** Authentication method */
-  method: "gitlab_pat";
-  /** Provider-specific credentials */
-  credentials: GitLabPATCredentials;
-}
-
-/**
- * Query parameters for updating organization token.
- */
-export interface OrganizationUpdateTokenQuery {
-  /** Token type (e.g., 'gitlab', 'github') */
-  type: string;
-}
-
-/**
- * Payload for updating organization provider token.
- */
-export interface OrganizationUpdateTokenUpdate {
-  /** Provider access token */
-  token: string;
-}
-
 /**
  * Author information for a message.
  */
@@ -238,6 +221,23 @@ export interface MessageAuthorCourseMember {
   course_role_id: string;
   /** Course ID */
   course_id: string;
+}
+
+export interface GradingAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
+/**
+ * Alternative authentication via external provider for password initialization.
+ */
+export interface ProviderAuthCredentials {
+  /** Authentication method */
+  method: "gitlab_pat";
+  /** Provider-specific credentials */
+  credentials: GitLabPATCredentials;
 }
 
 /**

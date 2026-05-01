@@ -15,21 +15,30 @@ export class MessagesClient extends BaseEndpointClient {
   /**
    * List Messages
    * List messages with read status.
-   * Supports filtering by:
-   * - unread: True = unread only, False = read only, None = all
-   * - created_after/created_before: Datetime boundaries
-   * - tags: List of tags to filter by in title (e.g., "ai", "ai-help", "review")
-   * - tags_match_all: True = must match ALL tags, False = match ANY tag
-   * - tag_scope: Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
+   * Target-id filters (``organization_id``, ``course_family_id``,
+   * ``course_id``, ``course_content_id``, ``course_group_id``,
+   * ``submission_group_id``) walk FK relations down to children. For
+   * example, ``course_id=X`` returns every message reachable through
+   * course X — directly on the course plus on any course_content /
+   * course_group / submission_group / course_member of that course. Pair
+   * with ``scope=`` to restrict to a specific target type, e.g.
+   * ``course_id=X & scope=submission_group``. Leaf targets
+   * (``course_member_id``, ``user_id``) match strictly. See
+   * ``MessageQuery`` for the full walk hierarchy.
+   * Other filters:
+   * - ``unread``: True = unread only, False = read only, None = all
+   * - ``created_after`` / ``created_before``: datetime boundaries
+   * - ``tags``: list of tags to filter by in title (e.g., "ai", "ai-help", "review")
+   * - ``tags_match_all``: True = must match ALL tags, False = match ANY tag
+   * - ``tag_scope``: tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
    */
-  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseIdAllMessages, courseMemberId, createdAfter, createdBefore, id, limit, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseIdAllMessages?: boolean | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
+  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, createdAfter, createdBefore, id, limit, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
     const queryParams: Record<string, unknown> = {
       author_id: authorId,
       course_content_id: courseContentId,
       course_family_id: courseFamilyId,
       course_group_id: courseGroupId,
       course_id: courseId,
-      course_id_all_messages: courseIdAllMessages,
       course_member_id: courseMemberId,
       created_after: createdAfter,
       created_before: createdBefore,

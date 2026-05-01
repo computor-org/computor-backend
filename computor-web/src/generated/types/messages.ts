@@ -111,6 +111,39 @@ export interface MessageList {
   scope: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user";
 }
 
+/**
+ * Query parameters for ``GET /messages``.
+ * 
+ * Target-id filters walk FK relations *down* to children: filtering by
+ * ``course_id=X`` returns every message reachable through course X
+ * (messages with ``course_id=X`` directly, plus messages on any
+ * course_content / course_group / submission_group / course_member of
+ * that course). Pair with ``scope=`` to restrict to a specific target
+ * type, e.g. ``course_id=X & scope=submission_group`` for "every
+ * submission-group message in course X".
+ * 
+ * Walk targets:
+ * 
+ * * ``organization_id`` → course_family, course, course_content,
+ * course_group, submission_group, course_member of that organization.
+ * * ``course_family_id`` → course, course_content, course_group,
+ * submission_group, course_member of that course_family.
+ * * ``course_id`` → course_content, course_group, submission_group,
+ * course_member of that course.
+ * * ``course_content_id`` → submission_group of that course_content.
+ * * ``course_group_id`` → course_member of that course_group.
+ * * ``submission_group_id`` → course_member of that submission_group
+ * (via SubmissionGroupMember).
+ * 
+ * Strict targets (no children):
+ * 
+ * * ``course_member_id`` — direct messages to a course_member.
+ * * ``user_id`` — direct messages to a user.
+ * 
+ * Permission filtering (``MessagePermissionHandler``) runs in addition
+ * to these filters, so the walked set is always narrowed to what the
+ * caller is actually allowed to read.
+ */
 export interface MessageQuery {
   skip?: number | null;
   limit?: number | null;
@@ -125,7 +158,6 @@ export interface MessageQuery {
   submission_group_id?: string | null;
   course_member_id?: string | null;
   user_id?: string | null;
-  course_id_all_messages?: boolean | null;
   scope?: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user" | null;
   /** Filter messages created at or after this datetime (inclusive) */
   created_after?: string | null;
