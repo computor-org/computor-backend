@@ -208,37 +208,83 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
         if params.user_id is not None:
             query = query.filter(Message.user_id == params.user_id)
 
-        # Scope filter (filter by message scope type)
+        # Scope filter — match by *effective* scope, i.e. the most-specific
+        # target id set on the message. A submission_group message has
+        # parent ids (course_content_id, course_id, …) denormalised on the
+        # row, so a naive ``course_content_id IS NOT NULL`` check would
+        # leak it into ``scope=course_content``. Mirror the priority chain
+        # in MessageGet.scope: for ``scope=X`` require X's column NOT NULL
+        # AND every more-specific column IS NULL.
         if params.scope is not None:
-            if params.scope == "global":
-                query = query.filter(
-                    and_(
-                        Message.organization_id.is_(None),
-                        Message.course_family_id.is_(None),
-                        Message.course_id.is_(None),
-                        Message.course_content_id.is_(None),
-                        Message.course_group_id.is_(None),
-                        Message.submission_group_id.is_(None),
-                        Message.course_member_id.is_(None),
-                        Message.user_id.is_(None),
-                    )
-                )
-            elif params.scope == "organization":
-                query = query.filter(Message.organization_id.isnot(None))
-            elif params.scope == "course_family":
-                query = query.filter(Message.course_family_id.isnot(None))
-            elif params.scope == "course":
-                query = query.filter(Message.course_id.isnot(None))
-            elif params.scope == "course_content":
-                query = query.filter(Message.course_content_id.isnot(None))
-            elif params.scope == "course_group":
-                query = query.filter(Message.course_group_id.isnot(None))
-            elif params.scope == "submission_group":
-                query = query.filter(Message.submission_group_id.isnot(None))
-            elif params.scope == "course_member":
-                query = query.filter(Message.course_member_id.isnot(None))
-            elif params.scope == "user":
+            if params.scope == "user":
                 query = query.filter(Message.user_id.isnot(None))
+            elif params.scope == "course_member":
+                query = query.filter(and_(
+                    Message.course_member_id.isnot(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "submission_group":
+                query = query.filter(and_(
+                    Message.submission_group_id.isnot(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "course_group":
+                query = query.filter(and_(
+                    Message.course_group_id.isnot(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "course_content":
+                query = query.filter(and_(
+                    Message.course_content_id.isnot(None),
+                    Message.course_group_id.is_(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "course":
+                query = query.filter(and_(
+                    Message.course_id.isnot(None),
+                    Message.course_content_id.is_(None),
+                    Message.course_group_id.is_(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "course_family":
+                query = query.filter(and_(
+                    Message.course_family_id.isnot(None),
+                    Message.course_id.is_(None),
+                    Message.course_content_id.is_(None),
+                    Message.course_group_id.is_(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "organization":
+                query = query.filter(and_(
+                    Message.organization_id.isnot(None),
+                    Message.course_family_id.is_(None),
+                    Message.course_id.is_(None),
+                    Message.course_content_id.is_(None),
+                    Message.course_group_id.is_(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
+            elif params.scope == "global":
+                query = query.filter(and_(
+                    Message.organization_id.is_(None),
+                    Message.course_family_id.is_(None),
+                    Message.course_id.is_(None),
+                    Message.course_content_id.is_(None),
+                    Message.course_group_id.is_(None),
+                    Message.submission_group_id.is_(None),
+                    Message.course_member_id.is_(None),
+                    Message.user_id.is_(None),
+                ))
 
         # Datetime boundary filters
         if params.created_after is not None:
