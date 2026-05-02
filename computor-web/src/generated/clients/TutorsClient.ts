@@ -261,9 +261,14 @@ export class TutorsClient extends BaseEndpointClient {
   /**
    * Download Tutor Test Input
    * Download tutor test input files as a ZIP.
-   * Used by the testing worker to fetch the tutor's uploaded code
-   * for test execution.
-   * **Permissions**: Only the test owner or admin can download input.
+   * Called by the testing worker (service account, ``X-API-Token``)
+   * to fetch the tutor's uploaded code for test execution. Service
+   * accounts bypass the per-user ownership check because the worker
+   * is never the same user as the tutor who created the test —
+   * rejecting it here breaks the whole testing pipeline (workflow
+   * can't fetch input → no artifacts → user later sees a confusing
+   * 404 on artifacts/download).
+   * **Permissions**: test owner, admin, or service account.
    */
   async downloadTutorTestInputTutorsTestsTestIdInputDownloadGet({ testId }: { testId: string }): Promise<void> {
     return this.client.get<void>(this.buildPath('tests', testId, 'input', 'download'));

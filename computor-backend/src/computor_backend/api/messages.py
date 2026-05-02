@@ -134,12 +134,24 @@ async def list_messages(
 ):
     """List messages with read status.
 
-    Supports filtering by:
-    - unread: True = unread only, False = read only, None = all
-    - created_after/created_before: Datetime boundaries
-    - tags: List of tags to filter by in title (e.g., "ai", "ai-help", "review")
-    - tags_match_all: True = must match ALL tags, False = match ANY tag
-    - tag_scope: Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
+    Target-id filters (``organization_id``, ``course_family_id``,
+    ``course_id``, ``course_content_id``, ``course_group_id``,
+    ``submission_group_id``) walk FK relations down to children. For
+    example, ``course_id=X`` returns every message reachable through
+    course X — directly on the course plus on any course_content /
+    course_group / submission_group / course_member of that course. Pair
+    with ``scope=`` to restrict to a specific target type, e.g.
+    ``course_id=X & scope=submission_group``. Leaf targets
+    (``course_member_id``, ``user_id``) match strictly. See
+    ``MessageQuery`` for the full walk hierarchy.
+
+    Other filters:
+
+    - ``unread``: True = unread only, False = read only, None = all
+    - ``created_after`` / ``created_before``: datetime boundaries
+    - ``tags``: list of tags to filter by in title (e.g., "ai", "ai-help", "review")
+    - ``tags_match_all``: True = must match ALL tags, False = match ANY tag
+    - ``tag_scope``: tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
     """
     # Merge the explicit tags parameter into params (FastAPI doesn't parse List from Pydantic Field)
     if tags is not None:
