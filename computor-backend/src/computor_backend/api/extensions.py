@@ -19,7 +19,8 @@ from fastapi import (
     Query,
     UploadFile,
 )
-from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 from sqlalchemy import func
@@ -330,10 +331,7 @@ async def publish_extension_version(
         object_key=new_version.object_key,
     )
 
-@extensions_router.get(
-    "/{extension_identity}/download",
-    status_code=302,
-)
+@extensions_router.get("/{extension_identity}/download")
 async def download_extension(
     extension_identity: str,
     version: Optional[str] = Query(None, description="Version specifier or 'latest'"),
@@ -358,12 +356,29 @@ async def download_extension(
     if not matched:
         raise NotFoundException("No matching extension version found")
 
-    presigned = await storage_service.generate_presigned_url(
-        object_key=matched.object_key,
-        method="GET",
-    )
+    # Stream the VSIX bytes through the API rather than redirecting to a
+    # presigned MinIO URL — the docker-internal ``minio:9000`` host the
+    # SDK signs is not externally reachable, and the host is part of the
+    # SigV4 signature so it can't be rewritten post-signing.
+    stream, _meta = await storage_service.get_file_stream(matched.object_key)
 
-    return RedirectResponse(url=presigned.url, status_code=302)
+    def _close_stream() -> None:
+        try:
+            stream.close()
+        finally:
+            stream.release_conn()
+
+    safe_filename = f"{_sanitize_segment(publisher)}.{_sanitize_segment(name)}-{matched.version}.vsix"
+
+    return StreamingResponse(
+        stream.stream(64 * 1024),
+        media_type=matched.content_type or "application/octet-stream",
+        headers={
+            "Content-Length": str(matched.size),
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
+        },
+        background=BackgroundTask(_close_stream),
+    )
 
 @extensions_router.get(
     "/{extension_identity}/versions",
