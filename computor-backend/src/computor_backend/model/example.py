@@ -6,15 +6,14 @@ Each example is stored in its own directory with a flat structure.
 """
 
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ARRAY, ForeignKey, text, Integer
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
 try:
-    from ..custom_types import LtreeType
+    from ..custom_types import LtreeType, UUID
 except ImportError:
     # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+    from computor_backend.custom_types import LtreeType, UUID
 
 from .base import Base
 

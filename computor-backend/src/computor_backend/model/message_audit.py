@@ -2,9 +2,14 @@ from sqlalchemy import (
     BigInteger, Column, DateTime, ForeignKey,
     Index, String, text, Enum as SQLEnum
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
+
+try:
+    from ..custom_types import UUID
+except ImportError:
+    # Fallback for Alembic context
+    from computor_backend.custom_types import UUID
 
 from .base import Base
 
