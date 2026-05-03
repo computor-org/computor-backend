@@ -94,9 +94,14 @@ class PyExecutor(InterpretedExecutor):
 
         This wrapper runs in a subprocess and communicates results via JSON file.
         """
+        # ``script_path`` and ``result_path`` are pre-translated by
+        # ``InterpretedExecutor.execute`` to the path the wrapper will
+        # see at runtime (host abs in local mode, ``/sandbox/...`` in
+        # docker mode). Same for ``self._runtime_workdir`` — it's
+        # ``self.working_dir`` locally, ``/sandbox`` in docker.
         escaped_script = self.escape_path(script_path)
         escaped_result = self.escape_path(result_path)
-        escaped_workdir = self.escape_path(self.working_dir)
+        escaped_workdir = self.escape_path(self._runtime_workdir)
 
         lines = [
             "#!/usr/bin/env python3",

@@ -16,7 +16,7 @@
 #   docker build -f docker/sandbox-python/Dockerfile -t ct-sandbox:python .
 # (run from the repo root — the COPY needs ``computor-testing/requirements.txt``)
 
-FROM python:3.10-slim AS deps
+FROM python:3.13-slim AS deps
 
 # Build deps for numpy/scipy/sympy native wheels. Discarded in the
 # final stage via multi-stage copy.
@@ -36,7 +36,7 @@ RUN python -m venv /opt/sandbox-venv \
  && /opt/sandbox-venv/bin/pip install --no-cache-dir -r /build/requirements.txt
 
 
-FROM python:3.10-slim
+FROM python:3.13-slim
 
 # Runtime libs needed by the wheels we copy in. matplotlib needs
 # libfreetype6 + libpng16 (when not using --no-binary), and scipy

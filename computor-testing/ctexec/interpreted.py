@@ -20,16 +20,24 @@ from .resources import make_preexec_fn
 # Pluggable runner backend. Default is ``LocalRunner`` (direct subprocess
 # in this process's namespace), behaviour-identical to the previous
 # ``subprocess.run`` call. ``CT_RUNNER_BACKEND=docker`` swaps in
-# ``DockerRunner`` — but the wrapper-script path mapping still has to
-# land before that becomes a working end-to-end flip.
+# ``DockerRunner`` — at which point wrapper + result files have to live
+# under ``working_dir`` (the bind-mount target) and the wrapper script's
+# baked-in paths have to be the in-container ``/sandbox/<basename>``
+# rather than the host path.
 try:
     from sandbox.backends import get_runner
-    from sandbox.config import RunnerSettings
+    from sandbox.config import RunnerSettings, RunnerBackend
     _RUNNER_AVAILABLE = True
 except ImportError:  # pragma: no cover - fallback if sandbox pkg missing
     get_runner = None  # type: ignore[assignment]
     RunnerSettings = None  # type: ignore[assignment]
+    RunnerBackend = None  # type: ignore[assignment]
     _RUNNER_AVAILABLE = False
+
+
+# Bind-mount target inside ``ct-sandbox:*`` containers. Must match
+# ``DockerRunner.run`` in ``sandbox/backends.py``.
+_DOCKER_SANDBOX_DIR = "/sandbox"
 
 
 class InterpretedExecutor(BaseExecutor):
@@ -58,6 +66,33 @@ class InterpretedExecutor(BaseExecutor):
     ):
         super().__init__(working_dir, timeout, use_safe_env, check_runtime, resource_limits=resource_limits)
         self._temp_files: List[str] = []
+        # Set per-execute(), reflecting the current backend (host
+        # ``working_dir`` for local, ``/sandbox`` for docker). Subclass
+        # ``_build_wrapper_script`` may read this for chdir/sys.path.
+        self._runtime_workdir: str = self.working_dir or ""
+
+    def _to_runtime_path(self, host_path: str) -> str:
+        """Map a host path to what the runtime (local subprocess /
+        docker container) will see when ``execute`` runs.
+
+        For ``LocalRunner``, runtime == host. For ``DockerRunner``, the
+        container only sees ``cwd`` mounted at ``/sandbox``, so any host
+        path that lives under ``working_dir`` is rewritten to its
+        ``/sandbox/<relative>`` equivalent. Paths outside ``working_dir``
+        are returned unchanged — the wrapper builder needs to make sure
+        it doesn't reach for such paths in docker mode.
+        """
+        if not host_path:
+            return host_path
+        if self._runtime_workdir == self.working_dir or not self.working_dir:
+            return host_path
+        try:
+            rel = os.path.relpath(host_path, self.working_dir)
+        except ValueError:
+            return host_path
+        if rel.startswith(".."):
+            return host_path
+        return os.path.join(self._runtime_workdir, rel)
 
     @abstractmethod
     def _get_interpreter_command(self) -> List[str]:
@@ -145,28 +180,53 @@ class InterpretedExecutor(BaseExecutor):
         else:
             source_path = ""
 
+        if not _RUNNER_AVAILABLE:
+            raise ExecutionError(
+                "sandbox.backends is required but unavailable. "
+                "Install the sandbox package or restore PYTHONPATH."
+            )
+
+        runner_settings = RunnerSettings.from_environment()
+        is_docker = runner_settings.backend == RunnerBackend.DOCKER
+
+        # In docker mode the wrapper + result file MUST live under
+        # ``working_dir`` because that's the only path bind-mounted
+        # into the container (``cwd:/sandbox`` in DockerRunner). In
+        # local mode this is just a slight tidy-up — tempfiles go in
+        # the working dir alongside the script instead of /tmp; both
+        # locations get cleaned up the same way.
+        tempfile_dir = self.working_dir or None
+
         # Create temp files
         wrapper_path = None
         result_path = None
 
         try:
-            # Create result file path
-            result_fd, result_path = tempfile.mkstemp(suffix=".json")
+            result_fd, result_path = tempfile.mkstemp(suffix=".json", dir=tempfile_dir)
             os.close(result_fd)
             self._temp_files.append(result_path)
 
-            # Create wrapper script
             ext = self._get_wrapper_extension()
-            wrapper_fd, wrapper_path = tempfile.mkstemp(suffix=ext)
+            wrapper_fd, wrapper_path = tempfile.mkstemp(suffix=ext, dir=tempfile_dir)
             self._temp_files.append(wrapper_path)
 
+            # Translate paths to what the runtime (host vs container)
+            # will actually see. ``script_path``, ``result_path``, and
+            # ``self.working_dir`` may all be referenced by the wrapper
+            # body, so the wrapper-builder gets pre-translated values.
+            self._runtime_workdir = (
+                _DOCKER_SANDBOX_DIR if is_docker else self.working_dir
+            )
+            runtime_script = self._to_runtime_path(source_path) if source_path else ""
+            runtime_result = self._to_runtime_path(result_path)
+
             wrapper_code = self._build_wrapper_script(
-                script_path=source_path,
+                script_path=runtime_script,
                 variables_to_extract=variables_to_extract,
                 setup_code=setup_code,
                 teardown_code=teardown_code,
                 input_data=input_data,
-                result_path=result_path,
+                result_path=runtime_result,
             )
             with os.fdopen(wrapper_fd, "w") as f:
                 f.write(wrapper_code)
@@ -177,17 +237,11 @@ class InterpretedExecutor(BaseExecutor):
             # caps are still applied via ``preexec_fn`` for the local
             # path; ``DockerRunner`` ignores it and uses container
             # flags. See ``sandbox/backends.py``.
-            cmd = self._get_interpreter_command() + [wrapper_path]
+            cmd = self._get_interpreter_command() + [self._to_runtime_path(wrapper_path)]
             env = self._get_env()
             preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
 
-            if not _RUNNER_AVAILABLE:
-                raise ExecutionError(
-                    "sandbox.backends is required but unavailable. "
-                    "Install the sandbox package or restore PYTHONPATH."
-                )
-
-            runner = get_runner(RunnerSettings.from_environment())
+            runner = get_runner(runner_settings)
 
             start_time = time.perf_counter()
             run_result = runner.run(

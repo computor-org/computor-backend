@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     wget \
     curl \
+    ca-certificates \
+    gnupg \
     # Python build dependencies
     libssl-dev \
     zlib1g-dev \
@@ -29,6 +31,20 @@ RUN apt-get update && apt-get install -y \
     g++ \
     gfortran \
     && rm -rf /var/lib/apt/lists/*
+
+# Docker CLI — used when CT_RUNNER_BACKEND=docker. The host's docker
+# socket is bind-mounted at runtime (see docker-compose.*.yaml) so this
+# CLI talks to the host daemon rather than running its own. No daemon
+# is started in this image.
+RUN install -m 0755 -d /etc/apt/keyrings \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+ && chmod a+r /etc/apt/keyrings/docker.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" \
+        > /etc/apt/sources.list.d/docker.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends docker-ce-cli \
+ && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.13 for test execution (alongside 3.10 for worker)
 RUN wget -q https://www.python.org/ftp/python/3.13.1/Python-3.13.1.tgz && \
