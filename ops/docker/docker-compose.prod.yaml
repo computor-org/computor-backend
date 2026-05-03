@@ -119,6 +119,11 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
+      args:
+        # Host's docker group GID — let the unprivileged worker user
+        # talk to the bind-mounted /var/run/docker.sock. ``startup.sh``
+        # auto-detects this. Falls back to 999 inside the Dockerfile.
+        DOCKER_GID: ${DOCKER_GID}
     networks:
       - computor-network
     restart: unless-stopped

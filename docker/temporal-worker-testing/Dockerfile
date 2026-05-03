@@ -69,8 +69,18 @@ RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-l
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Create worker user
-RUN useradd -ms /bin/bash worker
+# Create worker user. The build arg ``DOCKER_GID`` puts it in a group
+# matching the host's ``docker`` group GID so the bind-mounted
+# /var/run/docker.sock from docker-compose.{dev,prod}.yaml is usable
+# by the unprivileged ``worker`` user. ``startup.sh`` auto-detects the
+# host GID; the compose ``build: args:`` block forwards it. Falls back
+# to ``999`` (Debian's default ``docker`` group GID) for setups that
+# don't pre-set DOCKER_GID — the worker just won't be able to talk to
+# the daemon in that case, which surfaces as a clean ``permission
+# denied`` rather than a silent fall-back to local mode.
+ARG DOCKER_GID=999
+RUN groupadd -g "${DOCKER_GID}" docker_host \
+ && useradd -ms /bin/bash -G docker_host worker
 WORKDIR /home/worker
 
 # Copy computor packages as root
