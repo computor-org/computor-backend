@@ -141,13 +141,13 @@ services:
       - PYTHON_TEST_VERSION=${PYTHON_TEST_VERSION:-3.13}
       - PYTHON_TEST_REQUIREMENTS=${PYTHON_TEST_REQUIREMENTS:-}
       - R_LIBS_USER=/home/worker/.local/lib/R/library
-      # Sandbox runner (LocalRunner default = no behaviour change).
-      # Flip CT_RUNNER_BACKEND=docker in .env to spawn each test inside
-      # the ct-sandbox image; the host docker socket is mounted above.
-      - CT_RUNNER_BACKEND=${CT_RUNNER_BACKEND:-local}
-      - CT_RUNNER_DOCKER_IMAGE=${CT_RUNNER_DOCKER_IMAGE:-ct-sandbox:python}
-      - CT_RUNNER_TIMEOUT=${CT_RUNNER_TIMEOUT:-30}
-      - CT_RUNNER_MEMORY_MB=${CT_RUNNER_MEMORY_MB:-256}
+      # Sandbox runner backend is configured per-Service via
+      # ``Service.config["runner"]`` (see ServiceRunnerConfig in
+      # computor-types/services.py). The testing worker translates
+      # that into per-subprocess CT_RUNNER_* env at execute time;
+      # nothing to set globally here. The host docker socket above
+      # is what lets the worker spawn ct-sandbox containers when a
+      # service has ``runner.backend = "docker"``.
     depends_on:
       - temporal
       - postgres

@@ -4,10 +4,72 @@ Service DTOs for service account management.
 
 from __future__ import annotations
 from datetime import datetime
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, Optional, Dict, Any
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
+
+
+RunnerBackend = Literal["local", "docker"]
+
+
+class ServiceRunnerConfig(BaseModel):
+    """Per-service runner configuration for student-code execution.
+
+    Lives under ``Service.config["runner"]`` and is read by the
+    ``ComputorTestingBackend`` when spawning ``computor-test``. ``local``
+    executes student code in a host subprocess (the testing-worker
+    container's namespace). ``docker`` spawns a fresh ``ct-sandbox`` /
+    similar container per test, with hardening flags applied by the
+    DockerRunner in ``computor-testing/sandbox/backends.py``.
+
+    Validated by ``ServiceType.schema`` on the testing service-type rows;
+    UI/API rejects writes that don't match this shape.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: RunnerBackend = Field(
+        "local",
+        description=(
+            "Execution backend. ``local`` runs in the worker's own "
+            "namespace; ``docker`` spawns a fresh container per test."
+        ),
+    )
+    docker_image: Optional[str] = Field(
+        None,
+        description=(
+            "Container image used when ``backend=docker`` "
+            "(e.g. ``ct-sandbox:python``). Required if backend is docker."
+        ),
+    )
+    timeout_seconds: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Per-test timeout in seconds. Falls back to executor defaults when null.",
+    )
+    memory_mb: Optional[int] = Field(
+        None,
+        gt=0,
+        description="Memory cap (MiB) applied to the docker container. Ignored for local.",
+    )
+    cpus: Optional[float] = Field(
+        None,
+        gt=0,
+        description="CPU quota for the docker container. Ignored for local.",
+    )
+    pids_limit: Optional[int] = Field(
+        None,
+        gt=0,
+        description="Max number of PIDs inside the docker container. Ignored for local.",
+    )
+    network_enabled: Optional[bool] = Field(
+        None,
+        description=(
+            "When false (the default for docker), the sandbox container "
+            "is started with ``--network=none``."
+        ),
+    )
 
 
 class ServiceCreate(BaseModel):

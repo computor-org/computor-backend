@@ -16,6 +16,40 @@ import Pyro5.errors
 logger = logging.getLogger(__name__)
 
 
+def _runner_config_to_env(runner_cfg: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    """Translate the ``runner`` block from ``Service.config`` into the
+    ``CT_RUNNER_*`` env vars consumed by ``computor-testing``'s
+    ``RunnerSettings.from_environment()``.
+
+    Source of truth for the shape is ``ServiceRunnerConfig`` in
+    ``computor-types/services.py``; the JSON Schema mirror lives on the
+    ``testing.temporal`` ``ServiceType.schema`` row. Empty / None values
+    are dropped so executor defaults still apply.
+    """
+    if not runner_cfg or not isinstance(runner_cfg, dict):
+        return {}
+
+    mapping = {
+        "backend": "CT_RUNNER_BACKEND",
+        "docker_image": "CT_RUNNER_DOCKER_IMAGE",
+        "timeout_seconds": "CT_RUNNER_TIMEOUT",
+        "memory_mb": "CT_RUNNER_MEMORY_MB",
+        "cpus": "CT_RUNNER_CPUS",
+        "pids_limit": "CT_RUNNER_MAX_PROCESSES",
+        "network_enabled": "CT_RUNNER_NETWORK_ENABLED",
+    }
+    out: Dict[str, str] = {}
+    for key, env_name in mapping.items():
+        value = runner_cfg.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            out[env_name] = "true" if value else "false"
+        else:
+            out[env_name] = str(value)
+    return out
+
+
 class TestingBackend(ABC):
     """Abstract base class for testing backends."""
 
@@ -306,6 +340,14 @@ class ComputorTestingBackend(TestingBackend):
         cmd = " ".join(cmd_parts)
         logger.info(f"Executing computor-test command: {cmd}")
 
+        # Runner config (Service.config["runner"]) → CT_RUNNER_* env on
+        # the computor-test subprocess. This is how a service can be
+        # configured to run student code in docker (per-test sandbox
+        # container) vs locally (in-process subprocess) without any
+        # global / .env knobs.
+        subprocess_env = os.environ.copy()
+        subprocess_env.update(_runner_config_to_env(backend_properties.get("runner")))
+
         try:
             # Execute test command
             result = subprocess.run(
@@ -313,7 +355,8 @@ class ComputorTestingBackend(TestingBackend):
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=backend_properties.get("timeout_seconds", 300)
+                timeout=backend_properties.get("timeout_seconds", 300),
+                env=subprocess_env,
             )
 
             # Log output for debugging
