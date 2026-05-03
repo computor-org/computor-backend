@@ -7,7 +7,6 @@ extracting variables via JSON serialization, and handling I/O.
 
 import json
 import os
-import subprocess
 import tempfile
 import time
 from abc import abstractmethod
@@ -17,6 +16,20 @@ from .base import BaseExecutor, ExecutorResult
 from .environment import get_safe_env
 from .exceptions import ExecutionError, ExecutionTimeoutError
 from .resources import make_preexec_fn
+
+# Pluggable runner backend. Default is ``LocalRunner`` (direct subprocess
+# in this process's namespace), behaviour-identical to the previous
+# ``subprocess.run`` call. ``CT_RUNNER_BACKEND=docker`` swaps in
+# ``DockerRunner`` — but the wrapper-script path mapping still has to
+# land before that becomes a working end-to-end flip.
+try:
+    from sandbox.backends import get_runner
+    from sandbox.config import RunnerSettings
+    _RUNNER_AVAILABLE = True
+except ImportError:  # pragma: no cover - fallback if sandbox pkg missing
+    get_runner = None  # type: ignore[assignment]
+    RunnerSettings = None  # type: ignore[assignment]
+    _RUNNER_AVAILABLE = False
 
 
 class InterpretedExecutor(BaseExecutor):
@@ -158,38 +171,49 @@ class InterpretedExecutor(BaseExecutor):
             with os.fdopen(wrapper_fd, "w") as f:
                 f.write(wrapper_code)
 
-            # Execute in subprocess
+            # Execute via the configured Runner backend. Default
+            # ``LocalRunner`` is a thin ``subprocess.run`` wrapper —
+            # behaviour-identical to the prior inline call. Resource
+            # caps are still applied via ``preexec_fn`` for the local
+            # path; ``DockerRunner`` ignores it and uses container
+            # flags. See ``sandbox/backends.py``.
             cmd = self._get_interpreter_command() + [wrapper_path]
             env = self._get_env()
             preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
 
-            start_time = time.perf_counter()
-            try:
-                proc = subprocess.run(
-                    cmd,
-                    cwd=self.working_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    env=env,
-                    input=input_data,
-                    preexec_fn=preexec_fn,
+            if not _RUNNER_AVAILABLE:
+                raise ExecutionError(
+                    "sandbox.backends is required but unavailable. "
+                    "Install the sandbox package or restore PYTHONPATH."
                 )
-                duration = time.perf_counter() - start_time
-                timed_out = False
-                return_code = proc.returncode
 
-            except subprocess.TimeoutExpired as e:
-                duration = time.perf_counter() - start_time
+            runner = get_runner(RunnerSettings.from_environment())
+
+            start_time = time.perf_counter()
+            run_result = runner.run(
+                cmd=cmd,
+                stdin=input_data,
+                cwd=self.working_dir,
+                env=env,
+                timeout=self.timeout,
+                preexec_fn=preexec_fn,
+            )
+            duration = time.perf_counter() - start_time
+
+            if run_result.get("timed_out"):
                 return ExecutorResult(
                     success=False,
-                    stdout=e.stdout or "" if hasattr(e, "stdout") else "",
-                    stderr=e.stderr or "" if hasattr(e, "stderr") else "",
+                    stdout=run_result.get("stdout", ""),
+                    stderr=run_result.get("stderr", ""),
                     duration=duration,
                     timed_out=True,
                     error_message=f"Execution timed out after {self.timeout}s",
                     error_type="TimeoutError",
                 )
+
+            return_code = run_result.get("return_code", -1)
+            proc_stdout = run_result.get("stdout", "")
+            proc_stderr = run_result.get("stderr", "")
 
             # Read results from JSON file
             result_data = self._read_result_file(result_path)
@@ -197,8 +221,8 @@ class InterpretedExecutor(BaseExecutor):
             # Build ExecutorResult
             return ExecutorResult(
                 success=result_data.get("status") == "COMPLETED",
-                stdout=result_data.get("stdout", proc.stdout),
-                stderr=result_data.get("stderr", proc.stderr),
+                stdout=result_data.get("stdout", proc_stdout),
+                stderr=result_data.get("stderr", proc_stderr),
                 duration=result_data.get("exectime", duration),
                 return_code=return_code,
                 namespace=result_data.get("variables", {}),
