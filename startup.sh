@@ -208,6 +208,23 @@ if [ -f "docker/postgres-init/01-create-multiple-databases.sh" ]; then
     chmod +x docker/postgres-init/01-create-multiple-databases.sh
 fi
 
+# Build the ct-sandbox:python image used by services configured with
+# runner.backend=docker. Cheap when nothing changed (layer cache hit on
+# the deps stage); expensive on first run or when requirements.txt
+# changed. ``CT_SANDBOX_BUILD=skip`` opts out — useful in CI where the
+# image is pulled from a registry instead.
+if [ "${CT_SANDBOX_BUILD:-auto}" != "skip" ]; then
+    echo -e "\n${GREEN}Ensuring ct-sandbox:python image exists...${NC}"
+    if [ -f "docker/sandbox-python/Dockerfile" ]; then
+        docker build \
+            -f docker/sandbox-python/Dockerfile \
+            -t ct-sandbox:python \
+            "${SCRIPT_DIR}"
+    else
+        echo -e "  ${YELLOW}Skipped — docker/sandbox-python/Dockerfile not found${NC}"
+    fi
+fi
+
 # Start services
 echo -e "\n${GREEN}Starting Computor services...${NC}"
 echo "Command: docker compose $COMPOSE_FILES up $DOCKER_ARGS"
