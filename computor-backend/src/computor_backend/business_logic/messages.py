@@ -169,7 +169,7 @@ def create_message_with_author(
 
 def _check_global_write_permission(permissions: Principal) -> None:
     """Global messages (no target set) are admin-only."""
-    if not getattr(permissions, 'is_admin', False):
+    if not permissions.is_admin:
         raise ForbiddenException(
             detail="Only administrators can create global messages"
         )
@@ -229,7 +229,7 @@ def _check_course_group_write_permission(
     db: Session,
 ) -> None:
     """Course-group messages: course role >= _lecturer in the group's course."""
-    if getattr(permissions, "is_admin", False):
+    if permissions.is_admin:
         return
 
     course_group = db.query(CourseGroup).filter(CourseGroup.id == course_group_id).first()
@@ -264,7 +264,7 @@ def _check_submission_group_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
-    if getattr(permissions, "is_admin", False):
+    if permissions.is_admin:
         return
 
     # Check if user is a submission group member
@@ -317,7 +317,7 @@ def _check_course_content_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
-    if getattr(permissions, "is_admin", False):
+    if permissions.is_admin:
         return
 
     from computor_backend.model.course import CourseContent
@@ -358,7 +358,7 @@ def _check_course_write_permission(
     Raises:
         ForbiddenException: If user lacks permission
     """
-    if getattr(permissions, "is_admin", False):
+    if permissions.is_admin:
         return
 
     # Check if user has _lecturer or higher role in the course
