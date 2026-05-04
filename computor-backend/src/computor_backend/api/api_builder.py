@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -16,11 +17,11 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
 from computor_backend.permissions.principal import Principal
 from computor_types.base import EntityInterface
-from computor_backend.redis_cache import get_redis_client, get_cache
-from computor_backend.cache import Cache
-from aiocache import BaseCache
+from computor_backend.redis_cache import get_cache
 from fastapi import FastAPI, BackgroundTasks
 from fastapi import Response
+
+logger = logging.getLogger(__name__)
 
 class CrudRouter:
 
@@ -48,16 +49,11 @@ class CrudRouter:
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 entity: self.dto.create,
-                cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ) -> self.dto.get:
             entity_created = await create_db(permissions, db, entity, self.dto.model, self.dto.get, self.dto.post_create)
 
-            # Clear related cache entries (old async Redis cache)
-            await self._clear_entity_cache(cache, self.dto.model.__tablename__)
-
-            # Invalidate user views (new sync Cache system)
-            self._invalidate_user_views_for_entity(entity_created, db)
+            self._invalidate_caches_for(entity_created)
 
             for task in self.on_created:
                 background_tasks.add_task(task, entity_created, permissions)
@@ -67,54 +63,22 @@ class CrudRouter:
     
     def get(self):
         async def route(
-                permissions: Annotated[Principal, Depends(get_current_principal)], 
-                id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], 
+                permissions: Annotated[Principal, Depends(get_current_principal)],
+                id: UUID | str,
                 db: Session = Depends(get_db)
         ) -> self.dto.get:
-            # Check cache first
-            # cache_key = f"{self.dto.model.__tablename__}:get:{permissions.user_id}:{id}"
-            # cached_result = await cache.get(cache_key)
-            
-            # if cached_result:
-            #     return self.dto.get.model_validate_json(cached_result)
-            
-            result = await get_id_db(permissions, db, id, self.dto)
-            
-            # # Cache the result
-            # await cache.set(cache_key, result.model_dump_json(), ttl=self.dto.cache_ttl)
-            
-            return result
+            return await get_id_db(permissions, db, id, self.dto)
         return route
 
     def list(self):
         async def route(
-                permissions: Annotated[Principal, Depends(get_current_principal)], 
-                cache: Annotated[BaseCache, Depends(get_redis_client)], 
-                response: Response, 
-                params: Annotated[self.dto.query , Depends()],
+                permissions: Annotated[Principal, Depends(get_current_principal)],
+                response: Response,
+                params: Annotated[self.dto.query, Depends()],
                 db: Session = Depends(get_db)
         ) -> list[self.dto.list]:
-            # Generate cache key based on params and user permissions
-            # import hashlib
-            # params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
-            # cache_key = f"{self.dto.model.__tablename__}:list:{permissions.user_id}:{params_hash}"
-            
-            # cached_result = await cache.get(cache_key)
-            # if cached_result:
-            #     cached_data = cached_result
-            #     response.headers["X-Total-Count"] = str(cached_data.get("total", 0))
-            #     return [self.dto.list.model_validate(item) for item in cached_data.get("items", [])]
-            
             list_result, total = await list_db(permissions, db, params, self.dto)
             response.headers["X-Total-Count"] = str(total)
-            
-            # Cache the result
-            # cache_data = {
-            #     "items": [item.model_dump(mode='json') for item in list_result],
-            #     "total": total
-            # }
-            # await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
-            
             return list_result
         return route
     
@@ -124,16 +88,11 @@ class CrudRouter:
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 id: UUID | str,
                 entity: self.dto.update,
-                cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ) -> self.dto.get:
             entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update, self.dto.custom_permissions)
 
-            # Clear related cache entries (old async Redis cache)
-            await self._clear_entity_cache(cache, self.dto.model.__tablename__)
-
-            # Invalidate user views (new sync Cache system)
-            self._invalidate_user_views_for_entity(entity_updated, db)
+            self._invalidate_caches_for(entity_updated)
 
             for task in self.on_updated:
                 background_tasks.add_task(task, entity_updated, permissions)
@@ -146,25 +105,14 @@ class CrudRouter:
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 id: UUID | str,
-                cache: Annotated[BaseCache, Depends(get_redis_client)],
                 db: Session = Depends(get_db)
         ):
+            # Fetch the row before deletion so post_delete callbacks and cache
+            # invalidation can see its fields. Cheaper than racing the delete.
+            entity_deleted = await get_id_db(permissions, db, id, self.dto)
 
-            entity_deleted = None
-            if len(self.on_deleted) > 0:
-                entity_deleted = await get_id_db(permissions, db, id, self.dto)
+            self._invalidate_caches_for(entity_deleted)
 
-            # If we need to invalidate views, get entity first
-            if entity_deleted is None:
-                entity_deleted = await get_id_db(permissions, db, id, self.dto)
-
-            # Clear related cache entries (old async Redis cache)
-            await self._clear_entity_cache(cache, self.dto.model.__tablename__)
-
-            # Invalidate user views (new sync Cache system)
-            self._invalidate_user_views_for_entity(entity_deleted, db)
-
-            # Run on_deleted tasks (not on_created)
             for task in self.on_deleted:
                 if entity_deleted:
                     background_tasks.add_task(task, entity_deleted, permissions)
@@ -172,28 +120,22 @@ class CrudRouter:
             return await delete_db(permissions, db, id, self.dto.model)
 
         return route
-    
+
     def archive(self):
         if hasattr(self.dto.model, "archived_at"):
             async def route(
                     background_tasks: BackgroundTasks,
                     permissions: Annotated[Principal, Depends(get_current_principal)],
                     id: UUID | str,
-                    cache: Annotated[BaseCache, Depends(get_redis_client)],
                     db: Session = Depends(get_db)
             ):
-                # Get entity before archiving for cache invalidation and callbacks
                 entity_archived = await get_id_db(permissions, db, id, self.dto)
 
                 for task in self.on_archived:
                     background_tasks.add_task(task, entity_archived, permissions)
 
                 result = await archive_db(permissions, db, id, self.dto.model)
-
-                # Invalidate caches
-                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
-                self._invalidate_user_views_for_entity(entity_archived, db)
-
+                self._invalidate_caches_for(entity_archived)
                 return result
             return route
         else:
@@ -204,18 +146,11 @@ class CrudRouter:
             async def route(
                     permissions: Annotated[Principal, Depends(get_current_principal)],
                     id: UUID | str,
-                    cache: Annotated[BaseCache, Depends(get_redis_client)],
                     db: Session = Depends(get_db)
             ):
-                # Get entity before unarchiving for cache invalidation
                 entity = await get_id_db(permissions, db, id, self.dto)
-
                 result = await unarchive_db(permissions, db, id, self.dto.model)
-
-                # Invalidate caches
-                await self._clear_entity_cache(cache, self.dto.model.__tablename__)
-                self._invalidate_user_views_for_entity(entity, db)
-
+                self._invalidate_caches_for(entity)
                 return result
             return route
         else:
@@ -248,13 +183,13 @@ class CrudRouter:
         
         archive_fun = self.archive()
 
-        if archive_fun != None:
+        if archive_fun is not None:
             self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/archive", archive_fun, methods=["PATCH"],
                 status_code=status.HTTP_204_NO_CONTENT, name=f"{archive_fun.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
 
         unarchive_fun = self.unarchive()
 
-        if unarchive_fun != None:
+        if unarchive_fun is not None:
             self.router.add_api_route(f"/{{{CrudRouter.id_type}}}/unarchive", unarchive_fun, methods=["PATCH"],
                 status_code=status.HTTP_204_NO_CONTENT, name=f"Unarchive {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
         
@@ -269,131 +204,31 @@ class CrudRouter:
         
         return self
     
-    async def _clear_entity_cache(self, cache: BaseCache, table_name: str):
-        """Clear all cache entries for a given entity type"""
-        try:
-            # The cache parameter is actually the async Redis client from get_redis_client()
-            # Check if it's a direct Redis client
-            if hasattr(cache, 'keys') and callable(cache.keys):
-                pattern = f"{table_name}:*"
-                cache_keys = await cache.keys(pattern)
-                if cache_keys:
-                    await cache.delete(*cache_keys)
-            # Otherwise check if it has a wrapped client (for aiocache BaseCache)
-            elif hasattr(cache, '_client') or hasattr(cache, 'client'):
-                redis_client = getattr(cache, '_client', None) or getattr(cache, 'client', None)
-                if redis_client and hasattr(redis_client, 'keys') and callable(redis_client.keys):
-                    pattern = f"{table_name}:*"
-                    cache_keys = await redis_client.keys(pattern)
-                    if cache_keys:
-                        await redis_client.delete(*cache_keys)
-                else:
-                    print(f"Warning: Using fallback cache clear method for {table_name}")
-            else:
-                print(f"Warning: Using fallback cache clear method for {table_name}")
+    def _invalidate_caches_for(self, entity) -> None:
+        """Invalidate user-view cache tags emitted by the entity's interface.
 
-        except Exception as e:
-            # Log error but don't fail the operation
-            print(f"Cache clear error for {table_name}: {e}")
-
-    def _invalidate_user_views_for_entity(self, entity, db: Session):
+        Each entity interface declares which tags it carries via
+        ``cache_invalidation_tags`` (see ``BackendEntityInterface``); the
+        default implementation handles the standard scope FKs and
+        per-entity overrides extend with role-aware view tags.
+        Failures are logged, never raised — a stale cache is preferable
+        to a 500 on the write path.
         """
-        Invalidate user views when entities are created/updated/deleted.
-
-        This ensures that lecturer/tutor/student views are invalidated when
-        related entities change (e.g., course content creation invalidates
-        lecturer course content lists).
-        """
+        if entity is None:
+            return
         try:
-            # Get the sync Cache instance
             cache = get_cache()
-
-            # Determine entity type and extract relevant IDs
-            table_name = self.dto.model.__tablename__
-
-            # Handle CourseMember specifically: course membership changes
-            # affect the *target user's* role-aware list views (e.g. student
-            # list_courses), which are tagged with user:<uid> and
-            # view:<type>:<params_hash> — *not* with course_id. Invalidating
-            # only by course_id (the generic course_id branch below) misses
-            # them entirely. Clear the affected user's views and the
-            # course-scoped role-view tags so other users observing the
-            # roster also refresh.
-            if table_name == "course_member":
-                if hasattr(entity, 'user_id') and entity.user_id is not None:
-                    cache.invalidate_user_views(user_id=str(entity.user_id))
-                if hasattr(entity, 'course_id') and entity.course_id is not None:
-                    course_id = str(entity.course_id)
-                    cache.invalidate_user_views(
-                        entity_type="course_id",
-                        entity_id=course_id,
-                    )
-                    for view_tag in ("student_view", "tutor_view", "lecturer_view"):
-                        cache.invalidate_user_views(
-                            entity_type=view_tag,
-                            entity_id=course_id,
-                        )
-
-            # Same shape as course_member: when an organization_member
-            # row is created/updated/deleted the affected user's scoped
-            # claims change, so all of their cached list_courses /
-            # course-detail views are stale until TTL. Clear by user_id;
-            # the org_id tag flushes any current/future caches that get
-            # tagged with the org's id.
-            elif table_name == "organization_member":
-                if hasattr(entity, 'user_id') and entity.user_id is not None:
-                    cache.invalidate_user_views(user_id=str(entity.user_id))
-                if hasattr(entity, 'organization_id') and entity.organization_id is not None:
-                    cache.invalidate_user_views(
-                        entity_type="organization_id",
-                        entity_id=str(entity.organization_id),
-                    )
-
-            # Same as organization_member but scoped to course_family.
-            elif table_name == "course_family_member":
-                if hasattr(entity, 'user_id') and entity.user_id is not None:
-                    cache.invalidate_user_views(user_id=str(entity.user_id))
-                if hasattr(entity, 'course_family_id') and entity.course_family_id is not None:
-                    cache.invalidate_user_views(
-                        entity_type="course_family_id",
-                        entity_id=str(entity.course_family_id),
-                    )
-
-            # Handle CourseContent specifically
-            elif table_name == "course_content" and hasattr(entity, 'course_id'):
-                # Invalidate all lecturer views for this course
-                # This uses the 'lecturer_view:course_id' tag set in LecturerViewRepository
+            for tag in self.dto.cache_invalidation_tags(entity):
                 cache.invalidate_user_views(
-                    entity_type="lecturer_view",
-                    entity_id=str(entity.course_id)
+                    user_id=tag.user_id,
+                    entity_type=tag.entity_type,
+                    entity_id=tag.entity_id,
                 )
-                # Also invalidate by course_id tag for broader invalidation
-                cache.invalidate_user_views(
-                    entity_type="course_id",
-                    entity_id=str(entity.course_id)
-                )
-
-            # Handle other entities with course_id
-            elif hasattr(entity, 'course_id'):
-                cache.invalidate_user_views(
-                    entity_type="course_id",
-                    entity_id=str(entity.course_id)
-                )
-
-            # Handle Course entities
-            elif table_name == "course" and hasattr(entity, 'id'):
-                cache.invalidate_user_views(
-                    entity_type="course_id",
-                    entity_id=str(entity.id)
-                )
-                cache.invalidate_user_views(
-                    entity_type="lecturer_view",
-                    entity_id=str(entity.id)
-                )
-
-        except Exception as e:
-            # Log error but don't fail the operation
-            print(f"User view cache invalidation error for {table_name}: {e}")
+        except Exception:
+            logger.exception(
+                "User view cache invalidation failed for %s",
+                self.dto.model.__tablename__,
+            )
 
 class LookUpRouter:
 

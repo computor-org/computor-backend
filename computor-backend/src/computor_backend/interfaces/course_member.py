@@ -10,7 +10,7 @@ from computor_types.course_members import (
     CourseMemberQuery,
     CourseMemberUpdate,
 )
-from computor_backend.interfaces.base import BackendEntityInterface
+from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import CourseMember
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.api.exceptions import ForbiddenException
@@ -150,6 +150,20 @@ class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
     post_create = post_create_course_member
     post_update = post_update_course_member
     custom_permissions = custom_permissions_course_member
+
+    @classmethod
+    def cache_invalidation_tags(cls, entity):
+        """Course-membership changes flip a user's role-aware list views.
+
+        Default impl emits ``user:<id>`` and ``course_id:<id>`` tags. We
+        also need the three role-specific course-view tags so other
+        users observing the roster (lecturer dashboards, etc.) refresh.
+        """
+        yield from super().cache_invalidation_tags(entity)
+        if entity.course_id is not None:
+            cid = str(entity.course_id)
+            for view_tag in ("student_view", "tutor_view", "lecturer_view"):
+                yield CacheTag.for_entity(view_tag, cid)
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseMemberQuery]):
