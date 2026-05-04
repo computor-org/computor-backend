@@ -365,8 +365,8 @@ async def delete_task(
         raise NotImplementedException(
             error_code="NIMPL_001",
             detail=str(e),
-            context={"operation": "delete_task"}
-        )
+            context={"operation": "delete_task"},
+        ) from e
     except KeyError:
         raise NotFoundException(
             error_code="TASK_001",

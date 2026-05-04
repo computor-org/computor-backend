@@ -49,10 +49,8 @@ def delete_user_role(
         db.delete(entity)
         db.commit()
     except exc.SQLAlchemyError as e:
-        logger.error(f"Database error deleting user role: {e}")
-        raise InternalServerException(detail=str(e))
-    except Exception as e:
-        logger.error(f"Error deleting user role: {e}")
-        raise InternalServerException(detail=str(e))
+        db.rollback()
+        logger.exception("Database error deleting user role")
+        raise InternalServerException(detail="Failed to delete user role") from e
 
     return {"ok": True}

@@ -7,12 +7,15 @@ operations, permission checks, and validation, wrapped in threadpool for
 async/await compatibility.
 """
 
+import logging
 from uuid import UUID
 from typing import Any, Optional, Callable
 from datetime import datetime, timezone
 from enum import Enum
 
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
@@ -324,12 +327,8 @@ async def update_entity(
             raise
         except Exception as e:
             db.rollback()
-            print(f"Exception in update_entity: {e}")
-            print(f"Exception type: {type(e)}")
-            print(f"Exception args: {e.args}")
-            import traceback
-            traceback.print_exc()
-            raise BadRequestException(detail=str(e))
+            logger.exception("Unhandled exception in update_entity")
+            raise BadRequestException(detail="Failed to update entity") from e
 
     db_item, old_db_item = await run_in_threadpool(_update_entity)
 
