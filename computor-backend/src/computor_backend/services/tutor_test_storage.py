@@ -23,7 +23,7 @@ from uuid import UUID
 from minio.commonconfig import ENABLED, Filter
 from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 
-from ..api.exceptions import NotFoundException, ServiceUnavailableException
+from ..exceptions import NotFoundException, ServiceUnavailableException
 from ..minio_client import get_minio_client
 
 logger = logging.getLogger(__name__)

@@ -26,7 +26,7 @@ from computor_backend.business_logic.team_formation import (
     validate_team_formation_action,
     is_team_assignment,
 )
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     ForbiddenException,

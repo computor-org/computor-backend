@@ -7,7 +7,7 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
 from computor_backend.api.api_builder import CrudRouter
-from computor_backend.api.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import ForbiddenException, NotFoundException
 from computor_backend.interfaces import CourseInterface
 from computor_backend.model import Course
 from computor_backend.services.storage_service import get_storage_service

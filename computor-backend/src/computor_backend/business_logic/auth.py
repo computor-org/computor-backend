@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from starlette.concurrency import run_in_threadpool
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
     NotFoundException,

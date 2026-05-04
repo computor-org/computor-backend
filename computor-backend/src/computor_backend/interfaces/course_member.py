@@ -13,7 +13,7 @@ from computor_types.course_members import (
 from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import CourseMember
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 
 logger = logging.getLogger(__name__)
 

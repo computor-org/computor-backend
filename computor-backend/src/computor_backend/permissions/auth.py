@@ -45,7 +45,7 @@ from computor_types.password_utils import verify_password, is_argon2_hash
 from computor_backend.model.auth import Account, User
 from computor_backend.model.role import UserRole
 from computor_backend.model.service import ApiToken
-from computor_backend.api.exceptions import NotFoundException, UnauthorizedException
+from computor_backend.exceptions import NotFoundException, UnauthorizedException
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.api_token import hash_api_token, validate_token_format
 import logging

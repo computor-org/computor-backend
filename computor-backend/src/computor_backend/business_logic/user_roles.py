@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 
-from computor_backend.api.exceptions import NotFoundException, InternalServerException
+from computor_backend.exceptions import NotFoundException, InternalServerException
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.role import UserRole

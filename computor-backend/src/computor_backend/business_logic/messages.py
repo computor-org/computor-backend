@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Optional, Tuple, List, Dict, Any
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotImplementedException, ForbiddenException
+from computor_backend.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.roles import CourseRole, ScopeRole, TUTOR_AND_ABOVE
 from computor_backend.permissions.core import check_permissions

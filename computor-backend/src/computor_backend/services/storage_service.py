@@ -6,7 +6,7 @@ from minio.datatypes import Object
 from minio.commonconfig import CopySource
 
 from ..minio_client import get_minio_client, MINIO_DEFAULT_BUCKET
-from ..api.exceptions import (
+from ..exceptions import (
     ServiceUnavailableException, 
     NotFoundException, 
     BadRequestException

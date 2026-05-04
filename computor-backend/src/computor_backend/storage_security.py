@@ -16,7 +16,7 @@ from .storage_config import (
     OFFICE_XML_EXTENSIONS,
     format_bytes
 )
-from .api.exceptions import BadRequestException
+from .exceptions import BadRequestException
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from computor_backend.model.message import Message
 from computor_backend.model.message_audit import MessageAuditLog, MessageAuditAction
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import ForbiddenException, NotFoundException
 
 
 def soft_delete_message(

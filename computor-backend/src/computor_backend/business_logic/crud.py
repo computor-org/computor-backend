@@ -19,7 +19,7 @@ from sqlalchemy import exc
 from sqlalchemy.inspection import inspect
 from starlette.concurrency import run_in_threadpool
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     InternalServerException,

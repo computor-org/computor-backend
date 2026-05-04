@@ -116,7 +116,7 @@ async def update_result(
 
     # Check permissions using the standard permission system
     from computor_backend.permissions.core import check_permissions
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
 
     query = check_permissions(permissions, ResultInterface.model, "update", db)
     if query is None:
@@ -194,7 +194,7 @@ async def list_result_artifacts_endpoint(
     - Generated reports
     - Debug output files
     """
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
 
     # Verify the user has access to this result
     result = await get_id_db(permissions, db, result_id, ResultInterface)
@@ -236,7 +236,7 @@ async def download_result_artifacts(
     Returns a ZIP archive containing all artifacts generated during test execution.
     """
     from fastapi.responses import StreamingResponse
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
     import zipfile
     from io import BytesIO
 
@@ -294,7 +294,7 @@ async def upload_result_artifacts(
     """
     import zipfile
     from io import BytesIO
-    from computor_backend.api.exceptions import NotFoundException, BadRequestException
+    from computor_backend.exceptions import NotFoundException, BadRequestException
     from computor_backend.services.result_storage import store_result_artifact
     from computor_types.artifacts import ArtifactInfo, ResultArtifactUploadResponse
 

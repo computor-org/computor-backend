@@ -13,7 +13,7 @@ from computor_types.storage import (
     PresignedUrlResponse,
     StorageUsageStats
 )
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     ServiceUnavailableException,
     NotFoundException,
     BadRequestException

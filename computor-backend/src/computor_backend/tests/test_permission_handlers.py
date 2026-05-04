@@ -8,7 +8,7 @@ logic using lightweight principals and mocked database sessions.
 import pytest
 from unittest.mock import MagicMock
 
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 from computor_backend.permissions.principal import Principal, build_claims
 from computor_backend.permissions.handlers_impl import (
     UserPermissionHandler,

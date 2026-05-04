@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import case
 
-from computor_backend.api.exceptions import BadRequestException, ForbiddenException, NotFoundException
+from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.model.course import CourseMember, CourseMemberComment

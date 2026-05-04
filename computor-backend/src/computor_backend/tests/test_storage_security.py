@@ -12,7 +12,7 @@ from computor_backend.storage_security import (
     perform_full_file_validation
 )
 from computor_backend.storage_config import MAX_UPLOAD_SIZE
-from computor_backend.api.exceptions import BadRequestException
+from computor_backend.exceptions import BadRequestException
 
 
 class TestFilenameSanitization:

@@ -8,7 +8,7 @@ from computor_backend.permissions.query_builders import (
     UserPermissionQueryBuilder,
 )
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 from computor_backend.database import SessionLocal
 from computor_backend.model.auth import User
 from computor_backend.model.course import (

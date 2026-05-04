@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..model.example import Example, ExampleDependency
 from ..custom_types import Ltree
-from ..api.exceptions import BadRequestException
+from ..exceptions import BadRequestException
 
 logger = logging.getLogger(__name__)
 

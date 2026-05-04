@@ -2,7 +2,7 @@ import base64
 from collections import defaultdict
 from typing import Optional, Dict, List, Set, Tuple
 from pydantic import BaseModel, model_validator, Field, PrivateAttr
-from computor_backend.api.exceptions import NotFoundException
+from computor_backend.exceptions import NotFoundException
 from functools import lru_cache
 
 

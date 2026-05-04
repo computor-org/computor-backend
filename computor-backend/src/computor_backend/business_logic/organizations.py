@@ -4,7 +4,7 @@ from uuid import UUID
 from gitlab import Gitlab
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotImplementedException
+from computor_backend.exceptions import BadRequestException, NotImplementedException
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.organizations import OrganizationProperties

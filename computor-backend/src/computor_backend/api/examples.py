@@ -46,7 +46,7 @@ from computor_backend.business_logic.crud import (
     list_entities as list_db
 )
 from computor_backend.business_logic.cascade_deletion import delete_examples_by_pattern
-from ..api.exceptions import (
+from ..exceptions import (
     NotFoundException,
     ForbiddenException,
     BadRequestException,

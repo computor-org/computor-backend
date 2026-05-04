@@ -12,7 +12,7 @@ from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_backend.cache import Cache
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.services.storage_service import get_storage_service
 from computor_backend.model.course import CourseMember

@@ -12,7 +12,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.session_repo import SessionRepository
 from computor_backend.model.auth import Session as SessionModel
-from computor_backend.api.exceptions import NotFoundException, UnauthorizedException
+from computor_backend.exceptions import NotFoundException, UnauthorizedException
 from computor_backend.utils.token_hash import hash_token
 from computor_types.sessions import SessionList, SessionGet
 

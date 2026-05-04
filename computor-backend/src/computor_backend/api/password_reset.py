@@ -18,7 +18,7 @@ from computor_backend.database import get_db
 from computor_backend.model.auth import User
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     NotFoundException,
     BadRequestException,
     ForbiddenException,

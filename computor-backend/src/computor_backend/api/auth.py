@@ -246,7 +246,7 @@ async def initiate_login(
         logger.error(f"Failed to initiate login for {provider}: {e}")
         logger.error(f"Exception type: {type(e)}")
         logger.error(f"Exception traceback:", exc_info=True)
-        from computor_backend.api.exceptions import InternalServerException
+        from computor_backend.exceptions import InternalServerException
         raise InternalServerException(detail=f"Failed to initiate login: {str(e)}")
 
 @auth_router.get("/{provider}/callback", name="handle_callback")

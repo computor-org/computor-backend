@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Tuple, List
 from sqlalchemy.orm import Session, Query
 
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import StudentProfile
 from computor_types.student_profile import (

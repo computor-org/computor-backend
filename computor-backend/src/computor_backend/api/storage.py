@@ -25,7 +25,7 @@ from computor_types.storage import (
 )
 from ..services.storage_service import get_storage_service
 from ..permissions.auth import get_current_principal
-from ..api.exceptions import BadRequestException, NotFoundException, ForbiddenException
+from ..exceptions import BadRequestException, NotFoundException, ForbiddenException
 from ..redis_cache import get_redis_client
 from ..storage_security import sanitize_filename, perform_full_file_validation
 from ..storage_config import format_bytes

@@ -17,7 +17,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
-from computor_backend.api.exceptions import NotImplementedException
+from computor_backend.exceptions import NotImplementedException
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from computor_backend.model.auth import Profile
 from computor_backend.permissions.principal import Principal
 from computor_types.profiles import ProfileQuery

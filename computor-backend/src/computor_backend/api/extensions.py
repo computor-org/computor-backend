@@ -26,7 +26,7 @@ from packaging.version import InvalidVersion, Version
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..api.exceptions import BadRequestException, ForbiddenException, NotFoundException
+from ..exceptions import BadRequestException, ForbiddenException, NotFoundException
 from ..database import get_db
 from computor_types.extensions import (
     ExtensionMetadata,

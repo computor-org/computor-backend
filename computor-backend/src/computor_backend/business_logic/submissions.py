@@ -13,7 +13,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, joinedload
 from starlette.concurrency import run_in_threadpool
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,

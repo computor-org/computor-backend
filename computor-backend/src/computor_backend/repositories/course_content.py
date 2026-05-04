@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload, contains_eager, subqueryload
 from pydantic import BaseModel, ConfigDict
 
-from computor_backend.api.exceptions import NotFoundException
+from computor_backend.exceptions import NotFoundException
 from computor_backend.model.course import (
     SubmissionGroupMember,
     Course,

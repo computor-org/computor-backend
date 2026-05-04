@@ -9,7 +9,7 @@ from computor_backend.model.auth import User, StudentProfile
 from computor_backend.model.course import Course, CourseMember, CourseGroup
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import ForbiddenException, BadRequestException
+from computor_backend.exceptions import ForbiddenException, BadRequestException
 
 from computor_types.course_member_import import (
     CourseMemberImportRequest,

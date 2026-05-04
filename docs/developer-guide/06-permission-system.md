@@ -183,7 +183,7 @@ Check if user has required role in a course:
 ```python
 # business_logic/courses.py
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException
+from computor_backend.exceptions import NotFoundException, ForbiddenException
 
 def get_course(
     course_id: str,
@@ -525,7 +525,7 @@ Test permission logic in isolation:
 import pytest
 from computor_backend.permissions.principal import Principal, Claims
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 
 def test_student_can_read_course():
     """Test that students can read courses they're enrolled in."""

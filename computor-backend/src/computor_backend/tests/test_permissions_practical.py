@@ -158,7 +158,7 @@ def create_test_client(user_type: str) -> TestClient:
         """Mock check_permissions to return a query mock"""
         # For admin or if action is allowed, return the query mock
         # For others, raise ForbiddenException
-        from computor_backend.api.exceptions import ForbiddenException
+        from computor_backend.exceptions import ForbiddenException
         
         # Simple permission logic for testing
         if permissions.is_admin:

@@ -20,7 +20,7 @@ from .course_member_gradings import CourseMemberGradingsRepository
 from ..model.course import Course, CourseMember
 from ..permissions.principal import Principal
 from ..permissions.core import check_course_permissions
-from ..api.exceptions import NotFoundException, ForbiddenException
+from ..exceptions import NotFoundException, ForbiddenException
 from ..exceptions import RateLimitException
 from computor_types.course_member_gradings import (
     CourseMemberGradingsGet,

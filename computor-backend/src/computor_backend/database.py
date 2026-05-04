@@ -126,7 +126,7 @@ def get_db(user_id: str | None = None) -> Generator[Session, None, None]:
         yield from _get_db(user_id)
     except sa_exc.TimeoutError as e:  # QueuePool acquisition timed out
         # Import here to avoid circular dependency
-        from computor_backend.api.exceptions import ServiceUnavailableException
+        from computor_backend.exceptions import ServiceUnavailableException
         # 503 is the right code for transient capacity issues
         raise ServiceUnavailableException(
             detail="Database is busy. Please retry shortly.",

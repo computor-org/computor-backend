@@ -186,6 +186,6 @@ class TestBuildQueryFiltersAdminRows:
         db.query.return_value.filter.assert_not_called()
 
     def test_outsider_write_raises_forbidden(self, handler):
-        from computor_backend.api.exceptions import ForbiddenException
+        from computor_backend.exceptions import ForbiddenException
         with pytest.raises(ForbiddenException):
             handler.build_query(_outsider(), "delete", MagicMock())

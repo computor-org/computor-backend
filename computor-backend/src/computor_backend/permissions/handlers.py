@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Type
 from sqlalchemy.orm import Session, Query, aliased
 from sqlalchemy import and_, or_, select
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 
 
 class PermissionHandler(ABC):

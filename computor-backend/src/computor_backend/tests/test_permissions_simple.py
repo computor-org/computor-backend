@@ -11,7 +11,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
 from computor_backend.permissions.principal import Principal, Claims, build_claims
 from computor_backend.permissions.core import check_permissions, check_admin, can_perform_on_resource, can_perform_with_parents
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 
 
 class TestSimplePermissions:

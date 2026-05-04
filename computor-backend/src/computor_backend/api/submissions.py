@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Response, status, File, Form, Upl
 from sqlalchemy.orm import Session, joinedload, contains_eager, aliased
 from sqlalchemy import and_, or_, exists, func as sql_func
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,

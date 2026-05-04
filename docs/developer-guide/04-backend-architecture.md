@@ -128,7 +128,7 @@ async def get_artifact_endpoint(
 ```python
 # permissions/core.py
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 
 def check_course_permissions(
     principal: Principal,
@@ -174,7 +174,7 @@ from sqlalchemy.orm import Session
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException
+from computor_backend.exceptions import NotFoundException, ForbiddenException
 from computor_types.artifacts import SubmissionArtifactGet
 
 def get_artifact_with_details(
@@ -764,7 +764,7 @@ def create_course(
 Use custom exceptions:
 
 ```python
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException,
     BadRequestException,

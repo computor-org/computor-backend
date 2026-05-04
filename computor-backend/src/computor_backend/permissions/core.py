@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Dict, Iterable
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 from computor_backend.permissions.handlers import permission_registry
 from computor_backend.permissions.handlers_impl import (
     UserPermissionHandler,
