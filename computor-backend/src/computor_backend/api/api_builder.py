@@ -13,6 +13,7 @@ from computor_backend.business_logic.crud import (
     delete_entity as delete_db
 )
 from typing import Annotated, Optional
+from computor_backend.api._pagination import paginated_list
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
 from computor_backend.permissions.principal import Principal
@@ -78,10 +79,9 @@ class CrudRouter:
                 db: Session = Depends(get_db)
         ) -> list[self.dto.list]:
             list_result, total = await list_db(permissions, db, params, self.dto)
-            response.headers["X-Total-Count"] = str(total)
-            return list_result
+            return paginated_list(list_result, total, response=response)
         return route
-    
+
     def update(self):
         async def route(
                 background_tasks: BackgroundTasks,
@@ -255,10 +255,9 @@ class LookUpRouter:
     def list(self):
         async def route(permissions: Annotated[Principal, Depends(get_current_principal)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             list_result, total = await list_db(permissions, db, params, self.dto)
-            response.headers["X-Total-Count"] = str(total)
-            return list_result
+            return paginated_list(list_result, total, response=response)
         return route
-    
+
     def register_routes(self, app: FastAPI):
         
         scope_name = self.path.replace("/","").replace("_"," ")

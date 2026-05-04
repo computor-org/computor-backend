@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Response, status
 from sqlalchemy.orm import Session
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     delete_entity as delete_db,
@@ -40,8 +41,7 @@ async def list_results(
     db: Session = Depends(get_db),
 ) -> list[ResultList]:
     results, total = await list_db(permissions, db, params, ResultInterface)
-    response.headers["X-Total-Count"] = str(total)
-    return results
+    return paginated_list(results, total, response=response)
 
 @result_router.get("/{result_id}", response_model=ResultGet)
 async def get_result(

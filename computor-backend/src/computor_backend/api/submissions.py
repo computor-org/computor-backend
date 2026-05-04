@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, Response, status, File, Form, Upl
 from sqlalchemy.orm import Session, joinedload, contains_eager, aliased
 from sqlalchemy import and_, or_, exists, func as sql_func
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -307,8 +308,6 @@ async def list_submission_artifacts(
         SubmissionArtifact.created_at.desc()
     ).limit(params.limit).offset(params.skip).all()
 
-    response.headers["X-Total-Count"] = str(total)
-
     # Build response with optional latest result
     result_list = []
     for artifact in artifacts:
@@ -329,7 +328,7 @@ async def list_submission_artifacts(
 
         result_list.append(artifact_dto)
 
-    return result_list
+    return paginated_list(result_list, total, response=response)
 
 @submissions_router.get(
     "/artifacts/download",
@@ -668,16 +667,12 @@ async def list_artifact_grades(
     if params.latest:
         grade = query.first()
         grades = [grade] if grade else []
+        total = len(grades)
     else:
-        # Apply pagination
         total = query.count()
         grades = query.limit(params.limit).offset(params.skip).all()
-        response.headers["X-Total-Count"] = str(total)
 
-    if params.latest:
-        response.headers["X-Total-Count"] = str(len(grades))
-
-    return [SubmissionGradeList.model_validate(grade) for grade in grades]
+    return paginated_list(grades, total, response=response, schema=SubmissionGradeList)
 
 @submissions_router.get("/grades", response_model=list[SubmissionGradeList])
 async def list_grades(
@@ -804,9 +799,7 @@ async def list_grades(
     # Apply pagination
     grades = query.limit(params.limit).offset(params.skip).all()
 
-    response.headers["X-Total-Count"] = str(total)
-
-    return [SubmissionGradeList.model_validate(grade) for grade in grades]
+    return paginated_list(grades, total, response=response, schema=SubmissionGradeList)
 
 
 @submissions_router.patch("/grades/{grade_id}", response_model=SubmissionGradeDetail)
@@ -950,9 +943,7 @@ async def list_artifact_reviews(
         SubmissionReview.artifact_id == artifact_id
     ).order_by(SubmissionReview.created_at.desc()).all()
 
-    response.headers["X-Total-Count"] = str(len(reviews))
-
-    return [SubmissionReviewListItem.model_validate(review) for review in reviews]
+    return paginated_list(reviews, len(reviews), response=response, schema=SubmissionReviewListItem)
 
 @submissions_router.patch("/reviews/{review_id}", response_model=SubmissionReviewListItem)
 async def update_artifact_review(
@@ -1201,8 +1192,6 @@ async def list_artifact_test_results(
 
     results = query.order_by(Result.created_at.desc()).all()
 
-    response.headers["X-Total-Count"] = str(len(results))
-
     # Build ResultGet responses with full details
     result_list = []
     for result in results:
@@ -1247,7 +1236,7 @@ async def list_artifact_test_results(
         )
         result_list.append(result_get)
 
-    return result_list
+    return paginated_list(result_list, len(result_list), response=response)
 
 @submissions_router.patch("/tests/{test_id}", response_model=ResultList)
 async def update_test_result(

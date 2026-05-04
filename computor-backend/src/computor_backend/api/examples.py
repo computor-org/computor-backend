@@ -42,6 +42,7 @@ from computor_types.cascade_deletion import (
 from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..permissions.auth import get_current_principal
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     get_entity_by_id as get_id_db,
     list_entities as list_db
@@ -289,16 +290,7 @@ async def list_examples(
 ):
     """List all examples."""
     list_result, total = await list_db(permissions, db, params, ExampleInterface)
-    response.headers["X-Total-Count"] = str(total)
-    
-    # Cache the result
-    # cache_data = {
-    #     "items": [item.model_dump(mode='json') for item in list_result],
-    #     "total": total
-    # }
-    # await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
-    
-    return list_result
+    return paginated_list(list_result, total, response=response)
 
 @examples_router.get("/{example_id}", response_model=ExampleGet)
 async def get_example(

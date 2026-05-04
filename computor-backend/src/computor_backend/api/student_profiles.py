@@ -8,6 +8,7 @@ from computor_types.student_profile import (
     StudentProfileGet, StudentProfileList, StudentProfileUpdate,
     StudentProfileCreate, StudentProfileQuery
 )
+from computor_backend.api._pagination import paginated_list
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 
@@ -31,8 +32,7 @@ async def list_student_profiles(
 ):
     """List student profiles - admins/_user_manager see all, users see only their own"""
     profiles, total = list_profiles(permissions, params, db)
-    response.headers["X-Total-Count"] = str(total)
-    return profiles
+    return paginated_list(profiles, total, response=response)
 
 @student_profile_router.get("/{id}", response_model=StudentProfileGet)
 async def get_student_profile(

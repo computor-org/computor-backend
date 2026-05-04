@@ -4,6 +4,7 @@ from fastapi import Depends, Response
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     list_entities as list_db
@@ -33,9 +34,7 @@ async def list_user_roles(
     """List user roles."""
 
     list_result, total = await list_db(permissions, db, params, UserRoleInterface)
-    response.headers["X-Total-Count"] = str(total)
-
-    return list_result
+    return paginated_list(list_result, total, response=response)
 
 @user_roles_router.get("/users/{user_id}/roles/{role_id}", response_model=UserRoleGet)
 async def get_user_role_endpoint(
