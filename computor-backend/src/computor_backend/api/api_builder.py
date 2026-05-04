@@ -31,7 +31,7 @@ class CrudRouter:
 
     def __init__(self, dto, endpoint: Optional[str] = None):
         self.dto = dto
-        if endpoint == None:
+        if endpoint is None:
             self.path = self.dto.endpoint
         else:
             self.path = endpoint
@@ -404,7 +404,7 @@ class LookUpRouter:
 
     def __init__(self, dto, endpoint: Optional[str] = None):
         self.dto = dto
-        if endpoint == None:
+        if endpoint is None:
             self.path = self.dto.endpoint
         else:
             self.path = endpoint

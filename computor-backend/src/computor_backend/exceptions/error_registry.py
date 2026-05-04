@@ -228,4 +228,4 @@ def validate_error_registry() -> tuple[bool, list[str]]:
         if not error_def.internal_description:
             errors.append(f"{code}: Missing internal description")
 
-    return len(errors) == 0, errors
+    return not errors, errors

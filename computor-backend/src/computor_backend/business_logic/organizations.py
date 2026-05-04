@@ -49,7 +49,7 @@ def update_organization_token(
                 gitlab.groups.list(search=full_path, min_access_level=50)
             ))
 
-            if len(groups) == 0:
+            if not groups:
                 raise BadRequestException(
                     detail="Token does not have owner access to the organization's GitLab group"
                 )

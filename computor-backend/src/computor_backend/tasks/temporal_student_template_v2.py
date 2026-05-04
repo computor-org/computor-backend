@@ -543,7 +543,7 @@ async def generate_student_template_activity_v2(
 
             logger.info(f"Selected {len(course_contents)} course contents to process")
             
-            if len(course_contents) == 0:
+            if not course_contents:
                 logger.warning(f"No course contents to deploy for course {course_id}. This will result in an empty student template.")
             
             # Process each CourseContent with an example
