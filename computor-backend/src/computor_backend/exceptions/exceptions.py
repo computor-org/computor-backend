@@ -5,7 +5,12 @@ This module provides custom HTTP exceptions that integrate with the error regist
 to provide consistent, informative error responses with unique error codes.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+# Detail accepted by every Computor exception. ``ComputorException.to_error_response``
+# branches on ``isinstance(detail, str)`` and ``isinstance(detail, dict)``; anything
+# else is ignored, so ``Any`` was hiding the real contract.
+ExceptionDetail = Optional[Union[str, Dict[str, Any]]]
 from fastapi import HTTPException, status
 import traceback
 import inspect
@@ -28,7 +33,7 @@ class ComputorException(HTTPException):
     def __init__(
         self,
         error_code: str,
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         context: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
@@ -133,7 +138,7 @@ class UnauthorizedException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -147,7 +152,7 @@ class BasicAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         **kwargs,
     ):
         headers = {"WWW-Authenticate": "Basic"}
@@ -161,7 +166,7 @@ class TokenExpiredException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -175,7 +180,7 @@ class SSOAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -194,7 +199,7 @@ class ForbiddenException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -208,7 +213,7 @@ class AdminRequiredException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -222,7 +227,7 @@ class CourseAccessDeniedException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -236,7 +241,7 @@ class InsufficientCourseRoleException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         required_role: Optional[str] = None,
         **kwargs,
@@ -260,7 +265,7 @@ class BadRequestException(ComputorException):
     def __init__(
         self,
         error_code: str = "VAL_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -275,7 +280,7 @@ class MissingFieldException(ComputorException):
         self,
         field_name: str,
         error_code: str = "VAL_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -294,7 +299,7 @@ class InvalidFieldFormatException(ComputorException):
         field_name: str,
         expected_format: str,
         error_code: str = "VAL_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -312,7 +317,7 @@ class InvalidFileUploadException(ComputorException):
     def __init__(
         self,
         error_code: str = "VAL_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         max_size: Optional[str] = None,
         **kwargs,
@@ -336,7 +341,7 @@ class NotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -350,7 +355,7 @@ class UserNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -364,7 +369,7 @@ class CourseNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -378,7 +383,7 @@ class EndpointNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -397,7 +402,7 @@ class ConflictException(ComputorException):
     def __init__(
         self,
         error_code: str = "CONFLICT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -411,7 +416,7 @@ class ConcurrentModificationException(ComputorException):
     def __init__(
         self,
         error_code: str = "CONFLICT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -430,7 +435,7 @@ class RateLimitException(ComputorException):
     def __init__(
         self,
         error_code: str = "RATE_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         retry_after: int = 60,
         **kwargs,
     ):
@@ -450,7 +455,7 @@ class GitLabServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -464,7 +469,7 @@ class GitLabAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -478,7 +483,7 @@ class MinIOServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -492,7 +497,7 @@ class TemporalServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -511,7 +516,7 @@ class DatabaseConnectionException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -525,7 +530,7 @@ class DatabaseQueryException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -539,7 +544,7 @@ class DatabaseTransactionException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -558,7 +563,7 @@ class InternalServerException(ComputorException):
     def __init__(
         self,
         error_code: str = "INT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -572,7 +577,7 @@ class ConfigurationException(ComputorException):
     def __init__(
         self,
         error_code: str = "INT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -591,7 +596,7 @@ class NotImplementedException(ComputorException):
     def __init__(
         self,
         error_code: str = "NIMPL_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -614,7 +619,7 @@ class ServiceUnavailableException(ComputorException):
     def __init__(
         self,
         error_code: str = "INT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
