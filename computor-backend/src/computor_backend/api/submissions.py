@@ -35,6 +35,7 @@ from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import TUTOR_AND_ABOVE
 from computor_types.artifacts import (
     SubmissionArtifactList,
     SubmissionArtifactGet,
@@ -771,7 +772,7 @@ async def list_grades(
             and_(
                 TutorAlias.course_id == SubmissionGroup.course_id,
                 TutorAlias.user_id == user_id,
-                TutorAlias.course_role_id.in_(["_tutor", "_lecturer", "_maintainer", "_owner"])
+                TutorAlias.course_role_id.in_(TUTOR_AND_ABOVE)
             )
         )
 

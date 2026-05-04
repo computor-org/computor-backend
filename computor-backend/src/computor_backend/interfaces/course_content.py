@@ -17,6 +17,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
+from computor_backend.permissions.roles import CourseRole
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
         .options(joinedload(CourseMember.user))
         .filter(
             CourseMember.course_id == course_content.course_id,
-            CourseMember.course_role_id == "_student"
+            CourseMember.course_role_id == CourseRole.STUDENT
         )
         .all()
     )
