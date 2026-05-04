@@ -37,7 +37,7 @@ def _require_manage(permissions: Principal) -> None:
     if permissions.is_admin:
         return
     if not permissions.permitted("workspace", "manage"):
-        raise ForbiddenException(detail="Workspace 'manage' permission required.")
+        raise ForbiddenException(detail="Workspace 'manage' permission required")
 
 
 def list_all_users(

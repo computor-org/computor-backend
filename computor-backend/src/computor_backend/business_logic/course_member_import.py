@@ -74,7 +74,7 @@ async def import_course_member(
 
     if not user_role:
         raise ForbiddenException(
-            "You don't have a role in this course."
+            "You don't have a role in this course"
         )
 
     if not course_role_hierarchy.can_assign_role(user_role, target_role):

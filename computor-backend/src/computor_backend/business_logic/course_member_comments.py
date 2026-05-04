@@ -220,7 +220,7 @@ def create_course_member_comment(
     """
     if permissions.is_admin:
         # For now, do not allow admin to impersonate a transmitter
-        raise BadRequestException(detail="[admin] is not permitted.")
+        raise BadRequestException(detail="[admin] is not permitted")
 
     # Tutors (and above) of the target course member's course
     if (
@@ -234,7 +234,7 @@ def create_course_member_comment(
     transmitter = get_current_transmitter(db, permissions, str(course_member_id))
 
     if not message or len(message.strip()) == 0:
-        raise BadRequestException(detail="The comment is empty.")
+        raise BadRequestException(detail="The comment is empty")
 
     db_item = CourseMemberComment(
         message=message.strip(),
@@ -288,7 +288,7 @@ def update_course_member_comment(
         ForbiddenException: If user not the transmitter
     """
     if permissions.is_admin:
-        raise BadRequestException(detail="[admin] is not permitted.")
+        raise BadRequestException(detail="[admin] is not permitted")
 
     db_item: Optional[CourseMemberComment] = (
         db.query(CourseMemberComment)
@@ -312,7 +312,7 @@ def update_course_member_comment(
         raise ForbiddenException()
 
     if not message or len(message.strip()) == 0:
-        raise BadRequestException(detail="The comment is empty.")
+        raise BadRequestException(detail="The comment is empty")
 
     db_item.message = message.strip()
     db.commit()
@@ -358,7 +358,7 @@ def delete_course_member_comment(
         ForbiddenException: If user not the transmitter and not maintainer/owner
     """
     if permissions.is_admin:
-        raise BadRequestException(detail="[admin] is not permitted.")
+        raise BadRequestException(detail="[admin] is not permitted")
 
     db_item: Optional[CourseMemberComment] = (
         db.query(CourseMemberComment)

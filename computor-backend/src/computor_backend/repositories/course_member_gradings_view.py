@@ -134,7 +134,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
             raise RateLimitException(
-                detail="Grading statistics are being calculated, please try again shortly.",
+                detail="Grading statistics are being calculated, please try again shortly",
                 retry_after=_LOCK_TTL,
             )
 
@@ -387,7 +387,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
             raise RateLimitException(
-                detail="Course grading statistics are being calculated, please try again shortly.",
+                detail="Course grading statistics are being calculated, please try again shortly",
                 retry_after=_LOCK_TTL,
             )
 

@@ -325,7 +325,7 @@ async def upload_result_artifacts(
         total_size = sum(info.file_size for info in file_infos if not info.is_dir())
         if total_size > MAX_TOTAL_SIZE:
             raise BadRequestException(
-                detail=f"ZIP total uncompressed size ({total_size} bytes) exceeds maximum ({MAX_TOTAL_SIZE} bytes)."
+                detail=f"ZIP total uncompressed size ({total_size} bytes) exceeds maximum ({MAX_TOTAL_SIZE} bytes)"
             )
 
     # Extract and store each file

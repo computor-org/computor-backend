@@ -1246,7 +1246,7 @@ def make_scope_member_custom_permissions(
             raise ForbiddenException(
                 detail=(
                     f"You need at least _manager on this {scope} to modify "
-                    "its memberships."
+                    "its memberships"
                 )
             )
 
@@ -1255,7 +1255,7 @@ def make_scope_member_custom_permissions(
         if current_role == "_owner" and not is_scope_owner:
             raise ForbiddenException(
                 error_code="AUTHZ_005",
-                detail="Only an _owner of this scope can modify an _owner membership.",
+                detail="Only an _owner of this scope can modify an _owner membership",
                 context={"scope": scope, "scope_id": scope_id, "current_role": current_role},
             )
 
@@ -1263,7 +1263,7 @@ def make_scope_member_custom_permissions(
         if new_role is not None and new_role == "_owner" and not is_scope_owner:
             raise ForbiddenException(
                 error_code="AUTHZ_005",
-                detail="Only an _owner of this scope can grant the _owner role.",
+                detail="Only an _owner of this scope can grant the _owner role",
                 context={"scope": scope, "scope_id": scope_id, "target_role": new_role},
             )
 

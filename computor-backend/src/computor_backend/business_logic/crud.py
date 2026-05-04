@@ -490,7 +490,7 @@ async def delete_entity(
                 )
             elif 'UniqueViolation' in error_msg:
                 # This shouldn't happen on delete, but handle it just in case
-                raise BadRequestException(detail="A unique constraint violation occurred while deleting.")
+                raise BadRequestException(detail="A unique constraint violation occurred while deleting")
             else:
                 # Generic integrity error
                 raise BadRequestException(
@@ -501,11 +501,11 @@ async def delete_entity(
             # Handle other SQLAlchemy errors
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in delete_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while deleting.") from e
+            raise InternalServerException(detail="An unexpected database error occurred while deleting") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in delete_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while deleting.") from e
+            raise InternalServerException(detail="An unexpected error occurred while deleting") from e
 
         return {"ok": True}
 
@@ -559,16 +559,16 @@ async def archive_entity(
         except exc.IntegrityError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-            raise BadRequestException(detail=f"Cannot archive this item due to data integrity constraints.") from e
+            raise BadRequestException(detail="Cannot archive this item due to data integrity constraints") from e
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in archive_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while archiving.") from e
+            raise InternalServerException(detail="An unexpected database error occurred while archiving") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in archive_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while archiving.") from e
+            raise InternalServerException(detail="An unexpected error occurred while archiving") from e
 
         return {"ok": True}
 
@@ -615,16 +615,16 @@ async def unarchive_entity(
             raise
         except exc.IntegrityError:
             db.rollback()
-            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints.")
+            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints")
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in unarchive_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while unarchiving.") from e
+            raise InternalServerException(detail="An unexpected database error occurred while unarchiving") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in unarchive_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while unarchiving.") from e
+            raise InternalServerException(detail="An unexpected error occurred while unarchiving") from e
 
         return {"ok": True}
 
