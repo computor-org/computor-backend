@@ -1062,7 +1062,10 @@ def get_message_thread(
     ).first()
 
     if not start_message:
-        raise BadRequestException(detail=f"Message {message_id} not found")
+        raise BadRequestException(
+            detail="Message not found",
+            context={"message_id": str(message_id)},
+        )
 
     # Walk up the parent chain to find the root
     root = start_message

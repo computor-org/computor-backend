@@ -142,18 +142,28 @@ async def create_my_team(
         CourseContent.id == course_content_id
     ).first()
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Validate this is a team assignment
     if not is_team_assignment(course_content):
         raise BadRequestException(
-            detail=f"Course content '{course_content.title}' is not a team assignment (max_group_size={course_content.max_group_size})"
+            detail=f"Course content '{course_content.title}' is not a team assignment",
+            context={
+                "course_content_id": str(course_content_id),
+                "max_group_size": course_content.max_group_size,
+            },
         )
 
     # Get course
     course = db.query(Course).filter(Course.id == course_content.course_id).first()
     if not course:
-        raise NotFoundException(detail=f"Course {course_content.course_id} not found")
+        raise NotFoundException(
+            detail="Course not found",
+            context={"course_id": str(course_content.course_id)},
+        )
 
     # Validate team formation rules
     allowed, error = validate_team_formation_action(course_content, "create", course, db)
@@ -164,7 +174,8 @@ async def create_my_team(
     course_member = get_course_member_for_user(user_id, course_content.course_id, db)
     if not course_member:
         raise ForbiddenException(
-            detail=f"You are not a member of course {course_content.course_id}"
+            detail="You are not a member of this course",
+            context={"course_id": str(course_content.course_id)},
         )
 
     # Check if user already has a team for this course content
@@ -180,7 +191,11 @@ async def create_my_team(
 
     if existing_team:
         raise BadRequestException(
-            detail=f"You already have a team for this assignment (team {existing_team.id})"
+            detail="You already have a team for this assignment",
+            context={
+                "course_content_id": str(course_content_id),
+                "submission_group_id": str(existing_team.id),
+            },
         )
 
     # Create submission group (team)
@@ -239,13 +254,17 @@ async def get_my_team(
         CourseContent.id == course_content_id
     ).first()
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Get course member
     course_member = get_course_member_for_user(user_id, course_content.course_id, db)
     if not course_member:
         raise ForbiddenException(
-            detail=f"You are not a member of course {course_content.course_id}"
+            detail="You are not a member of this course",
+            context={"course_id": str(course_content.course_id)},
         )
 
     # Find user's team
@@ -289,12 +308,18 @@ async def leave_my_team(
         CourseContent.id == course_content_id
     ).first()
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Get course
     course = db.query(Course).filter(Course.id == course_content.course_id).first()
     if not course:
-        raise NotFoundException(detail=f"Course {course_content.course_id} not found")
+        raise NotFoundException(
+            detail="Course not found",
+            context={"course_id": str(course_content.course_id)},
+        )
 
     # Validate leaving is allowed
     allowed, error = validate_team_formation_action(course_content, "leave", course, db)
@@ -305,7 +330,8 @@ async def leave_my_team(
     course_member = get_course_member_for_user(user_id, course_content.course_id, db)
     if not course_member:
         raise ForbiddenException(
-            detail=f"You are not a member of course {course_content.course_id}"
+            detail="You are not a member of this course",
+            context={"course_id": str(course_content.course_id)},
         )
 
     # Find user's team
@@ -390,7 +416,10 @@ async def get_available_teams(
         CourseContent.id == course_content_id
     ).first()
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Validate this is a team assignment
     if not is_team_assignment(course_content):
@@ -402,7 +431,8 @@ async def get_available_teams(
     course_member = get_course_member_for_user(user_id, course_content.course_id, db)
     if not course_member:
         raise ForbiddenException(
-            detail=f"You are not a member of course {course_content.course_id}"
+            detail="You are not a member of this course",
+            context={"course_id": str(course_content.course_id)},
         )
 
     # Check if user already has a team
@@ -496,7 +526,10 @@ async def join_team(
         SubmissionGroup.id == submission_group_id
     ).first()
     if not submission_group:
-        raise NotFoundException(detail=f"Team {submission_group_id} not found")
+        raise NotFoundException(
+            detail="Team not found",
+            context={"submission_group_id": str(submission_group_id)},
+        )
 
     # Get course content
     course_content = db.query(CourseContent).filter(

@@ -94,7 +94,10 @@ def assign_workspace_role(
 
     existing = get_user_role(db, str(user.id), role_id)
     if existing:
-        raise ConflictException(detail=f"User already has the {role_id} role")
+        raise ConflictException(
+            detail="User already has the requested role",
+            context={"user_id": str(user.id), "role_id": role_id},
+        )
 
     create_user_role(db, str(user.id), role_id)
 

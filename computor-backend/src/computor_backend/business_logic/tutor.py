@@ -108,7 +108,10 @@ async def update_tutor_course_content_grade(
     # 1) Resolve the student's course member and related submission group for this content
     student_cm = course_member_repo.get_by_id_optional(course_member_id)
     if student_cm is None:
-        raise NotFoundException(detail=f"Course member {course_member_id} not found")
+        raise NotFoundException(
+            detail="Course member not found",
+            context={"course_member_id": str(course_member_id)},
+        )
 
     # Check if current user has tutor permissions for the student's course
     if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
@@ -130,7 +133,14 @@ async def update_tutor_course_content_grade(
     ).first()
 
     if submission_group is None:
-        raise NotFoundException(detail=f"No submission group found for course member {course_member_id} in course content {course_content_id}. The student may not have been assigned to this content yet.")
+        raise NotFoundException(
+            detail="No submission group found for the requested course member and content. "
+                   "The student may not have been assigned to this content yet.",
+            context={
+                "course_member_id": str(course_member_id),
+                "course_content_id": str(course_content_id),
+            },
+        )
 
     # 2) Resolve the grader's course member (the current user in the same course)
     grader_cm = course_member_repo.find_by_course_and_user(
@@ -253,7 +263,10 @@ def get_tutor_course_member(
     ).first()
 
     if course_member is None:
-        raise NotFoundException(detail=f"Course member {course_member_id} not found")
+        raise NotFoundException(
+            detail="Course member not found",
+            context={"course_member_id": str(course_member_id)},
+        )
 
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_results = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id).all()
@@ -406,7 +419,10 @@ def get_tutor_submission_group(
     ).filter(SubmissionGroup.id == submission_group_id).first()
 
     if submission_group is None:
-        raise NotFoundException(detail=f"Submission group {submission_group_id} not found")
+        raise NotFoundException(
+            detail="Submission group not found",
+            context={"submission_group_id": str(submission_group_id)},
+        )
 
     # Check tutor permissions for the course
     if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(

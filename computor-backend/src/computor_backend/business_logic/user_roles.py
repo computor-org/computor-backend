@@ -25,7 +25,10 @@ def get_user_role(
     entity = query.filter(UserRole.user_id == user_id, UserRole.role_id == role_id).first()
 
     if not entity:
-        raise NotFoundException(detail=f"UserRole not found for user {user_id} and role {role_id}")
+        raise NotFoundException(
+            detail="UserRole not found",
+            context={"user_id": str(user_id), "role_id": str(role_id)},
+        )
 
     return entity
 

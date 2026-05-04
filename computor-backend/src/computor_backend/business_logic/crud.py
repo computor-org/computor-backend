@@ -176,7 +176,10 @@ async def get_entity_by_id(
         item = await run_in_threadpool(_get_entity)
 
         if item is None:
-            raise NotFoundException(detail=f"{db_type.__name__} with id [{id}] not found")
+            raise NotFoundException(
+                detail=f"{db_type.__name__} not found",
+                context={"id": str(id), "entity": db_type.__name__},
+            )
 
         return interface.get.model_validate(item, from_attributes=True)
 
