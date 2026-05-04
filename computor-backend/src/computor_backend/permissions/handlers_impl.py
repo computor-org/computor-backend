@@ -1254,13 +1254,17 @@ def make_scope_member_custom_permissions(
 
         if current_role == "_owner" and not is_scope_owner:
             raise ForbiddenException(
-                detail="Only an _owner of this scope can modify an _owner membership."
+                error_code="AUTHZ_005",
+                detail="Only an _owner of this scope can modify an _owner membership.",
+                context={"scope": scope, "scope_id": scope_id, "current_role": current_role},
             )
 
         new_role = getattr(entity, role_fk, None)
         if new_role is not None and new_role == "_owner" and not is_scope_owner:
             raise ForbiddenException(
-                detail="Only an _owner of this scope can grant the _owner role."
+                error_code="AUTHZ_005",
+                detail="Only an _owner of this scope can grant the _owner role.",
+                context={"scope": scope, "scope_id": scope_id, "target_role": new_role},
             )
 
         return db.query(model)

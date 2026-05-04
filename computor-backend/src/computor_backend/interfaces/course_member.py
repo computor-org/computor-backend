@@ -133,8 +133,10 @@ def custom_permissions_course_member(
         target_role = entity.course_role_id
         if not course_role_hierarchy.can_assign_role(user_role, target_role):
             raise ForbiddenException(
-                f"You cannot assign the role '{target_role}'. "
-                f"Your role '{user_role}' can only assign roles at or below your privilege level."
+                error_code="AUTHZ_005",
+                detail=f"You cannot assign the role '{target_role}'. "
+                       f"Your role '{user_role}' can only assign roles at or below your privilege level.",
+                context={"target_role": target_role, "user_role": user_role, "course_id": course_id},
             )
 
     # Return query for the specific course member
