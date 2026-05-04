@@ -515,20 +515,24 @@ class NotImplementedException(ComputorException):
 
 
 # ============================================================================
-# LEGACY COMPATIBILITY - DEPRECATED
+# GENERIC SERVICE UNAVAILABLE (503)
 # ============================================================================
 
 
 class ServiceUnavailableException(ComputorException):
-    """
-    Legacy exception - use specific service exceptions instead.
+    """Generic 503 fallback when the upstream service is unknown.
 
-    DEPRECATED: Use GitLabServiceException, MinIOServiceException, etc.
+    Prefer the service-specific subclasses where possible:
+    ``GitLabServiceException`` (EXT_001), ``MinIOServiceException``
+    (EXT_003), ``TemporalServiceException`` (EXT_004). Use this class
+    only when the originating service can't be identified — e.g. the
+    Starlette HTTPException → ComputorException fallback in
+    ``error_handlers.http_exception_handler``.
     """
 
     def __init__(
         self,
-        error_code: str = "INT_001",
+        error_code: str = "EXT_006",
         detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,

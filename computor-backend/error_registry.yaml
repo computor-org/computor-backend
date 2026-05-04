@@ -1412,6 +1412,25 @@ errors:
       - "Contact administrator to verify testing service setup"
     documentation_url: "/docs/testing-services"
 
+  - code: EXT_006
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "Service Unavailable"
+    message:
+      plain: "An external service is temporarily unavailable."
+      markdown: "**Service Unavailable**\n\nAn external service is temporarily unavailable. Please try again later."
+      html: "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>"
+    retry_after: 60
+    internal_description: "Generic 503 fallback when the specific upstream service is unknown or not yet categorised; prefer EXT_001 (GitLab), EXT_003 (MinIO), EXT_004 (Temporal), or EXT_005 (task queue) when the source is known."
+    affected_functions: []
+    common_causes:
+      - "Generic upstream failure surfaced through Starlette's HTTPException"
+      - "Service-specific exception subclass not yet introduced for this code path"
+    resolution_steps:
+      - "Inspect server logs for the underlying cause"
+      - "Retry the request after a short backoff"
+
   # ============================================================================
   # DATABASE ERRORS (500, 503)
   # ============================================================================
