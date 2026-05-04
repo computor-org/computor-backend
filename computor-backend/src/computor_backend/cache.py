@@ -72,9 +72,10 @@ def _stable_key(obj: Any) -> str:
     """
     try:
         raw = orjson.dumps(obj, option=orjson.OPT_SORT_KEYS)
-    except:
+    except TypeError:
+        # orjson rejects custom objects / sets that stdlib json handles via default=str.
         import json
-        raw = json.dumps(obj, sort_keys=True).encode()
+        raw = json.dumps(obj, sort_keys=True, default=str).encode()
 
     return hashlib.sha1(raw).hexdigest()
 

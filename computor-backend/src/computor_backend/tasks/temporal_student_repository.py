@@ -336,7 +336,8 @@ async def find_existing_repository(
             project = gitlab.projects.get(full_path.replace('/', '%2F'))
             logger.info(f"Found existing repository: {project.path_with_namespace}")
             return project
-        except:
+        except GitlabGetError:
+            # Project does not exist on this path — fall through to search.
             pass
         
         # Method 2: Search projects in namespace by name

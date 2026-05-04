@@ -154,12 +154,17 @@ def set_user_password(
             if verify_password(new_password, user.password):
                 raise BadRequestException("New password must be different from current password")
         else:
-            # Legacy comparison
+            # Legacy comparison: a stored password we can't decrypt (corrupt /
+            # missing key) is treated as "no current password to match" — let
+            # the new password through. Re-raising BadRequestException would
+            # break this flow, so it's let through explicitly.
             try:
                 if new_password == decrypt_api_key(user.password):
                     raise BadRequestException("New password must be different from current password")
-            except:
-                pass  # If decryption fails, allow new password
+            except BadRequestException:
+                raise
+            except Exception:
+                logger.debug("Could not decrypt legacy password for comparison", exc_info=True)
     else:
         raise ForbiddenException("Invalid password change request")
 

@@ -168,13 +168,13 @@ class VersionResolver:
                         v_parsed = version.parse(v.version_tag)
                         if v_parsed.major == target_major:
                             compatible.append(v)
-                    except:
+                    except version.InvalidVersion:
                         # If parsing fails, include version if it's >= target number
                         compatible.append(v)
             
             return min(compatible, key=lambda v: v.version_number) if compatible else None
             
-        except:
+        except version.InvalidVersion:
             # Fallback: just use >= constraint
             return self._find_version_with_number_constraint(target_tag, versions, '>=')
     
@@ -204,13 +204,13 @@ class VersionResolver:
                         v_parsed = version.parse(v.version_tag)
                         if v_parsed.major == target_major and v_parsed.minor == target_minor:
                             compatible.append(v)
-                    except:
+                    except version.InvalidVersion:
                         # If parsing fails, include version if it's >= target number
                         compatible.append(v)
             
             return min(compatible, key=lambda v: v.version_number) if compatible else None
             
-        except:
+        except version.InvalidVersion:
             # Fallback: just use >= constraint
             return self._find_version_with_number_constraint(target_tag, versions, '>=')
     
