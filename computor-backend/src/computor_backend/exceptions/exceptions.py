@@ -28,6 +28,49 @@ class ComputorException(HTTPException):
     - Structured error responses
     - Debug information in development mode
     - Context metadata for logging and debugging
+
+    -------------------------------------------------------------------
+    Conventions for raising
+    -------------------------------------------------------------------
+
+    1. **Always pick a typed subclass.** Never raise ``HTTPException``
+       directly — the FastAPI handler at
+       ``error_handlers.http_exception_handler`` will translate it, but
+       the call site loses the chance to attach ``error_code`` /
+       ``context`` and bypasses the structured logging path.
+
+    2. **error_code policy.**
+       - If a subclass has only one canonical code (e.g.
+         ``ForbiddenException`` → ``AUTHZ_001``), rely on the class
+         default.
+       - If you want a more specific registry entry (e.g.
+         ``BadRequestException(error_code="VAL_003", ...)``), pass it
+         explicitly. The class's ``status_code`` always wins over the
+         registry's ``http_status``, so callers cannot accidentally
+         change the response code by picking a code from the wrong
+         category.
+       - The error code is what the client uses to programmatically
+         identify an error. Stable codes belong in
+         ``error_registry.yaml`` first; the code goes into a raise
+         second.
+
+    3. **detail vs context.**
+       - ``detail``: the user-facing message. Strings are returned as
+         ``message``; dicts surface as structured ``details`` with an
+         optional ``message`` key.
+       - ``context``: structured metadata for logging only — IDs, role
+         names, request shape. Never returned to the client. Prefer
+         this over interpolating IDs into the ``detail`` string.
+
+    4. **Preserve the cause chain.** When converting one exception to
+       another, write ``raise NewException(...) from e``. The handler's
+       structured log relies on the cause chain to surface the
+       underlying error.
+
+    5. **Don't leak ``str(e)`` from external libraries.** Raw
+       SQLAlchemy / GitLab / MinIO error strings can carry internals
+       (constraint names, SQL fragments). Log the full exception, but
+       hand the user a sanitised message.
     """
 
     def __init__(
