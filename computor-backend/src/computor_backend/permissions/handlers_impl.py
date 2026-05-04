@@ -1,16 +1,28 @@
 from typing import Optional
-from sqlalchemy.orm import Session, Query
+from sqlalchemy import and_, exists, not_, or_, select
+from sqlalchemy.orm import Session, Query, aliased
 from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.query_builders import (
-    CoursePermissionQueryBuilder, 
+    CoursePermissionQueryBuilder,
     OrganizationPermissionQueryBuilder,
-    UserPermissionQueryBuilder
+    UserPermissionQueryBuilder,
 )
-from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.database import SessionLocal
 from computor_backend.model.auth import User
-from computor_backend.model.course import Course, CourseMember, CourseContentType
+from computor_backend.model.course import (
+    Course,
+    CourseContent,
+    CourseContentType,
+    CourseGroup,
+    CourseMember,
+    SubmissionGroup,
+    SubmissionGroupMember,
+)
 from computor_backend.model.message import Message
+from computor_backend.model.result import Result
+from computor_backend.model.role import UserRole
 
 
 class UserPermissionHandler(PermissionHandler):
@@ -35,16 +47,9 @@ class UserPermissionHandler(PermissionHandler):
             if action in ["list", "get", "create"]:
                 return True
 
-            # For update/delete, user managers cannot modify admins or service accounts
+            # For update/delete, user managers cannot modify admins or service accounts.
+            # The actual check is in build_query; here we just allow the action through.
             if action in ["update", "delete"] and resource_id:
-                from computor_backend.model.auth import User
-                from computor_backend.model.role import UserRole
-                from computor_backend.database import SessionLocal
-
-                # Need to check the target user in the database
-                # This requires a database query, which is handled in build_query
-                # For can_perform_action with resource_id, we return True here
-                # and do the actual check in build_query
                 return True
 
         # Users can view themselves
@@ -54,9 +59,6 @@ class UserPermissionHandler(PermissionHandler):
         return False
     
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        from computor_backend.model.role import UserRole
-        from sqlalchemy import and_, not_, exists
-
         # Admin gets everything
         if self.check_admin(principal):
             return db.query(self.entity)
@@ -293,18 +295,14 @@ class OrganizationPermissionHandler(PermissionHandler):
 
         if action in ("get", "list"):
             # Visible if course-cascade OR org_member: union of two id sets.
-            from sqlalchemy import or_
-
             course_subquery = (
                 CoursePermissionQueryBuilder.user_courses_subquery(
                     principal.user_id, self.READ_COURSE_ROLE, db
                 )
             )
-            from computor_backend.model.course import Course as _Course
-
             org_via_course = (
-                db.query(_Course.organization_id)
-                .filter(_Course.id.in_(course_subquery))
+                db.query(Course.organization_id)
+                .filter(Course.id.in_(course_subquery))
             )
 
             org_via_member_ids = principal.get_scoped_ids_with_role(
@@ -380,8 +378,6 @@ class CourseFamilyPermissionHandler(PermissionHandler):
             return db.query(self.entity)
 
         if action in ("get", "list"):
-            from sqlalchemy import or_
-
             course_subquery = CoursePermissionQueryBuilder.user_courses_subquery(
                 principal.user_id, self.READ_COURSE_ROLE, db
             )
@@ -419,8 +415,6 @@ class CourseContentTypePermissionHandler(PermissionHandler):
     
     def _check_role_hierarchy(self, user_roles: set, required_role: str) -> bool:
         """Check if user roles meet the required role in hierarchy"""
-        from computor_backend.permissions.principal import course_role_hierarchy
-        
         if not user_roles:
             return False
         
@@ -478,11 +472,8 @@ class CourseContentTypePermissionHandler(PermissionHandler):
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
             # For CourseContentType, we need to check if the user has the required role
-            # in at least one course that uses this content type
-            from sqlalchemy.orm import aliased
-            from sqlalchemy import select, exists
-            
-            # For read operations, return all content types if user has any course membership
+            # in at least one course that uses this content type.
+            # For read operations, return all content types if user has any course membership.
             if action in ["get", "list"]:
                 # Check if user has any course membership
                 has_membership = db.query(
@@ -569,9 +560,6 @@ class CourseContentPermissionHandler(PermissionHandler):
         
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            from sqlalchemy.orm import aliased
-            from sqlalchemy import select
-            
             cm_other = aliased(CourseMember)
             
             subquery = CoursePermissionQueryBuilder.user_courses_subquery(
@@ -640,8 +628,6 @@ class CourseMemberPermissionHandler(PermissionHandler):
 
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            from sqlalchemy import or_
-
             # Get courses where principal has required role
             permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(
                 principal.user_id, min_role, db
@@ -687,11 +673,6 @@ class ResultPermissionHandler(PermissionHandler):
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        from computor_backend.model.result import Result
-        from computor_backend.model.course import CourseContent, CourseMember, SubmissionGroupMember
-        from sqlalchemy.orm import aliased
-        from sqlalchemy import or_, and_
-
         if self.check_admin(principal):
             return db.query(Result)
 
@@ -948,17 +929,6 @@ class MessagePermissionHandler(PermissionHandler):
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        from sqlalchemy import or_, and_
-        from computor_backend.permissions.query_builders import CoursePermissionQueryBuilder
-        from computor_backend.model.course import (
-            Course,
-            CourseContent,
-            CourseGroup,
-            CourseMember,
-            SubmissionGroup,
-            SubmissionGroupMember,
-        )
-
         base = db.query(self.entity)
 
         if self.check_admin(principal):
@@ -1177,8 +1147,6 @@ class _ScopeMemberPermissionHandler(PermissionHandler):
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        from sqlalchemy import and_, or_
-
         scope_fk = getattr(self.entity, self.SCOPE_FK)
         role_fk = getattr(self.entity, self.ROLE_FK)
 
