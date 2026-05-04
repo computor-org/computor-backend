@@ -62,14 +62,14 @@ async def deploy_from_config(
         return DeploymentResponse(**result)
 
     except ValueError as e:
-        raise BadRequestException(f"Invalid configuration: {str(e)}")
+        raise BadRequestException(f"Invalid configuration: {str(e)}") from e
     except Exception as e:
         logger.error(f"Deployment failed: {str(e)}")
         raise InternalServerException(
             error_code="INT_001",
             detail=f"Deployment failed: {str(e)}",
             context={"operation": "deploy_from_configuration"}
-        )
+        ) from e
 
 @deployment_router.post("/deploy/from-yaml", response_model=DeploymentResponse)
 async def deploy_from_yaml(
@@ -102,7 +102,7 @@ async def deploy_from_yaml(
             error_code="INT_001",
             detail=f"Deployment failed: {str(e)}",
             context={"operation": "deploy_from_yaml", "filename": file.filename}
-        )
+        ) from e
 
 @deployment_router.get("/deploy/status/{workflow_id}")
 async def get_deployment_status(
@@ -124,7 +124,7 @@ async def get_deployment_status(
             error_code="INT_001",
             detail=f"Failed to get status: {str(e)}",
             context={"operation": "get_deployment_status", "workflow_id": workflow_id}
-        )
+        ) from e
 
 @deployment_router.post("/deploy/validate")
 async def validate_deployment_config(

@@ -69,4 +69,4 @@ def update_organization_token(
         raise
     except Exception as e:
         logger.error(f"Error updating organization token: {e}")
-        raise BadRequestException(detail="Failed to update organization token")
+        raise BadRequestException(detail="Failed to update organization token") from e

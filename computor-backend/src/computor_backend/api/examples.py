@@ -582,7 +582,7 @@ async def upload_example(
                 extracted_files = files
         except Exception as e:
             logger.exception("Failed to extract uploaded zip for example")
-            raise BadRequestException(f"Invalid zip upload: {e}")
+            raise BadRequestException(f"Invalid zip upload: {e}") from e
 
     # Choose file source
     incoming_files = extracted_files if extracted_files is not None else request.files
@@ -600,7 +600,7 @@ async def upload_example(
             meta_str = str(meta_content)
         meta_data = yaml.safe_load(meta_str)
     except yaml.YAMLError as e:
-        raise BadRequestException(f"Invalid meta.yaml format: {str(e)}")
+        raise BadRequestException(f"Invalid meta.yaml format: {str(e)}") from e
     
     # Extract metadata from meta.yaml
     title = meta_data.get('title', request.directory.replace('-', ' ').replace('_', ' ').title())
@@ -617,7 +617,7 @@ async def upload_example(
     except ValueError as e:
         raise BadRequestException(
             f"Invalid version format in meta.yaml: {str(e)}"
-        )
+        ) from e
 
     # Extract tags and other metadata
     tags = []

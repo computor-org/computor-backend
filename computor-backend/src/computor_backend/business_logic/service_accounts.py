@@ -101,7 +101,7 @@ def create_service_account(
             db.flush()  # Get user ID
             logger.info(f"Created new service user: {username}")
         except Exception as e:
-            raise BadRequestException(detail=f"Failed to create user: {str(e)}")
+            raise BadRequestException(detail=f"Failed to create user: {str(e)}") from e
 
     # Look up ServiceType by path to get UUID
     service_type_id = None
@@ -141,7 +141,7 @@ def create_service_account(
     except IntegrityError as e:
         db.rollback()
         logger.error(f"Database integrity error creating service: {e}")
-        raise BadRequestException(detail="Failed to create service - database constraint violated")
+        raise BadRequestException(detail="Failed to create service - database constraint violated") from e
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating service account: {e}")

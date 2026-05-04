@@ -537,7 +537,7 @@ def create_api_token_admin(
         logger.error(f"Failed to create admin token (likely duplicate): {e}")
         raise BadRequestException(
             detail="Failed to create token - token hash may already exist"
-        )
+        ) from e
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating admin API token: {e}")

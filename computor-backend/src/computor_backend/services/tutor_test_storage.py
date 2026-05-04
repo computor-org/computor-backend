@@ -65,7 +65,7 @@ def ensure_tutor_tests_bucket_exists() -> None:
             )
     except Exception as e:
         logger.error(f"Error ensuring tutor-tests bucket exists: {e}")
-        raise ServiceUnavailableException(f"Storage service error: {e}")
+        raise ServiceUnavailableException(f"Storage service error: {e}") from e
 
 
 async def store_tutor_test_input(
@@ -161,7 +161,7 @@ async def store_tutor_test_input(
         raise ServiceUnavailableException("Invalid ZIP file")
     except Exception as e:
         logger.error(f"Error storing tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e
 
 
 async def get_tutor_test_input_path(test_id: str | UUID) -> str:
@@ -227,7 +227,7 @@ async def download_tutor_test_input_as_zip(test_id: str | UUID) -> bytes:
         raise
     except Exception as e:
         logger.error(f"Error downloading tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e
 
 
 async def store_tutor_test_result(
@@ -271,7 +271,7 @@ async def store_tutor_test_result(
 
     except Exception as e:
         logger.error(f"Error storing tutor test result: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e
 
 
 async def retrieve_tutor_test_result(test_id: str | UUID) -> Optional[dict]:
@@ -364,7 +364,7 @@ async def store_tutor_test_artifact(
 
     except Exception as e:
         logger.error(f"Error storing tutor test artifact: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e
 
 
 async def store_tutor_test_artifacts_from_zip(
@@ -408,7 +408,7 @@ async def store_tutor_test_artifacts_from_zip(
 
     except Exception as e:
         logger.error(f"Error storing tutor test artifacts: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e
 
 
 async def list_tutor_test_artifacts(test_id: str | UUID) -> list[dict]:
@@ -562,4 +562,4 @@ async def extract_tutor_test_input_to_directory(
         raise
     except Exception as e:
         logger.error(f"Error extracting tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}")
+        raise ServiceUnavailableException(f"Storage error: {e}") from e

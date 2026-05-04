@@ -57,7 +57,7 @@ def get_current_user(user_id: str, db: Session) -> User:
         return user
     except Exception as e:
         logger.error(f"Error fetching user: {e}")
-        raise NotFoundException()
+        raise NotFoundException() from e
 
 
 def get_user_scopes_from_principal(principal: Principal) -> UserScopes:
@@ -179,7 +179,7 @@ def set_user_password(
         )
     except PasswordValidationError as e:
         # Convert PasswordValidationError to BadRequestException for API
-        raise BadRequestException(str(e))
+        raise BadRequestException(str(e)) from e
 
     # Clear password reset flag
     user.password_reset_required = False

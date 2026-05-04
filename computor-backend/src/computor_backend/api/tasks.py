@@ -100,7 +100,7 @@ async def list_tasks(
             error_code="INT_001",
             detail=f"Failed to list tasks: {str(e)}",
             context={"operation": "list_tasks"}
-        )
+        ) from e
 
 @tasks_router.post("/submit", response_model=Dict[str, str])
 async def submit_task(
@@ -140,13 +140,13 @@ async def submit_task(
             error_code="VAL_001",
             detail=f"Unknown task type: {str(e)}",
             context={"task_name": submission.task_name}
-        )
+        ) from e
     except Exception as e:
         raise InternalServerException(
             error_code="INT_001",
             detail=f"Failed to submit task: {str(e)}",
             context={"operation": "submit_task", "task_name": submission.task_name}
-        )
+        ) from e
 
 @tasks_router.get("/{task_id}", response_model=TaskInfo)
 async def get_task(
@@ -219,7 +219,7 @@ async def get_task_status(
             error_code="INT_001",
             detail=f"Failed to get task status: {str(e)}",
             context={"operation": "get_task_status", "task_id": task_id}
-        )
+        ) from e
 
 @tasks_router.get("/{task_id}/result", response_model=TaskResult)
 async def get_task_result(
@@ -269,7 +269,7 @@ async def get_task_result(
             error_code="INT_001",
             detail=f"Failed to get task result: {str(e)}",
             context={"operation": "get_task_result", "task_id": task_id}
-        )
+        ) from e
 
 @tasks_router.delete("/{task_id}/cancel")
 async def cancel_task(
@@ -316,7 +316,7 @@ async def cancel_task(
             error_code="INT_001",
             detail=f"Failed to cancel task: {str(e)}",
             context={"operation": "cancel_task", "task_id": task_id}
-        )
+        ) from e
 
 @tasks_router.delete("/{task_id}")
 async def delete_task(
@@ -378,7 +378,7 @@ async def delete_task(
             error_code="INT_001",
             detail=f"Failed to delete task: {str(e)}",
             context={"operation": "delete_task", "task_id": task_id}
-        )
+        ) from e
 
 @tasks_router.get("/types", response_model=List[str])
 async def list_task_types(
@@ -407,7 +407,7 @@ async def list_task_types(
             error_code="INT_001",
             detail=f"Failed to list task types: {str(e)}",
             context={"operation": "list_task_types"}
-        )
+        ) from e
 
 @tasks_router.get("/workers/status", response_model=Dict[str, Any])
 async def get_worker_status(
@@ -437,4 +437,4 @@ async def get_worker_status(
             error_code="INT_001",
             detail=f"Failed to get worker status: {str(e)}",
             context={"operation": "get_worker_status"}
-        )
+        ) from e

@@ -111,7 +111,7 @@ async def deploy_from_yaml_file(
     try:
         yaml_data = yaml.safe_load(file_content)
     except yaml.YAMLError as e:
-        raise BadRequestException(f"Invalid YAML format: {str(e)}")
+        raise BadRequestException(f"Invalid YAML format: {str(e)}") from e
 
     # Convert to deployment configuration
     config = ComputorDeploymentConfig(**yaml_data)

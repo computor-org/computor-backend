@@ -687,7 +687,7 @@ async def create_tutor_test(
         logger.info(f"Started tutor test workflow {workflow_id} for test {test_id}")
     except Exception as e:
         logger.error(f"Failed to start tutor test workflow: {e}")
-        raise BadRequestException(detail=f"Failed to start test: {e}")
+        raise BadRequestException(detail=f"Failed to start test: {e}") from e
 
     return TutorTestCreateResponse(
         test_id=test_id,

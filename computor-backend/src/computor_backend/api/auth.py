@@ -247,7 +247,7 @@ async def initiate_login(
         logger.error(f"Exception type: {type(e)}")
         logger.error(f"Exception traceback:", exc_info=True)
         from computor_backend.exceptions import InternalServerException
-        raise InternalServerException(detail=f"Failed to initiate login: {str(e)}")
+        raise InternalServerException(detail=f"Failed to initiate login: {str(e)}") from e
 
 @auth_router.get("/{provider}/callback", name="handle_callback")
 async def handle_callback(
@@ -434,9 +434,9 @@ async def disable_plugin(
     # Check admin permission
     if "_admin" not in principal.roles:
         raise UnauthorizedException("Admin access required")
-    
+
     registry = get_plugin_registry()
-    
+
     # Unload if loaded
     await registry.unload_plugin(plugin_name)
     

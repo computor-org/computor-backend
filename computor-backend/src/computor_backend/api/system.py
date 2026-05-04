@@ -97,7 +97,7 @@ async def create_organization_async(
         raise TemporalServiceException(
             detail=f"Failed to submit organization creation task: {str(e)}",
             context={"operation": "create_organization"}
-        )
+        ) from e
 
     return TaskResponse(
         task_id=task_id,
@@ -165,7 +165,7 @@ async def create_course_family_async(
         raise TemporalServiceException(
             detail=f"Failed to submit course family creation task: {str(e)}",
             context={"operation": "create_course_family", "organization_id": request.organization_id}
-        )
+        ) from e
 
     return TaskResponse(
         task_id=task_id,
@@ -232,7 +232,7 @@ async def create_course_async(
         raise TemporalServiceException(
             detail=f"Failed to submit course creation task: {str(e)}",
             context={"operation": "create_course", "course_family_id": request.course_family_id}
-        )
+        ) from e
 
     return TaskResponse(
         task_id=task_id,
@@ -741,7 +741,7 @@ async def create_hierarchy(
             error_code="VAL_001",
             detail=f"Invalid deployment configuration: {str(e)}",
             context={"validation_error": str(e)}
-        )
+        ) from e
     
     if validate_only:
         return {
