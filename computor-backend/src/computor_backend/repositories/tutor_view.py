@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from .view_base import ViewRepository
-from ..api.mappers import course_member_course_content_result_mapper
+from .view_mappers import course_member_course_content_result_mapper
 from ..repositories.course_content import (
     course_member_course_content_query,
     course_member_course_content_list_query,

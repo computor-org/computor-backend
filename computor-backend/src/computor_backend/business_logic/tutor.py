@@ -21,7 +21,7 @@ from computor_backend.repositories.course_content import (
     get_unread_message_count_per_member,
     get_unreviewed_submission_count_per_member,
 )
-from computor_backend.api.mappers import course_member_course_content_result_mapper
+from computor_backend.repositories.view_mappers import course_member_course_content_result_mapper
 from computor_backend.model.auth import User
 from computor_backend.model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
