@@ -175,13 +175,18 @@ class ConnectionManager:
         logger.info("ConnectionManager stopped")
 
     async def _close_connection_safe(self, conn: Connection):
-        """Close a connection safely with timeout."""
+        """Close a connection safely with timeout.
+
+        The socket may already be gone (peer disconnect, network failure).
+        Treat all failures as best-effort — logging at debug avoids spam
+        when many connections drop at once.
+        """
         try:
             await asyncio.wait_for(conn.websocket.close(), timeout=1.0)
         except asyncio.TimeoutError:
-            pass
+            logger.debug("WebSocket close timed out")
         except Exception:
-            pass
+            logger.debug("WebSocket close failed", exc_info=True)
 
     async def connect(self, websocket: WebSocket, principal: Principal) -> Connection:
         """

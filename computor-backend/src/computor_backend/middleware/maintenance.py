@@ -212,7 +212,10 @@ class MaintenanceMiddleware:
                 principal_data = json.loads(cached_data)
                 return principal_data.get("is_admin", False)
         except Exception:
-            pass
+            # Cache lookup failed — fall through and treat as non-admin to keep
+            # the maintenance gate strict. Logged at debug to avoid spamming on
+            # cache outages.
+            logger.debug("Maintenance admin cache lookup failed", exc_info=True)
 
         return False
 

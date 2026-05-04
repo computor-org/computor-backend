@@ -260,7 +260,13 @@ async def generate_assignments_repository_activity(
                                 if ev and ev.version_tag and not content.deployment.version_tag:
                                     content.deployment.version_tag = ev.version_tag
                             except Exception:
-                                pass
+                                # Best-effort metadata stamping — deployment row will still
+                                # commit without source identity if this branch trips.
+                                logger.warning(
+                                    "Failed to stamp deployment source identity for content %s",
+                                    getattr(content, "id", "<unknown>"),
+                                    exc_info=True,
+                                )
                             # History entry
                             # Ensure history example_identifier is proper ltree
                             from computor_backend.custom_types import Ltree
@@ -279,7 +285,13 @@ async def generate_assignments_repository_activity(
                             db.add(hist)
                     db.commit()
                 except Exception:
-                    pass
+                    # History/metadata commit failed — roll back so the session
+                    # is reusable; the push itself already succeeded.
+                    db.rollback()
+                    logger.warning(
+                        "Failed to commit deployment history for assignments push",
+                        exc_info=True,
+                    )
 
             result = {
                 "success": processed > 0 and pushed,

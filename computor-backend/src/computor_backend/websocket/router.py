@@ -143,7 +143,9 @@ async def websocket_endpoint(
             ).model_dump())
             await websocket.close(code=e.code, reason=e.reason)
         except Exception:
-            pass
+            # Best-effort close: original error already logged; the close
+            # itself can fail if the socket is already gone. Nothing to do.
+            logger.debug("Failed to close WebSocket after error", exc_info=True)
 
     except ConnectionLimitError as e:
         logger.warning(f"WebSocket connection limit: {e.message}")
@@ -155,14 +157,18 @@ async def websocket_endpoint(
             ).model_dump())
             await websocket.close(code=e.code, reason=e.message)
         except Exception:
-            pass
+            # Best-effort close: original error already logged; the close
+            # itself can fail if the socket is already gone. Nothing to do.
+            logger.debug("Failed to close WebSocket after error", exc_info=True)
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         try:
             await websocket.close(code=1011, reason="Internal error")
         except Exception:
-            pass
+            # Best-effort close: original error already logged; the close
+            # itself can fail if the socket is already gone. Nothing to do.
+            logger.debug("Failed to close WebSocket after error", exc_info=True)
 
     finally:
         if connection:

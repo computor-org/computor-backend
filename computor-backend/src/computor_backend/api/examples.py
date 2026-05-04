@@ -3,6 +3,7 @@ FastAPI endpoints for Example Library management.
 """
 
 import base64
+import binascii
 import zipfile
 import mimetypes
 import io
@@ -165,8 +166,8 @@ def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, boo
             if idx != -1:
                 b64 = text[idx + len(base64_marker):]
                 return io.BytesIO(base64.b64decode(b64, validate=False)), True
-        except Exception:
-            pass  # fall back to other handling
+        except (ValueError, binascii.Error):
+            pass  # malformed data URI — fall back to other handling
 
     # Normalize whitespace
     clean = text.replace('\n', '').replace('\r', '').replace(' ', '').replace('\t', '')
@@ -185,8 +186,8 @@ def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, boo
         try:
             decoded = base64.b64decode(clean, validate=True)
             return io.BytesIO(decoded), True
-        except Exception:
-            pass
+        except (ValueError, binascii.Error):
+            pass  # not valid base64 — treat as text below
 
     # Default: treat as UTF-8 text
     return io.BytesIO(text.encode('utf-8')), False

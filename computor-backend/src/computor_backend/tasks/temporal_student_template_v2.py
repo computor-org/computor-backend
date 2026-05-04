@@ -495,7 +495,9 @@ async def generate_student_template_activity_v2(
                         example = content.deployment.example_version.example
                         if example and example.identifier:
                             deployment_path = str(example.identifier)
-                    except Exception:
+                    except AttributeError:
+                        # Lazy-loaded relationship missing under detached session — skip,
+                        # caller will fall through to the empty-deployment branch.
                         pass
 
                 exists_in_repo = deployment_path in existing_directories if deployment_path else False

@@ -179,12 +179,12 @@ class BaseRepository(ABC, Generic[T]):
                         import json
                         # Try to parse as JSON first
                         value = json.loads(value)
-                    except Exception:
+                    except (ValueError, TypeError):
                         # If JSON parsing fails, try Python literal eval
                         try:
                             import ast
                             value = ast.literal_eval(value)
-                        except Exception:
+                        except (ValueError, SyntaxError):
                             # If all parsing fails, leave as string (will be fixed on next write)
                             pass
 

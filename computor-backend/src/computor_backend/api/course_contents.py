@@ -707,7 +707,7 @@ async def move_course_content(
                 if cache_keys:
                     await cache.delete(*cache_keys)
         except Exception:
-            pass
+            logger.warning("Failed to clear Redis cache for %s", table_name, exc_info=True)
 
     # Invalidate lecturer/tutor user view caches for this course
     try:
@@ -721,6 +721,6 @@ async def move_course_content(
             entity_id=course_id
         )
     except Exception:
-        pass
+        logger.warning("Failed to invalidate user view caches for course %s", course_id, exc_info=True)
 
     return content
