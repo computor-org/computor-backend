@@ -207,20 +207,6 @@ class ForbiddenException(ComputorException):
         self.status_code = status.HTTP_403_FORBIDDEN
 
 
-class AdminRequiredException(ComputorException):
-    """Admin access required - 403"""
-
-    def __init__(
-        self,
-        error_code: str = "AUTHZ_002",
-        detail: ExceptionDetail = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_403_FORBIDDEN
-
-
 class CourseAccessDeniedException(ComputorException):
     """Course access denied - 403"""
 
@@ -231,25 +217,6 @@ class CourseAccessDeniedException(ComputorException):
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_403_FORBIDDEN
-
-
-class InsufficientCourseRoleException(ComputorException):
-    """Insufficient course role - 403"""
-
-    def __init__(
-        self,
-        error_code: str = "AUTHZ_004",
-        detail: ExceptionDetail = None,
-        headers: Optional[Dict[str, str]] = None,
-        required_role: Optional[str] = None,
-        **kwargs,
-    ):
-        if required_role:
-            if "context" not in kwargs:
-                kwargs["context"] = {}
-            kwargs["context"]["required_role"] = required_role
         super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
         self.status_code = status.HTTP_403_FORBIDDEN
 
@@ -269,63 +236,6 @@ class BadRequestException(ComputorException):
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class MissingFieldException(ComputorException):
-    """Required field missing - 400"""
-
-    def __init__(
-        self,
-        field_name: str,
-        error_code: str = "VAL_002",
-        detail: ExceptionDetail = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        if "context" not in kwargs:
-            kwargs["context"] = {}
-        kwargs["context"]["field_name"] = field_name
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class InvalidFieldFormatException(ComputorException):
-    """Invalid field format - 400"""
-
-    def __init__(
-        self,
-        field_name: str,
-        expected_format: str,
-        error_code: str = "VAL_003",
-        detail: ExceptionDetail = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        if "context" not in kwargs:
-            kwargs["context"] = {}
-        kwargs["context"]["field_name"] = field_name
-        kwargs["context"]["expected_format"] = expected_format
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class InvalidFileUploadException(ComputorException):
-    """Invalid file upload - 400"""
-
-    def __init__(
-        self,
-        error_code: str = "VAL_004",
-        detail: ExceptionDetail = None,
-        headers: Optional[Dict[str, str]] = None,
-        max_size: Optional[str] = None,
-        **kwargs,
-    ):
-        if max_size:
-            if "context" not in kwargs:
-                kwargs["context"] = {}
-            kwargs["context"]["max_size"] = max_size
         super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
         self.status_code = status.HTTP_400_BAD_REQUEST
 
