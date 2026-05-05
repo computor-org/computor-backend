@@ -16,7 +16,7 @@ from typing import Optional
 from uuid import UUID
 
 from .storage_service import get_storage_service
-from ..api.exceptions import NotFoundException
+from ..exceptions import NotFoundException
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,12 @@ This module provides custom HTTP exceptions that integrate with the error regist
 to provide consistent, informative error responses with unique error codes.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+# Detail accepted by every Computor exception. ``ComputorException.to_error_response``
+# branches on ``isinstance(detail, str)`` and ``isinstance(detail, dict)``; anything
+# else is ignored, so ``Any`` was hiding the real contract.
+ExceptionDetail = Optional[Union[str, Dict[str, Any]]]
 from fastapi import HTTPException, status
 import traceback
 import inspect
@@ -23,12 +28,55 @@ class ComputorException(HTTPException):
     - Structured error responses
     - Debug information in development mode
     - Context metadata for logging and debugging
+
+    -------------------------------------------------------------------
+    Conventions for raising
+    -------------------------------------------------------------------
+
+    1. **Always pick a typed subclass.** Never raise ``HTTPException``
+       directly — the FastAPI handler at
+       ``error_handlers.http_exception_handler`` will translate it, but
+       the call site loses the chance to attach ``error_code`` /
+       ``context`` and bypasses the structured logging path.
+
+    2. **error_code policy.**
+       - If a subclass has only one canonical code (e.g.
+         ``ForbiddenException`` → ``AUTHZ_001``), rely on the class
+         default.
+       - If you want a more specific registry entry (e.g.
+         ``BadRequestException(error_code="VAL_003", ...)``), pass it
+         explicitly. The class's ``status_code`` always wins over the
+         registry's ``http_status``, so callers cannot accidentally
+         change the response code by picking a code from the wrong
+         category.
+       - The error code is what the client uses to programmatically
+         identify an error. Stable codes belong in
+         ``error_registry.yaml`` first; the code goes into a raise
+         second.
+
+    3. **detail vs context.**
+       - ``detail``: the user-facing message. Strings are returned as
+         ``message``; dicts surface as structured ``details`` with an
+         optional ``message`` key.
+       - ``context``: structured metadata for logging only — IDs, role
+         names, request shape. Never returned to the client. Prefer
+         this over interpolating IDs into the ``detail`` string.
+
+    4. **Preserve the cause chain.** When converting one exception to
+       another, write ``raise NewException(...) from e``. The handler's
+       structured log relies on the cause chain to surface the
+       underlying error.
+
+    5. **Don't leak ``str(e)`` from external libraries.** Raw
+       SQLAlchemy / GitLab / MinIO error strings can carry internals
+       (constraint names, SQL fragments). Log the full exception, but
+       hand the user a sanitised message.
     """
 
     def __init__(
         self,
         error_code: str,
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         context: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None,
@@ -133,7 +181,7 @@ class UnauthorizedException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -147,7 +195,7 @@ class BasicAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         **kwargs,
     ):
         headers = {"WWW-Authenticate": "Basic"}
@@ -161,7 +209,7 @@ class TokenExpiredException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -175,7 +223,7 @@ class SSOAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTH_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -194,21 +242,7 @@ class ForbiddenException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_001",
-        detail: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_403_FORBIDDEN
-
-
-class AdminRequiredException(ComputorException):
-    """Admin access required - 403"""
-
-    def __init__(
-        self,
-        error_code: str = "AUTHZ_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -222,29 +256,10 @@ class CourseAccessDeniedException(ComputorException):
     def __init__(
         self,
         error_code: str = "AUTHZ_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_403_FORBIDDEN
-
-
-class InsufficientCourseRoleException(ComputorException):
-    """Insufficient course role - 403"""
-
-    def __init__(
-        self,
-        error_code: str = "AUTHZ_004",
-        detail: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        required_role: Optional[str] = None,
-        **kwargs,
-    ):
-        if required_role:
-            if "context" not in kwargs:
-                kwargs["context"] = {}
-            kwargs["context"]["required_role"] = required_role
         super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
         self.status_code = status.HTTP_403_FORBIDDEN
 
@@ -260,67 +275,10 @@ class BadRequestException(ComputorException):
     def __init__(
         self,
         error_code: str = "VAL_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class MissingFieldException(ComputorException):
-    """Required field missing - 400"""
-
-    def __init__(
-        self,
-        field_name: str,
-        error_code: str = "VAL_002",
-        detail: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        if "context" not in kwargs:
-            kwargs["context"] = {}
-        kwargs["context"]["field_name"] = field_name
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class InvalidFieldFormatException(ComputorException):
-    """Invalid field format - 400"""
-
-    def __init__(
-        self,
-        field_name: str,
-        expected_format: str,
-        error_code: str = "VAL_003",
-        detail: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
-        if "context" not in kwargs:
-            kwargs["context"] = {}
-        kwargs["context"]["field_name"] = field_name
-        kwargs["context"]["expected_format"] = expected_format
-        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
-        self.status_code = status.HTTP_400_BAD_REQUEST
-
-
-class InvalidFileUploadException(ComputorException):
-    """Invalid file upload - 400"""
-
-    def __init__(
-        self,
-        error_code: str = "VAL_004",
-        detail: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        max_size: Optional[str] = None,
-        **kwargs,
-    ):
-        if max_size:
-            if "context" not in kwargs:
-                kwargs["context"] = {}
-            kwargs["context"]["max_size"] = max_size
         super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
         self.status_code = status.HTTP_400_BAD_REQUEST
 
@@ -336,7 +294,7 @@ class NotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -350,7 +308,7 @@ class UserNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -364,7 +322,7 @@ class CourseNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -378,7 +336,7 @@ class EndpointNotFoundException(ComputorException):
     def __init__(
         self,
         error_code: str = "NF_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -397,7 +355,7 @@ class ConflictException(ComputorException):
     def __init__(
         self,
         error_code: str = "CONFLICT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -411,7 +369,7 @@ class ConcurrentModificationException(ComputorException):
     def __init__(
         self,
         error_code: str = "CONFLICT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -430,7 +388,7 @@ class RateLimitException(ComputorException):
     def __init__(
         self,
         error_code: str = "RATE_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         retry_after: int = 60,
         **kwargs,
     ):
@@ -450,7 +408,7 @@ class GitLabServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -464,7 +422,7 @@ class GitLabAuthException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -478,7 +436,7 @@ class MinIOServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -492,7 +450,7 @@ class TemporalServiceException(ComputorException):
     def __init__(
         self,
         error_code: str = "EXT_004",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -511,7 +469,7 @@ class DatabaseConnectionException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -525,7 +483,7 @@ class DatabaseQueryException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -539,7 +497,7 @@ class DatabaseTransactionException(ComputorException):
     def __init__(
         self,
         error_code: str = "DB_003",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -558,7 +516,7 @@ class InternalServerException(ComputorException):
     def __init__(
         self,
         error_code: str = "INT_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -572,7 +530,7 @@ class ConfigurationException(ComputorException):
     def __init__(
         self,
         error_code: str = "INT_002",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -591,7 +549,7 @@ class NotImplementedException(ComputorException):
     def __init__(
         self,
         error_code: str = "NIMPL_001",
-        detail: Any = None,
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
@@ -600,21 +558,25 @@ class NotImplementedException(ComputorException):
 
 
 # ============================================================================
-# LEGACY COMPATIBILITY - DEPRECATED
+# GENERIC SERVICE UNAVAILABLE (503)
 # ============================================================================
 
 
 class ServiceUnavailableException(ComputorException):
-    """
-    Legacy exception - use specific service exceptions instead.
+    """Generic 503 fallback when the upstream service is unknown.
 
-    DEPRECATED: Use GitLabServiceException, MinIOServiceException, etc.
+    Prefer the service-specific subclasses where possible:
+    ``GitLabServiceException`` (EXT_001), ``MinIOServiceException``
+    (EXT_003), ``TemporalServiceException`` (EXT_004). Use this class
+    only when the originating service can't be identified — e.g. the
+    Starlette HTTPException → ComputorException fallback in
+    ``error_handlers.http_exception_handler``.
     """
 
     def __init__(
         self,
-        error_code: str = "INT_001",
-        detail: Any = None,
+        error_code: str = "EXT_006",
+        detail: ExceptionDetail = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs,
     ):

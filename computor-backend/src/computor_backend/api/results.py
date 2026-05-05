@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Response, status
 from sqlalchemy.orm import Session
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     delete_entity as delete_db,
@@ -40,8 +41,7 @@ async def list_results(
     db: Session = Depends(get_db),
 ) -> list[ResultList]:
     results, total = await list_db(permissions, db, params, ResultInterface)
-    response.headers["X-Total-Count"] = str(total)
-    return results
+    return paginated_list(results, total, response=response)
 
 @result_router.get("/{result_id}", response_model=ResultGet)
 async def get_result(
@@ -116,7 +116,7 @@ async def update_result(
 
     # Check permissions using the standard permission system
     from computor_backend.permissions.core import check_permissions
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
 
     query = check_permissions(permissions, ResultInterface.model, "update", db)
     if query is None:
@@ -194,7 +194,7 @@ async def list_result_artifacts_endpoint(
     - Generated reports
     - Debug output files
     """
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
 
     # Verify the user has access to this result
     result = await get_id_db(permissions, db, result_id, ResultInterface)
@@ -236,7 +236,7 @@ async def download_result_artifacts(
     Returns a ZIP archive containing all artifacts generated during test execution.
     """
     from fastapi.responses import StreamingResponse
-    from computor_backend.api.exceptions import NotFoundException
+    from computor_backend.exceptions import NotFoundException
     import zipfile
     from io import BytesIO
 
@@ -294,7 +294,7 @@ async def upload_result_artifacts(
     """
     import zipfile
     from io import BytesIO
-    from computor_backend.api.exceptions import NotFoundException, BadRequestException
+    from computor_backend.exceptions import NotFoundException, BadRequestException
     from computor_backend.services.result_storage import store_result_artifact
     from computor_types.artifacts import ArtifactInfo, ResultArtifactUploadResponse
 
@@ -325,7 +325,7 @@ async def upload_result_artifacts(
         total_size = sum(info.file_size for info in file_infos if not info.is_dir())
         if total_size > MAX_TOTAL_SIZE:
             raise BadRequestException(
-                detail=f"ZIP total uncompressed size ({total_size} bytes) exceeds maximum ({MAX_TOTAL_SIZE} bytes)."
+                detail=f"ZIP total uncompressed size ({total_size} bytes) exceeds maximum ({MAX_TOTAL_SIZE} bytes)"
             )
 
     # Extract and store each file

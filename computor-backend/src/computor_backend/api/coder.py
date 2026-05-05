@@ -7,7 +7,7 @@ This router provides endpoints for on-demand workspace provisioning.
 import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,14 @@ from computor_backend.coder.exceptions import (
     CoderDisabledError,
     CoderNotFoundError,
     CoderTemplateNotFoundError,
+)
+from computor_backend.exceptions import (
+    BadRequestException,
+    ComputorException,
+    ForbiddenException,
+    InternalServerException,
+    NotFoundException,
+    ServiceUnavailableException,
 )
 from computor_backend.coder.schemas import (
     CoderAdminTaskResponse,
@@ -57,44 +65,35 @@ def _check_workspace_access(permissions: Principal, action: str = "access") -> N
     if permissions.is_admin:
         return
     if not permissions.permitted("workspace", action):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+        raise ForbiddenException(
             detail=f"Workspace '{action}' permission required. Contact your administrator.",
         )
 
 
-def _handle_coder_error(e: Exception) -> HTTPException:
-    """Convert Coder exceptions to HTTP exceptions."""
+def _handle_coder_error(e: Exception) -> ComputorException:
+    """Convert Coder exceptions to typed ComputorException instances.
+
+    Returned (not raised) so callers can ``raise _handle_coder_error(e) from e``
+    and preserve the cause chain via ``from e``.
+    """
     if isinstance(e, CoderDisabledError):
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Coder integration is disabled",
-        )
+        return ServiceUnavailableException(detail="Coder integration is disabled")
     if isinstance(e, CoderConnectionError):
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Cannot connect to Coder server",
-        )
+        return ServiceUnavailableException(detail="Cannot connect to Coder server")
     if isinstance(e, CoderAuthenticationError):
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        return ServiceUnavailableException(
             detail="Coder admin authentication failed — check CODER_ADMIN_EMAIL and CODER_ADMIN_PASSWORD in .env",
         )
     if isinstance(e, CoderNotFoundError):
-        return HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+        return NotFoundException(detail=str(e))
     if isinstance(e, CoderAPIError):
-        return HTTPException(
-            status_code=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=e.message,
-        )
-    logger.exception(f"Unexpected Coder error: {e}")
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Internal Coder error",
-    )
+        # CoderAPIError carries its own status_code; surface 4xx as bad request,
+        # 5xx as internal — handlers will pick the right log severity.
+        if e.status_code and 400 <= e.status_code < 500:
+            return BadRequestException(detail=e.message)
+        return InternalServerException(detail=e.message)
+    logger.exception("Unexpected Coder error")
+    return InternalServerException(detail="Internal Coder error")
 
 
 async def require_coder_enabled(
@@ -155,7 +154,7 @@ async def list_templates(
             count=len(templates),
         )
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 # -----------------------------------------------------------------------------
@@ -186,18 +185,16 @@ async def provision_workspace(
         # Verify template exists in Coder before minting a token
         try:
             await client.get_template_id(request.template.value)
-        except CoderTemplateNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        except CoderTemplateNotFoundError as e:
+            raise ServiceUnavailableException(
                 detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
-            )
+            ) from e
 
         # Resolve target user
         if request.email:
             target_user = get_user_by_email(db, cache, request.email)
             if not target_user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
+                raise NotFoundException(
                     detail=f"User with email {request.email} not found",
                 )
         else:
@@ -222,7 +219,7 @@ async def provision_workspace(
     except HTTPException:
         raise
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 # -----------------------------------------------------------------------------
@@ -266,7 +263,7 @@ async def get_workspaces(
     except CoderNotFoundError:
         return WorkspaceListResponse(workspaces=[], count=0)
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 @router.get(
@@ -303,7 +300,7 @@ async def workspace_exists(
     except CoderNotFoundError:
         return False
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 # -----------------------------------------------------------------------------
@@ -327,7 +324,7 @@ async def get_workspace_details(
     try:
         return await client.get_workspace(username, workspace_name)
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 @router.post(
@@ -351,7 +348,7 @@ async def start_workspace(
             message="Workspace starting" if success else "Failed to start workspace",
         )
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 @router.post(
@@ -375,7 +372,7 @@ async def stop_workspace(
             message="Workspace stopping" if success else "Failed to stop workspace",
         )
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 @router.delete(
@@ -399,7 +396,7 @@ async def delete_workspace(
             message="Workspace deleted" if success else "Failed to delete workspace",
         )
     except Exception as e:
-        raise _handle_coder_error(e)
+        raise _handle_coder_error(e) from e
 
 
 # -----------------------------------------------------------------------------
@@ -576,7 +573,4 @@ async def get_admin_task_status(
     try:
         return await executor.get_task_status(workflow_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+        raise NotFoundException(detail=str(e)) from e

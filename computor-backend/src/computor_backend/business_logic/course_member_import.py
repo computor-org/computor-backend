@@ -9,7 +9,7 @@ from computor_backend.model.auth import User, StudentProfile
 from computor_backend.model.course import Course, CourseMember, CourseGroup
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import ForbiddenException, BadRequestException
+from computor_backend.exceptions import ForbiddenException, BadRequestException
 
 from computor_types.course_member_import import (
     CourseMemberImportRequest,
@@ -74,13 +74,15 @@ async def import_course_member(
 
     if not user_role:
         raise ForbiddenException(
-            "You don't have a role in this course."
+            "You don't have a role in this course"
         )
 
     if not course_role_hierarchy.can_assign_role(user_role, target_role):
         raise ForbiddenException(
-            f"You cannot assign the role '{target_role}'. "
-            f"Your role '{user_role}' can only assign roles at or below your privilege level."
+            error_code="AUTHZ_005",
+            detail=f"You cannot assign the role '{target_role}'. "
+                   f"Your role '{user_role}' can only assign roles at or below your privilege level.",
+            context={"target_role": target_role, "user_role": user_role, "course_id": str(course_id)},
         )
 
     # Initialize tracking variables

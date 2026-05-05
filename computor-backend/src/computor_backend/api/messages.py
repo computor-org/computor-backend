@@ -26,6 +26,7 @@ async def _safe_broadcast(coro, *, op: str, message_id: str | None = None):
             exc_info=True,
         )
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     delete_entity as delete_db,
@@ -160,8 +161,7 @@ async def list_messages(
     # Use custom list function that supports user-specific filtering
     items, total = list_messages_with_filters(permissions, db, params)
     items = list_messages_with_read_status(items, permissions, db)
-    response.headers["X-Total-Count"] = str(total)
-    return items
+    return paginated_list(items, total, response=response)
 
 @messages_router.patch("/{id}", response_model=MessageGet)
 async def update_message(

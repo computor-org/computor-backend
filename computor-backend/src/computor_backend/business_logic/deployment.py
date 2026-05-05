@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from computor_types.deployments_refactored import ComputorDeploymentConfig
 from computor_backend.permissions.principal import Principal
 from computor_backend.tasks import get_task_executor, TaskSubmission
-from computor_backend.api.exceptions import BadRequestException, ForbiddenException
+from computor_backend.exceptions import BadRequestException, ForbiddenException
 from computor_backend.api.permissions import check_admin
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ async def deploy_from_yaml_file(
     try:
         yaml_data = yaml.safe_load(file_content)
     except yaml.YAMLError as e:
-        raise BadRequestException(f"Invalid YAML format: {str(e)}")
+        raise BadRequestException(f"Invalid YAML format: {str(e)}") from e
 
     # Convert to deployment configuration
     config = ComputorDeploymentConfig(**yaml_data)

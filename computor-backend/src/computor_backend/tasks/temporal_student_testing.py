@@ -738,7 +738,9 @@ async def run_complete_student_test_activity(
                     api_config,
                 )
             except Exception:
-                pass  # Best effort
+                # Best-effort failure-result POST; the original test failure is
+                # what we ultimately surface to Temporal below.
+                logger.warning("Failed to POST testing failure result", exc_info=True)
 
             raise ApplicationError(message=str(e))
 

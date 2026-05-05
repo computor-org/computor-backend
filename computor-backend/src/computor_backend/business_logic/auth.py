@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from starlette.concurrency import run_in_threadpool
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
@@ -893,15 +893,15 @@ async def verify_user_with_gitlab_pat(
         logger.info(f"Successfully authenticated with GitLab. User email: {gitlab_email}")
 
     except GitlabAuthenticationError as e:
-        raise UnauthorizedException(f"GitLab authentication failed: {str(e)}")
+        raise UnauthorizedException(f"GitLab authentication failed: {str(e)}") from e
     except GitlabGetError as e:
-        raise UnauthorizedException(f"GitLab API error: {str(e)}")
+        raise UnauthorizedException(f"GitLab API error: {str(e)}") from e
     except (BadRequestException,):
         # Re-raise our own validation errors
         raise
     except Exception as e:
         logger.error(f"Unexpected error with GitLab: {str(e)}", exc_info=True)
-        raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}")
+        raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}") from e
 
     # 3. Find user in our system by email (case-insensitive)
     # Try User.email first - if found, user can link any GitLab instance

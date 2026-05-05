@@ -31,7 +31,8 @@ def get_client_ip(request: Request) -> str:
                         ip = p.split("=", 1)[1].strip().strip('"').strip("[]")
                         if ip:
                             return ip
-            except Exception:
+            except (ValueError, IndexError):
+                # Malformed Forwarded header — fall through to other detection.
                 pass
         
         # X-Forwarded-For: first IP is the client

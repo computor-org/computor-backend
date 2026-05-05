@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, HTTPException
 from sqlalchemy.orm import Session
 
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     get_entity_by_id as get_id_db,
@@ -103,8 +104,7 @@ async def list_service_types(
         GET /service-types?enabled=true
     """
     data, total = await list_db(permissions, db, params, ServiceTypeInterface)
-    response.headers["X-Total-Count"] = str(total)
-    return data
+    return paginated_list(data, total, response=response)
 
 
 @service_type_router.patch("/{entity_id}", response_model=ServiceTypeGet)

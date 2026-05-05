@@ -1,9 +1,10 @@
 """Business logic for student profile operations."""
+import logging
 from uuid import UUID
 from typing import Tuple, List
 from sqlalchemy.orm import Session, Query
 
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import StudentProfile
 from computor_types.student_profile import (
@@ -11,6 +12,8 @@ from computor_types.student_profile import (
     StudentProfileCreate, StudentProfileQuery
 )
 from computor_backend.interfaces import StudentProfileInterface
+
+logger = logging.getLogger(__name__)
 
 
 def has_profile_permission(permissions: Principal) -> bool:
@@ -157,7 +160,8 @@ def create_profile(
         return StudentProfileGet.model_validate(profile, from_attributes=True)
     except Exception as e:
         db.rollback()
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error creating student profile")
+        raise BadRequestException(detail="Failed to create student profile") from e
 
 
 def update_profile(
@@ -205,7 +209,8 @@ def update_profile(
         return StudentProfileGet.model_validate(profile, from_attributes=True)
     except Exception as e:
         db.rollback()
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error updating student profile")
+        raise BadRequestException(detail="Failed to update student profile") from e
 
 
 def delete_profile(
@@ -243,4 +248,5 @@ def delete_profile(
         db.commit()
     except Exception as e:
         db.rollback()
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error deleting student profile")
+        raise BadRequestException(detail="Failed to delete student profile") from e

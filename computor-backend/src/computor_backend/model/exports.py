@@ -1,9 +1,12 @@
+import logging
 import numpy as np
 import pandas as pd
 import random
 from faker import Faker
 from datetime import timedelta
 from computor_backend.database import get_db
+
+logger = logging.getLogger(__name__)
 from computor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
 from computor_backend.model.auth import User
 from computor_backend.model.course import SubmissionGroup, SubmissionGroupMember
@@ -305,5 +308,5 @@ def create_grading_all(db: Session):
             result_df = db_export_course_member_results(str(course_member_id[0]))
             grading_df = db_export_course_member_grading(str(course_member_id[0]))
             
-            print(result_df)
-            print(grading_df)
+            logger.debug("result_df:\n%s", result_df)
+            logger.debug("grading_df:\n%s", grading_df)

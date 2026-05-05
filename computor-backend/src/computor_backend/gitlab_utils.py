@@ -128,7 +128,7 @@ def get_gitlab_urls_from_properties(properties: Dict[Any, Any]) -> Dict[str, Opt
             from urllib.parse import urlparse
             parsed = urlparse(base_url)
             gitlab_host = parsed.hostname
-        except:
+        except ValueError:
             gitlab_host = "localhost"
 
     return {

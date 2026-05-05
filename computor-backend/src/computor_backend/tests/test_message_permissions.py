@@ -32,7 +32,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotImplementedException,

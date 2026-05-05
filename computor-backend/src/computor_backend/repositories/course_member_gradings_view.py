@@ -20,7 +20,7 @@ from .course_member_gradings import CourseMemberGradingsRepository
 from ..model.course import Course, CourseMember
 from ..permissions.principal import Principal
 from ..permissions.core import check_course_permissions
-from ..api.exceptions import NotFoundException, ForbiddenException
+from ..exceptions import NotFoundException, ForbiddenException
 from ..exceptions import RateLimitException
 from computor_types.course_member_gradings import (
     CourseMemberGradingsGet,
@@ -134,7 +134,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
             raise RateLimitException(
-                detail="Grading statistics are being calculated, please try again shortly.",
+                detail="Grading statistics are being calculated, please try again shortly",
                 retry_after=_LOCK_TTL,
             )
 
@@ -154,7 +154,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             ).first()
 
             if course_member is None:
-                raise NotFoundException(detail=f"Course member {course_member_id} not found")
+                raise NotFoundException(
+                    detail="Course member not found",
+                    context={"course_member_id": str(course_member_id)},
+                )
 
             # Determine course_id
             course_id = params.course_id or str(course_member.course_id)
@@ -162,7 +165,11 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             # Check if course_id matches the member's course
             if str(course_member.course_id) != course_id:
                 raise NotFoundException(
-                    detail=f"Course member {course_member_id} does not belong to course {course_id}"
+                    detail="Course member does not belong to the requested course",
+                    context={
+                        "course_member_id": str(course_member_id),
+                        "course_id": str(course_id),
+                    },
                 )
 
             # Get organization_id from course for student_profile lookup
@@ -320,7 +327,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         ).first()
 
         if course_member is None:
-            raise NotFoundException(detail=f"Course member {course_member_id} not found")
+            raise NotFoundException(
+                detail="Course member not found",
+                context={"course_member_id": str(course_member_id)},
+            )
 
         course_id = params.course_id or str(course_member.course_id)
 
@@ -377,7 +387,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
             raise RateLimitException(
-                detail="Course grading statistics are being calculated, please try again shortly.",
+                detail="Course grading statistics are being calculated, please try again shortly",
                 retry_after=_LOCK_TTL,
             )
 
@@ -391,7 +401,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             # Cache miss confirmed — verify course exists
             course = self.db.query(Course).filter(Course.id == course_id).first()
             if course is None:
-                raise NotFoundException(detail=f"Course {course_id} not found")
+                raise NotFoundException(
+                    detail="Course not found",
+                    context={"course_id": str(course_id)},
+                )
 
             # Permission check
             self._check_course_list_permissions(permissions, user_id, course_id)

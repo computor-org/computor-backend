@@ -4,7 +4,7 @@ from uuid import UUID
 from gitlab import Gitlab
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotImplementedException
+from computor_backend.exceptions import BadRequestException, NotImplementedException
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.organizations import OrganizationProperties
@@ -49,7 +49,7 @@ def update_organization_token(
                 gitlab.groups.list(search=full_path, min_access_level=50)
             ))
 
-            if len(groups) == 0:
+            if not groups:
                 raise BadRequestException(
                     detail="Token does not have owner access to the organization's GitLab group"
                 )
@@ -69,4 +69,4 @@ def update_organization_token(
         raise
     except Exception as e:
         logger.error(f"Error updating organization token: {e}")
-        raise BadRequestException(detail="Failed to update organization token")
+        raise BadRequestException(detail="Failed to update organization token") from e

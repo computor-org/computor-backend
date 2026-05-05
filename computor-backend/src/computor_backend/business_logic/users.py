@@ -15,7 +15,7 @@ from gitlab.exceptions import (
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
@@ -57,7 +57,7 @@ def get_current_user(user_id: str, db: Session) -> User:
         return user
     except Exception as e:
         logger.error(f"Error fetching user: {e}")
-        raise NotFoundException()
+        raise NotFoundException() from e
 
 
 def get_user_scopes_from_principal(principal: Principal) -> UserScopes:
@@ -154,12 +154,17 @@ def set_user_password(
             if verify_password(new_password, user.password):
                 raise BadRequestException("New password must be different from current password")
         else:
-            # Legacy comparison
+            # Legacy comparison: a stored password we can't decrypt (corrupt /
+            # missing key) is treated as "no current password to match" — let
+            # the new password through. Re-raising BadRequestException would
+            # break this flow, so it's let through explicitly.
             try:
                 if new_password == decrypt_api_key(user.password):
                     raise BadRequestException("New password must be different from current password")
-            except:
-                pass  # If decryption fails, allow new password
+            except BadRequestException:
+                raise
+            except Exception:
+                logger.debug("Could not decrypt legacy password for comparison", exc_info=True)
     else:
         raise ForbiddenException("Invalid password change request")
 
@@ -174,7 +179,7 @@ def set_user_password(
         )
     except PasswordValidationError as e:
         # Convert PasswordValidationError to BadRequestException for API
-        raise BadRequestException(str(e))
+        raise BadRequestException(str(e)) from e
 
     # Clear password reset flag
     user.password_reset_required = False
@@ -357,7 +362,7 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
     if not provider_url:
         raise BadRequestException(
             error_code="GITLAB_001",
-            detail="GitLab provider URL is required for verification."
+            detail="GitLab provider URL is required for verification"
         )
 
     base_url = provider_url.rstrip("/")
@@ -370,7 +375,7 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
         logger.warning("GitLab user lookup failed: %s", exc)
         raise BadRequestException(
             error_code="GITLAB_007",
-            detail="Could not reach GitLab to verify the access token.",
+            detail="Could not reach GitLab to verify the access token",
             context={"provider_url": provider_url, "error": str(exc)}
         ) from exc
 
@@ -388,7 +393,7 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
             )
         raise BadRequestException(
             error_code="EXT_001",
-            detail="Unexpected response from GitLab user API.",
+            detail="Unexpected response from GitLab user API",
             context={"status_code": response.status_code}
         )
 
@@ -398,7 +403,7 @@ def _fetch_gitlab_user_profile(provider_url: Optional[str], access_token: str) -
         logger.warning("Failed to decode GitLab user response: %s", exc)
         raise BadRequestException(
             error_code="EXT_001",
-            detail="Unexpected response from GitLab user API.",
+            detail="Unexpected response from GitLab user API",
             context={"error": str(exc)}
         ) from exc
 
@@ -796,7 +801,7 @@ def _sync_gitlab_memberships(
     gitlab_user_id = _fetch_gitlab_user_id(client, gitlab_username)
     if gitlab_user_id is None:
         raise BadRequestException(
-            detail=f"GitLab user '{gitlab_username}' could not be found for access provisioning."
+            detail=f"GitLab user '{gitlab_username}' could not be found for access provisioning"
         )
 
     raw_member_props = course_member.properties or {}
@@ -909,7 +914,7 @@ def validate_user_course(
         if not provider_access_token:
             raise UnauthorizedException(
                 error_code="GITLAB_005",
-                detail="GitLab access token is required to validate and register account."
+                detail="GitLab access token is required to validate and register account"
             )
 
         # Fetch GitLab user profile from the token
@@ -918,7 +923,7 @@ def validate_user_course(
         if not current_username:
             raise BadRequestException(
                 error_code="GITLAB_006",
-                detail="Unable to determine GitLab user from provided token."
+                detail="Unable to determine GitLab user from provided token"
             )
 
         if existing_account:
@@ -926,7 +931,7 @@ def validate_user_course(
             if current_username.lower() != existing_account.provider_account_id.lower():
                 raise BadRequestException(
                     error_code="GITLAB_003",
-                    detail="The GitLab access token does not match the linked provider account.",
+                    detail="The GitLab access token does not match the linked provider account",
                     context={
                         "actual_username": current_username,
                         "expected_username": existing_account.provider_account_id
@@ -949,7 +954,7 @@ def validate_user_course(
             if conflicting_account:
                 raise BadRequestException(
                     error_code="GITLAB_004",
-                    detail="This GitLab account is already linked to another user.",
+                    detail="This GitLab account is already linked to another user",
                     context={"username": current_username}
                 )
 
@@ -1013,14 +1018,14 @@ def register_user_course_account(
     if not provider_url:
         raise BadRequestException(
             error_code="GITLAB_001",
-            detail="Course organization does not define a GitLab provider, no account required."
+            detail="Course organization does not define a GitLab provider, no account required"
         )
 
     provider_account_id = provider_account_id.strip()
     if not provider_account_id:
         raise BadRequestException(
             error_code="GITLAB_008",
-            detail="Provider account ID must not be empty."
+            detail="Provider account ID must not be empty"
         )
 
     provider_access_token = (
@@ -1033,20 +1038,20 @@ def register_user_course_account(
         if not provider_access_token:
             raise BadRequestException(
                 error_code="GITLAB_005",
-                detail="GitLab access token is required to verify account ownership."
+                detail="GitLab access token is required to verify account ownership"
             )
         current_user = _fetch_gitlab_user_profile(provider_url, provider_access_token)
         current_username = (current_user or {}).get("username")
         if not current_username:
             raise BadRequestException(
                 error_code="GITLAB_006",
-                detail="Unable to determine GitLab user from provided token."
+                detail="Unable to determine GitLab user from provided token"
             )
 
         if current_username.lower() != provider_account_id.lower():
             raise BadRequestException(
                 error_code="GITLAB_003",
-                detail="The GitLab access token does not belong to the specified account.",
+                detail="The GitLab access token does not belong to the specified account",
                 context={
                     "actual_username": current_username,
                     "expected_username": provider_account_id
@@ -1069,7 +1074,7 @@ def register_user_course_account(
     if conflicting_account:
         raise BadRequestException(
             error_code="GITLAB_004",
-            detail="Provider account ID is already linked to another user for this provider.",
+            detail="Provider account ID is already linked to another user for this provider",
             context={"username": provider_account_id}
         )
 

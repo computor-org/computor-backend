@@ -1051,10 +1051,8 @@ class CoderClient:
 
         success = resp.status_code in (200, 201)
         if success:
-            print(f"[CODER] Token update build initiated for workspace {workspace_id}")
             logger.info(f"Workspace {workspace_id}: token update build initiated")
         else:
-            print(f"[CODER] FAILED to update token: {resp.status_code} - {resp.text}")
             logger.error(f"Failed to update workspace token: {resp.status_code} - {resp.text}")
         return success
 
@@ -1125,8 +1123,7 @@ class CoderClient:
             workspace = details.workspace
             # Workspace exists - update it with new token by triggering a rebuild
             if computor_auth_token:
-                print(f"[CODER] Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
-                logger.info(f"Workspace exists, updating with new token...")
+                logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
                 await self._update_workspace_token(
                     workspace.id,
                     computor_auth_token,

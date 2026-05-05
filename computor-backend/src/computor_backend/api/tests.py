@@ -10,7 +10,7 @@ from fastapi import Depends, APIRouter
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import BadRequestException, NotFoundException, ForbiddenException, RateLimitException
+from computor_backend.exceptions import BadRequestException, NotFoundException, ForbiddenException, RateLimitException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions

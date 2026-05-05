@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,

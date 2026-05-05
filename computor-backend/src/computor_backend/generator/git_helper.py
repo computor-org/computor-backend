@@ -9,7 +9,7 @@ def git_repo_exist(directory):
     if return_code.returncode == 0:
         return True
     return False
-  except:
+  except (OSError, subprocess.SubprocessError):
       return False
   
 def construct_git_auth_url(gitlab_base_url: str, full_path: str, token: str) -> str:

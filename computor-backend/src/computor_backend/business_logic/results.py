@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import NotFoundException
+from computor_backend.exceptions import NotFoundException
 from computor_backend.model.result import Result
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal

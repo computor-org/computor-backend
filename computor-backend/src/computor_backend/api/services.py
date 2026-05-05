@@ -69,7 +69,8 @@ async def get_service_me(
     if not user:
         raise UserNotFoundException(
             error_code="NF_002",
-            detail=f"User {user_id} not found"
+            detail="User not found",
+            context={"user_id": str(user_id)},
         )
 
     if not user.is_service:

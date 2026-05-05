@@ -45,7 +45,7 @@ from computor_types.password_utils import verify_password, is_argon2_hash
 from computor_backend.model.auth import Account, User
 from computor_backend.model.role import UserRole
 from computor_backend.model.service import ApiToken
-from computor_backend.api.exceptions import NotFoundException, UnauthorizedException
+from computor_backend.exceptions import NotFoundException, UnauthorizedException
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.api_token import hash_api_token, validate_token_format
 import logging
@@ -121,7 +121,7 @@ class AuthenticationService:
             except Exception as e:
                 # Catch decryption errors
                 logger.error(f"Password verification failed for user '{username}': {str(e)}")
-                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
+                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials") from e
         
         # Collect roles (role_id is now at index 2 after removing user_type and token_expiration)
         role_ids = [res[2] for res in results if res[2] is not None]
@@ -138,7 +138,7 @@ class AuthenticationService:
             user_dict = gitlab_current_user(gl)
         except Exception as e:
             logger.error(f"GitLab authentication failed: {e}")
-            raise UnauthorizedException("GitLab authentication failed")
+            raise UnauthorizedException("GitLab authentication failed") from e
         
         results = (
             db.query(User.id, UserRole.role_id)
@@ -203,7 +203,7 @@ class AuthenticationService:
             raise UnauthorizedException("Invalid session data format")
         except Exception as e:
             logger.error(f"Error during SSO authentication: {e}")
-            raise UnauthorizedException("SSO authentication failed")
+            raise UnauthorizedException("SSO authentication failed") from e
 
     @staticmethod
     async def authenticate_api_token(token: str, db: Session) -> AuthenticationResult:
@@ -411,7 +411,7 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
             return GLPAuthConfig(**gitlab_creds)
         except Exception as e:
             logger.error(f"Failed to parse GitLab credentials: {e}")
-            raise UnauthorizedException("Invalid GitLab credentials")
+            raise UnauthorizedException("Invalid GitLab credentials") from e
 
     # Check for standard Authorization header
     authorization = request.headers.get("Authorization")
@@ -655,4 +655,4 @@ def get_permissions_from_mockup(user_id: str) -> Principal:
             
     except Exception as e:
         logger.error(f"Mockup auth error: {e}")
-        raise UnauthorizedException("Mockup authentication failed")
+        raise UnauthorizedException("Mockup authentication failed") from e

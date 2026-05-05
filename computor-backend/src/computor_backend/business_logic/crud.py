@@ -7,6 +7,7 @@ operations, permission checks, and validation, wrapped in threadpool for
 async/await compatibility.
 """
 
+import logging
 from uuid import UUID
 from typing import Any, Optional, Callable
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from sqlalchemy import exc
 from sqlalchemy.inspection import inspect
 from starlette.concurrency import run_in_threadpool
 
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     InternalServerException,
@@ -32,6 +33,8 @@ from computor_types.base import EntityInterface, ListQuery
 from computor_backend.custom_types import Ltree, LtreeType
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_backend.database import set_db_user
+
+logger = logging.getLogger(__name__)
 
 
 async def create_entity(
@@ -126,12 +129,12 @@ async def create_entity(
             clean_msg = f"{main_error}. {detail_part}"
         else:
             clean_msg = error_msg.split('\n')[0] if '\n' in error_msg else error_msg
-        raise BadRequestException(detail=clean_msg)
+        raise BadRequestException(detail=clean_msg) from e
 
     except Exception as e:
-        print(e.args)
         db.rollback()
-        raise BadRequestException(detail=e.args)
+        logger.exception("Unhandled error in create_entity")
+        raise BadRequestException(detail="Failed to create entity") from e
 
 
 async def get_entity_by_id(
@@ -173,7 +176,10 @@ async def get_entity_by_id(
         item = await run_in_threadpool(_get_entity)
 
         if item is None:
-            raise NotFoundException(detail=f"{db_type.__name__} with id [{id}] not found")
+            raise NotFoundException(
+                detail=f"{db_type.__name__} not found",
+                context={"id": str(id), "entity": db_type.__name__},
+            )
 
         return interface.get.model_validate(item, from_attributes=True)
 
@@ -181,10 +187,10 @@ async def get_entity_by_id(
         raise e
 
     except exc.StatementError as e:
-        raise BadRequestException(detail=e.args)
+        raise BadRequestException(detail=e.args) from e
 
     except Exception as e:
-        raise NotFoundException(detail=e.args)
+        raise NotFoundException(detail=e.args) from e
 
 
 async def list_entities(
@@ -324,12 +330,8 @@ async def update_entity(
             raise
         except Exception as e:
             db.rollback()
-            print(f"Exception in update_entity: {e}")
-            print(f"Exception type: {type(e)}")
-            print(f"Exception args: {e.args}")
-            import traceback
-            traceback.print_exc()
-            raise BadRequestException(detail=str(e))
+            logger.exception("Unhandled exception in update_entity")
+            raise BadRequestException(detail="Failed to update entity") from e
 
     db_item, old_db_item = await run_in_threadpool(_update_entity)
 
@@ -464,7 +466,7 @@ async def delete_entity(
                 if 'course_content_type_id' in error_msg and 'course_content' in error_msg:
                     raise BadRequestException(
                         detail="Cannot delete this course content type because it is still being used by course content items. Please remove or reassign all course content using this type first."
-                    )
+                    ) from e
                 else:
                     # Generic not null violation message
                     raise BadRequestException(
@@ -488,7 +490,7 @@ async def delete_entity(
                 )
             elif 'UniqueViolation' in error_msg:
                 # This shouldn't happen on delete, but handle it just in case
-                raise BadRequestException(detail="A unique constraint violation occurred while deleting.")
+                raise BadRequestException(detail="A unique constraint violation occurred while deleting")
             else:
                 # Generic integrity error
                 raise BadRequestException(
@@ -499,11 +501,11 @@ async def delete_entity(
             # Handle other SQLAlchemy errors
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in delete_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while deleting.")
+            raise InternalServerException(detail="An unexpected database error occurred while deleting") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in delete_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while deleting.")
+            raise InternalServerException(detail="An unexpected error occurred while deleting") from e
 
         return {"ok": True}
 
@@ -557,16 +559,16 @@ async def archive_entity(
         except exc.IntegrityError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-            raise BadRequestException(detail=f"Cannot archive this item due to data integrity constraints.")
+            raise BadRequestException(detail="Cannot archive this item due to data integrity constraints") from e
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in archive_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while archiving.")
+            raise InternalServerException(detail="An unexpected database error occurred while archiving") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in archive_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while archiving.")
+            raise InternalServerException(detail="An unexpected error occurred while archiving") from e
 
         return {"ok": True}
 
@@ -613,16 +615,16 @@ async def unarchive_entity(
             raise
         except exc.IntegrityError:
             db.rollback()
-            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints.")
+            raise BadRequestException(detail="Cannot unarchive this item due to data integrity constraints")
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
             print(f"SQLAlchemyError in unarchive_entity: {error_msg}")
-            raise InternalServerException(detail="An unexpected database error occurred while unarchiving.")
+            raise InternalServerException(detail="An unexpected database error occurred while unarchiving") from e
         except Exception as e:
             db.rollback()
             print(f"Unexpected error in unarchive_entity: {e}")
-            raise InternalServerException(detail="An unexpected error occurred while unarchiving.")
+            raise InternalServerException(detail="An unexpected error occurred while unarchiving") from e
 
         return {"ok": True}
 

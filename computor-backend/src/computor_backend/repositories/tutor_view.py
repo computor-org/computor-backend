@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from .view_base import ViewRepository
-from ..api.mappers import course_member_course_content_result_mapper
+from .view_mappers import course_member_course_content_result_mapper
 from ..repositories.course_content import (
     course_member_course_content_query,
     course_member_course_content_list_query,
@@ -18,7 +18,7 @@ from ..repositories.course_content import (
 )
 from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
-from ..api.exceptions import ForbiddenException
+from ..exceptions import ForbiddenException
 from computor_types.student_courses import CourseStudentQuery
 from computor_backend.interfaces.student_courses import CourseStudentInterface
 from computor_types.student_course_contents import CourseContentStudentQuery
@@ -216,7 +216,7 @@ class TutorViewRepository(ViewRepository):
         ).first()
 
         if course is None:
-            from ..api.exceptions import NotFoundException
+            from ..exceptions import NotFoundException
             raise NotFoundException()
 
         gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}

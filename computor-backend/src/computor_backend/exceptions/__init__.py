@@ -28,15 +28,10 @@ from computor_backend.exceptions.exceptions import (
 
     # Authorization exceptions (403)
     ForbiddenException,
-    AdminRequiredException,
     CourseAccessDeniedException,
-    InsufficientCourseRoleException,
 
     # Validation exceptions (400)
     BadRequestException,
-    MissingFieldException,
-    InvalidFieldFormatException,
-    InvalidFileUploadException,
 
     # Not found exceptions (404)
     NotFoundException,
@@ -106,15 +101,10 @@ __all__ = [
 
     # Authorization
     "ForbiddenException",
-    "AdminRequiredException",
     "CourseAccessDeniedException",
-    "InsufficientCourseRoleException",
 
     # Validation
     "BadRequestException",
-    "MissingFieldException",
-    "InvalidFieldFormatException",
-    "InvalidFileUploadException",
 
     # Not Found
     "NotFoundException",

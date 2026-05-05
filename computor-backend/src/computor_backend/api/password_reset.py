@@ -18,7 +18,7 @@ from computor_backend.database import get_db
 from computor_backend.model.auth import User
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import (
+from computor_backend.exceptions import (
     NotFoundException,
     BadRequestException,
     ForbiddenException,
@@ -177,7 +177,7 @@ async def set_initial_password(
         user.password_reset_required = False
         db.commit()
     except PasswordValidationError as e:
-        raise BadRequestException(str(e))
+        raise BadRequestException(str(e)) from e
 
     logger.info(
         f"Initial password set for user {user.username} (ID: {user.id}) "
@@ -223,7 +223,7 @@ async def change_password(
             db=db,
         )
     except PasswordValidationError as e:
-        raise BadRequestException(str(e))
+        raise BadRequestException(str(e)) from e
 
     logger.info(f"Password changed for user {user.username} (ID: {user.id})")
 
@@ -273,7 +273,7 @@ async def admin_set_password(
             db.commit()
 
     except PasswordValidationError as e:
-        raise BadRequestException(str(e))
+        raise BadRequestException(str(e)) from e
 
     logger.info(
         f"Admin {principal.user_id} set password for user {target_user.username} "

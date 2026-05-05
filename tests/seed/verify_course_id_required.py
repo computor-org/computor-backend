@@ -19,7 +19,7 @@ from computor_backend.business_logic.tutor import (
     list_tutor_course_members,
     list_tutor_submission_groups,
 )
-from computor_backend.api.exceptions import BadRequestException
+from computor_backend.exceptions import BadRequestException
 from computor_backend.permissions.principal import Principal, Claims
 from computor_types.course_members import CourseMemberQuery
 from computor_types.tutor_submission_groups import TutorSubmissionGroupQuery

@@ -19,7 +19,7 @@ import pytest
 from sqlalchemy import Column, String, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from computor_backend.api.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException
 from computor_backend.permissions.handlers_impl import (
     make_scope_member_custom_permissions,
 )

@@ -12,7 +12,7 @@ from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_backend.cache import Cache
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.services.storage_service import get_storage_service
 from computor_backend.model.course import CourseMember
@@ -195,7 +195,10 @@ async def _get_example_version_for_course_content(
     course_content = course_content_repo.get_by_id_optional(str(course_content_id))
 
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Check tutor permissions for the course
     user_id = permissions.get_user_id()
@@ -233,15 +236,24 @@ async def _get_example_version_for_course_content(
     version = version_repo.get_with_relationships(example_version_id)
 
     if not version:
-        raise NotFoundException(detail=f"Example version {example_version_id} not found")
+        raise NotFoundException(
+            detail="Example version not found",
+            context={"example_version_id": str(example_version_id)},
+        )
 
     example = version.example
     if not example:
-        raise NotFoundException(detail=f"Example not found for version {example_version_id}")
+        raise NotFoundException(
+            detail="Example not found for the requested version",
+            context={"example_version_id": str(example_version_id)},
+        )
 
     repository = example.repository
     if not repository:
-        raise NotFoundException(detail=f"Repository not found for example {example.id}")
+        raise NotFoundException(
+            detail="Repository not found for the requested example",
+            context={"example_id": str(example.id)},
+        )
 
     # Only support MinIO/S3 repositories
     if repository.source_type == "git":
@@ -497,7 +509,10 @@ async def _check_tutor_permission_for_course_content(
     course_content = course_content_repo.get_by_id_optional(str(course_content_id))
 
     if not course_content:
-        raise NotFoundException(detail=f"Course content {course_content_id} not found")
+        raise NotFoundException(
+            detail="Course content not found",
+            context={"course_content_id": str(course_content_id)},
+        )
 
     # Get course using repository
     course_repo = CourseRepository(db, cache)
@@ -687,7 +702,7 @@ async def create_tutor_test(
         logger.info(f"Started tutor test workflow {workflow_id} for test {test_id}")
     except Exception as e:
         logger.error(f"Failed to start tutor test workflow: {e}")
-        raise BadRequestException(detail=f"Failed to start test: {e}")
+        raise BadRequestException(detail=f"Failed to start test: {e}") from e
 
     return TutorTestCreateResponse(
         test_id=test_id,
@@ -723,7 +738,10 @@ async def _get_tutor_test_info_and_sync(
     test_info = await get_tutor_test_full(redis, test_id)
 
     if not test_info:
-        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+        raise NotFoundException(
+            detail="Tutor test not found or expired",
+            context={"test_id": str(test_id)},
+        )
 
     # Check if user owns this test
     user_id = permissions.get_user_id()
@@ -888,7 +906,10 @@ async def list_tutor_test_artifacts_endpoint(
     metadata = await get_tutor_test_metadata(redis, test_id)
 
     if not metadata:
-        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+        raise NotFoundException(
+            detail="Tutor test not found or expired",
+            context={"test_id": str(test_id)},
+        )
 
     # Check permissions
     user_id = permissions.get_user_id()
@@ -937,7 +958,10 @@ async def download_tutor_test_artifacts(
     metadata = await get_tutor_test_metadata(redis, test_id)
 
     if not metadata:
-        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+        raise NotFoundException(
+            detail="Tutor test not found or expired",
+            context={"test_id": str(test_id)},
+        )
 
     # Check permissions
     user_id = permissions.get_user_id()
@@ -995,7 +1019,10 @@ async def download_tutor_test_input(
     metadata = await get_tutor_test_metadata(redis, test_id)
 
     if not metadata:
-        raise NotFoundException(detail=f"Tutor test {test_id} not found or expired")
+        raise NotFoundException(
+            detail="Tutor test not found or expired",
+            context={"test_id": str(test_id)},
+        )
 
     user_id = permissions.get_user_id()
     if metadata.get("user_id") and str(user_id) != metadata.get("user_id"):

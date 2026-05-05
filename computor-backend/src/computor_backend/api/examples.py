@@ -3,6 +3,7 @@ FastAPI endpoints for Example Library management.
 """
 
 import base64
+import binascii
 import zipfile
 import mimetypes
 import io
@@ -41,12 +42,13 @@ from computor_types.cascade_deletion import (
 from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..permissions.auth import get_current_principal
+from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
     get_entity_by_id as get_id_db,
     list_entities as list_db
 )
 from computor_backend.business_logic.cascade_deletion import delete_examples_by_pattern
-from ..api.exceptions import (
+from ..exceptions import (
     NotFoundException,
     ForbiddenException,
     BadRequestException,
@@ -165,8 +167,8 @@ def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, boo
             if idx != -1:
                 b64 = text[idx + len(base64_marker):]
                 return io.BytesIO(base64.b64decode(b64, validate=False)), True
-        except Exception:
-            pass  # fall back to other handling
+        except (ValueError, binascii.Error):
+            pass  # malformed data URI — fall back to other handling
 
     # Normalize whitespace
     clean = text.replace('\n', '').replace('\r', '').replace(' ', '').replace('\t', '')
@@ -185,8 +187,8 @@ def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, boo
         try:
             decoded = base64.b64decode(clean, validate=True)
             return io.BytesIO(decoded), True
-        except Exception:
-            pass
+        except (ValueError, binascii.Error):
+            pass  # not valid base64 — treat as text below
 
     # Default: treat as UTF-8 text
     return io.BytesIO(text.encode('utf-8')), False
@@ -288,16 +290,7 @@ async def list_examples(
 ):
     """List all examples."""
     list_result, total = await list_db(permissions, db, params, ExampleInterface)
-    response.headers["X-Total-Count"] = str(total)
-    
-    # Cache the result
-    # cache_data = {
-    #     "items": [item.model_dump(mode='json') for item in list_result],
-    #     "total": total
-    # }
-    # await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
-    
-    return list_result
+    return paginated_list(list_result, total, response=response)
 
 @examples_router.get("/{example_id}", response_model=ExampleGet)
 async def get_example(
@@ -582,7 +575,7 @@ async def upload_example(
                 extracted_files = files
         except Exception as e:
             logger.exception("Failed to extract uploaded zip for example")
-            raise BadRequestException(f"Invalid zip upload: {e}")
+            raise BadRequestException(f"Invalid zip upload: {e}") from e
 
     # Choose file source
     incoming_files = extracted_files if extracted_files is not None else request.files
@@ -600,7 +593,7 @@ async def upload_example(
             meta_str = str(meta_content)
         meta_data = yaml.safe_load(meta_str)
     except yaml.YAMLError as e:
-        raise BadRequestException(f"Invalid meta.yaml format: {str(e)}")
+        raise BadRequestException(f"Invalid meta.yaml format: {str(e)}") from e
     
     # Extract metadata from meta.yaml
     title = meta_data.get('title', request.directory.replace('-', ' ').replace('_', ' ').title())
@@ -617,7 +610,7 @@ async def upload_example(
     except ValueError as e:
         raise BadRequestException(
             f"Invalid version format in meta.yaml: {str(e)}"
-        )
+        ) from e
 
     # Extract tags and other metadata
     tags = []

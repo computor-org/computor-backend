@@ -8,7 +8,7 @@ from computor_types.courses import (
     CourseQuery,
 )
 from computor_types.custom_types import Ltree
-from computor_backend.interfaces.base import BackendEntityInterface
+from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import Course
 
 
@@ -18,6 +18,15 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
     model = Course
     endpoint = "courses"
     cache_ttl = 300
+
+    @classmethod
+    def cache_invalidation_tags(cls, entity):
+        """Course's own ``id`` is the ``course_id`` other entities key on."""
+        if entity.id is None:
+            return
+        cid = str(entity.id)
+        yield CacheTag.for_entity("course_id", cid)
+        yield CacheTag.for_entity("lecturer_view", cid)
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseQuery]):

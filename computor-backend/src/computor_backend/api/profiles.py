@@ -8,6 +8,7 @@ from computor_types.profiles import (
     ProfileGet, ProfileList, ProfileUpdate, ProfileCreate,
     ProfileQuery
 )
+from computor_backend.api._pagination import paginated_list
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 
@@ -32,9 +33,7 @@ async def list_profiles_endpoint(
     """List profiles - admins/_user_manager see all, users see only their own."""
 
     profiles, total = list_profiles(permissions, params, db)
-    response.headers["X-Total-Count"] = str(total)
-
-    return [ProfileList.model_validate(p, from_attributes=True) for p in profiles]
+    return paginated_list(profiles, total, response=response, schema=ProfileList)
 
 @profile_router.get("/{id}", response_model=ProfileGet)
 async def get_profile_endpoint(

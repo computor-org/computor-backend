@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .storage_service import StorageService, get_storage_service
 from .result_storage import RESULTS_BUCKET, delete_result_json, delete_result_artifacts
-from ..api.exceptions import NotFoundException
+from ..exceptions import NotFoundException
 
 logger = logging.getLogger(__name__)
 

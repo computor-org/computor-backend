@@ -38,7 +38,7 @@ def mint_workspace_token(
     Returns:
         The full token string if successful, None if failed
     """
-    print(f"[TOKEN] mint_workspace_token called: target={target_user_id}, by={created_by}")
+    logger.info(f"mint_workspace_token called: target={target_user_id}, by={created_by}")
     try:
         token_repo = ApiTokenRepository(db, cache)
         token_name = "workspace-auto-login"
@@ -63,14 +63,10 @@ def mint_workspace_token(
         db.add(api_token)
         db.commit()
 
-        print(f"[TOKEN] SUCCESS: minted token prefix={token_prefix}, length={len(full_token)}")
         logger.info(f"Minted workspace token for user {target_user_id} (prefix: {token_prefix}, length: {len(full_token)})")
         return full_token
 
     except Exception as e:
-        print(f"[TOKEN] FAILED: {e}")
-        import traceback
-        traceback.print_exc()
         logger.error(f"Failed to mint workspace token: {e}", exc_info=True)
         db.rollback()
         return None

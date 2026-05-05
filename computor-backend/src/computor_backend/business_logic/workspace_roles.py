@@ -8,9 +8,14 @@ assigning/removing _workspace_user and _workspace_maintainer roles.
 import logging
 from typing import List
 
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from computor_backend.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.workspace_roles import (
     WORKSPACE_ROLES,
@@ -32,10 +37,7 @@ def _require_manage(permissions: Principal) -> None:
     if permissions.is_admin:
         return
     if not permissions.permitted("workspace", "manage"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Workspace 'manage' permission required.",
-        )
+        raise ForbiddenException(detail="Workspace 'manage' permission required")
 
 
 def list_all_users(
@@ -82,23 +84,19 @@ def assign_workspace_role(
     _require_manage(permissions)
 
     if role_id not in WORKSPACE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=f"Invalid role. Must be one of: {', '.join(sorted(WORKSPACE_ROLES))}",
         )
 
     user = find_user_by_email(db, email)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No user found with email: {email}",
-        )
+        raise NotFoundException(detail=f"No user found with email: {email}")
 
     existing = get_user_role(db, str(user.id), role_id)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"User already has the {role_id} role",
+        raise ConflictException(
+            detail="User already has the requested role",
+            context={"user_id": str(user.id), "role_id": role_id},
         )
 
     create_user_role(db, str(user.id), role_id)
@@ -128,17 +126,13 @@ def remove_workspace_role(
     _require_manage(permissions)
 
     if role_id not in WORKSPACE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestException(
             detail=f"Invalid role. Must be one of: {', '.join(sorted(WORKSPACE_ROLES))}",
         )
 
     user_role = get_user_role(db, user_id, role_id)
     if not user_role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User role not found",
-        )
+        raise NotFoundException(detail="User role not found")
 
     delete_user_role(db, user_role)
 

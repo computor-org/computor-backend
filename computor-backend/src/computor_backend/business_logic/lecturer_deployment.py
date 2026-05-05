@@ -97,11 +97,13 @@ def validate_semantic_version(version_str: str) -> SemanticVersion:
     try:
         return SemanticVersion.from_string(version_str)
     except ValueError as e:
+        # ValueError is from our own SemanticVersion parser; its message is
+        # user-safe ("invalid version format: ..."). No internals leaked.
         raise BadRequestException(
             error_code="VAL_003",
             detail=str(e),
-            context={"version_string": version_str}
-        )
+            context={"version_string": version_str},
+        ) from e
 
 
 def _auto_link_testing_service(

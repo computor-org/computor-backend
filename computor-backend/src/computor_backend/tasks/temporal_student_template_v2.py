@@ -495,7 +495,9 @@ async def generate_student_template_activity_v2(
                         example = content.deployment.example_version.example
                         if example and example.identifier:
                             deployment_path = str(example.identifier)
-                    except Exception:
+                    except AttributeError:
+                        # Lazy-loaded relationship missing under detached session — skip,
+                        # caller will fall through to the empty-deployment branch.
                         pass
 
                 exists_in_repo = deployment_path in existing_directories if deployment_path else False
@@ -543,7 +545,7 @@ async def generate_student_template_activity_v2(
 
             logger.info(f"Selected {len(course_contents)} course contents to process")
             
-            if len(course_contents) == 0:
+            if not course_contents:
                 logger.warning(f"No course contents to deploy for course {course_id}. This will result in an empty student template.")
             
             # Process each CourseContent with an example

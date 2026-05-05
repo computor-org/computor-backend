@@ -331,7 +331,7 @@ from computor_backend.model.assignment import Assignment
 from computor_backend.repositories.assignment import AssignmentRepository
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.api.exceptions import NotFoundException
+from computor_backend.exceptions import NotFoundException
 from computor_types.assignments import AssignmentGet, AssignmentCreate, AssignmentUpdate
 
 def create_assignment(

@@ -9,7 +9,7 @@ from computor_types.course_contents import (
     CourseContentQuery,
 )
 from computor_types.custom_types import Ltree
-from computor_backend.interfaces.base import BackendEntityInterface
+from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import (
     CourseContent,
     CourseMember,
@@ -17,6 +17,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
+from computor_backend.permissions.roles import CourseRole
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
         .options(joinedload(CourseMember.user))
         .filter(
             CourseMember.course_id == course_content.course_id,
-            CourseMember.course_role_id == "_student"
+            CourseMember.course_role_id == CourseRole.STUDENT
         )
         .all()
     )
@@ -132,6 +133,13 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
     endpoint = "course-contents"
     cache_ttl = 300
     post_create = post_create_course_content
+
+    @classmethod
+    def cache_invalidation_tags(cls, entity):
+        """Lecturer dashboards key on a ``lecturer_view:<course_id>`` tag."""
+        yield from super().cache_invalidation_tags(entity)
+        if entity.course_id is not None:
+            yield CacheTag.for_entity("lecturer_view", entity.course_id)
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseContentQuery]):

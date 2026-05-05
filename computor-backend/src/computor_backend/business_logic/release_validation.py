@@ -230,7 +230,7 @@ def validate_course_for_release(
 
         logger.debug(f"[Validation] ✅ '{assignment.path}': Valid (status: {deployment.deployment_status})")
 
-    is_valid = len(validation_errors) == 0
+    is_valid = not validation_errors
 
     if is_valid:
         logger.info(f"[Validation] ✅ SUCCESS: All {len(assignments)} assignments are valid for release")

@@ -112,6 +112,25 @@ errors:
       - "Contact administrator to verify SSO configuration"
     documentation_url: "/docs/authentication#sso"
 
+  - code: AUTH_005
+    http_status: 401
+    category: authentication
+    severity: warning
+    title: "API Token Expired"
+    message:
+      plain: "Your API token has expired. Generate a new one and retry."
+      markdown: "**API Token Expired**\n\nThe API token used for this request has expired. Generate a new token and retry."
+      html: "<strong>API Token Expired</strong><p>The API token used for this request has expired. Generate a new token and retry.</p>"
+    internal_description: "ApiToken.expires_at is in the past — token validation rejected the request before reaching the endpoint."
+    affected_functions:
+      - "_authenticate_api_token"
+    common_causes:
+      - "Token TTL elapsed since issuance"
+    resolution_steps:
+      - "Issue a new API token via /api-tokens"
+      - "Update the client to use the new token"
+    documentation_url: "/docs/authentication#api-tokens"
+
   # ============================================================================
   # AUTHORIZATION ERRORS (403)
   # ============================================================================
@@ -225,6 +244,24 @@ errors:
       - "Request a user with higher privileges to perform this action"
       - "Assign a role at or below your own privilege level"
     documentation_url: "/docs/permissions#role-assignment"
+
+  - code: AUTHZ_010
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Service Account Required"
+    message:
+      plain: "This endpoint is only available for service accounts."
+      markdown: "**Service Account Required**\n\nThis endpoint is only available for users marked as service accounts."
+      html: "<strong>Service Account Required</strong><p>This endpoint is only available for users marked as service accounts.</p>"
+    internal_description: "Endpoint requires User.is_service=True; called with a regular human user."
+    affected_functions:
+      - "get_service_by_user_id"
+    common_causes:
+      - "Calling a service-account endpoint with a normal user token"
+    resolution_steps:
+      - "Use the service-account user_id when calling this endpoint"
+    documentation_url: "/docs/authentication#service-accounts"
 
   # ============================================================================
   # VALIDATION ERRORS (400)
@@ -414,6 +451,26 @@ errors:
       - "Verify API version"
       - "Check HTTP method (GET, POST, etc.)"
     documentation_url: "/docs/api"
+
+  - code: NF_010
+    http_status: 404
+    category: not_found
+    severity: warning
+    title: "Service Record Not Found"
+    message:
+      plain: "No service record exists for this service account."
+      markdown: "**Service Record Not Found**\n\nThe service-account user has no associated ``Service`` row. The account exists but is not linked to a service definition."
+      html: "<strong>Service Record Not Found</strong><p>The service-account user has no associated <code>Service</code> row. The account exists but is not linked to a service definition.</p>"
+    internal_description: "ServiceRepository.find_by_user_id returned None for a User.is_service=True row."
+    affected_functions:
+      - "get_service_by_user_id"
+    common_causes:
+      - "Service account created without provisioning a Service row"
+      - "Service row deleted while the user was kept"
+    resolution_steps:
+      - "Re-provision the service via the admin API"
+      - "Or delete the orphan service-account user"
+    documentation_url: "/docs/services"
 
   # ============================================================================
   # CONFLICT ERRORS (409)
@@ -1411,6 +1468,25 @@ errors:
       - "Check that a worker is running for the specified task queue"
       - "Contact administrator to verify testing service setup"
     documentation_url: "/docs/testing-services"
+
+  - code: EXT_006
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "Service Unavailable"
+    message:
+      plain: "An external service is temporarily unavailable."
+      markdown: "**Service Unavailable**\n\nAn external service is temporarily unavailable. Please try again later."
+      html: "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>"
+    retry_after: 60
+    internal_description: "Generic 503 fallback when the specific upstream service is unknown or not yet categorised; prefer EXT_001 (GitLab), EXT_003 (MinIO), EXT_004 (Temporal), or EXT_005 (task queue) when the source is known."
+    affected_functions: []
+    common_causes:
+      - "Generic upstream failure surfaced through Starlette's HTTPException"
+      - "Service-specific exception subclass not yet introduced for this code path"
+    resolution_steps:
+      - "Inspect server logs for the underlying cause"
+      - "Retry the request after a short backoff"
 
   # ============================================================================
   # DATABASE ERRORS (500, 503)

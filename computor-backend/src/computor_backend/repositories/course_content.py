@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, joinedload, contains_eager, subqueryload
 from pydantic import BaseModel, ConfigDict
 
-from computor_backend.api.exceptions import NotFoundException
+from computor_backend.exceptions import NotFoundException
 from computor_backend.model.course import (
     SubmissionGroupMember,
     Course,
@@ -1103,7 +1103,7 @@ def get_unreviewed_submission_count_per_member(
     from sqlalchemy.sql import expression
     from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 
-    if course_member_ids is not None and len(course_member_ids) == 0:
+    if course_member_ids is not None and not course_member_ids:
         return {}
 
     # Step 1: Get the latest artifact per submission group (submit=True),
@@ -1234,7 +1234,7 @@ def get_unread_message_count_per_member(
     if reader_user_id is None:
         return {}
 
-    if course_member_ids is not None and len(course_member_ids) == 0:
+    if course_member_ids is not None and not course_member_ids:
         return {}
 
     # Base query: count messages per course_member via submission_group

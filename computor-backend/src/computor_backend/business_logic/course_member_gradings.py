@@ -14,7 +14,7 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException
+from computor_backend.exceptions import NotFoundException, ForbiddenException
 from computor_backend.permissions.principal import Principal
 from computor_backend.cache import Cache
 from computor_backend.repositories.course_member_gradings_view import (

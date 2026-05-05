@@ -8,7 +8,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from computor_backend.model.message import Message
 from computor_backend.model.message_audit import MessageAuditLog, MessageAuditAction
 from computor_backend.permissions.principal import Principal
-from computor_backend.api.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import ForbiddenException, NotFoundException
 
 
 def soft_delete_message(
@@ -40,7 +40,8 @@ def soft_delete_message(
     if not message:
         raise NotFoundException(
             error_code="NF_001",
-            detail=f"Message {message_id} not found"
+            detail="Message not found",
+            context={"message_id": str(message_id)},
         )
 
     # Check if user is author or admin
@@ -122,7 +123,8 @@ def update_message_with_audit(
     if not message:
         raise NotFoundException(
             error_code="NF_001",
-            detail=f"Message {message_id} not found"
+            detail="Message not found",
+            context={"message_id": str(message_id)},
         )
 
     # Check if user is author
@@ -226,7 +228,8 @@ def get_message_audit_history(
     if not message:
         raise NotFoundException(
             error_code="NF_001",
-            detail=f"Message {message_id} not found"
+            detail="Message not found",
+            context={"message_id": str(message_id)},
         )
 
     # Check if user is author or admin

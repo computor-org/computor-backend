@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
-from computor_backend.api.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from computor_backend.model.auth import Profile
 from computor_backend.permissions.principal import Principal
 from computor_types.profiles import ProfileQuery
@@ -99,8 +99,8 @@ def create_profile(
         return profile
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating profile: {e}")
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error creating profile")
+        raise BadRequestException(detail="Failed to create profile") from e
 
 
 def update_profile(
@@ -128,8 +128,8 @@ def update_profile(
         return profile
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating profile: {e}")
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error updating profile")
+        raise BadRequestException(detail="Failed to update profile") from e
 
 
 def delete_profile(
@@ -152,5 +152,5 @@ def delete_profile(
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error(f"Error deleting profile: {e}")
-        raise BadRequestException(detail=str(e))
+        logger.exception("Error deleting profile")
+        raise BadRequestException(detail="Failed to delete profile") from e

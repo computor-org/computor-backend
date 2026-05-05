@@ -11,7 +11,7 @@ from uuid import UUID
 from .view_base import ViewRepository, _aggregate_grading_status
 
 
-from ..api.mappers import course_member_course_content_result_mapper
+from .view_mappers import course_member_course_content_result_mapper
 from ..repositories.course_content import CourseMemberCourseContentQueryResult
 from ..repositories.course_content import (
     user_course_content_query,

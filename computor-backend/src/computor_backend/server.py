@@ -132,8 +132,8 @@ async def initialize_plugin_registry_with_config():
         try:
             Path(config_file).unlink()
             logger.debug("Cleaned up temporary plugin config")
-        except:
-            pass
+        except OSError:
+            logger.debug("Failed to remove temporary plugin config %s", config_file, exc_info=True)
 
 async def init_admin_user(db: Session):
 
@@ -165,8 +165,8 @@ async def init_admin_user(db: Session):
         )
         db.commit()
 
-    except:
-        print("[CRITICAL BUG] Admin user could not be created. The backend is shutting down.")
+    except Exception:
+        logger.critical("Admin user could not be created. The backend is shutting down.", exc_info=True)
         quit(1)
 
 async def startup_logic():

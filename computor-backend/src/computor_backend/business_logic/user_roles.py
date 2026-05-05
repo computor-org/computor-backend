@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 
-from computor_backend.api.exceptions import NotFoundException, InternalServerException
+from computor_backend.exceptions import NotFoundException, InternalServerException
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.role import UserRole
@@ -25,7 +25,10 @@ def get_user_role(
     entity = query.filter(UserRole.user_id == user_id, UserRole.role_id == role_id).first()
 
     if not entity:
-        raise NotFoundException(detail=f"UserRole not found for user {user_id} and role {role_id}")
+        raise NotFoundException(
+            detail="UserRole not found",
+            context={"user_id": str(user_id), "role_id": str(role_id)},
+        )
 
     return entity
 
@@ -49,10 +52,8 @@ def delete_user_role(
         db.delete(entity)
         db.commit()
     except exc.SQLAlchemyError as e:
-        logger.error(f"Database error deleting user role: {e}")
-        raise InternalServerException(detail=str(e))
-    except Exception as e:
-        logger.error(f"Error deleting user role: {e}")
-        raise InternalServerException(detail=str(e))
+        db.rollback()
+        logger.exception("Database error deleting user role")
+        raise InternalServerException(detail="Failed to delete user role") from e
 
     return {"ok": True}
