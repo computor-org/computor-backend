@@ -147,20 +147,27 @@ export interface ExampleUpdate {
 
 /**
  * Create a new example version.
+ * 
+ * Clients pass an already-parsed meta.yaml as ``meta`` — the server
+ * extracts the promoted scalar / array / FK columns from it and
+ * discards the rest. The full meta.yaml document lives in MinIO
+ * alongside the other example files; the download endpoint serves
+ * it from there.
  */
 export interface ExampleVersionCreate {
   example_id: string;
   version_tag: string;
   version_number: number;
   storage_path: string;
-  /** Content of meta.yaml */
-  meta_yaml: string;
-  /** Content of test.yaml */
-  test_yaml?: string | null;
+  /** Parsed meta.yaml — used to populate promoted columns */
+  meta: Record<string, any>;
 }
 
 /**
- * Get example version details.
+ * Get example version details — promoted columns only.
+ * 
+ * The full parsed meta.yaml / test.yaml documents are not returned
+ * here; call ``GET /examples/download/{version_id}`` for those.
  */
 export interface ExampleVersionGet {
   created_at: string;
@@ -173,8 +180,18 @@ export interface ExampleVersionGet {
   version_tag: string;
   version_number: number;
   storage_path: string;
-  meta_yaml: string;
-  test_yaml?: string | null;
+  title?: string | null;
+  description?: string | null;
+  language?: string | null;
+  license?: string | null;
+  /** Full meta.yaml properties.executionBackend (slug + version + settings) */
+  execution_backend?: Record<string, any> | null;
+  student_submission_files?: string[];
+  additional_files?: string[];
+  student_templates?: string[];
+  test_files?: string[];
+  /** Resolved Service.id derived from properties.executionBackend.slug */
+  testing_service_id?: string | null;
 }
 
 /**
@@ -184,6 +201,9 @@ export interface ExampleVersionList {
   id: string;
   version_tag: string;
   version_number: number;
+  title?: string | null;
+  description?: string | null;
+  testing_service_id?: string | null;
   created_at: string;
 }
 
@@ -286,10 +306,12 @@ export interface ExampleFileSet {
   directory: string;
   identifier: string;
   title: string;
-  /** Map of filename to content */
+  /** Map of filename to content (meta.yaml and test.yaml ride inside this dict) */
   files: Record<string, string>;
-  meta_yaml: string;
-  test_yaml?: string | null;
+  /** Parsed meta.yaml (fetched from MinIO with Redis cache) */
+  meta: Record<string, any>;
+  /** Parsed test.yaml (fetched from MinIO with Redis cache); None if absent */
+  test?: Record<string, any> | null;
 }
 
 /**
@@ -303,10 +325,12 @@ export interface ExampleDownloadResponse {
   identifier: string;
   /** Directory name of the example */
   directory: string;
-  /** Map of filename to content */
+  /** Map of filename to content (includes meta.yaml and test.yaml) */
   files: Record<string, string>;
-  meta_yaml: string;
-  test_yaml?: string | null;
+  /** Parsed meta.yaml (fetched from MinIO with Redis cache) */
+  meta: Record<string, any>;
+  /** Parsed test.yaml (fetched from MinIO with Redis cache); None if absent */
+  test?: Record<string, any> | null;
   /** Dependency examples when with_dependencies=True */
   dependencies?: ExampleFileSet[] | null;
 }

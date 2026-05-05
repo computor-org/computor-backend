@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-05-01T19:35:09.629600",
-  "error_count": 66,
+  "generated_at": "2026-05-05T23:44:23.383979",
+  "error_count": 70,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -52,6 +52,19 @@
         "plain": "Single Sign-On authentication failed. Please try again or contact support.",
         "markdown": "**SSO Authentication Failed**\n\nSingle Sign-On authentication failed. Please try again or contact support if the problem persists.",
         "html": "<strong>SSO Authentication Failed</strong><p>Single Sign-On authentication failed. Please try again or contact support if the problem persists.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTH_005": {
+      "code": "AUTH_005",
+      "http_status": 401,
+      "category": "authentication",
+      "severity": "warning",
+      "title": "API Token Expired",
+      "message": {
+        "plain": "Your API token has expired. Generate a new one and retry.",
+        "markdown": "**API Token Expired**\n\nThe API token used for this request has expired. Generate a new token and retry.",
+        "html": "<strong>API Token Expired</strong><p>The API token used for this request has expired. Generate a new token and retry.</p>"
       },
       "retry_after": null
     },
@@ -117,6 +130,19 @@
         "plain": "You cannot assign a role higher than your own.",
         "markdown": "**Role Escalation Denied**\n\nYou cannot assign the role '{target_role}'. Your role '{user_role}' can only assign roles at or below your privilege level.",
         "html": "<strong>Role Escalation Denied</strong><p>You cannot assign the role <code>{target_role}</code>. Your role <code>{user_role}</code> can only assign roles at or below your privilege level.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_010": {
+      "code": "AUTHZ_010",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Service Account Required",
+      "message": {
+        "plain": "This endpoint is only available for service accounts.",
+        "markdown": "**Service Account Required**\n\nThis endpoint is only available for users marked as service accounts.",
+        "html": "<strong>Service Account Required</strong><p>This endpoint is only available for users marked as service accounts.</p>"
       },
       "retry_after": null
     },
@@ -221,6 +247,19 @@
         "plain": "The requested API endpoint does not exist.",
         "markdown": "**Endpoint Not Found**\n\nThe requested API endpoint does not exist. Please check the URL and API version.",
         "html": "<strong>Endpoint Not Found</strong><p>The requested API endpoint does not exist. Please check the URL and API version.</p>"
+      },
+      "retry_after": null
+    },
+    "NF_010": {
+      "code": "NF_010",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "warning",
+      "title": "Service Record Not Found",
+      "message": {
+        "plain": "No service record exists for this service account.",
+        "markdown": "**Service Record Not Found**\n\nThe service-account user has no associated ``Service`` row. The account exists but is not linked to a service definition.",
+        "html": "<strong>Service Record Not Found</strong><p>The service-account user has no associated <code>Service</code> row. The account exists but is not linked to a service definition.</p>"
       },
       "retry_after": null
     },
@@ -782,6 +821,19 @@
         "html": "<strong>Task Queue Unavailable</strong><p>No worker is available to process tasks on the specified queue. The testing service may be misconfigured or the worker is not running.</p>"
       },
       "retry_after": 120
+    },
+    "EXT_006": {
+      "code": "EXT_006",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "Service Unavailable",
+      "message": {
+        "plain": "An external service is temporarily unavailable.",
+        "markdown": "**Service Unavailable**\n\nAn external service is temporarily unavailable. Please try again later.",
+        "html": "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>"
+      },
+      "retry_after": 60
     },
     "DB_001": {
       "code": "DB_001",

@@ -314,7 +314,6 @@ export interface CourseContentCreate {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
-  testing_service_id?: string | null;
 }
 
 /**
@@ -389,7 +388,6 @@ export interface CourseContentUpdate {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
-  testing_service_id?: string | null;
 }
 
 /**

@@ -2,7 +2,7 @@
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: 2026-05-01T19:35:09.631976
+Generated at: 2026-05-05T23:44:23.386638
 
 To regenerate: bash generate_error_codes.sh
 """
@@ -16,11 +16,13 @@ class ErrorCode(str, Enum):
     AUTH_002 = "AUTH_002"  # Invalid Credentials
     AUTH_003 = "AUTH_003"  # Token Expired
     AUTH_004 = "AUTH_004"  # SSO Authentication Failed
+    AUTH_005 = "AUTH_005"  # API Token Expired
     AUTHZ_001 = "AUTHZ_001"  # Insufficient Permissions
     AUTHZ_002 = "AUTHZ_002"  # Admin Access Required
     AUTHZ_003 = "AUTHZ_003"  # Course Access Denied
     AUTHZ_004 = "AUTHZ_004"  # Insufficient Course Role
     AUTHZ_005 = "AUTHZ_005"  # Role Escalation Denied
+    AUTHZ_010 = "AUTHZ_010"  # Service Account Required
     VAL_001 = "VAL_001"  # Invalid Request Data
     VAL_002 = "VAL_002"  # Missing Required Field
     VAL_003 = "VAL_003"  # Invalid Field Format
@@ -29,6 +31,7 @@ class ErrorCode(str, Enum):
     NF_002 = "NF_002"  # User Not Found
     NF_003 = "NF_003"  # Course Not Found
     NF_004 = "NF_004"  # Endpoint Not Found
+    NF_010 = "NF_010"  # Service Record Not Found
     CONFLICT_001 = "CONFLICT_001"  # Resource Already Exists
     CONFLICT_002 = "CONFLICT_002"  # Concurrent Modification
     RATE_001 = "RATE_001"  # Rate Limit Exceeded
@@ -72,6 +75,7 @@ class ErrorCode(str, Enum):
     EXT_003 = "EXT_003"  # MinIO Service Unavailable
     EXT_004 = "EXT_004"  # Temporal Service Unavailable
     EXT_005 = "EXT_005"  # Task Queue Unavailable
+    EXT_006 = "EXT_006"  # Service Unavailable
     DB_001 = "DB_001"  # Database Connection Failed
     DB_002 = "DB_002"  # Database Query Failed
     DB_003 = "DB_003"  # Transaction Failed
@@ -100,11 +104,13 @@ ERROR_CATEGORIES = {
     ErrorCode.AUTH_002: "authentication",
     ErrorCode.AUTH_003: "authentication",
     ErrorCode.AUTH_004: "authentication",
+    ErrorCode.AUTH_005: "authentication",
     ErrorCode.AUTHZ_001: "authorization",
     ErrorCode.AUTHZ_002: "authorization",
     ErrorCode.AUTHZ_003: "authorization",
     ErrorCode.AUTHZ_004: "authorization",
     ErrorCode.AUTHZ_005: "authorization",
+    ErrorCode.AUTHZ_010: "authorization",
     ErrorCode.VAL_001: "validation",
     ErrorCode.VAL_002: "validation",
     ErrorCode.VAL_003: "validation",
@@ -113,6 +119,7 @@ ERROR_CATEGORIES = {
     ErrorCode.NF_002: "not_found",
     ErrorCode.NF_003: "not_found",
     ErrorCode.NF_004: "not_found",
+    ErrorCode.NF_010: "not_found",
     ErrorCode.CONFLICT_001: "conflict",
     ErrorCode.CONFLICT_002: "conflict",
     ErrorCode.RATE_001: "rate_limit",
@@ -156,6 +163,7 @@ ERROR_CATEGORIES = {
     ErrorCode.EXT_003: "external_service",
     ErrorCode.EXT_004: "external_service",
     ErrorCode.EXT_005: "external_service",
+    ErrorCode.EXT_006: "external_service",
     ErrorCode.DB_001: "database",
     ErrorCode.DB_002: "database",
     ErrorCode.DB_003: "database",
