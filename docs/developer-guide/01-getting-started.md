@@ -103,18 +103,21 @@ LOG_LEVEL=INFO
 
 ### 5. Start Docker Services
 
-Start all required infrastructure services:
+Start the docker-managed infrastructure (Postgres, Redis, Temporal + UI, MinIO, Traefik, workers):
 
 ```bash
-bash startup.sh
+bash startup.sh dev -d
 ```
 
-This starts:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- Temporal Server (port 7233)
-- Temporal UI (port 8088)
-- MinIO (port 9000, console 9001)
+In dev mode the FastAPI server and the Next.js frontend run **locally**, not in containers — only the supporting services live in docker.
+
+Default port mapping (configurable via `.env`):
+- PostgreSQL: 5432 (external) → 5437 (internal)
+- Redis: 6379
+- Temporal Server: 7233
+- Temporal UI: 8088
+- MinIO: 9000 (API), 9001 (console)
+- Traefik: 8080
 
 **Verify services are running**:
 
@@ -122,49 +125,30 @@ This starts:
 docker ps
 ```
 
-You should see containers for postgres, redis, temporal, and minio.
+You should see containers for postgres, redis, temporal, temporal-ui, minio, traefik, and the temporal worker fleet.
 
-### 6. Run Database Migrations
-
-Create the database schema:
-
-```bash
-bash migrations.sh
-```
-
-This runs Alembic migrations to create all tables.
-
-### 7. Start the Server
-
-The server automatically creates the admin user and applies roles on startup:
+### 6. Start the API
 
 ```bash
 bash api.sh
 ```
 
-This handles:
-- Admin user creation with credentials from `.env` (`API_ADMIN_USER`, `API_ADMIN_PASSWORD`)
-- Role and permission setup
-- Base roles and content kinds are seeded by Alembic migrations
-
-**Optional: Seed development data**:
-
-```bash
-cd computor-backend/src
-python seeder.py
-cd ../..
-```
-
-### 8. Start the Backend API
-
-```bash
-bash api.sh
-```
+`api.sh` runs Alembic migrations, creates the admin user from `API_ADMIN_USER` / `API_ADMIN_PASSWORD` in `.env`, applies roles, and then starts uvicorn. No separate `migrations.sh` step is needed in the normal flow.
 
 The API will be available at:
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Redoc**: http://localhost:8000/redoc
+
+### 7. Start the Web Frontend
+
+In a separate terminal:
+
+```bash
+bash web.sh
+```
+
+Frontend will be at http://localhost:3000 (proxies API calls to `:8000`).
 
 
 ## Verification
@@ -218,13 +202,13 @@ git pull
 pip install -e computor-backend/ --upgrade
 
 # Start Docker services (if not running)
-bash startup.sh
+bash startup.sh dev -d
 
-# Run migrations (if new migrations exist)
-bash migrations.sh
-
-# Start backend API
+# Start backend API (runs migrations automatically)
 bash api.sh
+
+# In a separate terminal: start the web frontend
+bash web.sh
 ```
 
 ### Making Changes
@@ -257,10 +241,10 @@ bash api.sh
 # Stop backend API
 Ctrl+C
 
-# Stop Docker services
+# Stop Docker services (auto-detects dev/prod from running containers)
 bash stop.sh
-# or
-docker-compose -f docker-compose-dev.yaml down
+# or be explicit:
+bash stop.sh dev
 ```
 
 ## Common Setup Issues
@@ -294,8 +278,10 @@ kill -9 <PID>
 **Solution**:
 ```bash
 # Drop all tables and start fresh (development only!)
-docker-compose -f docker-compose-dev.yaml down -v
-bash startup.sh
+# stop.sh intentionally disables -v; remove the postgres data dir manually instead.
+bash stop.sh
+sudo rm -rf "${SYSTEM_DEPLOYMENT_PATH}/postgres"
+bash startup.sh dev -d
 bash migrations.sh
 ```
 
@@ -382,20 +368,22 @@ Now that your environment is set up:
 
 ```bash
 # Backend
-bash api.sh              # Start API server
-bash migrations.sh       # Run migrations
-bash test.sh            # Run tests
+bash api.sh              # Start API server (runs migrations automatically)
+bash web.sh              # Start Next.js dev server (dev only)
+bash migrations.sh       # Run migrations standalone (rarely needed)
+bash test.sh             # Run tests
 
 # Code Generation
-bash generate.sh types      # Generate TypeScript types
-bash generate.sh python-client    # Generate Python client
-bash generate.sh schema     # Generate OpenAPI schema
+bash generate.sh types          # Generate TypeScript types
+bash generate.sh python-client  # Generate Python client
+bash generate.sh schema         # Generate OpenAPI schema
 
-# Docker
-bash startup.sh         # Start all services
-bash stop.sh            # Stop all services
-docker ps               # List running containers
-docker logs <container> # View container logs
+# Docker stack
+bash startup.sh dev -d   # Dev: docker services only (API/web run locally)
+bash startup.sh prod -d  # Prod: everything in docker (API + web + workers)
+bash stop.sh             # Stop services (auto-detects env)
+docker ps                # List running containers
+docker logs <container>  # View container logs
 
 # Database
 alembic revision --autogenerate -m "message"  # Create migration

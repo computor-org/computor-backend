@@ -17,8 +17,11 @@ computor-fullstack/
 ├── computor-web/            # Next.js web frontend
 ├── computor-coder/          # Coder workspace deployment
 ├── docs/                    # Documentation
-├── docker/                  # Docker configurations
-├── scripts/                 # Utility scripts
+├── docker/                  # Per-service Dockerfiles (api/, web/, temporal-worker-*/, postgres-init/, ...)
+├── ops/                     # Operational configs
+│   ├── docker/              # Docker Compose files (base, dev, prod, web, coder)
+│   ├── environments/        # .env templates
+│   └── docs/                # Ops documentation (DOCKER_SETUP.md, ENV_CONFIGURATION.md, ...)
 └── *.sh                     # Shell scripts for development
 ```
 
@@ -528,9 +531,32 @@ from computor_client import ComputorClient
 
 ### Docker
 
-- `docker-compose-dev.yaml`: Development services
-- `docker-compose-prod.yaml`: Production services
-- `docker/`: Individual Dockerfiles
+Compose is split into a base file plus environment-specific overrides, all under `ops/docker/`. You should never invoke `docker compose` directly — `startup.sh` and `stop.sh` select the right combination of files based on the `dev|prod` argument and `CODER_ENABLED` from `.env`.
+
+- `ops/docker/docker-compose.base.yaml`: Core shared services (Traefik, PostgreSQL, Redis, Temporal + temporal-postgres, MinIO, static-server)
+- `ops/docker/docker-compose.dev.yaml`: Development overrides — Temporal UI plus `temporal-worker`, `temporal-worker-testing`, `temporal-worker-matlab`. The API and frontend run **locally** via `api.sh` / `web.sh`, not in containers.
+- `ops/docker/docker-compose.prod.yaml`: Production overrides — adds the `uvicorn` API service and the production worker fleet
+- `ops/docker/docker-compose.web.yaml`: Next.js frontend behind Traefik (auto-included by `startup.sh prod`)
+- `ops/docker/docker-compose.coder.yaml`: Optional Coder addon (gated by `CODER_ENABLED=true`) — `coder`, `coder-postgres`, `coder-registry`, `temporal-worker-coder`
+- `docker/`: Per-service Dockerfiles (`api/`, `web/`, `temporal-worker-dev/`, `temporal-worker-testing/`, `temporal-worker-matlab/`, `temporal-worker-coder/`, `matlab/`, `postgres-init/`, `temporal/`, `backup/`)
+- `ops/environments/`: `.env.*.template` files; copy `ops/environments/.env.common.template` to `.env` at the repo root
+
+How to run things:
+
+```bash
+# Development — docker services + local FastAPI + local Next.js
+bash startup.sh dev -d   # postgres, redis, temporal, minio, traefik, workers
+bash api.sh              # FastAPI on :8000 (separate terminal)
+bash web.sh              # Next.js on :3000 (separate terminal)
+
+# Production — everything in docker (API, frontend, workers)
+bash startup.sh prod -d
+
+# Stop (auto-detects dev vs prod from running containers)
+bash stop.sh
+```
+
+Coder is toggled via `CODER_ENABLED=true` in `.env` — `startup.sh` then mixes in `docker-compose.coder.yaml` automatically.
 
 ## Next Steps
 

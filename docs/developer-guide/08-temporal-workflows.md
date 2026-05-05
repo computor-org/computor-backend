@@ -690,21 +690,20 @@ python -m computor_backend.tasks.temporal_worker
 
 ### Via Docker
 
-Worker can be included in docker-compose:
+Workers are already part of the standard stack — `bash startup.sh dev -d` (or `prod -d`) brings them up automatically. Three worker services are defined in `ops/docker/docker-compose.{dev,prod}.yaml`:
 
-```yaml
-# docker-compose-dev.yaml
-services:
-  temporal-worker:
-    build: ./computor-backend
-    command: python -m computor_backend.tasks.temporal_worker
-    environment:
-      - TEMPORAL_HOST=temporal
-      - TEMPORAL_PORT=7233
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/computor
-    depends_on:
-      - temporal
-      - postgres
+- `temporal-worker` — generic worker (hierarchy management, student template, examples). Built from `docker/temporal-worker-dev/Dockerfile`.
+- `temporal-worker-testing` — unified testing queue (Python, Octave, R, Julia, C, Fortran, Document). Built from `docker/temporal-worker-testing/Dockerfile`, registered on `--queues=testing`.
+- `temporal-worker-matlab` — MATLAB testing queue (`--queues=testing-matlab`), built on top of `${MATLAB_BASE_IMAGE}`.
+
+When `CODER_ENABLED=true`, `ops/docker/docker-compose.coder.yaml` adds a fourth worker, `temporal-worker-coder`, for image builds and template pushes.
+
+Replica counts are env-tunable: `TEMPORAL_WORKER_REPLICAS`, `TESTING_WORKER_REPLICAS`, `MATLAB_TESTING_WORKER_REPLICAS`.
+
+To iterate on worker code without restarting the whole stack, rebuild just that service through `startup.sh`:
+
+```bash
+bash startup.sh dev --build -d
 ```
 
 ## Monitoring Workflows
