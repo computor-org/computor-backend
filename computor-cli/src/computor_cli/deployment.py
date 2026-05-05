@@ -947,19 +947,16 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                                 if v.get('version_tag') == version_tag:
                                     version = v
                                     break
-                        # Fetch full version details to access meta_yaml
-                        if version and not version.get('meta_yaml'):
+                        # Fetch full version details if the list view didn't carry
+                        # title/description (the GET version response always does).
+                        if version and version.get('title') is None and version.get('description') is None:
                             try:
                                 version = custom_client.get(f"examples/versions/{version['id']}") or version
                             except Exception:
                                 pass
-                        if version and version.get('meta_yaml'):
-                            try:
-                                meta = yaml.safe_load(version.get('meta_yaml') or "") or {}
-                                meta_title = meta.get('title')
-                                meta_description = meta.get('description')
-                            except Exception:
-                                pass
+                        if version:
+                            meta_title = version.get('title')
+                            meta_description = version.get('description')
                 except Exception:
                     pass
 

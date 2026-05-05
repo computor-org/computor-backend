@@ -63,8 +63,9 @@ export class ServicesClient extends BaseEndpointClient {
    * Delete Service Endpoint
    * Delete (archive) a service account.
    */
-  async deleteServiceEndpointServiceAccountsServiceIdDelete({ serviceId, userId }: { serviceId: string | string; userId?: string | null }): Promise<void> {
+  async deleteServiceEndpointServiceAccountsServiceIdDelete({ serviceId, force, userId }: { serviceId: string | string; force?: boolean; userId?: string | null }): Promise<void> {
     const queryParams: Record<string, unknown> = {
+      force,
       user_id: userId,
     };
     return this.client.delete<void>(this.buildPath(serviceId), { params: queryParams });
@@ -85,8 +86,9 @@ export class ServicesClient extends BaseEndpointClient {
    * Update Service Endpoint
    * Update service account details.
    */
-  async updateServiceEndpointServiceAccountsServiceIdPatch({ serviceId, userId, body }: { serviceId: string | string; userId?: string | null; body: ServiceUpdate }): Promise<ServiceGet> {
+  async updateServiceEndpointServiceAccountsServiceIdPatch({ serviceId, force, userId, body }: { serviceId: string | string; force?: boolean; userId?: string | null; body: ServiceUpdate }): Promise<ServiceGet> {
     const queryParams: Record<string, unknown> = {
+      force,
       user_id: userId,
     };
     return this.client.patch<ServiceGet>(this.buildPath(serviceId), body, { params: queryParams });

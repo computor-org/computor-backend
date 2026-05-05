@@ -7,7 +7,7 @@ Provides endpoints for service account management and self-identification.
 from typing import Annotated, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
@@ -155,9 +155,17 @@ def update_service_endpoint(
     service_data: ServiceUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    force: bool = Query(
+        False,
+        description=(
+            "Override the dependents-check when disabling a service. "
+            "Without this, disabling a service that course contents or "
+            "example versions depend on returns 409."
+        ),
+    ),
 ):
     """Update service account details."""
-    return update_service_account(service_id, service_data, permissions, db)
+    return update_service_account(service_id, service_data, permissions, db, force=force)
 
 
 @services_router.put("/{service_id}/heartbeat", status_code=status.HTTP_204_NO_CONTENT)
@@ -175,6 +183,14 @@ def delete_service_endpoint(
     service_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    force: bool = Query(
+        False,
+        description=(
+            "Override the dependents-check when archiving a service. "
+            "Without this, archiving a service that course contents or "
+            "example versions depend on returns 409."
+        ),
+    ),
 ):
     """Delete (archive) a service account."""
-    delete_service_account(service_id, permissions, db)
+    delete_service_account(service_id, permissions, db, force=force)

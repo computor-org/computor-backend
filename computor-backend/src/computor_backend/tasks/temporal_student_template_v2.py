@@ -23,23 +23,26 @@ async def process_example_for_student_template_v2(
 ) -> Dict[str, Any]:
     """
     Process example files for student template generation.
-    Uses meta.yaml to determine which files to include.
+    File lists come from the ExampleVersion DB row (typed columns), not
+    from re-parsing the workspace meta.yaml.
     """
-    import yaml
     from pathlib import Path
-    
+
     try:
         # Create target directory
         target_path.mkdir(parents=True, exist_ok=True)
-        
-        # Parse meta.yaml if it exists
-        meta_yaml = None
-        if 'meta.yaml' in example_files:
-            try:
-                meta_yaml = yaml.safe_load(example_files['meta.yaml'])
-            except Exception as e:
-                logger.error(f"Failed to parse meta.yaml: {e}")
-        
+
+        # File lists from typed columns on ExampleVersion. These were
+        # derived from meta.yaml at upload and are the source of truth
+        # for what files belong to this version.
+        additional_files = list(getattr(version, 'additional_files', None) or [])
+        submission_files = list(getattr(version, 'student_submission_files', None) or [])
+        student_templates = list(getattr(version, 'student_templates', None) or [])
+        has_meta = (
+            additional_files or submission_files or student_templates
+            or getattr(version, 'meta', None)
+        )
+
         # Process content directory files
         for filename, content in example_files.items():
             if filename.startswith('content/'):
@@ -63,23 +66,15 @@ async def process_example_for_student_template_v2(
                     file_path = target_path / relative_path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_bytes(content)
-        
-        if meta_yaml:
-            properties = meta_yaml.get('properties', {})
-            
+
+        if has_meta:
             # Process additionalFiles - copy to assignment root
-            additional_files = properties.get('additionalFiles', [])
             for file_name in additional_files:
                 if file_name in example_files:
                     # Copy to root of assignment directory
                     file_path = target_path / Path(file_name).name  # Use only filename, not path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_bytes(example_files[file_name])
-            
-            # Process studentSubmissionFiles - ensure all required files exist
-            # Use content from studentTemplates when available, otherwise create empty
-            submission_files = properties.get('studentSubmissionFiles', [])
-            student_templates = properties.get('studentTemplates', [])
             
             # Build a map of template filenames to their content
             template_content_map = {}
@@ -619,69 +614,72 @@ async def generate_student_template_activity_v2(
                         logger.warning(f"Failed to load files from example repository for {content.path}: {e}")
                         files = {}
 
-                    # Extract service type from meta.yaml and link to appropriate service
-                    if not content.testing_service_id and files:
+                    # Legacy fallback: link a testing service by language when
+                    # the slug→service.id resolution didn't fire. Reads from
+                    # the ExampleVersion's typed ``execution_backend`` column
+                    # first; falls back to parsing the meta.yaml that's
+                    # already in the ``files`` dict for the rare
+                    # ``properties.serviceType`` path.
+                    if not content.testing_service_id and content.deployment.example_version:
                         try:
-                            meta_yaml_bytes = files.get('meta.yaml')
+                            ev = content.deployment.example_version
+                            language = None
+
+                            # New ``properties.serviceType`` path lives only
+                            # in meta.yaml — parse the workspace copy if we
+                            # have it.
+                            meta_yaml_bytes = files.get('meta.yaml') if files else None
                             if meta_yaml_bytes:
-                                import yaml
-                                meta_data = yaml.safe_load(meta_yaml_bytes)
-                                language = None
+                                import yaml as _yaml
+                                try:
+                                    meta_data = _yaml.safe_load(meta_yaml_bytes) or {}
+                                except Exception:
+                                    meta_data = {}
+                                props = meta_data.get('properties') if isinstance(meta_data.get('properties'), dict) else {}
+                                service_type_spec = props.get('serviceType') or props.get('service_type')
+                                if service_type_spec and isinstance(service_type_spec, str) and service_type_spec.startswith('testing.'):
+                                    # e.g., "testing.python" -> "python"
+                                    language = service_type_spec.split('.')[-1]
 
-                                if meta_data:
-                                    props = (meta_data.get('properties') or {})
-                                    # Check for new service_type path or legacy executionBackend slug
-                                    service_type_spec = props.get('serviceType') or props.get('service_type')
+                            if not language:
+                                # Legacy: map executionBackend.slug suffix to language
+                                backend_slug = (ev.execution_backend or {}).get('slug') if isinstance(ev.execution_backend, dict) else None
+                                if backend_slug:
+                                    slug_parts = backend_slug.split('.')
+                                    backend_type = slug_parts[-1] if slug_parts else backend_slug
+                                    legacy_mapping = {
+                                        'py': 'python',
+                                        'python': 'python',
+                                        'matlab': 'matlab',
+                                        'mat': 'matlab',
+                                    }
+                                    language = legacy_mapping.get(backend_type)
 
-                                    if service_type_spec:
-                                        # Extract language from service type spec
-                                        # e.g., "testing.python" -> "python", "testing.matlab" -> "matlab"
-                                        if service_type_spec.startswith('testing.'):
-                                            language = service_type_spec.split('.')[-1]
+                            if language:
+                                from sqlalchemy_utils import Ltree
+                                from ..model.service import Service
 
-                                    if not language:
-                                        # Legacy support: map old backend slugs to languages
-                                        eb = props.get('executionBackend') or {}
-                                        backend_slug = eb.get('slug')
-                                        if backend_slug:
-                                            # Extract language from legacy slug
-                                            # e.g., 'python' -> 'python', 'itpcp.exec.py' -> 'py' -> 'python'
-                                            slug_parts = backend_slug.split('.')
-                                            backend_type = slug_parts[-1] if slug_parts else backend_slug
-                                            # Map legacy backend types to languages
-                                            legacy_mapping = {
-                                                'py': 'python',
-                                                'python': 'python',
-                                                'matlab': 'matlab',
-                                                'mat': 'matlab',
-                                            }
-                                            language = legacy_mapping.get(backend_type)
+                                # Find the testing.temporal ServiceType
+                                service_type = db.query(ServiceType).filter(
+                                    ServiceType.path == Ltree('testing.temporal')
+                                ).first()
 
-                                if language:
-                                    from sqlalchemy_utils import Ltree
-                                    from ..model.service import Service
-
-                                    # Find the testing.temporal ServiceType
-                                    service_type = db.query(ServiceType).filter(
-                                        ServiceType.path == Ltree('testing.temporal')
+                                if service_type:
+                                    # Find a Service with this service_type_id AND matching language
+                                    # Prefer enabled services
+                                    service = db.query(Service).filter(
+                                        Service.service_type_id == service_type.id,
+                                        Service.enabled == True,
+                                        Service.properties['language'].astext == language
                                     ).first()
 
-                                    if service_type:
-                                        # Find a Service with this service_type_id AND matching language
-                                        # Prefer enabled services
-                                        service = db.query(Service).filter(
-                                            Service.service_type_id == service_type.id,
-                                            Service.enabled == True,
-                                            Service.properties['language'].astext == language
-                                        ).first()
-
-                                        if service:
-                                            content.testing_service_id = service.id
-                                            logger.info(f"Linked service '{service.slug}' (language: {language}) to course content {content.path}")
-                                        else:
-                                            logger.warning(f"No enabled Service found for language '{language}' with ServiceType 'testing.temporal'")
+                                    if service:
+                                        content.testing_service_id = service.id
+                                        logger.info(f"Linked service '{service.slug}' (language: {language}) to course content {content.path}")
                                     else:
-                                        logger.warning(f"ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
+                                        logger.warning(f"No enabled Service found for language '{language}' with ServiceType 'testing.temporal'")
+                                else:
+                                    logger.warning(f"ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
                         except Exception as e:
                             logger.warning(f"Failed to link service: {e}")
 

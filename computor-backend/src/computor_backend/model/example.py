@@ -6,7 +6,7 @@ Each example is stored in its own directory with a flat structure.
 """
 
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ARRAY, ForeignKey, text, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
@@ -212,63 +212,120 @@ class ExampleVersion(Base):
         comment="Path in storage system (MinIO path, S3 key, etc.)"
     )
     
-    # Content metadata
-    meta_yaml = Column(
-        Text,
-        nullable=False,
-        comment="Content of meta.yaml file for this version"
+    # Content metadata: only promoted columns live in the DB. The full
+    # meta.yaml / test.yaml documents are persisted to MinIO at
+    # ``{storage_path}/meta.yaml`` and ``{storage_path}/test.yaml``;
+    # download endpoints read them from there (with a Redis cache in
+    # front) instead of duplicating the raw documents in Postgres.
+    title = Column(
+        String(255),
+        nullable=True,
+        comment="meta.yaml: title (per-version)",
     )
-    test_yaml = Column(
+    description = Column(
         Text,
         nullable=True,
-        comment="Content of test.yaml file for this version (optional)"
+        comment="meta.yaml: description (per-version)",
+    )
+    language = Column(
+        String(16),
+        nullable=True,
+        comment="meta.yaml: language",
+    )
+    license = Column(
+        String(255),
+        nullable=True,
+        comment="meta.yaml: license",
+    )
+    execution_backend = Column(
+        JSONB,
+        nullable=True,
+        comment="meta.yaml: properties.executionBackend full dict (slug + version + settings)",
+    )
+    student_submission_files = Column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        comment="meta.yaml: properties.studentSubmissionFiles",
+    )
+    additional_files = Column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        comment="meta.yaml: properties.additionalFiles",
+    )
+    student_templates = Column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        comment="meta.yaml: properties.studentTemplates",
+    )
+    test_files = Column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        comment="meta.yaml: properties.testFiles",
     )
     
+    # Testing service: resolved at upload from
+    # ``properties.executionBackend.slug`` in meta.yaml against the
+    # ``service`` table. Stored as a real FK so assignment-time copies
+    # are O(1) and the resolution can't silently drift after upload.
+    testing_service_id = Column(
+        UUID,
+        ForeignKey('service.id', ondelete='RESTRICT'),
+        nullable=True,
+        index=True,
+        comment="Resolved Service.id for the executionBackend declared in meta.yaml",
+    )
+
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID, ForeignKey("user.id"), comment="User who created this version")
-    
+
     # Relationships
     example = relationship("Example", back_populates="versions")
     created_by_user = relationship("User", foreign_keys=[created_by])
-    
+    testing_service = relationship("Service", foreign_keys=[testing_service_id])
+
     # Deployment tracking
-    
+
     # Constraints
     __table_args__ = (
         UniqueConstraint("example_id", "version_tag", name="unique_example_version_tag"),
         UniqueConstraint("example_id", "version_number", name="unique_example_version_number"),
     )
-    
+
     def __repr__(self):
         return f"<ExampleVersion(id={self.id}, version_tag='{self.version_tag}')>"
-    
-    def get_execution_backend_slug(self) -> str:
+
+    @staticmethod
+    def extract_execution_backend(meta: dict | None) -> dict | None:
+        """Pull ``properties.executionBackend`` out of a parsed meta dict.
+
+        Returns the full block (slug + version + settings) or None.
+        Used by the upload path to populate ``execution_backend``.
         """
-        Extract the execution backend slug from the meta_yaml.
-        
-        Returns:
-            Execution backend slug if found, None otherwise
+        if not isinstance(meta, dict):
+            return None
+        properties = meta.get('properties')
+        if not isinstance(properties, dict):
+            return None
+        eb = properties.get('executionBackend')
+        return eb if isinstance(eb, dict) else None
+
+    def get_execution_backend_slug(self) -> str | None:
+        """Convenience accessor for the execution-backend slug.
+
+        Reads the dedicated ``execution_backend`` JSONB column — no YAML
+        parsing, no nested-dict walking. Prefer the resolved
+        ``testing_service_id`` FK for runtime decisions; this method is
+        for callers that genuinely need the original slug string (e.g.
+        legacy fallbacks where the FK wasn't backfilled).
         """
-        import yaml
-        
-        if not self.meta_yaml:
+        if not isinstance(self.execution_backend, dict):
             return None
-        
-        try:
-            # Parse the meta.yaml content
-            meta_data = yaml.safe_load(self.meta_yaml)
-            
-            # Navigate to properties.executionBackend.slug
-            properties = meta_data.get('properties', {})
-            if properties:
-                execution_backend = properties.get('executionBackend', {})
-                if execution_backend and isinstance(execution_backend, dict):
-                    return execution_backend.get('slug')
-            
-            return None
-        except (yaml.YAMLError, AttributeError, TypeError):
-            return None
+        return self.execution_backend.get('slug')
 
 
 class ExampleDependency(Base):
