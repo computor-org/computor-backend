@@ -106,38 +106,83 @@ def validate_semantic_version(version_str: str) -> SemanticVersion:
         ) from e
 
 
-def _auto_link_testing_service(
+def _link_testing_service(
     course_content: CourseContent,
     example_version: ExampleVersion,
     permissions: Principal,
     db: Session
 ) -> None:
+    """Copy ``example_version.testing_service_id`` onto the course content.
+
+    The canonical resolution from meta.yaml's executionBackend slug to a
+    Service.id happens once at example-version upload (see
+    ``api.examples._resolve_testing_service_id``). At assignment time we
+    just propagate the already-validated FK — O(1) and cannot silently
+    fail.
+
+    Legacy fallback: rows uploaded before the FK existed (or whose
+    backfill couldn't resolve at migration time) still have
+    ``example_version.testing_service_id = NULL``. For those, we
+    attempt the slug→service lookup once and write the result back to
+    ``example_version`` so subsequent assignments take the fast path.
+    Truly unresolvable versions raise BadRequestException — the lecturer
+    sees the failure here instead of getting an assignment that can't
+    run tests.
     """
-    Auto-link testing service to course content based on example's execution backend slug.
-
-    Looks up the service by the slug extracted from the example version's meta.yaml
-    and sets course_content.testing_service_id if found.
-    """
-    execution_backend_slug = example_version.get_execution_backend_slug()
-    if not execution_backend_slug:
-        return
-
-    service = db.query(Service).filter(
-        Service.slug == execution_backend_slug,
-        Service.enabled == True,
-        Service.archived_at.is_(None)
-    ).first()
-
-    if service:
-        if course_content.testing_service_id != service.id:
-            course_content.testing_service_id = service.id
+    if example_version.testing_service_id is not None:
+        if course_content.testing_service_id != example_version.testing_service_id:
+            course_content.testing_service_id = example_version.testing_service_id
             course_content.updated_by = permissions.user_id
             course_content.updated_at = datetime.now(timezone.utc)
-            logger.info(
-                f"Linked testing service '{execution_backend_slug}' to course content {course_content.path}"
-            )
-    else:
-        logger.warning(f"Service not found for execution_backend slug: {execution_backend_slug}")
+        return
+
+    # Legacy fallback — only reached for example_versions predating the
+    # upload-time resolver, or where backfill couldn't match the slug.
+    slug = example_version.get_execution_backend_slug()
+    if not slug:
+        raise BadRequestException(
+            error_code="EXAMPLE_VERSION_NO_BACKEND",
+            detail=(
+                f"Example version {example_version.id} has no testing "
+                "service link and its meta.yaml declares no "
+                "executionBackend. Re-upload the example with a valid "
+                "executionBackend slug."
+            ),
+            context={"example_version_id": str(example_version.id)},
+        )
+
+    service = db.query(Service).filter(
+        Service.slug == slug,
+        Service.enabled == True,  # noqa: E712 — SQLAlchemy column comparison
+        Service.archived_at.is_(None),
+    ).first()
+
+    if not service:
+        raise BadRequestException(
+            error_code="EXAMPLE_VERSION_UNKNOWN_BACKEND",
+            detail=(
+                f"Example version {example_version.id} declares "
+                f"executionBackend slug '{slug}', which does not match "
+                "any enabled, non-archived service. Register the service "
+                "or fix the slug in meta.yaml."
+            ),
+            context={
+                "example_version_id": str(example_version.id),
+                "slug": slug,
+            },
+        )
+
+    # Self-heal: persist the resolved FK on the example version so we
+    # don't have to re-do this lookup on every future assignment.
+    example_version.testing_service_id = service.id
+    course_content.testing_service_id = service.id
+    course_content.updated_by = permissions.user_id
+    course_content.updated_at = datetime.now(timezone.utc)
+    logger.info(
+        "Backfilled testing service '%s' onto example_version %s "
+        "and course content %s",
+        slug, example_version.id, course_content.path,
+    )
 
 
 def assign_example_to_content(
@@ -346,8 +391,8 @@ def assign_example_to_content(
         )
         db.add(history)
 
-        # Auto-link testing service based on example's execution backend
-        _auto_link_testing_service(course_content, example_version, permissions, db)
+        # Propagate testing service from the (validated) example version FK
+        _link_testing_service(course_content, example_version, permissions, db)
 
         db.commit()
         db.refresh(existing_deployment)
@@ -386,8 +431,8 @@ def assign_example_to_content(
         )
         db.add(history)
 
-        # Auto-link testing service based on example's execution backend
-        _auto_link_testing_service(course_content, example_version, permissions, db)
+        # Propagate testing service from the (validated) example version FK
+        _link_testing_service(course_content, example_version, permissions, db)
 
         db.commit()
         db.refresh(deployment)
@@ -559,6 +604,12 @@ def unassign_example_from_content(
     deployment.example_version_id = None
     deployment.deployment_message = 'Unassigned by lecturer'
     deployment.updated_by = permissions.user_id
+
+    # Clear the cached testing_service_id on the course content too —
+    # it was a denormalisation of the now-unassigned example version.
+    if course_content.testing_service_id is not None:
+        course_content.testing_service_id = None
+        course_content.updated_by = permissions.user_id
 
     db.commit()
 

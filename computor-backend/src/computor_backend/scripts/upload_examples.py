@@ -192,14 +192,15 @@ language: en
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(content)
             
-            # Write meta.yaml
+            # Write meta.yaml — server returns parsed dict, render back to YAML
+            import yaml as _yaml
             with open(example_dir / 'meta.yaml', 'w', encoding='utf-8') as f:
-                f.write(data['meta_yaml'])
-            
-            # Write test.yaml if present
-            if data['test_yaml']:
+                _yaml.safe_dump(data['meta'], f, default_flow_style=False, sort_keys=False)
+
+            # Write test.yaml if present — server returns parsed dict, render back
+            if data.get('test'):
                 with open(example_dir / 'test.yaml', 'w', encoding='utf-8') as f:
-                    f.write(data['test_yaml'])
+                    _yaml.safe_dump(data['test'], f, default_flow_style=False, sort_keys=False)
             
             print(f"✅ Downloaded to: {example_dir}")
             return True

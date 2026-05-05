@@ -41,6 +41,7 @@ from computor_types.cascade_deletion import (
 )
 from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
+from ..model.service import Service
 from ..permissions.auth import get_current_principal
 from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
@@ -74,6 +75,160 @@ CACHE_TTL_GET = 600   # 10 minutes
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
+
+def _resolve_testing_service_id(db: Session, meta: dict) -> str:
+    """Resolve ``example_version.testing_service_id`` from parsed meta.
+
+    The slug at ``properties.executionBackend.slug`` is the contract
+    between an example and the platform's testing infrastructure. We
+    resolve it once at upload — every later assignment just copies the
+    FK — so a missing or stale slug must fail loudly here instead of
+    silently producing assignable-but-untestable content downstream.
+
+    Raises BadRequestException if meta lacks the field, or if the
+    declared slug doesn't resolve to an enabled, non-archived Service.
+    """
+    eb = ExampleVersion.extract_execution_backend(meta)
+    slug = eb.get('slug') if eb else None
+    if not slug:
+        raise BadRequestException(
+            error_code="EXAMPLE_VERSION_NO_BACKEND",
+            detail=(
+                "meta.yaml is missing properties.executionBackend.slug. "
+                "Add an executionBackend declaration so the platform "
+                "knows which service should run tests for this example."
+            ),
+        )
+    service = db.query(Service).filter(
+        Service.slug == slug,
+        Service.enabled == True,  # noqa: E712 — SQLAlchemy column comparison
+        Service.archived_at.is_(None),
+    ).first()
+    if not service:
+        raise BadRequestException(
+            error_code="EXAMPLE_VERSION_UNKNOWN_BACKEND",
+            detail=(
+                f"meta.yaml references execution backend slug '{slug}', "
+                "which does not match any enabled, non-archived service. "
+                "Register the service or fix the slug in meta.yaml."
+            ),
+            context={"slug": slug},
+        )
+    return service.id
+
+
+def _split_promoted_meta(meta: dict) -> dict:
+    """Pull promoted columns out of a parsed meta.yaml dict.
+
+    Returns a kwargs dict ready to spread onto ExampleVersion(...).
+    The full meta.yaml document itself is **not** stored in the DB —
+    it's persisted to MinIO at ``{storage_path}/meta.yaml`` along
+    with the rest of the example files. Only the promoted scalars,
+    file lists, and the executionBackend block survive in Postgres.
+    """
+    if not isinstance(meta, dict):
+        meta = {}
+    properties = meta.get("properties") if isinstance(meta.get("properties"), dict) else {}
+
+    def _str_list(value) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value if item is not None]
+
+    eb = properties.get("executionBackend") if isinstance(properties.get("executionBackend"), dict) else None
+
+    return {
+        "title": meta.get("title"),
+        "description": meta.get("description"),
+        "language": meta.get("language"),
+        "license": meta.get("license"),
+        "execution_backend": eb,
+        "student_submission_files": _str_list(properties.get("studentSubmissionFiles")),
+        "additional_files": _str_list(properties.get("additionalFiles")),
+        "student_templates": _str_list(properties.get("studentTemplates")),
+        "test_files": _str_list(properties.get("testFiles")),
+    }
+
+
+# Redis-backed cache for yaml documents fetched from MinIO. Example
+# versions are immutable (a new upload creates a new version), so we
+# can cache for a long time. Keys are namespaced per (kind, version_id).
+_YAML_CACHE_TTL = 7 * 24 * 60 * 60  # 7 days
+
+
+async def _get_version_yaml_dict(
+    version: ExampleVersion,
+    kind: str,  # "meta" | "test"
+    storage_service,
+) -> dict | None:
+    """Fetch and parse meta.yaml or test.yaml for a version from MinIO,
+    returning a dict (or None for ``test`` when the file is absent).
+
+    Goes through the shared cache: first checks Redis, falls back to
+    MinIO on miss, populates the cache on success. Git-source examples
+    don't have files in MinIO — for those, return a synthetic minimal
+    dict for ``meta`` and ``None`` for ``test``.
+    """
+    if kind not in ("meta", "test"):
+        raise ValueError(f"Unsupported yaml kind: {kind}")
+
+    repository = version.example.repository
+
+    if repository.source_type == "git":
+        # Synthetic meta for git-sourced examples; no test.yaml available.
+        if kind == "meta":
+            return {
+                "slug": str(version.example.identifier),
+                "title": version.example.title,
+                "description": version.example.description or "",
+            }
+        return None
+
+    if repository.source_type not in ("minio", "s3"):
+        return None
+
+    cache = get_cache()
+    cache_key = cache.k("example_version_yaml", kind, str(version.id))
+
+    cached = cache.get_by_key(cache_key)
+    if cached is not None:
+        return cached if cached != {"_absent": True} else None
+
+    bucket_name = repository.source_url.split('/')[0]
+    object_key = f"{version.storage_path}/{kind}.yaml"
+
+    try:
+        raw = await storage_service.download_file(
+            bucket_name=bucket_name,
+            object_key=object_key,
+        )
+    except NotFoundException:
+        if kind == "test":
+            cache.set_with_tags(
+                cache_key,
+                {"_absent": True},
+                tags=[f"example_version:{version.id}"],
+                ttl=_YAML_CACHE_TTL,
+            )
+            return None
+        # meta.yaml is required — re-raise so the caller surfaces it.
+        raise
+
+    if isinstance(raw, (bytes, bytearray)):
+        raw = raw.decode("utf-8", errors="replace")
+
+    parsed = yaml.safe_load(raw) or {}
+    if not isinstance(parsed, dict):
+        parsed = {"_parse_error": "yaml did not parse to a dict", "_raw": raw[:2000]}
+
+    cache.set_with_tags(
+        cache_key,
+        parsed,
+        tags=[f"example_version:{version.id}"],
+        ttl=_YAML_CACHE_TTL,
+    )
+    return parsed
+
 
 def _guess_content_type(filename: str, is_binary: bool) -> str:
     """Return a reasonable content-type for a given filename.
@@ -330,9 +485,21 @@ async def create_version(
     if version.example_id != example_id:
         raise BadRequestException("Example ID mismatch")
 
-    # Create version
+    # Resolve testing service before persisting — catches missing/unknown
+    # executionBackend at the doorstep instead of letting the broken row
+    # reach assignment.
+    testing_service_id = _resolve_testing_service_id(db, version.meta)
+
+    # Build the kwargs by combining the DTO scalars with the promoted
+    # columns extracted from ``meta``. The full meta dict itself is
+    # not stored — the meta.yaml file lives in MinIO under
+    # ``{storage_path}/meta.yaml``.
+    payload = version.model_dump(exclude={"meta"})
+    payload.update(_split_promoted_meta(version.meta))
+
     db_version = ExampleVersion(
-        **version.model_dump(),
+        **payload,
+        testing_service_id=testing_service_id,
         created_by=permissions.user_id,
     )
 
@@ -676,13 +843,11 @@ async def upload_example(
         version_number = version_repo.get_next_version_number(example.id)
         storage_path = f"examples/{repository.id}/{example.directory}/v{version_number}"
     
-    # Upload files to MinIO
+    # Upload files to MinIO. meta.yaml and test.yaml ride inside this
+    # loop alongside the rest — the DB no longer carries a separate
+    # copy of those documents; downloads fetch them from MinIO via
+    # ``_get_version_yaml_dict`` (Redis-cached).
     bucket_name = repository.source_url.split('/')[0]  # First part is bucket
-    
-    # Get test.yaml content if it exists
-    test_yaml_content = incoming_files.get('test.yaml')
-    if isinstance(test_yaml_content, (bytes, bytearray)):
-        test_yaml_content = test_yaml_content.decode('utf-8', errors='replace')
 
     for filename, content in incoming_files.items():
         if filename.lower().endswith('.zip'):
@@ -707,13 +872,30 @@ async def upload_example(
             content_type=content_type,
         )
     
-    # Create or update version record
+    # Resolve testing service from meta.yaml — applies to both create
+    # and update branches, since updating an existing version may swap
+    # the executionBackend declaration.
+    testing_service_id = _resolve_testing_service_id(db, meta_data)
+
+    # Pre-compute promoted column values from the parsed meta dict.
+    promoted = _split_promoted_meta(meta_data)
+
+    # Create or update version record. Re-uploads of an existing
+    # version invalidate the cached yaml — the file was overwritten
+    # in MinIO above, but the parsed dict in Redis would otherwise
+    # serve stale data until TTL.
+    cache = get_cache()
+
     if existing_version:
-        # Update existing version
-        existing_version.meta_yaml = meta_str
-        existing_version.test_yaml = test_yaml_content
+        # Update existing version — refresh every promoted column so
+        # we don't end up with a stale title / exec-backend / file
+        # list hanging off a re-uploaded version.
+        for field, value in promoted.items():
+            setattr(existing_version, field, value)
+        existing_version.testing_service_id = testing_service_id
         existing_version.updated_at = func.now()
         version = version_repo.update(existing_version)
+        cache.invalidate_tags(f"example_version:{version.id}")
     else:
         # Create new version
         version = ExampleVersion(
@@ -721,9 +903,9 @@ async def upload_example(
             version_tag=version_tag,
             version_number=version_number,
             storage_path=storage_path,
-            meta_yaml=meta_str,
-            test_yaml=test_yaml_content,
+            testing_service_id=testing_service_id,
             created_by=permissions.user_id,
+            **promoted,
         )
         version = version_repo.create(version)
     
@@ -788,17 +970,26 @@ async def download_example_latest(
         
         # For Git repositories, we can't download directly
         if repository.source_type == "git":
-            # Return basic structure for Git-based examples
+            # Return basic structure for Git-based examples. The
+            # ``meta`` field carries the fields we know from the
+            # ``Example`` row; clients that want the full meta.yaml
+            # should clone the git repository.
+            synthetic_meta = {
+                "slug": str(example.identifier),
+                "title": example.title,
+                "description": example.description or "",
+            }
             return ExampleDownloadResponse(
                 example_id=example.id,
                 version_id=None,
                 version_tag="latest",
+                identifier=str(example.identifier),
+                directory=example.directory,
                 files={
                     "README.md": f"# {example.title}\n\n{example.description or 'No description available'}\n\nThis example is stored in a Git repository.\nClone the repository to access the files.",
-                    "meta.yaml": f"slug: {example.identifier}\ntitle: {example.title}\ndescription: {example.description or ''}\n"
                 },
-                meta_yaml=f"slug: {example.identifier}\ntitle: {example.title}\n",
-                test_yaml=None,
+                meta=synthetic_meta,
+                test=None,
                 dependencies=None,
             )
         
@@ -943,6 +1134,8 @@ async def download_example_version(
             # Download dependency files
             dep_files = await download_example_files(dep_version)
             
+            dep_meta = await _get_version_yaml_dict(dep_version, "meta", storage_service)
+            dep_test = await _get_version_yaml_dict(dep_version, "test", storage_service)
             dependency_files.append({
                 "example_id": str(dep_example.id),
                 "version_id": str(dep_version.id),
@@ -951,10 +1144,12 @@ async def download_example_version(
                 "identifier": str(dep_example.identifier),
                 "title": dep_example.title,
                 "files": dep_files,
-                "meta_yaml": dep_version.meta_yaml,
-                "test_yaml": dep_version.test_yaml,
+                "meta": dep_meta or {},
+                "test": dep_test,
             })
-    
+
+    main_meta = await _get_version_yaml_dict(version, "meta", storage_service)
+    main_test = await _get_version_yaml_dict(version, "test", storage_service)
     return ExampleDownloadResponse(
         example_id=example.id,
         version_id=version.id,
@@ -962,8 +1157,8 @@ async def download_example_version(
         identifier=str(example.identifier),
         directory=example.directory,
         files=main_files,
-        meta_yaml=version.meta_yaml,
-        test_yaml=version.test_yaml,
+        meta=main_meta or {},
+        test=main_test,
         dependencies=dependency_files if with_dependencies else None,
     )
 

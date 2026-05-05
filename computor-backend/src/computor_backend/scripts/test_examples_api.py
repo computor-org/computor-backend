@@ -94,17 +94,10 @@ class ExampleAPITester:
         print("\n🧪 Testing Upload/Download")
         print("=" * 40)
         
-        # Test upload
+        # Test upload — meta.yaml and test.yaml ride inside the ``files``
+        # dict (the upload endpoint extracts them from there).
         print("\n1. Testing upload...")
-        upload_data = {
-            "repository_id": repository_id,
-            "directory": "hello-world",
-            "version_tag": "1.0",
-            "files": {
-                "main.py": "print('Hello, World!')\n",
-                "README.md": "# Hello World Example\n\nA simple hello world program.\n"
-            },
-            "meta_yaml": """slug: api.test.hello.world
+        meta_yaml_str = """slug: api.test.hello.world
 version: '1.0'
 title: Hello World
 description: Simple hello world example
@@ -112,8 +105,11 @@ language: en
 properties:
   studentSubmissionFiles:
   - main.py
-""",
-            "test_yaml": """type: python
+  executionBackend:
+    slug: itpcp.exec.py
+    version: '3.13'
+"""
+        test_yaml_str = """type: python
 name: Hello World Test
 description: Test for hello world
 version: '1.0'
@@ -123,6 +119,16 @@ properties:
     name: hello_output
     expected: "Hello, World!"
 """
+        upload_data = {
+            "repository_id": repository_id,
+            "directory": "hello-world",
+            "version_tag": "1.0",
+            "files": {
+                "main.py": "print('Hello, World!')\n",
+                "README.md": "# Hello World Example\n\nA simple hello world program.\n",
+                "meta.yaml": meta_yaml_str,
+                "test.yaml": test_yaml_str,
+            },
         }
         
         response = self.session.post(f"{self.base_url}/examples/upload", json=upload_data)
@@ -140,8 +146,8 @@ properties:
                 print(f"   Downloaded {len(download_data['files'])} files:")
                 for filename in download_data['files'].keys():
                     print(f"   - {filename}")
-                print(f"   Has meta.yaml: {bool(download_data['meta_yaml'])}")
-                print(f"   Has test.yaml: {bool(download_data['test_yaml'])}")
+                print(f"   Has meta:      {bool(download_data.get('meta'))}")
+                print(f"   Has test:      {bool(download_data.get('test'))}")
                 return True
             else:
                 print(f"   Download Error: {response.text}")

@@ -215,6 +215,14 @@ async def unassign_example_from_content(
     deployment.deployment_message = "Example unassigned"
     deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
 
+    # Clear the cached testing_service_id on the course content too — it
+    # only made sense as a denormalisation of the now-unassigned example
+    # version. Leaving it set would falsely advertise that this content
+    # has a testing backend.
+    if content.testing_service_id is not None:
+        content.testing_service_id = None
+        content.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
+
     # Update via repository
     deployment = deployment_repo.update(deployment)
 
