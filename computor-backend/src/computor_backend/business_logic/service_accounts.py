@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from computor_backend.exceptions import (
     BadRequestException,
+    ConflictException,
     NotFoundException,
     ForbiddenException,
 )
@@ -16,6 +17,8 @@ from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.service import Service
 from computor_backend.model.auth import User
+from computor_backend.model.course import CourseContent
+from computor_backend.model.example import ExampleVersion
 from computor_types.services import (
     ServiceCreate,
     ServiceGet,
@@ -183,13 +186,67 @@ def list_service_accounts(
     return [ServiceGet.model_validate(s, from_attributes=True) for s in services]
 
 
+def _get_service_dependents(db: Session, service_id) -> dict:
+    """Return a snapshot of resources that depend on a given service.
+
+    A service is considered "in use" if either:
+      - any course_content currently caches it as ``testing_service_id``
+        (i.e. the lecturer has assigned an example whose backend is this
+        service), or
+      - any example_version was uploaded with this service as its
+        resolved testing backend.
+
+    We cap the sampled lists at 10 IDs so the 409 response stays small;
+    the totals are accurate.
+    """
+    cc_total = (
+        db.query(CourseContent)
+        .filter(CourseContent.testing_service_id == service_id)
+        .count()
+    )
+    cc_sample = [
+        str(row.id)
+        for row in db.query(CourseContent.id)
+        .filter(CourseContent.testing_service_id == service_id)
+        .limit(10)
+        .all()
+    ]
+    ev_total = (
+        db.query(ExampleVersion)
+        .filter(ExampleVersion.testing_service_id == service_id)
+        .count()
+    )
+    ev_sample = [
+        str(row.id)
+        for row in db.query(ExampleVersion.id)
+        .filter(ExampleVersion.testing_service_id == service_id)
+        .limit(10)
+        .all()
+    ]
+    return {
+        "course_content_count": cc_total,
+        "course_content_sample": cc_sample,
+        "example_version_count": ev_total,
+        "example_version_sample": ev_sample,
+        "in_use": cc_total > 0 or ev_total > 0,
+    }
+
+
 def update_service_account(
     service_id: UUID | str,
     service_data: ServiceUpdate,
     permissions: Principal,
     db: Session,
+    *,
+    force: bool = False,
 ) -> ServiceGet:
-    """Update service account details."""
+    """Update service account details.
+
+    Refuses to disable (``enabled`` from True→False) a service that
+    course contents or example versions currently depend on, unless the
+    caller explicitly passes ``force=True``. Other field updates pass
+    through unchanged.
+    """
     query = check_permissions(permissions, Service, "update", db)
 
     service = query.filter(Service.id == service_id).first()
@@ -197,8 +254,38 @@ def update_service_account(
         raise NotFoundException(detail="Service not found")
 
     try:
-        # Update fields
         update_data = service_data.model_dump(exclude_unset=True)
+
+        # Guard: disabling a service in use breaks every course content
+        # and example version that points at it. Surface dependents so
+        # the admin can clean them up first (or pass force=true to
+        # override after acknowledging the impact).
+        will_disable = (
+            "enabled" in update_data
+            and update_data["enabled"] is False
+            and service.enabled is True
+        )
+        if will_disable and not force:
+            dependents = _get_service_dependents(db, service.id)
+            if dependents["in_use"]:
+                raise ConflictException(
+                    error_code="SERVICE_HAS_DEPENDENTS",
+                    detail=(
+                        f"Cannot disable service '{service.slug}': "
+                        f"{dependents['course_content_count']} course "
+                        "content(s) and "
+                        f"{dependents['example_version_count']} example "
+                        "version(s) depend on it. Reassign or unassign "
+                        "those before disabling, or retry with "
+                        "force=true to override."
+                    ),
+                    context={
+                        "service_id": str(service.id),
+                        "service_slug": service.slug,
+                        **dependents,
+                    },
+                )
+
         for field, value in update_data.items():
             if hasattr(service, field):
                 setattr(service, field, value)
@@ -212,6 +299,9 @@ def update_service_account(
 
         return ServiceGet.model_validate(service, from_attributes=True)
 
+    except ConflictException:
+        # ConflictException is intentional — don't swallow it as a 500.
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating service account: {e}")
@@ -247,18 +337,45 @@ def delete_service_account(
     service_id: UUID | str,
     permissions: Principal,
     db: Session,
+    *,
+    force: bool = False,
 ) -> None:
     """
     Delete (archive) a service account.
 
-    This soft-deletes the service by setting archived_at.
-    The user account is not deleted.
+    This soft-deletes the service by setting archived_at. The user
+    account is not deleted.
+
+    Refuses if any course_content or example_version currently depends
+    on the service (would render their assignments untestable). Pass
+    ``force=True`` to archive anyway after acknowledging the impact.
     """
     query = check_permissions(permissions, Service, "delete", db)
 
     service = query.filter(Service.id == service_id).first()
     if not service:
         raise NotFoundException(detail="Service not found")
+
+    if not force:
+        dependents = _get_service_dependents(db, service.id)
+        if dependents["in_use"]:
+            raise ConflictException(
+                error_code="SERVICE_HAS_DEPENDENTS",
+                detail=(
+                    f"Cannot archive service '{service.slug}': "
+                    f"{dependents['course_content_count']} course "
+                    "content(s) and "
+                    f"{dependents['example_version_count']} example "
+                    "version(s) depend on it. Reassign or unassign "
+                    "those before archiving, or retry with force=true "
+                    "to override."
+                ),
+                context={
+                    "service_id": str(service.id),
+                    "service_slug": service.slug,
+                    **dependents,
+                },
+            )
 
     try:
         service.archived_at = datetime.now(timezone.utc)

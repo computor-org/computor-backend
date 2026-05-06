@@ -295,19 +295,14 @@ async def download_course_content_reference(
     """
     import zipfile
     import io
-    import yaml
 
     course_content, version, repository = await _get_example_version_for_course_content(
         course_content_id, permissions, db, cache
     )
 
-    # Parse meta.yaml to get reference file paths
-    meta_data = yaml.safe_load(version.meta_yaml) if version.meta_yaml else {}
-    properties = meta_data.get('properties', {})
-
-    # Get the reference file patterns from meta.yaml
-    student_submission_files = properties.get('studentSubmissionFiles', []) or []
-    additional_files = properties.get('additionalFiles', []) or []
+    # File lists live on dedicated columns now — no YAML parsing needed.
+    student_submission_files = list(version.student_submission_files or [])
+    additional_files = list(version.additional_files or [])
     reference_paths = set(student_submission_files + additional_files)
 
     if not reference_paths:

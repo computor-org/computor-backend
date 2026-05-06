@@ -1,8 +1,8 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** 2026-05-01 19:35:09
-**Total errors:** 66
+**Generated:** 2026-05-05 23:44:23
+**Total errors:** 70
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -137,6 +137,31 @@ Keycloak or other SSO provider authentication failed
 1. Retry authentication
 2. Check SSO provider status
 3. Contact administrator to verify SSO configuration
+
+---
+
+### AUTH_005 - API Token Expired
+
+**HTTP Status:** `401`  
+**Severity:** `warning`  
+**Category:** `authentication`  
+**Documentation:** [/docs/authentication#api-tokens](/docs/authentication#api-tokens)  
+
+**Description:**  
+ApiToken.expires_at is in the past — token validation rejected the request before reaching the endpoint.
+
+**User Message:**  
+> Your API token has expired. Generate a new one and retry.
+
+**Affected Functions:**
+- `_authenticate_api_token`
+
+**Common Causes:**
+- Token TTL elapsed since issuance
+
+**Resolution Steps:**
+1. Issue a new API token via /api-tokens
+2. Update the client to use the new token
 
 ---
 
@@ -336,6 +361,30 @@ User attempted to assign a course role higher than their own privilege level
 **Resolution Steps:**
 1. Request a user with higher privileges to perform this action
 2. Assign a role at or below your own privilege level
+
+---
+
+### AUTHZ_010 - Service Account Required
+
+**HTTP Status:** `403`  
+**Severity:** `warning`  
+**Category:** `authorization`  
+**Documentation:** [/docs/authentication#service-accounts](/docs/authentication#service-accounts)  
+
+**Description:**  
+Endpoint requires User.is_service=True; called with a regular human user.
+
+**User Message:**  
+> This endpoint is only available for service accounts.
+
+**Affected Functions:**
+- `get_service_by_user_id`
+
+**Common Causes:**
+- Calling a service-account endpoint with a normal user token
+
+**Resolution Steps:**
+1. Use the service-account user_id when calling this endpoint
 
 ---
 
@@ -758,6 +807,29 @@ Temporal task queue has no available workers or queue configuration is invalid
 
 ---
 
+### EXT_006 - Service Unavailable
+
+**HTTP Status:** `503`  
+**Severity:** `error`  
+**Category:** `external_service`  
+**Retry After:** 60 seconds  
+
+**Description:**  
+Generic 503 fallback when the specific upstream service is unknown or not yet categorised; prefer EXT_001 (GitLab), EXT_003 (MinIO), EXT_004 (Temporal), or EXT_005 (task queue) when the source is known.
+
+**User Message:**  
+> An external service is temporarily unavailable.
+
+**Common Causes:**
+- Generic upstream failure surfaced through Starlette's HTTPException
+- Service-specific exception subclass not yet introduced for this code path
+
+**Resolution Steps:**
+1. Inspect server logs for the underlying cause
+2. Retry the request after a short backoff
+
+---
+
 ## Internal
 
 ### TASK_002 - Task Submission Failed
@@ -961,6 +1033,32 @@ HTTP route not registered in FastAPI application
 1. Check API documentation for correct endpoint
 2. Verify API version
 3. Check HTTP method (GET, POST, etc.)
+
+---
+
+### NF_010 - Service Record Not Found
+
+**HTTP Status:** `404`  
+**Severity:** `warning`  
+**Category:** `not_found`  
+**Documentation:** [/docs/services](/docs/services)  
+
+**Description:**  
+ServiceRepository.find_by_user_id returned None for a User.is_service=True row.
+
+**User Message:**  
+> No service record exists for this service account.
+
+**Affected Functions:**
+- `get_service_by_user_id`
+
+**Common Causes:**
+- Service account created without provisioning a Service row
+- Service row deleted while the user was kept
+
+**Resolution Steps:**
+1. Re-provision the service via the admin API
+2. Or delete the orphan service-account user
 
 ---
 

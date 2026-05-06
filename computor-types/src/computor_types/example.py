@@ -132,23 +132,48 @@ class ExampleUpdate(BaseModel):
     tags: Optional[List[str]] = None
 
 class ExampleVersionCreate(BaseModel):
-    """Create a new example version."""
+    """Create a new example version.
+
+    Clients pass an already-parsed meta.yaml as ``meta`` — the server
+    extracts the promoted scalar / array / FK columns from it and
+    discards the rest. The full meta.yaml document lives in MinIO
+    alongside the other example files; the download endpoint serves
+    it from there.
+    """
     example_id: str
     version_tag: str = Field(..., max_length=64)
     version_number: int = Field(..., ge=1)
     storage_path: str
-    meta_yaml: str = Field(..., description="Content of meta.yaml")
-    test_yaml: Optional[str] = Field(None, description="Content of test.yaml")
+    meta: Dict[str, Any] = Field(..., description="Parsed meta.yaml — used to populate promoted columns")
 
 class ExampleVersionGet(BaseEntityGet):
-    """Get example version details."""
+    """Get example version details — promoted columns only.
+
+    The full parsed meta.yaml / test.yaml documents are not returned
+    here; call ``GET /examples/download/{version_id}`` for those.
+    """
     id: str
     example_id: str
     version_tag: str
     version_number: int
     storage_path: str
-    meta_yaml: str
-    test_yaml: Optional[str] = None
+    # Promoted fields — direct column reads, no dict navigation.
+    title: Optional[str] = None
+    description: Optional[str] = None
+    language: Optional[str] = None
+    license: Optional[str] = None
+    execution_backend: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Full meta.yaml properties.executionBackend (slug + version + settings)",
+    )
+    student_submission_files: List[str] = Field(default_factory=list)
+    additional_files: List[str] = Field(default_factory=list)
+    student_templates: List[str] = Field(default_factory=list)
+    test_files: List[str] = Field(default_factory=list)
+    testing_service_id: Optional[str] = Field(
+        None,
+        description="Resolved Service.id derived from properties.executionBackend.slug",
+    )
     created_at: datetime
     created_by: Optional[str] = None
 
@@ -159,6 +184,9 @@ class ExampleVersionList(BaseModel):
     id: str
     version_tag: str
     version_number: int
+    title: Optional[str] = None
+    description: Optional[str] = None
+    testing_service_id: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -242,9 +270,9 @@ class ExampleFileSet(BaseModel):
     directory: str
     identifier: str
     title: str
-    files: Dict[str, str] = Field(..., description="Map of filename to content")
-    meta_yaml: str
-    test_yaml: Optional[str] = None
+    files: Dict[str, str] = Field(..., description="Map of filename to content (meta.yaml and test.yaml ride inside this dict)")
+    meta: Dict[str, Any] = Field(..., description="Parsed meta.yaml (fetched from MinIO with Redis cache)")
+    test: Optional[Dict[str, Any]] = Field(None, description="Parsed test.yaml (fetched from MinIO with Redis cache); None if absent")
 
 class ExampleDownloadResponse(BaseModel):
     """Response containing downloaded example files."""
@@ -253,9 +281,9 @@ class ExampleDownloadResponse(BaseModel):
     version_tag: str
     identifier: str = Field(..., description="Hierarchical identifier of the example (e.g., itpcp.pgph.py.quadratic_eq)")
     directory: str = Field(..., description="Directory name of the example")
-    files: Dict[str, str] = Field(..., description="Map of filename to content")
-    meta_yaml: str
-    test_yaml: Optional[str] = None
+    files: Dict[str, str] = Field(..., description="Map of filename to content (includes meta.yaml and test.yaml)")
+    meta: Dict[str, Any] = Field(..., description="Parsed meta.yaml (fetched from MinIO with Redis cache)")
+    test: Optional[Dict[str, Any]] = Field(None, description="Parsed test.yaml (fetched from MinIO with Redis cache); None if absent")
     # Dependencies included when with_dependencies=True
     dependencies: Optional[List[ExampleFileSet]] = Field(None, description="Dependency examples when with_dependencies=True")
 

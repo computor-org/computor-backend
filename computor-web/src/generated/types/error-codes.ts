@@ -2,7 +2,7 @@
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: 2026-05-01T19:35:09.625964
+ * Generated at: 2026-05-05T23:44:23.380712
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -65,11 +65,13 @@ export const ErrorCodes = {
   AUTH_002: "AUTH_002", // Invalid Credentials
   AUTH_003: "AUTH_003", // Token Expired
   AUTH_004: "AUTH_004", // SSO Authentication Failed
+  AUTH_005: "AUTH_005", // API Token Expired
   AUTHZ_001: "AUTHZ_001", // Insufficient Permissions
   AUTHZ_002: "AUTHZ_002", // Admin Access Required
   AUTHZ_003: "AUTHZ_003", // Course Access Denied
   AUTHZ_004: "AUTHZ_004", // Insufficient Course Role
   AUTHZ_005: "AUTHZ_005", // Role Escalation Denied
+  AUTHZ_010: "AUTHZ_010", // Service Account Required
   VAL_001: "VAL_001", // Invalid Request Data
   VAL_002: "VAL_002", // Missing Required Field
   VAL_003: "VAL_003", // Invalid Field Format
@@ -78,6 +80,7 @@ export const ErrorCodes = {
   NF_002: "NF_002", // User Not Found
   NF_003: "NF_003", // Course Not Found
   NF_004: "NF_004", // Endpoint Not Found
+  NF_010: "NF_010", // Service Record Not Found
   CONFLICT_001: "CONFLICT_001", // Resource Already Exists
   CONFLICT_002: "CONFLICT_002", // Concurrent Modification
   RATE_001: "RATE_001", // Rate Limit Exceeded
@@ -121,6 +124,7 @@ export const ErrorCodes = {
   EXT_003: "EXT_003", // MinIO Service Unavailable
   EXT_004: "EXT_004", // Temporal Service Unavailable
   EXT_005: "EXT_005", // Task Queue Unavailable
+  EXT_006: "EXT_006", // Service Unavailable
   DB_001: "DB_001", // Database Connection Failed
   DB_002: "DB_002", // Database Query Failed
   DB_003: "DB_003", // Transaction Failed
@@ -207,6 +211,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     retryAfter: undefined,
     documentationUrl: "/docs/authentication#sso",
   },
+  AUTH_005: {
+    code: "AUTH_005",
+    httpStatus: 401,
+    category: ErrorCategory.AUTHENTICATION,
+    severity: ErrorSeverity.WARNING,
+    title: "API Token Expired",
+    message: {
+      plain: "Your API token has expired. Generate a new one and retry.",
+      markdown: "**API Token Expired**\n\nThe API token used for this request has expired. Generate a new token and retry.",
+      html: "<strong>API Token Expired</strong><p>The API token used for this request has expired. Generate a new token and retry.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/authentication#api-tokens",
+  },
   AUTHZ_001: {
     code: "AUTHZ_001",
     httpStatus: 403,
@@ -276,6 +294,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/permissions#role-assignment",
+  },
+  AUTHZ_010: {
+    code: "AUTHZ_010",
+    httpStatus: 403,
+    category: ErrorCategory.AUTHORIZATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Service Account Required",
+    message: {
+      plain: "This endpoint is only available for service accounts.",
+      markdown: "**Service Account Required**\n\nThis endpoint is only available for users marked as service accounts.",
+      html: "<strong>Service Account Required</strong><p>This endpoint is only available for users marked as service accounts.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/authentication#service-accounts",
   },
   VAL_001: {
     code: "VAL_001",
@@ -388,6 +420,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/api",
+  },
+  NF_010: {
+    code: "NF_010",
+    httpStatus: 404,
+    category: ErrorCategory.NOT_FOUND,
+    severity: ErrorSeverity.WARNING,
+    title: "Service Record Not Found",
+    message: {
+      plain: "No service record exists for this service account.",
+      markdown: "**Service Record Not Found**\n\nThe service-account user has no associated ``Service`` row. The account exists but is not linked to a service definition.",
+      html: "<strong>Service Record Not Found</strong><p>The service-account user has no associated <code>Service</code> row. The account exists but is not linked to a service definition.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/services",
   },
   CONFLICT_001: {
     code: "CONFLICT_001",
@@ -990,6 +1036,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: 120,
     documentationUrl: "/docs/testing-services",
+  },
+  EXT_006: {
+    code: "EXT_006",
+    httpStatus: 503,
+    category: ErrorCategory.EXTERNAL_SERVICE,
+    severity: ErrorSeverity.ERROR,
+    title: "Service Unavailable",
+    message: {
+      plain: "An external service is temporarily unavailable.",
+      markdown: "**Service Unavailable**\n\nAn external service is temporarily unavailable. Please try again later.",
+      html: "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>",
+    },
+    retryAfter: 60,
+    documentationUrl: undefined,
   },
   DB_001: {
     code: "DB_001",

@@ -42,7 +42,11 @@ class CourseContentCreate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    testing_service_id: Optional[str] = None
+    # Note: testing_service_id is no longer client-settable. It's derived
+    # from the assigned example version's executionBackend declaration
+    # (resolved at upload, propagated by the deployment API). Setting it
+    # by hand on create/update could decouple it from the example version
+    # and break testing.
     # Note: Example assignments are now handled through the deployment API
     # Use POST /course-contents/{id}/assign-example instead
 
@@ -144,7 +148,9 @@ class CourseContentUpdate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    testing_service_id: Optional[str] = None
+    # Note: testing_service_id is no longer client-settable. It's derived
+    # from the assigned example version's executionBackend declaration.
+    # See CourseContentCreate for rationale.
     # Note: Example assignments cannot be updated here
     # Use the deployment API endpoints instead
 
