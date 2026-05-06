@@ -9,6 +9,13 @@ class BackendSettings:
         self.DEBUG_MODE = os.environ.get("DEBUG_MODE","development")
         self.API_LOCAL_STORAGE_DIR = os.environ.get("API_LOCAL_STORAGE_DIR",None)
 
+        # Documents API: write side maintained by ``api/documents.py``,
+        # read side served by the ``static-server`` container at /docs.
+        # Both must point at the same host directory; see DOCUMENTS_LEGACY.md
+        # and the compose mounts.
+        self.DOCUMENTS_ROOT = os.environ.get("DOCUMENTS_ROOT", None)
+        self.DOCUMENTS_MAX_FILE_SIZE = int(os.environ.get("DOCUMENTS_MAX_FILE_SIZE", str(10 * 1024 * 1024)))
+
         # Security: Force disable debug info in API responses (overrides DEBUG_MODE)
         # Set DISABLE_API_DEBUG_INFO=true to hide sensitive information even in development
         self.DISABLE_API_DEBUG_INFO = os.environ.get("DISABLE_API_DEBUG_INFO", "false").lower() in ["true", "1", "yes", "on"]
