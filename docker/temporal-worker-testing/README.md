@@ -12,23 +12,22 @@ Handles test execution for multiple programming languages:
    - Runs computor-testing framework CLI
    - Manages test orchestration
 
-2. **Test Execution Environment** (Configurable, default: Python 3.13)
+2. **Test Execution Environment** (Python 3.13, fixed at build time)
    - Runs actual student code
    - Has scientific/testing dependencies (numpy, scipy, matplotlib, etc.)
    - Isolated venv at `/home/worker/test-venv`
+   - Python version is baked into the worker [Dockerfile](Dockerfile); to change
+     it, edit the Dockerfile and rebuild — there is no runtime knob.
 
 ## Configuration
 
-### Python Test Environment
+### Test Execution Environment
 
-Configure via environment variables in `.env` or `docker-compose-dev.yaml`:
+Configure via environment variable in `.env` or the docker-compose file:
 
 ```bash
-# Python version for test execution (e.g., 3.13, 3.12, 3.11)
-PYTHON_TEST_VERSION=3.13
-
-# Additional Python packages (comma-separated)
-# Example: pandas,scikit-learn,requests,beautifulsoup4
+# Additional Python packages installed into the test venv at worker startup
+# (comma-separated). Example: pandas,scikit-learn,requests,beautifulsoup4
 PYTHON_TEST_REQUIREMENTS=
 ```
 
@@ -88,16 +87,8 @@ docker exec -u worker computor-fullstack-temporal-worker-testing-1 \
   /home/worker/test-venv/bin/python -c "import numpy; print(numpy.__version__)"
 ```
 
-### Adding More Python Versions
+### Changing the Test Python Version
 
-Edit Dockerfile to install additional Python versions:
-```dockerfile
-RUN wget https://www.python.org/ftp/python/3.12.X/Python-3.12.X.tgz && \
-    tar -xzf Python-3.12.X.tgz && \
-    cd Python-3.12.X && \
-    ./configure --prefix=/usr/local/python3.12 && \
-    make -j$(nproc) && \
-    make altinstall
-```
-
-Then set `PYTHON_TEST_VERSION=3.12` in environment.
+The test Python version is hard-coded in the [Dockerfile](Dockerfile) (see the
+`Python-3.13.1.tgz` download). To change it: update the URL/version in the
+Dockerfile, rebuild the worker image, and rebuild the pre-built test venv.

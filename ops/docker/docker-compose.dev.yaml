@@ -99,8 +99,9 @@ services:
       - API_TOKEN=${TESTING_WORKER_TOKEN}
       # Default testing configuration (can be overridden by service.config)
       - TESTING_EXECUTABLE=computor-test
-      # Python test execution environment
-      - PYTHON_TEST_VERSION=${PYTHON_TEST_VERSION:-3.13}
+      # Extra pip packages installed into the test venv at worker startup
+      # (see docker/temporal-worker-testing/testing-worker.py).
+      # The Python version itself is fixed in the worker Dockerfile.
       - PYTHON_TEST_REQUIREMENTS=${PYTHON_TEST_REQUIREMENTS:-}
       # R configuration
       - R_LIBS_USER=/home/worker/.local/lib/R/library
