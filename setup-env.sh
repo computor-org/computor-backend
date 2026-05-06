@@ -35,8 +35,18 @@ fi
 echo -e "${GREEN}=== Computor Environment Setup ===${NC}"
 echo -e "This script creates a unified environment configuration.\n"
 
+# Check for --force across all args (not just $1, otherwise `setup-env.sh --auto --force`
+# wouldn't suppress this warning).
+HAS_FORCE_ARG=false
+for arg in "$@"; do
+    if [ "$arg" = "--force" ]; then
+        HAS_FORCE_ARG=true
+        break
+    fi
+done
+
 # Check for existing .env file
-if [ -f .env ] && [ "$1" != "--force" ]; then
+if [ -f .env ] && [ "$HAS_FORCE_ARG" != true ]; then
     echo -e "${YELLOW}⚠️  Warning: Existing .env file detected!${NC}"
     echo -e "This file will be backed up and replaced."
     echo -e "Your existing configuration will be preserved in a backup file.\n"
@@ -267,8 +277,16 @@ if [ "$SKIP_COMMON" != true ]; then
                 echo -e "  Generated password: ${YELLOW}$CODER_ADMIN_PASSWORD${NC}"
             fi
 
-            # Generate CODER_ADMIN_API_SECRET using same method as computor-coder/deployment/generate-secret.sh
-            CODER_API_SECRET=$(openssl rand -hex 32 2>/dev/null || generate_hex_token)
+            # Ask before generating CODER_ADMIN_API_SECRET (used by Traefik-protected
+            # endpoints; equivalent to ``openssl rand -hex 32``).
+            CODER_API_SECRET=""
+            read -r -p "Generate CODER_ADMIN_API_SECRET now via 'openssl rand -hex 32'? (Y/n): " gen_api_secret
+            if [ -z "$gen_api_secret" ] || [ "$gen_api_secret" = "y" ] || [ "$gen_api_secret" = "Y" ]; then
+                CODER_API_SECRET=$(openssl rand -hex 32 2>/dev/null || generate_hex_token)
+                echo -e "  ${GREEN}✓${NC} Generated CODER_ADMIN_API_SECRET"
+            else
+                echo -e "  ${YELLOW}Skipping CODER_ADMIN_API_SECRET — placeholder kept; fill it in manually.${NC}"
+            fi
 
             # Escape any pipe characters in user input for sed
             CODER_DOMAIN_ESCAPED=$(echo "$CODER_DOMAIN" | sed 's/|/\\|/g')
@@ -280,12 +298,19 @@ if [ "$SKIP_COMMON" != true ]; then
                 sed -i '' "s|CODER_DOMAIN=.*|CODER_DOMAIN=$CODER_DOMAIN_ESCAPED|" "$TARGET_FILE"
                 sed -i '' "s|CODER_ADMIN_EMAIL=.*|CODER_ADMIN_EMAIL=$CODER_ADMIN_EMAIL_ESCAPED|" "$TARGET_FILE"
                 sed -i '' "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD_ESCAPED|" "$TARGET_FILE"
-                sed -i '' "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
             else
                 sed -i "s|CODER_DOMAIN=.*|CODER_DOMAIN=$CODER_DOMAIN_ESCAPED|" "$TARGET_FILE"
                 sed -i "s|CODER_ADMIN_EMAIL=.*|CODER_ADMIN_EMAIL=$CODER_ADMIN_EMAIL_ESCAPED|" "$TARGET_FILE"
                 sed -i "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD_ESCAPED|" "$TARGET_FILE"
-                sed -i "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
+            fi
+            # Only overwrite the CODER_ADMIN_API_SECRET line when the user said yes
+            # to generation; otherwise leave the placeholder intact.
+            if [ -n "$CODER_API_SECRET" ]; then
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    sed -i '' "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
+                else
+                    sed -i "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
+                fi
             fi
         else
             # Auto mode - generate Coder credentials
