@@ -137,6 +137,12 @@ def resolve_scope_root(
             context={"scope": scope},
         )
 
+    # SQLAlchemy + psycopg2's UUID bind processor calls ``uuid.UUID(value)``
+    # on the parameter, which fails if ``value`` is already a UUID instance.
+    # Coerce to str at the boundary so the rest of the function can pass
+    # ``scope_id`` straight into filters regardless of input type.
+    scope_id = str(scope_id)
+
     if scope == "organization":
         org = db.query(Organization).filter(Organization.id == scope_id).first()
         if org is None:
@@ -222,6 +228,11 @@ def check_reserved_name_collision(
                 context={"name": first_segment, "scope": scope},
             )
         return
+
+    # See ``resolve_scope_root`` — coerce to str so the psycopg2 UUID
+    # bind processor doesn't choke on a uuid.UUID instance.
+    if scope_id is not None:
+        scope_id = str(scope_id)
 
     if scope == "organization":
         hit = (
