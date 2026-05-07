@@ -262,3 +262,21 @@ def check_reserved_name_collision(
                 },
             )
         return
+
+
+def resolve_listing_target(
+    scope: DocumentScope,
+    scope_id: Optional[UUID | str],
+    path: Optional[str],
+    db: Session,
+) -> Path:
+    """Resolve the target directory for a list operation.
+
+    Empty/None ``path`` → the scope root itself; non-empty path runs
+    through the same validation and escape-protection as writes.
+    """
+    scope_root = resolve_scope_root(scope, scope_id, db)
+    if not path:
+        return scope_root
+    segments = validate_relative_path(path)
+    return resolve_absolute_path(scope_root, segments)

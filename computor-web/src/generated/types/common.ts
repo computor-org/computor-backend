@@ -3401,6 +3401,149 @@ export interface ProfileQuery {
 }
 
 /**
+ * Shared fields and validation for all documents-API payloads.
+ * 
+ * Not exported — concrete request/response classes inherit from it so
+ * the per-endpoint type still follows the ``<Entity><Action>`` naming
+ * convention used elsewhere in this package.
+ */
+export interface _DocumentScopedPathBase {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+}
+
+/**
+ * Form fields for ``POST /documents/files`` (the file itself is
+ * sent as a multipart upload alongside this payload).
+ */
+export interface DocumentCreate {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+}
+
+/**
+ * Body for ``DELETE /documents/files``.
+ */
+export interface DocumentDelete {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+}
+
+/**
+ * Response from a successful file upload.
+ */
+export interface DocumentGet {
+  scope: "system" | "organization" | "course_family" | "course";
+  scope_id?: string | null;
+  path: string;
+  /** File size in bytes after writing. */
+  size: number;
+  content_type?: string | null;
+}
+
+/**
+ * Body for ``PATCH /documents/files`` (rename a file).
+ * 
+ * ``path`` is the source; ``new_path`` is the target. Both validated
+ * against the same rules. The scope itself is unchanged — this is a
+ * same-scope rename, not a cross-scope move.
+ */
+export interface DocumentRename {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+  /** Target relative path inside the scope's documents area. Same validation rules as ``path``. */
+  new_path: string;
+}
+
+/**
+ * Body for ``POST /documents/directories``.
+ */
+export interface DocumentDirectoryCreate {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+}
+
+/**
+ * Body for ``DELETE /documents/directories``.
+ */
+export interface DocumentDirectoryDelete {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+}
+
+/**
+ * Body for ``PATCH /documents/directories`` (rename a directory).
+ * 
+ * Same shape as :class:`DocumentRename`. Refuses to move a directory
+ * into a path that lies inside itself.
+ */
+export interface DocumentDirectoryRename {
+  /** Documents scope. 'system' = top-level admin-only area; others must be paired with the matching scope_id. */
+  scope: "system" | "organization" | "course_family" | "course";
+  /** Entity ID for the chosen scope. Required for organization / course_family / course; ignored for system. */
+  scope_id?: string | null;
+  /** Relative path inside the scope's documents area. Must not contain '..' or absolute components. */
+  path: string;
+  /** Target relative path inside the scope's documents area. Same validation rules as ``path``. */
+  new_path: string;
+}
+
+/**
+ * Response from a successful mkdir.
+ */
+export interface DocumentDirectoryGet {
+  scope: "system" | "organization" | "course_family" | "course";
+  scope_id?: string | null;
+  path: string;
+  /** False if the directory already existed. */
+  created: boolean;
+}
+
+/**
+ * One entry in a ``GET /documents/list`` response.
+ * 
+ * A directory listing mixes files and subdirectories — ``type``
+ * discriminates, and ``size`` is null for directories. ``etag`` and
+ * ``last_modified`` are derived from the filesystem stat and let
+ * clients revalidate per entry against ``GET /documents/files`` via
+ * ``If-None-Match`` without a full re-download.
+ */
+export interface DocumentList {
+  name: string;
+  type: "file" | "directory";
+  /** File size in bytes; null for directories. */
+  size?: number | null;
+  /** Quoted weak validator (matches the ETag the file GET endpoint returns) for cache revalidation. */
+  etag: string;
+  /** UTC mtime of the entry. */
+  last_modified: string;
+}
+
+/**
  * DTO for creating a grade through the tutor endpoint.
  * 
  * This is used when a tutor grades a student's submission for a specific course content.
@@ -3978,4 +4121,4 @@ export type ErrorCategory = "authentication" | "authorization" | "validation" | 
 
 export type GradingStatus = 0 | 1 | 2 | 3;
 
-export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
+export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
