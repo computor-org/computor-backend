@@ -263,8 +263,8 @@ If Coder fails to start:
 1. **Never commit `.env` files** to version control
 2. **Use strong passwords** — credential env vars (e.g. `POSTGRES_PASSWORD`,
    `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `TEMPORAL_POSTGRES_PASSWORD`,
-   `CODER_POSTGRES_*`, `REGISTRY_USER`, `REGISTRY_PASSWORD`) have **no defaults** —
-   compose will fail to start if any are missing.
+   `CODER_POSTGRES_*`) have **no defaults** — compose will fail to start if
+   any are missing.
 3. **All service ports bound to `127.0.0.1`** except Traefik's 8080 — services
    are reachable from the host (and SSH tunnels) but not from the intranet.
 4. **HTTPS** is expected to be terminated upstream (e.g. nginx in front of
@@ -273,16 +273,12 @@ If Coder fails to start:
    in production (dev mounts the socket directly). Coder and `temporal-worker-coder`
    need RW socket access for container provisioning and image builds; both run
    with `no-new-privileges`.
-6. **Coder registry** (`coder-registry`) requires htpasswd auth. Generate the
-   file before first start:
-   ```bash
-   mkdir -p ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth
-   htpasswd -Bbn "$REGISTRY_USER" "$REGISTRY_PASSWORD" \
-     > ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth/htpasswd
-   ```
-   Note: workspaces will fail to pull images until the Terraform templates
-   (`computor-coder/deployment/templates/*/main.tf`) are updated to supply
-   `registry_auth` — follow-up work.
+6. **Coder registry isolation:** `coder-registry` is deliberately left off the
+   `computor-network`, so workspace containers (which DO live on that network)
+   can't reach it over TCP. The host docker daemon talks to it via the
+   `127.0.0.1:5000` port binding, so pushes from `temporal-worker-coder` and
+   pulls during workspace creation still work — but neither goes through a
+   network path that user workspaces can intercept.
 7. **Rotate tokens regularly** especially API tokens.
 
 ## Support

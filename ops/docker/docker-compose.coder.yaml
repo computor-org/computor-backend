@@ -85,17 +85,15 @@ services:
       - "traefik.enable=false"
 
   # Local Docker registry for workspace images.
-  # Auth uses htpasswd — the host file must exist before first start:
-  #   mkdir -p ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth
-  #   htpasswd -Bbn "$REGISTRY_USER" "$REGISTRY_PASSWORD" > \
-  #     ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth/htpasswd
-  # NOTE: Workspaces won't be able to pull images until the Terraform
-  # templates (computor-coder/deployment/templates/*/main.tf) are updated to
-  # supply registry_auth — follow-up code work.
+  #
+  # Deliberately NOT attached to computor-network. Workspace containers
+  # (which DO live on computor-network) therefore can't reach the registry
+  # over TCP and can't push poisoned images. The host docker daemon still
+  # reaches the registry via the 127.0.0.1:5000 port binding — sufficient
+  # for both pushes (from temporal-worker-coder) and pulls (from terraform
+  # at workspace creation), since both go through the docker socket.
   coder-registry:
     image: registry:2
-    networks:
-      - computor-network
     container_name: computor-coder-registry
     restart: unless-stopped
     security_opt:
@@ -109,17 +107,10 @@ services:
       - "127.0.0.1:${CODER_REGISTRY_PORT:-5000}:5000"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/registry:/var/lib/registry
-      - ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth:/auth:ro
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
-      REGISTRY_AUTH: htpasswd
-      REGISTRY_AUTH_HTPASSWD_REALM: "Coder Registry"
-      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
-      # Used only by the healthcheck below; not consumed by the registry binary.
-      HC_USER: ${REGISTRY_USER:?must be set in .env}
-      HC_PASS: ${REGISTRY_PASSWORD:?must be set in .env}
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q --user $$HC_USER --password $$HC_PASS http://localhost:5000/v2/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/v2/"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -153,9 +144,11 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_TEMPLATES_DIR: /templates
-      CODER_REGISTRY_HOST: coder-registry:5000
-      CODER_REGISTRY_USER: ${REGISTRY_USER:?must be set in .env}
-      CODER_REGISTRY_PASSWORD: ${REGISTRY_PASSWORD:?must be set in .env}
+      # localhost:5000 (not coder-registry:5000): the worker calls the host
+      # docker daemon via the socket, so this name is resolved from the daemon's
+      # perspective. localhost:5000 reaches the registry's port binding and is
+      # also auto-treated by docker as an insecure (HTTP) registry, so no TLS.
+      CODER_REGISTRY_HOST: localhost:5000
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}

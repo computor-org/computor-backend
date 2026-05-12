@@ -260,21 +260,18 @@ if [ "$SKIP_COMMON" != true ]; then
     if [ "$ENABLE_CODER" = true ]; then
         echo -e "  Configuring Coder integration..."
 
-        # Generate internal Coder credentials (DB password + registry auth).
-        # These are required by docker-compose.coder.yaml's :? fail-closed checks
-        # and never need to be human-memorable, so we always auto-generate them.
+        # Generate internal Coder DB credential.
+        # CODER_POSTGRES_PASSWORD is required by docker-compose.coder.yaml's :?
+        # fail-closed check and never needs to be human-memorable.
         CODER_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
-        CODER_REGISTRY_PW=$(generate_token | tr -d '/+=' | cut -c1-20)
 
-        # Enable Coder + write the generated credentials
+        # Enable Coder + write the generated credential
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
             sed -i '' "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
-            sed -i '' "s|REGISTRY_PASSWORD=.*|REGISTRY_PASSWORD=$CODER_REGISTRY_PW|" "$TARGET_FILE"
         else
             sed -i "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
             sed -i "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
-            sed -i "s|REGISTRY_PASSWORD=.*|REGISTRY_PASSWORD=$CODER_REGISTRY_PW|" "$TARGET_FILE"
         fi
 
         # Interactive Coder configuration
@@ -377,13 +374,6 @@ if [ "$ENABLE_CODER" = true ]; then
     if [ -n "$CODER_ADMIN_PASSWORD" ]; then
         echo -e "  Password: ${YELLOW}$CODER_ADMIN_PASSWORD${NC}"
     fi
-
-    echo -e "\n${YELLOW}One more step before starting (coder-registry needs htpasswd):${NC}"
-    echo -e "  source .env  # load REGISTRY_USER / REGISTRY_PASSWORD / SYSTEM_DEPLOYMENT_PATH"
-    echo -e "  mkdir -p \"\$SYSTEM_DEPLOYMENT_PATH/coder/registry-auth\""
-    echo -e "  htpasswd -Bbn \"\$REGISTRY_USER\" \"\$REGISTRY_PASSWORD\" \\"
-    echo -e "    > \"\$SYSTEM_DEPLOYMENT_PATH/coder/registry-auth/htpasswd\""
-    echo -e "  (Install htpasswd via 'apt install apache2-utils' on Debian/Ubuntu.)"
 fi
 
 echo -e "\n${YELLOW}Important:${NC}"

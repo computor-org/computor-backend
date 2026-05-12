@@ -104,12 +104,9 @@ CODER_ADMIN_API_SECRET=<set-in-.env>
 CODER_POSTGRES_USER=<set-in-.env>
 CODER_POSTGRES_PASSWORD=<set-in-.env>
 
-# coder-registry uses htpasswd auth. Generate the file before first start:
-#   mkdir -p ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth
-#   htpasswd -Bbn "$REGISTRY_USER" "$REGISTRY_PASSWORD" \
-#     > ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth/htpasswd
-REGISTRY_USER=<set-in-.env>
-REGISTRY_PASSWORD=<set-in-.env>
+# coder-registry has no auth — it is protected by docker-network isolation
+# instead (it does not join computor-network, so workspaces can't reach it
+# over TCP). See docker-compose.coder.yaml for details.
 ```
 
 ### Fail-Closed Variables
@@ -128,7 +125,7 @@ compose` to exit at parse time:
 - `TESTING_WORKER_TOKEN`, `MATLAB_WORKER_TOKEN`, `MATLAB_TEST_ENGINE_*`,
   `MATLAB_MLM_LICENSE_FILE`
 - When coder is enabled: `CODER_POSTGRES_USER`, `CODER_POSTGRES_PASSWORD`,
-  `CODER_ADMIN_EMAIL`, `CODER_ADMIN_PASSWORD`, `REGISTRY_USER`, `REGISTRY_PASSWORD`
+  `CODER_ADMIN_EMAIL`, `CODER_ADMIN_PASSWORD`
 
 ## How It Works
 

@@ -106,7 +106,6 @@ gets its own dedicated postgres container (`coder-postgres`).
 | `CODER_ADMIN_EMAIL` | `CODER_ADMIN_EMAIL` | Same |
 | `CODER_ADMIN_PASSWORD` | `CODER_ADMIN_PASSWORD` | Same |
 | `DOCKER_GID` | `DOCKER_GID` | Same |
-| n/a | `REGISTRY_USER` / `REGISTRY_PASSWORD` | Required when integrated; auth for `coder-registry` |
 
 ## Quick Start
 
