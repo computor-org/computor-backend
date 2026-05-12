@@ -14,7 +14,7 @@ services:
     container_name: computor-coder-postgres
     restart: unless-stopped
     ports:
-      - "5439:5439"  # Different port from main postgres
+      - "127.0.0.1:5439:5439"  # Different port from main postgres
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder-postgres:/var/lib/postgresql/data
     environment:
@@ -39,7 +39,7 @@ services:
     container_name: computor-coder
     restart: unless-stopped
     ports:
-      - "7080:7080"  # Expose for local API access
+      - "127.0.0.1:7080:7080"  # Expose for local API access
     environment:
       CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"

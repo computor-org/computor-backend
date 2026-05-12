@@ -18,7 +18,7 @@ services:
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
       - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: true
