@@ -24,6 +24,13 @@ services:
   # Temporal UI (only in development)
   temporal-ui:
     image: temporalio/ui:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal-ui
@@ -46,6 +53,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     deploy:
       replicas: ${TEMPORAL_WORKER_REPLICAS:-1}
     extra_hosts:
@@ -95,6 +109,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing"]
     deploy:
       replicas: ${TESTING_WORKER_REPLICAS:-1}
@@ -133,6 +154,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing-matlab"]
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}

@@ -12,6 +12,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       - uvicorn
       - traefik

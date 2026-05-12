@@ -13,6 +13,13 @@ services:
       - computor-network
     container_name: computor-coder-postgres
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - "127.0.0.1:5439:5439"  # Different port from main postgres
     volumes:
@@ -40,6 +47,11 @@ services:
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - "127.0.0.1:7080:7080"  # Expose for local API access
     environment:
@@ -72,21 +84,42 @@ services:
     labels:
       - "traefik.enable=false"
 
-  # Local Docker registry for workspace images
+  # Local Docker registry for workspace images.
+  # Auth uses htpasswd — the host file must exist before first start:
+  #   mkdir -p ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth
+  #   htpasswd -Bbn "$REGISTRY_USER" "$REGISTRY_PASSWORD" > \
+  #     ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth/htpasswd
+  # NOTE: Workspaces won't be able to pull images until the Terraform
+  # templates (computor-coder/deployment/templates/*/main.tf) are updated to
+  # supply registry_auth — follow-up code work.
   coder-registry:
     image: registry:2
     networks:
       - computor-network
     container_name: computor-coder-registry
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - "127.0.0.1:${CODER_REGISTRY_PORT:-5000}:5000"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/registry:/var/lib/registry
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/registry-auth:/auth:ro
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Coder Registry"
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      # Used only by the healthcheck below; not consumed by the registry binary.
+      HC_USER: ${REGISTRY_USER:?must be set in .env}
+      HC_PASS: ${REGISTRY_PASSWORD:?must be set in .env}
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/v2/"]
+      test: ["CMD-SHELL", "wget --spider -q --user $$HC_USER --password $$HC_PASS http://localhost:5000/v2/"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -102,6 +135,11 @@ services:
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates:ro
@@ -116,6 +154,8 @@ services:
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_TEMPLATES_DIR: /templates
       CODER_REGISTRY_HOST: coder-registry:5000
+      CODER_REGISTRY_USER: ${REGISTRY_USER:?must be set in .env}
+      CODER_REGISTRY_PASSWORD: ${REGISTRY_PASSWORD:?must be set in .env}
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}

@@ -11,6 +11,11 @@ services:
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     environment:
       CONTAINERS: "1"
       NETWORKS: "1"
@@ -43,6 +48,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["sh", "startup.bash"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
@@ -114,6 +126,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     deploy:
       replicas: ${TEMPORAL_WORKER_REPLICAS:-2}
     environment:
@@ -161,6 +180,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing"]
     deploy:
       replicas: ${TESTING_WORKER_REPLICAS:-2}
@@ -194,6 +220,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing-matlab"]
     init: true  # Use tini as PID 1 to properly reap zombie processes
     deploy:

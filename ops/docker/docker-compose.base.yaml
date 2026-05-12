@@ -13,6 +13,13 @@ services:
   # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
     image: traefik:v3.6.6
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     ports:
@@ -25,6 +32,13 @@ services:
   # PostgreSQL with multiple databases support
   postgres:
     image: postgres:16
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     ports:
@@ -49,6 +63,13 @@ services:
   # Redis cache
   redis:
     image: "redis:alpine"
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     restart: unless-stopped
@@ -67,6 +88,13 @@ services:
   # Temporal PostgreSQL database
   temporal-postgres:
     image: postgres:16
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal-postgres
@@ -90,6 +118,13 @@ services:
   # Temporal server
   temporal:
     image: temporalio/auto-setup:1.27.0
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal
@@ -119,6 +154,13 @@ services:
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: computor-minio
@@ -145,6 +187,13 @@ services:
   # the /documents API. Both must point at the same host directory.
   static-server:
     image: halverneus/static-file-server:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     restart: unless-stopped
