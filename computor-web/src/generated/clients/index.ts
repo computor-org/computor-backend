@@ -19,6 +19,7 @@ export * from './CourseMemberImportClient';
 export * from './CourseMembersClient';
 export * from './CourseRolesClient';
 export * from './CoursesClient';
+export * from './DocumentsClient';
 export * from './ExampleRepositoriesClient';
 export * from './ExamplesClient';
 export * from './ExtensionsClient';

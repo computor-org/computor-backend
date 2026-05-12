@@ -43,7 +43,7 @@ async def create_entity(
     entity: BaseModel,
     db_type: Any,
     response_type: BaseModel,
-    post_create: Optional[Callable] = None
+    post_create: Optional[Callable] = None,
 ) -> BaseModel:
     """
     Create a new database entity with permission checks and validation.

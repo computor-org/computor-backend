@@ -12,7 +12,6 @@ import yaml
 import json
 from pathlib import Path
 from typing import Any, Dict, List
-from datetime import datetime
 
 
 def load_error_registry(registry_path: Path) -> Dict[str, Any]:
@@ -35,7 +34,6 @@ def generate_typescript(errors: List[Dict], output_path: Path) -> None:
  * Auto-generated error code definitions
  *
  * DO NOT EDIT MANUALLY
- * Generated at: {datetime.now().isoformat()}
  *
  * To regenerate: bash generate_error_codes.sh
  */
@@ -279,7 +277,6 @@ def generate_json_catalog(errors: List[Dict], output_path: Path) -> None:
     """
     catalog = {
         "version": "1.0.0",
-        "generated_at": datetime.now().isoformat(),
         "error_count": len(errors),
         "errors": {}
     }
@@ -322,7 +319,6 @@ def generate_vscode_catalog(errors: List[Dict], output_path: Path) -> None:
     """
     catalog = {
         "version": "1.0.0",
-        "generated_at": datetime.now().isoformat(),
         "error_count": len(errors),
         "errors": {}
     }
@@ -357,7 +353,6 @@ def generate_markdown_docs(errors: List[Dict], output_path: Path) -> None:
     md_content = f'''# Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **Total errors:** {len(errors)}
 
 To regenerate: `bash generate_error_codes.sh`
@@ -451,7 +446,6 @@ def generate_python_constants(errors: List[Dict], output_path: Path) -> None:
 Auto-generated error code constants
 
 DO NOT EDIT MANUALLY
-Generated at: {datetime.now().isoformat()}
 
 To regenerate: bash generate_error_codes.sh
 """

@@ -76,6 +76,7 @@ from computor_backend.api.course_member_import import course_member_import_route
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
+from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
 from computor_backend.websocket.connection_manager import manager as ws_manager
@@ -381,6 +382,11 @@ app.include_router(
     prefix="/lecturers",
     tags=["lecturers"],
     dependencies=[Depends(get_current_principal),Depends(get_redis_client)]
+)
+
+app.include_router(
+    documents_router,
+    dependencies=[Depends(get_current_principal)],
 )
 
 app.include_router(

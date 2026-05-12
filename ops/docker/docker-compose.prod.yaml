@@ -13,6 +13,10 @@ services:
     command: ["sh", "startup.bash"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
+      # Documents tree shared with static-server (which mounts the same host
+      # path read-only). Same path inside the container as outside so
+      # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
+      - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
@@ -21,6 +25,8 @@ services:
       API_ADMIN_USER: ${API_ADMIN_USER}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
       API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
+      DOCUMENTS_MAX_FILE_SIZE: ${DOCUMENTS_MAX_FILE_SIZE:-10485760}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5437
       POSTGRES_USER: ${POSTGRES_USER}

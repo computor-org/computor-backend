@@ -202,6 +202,21 @@
 | `getCoursesCoursesIdGet` | GET | `/courses/{id}` | — | `CourseGet` |
 | `updateCoursesCoursesIdPatch` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
 
+## DocumentsClient
+- Base path: `/documents`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `deleteDocumentDirectoryDocumentsDirectoriesDelete` | DELETE | `/documents/directories` | `DocumentDirectoryDelete` | `void` |
+| `renameDocumentDirectoryDocumentsDirectoriesPatch` | PATCH | `/documents/directories` | `DocumentDirectoryRename` | `DocumentDirectoryGet` |
+| `createDocumentDirectoryDocumentsDirectoriesPost` | POST | `/documents/directories` | `DocumentDirectoryCreate` | `DocumentDirectoryGet` |
+| `deleteDocumentFileDocumentsFilesDelete` | DELETE | `/documents/files` | `DocumentDelete` | `void` |
+| `getDocumentFileDocumentsFilesGet` | GET | `/documents/files` | — | `void` |
+| `renameDocumentFileDocumentsFilesPatch` | PATCH | `/documents/files` | `DocumentRename` | `DocumentGet` |
+| `uploadDocumentFileDocumentsFilesPost` | POST | `/documents/files` | — | `DocumentGet` |
+| `listDocumentsDirectoryDocumentsListGet` | GET | `/documents/list` | — | `DocumentList[]` |
+
 ## ExampleRepositoriesClient
 - Base path: `/example-repositories`
 - Note: custom operations discovered from OpenAPI schema

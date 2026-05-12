@@ -1,7 +1,6 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Generated:** 2026-05-05 23:44:23
 **Total errors:** 70
 
 To regenerate: `bash generate_error_codes.sh`

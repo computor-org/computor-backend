@@ -148,14 +148,15 @@ services:
     labels:
       - "traefik.enable=false"
 
-  # Static file server
+  # Static file server — read-only view of the documents tree maintained by
+  # the /documents API. Both must point at the same host directory.
   static-server:
     image: halverneus/static-file-server:latest
     networks:
       - computor-network
     restart: unless-stopped
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/shared/documents:/web:ro
+      - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:/web:ro
     environment:
       - FOLDER=/web
       - PORT=8080

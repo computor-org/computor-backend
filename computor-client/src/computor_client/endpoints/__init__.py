@@ -20,6 +20,7 @@ from computor_client.endpoints.course_member_import import CourseMemberImportCli
 from computor_client.endpoints.course_members import CourseMembersClient
 from computor_client.endpoints.course_roles import CourseRolesClient
 from computor_client.endpoints.courses import CoursesClient
+from computor_client.endpoints.documents import DocumentsClient
 from computor_client.endpoints.example_repositories import ExampleRepositoriesClient
 from computor_client.endpoints.examples import ExamplesClient
 from computor_client.endpoints.extensions import ExtensionsClient
@@ -68,6 +69,7 @@ __all__ = [
     "CourseMembersClient",
     "CourseRolesClient",
     "CoursesClient",
+    "DocumentsClient",
     "ExampleRepositoriesClient",
     "ExamplesClient",
     "ExtensionsClient",
