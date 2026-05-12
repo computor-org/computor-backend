@@ -2,6 +2,39 @@
 # Extends docker-compose.base.yaml with production services and configuration
 
 services:
+  # Restricted Docker API proxy. Traefik talks to this instead of the raw
+  # socket, so a compromised Traefik can't drive arbitrary Docker actions.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    networks:
+      - computor-network
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      SERVICES: "1"
+      TASKS: "1"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=false"
+
+  # Traefik override for production — Docker API via socket-proxy
+  traefik:
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=computor-network"
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    depends_on:
+      - socket-proxy
+
   # Production API service
   uvicorn:
     build:

@@ -8,23 +8,16 @@ networks:
     driver: bridge
 
 services:
-  # Single Traefik instance for all routing
+  # Single Traefik instance for all routing.
+  # Docker-provider command flags and socket access live in dev/prod overlays:
+  # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
     image: traefik:v3.6.6
     networks:
       - computor-network
     ports:
       - "${TRAEFIK_HTTP_PORT:-8080}:80"
-    command:
-      - "--api.insecure=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=computor-network"
-      - "--entrypoints.web.address=:80"
-      - "--providers.file.directory=/etc/traefik/dynamic"
-      - "--providers.file.watch=true"
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic:/etc/traefik/dynamic:ro
     labels:
       - "traefik.enable=false"  # Traefik itself doesn't need to be routed

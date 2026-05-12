@@ -2,8 +2,19 @@
 # Extends docker-compose.base.yaml with development services and configuration
 
 services:
-  # Traefik override for development - allow access to host machine
+  # Traefik override for development — direct docker socket access (no proxy)
   traefik:
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=computor-network"
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
