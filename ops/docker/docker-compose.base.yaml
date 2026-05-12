@@ -85,7 +85,7 @@ services:
     environment:
       TZ: UTC
       POSTGRES_USER: temporal
-      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:?must be set in .env}
       POSTGRES_DB: temporal
       PGPORT: 5433
     healthcheck:
@@ -107,7 +107,7 @@ services:
       - DB=postgres12
       - DB_PORT=5433
       - POSTGRES_USER=temporal
-      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:?must be set in .env}
       - POSTGRES_SEEDS=temporal-postgres
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig.yaml
     volumes:
@@ -136,8 +136,8 @@ services:
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?must be set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?must be set in .env}
       MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
     command: server /data --console-address ":9001"
     healthcheck:

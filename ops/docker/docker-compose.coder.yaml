@@ -19,12 +19,12 @@ services:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder-postgres:/var/lib/postgresql/data
     environment:
       TZ: UTC
-      POSTGRES_USER: ${CODER_POSTGRES_USER:-coder}
-      POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD:-coder_password}
+      POSTGRES_USER: ${CODER_POSTGRES_USER:?must be set in .env}
+      POSTGRES_PASSWORD: ${CODER_POSTGRES_PASSWORD:?must be set in .env}
       POSTGRES_DB: coder
       PGPORT: 5439
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CODER_POSTGRES_USER:-coder} -p 5439"]
+      test: ["CMD-SHELL", "pg_isready -U ${CODER_POSTGRES_USER:?must be set in .env} -p 5439"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
     ports:
       - "127.0.0.1:7080:7080"  # Expose for local API access
     environment:
-      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:-coder}:${CODER_POSTGRES_PASSWORD:-coder_password}@coder-postgres:5439/coder?sslmode=disable"
+      CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:?must be set in .env}:${CODER_POSTGRES_PASSWORD:?must be set in .env}@coder-postgres:5439/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
       # Internal URL - used by Coder for agent binary downloads (must be reachable from workspace containers)
       CODER_ACCESS_URL: "http://coder:7080"
