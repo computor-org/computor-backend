@@ -585,9 +585,11 @@ async def get_version(
     summary="Delete a single example version",
     description=(
         "Delete one ExampleVersion (and its MinIO storage) by id. "
-        "Refuses if any course_content_deployment row references the version "
-        "in either example_version_id (current) or previous_example_version_id "
-        "(history). No force flag — references must be cleared first."
+        "Refuses if any course_content_deployment row currently has its "
+        "example_version_id pointing at this version. DeploymentHistory rows "
+        "are NOT a blocker — those FKs SET NULL on delete and the audit "
+        "record (action, timestamp, example_identifier, version_tag) is "
+        "preserved. No force flag — active deployments must be cleared first."
     ),
 )
 async def delete_example_version_endpoint(
@@ -603,30 +605,19 @@ async def delete_example_version_endpoint(
     if not version:
         raise NotFoundException(f"Version {version_id} not found")
 
-    # Find every deployment that references this version in either FK column.
-    # Both have ondelete=SET NULL at the schema level, but we refuse anyway:
-    # silently nulling out a deployed version would mean losing the link
-    # between a course's deployed state and the example version that produced
-    # it. previous_example_version_id is included so audit history isn't
-    # silently broken either.
+    # Active references only: rows on `course_content_deployment` whose
+    # `example_version_id` points at this version. That is the user-facing
+    # "currently used" definition. DeploymentHistory references are audit
+    # log entries and not considered "in use" — they get SET NULL on delete
+    # by the schema-level FK.
     refs_query = (
         db.query(CourseContentDeployment, CourseContent, Course)
         .join(CourseContent, CourseContent.id == CourseContentDeployment.course_content_id)
         .join(Course, Course.id == CourseContent.course_id)
-        .filter(
-            or_(
-                CourseContentDeployment.example_version_id == version_id,
-                CourseContentDeployment.previous_example_version_id == version_id,
-            )
-        )
+        .filter(CourseContentDeployment.example_version_id == version_id)
     )
     references: List[ExampleVersionReference] = []
     for deployment, course_content, course in refs_query.all():
-        relation = (
-            "current"
-            if str(deployment.example_version_id) == str(version_id)
-            else "previous"
-        )
         references.append(
             ExampleVersionReference(
                 deployment_id=str(deployment.id),
@@ -636,7 +627,7 @@ async def delete_example_version_endpoint(
                 course_content_path=(
                     str(course_content.path) if getattr(course_content, "path", None) else None
                 ),
-                relation=relation,
+                relation="current",
             )
         )
 
