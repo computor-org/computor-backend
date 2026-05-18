@@ -118,6 +118,38 @@ class ExampleBulkDeleteRequest(BaseModel):
     )
 
 
+class ExampleVersionReference(BaseModel):
+    """A single course_content_deployment row that references an example_version."""
+    deployment_id: str
+    course_id: str
+    course_path: Optional[str] = None
+    course_content_id: str
+    course_content_path: Optional[str] = None
+    relation: str = Field(
+        ...,
+        description="Which FK references the version: 'current' (example_version_id) or 'previous' (previous_example_version_id)",
+    )
+
+
+class ExampleVersionDeleteResult(BaseModel):
+    """Result of a single example-version deletion."""
+    dry_run: bool = Field(..., description="Whether this was a preview only")
+    deleted: bool = Field(
+        ...,
+        description="True if the version row was deleted (or would be, on dry run with no references)",
+    )
+    version_id: str
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
+    storage_path: Optional[str] = None
+    storage_objects_deleted: int = Field(0, description="MinIO objects removed")
+    references: List[ExampleVersionReference] = Field(
+        default_factory=list,
+        description="Deployment rows blocking the delete; non-empty means deletion was refused",
+    )
+    errors: List[str] = Field(default_factory=list)
+
+
 class ExampleBulkDeleteResult(BaseModel):
     """Result of bulk example deletion operation."""
     dry_run: bool = Field(..., description="Whether this was a preview only")

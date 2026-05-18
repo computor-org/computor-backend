@@ -37,11 +37,16 @@ from computor_types.example import (
 from computor_types.cascade_deletion import (
     ExampleBulkDeleteRequest,
     ExampleBulkDeleteResult,
+    ExampleVersionDeleteResult,
+    ExampleVersionReference,
     ForceLevel,
 )
 from computor_backend.interfaces.example import ExampleInterface
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
+from ..model.deployment import CourseContentDeployment
+from ..model.course import CourseContent, Course
 from ..model.service import Service
+from ..services.cascade_cleanup import cleanup_example_version_storage
 from ..permissions.auth import get_current_principal
 from computor_backend.api._pagination import paginated_list
 from computor_backend.business_logic.crud import (
@@ -572,6 +577,133 @@ async def get_version(
 
     # Convert to response model
     return ExampleVersionGet.model_validate(version)
+
+
+@examples_router.delete(
+    "/versions/{version_id}",
+    response_model=ExampleVersionDeleteResult,
+    summary="Delete a single example version",
+    description=(
+        "Delete one ExampleVersion (and its MinIO storage) by id. "
+        "Refuses if any course_content_deployment row references the version "
+        "in either example_version_id (current) or previous_example_version_id "
+        "(history). No force flag — references must be cleared first."
+    ),
+)
+async def delete_example_version_endpoint(
+    version_id: str,
+    permissions: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    dry_run: bool = Query(default=False, description="If true, only returns preview without deleting"),
+) -> ExampleVersionDeleteResult:
+    if not permissions.is_admin:
+        raise ForbiddenException("Deletion requires admin permissions")
+
+    version = db.query(ExampleVersion).filter(ExampleVersion.id == version_id).first()
+    if not version:
+        raise NotFoundException(f"Version {version_id} not found")
+
+    # Find every deployment that references this version in either FK column.
+    # Both have ondelete=SET NULL at the schema level, but we refuse anyway:
+    # silently nulling out a deployed version would mean losing the link
+    # between a course's deployed state and the example version that produced
+    # it. previous_example_version_id is included so audit history isn't
+    # silently broken either.
+    refs_query = (
+        db.query(CourseContentDeployment, CourseContent, Course)
+        .join(CourseContent, CourseContent.id == CourseContentDeployment.course_content_id)
+        .join(Course, Course.id == CourseContent.course_id)
+        .filter(
+            or_(
+                CourseContentDeployment.example_version_id == version_id,
+                CourseContentDeployment.previous_example_version_id == version_id,
+            )
+        )
+    )
+    references: List[ExampleVersionReference] = []
+    for deployment, course_content, course in refs_query.all():
+        relation = (
+            "current"
+            if str(deployment.example_version_id) == str(version_id)
+            else "previous"
+        )
+        references.append(
+            ExampleVersionReference(
+                deployment_id=str(deployment.id),
+                course_id=str(course.id),
+                course_path=str(course.path) if getattr(course, "path", None) else None,
+                course_content_id=str(course_content.id),
+                course_content_path=(
+                    str(course_content.path) if getattr(course_content, "path", None) else None
+                ),
+                relation=relation,
+            )
+        )
+
+    example_identifier = (
+        str(version.example.identifier)
+        if version.example and getattr(version.example, "identifier", None)
+        else None
+    )
+
+    base_result = dict(
+        dry_run=dry_run,
+        version_id=str(version.id),
+        example_identifier=example_identifier,
+        version_tag=version.version_tag,
+        storage_path=version.storage_path,
+    )
+
+    # Blocked by references — refuse regardless of dry_run.
+    if references:
+        return ExampleVersionDeleteResult(
+            **base_result,
+            deleted=False,
+            storage_objects_deleted=0,
+            references=references,
+            errors=[
+                f"Version {version_id} is referenced by {len(references)} deployment(s); "
+                "clear those references before deleting."
+            ],
+        )
+
+    if dry_run:
+        return ExampleVersionDeleteResult(
+            **base_result,
+            deleted=True,  # would be deleted on a real run
+            storage_objects_deleted=0,
+        )
+
+    # No references — actually delete.
+    repo = version.example.repository if version.example else None
+    if not repo or not repo.source_url:
+        raise BadRequestException(
+            f"Cannot resolve bucket for version {version_id}: "
+            "example.repository.source_url is missing"
+        )
+    bucket_name = repo.source_url.split("/")[0]
+
+    storage = get_storage_service()
+    objects_deleted = 0
+    if version.storage_path:
+        objects_deleted = await cleanup_example_version_storage(
+            storage_path=version.storage_path,
+            bucket_name=bucket_name,
+            storage=storage,
+        )
+
+    db.delete(version)
+    db.commit()
+
+    # Invalidate any cached representation of the deleted version
+    get_cache().invalidate_tags(f"example_version:{version_id}")
+
+    return ExampleVersionDeleteResult(
+        **base_result,
+        deleted=True,
+        storage_objects_deleted=objects_deleted,
+    )
+
 
 # ==============================================================================
 # Example Dependencies Endpoints

@@ -363,3 +363,151 @@ def delete_examples(identifier_pattern: str, repository_id: str, dry_run: bool, 
         click.echo(f"\n{click.style('Warnings:', fg='yellow')}")
         for error in result["errors"]:
             click.echo(f"  - {error}")
+
+
+@delete.command("example-version")
+@click.argument("identifier_or_uuid")
+@click.argument("version_tag", required=False)
+@click.option("--dry-run", is_flag=True, default=False, help="Preview without deleting")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+@authenticate
+@handle_api_exceptions
+def delete_example_version(
+    identifier_or_uuid: str,
+    version_tag: str,
+    dry_run: bool,
+    yes: bool,
+    auth: CLIAuthConfig,
+):
+    """
+    Delete a single ExampleVersion (DB row + MinIO storage).
+
+    \b
+    Two argument forms are supported:
+      computor delete example-version <uuid>
+      computor delete example-version <example_identifier> <version_tag>
+
+    \b
+    Examples:
+      computor delete example-version 1d2c...8f
+      computor delete example-version itpcp.pgph.py.damped_oscillation 1.0.1
+
+    Refuses if any course_content_deployment row references the version,
+    either as current (example_version_id) or previous (previous_example_version_id).
+    No force flag — references must be cleared first.
+    """
+    client = run_async(get_computor_client(auth))
+
+    # Resolve to a UUID. If a version_tag was provided, look up the example
+    # by identifier and then find the matching version. The DELETE endpoint
+    # itself is UUID-only by design.
+    if version_tag:
+        examples_resp = run_async(
+            client._http.get(
+                "/examples",
+                params={"identifier": identifier_or_uuid, "limit": 10},
+            )
+        )
+        examples_resp.raise_for_status()
+        examples = examples_resp.json() or []
+        if not examples:
+            click.echo(
+                f"{click.style('Not found:', fg='red')} no example with identifier "
+                f"{identifier_or_uuid!r}"
+            )
+            return
+        if len(examples) > 1:
+            click.echo(
+                f"{click.style('Ambiguous:', fg='red')} identifier "
+                f"{identifier_or_uuid!r} matches {len(examples)} examples "
+                "(probably across different repositories). Use the UUID form instead."
+            )
+            for ex in examples:
+                click.echo(f"  - {ex.get('id')}  repo={ex.get('example_repository_id')}")
+            return
+        example_id = examples[0].get("id")
+
+        versions_resp = run_async(
+            client._http.get(f"/examples/{example_id}/versions")
+        )
+        versions_resp.raise_for_status()
+        versions = versions_resp.json() or []
+        match = next(
+            (v for v in versions if str(v.get("version_tag")) == str(version_tag)),
+            None,
+        )
+        if not match:
+            click.echo(
+                f"{click.style('Not found:', fg='red')} no version tag "
+                f"{version_tag!r} on example {identifier_or_uuid!r}"
+            )
+            return
+        resolved_uuid = match.get("id")
+    else:
+        resolved_uuid = identifier_or_uuid
+
+    # Step 1: always do a dry-run preview so we can show references before
+    # asking for confirmation.
+    preview = run_async(
+        client._http.delete(
+            f"/examples/versions/{resolved_uuid}",
+            params={"dry_run": "true"},
+        )
+    )
+    preview.raise_for_status()
+    preview_data = preview.json()
+
+    identifier_resolved = preview_data.get("example_identifier") or "?"
+    tag_resolved = preview_data.get("version_tag") or "?"
+    uuid_resolved = preview_data.get("version_id") or "?"
+    storage_path = preview_data.get("storage_path") or "?"
+    refs = preview_data.get("references") or []
+
+    click.echo(f"\nVersion: {uuid_resolved}")
+    click.echo(f"  Example:      {identifier_resolved}")
+    click.echo(f"  Tag:          {tag_resolved}")
+    click.echo(f"  Storage path: {storage_path}")
+
+    if refs:
+        click.echo(
+            f"\n{click.style('Cannot delete:', fg='red')} "
+            f"{len(refs)} deployment reference(s) — clear these first:"
+        )
+        for r in refs:
+            relation = r.get("relation", "?")
+            cpath = r.get("course_path") or r.get("course_id")
+            ccpath = r.get("course_content_path") or r.get("course_content_id")
+            tag = click.style(f"[{relation}]", fg="yellow")
+            click.echo(f"  {tag} course={cpath} content={ccpath} deployment={r.get('deployment_id')}")
+        return
+
+    if dry_run:
+        click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - would delete this version. No references found.")
+        return
+
+    if not yes:
+        if not click.confirm(
+            f"\nDelete version {identifier_resolved}@{tag_resolved} (id={uuid_resolved})?",
+            default=False,
+        ):
+            click.echo("Aborted.")
+            return
+
+    # Step 2: actually delete.
+    response = run_async(client._http.delete(f"/examples/versions/{resolved_uuid}"))
+    response.raise_for_status()
+    result = response.json()
+
+    if not result.get("deleted"):
+        # Belt-and-braces: a deployment may have been created between the
+        # preview and the actual delete (race window). Surface it.
+        click.echo(f"\n{click.style('Refused:', fg='red')} {result.get('errors') or 'unknown reason'}")
+        for r in result.get("references", []):
+            click.echo(f"  - {r}")
+        return
+
+    click.echo(
+        f"\n{click.style('SUCCESS', fg='green', bold=True)} - "
+        f"deleted version {identifier_resolved}@{tag_resolved} "
+        f"({result.get('storage_objects_deleted', 0)} MinIO objects removed)."
+    )
