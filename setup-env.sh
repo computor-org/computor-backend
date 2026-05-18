@@ -189,6 +189,7 @@ if [ "$SKIP_COMMON" != true ]; then
     POSTGRES_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     REDIS_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     MINIO_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
+    TEMPORAL_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     ADMIN_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-16)
     TESTING_WORKER_TOKEN=$(generate_hex_token | cut -c1-32)
     MATLAB_WORKER_TOKEN=$(generate_hex_token | cut -c1-32)
@@ -199,6 +200,7 @@ if [ "$SKIP_COMMON" != true ]; then
         sed -i '' "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$POSTGRES_PASSWORD|" "$TARGET_FILE"
         sed -i '' "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$REDIS_PASSWORD|" "$TARGET_FILE"
         sed -i '' "s|MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=$MINIO_PASSWORD|" "$TARGET_FILE"
+        sed -i '' "s|TEMPORAL_POSTGRES_PASSWORD=.*|TEMPORAL_POSTGRES_PASSWORD=$TEMPORAL_PG_PASSWORD|" "$TARGET_FILE"
         sed -i '' "s|TOKEN_SECRET=.*|TOKEN_SECRET=$TOKEN_SECRET|" "$TARGET_FILE"
         sed -i '' "s|AUTH_SECRET=.*|AUTH_SECRET=$AUTH_SECRET|" "$TARGET_FILE"
         sed -i '' "s|API_ADMIN_PASSWORD=.*|API_ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$TARGET_FILE"
@@ -209,6 +211,7 @@ if [ "$SKIP_COMMON" != true ]; then
         sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$POSTGRES_PASSWORD|" "$TARGET_FILE"
         sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$REDIS_PASSWORD|" "$TARGET_FILE"
         sed -i "s|MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=$MINIO_PASSWORD|" "$TARGET_FILE"
+        sed -i "s|TEMPORAL_POSTGRES_PASSWORD=.*|TEMPORAL_POSTGRES_PASSWORD=$TEMPORAL_PG_PASSWORD|" "$TARGET_FILE"
         sed -i "s|TOKEN_SECRET=.*|TOKEN_SECRET=$TOKEN_SECRET|" "$TARGET_FILE"
         sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=$AUTH_SECRET|" "$TARGET_FILE"
         sed -i "s|API_ADMIN_PASSWORD=.*|API_ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$TARGET_FILE"
@@ -257,11 +260,18 @@ if [ "$SKIP_COMMON" != true ]; then
     if [ "$ENABLE_CODER" = true ]; then
         echo -e "  Configuring Coder integration..."
 
-        # Enable Coder
+        # Generate internal Coder DB credential.
+        # CODER_POSTGRES_PASSWORD is required by docker-compose.coder.yaml's :?
+        # fail-closed check and never needs to be human-memorable.
+        CODER_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
+
+        # Enable Coder + write the generated credential
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
+            sed -i '' "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
         else
             sed -i "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
+            sed -i "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
         fi
 
         # Interactive Coder configuration

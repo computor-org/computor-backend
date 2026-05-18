@@ -10,16 +10,16 @@ The Computor platform now uses a modular Docker Compose architecture that separa
 
 ```
 computor-fullstack/
-├── docker-compose.base.yaml      # Core shared services
-├── docker-compose.dev.yaml       # Development-specific services
-├── docker-compose.prod.yaml      # Production-specific services
-├── docker-compose.coder.yaml     # Optional Coder addon
-├── .env.common.template          # Shared environment template
-├── .env.dev.template             # Development environment template
-├── .env.prod.template            # Production environment template
-├── .env.coder.template           # Coder environment template
-├── setup-env.sh                  # Environment setup script
-└── startup.sh                    # Service startup script
+├── ops/docker/
+│   ├── docker-compose.base.yaml   # Core shared services
+│   ├── docker-compose.dev.yaml    # Development-specific services
+│   ├── docker-compose.prod.yaml   # Production-specific services
+│   ├── docker-compose.coder.yaml  # Optional Coder addon
+│   └── docker-compose.web.yaml    # Frontend (auto-loaded in prod)
+├── .env                            # Active environment file
+├── setup-env.sh                    # Environment setup script
+├── startup.sh                      # Service startup script
+└── stop.sh                         # Service stop script
 ```
 
 ### Service Organization
@@ -83,15 +83,13 @@ Coder workspace support is controlled via `CODER_ENABLED=true` in `.env`.
 ### 3. Stop Services
 
 ```bash
-# Development
-docker-compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down
-
-# Development with Coder
-docker-compose -f docker-compose.base.yaml -f docker-compose.dev.yaml -f docker-compose.coder.yaml down
-
-# Production
-docker-compose -f docker-compose.base.yaml -f docker-compose.prod.yaml down
+./stop.sh dev    # development stack
+./stop.sh prod   # production stack
 ```
+
+The startup/stop scripts compose the correct overlay set based on `CODER_ENABLED`
+in `.env`. Avoid running `docker compose` directly with hand-listed `-f` flags —
+it bypasses the script's overlay logic.
 
 ## Environment Configuration
 
@@ -127,48 +125,65 @@ The system uses a layered environment configuration:
 
 ### Manual Docker Compose Commands
 
+The startup/stop scripts are the supported entry points. If you really need to
+invoke compose directly:
+
 ```bash
-# Development with specific services
-docker-compose \
-  -f docker-compose.base.yaml \
-  -f docker-compose.dev.yaml \
-  up -d postgres redis temporal
+# Development
+docker compose \
+  -f ops/docker/docker-compose.base.yaml \
+  -f ops/docker/docker-compose.dev.yaml \
+  up -d
 
 # Production with Coder
-docker-compose \
-  -f docker-compose.base.yaml \
-  -f docker-compose.prod.yaml \
-  -f docker-compose.coder.yaml \
+docker compose \
+  -f ops/docker/docker-compose.base.yaml \
+  -f ops/docker/docker-compose.prod.yaml \
+  -f ops/docker/docker-compose.web.yaml \
+  -f ops/docker/docker-compose.coder.yaml \
   up -d
 
 # View logs
-docker-compose \
-  -f docker-compose.base.yaml \
-  -f docker-compose.dev.yaml \
+docker compose \
+  -f ops/docker/docker-compose.base.yaml \
+  -f ops/docker/docker-compose.dev.yaml \
   logs -f temporal-worker
 ```
 
 ### Service URLs
 
-#### Development
-- API: http://localhost:8000
+All non-Traefik service ports are bound to `127.0.0.1` only — they're reachable
+from the host (and over SSH tunnels) but **not** from the surrounding network.
+Only Traefik on `${TRAEFIK_HTTP_PORT:-8080}` is exposed publicly.
+
+#### Development (from the host)
+- Traefik / public entrypoint: http://localhost:8080
+- API (direct): http://localhost:8000
 - Temporal UI: http://localhost:8088
 - MinIO Console: http://localhost:9001
-- Traefik Dashboard: http://localhost:8080
-- Coder (if enabled): https://coder.localhost:8446
+- Coder API (if enabled): http://localhost:7080
+- Postgres: localhost:5432 → container 5437 (`psql -h localhost -p 5432`)
+- Redis: localhost:6379
 
-#### Production
-- API: http://localhost:8000/api
-- Frontend: http://localhost:8080
-- Coder (if enabled): https://your-coder-domain:8446
+#### Production (from the host)
+- Traefik / public entrypoint: http://your-host:8080
+  - `/api` → uvicorn
+  - `/docs` → documents
+  - `/coder/{user}/{workspace}/` → coder workspaces
+  - `/` → frontend
+- API (direct, host-only): http://localhost:8000
+- Coder API (direct, host-only): http://localhost:7080
 
 ### Database Access
 
-The system uses a single PostgreSQL instance with multiple databases:
+The system uses three **separate** PostgreSQL instances on different ports:
 
-- `computor` - Main application database
-- `coder` - Coder workspace database (created when Coder is enabled)
-- `temporal` - Temporal workflow database (separate instance)
+- `postgres` (host 5432 → container 5437) — Main application database `computor`
+- `temporal-postgres` (5433) — Temporal workflow database `temporal`
+- `coder-postgres` (5439) — Coder workspace database `coder` (only when
+  `CODER_ENABLED=true`)
+
+Each instance has its own data directory under `${SYSTEM_DEPLOYMENT_PATH}/`.
 
 ### Networking
 
@@ -246,10 +261,25 @@ If Coder fails to start:
 ## Security Notes
 
 1. **Never commit `.env` files** to version control
-2. **Use strong passwords** - the setup script generates secure ones
-3. **Restrict MinIO ports** in production (already configured)
-4. **Enable HTTPS** for production deployments
-5. **Rotate tokens regularly** especially API tokens
+2. **Use strong passwords** — credential env vars (e.g. `POSTGRES_PASSWORD`,
+   `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `TEMPORAL_POSTGRES_PASSWORD`,
+   `CODER_POSTGRES_*`) have **no defaults** — compose will fail to start if
+   any are missing.
+3. **All service ports bound to `127.0.0.1`** except Traefik's 8080 — services
+   are reachable from the host (and SSH tunnels) but not from the intranet.
+4. **HTTPS** is expected to be terminated upstream (e.g. nginx in front of
+   Traefik:8080). No TLS inside the compose stack.
+5. **Docker socket** is exposed read-only to Traefik via `tecnativa/docker-socket-proxy`
+   in production (dev mounts the socket directly). Coder and `temporal-worker-coder`
+   need RW socket access for container provisioning and image builds; both run
+   with `no-new-privileges`.
+6. **Coder registry isolation:** `coder-registry` is deliberately left off the
+   `computor-network`, so workspace containers (which DO live on that network)
+   can't reach it over TCP. The host docker daemon talks to it via the
+   `127.0.0.1:5000` port binding, so pushes from `temporal-worker-coder` and
+   pulls during workspace creation still work — but neither goes through a
+   network path that user workspaces can intercept.
+7. **Rotate tokens regularly** especially API tokens.
 
 ## Support
 

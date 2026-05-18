@@ -6,14 +6,16 @@ The Computor platform supports Coder in two different ways:
 
 ### 1. Integrated Coder (Recommended)
 **Location**: `ops/docker/docker-compose.coder.yaml`
-**Config**: `.env.coder` (in project root)
+**Config**: `.env` (in project root)
 **Usage**: Set `CODER_ENABLED=true` in `.env`, then `./startup.sh dev -d`
 
 - Runs as part of Computor stack
-- Shares PostgreSQL with Computor (uses `coder` database)
+- Has its **own** dedicated PostgreSQL (`computor-coder-postgres`, port 5439)
+  — separate from the main Computor postgres
+- Has its **own** dedicated Docker registry (`computor-coder-registry`) for
+  workspace images, with htpasswd auth
 - Managed by main startup/stop scripts
-- Single Traefik instance for routing
-- Configured via `.env.coder` in root
+- Single Traefik instance for routing (workspaces reachable at `/coder/{user}/{workspace}/`)
 
 ### 2. Standalone Coder
 **Location**: `computor-coder/deployment/`
@@ -64,8 +66,11 @@ Key variables:
 ### Use Integrated Coder when:
 - You want everything managed together
 - You're already running Computor
-- You want shared resources (PostgreSQL, network)
+- You want a shared Docker network and single Traefik routing
 - You prefer single-point management
+
+Note: integrated mode does **not** share PostgreSQL with Computor — Coder
+gets its own dedicated postgres container (`coder-postgres`).
 
 ### Use Standalone Coder when:
 - You want Coder independent of Computor
@@ -90,14 +95,14 @@ Key variables:
 
 ## Environment Variable Mapping
 
-| Standalone `.env` | Integrated `.env.coder` | Notes |
-|-------------------|-------------------------|--------|
+| Standalone `.env` | Integrated `.env` | Notes |
+|-------------------|-------------------|--------|
 | `CODER_DIR` | `CODER_DIR` | Same |
 | `CODER_DOMAIN` | `CODER_DOMAIN` | Same |
 | `CODER_PORT` | `CODER_EXTERNAL_PORT` | Different naming |
-| `CODER_POSTGRES_PORT` | Uses `POSTGRES_EXTERNAL_PORT` | Shared DB |
-| `CODER_POSTGRES_USER` | Uses `POSTGRES_USER` | Shared DB |
-| `CODER_POSTGRES_PASSWORD` | Uses `POSTGRES_PASSWORD` | Shared DB |
+| `CODER_POSTGRES_PORT` | hard-coded `5439` | Separate DB instance |
+| `CODER_POSTGRES_USER` | `CODER_POSTGRES_USER` | Required (no default); separate from main `POSTGRES_USER` |
+| `CODER_POSTGRES_PASSWORD` | `CODER_POSTGRES_PASSWORD` | Required (no default); separate from main `POSTGRES_PASSWORD` |
 | `CODER_ADMIN_EMAIL` | `CODER_ADMIN_EMAIL` | Same |
 | `CODER_ADMIN_PASSWORD` | `CODER_ADMIN_PASSWORD` | Same |
 | `DOCKER_GID` | `DOCKER_GID` | Same |
@@ -154,7 +159,7 @@ If running both modes on the same machine, ensure different ports:
 - Standalone uses ports from `computor-coder/deployment/.env`
 
 ### Database Issues
-- Integrated: Check `coder` database exists in shared PostgreSQL
+- Integrated: Check `computor-coder-postgres` container (port 5439) is running
 - Standalone: Check separate PostgreSQL container is running
 
 ### Network Issues

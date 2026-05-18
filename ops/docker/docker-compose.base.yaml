@@ -8,23 +8,23 @@ networks:
     driver: bridge
 
 services:
-  # Single Traefik instance for all routing
+  # Single Traefik instance for all routing.
+  # Docker-provider command flags and socket access live in dev/prod overlays:
+  # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
     image: traefik:v3.6.6
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     ports:
       - "${TRAEFIK_HTTP_PORT:-8080}:80"
-    command:
-      - "--api.insecure=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=computor-network"
-      - "--entrypoints.web.address=:80"
-      - "--providers.file.directory=/etc/traefik/dynamic"
-      - "--providers.file.watch=true"
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic:/etc/traefik/dynamic:ro
     labels:
       - "traefik.enable=false"  # Traefik itself doesn't need to be routed
@@ -32,10 +32,17 @@ services:
   # PostgreSQL with multiple databases support
   postgres:
     image: postgres:16
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     ports:
-      - "${POSTGRES_EXTERNAL_PORT:-5432}:5437"
+      - "127.0.0.1:${POSTGRES_EXTERNAL_PORT:-5432}:5437"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/postgres:/var/lib/postgresql/data
       - ../../docker/postgres-init:/docker-entrypoint-initdb.d:ro
@@ -56,11 +63,18 @@ services:
   # Redis cache
   redis:
     image: "redis:alpine"
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
@@ -74,18 +88,25 @@ services:
   # Temporal PostgreSQL database
   temporal-postgres:
     image: postgres:16
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal-postgres
     restart: unless-stopped
     ports:
-      - "${TEMPORAL_POSTGRES_PORT:-5433}:5433"
+      - "127.0.0.1:${TEMPORAL_POSTGRES_PORT:-5433}:5433"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/temporal-postgres:/var/lib/postgresql/data
     environment:
       TZ: UTC
       POSTGRES_USER: temporal
-      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:?must be set in .env}
       POSTGRES_DB: temporal
       PGPORT: 5433
     healthcheck:
@@ -97,17 +118,24 @@ services:
   # Temporal server
   temporal:
     image: temporalio/auto-setup:1.27.0
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal
     restart: unless-stopped
     ports:
-      - "${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
+      - "127.0.0.1:${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
     environment:
       - DB=postgres12
       - DB_PORT=5433
       - POSTGRES_USER=temporal
-      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_PWD=${TEMPORAL_POSTGRES_PASSWORD:?must be set in .env}
       - POSTGRES_SEEDS=temporal-postgres
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig.yaml
     volumes:
@@ -126,6 +154,13 @@ services:
   # MinIO Object Storage
   minio:
     image: minio/minio:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: computor-minio
@@ -136,8 +171,8 @@ services:
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?must be set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?must be set in .env}
       MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
     command: server /data --console-address ":9001"
     healthcheck:
@@ -152,6 +187,13 @@ services:
   # the /documents API. Both must point at the same host directory.
   static-server:
     image: halverneus/static-file-server:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     restart: unless-stopped

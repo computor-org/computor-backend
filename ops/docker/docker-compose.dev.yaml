@@ -2,8 +2,19 @@
 # Extends docker-compose.base.yaml with development services and configuration
 
 services:
-  # Traefik override for development - allow access to host machine
+  # Traefik override for development — direct docker socket access (no proxy)
   traefik:
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=computor-network"
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -13,12 +24,19 @@ services:
   # Temporal UI (only in development)
   temporal-ui:
     image: temporalio/ui:latest
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - computor-network
     container_name: temporal-ui
     restart: unless-stopped
     ports:
-      - "${TEMPORAL_UI_PORT:-8088}:8080"
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8088}:8080"
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
@@ -35,6 +53,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     deploy:
       replicas: ${TEMPORAL_WORKER_REPLICAS:-1}
     extra_hosts:
@@ -63,8 +88,8 @@ services:
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
       - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
       - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?must be set in .env}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?must be set in .env}
       - MINIO_SECURE=false
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
@@ -84,6 +109,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing"]
     deploy:
       replicas: ${TESTING_WORKER_REPLICAS:-1}
@@ -122,6 +154,13 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     command: ["--queues=testing-matlab"]
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
