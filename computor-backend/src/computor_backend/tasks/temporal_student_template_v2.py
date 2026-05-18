@@ -43,29 +43,26 @@ async def process_example_for_student_template_v2(
             or getattr(version, 'meta', None)
         )
 
-        # Process content directory files
+        # SAFETY: This function is the boundary between the full example bundle
+        # (which contains solutions, tests, hints, and other instructor-only
+        # material) and the student-facing template repo. It operates as a
+        # strict allowlist. The ONLY files emitted are:
+        #   1. README.md       <- content/index.md  (rename only; content/ itself never ships)
+        #   2. README_<lang>.md <- content/index_<lang>.md  (same)
+        #   3. additionalFiles  (from meta.yaml's typed columns)
+        #   4. studentSubmissionFiles  (filled from studentTemplates or empty)
+        # The entire content/ directory and the entire localTests/ directory
+        # must NEVER appear in the student template.
         for filename, content in example_files.items():
-            if filename.startswith('content/'):
-                # Handle index*.md files specially - rename to README*.md
-                if filename.startswith('content/index'):
-                    # Handle index.md -> README.md
-                    if filename == 'content/index.md':
-                        readme_path = target_path / 'README.md'
-                        readme_path.write_bytes(content)
-                    # Handle index_<lang>.md -> README_<lang>.md
-                    elif filename.startswith('content/index_') and filename.endswith('.md'):
-                        # Extract language suffix
-                        lang_suffix = filename[len('content/index'):-3]  # Gets '_de' from 'content/index_de.md'
-                        readme_filename = f'README{lang_suffix}.md'
-                        readme_path = target_path / readme_filename
-                        readme_path.write_bytes(content)
-                # Copy all other content files (mediaFiles, etc.) preserving structure
-                else:
-                    # Remove 'content/' prefix and copy to assignment root
-                    relative_path = filename.replace('content/', '', 1)
-                    file_path = target_path / relative_path
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_bytes(content)
+            # Handle index*.md inside content/ — these are the ONLY files we
+            # take out of content/, and they get renamed to README.
+            if filename == 'content/index.md':
+                (target_path / 'README.md').write_bytes(content)
+            elif filename.startswith('content/index_') and filename.endswith('.md'):
+                lang_suffix = filename[len('content/index'):-3]  # '_de' from 'content/index_de.md'
+                (target_path / f'README{lang_suffix}.md').write_bytes(content)
+            # Everything else under content/ or localTests/ is DROPPED.
+            # No fallback, no implicit copy.
 
         if has_meta:
             # Process additionalFiles - copy to assignment root
@@ -123,15 +120,22 @@ async def process_example_for_student_template_v2(
                     submission_path.write_text('')
                     logger.info(f"Created empty file: {submission_file}")
         else:
-            # No meta.yaml - fallback processing
-            logger.warning(f"No meta.yaml found for {course_content.path}, using fallback processing")
-            for filename, content in example_files.items():
-                # Skip test files and meta files
-                if not filename.startswith('test') and not filename.endswith('_test.py') and filename != 'meta.yaml':
-                    file_path = target_path / filename
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_bytes(content)
-        
+            # No meta.yaml — REFUSE. There is no safe fallback: an
+            # allowlist-free copy would ship localTests/, content/, and
+            # whatever else the example contains. localTests/ must NEVER
+            # reach the student template under any circumstance.
+            logger.error(
+                f"Refusing to generate student template for {course_content.path}: "
+                f"no meta.yaml fields populated on ExampleVersion. Fix the example."
+            )
+            return {
+                "success": False,
+                "error": (
+                    f"meta.yaml missing/empty for {course_content.path}; "
+                    "refusing to emit any files (no safe fallback exists)"
+                ),
+            }
+
         return {"success": True}
         
     except Exception as e:
@@ -709,11 +713,18 @@ async def generate_student_template_activity_v2(
                     # Process the example files for student template
                     # This function handles meta.yaml properties like studentSubmissionFiles,
                     # studentTemplates, additionalFiles, and content directory processing
+                    # IMPORTANT: pass the ExampleVersion so the function can
+                    # read its typed allowlist columns (additional_files,
+                    # student_submission_files, student_templates). When this
+                    # was None — regression in 41b6ba9 (2025-09-15) — every
+                    # release fell through to the no-meta fallback and shipped
+                    # the full example bundle minus things prefixed "test"
+                    # (i.e. localTests/ leaked).
                     process_result = await process_example_for_student_template_v2(
                         example_files=files,
                         target_path=Path(full_target_path),
                         course_content=content,
-                        version=None
+                        version=content.deployment.example_version,
                     )
                     
                     if not process_result.get("success"):
