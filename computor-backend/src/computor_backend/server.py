@@ -287,7 +287,20 @@ app.add_middleware(
     expose_headers=["X-Total-Count"],
 )
 
-CrudRouter(UserInterface).register_routes(app)
+def _guard_no_archive_admin(entity, permissions, db):
+    """Prevent archiving a user who holds the _admin role."""
+    from computor_backend.model.role import UserRole
+    from computor_backend.exceptions import ForbiddenException
+    is_admin_target = db.query(UserRole).filter(
+        UserRole.user_id == entity.id,
+        UserRole.role_id == "_admin",
+    ).first() is not None
+    if is_admin_target:
+        raise ForbiddenException("Admin users cannot be archived")
+
+_user_router = CrudRouter(UserInterface)
+_user_router.pre_archive.append(_guard_no_archive_admin)
+_user_router.register_routes(app)
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
