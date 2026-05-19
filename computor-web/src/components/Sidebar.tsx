@@ -66,6 +66,7 @@ const userMgmtNavigation: NavItem[] = [
     subItems: [
       { id: 'um-users', label: 'Users', path: '/admin/users' },
       { id: 'um-invites', label: 'Invite Links', path: '/admin/users/invites' },
+      { id: 'um-roles', label: 'Roles & Claims', path: '/admin/users/roles' },
     ],
   },
 ];
