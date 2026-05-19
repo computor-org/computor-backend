@@ -68,7 +68,7 @@ export default function UsersPage() {
     open: false, user: null, selectedRoles: [], saving: false, error: null,
   });
 
-  const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; username: string } | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; username: string; managerPassword: string } | null>(null);
   const [archiveConfirm, setArchiveConfirm] = useState<{ open: boolean; user: UserList } | null>(null);
 
   const [accountsModal, setAccountsModal] = useState<{
@@ -207,19 +207,22 @@ export default function UsersPage() {
     }
   };
 
-  const handleResetPassword = async (userId: string) => {
+  const handleResetPassword = async (userId: string, managerPassword: string) => {
     try {
       const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const res = await fetch(`${API}/password/reset`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, manager_password: '' }),
+        body: JSON.stringify({ user_id: userId, manager_password: managerPassword }),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || 'Failed to reset password');
+      }
       notify('Password reset — user must set a new password', 'success');
-    } catch {
-      notify('Failed to reset password', 'error');
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to reset password', 'error');
     }
     setResetConfirm(null);
   };
@@ -372,7 +375,7 @@ export default function UsersPage() {
                         </button>
                         {isAdmin && (
                           <button
-                            onClick={() => setResetConfirm({ open: true, userId: u.id, username: u.username ?? '' })}
+                            onClick={() => setResetConfirm({ open: true, userId: u.id, username: u.username ?? '', managerPassword: '' })}
                             className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                           >
                             Reset PW
@@ -541,11 +544,24 @@ export default function UsersPage() {
             <p className="text-sm text-gray-600 mb-4">
               This will clear <strong>{resetConfirm.username}</strong>'s password. They will need to set a new one via invite link or admin.
             </p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Your password (to confirm)</label>
+              <input
+                type="password"
+                autoFocus
+                value={resetConfirm.managerPassword}
+                onChange={e => setResetConfirm(r => r ? { ...r, managerPassword: e.target.value } : r)}
+                onKeyDown={e => { if (e.key === 'Enter' && resetConfirm.managerPassword) handleResetPassword(resetConfirm.userId, resetConfirm.managerPassword); }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Enter your password"
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setResetConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
               <button
-                onClick={() => handleResetPassword(resetConfirm.userId)}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                onClick={() => handleResetPassword(resetConfirm.userId, resetConfirm.managerPassword)}
+                disabled={!resetConfirm.managerPassword}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 Reset Password
               </button>
