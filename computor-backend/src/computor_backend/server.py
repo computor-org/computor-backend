@@ -76,6 +76,8 @@ from computor_backend.api.course_member_import import course_member_import_route
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
+from computor_backend.api.invites import invites_router
+from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
@@ -286,7 +288,23 @@ app.add_middleware(
     expose_headers=["X-Total-Count"],
 )
 
-CrudRouter(UserInterface).register_routes(app)
+def _guard_no_archive_admin(entity, permissions, db):
+    """Prevent archiving a user who holds the _admin role."""
+    from computor_backend.model.role import UserRole
+    from computor_backend.exceptions import ForbiddenException
+    is_admin_target = db.query(UserRole).filter(
+        UserRole.user_id == entity.id,
+        UserRole.role_id == "_admin",
+    ).first() is not None
+    if is_admin_target:
+        raise ForbiddenException("Admin users cannot be archived")
+
+_user_router = CrudRouter(UserInterface)
+_user_router.pre_archive.append(_guard_no_archive_admin)
+_user_router.register_routes(app)
+# accounts_router must be registered before CrudRouter(AccountInterface) so that
+# GET /accounts/providers is matched before the authenticated GET /accounts/{id} route.
+app.include_router(accounts_router, tags=["accounts"])
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
@@ -455,6 +473,11 @@ app.include_router(
 app.include_router(
     auth_router,
     tags=["authentication", "sso"]
+)
+
+app.include_router(
+    invites_router,
+    tags=["invites", "user-management"]
 )
 
 app.include_router(

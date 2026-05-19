@@ -44,6 +44,7 @@ class CrudRouter:
         self.on_updated = []
         self.on_deleted = []
         self.on_archived = []
+        self.pre_archive = []  # sync guards: (entity, permissions, db) -> None, raise to block
 
     def create(self):
         async def route(
@@ -123,6 +124,8 @@ class CrudRouter:
 
     def archive(self):
         if hasattr(self.dto.model, "archived_at"):
+            pre_archive_guards = self.pre_archive
+
             async def route(
                     background_tasks: BackgroundTasks,
                     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -130,6 +133,9 @@ class CrudRouter:
                     db: Session = Depends(get_db)
             ):
                 entity_archived = await get_id_db(permissions, db, id, self.dto)
+
+                for guard in pre_archive_guards:
+                    guard(entity_archived, permissions, db)
 
                 for task in self.on_archived:
                     background_tasks.add_task(task, entity_archived, permissions)

@@ -120,8 +120,9 @@ export class SSOAuthService implements ISSOAuthProvider {
         givenName: userInfo.user.given_name,
         familyName: userInfo.user.family_name,
         role: this.mapRolesToFrontend(userInfo.roles),
+        systemRoles: Array.isArray(userInfo.roles) ? userInfo.roles : [],
         permissions: this.mapPermissions(userInfo.roles),
-        courses: [], // TODO: Fetch from user's course enrollments
+        courses: [],
       };
 
       // Store ONLY user data (not tokens!)
@@ -241,6 +242,7 @@ export class SSOAuthService implements ISSOAuthProvider {
         givenName: userInfo.user.given_name,
         familyName: userInfo.user.family_name,
         role: this.mapRolesToFrontend(userInfo.roles),
+        systemRoles: Array.isArray(userInfo.roles) ? userInfo.roles : [],
         permissions: this.mapPermissions(userInfo.roles),
         courses: [],
       };
