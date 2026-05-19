@@ -5,10 +5,14 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
-import type { UserList, UserGet, UserCreate, RoleList } from 'types/generated';
+import { AccountsClient } from '@/src/generated/clients/AccountsClient';
+import { AccountProvidersClient, AccountProvider } from '@/src/generated/clients/AccountProvidersClient';
+import type { UserList, UserGet, UserCreate, RoleList, AccountList } from 'types/generated';
 
 const usersClient = new UsersClient();
 const rolesClient = new RolesClient();
+const accountsClient = new AccountsClient();
+const accountProvidersClient = new AccountProvidersClient();
 
 const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 
@@ -65,6 +69,19 @@ export default function UsersPage() {
 
   const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; username: string } | null>(null);
 
+  const [accountsModal, setAccountsModal] = useState<{
+    open: boolean;
+    user: UserList | null;
+    accounts: AccountList[];
+    loading: boolean;
+    addingProvider: string | null;  // provider id being added, or null
+    accountId: string;
+    saving: boolean;
+    error: string | null;
+  }>({ open: false, user: null, accounts: [], loading: false, addingProvider: null, accountId: '', saving: false, error: null });
+
+  const [providers, setProviders] = useState<AccountProvider[]>([]);
+
   const isAdmin = user?.role === 'admin';
   const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
 
@@ -94,6 +111,7 @@ export default function UsersPage() {
     if (!isUserManager) return;
     fetchUsers();
     rolesClient.listRolesRolesGet({ builtin: true }).then(setAllRoles).catch(() => {});
+    accountProvidersClient.listProviders().then(setProviders).catch(() => {});
   }, [authLoading, isAuthenticated, isUserManager, fetchUsers]);
 
   // Guard
@@ -202,6 +220,44 @@ export default function UsersPage() {
     setResetConfirm(null);
   };
 
+  const openAccountsModal = async (u: UserList) => {
+    setAccountsModal(m => ({ ...m, open: true, user: u, accounts: [], loading: true, addingProvider: null, accountId: '', error: null }));
+    try {
+      const data = await accountsClient.listAccountsAccountsGet({ userId: u.id, limit: 100 });
+      setAccountsModal(m => ({ ...m, accounts: data, loading: false }));
+    } catch {
+      setAccountsModal(m => ({ ...m, loading: false, error: 'Failed to load accounts' }));
+    }
+  };
+
+  const handleAddAccount = async () => {
+    const { user: u, addingProvider, accountId } = accountsModal;
+    if (!u || !addingProvider || !accountId.trim()) return;
+    const prov = providers.find(p => p.id === addingProvider);
+    if (!prov) return;
+    setAccountsModal(m => ({ ...m, saving: true, error: null }));
+    try {
+      await accountsClient.createAccountsAccountsPost({
+        body: { provider: prov.provider, type: prov.type, provider_account_id: accountId.trim(), user_id: u.id },
+      });
+      const data = await accountsClient.listAccountsAccountsGet({ userId: u.id, limit: 100 });
+      setAccountsModal(m => ({ ...m, accounts: data, addingProvider: null, accountId: '', saving: false }));
+      notify('Account linked', 'success');
+    } catch (e) {
+      setAccountsModal(m => ({ ...m, error: e instanceof Error ? e.message : 'Failed to add account', saving: false }));
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    try {
+      await accountsClient.deleteAccountsAccountsIdDelete({ id: accountId });
+      setAccountsModal(m => ({ ...m, accounts: m.accounts.filter(a => a.id !== accountId) }));
+      notify('Account removed', 'success');
+    } catch {
+      notify('Failed to remove account', 'error');
+    }
+  };
+
   const filtered = users.filter(u =>
     !search ||
     u.username?.toLowerCase().includes(search.toLowerCase()) ||
@@ -288,6 +344,12 @@ export default function UsersPage() {
                           className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
                           Roles
+                        </button>
+                        <button
+                          onClick={() => openAccountsModal(u)}
+                          className="px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        >
+                          Accounts
                         </button>
                         <button
                           onClick={() => handleArchiveToggle(u)}
@@ -447,6 +509,108 @@ export default function UsersPage() {
                 className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Reset Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Accounts Modal */}
+      {accountsModal.open && accountsModal.user && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Accounts — {accountsModal.user.username}</h2>
+              <p className="text-xs text-gray-500 mt-0.5">{accountsModal.user.email}</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {accountsModal.error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{accountsModal.error}</div>
+              )}
+
+              {/* Existing accounts */}
+              {accountsModal.loading ? (
+                <div className="text-sm text-gray-500">Loading accounts…</div>
+              ) : accountsModal.accounts.length === 0 ? (
+                <div className="text-sm text-gray-400 italic">No linked accounts yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {accountsModal.accounts.map(acc => {
+                    const prov = providers.find(p => p.provider === acc.provider && p.type === acc.type);
+                    return (
+                      <div key={acc.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{prov?.display_name ?? acc.provider}</span>
+                          <span className="mx-2 text-gray-300">·</span>
+                          <span className="text-sm text-gray-600">{acc.provider_account_id}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteAccount(acc.id)}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add account form */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-medium text-gray-700 mb-2">Link new account</p>
+                {accountsModal.addingProvider === null ? (
+                  <div className="flex flex-wrap gap-2">
+                    {providers.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => setAccountsModal(m => ({ ...m, addingProvider: p.id, accountId: '', error: null }))}
+                        className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        + {p.display_name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (() => {
+                  const prov = providers.find(p => p.id === accountsModal.addingProvider)!;
+                  return (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700">{prov.field_label}</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={prov.placeholder}
+                          value={accountsModal.accountId}
+                          onChange={e => setAccountsModal(m => ({ ...m, accountId: e.target.value }))}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleAddAccount}
+                          disabled={accountsModal.saving || !accountsModal.accountId.trim()}
+                          className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {accountsModal.saving ? '…' : 'Add'}
+                        </button>
+                        <button
+                          onClick={() => setAccountsModal(m => ({ ...m, addingProvider: null, accountId: '' }))}
+                          className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end">
+              <button
+                onClick={() => setAccountsModal(m => ({ ...m, open: false, user: null }))}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Close
               </button>
             </div>
           </div>

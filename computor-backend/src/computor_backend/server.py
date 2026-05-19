@@ -77,6 +77,7 @@ from computor_backend.api.course_member_gradings import course_member_gradings_r
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
 from computor_backend.api.invites import invites_router
+from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.websocket.router import ws_router
@@ -474,6 +475,11 @@ app.include_router(
 app.include_router(
     invites_router,
     tags=["invites", "user-management"]
+)
+
+app.include_router(
+    accounts_router,
+    tags=["accounts"]
 )
 
 app.include_router(
