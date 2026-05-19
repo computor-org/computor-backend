@@ -54,6 +54,7 @@ export default function UsersPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserList[]>([]);
   const [search, setSearch] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -74,11 +75,12 @@ export default function UsersPage() {
     user: UserList | null;
     accounts: AccountList[];
     loading: boolean;
-    addingProvider: string | null;  // provider id being added, or null
+    addingProvider: string | null;
+    providerUrl: string;
     accountId: string;
     saving: boolean;
     error: string | null;
-  }>({ open: false, user: null, accounts: [], loading: false, addingProvider: null, accountId: '', saving: false, error: null });
+  }>({ open: false, user: null, accounts: [], loading: false, addingProvider: null, providerUrl: '', accountId: '', saving: false, error: null });
 
   const [providers, setProviders] = useState<AccountProvider[]>([]);
 
@@ -95,6 +97,7 @@ export default function UsersPage() {
     try {
       const data = await usersClient.listUsersUsersGet({
         username: search || undefined,
+        archived: showArchived ? true : undefined,
         limit: 200,
       });
       setUsers(data);
@@ -104,7 +107,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, showArchived]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -221,7 +224,7 @@ export default function UsersPage() {
   };
 
   const openAccountsModal = async (u: UserList) => {
-    setAccountsModal(m => ({ ...m, open: true, user: u, accounts: [], loading: true, addingProvider: null, accountId: '', error: null }));
+    setAccountsModal(m => ({ ...m, open: true, user: u, accounts: [], loading: true, addingProvider: null, providerUrl: '', accountId: '', error: null }));
     try {
       const data = await accountsClient.listAccountsAccountsGet({ userId: u.id, limit: 100 });
       setAccountsModal(m => ({ ...m, accounts: data, loading: false }));
@@ -231,17 +234,17 @@ export default function UsersPage() {
   };
 
   const handleAddAccount = async () => {
-    const { user: u, addingProvider, accountId } = accountsModal;
-    if (!u || !addingProvider || !accountId.trim()) return;
+    const { user: u, addingProvider, providerUrl, accountId } = accountsModal;
+    if (!u || !addingProvider || !providerUrl.trim() || !accountId.trim()) return;
     const prov = providers.find(p => p.id === addingProvider);
     if (!prov) return;
     setAccountsModal(m => ({ ...m, saving: true, error: null }));
     try {
       await accountsClient.createAccountsAccountsPost({
-        body: { provider: prov.provider, type: prov.type, provider_account_id: accountId.trim(), user_id: u.id },
+        body: { provider: providerUrl.trim(), type: prov.type, provider_account_id: accountId.trim(), user_id: u.id },
       });
       const data = await accountsClient.listAccountsAccountsGet({ userId: u.id, limit: 100 });
-      setAccountsModal(m => ({ ...m, accounts: data, addingProvider: null, accountId: '', saving: false }));
+      setAccountsModal(m => ({ ...m, accounts: data, addingProvider: null, providerUrl: '', accountId: '', saving: false }));
       notify('Account linked', 'success');
     } catch (e) {
       setAccountsModal(m => ({ ...m, error: e instanceof Error ? e.message : 'Failed to add account', saving: false }));
@@ -290,8 +293,8 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="mb-4">
+        {/* Search + filters */}
+        <div className="mb-4 flex items-center gap-3">
           <input
             type="text"
             placeholder="Search by username or email…"
@@ -299,6 +302,15 @@ export default function UsersPage() {
             onChange={e => setSearch(e.target.value)}
             className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={e => setShowArchived(e.target.checked)}
+              className="rounded"
+            />
+            Show archived
+          </label>
         </div>
 
         {/* Table */}
@@ -564,7 +576,7 @@ export default function UsersPage() {
                     {providers.map(p => (
                       <button
                         key={p.id}
-                        onClick={() => setAccountsModal(m => ({ ...m, addingProvider: p.id, accountId: '', error: null }))}
+                        onClick={() => setAccountsModal(m => ({ ...m, addingProvider: p.id, providerUrl: p.provider, accountId: '', error: null }))}
                         className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         + {p.display_name}
@@ -575,28 +587,40 @@ export default function UsersPage() {
                   const prov = providers.find(p => p.id === accountsModal.addingProvider)!;
                   return (
                     <div className="space-y-2">
-                      <label className="block text-xs font-medium text-gray-700">{prov.field_label}</label>
-                      <div className="flex gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Provider URL</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. gitlab.com or gitlab.mycompany.com"
+                          value={accountsModal.providerUrl}
+                          onChange={e => setAccountsModal(m => ({ ...m, providerUrl: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          autoFocus
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">{prov.field_label}</label>
                         <input
                           type="text"
                           placeholder={prov.placeholder}
                           value={accountsModal.accountId}
                           onChange={e => setAccountsModal(m => ({ ...m, accountId: e.target.value }))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          autoFocus
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
                         <button
-                          onClick={handleAddAccount}
-                          disabled={accountsModal.saving || !accountsModal.accountId.trim()}
-                          className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                          {accountsModal.saving ? '…' : 'Add'}
-                        </button>
-                        <button
-                          onClick={() => setAccountsModal(m => ({ ...m, addingProvider: null, accountId: '' }))}
+                          onClick={() => setAccountsModal(m => ({ ...m, addingProvider: null, providerUrl: '', accountId: '' }))}
                           className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg"
                         >
                           Cancel
+                        </button>
+                        <button
+                          onClick={handleAddAccount}
+                          disabled={accountsModal.saving || !accountsModal.providerUrl.trim() || !accountsModal.accountId.trim()}
+                          className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {accountsModal.saving ? '…' : 'Add'}
                         </button>
                       </div>
                     </div>

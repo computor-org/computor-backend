@@ -302,6 +302,9 @@ def _guard_no_archive_admin(entity, permissions, db):
 _user_router = CrudRouter(UserInterface)
 _user_router.pre_archive.append(_guard_no_archive_admin)
 _user_router.register_routes(app)
+# accounts_router must be registered before CrudRouter(AccountInterface) so that
+# GET /accounts/providers is matched before the authenticated GET /accounts/{id} route.
+app.include_router(accounts_router, tags=["accounts"])
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
@@ -475,11 +478,6 @@ app.include_router(
 app.include_router(
     invites_router,
     tags=["invites", "user-management"]
-)
-
-app.include_router(
-    accounts_router,
-    tags=["accounts"]
 )
 
 app.include_router(
