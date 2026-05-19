@@ -69,6 +69,7 @@ export default function UsersPage() {
   });
 
   const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; username: string } | null>(null);
+  const [archiveConfirm, setArchiveConfirm] = useState<{ open: boolean; user: UserList } | null>(null);
 
   const [accountsModal, setAccountsModal] = useState<{
     open: boolean;
@@ -364,7 +365,7 @@ export default function UsersPage() {
                           Accounts
                         </button>
                         <button
-                          onClick={() => handleArchiveToggle(u)}
+                          onClick={() => setArchiveConfirm({ open: true, user: u })}
                           className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         >
                           {u.archived_at ? 'Unarchive' : 'Archive'}
@@ -500,6 +501,32 @@ export default function UsersPage() {
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {rolesModal.saving ? 'Saving…' : 'Save Roles'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive / Unarchive Confirm */}
+      {archiveConfirm?.open && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              {archiveConfirm.user.archived_at ? 'Unarchive user?' : 'Archive user?'}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {archiveConfirm.user.archived_at
+                ? <>Restore <strong>{archiveConfirm.user.username}</strong> so they can log in again?</>
+                : <>Archive <strong>{archiveConfirm.user.username}</strong>? They will no longer be able to log in.</>
+              }
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setArchiveConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button
+                onClick={() => { handleArchiveToggle(archiveConfirm.user); setArchiveConfirm(null); }}
+                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+              >
+                {archiveConfirm.user.archived_at ? 'Unarchive' : 'Archive'}
               </button>
             </div>
           </div>
