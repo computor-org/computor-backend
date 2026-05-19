@@ -15,6 +15,7 @@ export interface AuthUser {
   givenName?: string;
   familyName?: string;
   role: 'admin' | 'lecturer' | 'student';
+  systemRoles: string[];
   permissions: string[];
   courses: string[];
 }

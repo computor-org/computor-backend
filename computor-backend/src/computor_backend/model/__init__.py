@@ -27,6 +27,7 @@ from .extension import Extension, ExtensionVersion
 from .deployment import CourseContentDeployment, DeploymentHistory
 from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
 from .service import Service, ServiceType, ApiToken
+from .invite import InviteLink
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -44,6 +45,7 @@ from . import (
     deployment,
     artifact,
     service,
+    invite,
 )
 
 __all__ = [
@@ -110,4 +112,6 @@ __all__ = [
     'Service',
     'ServiceType',
     'ApiToken',
+    # Invite link
+    'InviteLink',
 ]

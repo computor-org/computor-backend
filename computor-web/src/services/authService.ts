@@ -224,8 +224,9 @@ export class AuthService implements IAuthProviderWithLogin {
       givenName: userInfo.given_name || userInfo.user?.given_name,
       familyName: userInfo.family_name || userInfo.user?.family_name,
       role,
+      systemRoles: globalRoles,
       permissions: this.mapViewsToPermissions(views || [], globalRoles),
-      courses: [], // TODO: Fetch from user's course enrollments
+      courses: [],
     };
   }
 

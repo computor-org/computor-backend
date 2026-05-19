@@ -56,6 +56,20 @@ const adminNavigation: NavItem[] = [
   },
 ];
 
+// User management navigation (admin or _user_manager)
+const userMgmtNavigation: NavItem[] = [
+  {
+    id: 'user-management',
+    label: 'User Management',
+    path: '/admin/users',
+    icon: 'users',
+    subItems: [
+      { id: 'um-users', label: 'Users', path: '/admin/users' },
+      { id: 'um-invites', label: 'Invite Links', path: '/admin/users/invites' },
+    ],
+  },
+];
+
 // Navigation structure for view-based navigation (when in course context)
 const getViewNavigation = (courseId: string): NavItem[] => [
   {
@@ -144,6 +158,11 @@ const icons: Record<string, React.ReactElement> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   ),
+  users: (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
   chevronDown: (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -156,13 +175,14 @@ export default function Sidebar() {
   const { user, views } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const isAdmin = user?.role === 'admin';
+  const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
 
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
     const cMatch = pathname.match(/^\/courses\/([^/]+)/);
     const cId = cMatch ? cMatch[1] : null;
     const items = cId
       ? getViewNavigation(cId)
-      : [...defaultNavigation, ...adminNavigation];
+      : [...defaultNavigation, ...adminNavigation, ...userMgmtNavigation];
     return computeAutoExpanded(items, pathname);
   });
   const [courseViews, setCourseViews] = useState<string[]>([]);
@@ -204,7 +224,7 @@ export default function Sidebar() {
   useEffect(() => {
     const items = currentCourseId
       ? getViewNavigation(currentCourseId)
-      : [...defaultNavigation, ...(isAdmin ? adminNavigation : [])];
+      : [...defaultNavigation, ...(isAdmin ? adminNavigation : []), ...(isUserManager ? userMgmtNavigation : [])];
 
     const autoExpanded = computeAutoExpanded(items, pathname);
 
@@ -410,6 +430,7 @@ export default function Sidebar() {
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(defaultNavigation)}
         {isAdmin && renderNavItems(adminNavigation)}
+        {isUserManager && renderNavItems(userMgmtNavigation)}
       </nav>
 
       {/* Footer - Logo & Version */}
