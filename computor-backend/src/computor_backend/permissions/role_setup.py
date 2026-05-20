@@ -132,3 +132,15 @@ def claims_workspace_maintainer() -> List[Tuple[str, str]]:
         ("permissions", "workspace:session"),       # Create coder sessions
         ("permissions", "workspace:templates"),     # View/manage templates
     ]
+
+
+def claims_git_manager() -> List[Tuple[str, str]]:
+    """
+    Generate claims for the git manager role.
+
+    Grants full access to git server user management via the /git/* endpoints.
+    Works regardless of which git server backend is configured (Forgejo, GitLab, ...).
+    """
+    return [
+        ("permissions", "git_server:manage"),
+    ]

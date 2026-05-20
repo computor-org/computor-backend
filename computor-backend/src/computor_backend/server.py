@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
-from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer
+from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager
 from computor_backend.permissions.core import db_apply_roles
 from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User
@@ -88,6 +88,9 @@ from pathlib import Path
 
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
+
+# Git server integration
+from computor_backend.api.git_server import router as git_server_router
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -179,6 +182,7 @@ async def startup_logic():
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
         db_apply_roles("_workspace_user",claims_workspace_user(),db)
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
+        db_apply_roles("_git_manager",claims_git_manager(),db)
 
         await init_admin_user(db)
 
@@ -546,6 +550,10 @@ app.include_router(
 # Coder integration API (only registered when CODER_ENABLED=true)
 if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
     app.include_router(coder_api_router)
+
+# Git server API (registered whenever GIT_SERVER is set)
+if os.environ.get("GIT_SERVER", ""):
+    app.include_router(git_server_router)
 
 
 @app.head("/", status_code=204)
