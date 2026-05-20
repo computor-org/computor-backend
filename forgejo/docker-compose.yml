@@ -8,19 +8,19 @@ services:
       FORGEJO__security__INSTALL_LOCK: "true"
       FORGEJO__database__DB_TYPE: postgres
       FORGEJO__database__HOST: forgejo-postgres:5441
-      FORGEJO__database__NAME: ${FORGEJO_DB_NAME:-forgejo}
-      FORGEJO__database__USER: ${FORGEJO_DB_USER:?must be set in .env}
-      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?must be set in .env}
-      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030/}
+      FORGEJO__database__NAME: ${FORGEJO_DB_NAME:?}
+      FORGEJO__database__USER: ${FORGEJO_DB_USER:?}
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?}
+      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:?}
       FORGEJO__server__HTTP_PORT: "3030"
-      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:-localhost}
-      FORGEJO__service__DISABLE_REGISTRATION: ${FORGEJO_DISABLE_REGISTRATION:-true}
-      FORGEJO__log__LEVEL: ${FORGEJO_LOG_LEVEL:-Info}
+      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:?}
+      FORGEJO__service__DISABLE_REGISTRATION: ${FORGEJO_DISABLE_REGISTRATION:?}
+      FORGEJO__log__LEVEL: ${FORGEJO_LOG_LEVEL:?}
     ports:
-      - "${FORGEJO_HTTP_PORT:-3030}:3030"
-      - "127.0.0.1:${FORGEJO_SSH_PORT:-2222}:22"
+      - "${FORGEJO_HTTP_PORT:?}:3030"
+      - "127.0.0.1:${FORGEJO_SSH_PORT:?}:22"
     volumes:
-      - ${FORGEJO_DATA_PATH:?must be set in .env}/forgejo:/data
+      - ${FORGEJO_DATA_PATH:?}/forgejo:/data
     depends_on:
       forgejo-postgres:
         condition: service_healthy
@@ -37,16 +37,16 @@ services:
       FORGEJO__security__INSTALL_LOCK: "true"
       FORGEJO__database__DB_TYPE: postgres
       FORGEJO__database__HOST: forgejo-postgres:5441
-      FORGEJO__database__NAME: ${FORGEJO_DB_NAME:-forgejo}
-      FORGEJO__database__USER: ${FORGEJO_DB_USER:?must be set in .env}
-      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?must be set in .env}
-      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030/}
-      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:-localhost}
-      FORGEJO_ADMIN_USER: ${FORGEJO_ADMIN_USERNAME:?must be set in .env}
-      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:?must be set in .env}
-      FORGEJO_ADMIN_PASSWORD: ${FORGEJO_ADMIN_PASSWORD:?must be set in .env}
+      FORGEJO__database__NAME: ${FORGEJO_DB_NAME:?}
+      FORGEJO__database__USER: ${FORGEJO_DB_USER:?}
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?}
+      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:?}
+      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:?}
+      FORGEJO_ADMIN_USER: ${FORGEJO_ADMIN_USERNAME:?}
+      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:?}
+      FORGEJO_ADMIN_PASSWORD: ${FORGEJO_ADMIN_PASSWORD:?}
     volumes:
-      - ${FORGEJO_DATA_PATH:?must be set in .env}/forgejo:/data
+      - ${FORGEJO_DATA_PATH:?}/forgejo:/data
     depends_on:
       forgejo-postgres:
         condition: service_healthy
@@ -66,14 +66,14 @@ services:
     image: postgres:16-alpine
     container_name: computor-forgejo-postgres
     environment:
-      POSTGRES_DB: ${FORGEJO_DB_NAME:-forgejo}
-      POSTGRES_USER: ${FORGEJO_DB_USER:?must be set in .env}
-      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD:?must be set in .env}
+      POSTGRES_DB: ${FORGEJO_DB_NAME:?}
+      POSTGRES_USER: ${FORGEJO_DB_USER:?}
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD:?}
       PGPORT: 5441
     ports:
-      - "127.0.0.1:${FORGEJO_POSTGRES_PORT:-5441}:5441"
+      - "127.0.0.1:${FORGEJO_POSTGRES_PORT:?}:5441"
     volumes:
-      - ${FORGEJO_DATA_PATH:?must be set in .env}/postgres:/var/lib/postgresql/data
+      - ${FORGEJO_DATA_PATH:?}/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${FORGEJO_DB_USER} -p 5441"]
       interval: 5s
