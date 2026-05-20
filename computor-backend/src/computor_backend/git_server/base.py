@@ -1,5 +1,5 @@
 from typing import Protocol, runtime_checkable
-from .schemas import CreateGitUserRequest, GitUser, GitServerHealthResponse, UpdateGitUserRequest
+from computor_types.git_server import CreateGitUserRequest, GitUser, GitServerHealthResponse, UpdateGitUserRequest
 
 
 @runtime_checkable

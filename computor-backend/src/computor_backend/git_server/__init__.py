@@ -1,5 +1,5 @@
 from .config import get_git_server_settings
-from .schemas import CreateGitUserRequest, GitUser, GitServerHealthResponse, UpdateGitUserRequest
+from computor_types.git_server import CreateGitUserRequest, GitUser, GitServerHealthResponse, UpdateGitUserRequest
 from .exceptions import (
     GitServerError,
     GitServerDisabledError,

@@ -11,7 +11,7 @@ from .exceptions import (
     GitUserAlreadyExistsError,
     GitUserNotFoundError,
 )
-from .schemas import CreateGitUserRequest, GitServerHealthResponse, GitUser, UpdateGitUserRequest
+from computor_types.git_server import CreateGitUserRequest, GitServerHealthResponse, GitUser, UpdateGitUserRequest
 
 logger = logging.getLogger(__name__)
 
