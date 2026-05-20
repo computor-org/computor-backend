@@ -44,7 +44,7 @@ def _handle_git_error(e: Exception) -> ComputorException:
     if isinstance(e, GitServerConnectionError):
         return ServiceUnavailableException(detail=f"Cannot reach git server: {e}")
     if isinstance(e, GitServerAuthError):
-        return InternalServerException(detail="Git server authentication failed — check FORGEJO_ADMIN_TOKEN.")
+        return InternalServerException(detail="Git server authentication failed — check GIT_SERVER_ADMIN_USERNAME and GIT_SERVER_ADMIN_PASSWORD.")
     if isinstance(e, GitUserNotFoundError):
         return NotFoundException(detail=str(e))
     if isinstance(e, GitUserAlreadyExistsError):
