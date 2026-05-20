@@ -6,9 +6,9 @@ class GitServerSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", extra="ignore")
 
     git_server: str = ""
-    forgejo_url: str = "http://localhost:3030"
-    forgejo_admin_username: str = ""
-    forgejo_admin_password: str = ""
+    git_server_url: str = ""
+    git_server_admin_username: str = ""
+    git_server_admin_password: str = ""
 
     @property
     def enabled(self) -> bool:

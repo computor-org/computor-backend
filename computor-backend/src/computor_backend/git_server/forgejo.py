@@ -41,8 +41,8 @@ class ForgejoClient:
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
-                base_url=self._settings.forgejo_url,
-                auth=(self._settings.forgejo_admin_username, self._settings.forgejo_admin_password),
+                base_url=self._settings.git_server_url,
+                auth=(self._settings.git_server_admin_username, self._settings.git_server_admin_password),
                 timeout=15.0,
             )
         return self._client
@@ -52,7 +52,7 @@ class ForgejoClient:
         try:
             resp = await client.request(method, f"{_BASE}{path}", **kwargs)
         except httpx.ConnectError as e:
-            raise GitServerConnectionError(f"Cannot reach Forgejo at {self._settings.forgejo_url}") from e
+            raise GitServerConnectionError(f"Cannot reach Forgejo at {self._settings.git_server_url}") from e
         except httpx.TimeoutException as e:
             raise GitServerConnectionError("Forgejo request timed out") from e
 
