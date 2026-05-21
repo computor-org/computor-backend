@@ -18,7 +18,6 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
 from computor_types.system import (
-    GitLabCredentials,
     OrganizationTaskRequest, CourseFamilyTaskRequest, CourseTaskRequest, TaskResponse,
     GenerateTemplateRequest, GenerateTemplateResponse,
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
@@ -35,16 +34,6 @@ from computor_backend.business_logic.release_validation import (
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
 
-def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optional[int], path: str) -> dict:
-    """Convert GitLab credentials to config format."""
-    config = {
-        "url": gitlab.gitlab_url,
-        "token": gitlab.gitlab_token,
-        "path": path
-    }
-    if parent_group_id is not None:
-        config["parent"] = parent_group_id
-    return config
 
 @system_router.post("/deploy/organizations", response_model=TaskResponse)
 async def create_organization_async(
@@ -57,27 +46,21 @@ async def create_organization_async(
     # Check permissions
     check_permissions(permissions, Organization, "create", db)
 
-    # Convert to organization config format
     org_config = {
         "name": request.organization.get("title", ""),
         "path": request.organization.get("path", ""),
         "description": request.organization.get("description", ""),
-        "gitlab": convert_to_gitlab_config(
-            request.gitlab,
-            request.parent_group_id,
-            request.organization.get("path", "")
-        )
     }
 
-    # Submit task using Temporal and track for permission-aware polling
     try:
         task_tracker = await get_task_tracker()
         task_submission = TaskSubmission(
             task_name="create_organization",
             parameters={
                 "org_config": org_config,
-                "gitlab_url": request.gitlab.gitlab_url,
-                "gitlab_token": request.gitlab.gitlab_token,
+                "git_provider_type": request.git_provider.type,
+                "git_provider_url": request.git_provider.url,
+                "git_provider_token": request.git_provider.token,
                 "user_id": permissions.user_id
             },
             queue="computor-tasks"

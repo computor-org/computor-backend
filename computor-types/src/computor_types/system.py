@@ -10,30 +10,34 @@ from pydantic import BaseModel, Field
 
 
 class GitLabCredentials(BaseModel):
-    """GitLab connection credentials."""
+    """GitLab connection credentials (kept for backwards compatibility)."""
     gitlab_url: str
     gitlab_token: str
 
 
+class GitProviderCredentials(BaseModel):
+    """Git provider connection credentials — provider-agnostic."""
+    type: str   # 'gitlab' | 'forgejo' | 'github'
+    url: str
+    token: str
+
+
 class OrganizationTaskRequest(BaseModel):
     """Request to create an organization via Temporal workflow."""
-    organization: Dict  # OrganizationCreate data
-    gitlab: GitLabCredentials
-    parent_group_id: int
+    organization: Dict
+    git_provider: GitProviderCredentials
 
 
 class CourseFamilyTaskRequest(BaseModel):
     """Request to create a course family via Temporal workflow."""
-    course_family: Dict  # CourseFamilyCreate data
+    course_family: Dict
     organization_id: str
-    gitlab: Optional[GitLabCredentials] = None  # Optional - will use org's GitLab config if not provided
 
 
 class CourseTaskRequest(BaseModel):
     """Request to create a course via Temporal workflow."""
-    course: Dict  # CourseCreate data
+    course: Dict
     course_family_id: str
-    gitlab: Optional[GitLabCredentials] = None  # Optional - will use course family's GitLab config if not provided
 
 
 class TaskResponse(BaseModel):

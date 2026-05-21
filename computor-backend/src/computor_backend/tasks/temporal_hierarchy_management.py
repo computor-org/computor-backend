@@ -6,9 +6,8 @@ from datetime import timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
-from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
+from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from computor_types.gitlab import GitLabConfig
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
 from ..database import get_db_session
 from ..model.organization import Organization
@@ -21,53 +20,67 @@ logger = logging.getLogger(__name__)
 @activity.defn(name="create_organization_activity")
 async def create_organization_activity(
     org_config: Dict[str, Any],
-    gitlab_url: str,
-    gitlab_token: str,
-    user_id: str
+    git_provider_type: str,
+    git_provider_url: str,
+    git_provider_token: str,   # plaintext — encrypted before storage
+    user_id: str,
 ) -> Dict[str, Any]:
-    """Activity to create an organization using GitLabBuilder."""
+    """
+    Create an organization and its git provider row.
+    The provider row is created here because the org doesn't exist yet when
+    the task is submitted (chicken-and-egg: git_provider FK requires org.id).
+    """
     from ..generator.gitlab_builder import GitLabBuilder
+    from ..model.git_provider import GitProvider
+    from computor_types.tokens import encrypt_api_key
+    from computor_types.gitlab import GitLabConfig
 
     logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
-
     try:
-        # Build the OrganizationConfig directly
         gitlab_config = GitLabConfig(
-            url=gitlab_url,
-            token=gitlab_token,
+            url=git_provider_url,
+            token=git_provider_token,
             parent=org_config.get("gitlab", {}).get("parent"),
-            path=org_config.get("path")
+            path=org_config.get("path"),
         )
-
-        org_config_obj = OrganizationConfig(
+        config = OrganizationConfig(
             name=org_config.get("name"),
             path=org_config.get("path"),
             description=org_config.get("description", ""),
-            gitlab=gitlab_config
+            gitlab=gitlab_config,
         )
-
-        # Create the builder and organization
         with get_db_session() as db:
-            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
-            result = builder._create_organization(org_config_obj, user_id)
-
-            if result["success"]:
-                db.commit()
-
-                return {
-                    "organization_id": result["organization"].id if result["organization"] else None,
-                    "status": "created",
-                    "name": org_config.get("name"),
-                    "gitlab_group_id": result["gitlab_group"].id if result["gitlab_group"] else None,
-                    "gitlab_created": result["gitlab_created"],
-                    "db_created": result["db_created"]
-                }
+            if git_provider_type == "gitlab":
+                builder = GitLabBuilder(db, git_provider_url, git_provider_token)
+                result = builder._create_organization(config, user_id)
+                if not result["success"]:
+                    raise RuntimeError(f"Organization creation failed: {result.get('error')}")
+                org = result["organization"]
             else:
-                error_msg = result.get("error", "Unknown error occurred")
-                raise RuntimeError(f"Organization creation failed: {error_msg}")
+                raise NotImplementedError(f"Provider type {git_provider_type!r} not yet supported for org creation")
 
+            # Create the git_provider row now that we have the org id
+            encrypted = encrypt_api_key(git_provider_token)
+            provider_row = GitProvider(
+                organization_id=str(org.id),
+                type=git_provider_type,
+                url=git_provider_url,
+                token=encrypted,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            db.add(provider_row)
+            db.commit()
+
+            return {
+                "organization_id": str(org.id),
+                "git_provider_id": str(provider_row.id),
+                "status": "created",
+                "name": org_config.get("name"),
+                "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
+            }
     except Exception as e:
-        logger.exception(f"Exception in organization creation activity: {str(e)}")
+        logger.exception(f"Exception in organization creation activity: {e}")
         raise
 
 
@@ -75,60 +88,67 @@ async def create_organization_activity(
 async def create_course_family_activity(
     family_config: Dict[str, Any],
     organization_id: str,
-    user_id: str
+    user_id: str,
 ) -> Dict[str, Any]:
-    """Activity to create a course family using GitLabBuilder."""
+    from ..git_provider import get_provider_client_from_db
+    from ..model.git_provider import GitProvider
     from ..generator.gitlab_builder import GitLabBuilder
 
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
-
     try:
+        config = CourseFamilyConfig(
+            name=family_config.get("name"),
+            path=family_config.get("path"),
+            description=family_config.get("description", ""),
+        )
         with get_db_session() as db:
             org = db.query(Organization).filter(Organization.id == organization_id).first()
             if not org:
                 raise ValueError(f"Organization {organization_id} not found")
 
-            # Extract GitLab config from organization
-            org_gitlab = org.properties.get("gitlab", {}) if org.properties else {}
-            gitlab_url = org_gitlab.get("url")
-            encrypted_token = org_gitlab.get("token")
+            provider_row = db.query(GitProvider).filter(GitProvider.organization_id == organization_id).first()
+            if not provider_row:
+                raise ValueError(f"No git provider configured for organization {organization_id}")
 
-            if not gitlab_url or not encrypted_token:
-                raise ValueError("Organization missing GitLab configuration")
+            from ..git_provider import _decrypt
+            token = _decrypt(provider_row.token)
 
-            # Decrypt the GitLab token
-            gitlab_token = decrypt_gitlab_token(encrypted_token)
-            if not gitlab_token:
-                raise ValueError("Failed to decrypt GitLab token")
-
-            # Build the CourseFamilyConfig directly
-            family_config_obj = CourseFamilyConfig(
-                name=family_config.get("name"),
-                path=family_config.get("path"),
-                description=family_config.get("description", "")
-            )
-
-            # Create the builder and course family
-            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
-            result = builder._create_course_family(family_config_obj, org, user_id)
-
-            if result["success"]:
+            if provider_row.type == "gitlab":
+                builder = GitLabBuilder(db, provider_row.url, token)
+                result = builder._create_course_family(config, org, user_id)
+                if not result["success"]:
+                    raise RuntimeError(f"Course family creation failed: {result.get('error')}")
                 db.commit()
-
                 return {
-                    "course_family_id": result["course_family"].id if result["course_family"] else None,
+                    "course_family_id": str(result["course_family"].id) if result.get("course_family") else None,
                     "status": "created",
                     "name": family_config.get("name"),
-                    "gitlab_group_id": result["gitlab_group"].id if result["gitlab_group"] else None,
-                    "gitlab_created": result["gitlab_created"],
-                    "db_created": result["db_created"]
+                    "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
+                }
+            elif provider_row.type == "forgejo":
+                from ..git_provider.forgejo import ForgejoProviderClient
+                client = ForgejoProviderClient(provider_row.url, token)
+                # For Forgejo, we need the family DB entity first
+                from ..repositories.course_family import CourseFamilyRepository
+                family = CourseFamilyRepository(db).get_or_create(config, org, user_id)
+                provider_result = client.setup_course_family(config, org, family, user_id)
+                from sqlalchemy.orm.attributes import flag_modified
+                props = family.properties or {}
+                props.update(provider_result.properties)
+                family.properties = props
+                flag_modified(family, "properties")
+                db.commit()
+                return {
+                    "course_family_id": str(family.id),
+                    "status": "created",
+                    "name": family_config.get("name"),
+                    "provider_entity_id": provider_result.provider_entity_id,
                 }
             else:
-                error_msg = result.get("error", "Unknown error occurred")
-                raise RuntimeError(f"Course family creation failed: {error_msg}")
+                raise NotImplementedError(f"Provider type {provider_row.type!r} not supported")
 
     except Exception as e:
-        logger.exception(f"Exception in course family creation activity: {str(e)}")
+        logger.exception(f"Exception in course family creation activity: {e}")
         raise
 
 
@@ -136,65 +156,68 @@ async def create_course_family_activity(
 async def create_course_activity(
     course_config: Dict[str, Any],
     course_family_id: str,
-    user_id: str
+    user_id: str,
 ) -> Dict[str, Any]:
-    """Activity to create a course using GitLabBuilder."""
+    from ..model.git_provider import GitProvider
     from ..generator.gitlab_builder import GitLabBuilder
 
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
-
     try:
+        config = CourseConfig(
+            name=course_config.get("name"),
+            path=course_config.get("path"),
+            description=course_config.get("description", ""),
+        )
         with get_db_session() as db:
             family = db.query(CourseFamily).filter(CourseFamily.id == course_family_id).first()
             if not family:
                 raise ValueError(f"Course family {course_family_id} not found")
-
-            # Get organization for GitLab config
             org = db.query(Organization).filter(Organization.id == family.organization_id).first()
             if not org:
                 raise ValueError(f"Organization {family.organization_id} not found")
 
-            # Extract GitLab config from organization
-            org_gitlab = org.properties.get("gitlab", {}) if org.properties else {}
-            gitlab_url = org_gitlab.get("url")
-            encrypted_token = org_gitlab.get("token")
+            provider_row = db.query(GitProvider).filter(GitProvider.organization_id == str(org.id)).first()
+            if not provider_row:
+                raise ValueError(f"No git provider configured for organization {org.id}")
 
-            if not gitlab_url or not encrypted_token:
-                raise ValueError("Organization missing GitLab configuration")
+            from ..git_provider import _decrypt
+            token = _decrypt(provider_row.token)
 
-            # Decrypt the GitLab token
-            gitlab_token = decrypt_gitlab_token(encrypted_token)
-            if not gitlab_token:
-                raise ValueError("Failed to decrypt GitLab token")
-
-            # Build the CourseConfig directly
-            course_config_obj = CourseConfig(
-                name=course_config.get("name"),
-                path=course_config.get("path"),
-                description=course_config.get("description", "")
-            )
-
-            # Create the builder and course
-            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
-            result = builder._create_course(course_config_obj, org, family, user_id)
-
-            if result["success"]:
+            if provider_row.type == "gitlab":
+                builder = GitLabBuilder(db, provider_row.url, token)
+                result = builder._create_course(config, org, family, user_id)
+                if not result["success"]:
+                    raise RuntimeError(f"Course creation failed: {result.get('error')}")
                 db.commit()
-
                 return {
-                    "course_id": result["course"].id if result["course"] else None,
+                    "course_id": str(result["course"].id) if result.get("course") else None,
                     "status": "created",
                     "name": course_config.get("name"),
-                    "gitlab_group_id": result["gitlab_group"].id if result["gitlab_group"] else None,
-                    "gitlab_created": result["gitlab_created"],
-                    "db_created": result["db_created"]
+                    "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
+                }
+            elif provider_row.type == "forgejo":
+                from ..git_provider.forgejo import ForgejoProviderClient
+                client = ForgejoProviderClient(provider_row.url, token)
+                from ..repositories.course import CourseRepository
+                course = CourseRepository(db).get_or_create(config, org, family, user_id)
+                provider_result = client.setup_course(config, org, family, course, user_id)
+                from sqlalchemy.orm.attributes import flag_modified
+                props = course.properties or {}
+                props.update(provider_result.properties)
+                course.properties = props
+                flag_modified(course, "properties")
+                db.commit()
+                return {
+                    "course_id": str(course.id),
+                    "status": "created",
+                    "name": course_config.get("name"),
+                    "provider_entity_id": provider_result.provider_entity_id,
                 }
             else:
-                error_msg = result.get("error", "Unknown error occurred")
-                raise RuntimeError(f"Course creation failed: {error_msg}")
+                raise NotImplementedError(f"Provider type {provider_row.type!r} not supported")
 
     except Exception as e:
-        logger.exception(f"Exception in course creation activity: {str(e)}")
+        logger.exception(f"Exception in course creation activity: {e}")
         raise
 
 
@@ -228,7 +251,7 @@ class CreateOrganizationWorkflow(BaseWorkflow):
                 - gitlab_token: GitLab access token
                 - user_id: User ID creating the organization
         """
-        required_params = ['org_config', 'gitlab_url', 'gitlab_token', 'user_id']
+        required_params = ['org_config', 'git_provider_type', 'git_provider_url', 'git_provider_token', 'user_id']
         missing_params = [param for param in required_params if not parameters.get(param)]
         if missing_params:
             error_msg = f"Missing required parameters: {', '.join(missing_params)}"
@@ -241,8 +264,9 @@ class CreateOrganizationWorkflow(BaseWorkflow):
             )
 
         org_config = parameters.get('org_config', {})
-        gitlab_url = parameters.get('gitlab_url')
-        gitlab_token = parameters.get('gitlab_token')
+        git_provider_type = parameters.get('git_provider_type')
+        git_provider_url = parameters.get('git_provider_url')
+        git_provider_token = parameters.get('git_provider_token')
         user_id = parameters.get('user_id')
 
         if not org_config.get('name') or not org_config.get('path'):
@@ -260,7 +284,7 @@ class CreateOrganizationWorkflow(BaseWorkflow):
         try:
             result = await workflow.execute_activity(
                 create_organization_activity,
-                args=[org_config, gitlab_url, gitlab_token, user_id],
+                args=[org_config, git_provider_type, git_provider_url, git_provider_token, user_id],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=1),
@@ -529,22 +553,24 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
             for org_idx, org_config in enumerate(organizations):
                 workflow.logger.info(f"Processing organization {org_idx + 1}/{total_orgs}: {org_config['name']}")
 
-                # Prepare GitLab configuration for this organization
-                gitlab_config = org_config.get("gitlab", {})
-                gitlab_url = gitlab_config.get("url", "")
-                gitlab_token = gitlab_config.get("token", "")
+                # Prepare git provider configuration for this organization
+                git_provider_cfg = org_config.get("git_provider", {})
+                git_provider_type = git_provider_cfg.get("type", "gitlab")
+                git_provider_url = git_provider_cfg.get("url", "")
+                git_provider_token = git_provider_cfg.get("token", "")
 
-                # Handle environment variable substitution
-                if gitlab_token.startswith("${") and gitlab_token.endswith("}"):
+                # Handle environment variable substitution in token
+                if git_provider_token.startswith("${") and git_provider_token.endswith("}"):
                     import os
-                    env_var = gitlab_token[2:-1]
-                    gitlab_token = os.environ.get(env_var, "")
+                    env_var = git_provider_token[2:-1]
+                    git_provider_token = os.environ.get(env_var, "")
 
                 # Create organization
                 org_params = {
                     "org_config": org_config,
-                    "gitlab_url": gitlab_url,
-                    "gitlab_token": gitlab_token,
+                    "git_provider_type": git_provider_type,
+                    "git_provider_url": git_provider_url,
+                    "git_provider_token": git_provider_token,
                     "user_id": user_id
                 }
 
