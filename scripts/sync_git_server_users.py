@@ -57,11 +57,24 @@ def _get_db_session():
     return get_db_session().__enter__()
 
 
-def sync_users(dry_run: bool = False, only_username: str | None = None):
+def _update_password(client: httpx.Client, username: str, password: str) -> bool:
+    resp = client.patch(
+        f"/api/v1/admin/users/{username}",
+        json={"source_id": 0, "login_name": username, "password": password},
+    )
+    return resp.is_success
+
+
+def sync_users(
+    dry_run: bool = False,
+    only_username: str | None = None,
+    update_passwords: bool = False,
+):
     git_server = os.environ.get("GIT_SERVER", "").strip()
     git_server_url = os.environ.get("GIT_SERVER_URL", "").strip()
     admin_user = os.environ.get("GIT_SERVER_ADMIN_USERNAME", "").strip()
     admin_pass = os.environ.get("GIT_SERVER_ADMIN_PASSWORD", "").strip()
+    default_password = os.environ.get("GIT_SERVER_DEFAULT_USER_PASSWORD", "").strip()
 
     if not git_server or not git_server_url:
         print("ERROR: GIT_SERVER and GIT_SERVER_URL must be set")
@@ -73,6 +86,8 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
     provider_type = git_server.lower()
 
     print(f"Git server : {git_server_url}  (type={provider_type})")
+    if default_password:
+        print(f"Password   : GIT_SERVER_DEFAULT_USER_PASSWORD (set)")
     if dry_run:
         print("DRY RUN — no changes will be made")
     print()
@@ -144,7 +159,7 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
                     "username": username,
                     "email": safe_email,
                     "full_name": display_name,
-                    "password": _generate_password(),
+                    "password": default_password or _generate_password(),
                     "must_change_password": False,
                     "send_notify": False,
                     "visibility": "private",
@@ -214,13 +229,40 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
         print(f"Already existed: {stats['already_exists']}")
         print(f"Failed         : {stats['failed']}")
 
+    # --update-passwords: reset Forgejo passwords for all provisioned accounts
+    if update_passwords and not dry_run:
+        if not default_password:
+            print("\nERROR: --update-passwords requires GIT_SERVER_DEFAULT_USER_PASSWORD to be set")
+            return
+        print(f"\nResetting passwords for all provisioned accounts...")
+        all_accounts = list(db.execute(
+            text("SELECT provider_account_id FROM account WHERE provider = :p AND type = :t"),
+            {"p": git_server_url, "t": provider_type},
+        ))
+        ok = fail = 0
+        with httpx.Client(base_url=git_server_url, auth=(admin_user, admin_pass), timeout=15.0) as client:
+            for (git_username,) in all_accounts:
+                if only_username and git_username != only_username:
+                    continue
+                if _update_password(client, git_username, default_password):
+                    ok += 1
+                else:
+                    print(f"  FAILED password reset for {git_username}")
+                    fail += 1
+        print(f"Passwords reset: {ok}  failed: {fail}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Sync computor users to the system git server")
     parser.add_argument("--dry-run", action="store_true", help="Print what would happen without making changes")
     parser.add_argument("--user", metavar="USERNAME", help="Sync a single user instead of all")
+    parser.add_argument(
+        "--update-passwords",
+        action="store_true",
+        help="Reset Forgejo passwords for all provisioned accounts to GIT_SERVER_DEFAULT_USER_PASSWORD",
+    )
     args = parser.parse_args()
-    sync_users(dry_run=args.dry_run, only_username=args.user)
+    sync_users(dry_run=args.dry_run, only_username=args.user, update_passwords=args.update_passwords)
 
 
 if __name__ == "__main__":
