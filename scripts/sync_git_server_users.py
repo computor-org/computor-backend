@@ -36,8 +36,7 @@ sys.path.insert(0, str(_repo_root / "computor-backend" / "src"))
 
 import os
 import httpx
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 
 def _generate_password() -> str:
@@ -46,18 +45,8 @@ def _generate_password() -> str:
 
 
 def _get_db_session():
-    database_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
-    if not database_url:
-        # Build from individual vars
-        host = os.environ.get("POSTGRES_HOST", "localhost")
-        port = os.environ.get("POSTGRES_PORT", "5437")
-        user = os.environ.get("POSTGRES_USER", "computor")
-        password = os.environ.get("POSTGRES_PASSWORD", "")
-        db = os.environ.get("POSTGRES_DB", "computor")
-        database_url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
-    engine = create_engine(database_url)
-    Session = sessionmaker(bind=engine)
-    return Session()
+    from computor_backend.database import get_db_session
+    return get_db_session().__enter__()
 
 
 def sync_users(dry_run: bool = False, only_username: str | None = None):
