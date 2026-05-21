@@ -128,7 +128,7 @@ def upgrade() -> None:
                     sa.text(
                         """
                         INSERT INTO account (provider, type, provider_account_id, user_id, properties)
-                        VALUES (:provider, :type, :account_id, :user_id, :props::jsonb)
+                        VALUES (:provider, :type, :account_id, :user_id, CAST(:props AS jsonb))
                         ON CONFLICT DO NOTHING
                         """
                     ),

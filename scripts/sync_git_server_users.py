@@ -171,7 +171,7 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
                     text(
                         """
                         INSERT INTO account (provider, type, provider_account_id, user_id, properties)
-                        VALUES (:provider, :type, :account_id, :user_id, :props::jsonb)
+                        VALUES (:provider, :type, :account_id, :user_id, CAST(:props AS jsonb))
                         ON CONFLICT DO NOTHING
                         """
                     ),
