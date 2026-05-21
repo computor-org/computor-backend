@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 # Resolve repo root and load .env
-_repo_root = Path(__file__).resolve().parents[4]
+_repo_root = Path(__file__).resolve().parents[1]
 _env_file = _repo_root / ".env"
 
 try:
@@ -32,7 +32,7 @@ try:
 except ImportError:
     pass  # dotenv optional; env vars may already be set
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(_repo_root / "computor-backend" / "src"))
 
 import os
 import httpx
