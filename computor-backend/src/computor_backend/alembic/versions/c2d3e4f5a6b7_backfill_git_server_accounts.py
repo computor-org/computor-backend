@@ -68,6 +68,16 @@ def upgrade() -> None:
         auth=(admin_user, admin_pass),
         timeout=15.0,
     ) as client:
+        # Probe connectivity before iterating all users
+        try:
+            probe = client.get("/api/v1/version")
+            if not probe.is_success:
+                logger.warning(f"Git server at {git_server_url} returned {probe.status_code} — skipping backfill")
+                return
+        except Exception as e:
+            logger.warning(f"Git server at {git_server_url} is unreachable — skipping backfill ({e})")
+            return
+
         for user_id, username, email, given_name, family_name in users:
             if user_id in existing_user_ids:
                 continue
