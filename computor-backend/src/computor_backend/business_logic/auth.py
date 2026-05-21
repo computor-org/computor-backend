@@ -88,13 +88,24 @@ async def _provision_git_server_account(
         logger.warning(f"Git server provisioning skipped for {username}: {e}")
         return
 
+    token: str | None = None
+    try:
+        token = await client.create_user_token(git_user.username)
+    except GitServerError as e:
+        logger.warning(f"Failed to create git token for {username}: {e}")
+
+    from computor_types.tokens import encrypt_api_key
+    properties: dict = {"git_user_id": git_user.id}
+    if token:
+        properties["token"] = encrypt_api_key(token)
+
     def _store_account():
         account = Account(
             provider=settings.git_server_url,
             type=settings.git_server.lower(),
             provider_account_id=git_user.username,
             user_id=user_id,
-            properties={"git_user_id": git_user.id},
+            properties=properties,
         )
         db.add(account)
         try:

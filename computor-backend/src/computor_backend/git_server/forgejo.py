@@ -136,6 +136,17 @@ class ForgejoClient:
         if not resp.is_success:
             raise GitServerError(f"Activate user failed: {resp.status_code} {resp.text}")
 
+    async def create_user_token(self, username: str, token_name: str = "computor") -> str:
+        """Create a personal access token for a user and return the token string (shown once)."""
+        resp = await self._request(
+            "POST",
+            f"/users/{username}/tokens",
+            json={"name": token_name},
+        )
+        if not resp.is_success:
+            raise GitServerError(f"Create token failed for {username}: {resp.status_code} {resp.text}")
+        return resp.json()["sha1"]
+
     async def close(self) -> None:
         if self._client:
             await self._client.aclose()

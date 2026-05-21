@@ -34,6 +34,7 @@ except ImportError:
 
 sys.path.insert(0, str(_repo_root / "computor-backend" / "src"))
 
+import json
 import os
 import httpx
 from sqlalchemy import text
@@ -42,6 +43,13 @@ from sqlalchemy import text
 def _generate_password() -> str:
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
     return "".join(secrets.choice(alphabet) for _ in range(24))
+
+
+def _create_user_token(client: httpx.Client, username: str) -> str | None:
+    resp = client.post(f"/api/v1/users/{username}/tokens", json={"name": "computor"})
+    if resp.is_success:
+        return resp.json().get("sha1")
+    return None
 
 
 def _get_db_session():
@@ -166,6 +174,14 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
 
             git_username = git_user_data.get("login", username)
             git_user_id = git_user_data.get("id")
+
+            # Create a PAT so the user (and computor) can use HTTPS git operations
+            from computor_types.tokens import encrypt_api_key
+            token = _create_user_token(client, git_username)
+            props: dict = {"git_user_id": git_user_id}
+            if token:
+                props["token"] = encrypt_api_key(token)
+
             try:
                 db.execute(
                     text(
@@ -180,7 +196,7 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
                         "type": provider_type,
                         "account_id": git_username,
                         "user_id": user_id,
-                        "props": f'{{"git_user_id": {git_user_id}}}',
+                        "props": json.dumps(props),
                     },
                 )
                 db.commit()
