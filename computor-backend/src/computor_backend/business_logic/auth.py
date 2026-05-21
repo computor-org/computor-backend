@@ -35,6 +35,63 @@ from computor_types.auth import (
 
 logger = logging.getLogger(__name__)
 
+
+async def _provision_git_server_account(user: User, db: Session) -> None:
+    """Provision a user on the system git server (if configured) and store an Account row."""
+    from ..git_server.config import get_git_server_settings
+    from ..git_server.forgejo import get_forgejo_client
+    from ..git_server.exceptions import GitUserAlreadyExistsError, GitServerConnectionError, GitServerError
+    from computor_types.git_server import CreateGitUserRequest
+
+    settings = get_git_server_settings()
+    if not settings.enabled:
+        return
+
+    existing = (
+        db.query(Account)
+        .filter(
+            Account.provider == settings.git_server_url,
+            Account.type == settings.git_server.lower(),
+            Account.user_id == user.id,
+        )
+        .first()
+    )
+    if existing:
+        return
+
+    client = get_forgejo_client()
+    req = CreateGitUserRequest(
+        username=user.username,
+        email=user.email or f"{user.username}@noreply.local",
+        display_name=(f"{user.given_name} {user.family_name}".strip()) or user.username,
+    )
+    try:
+        git_user = await client.create_user(req)
+    except GitUserAlreadyExistsError:
+        try:
+            git_user = await client.get_user(user.username)
+        except GitServerError as e:
+            logger.warning(f"Git user exists but fetch failed for {user.username}: {e}")
+            return
+    except (GitServerConnectionError, GitServerError) as e:
+        logger.warning(f"Git server provisioning skipped for {user.username}: {e}")
+        return
+
+    account = Account(
+        provider=settings.git_server_url,
+        type=settings.git_server.lower(),
+        provider_account_id=git_user.username,
+        user_id=user.id,
+        properties={"git_user_id": git_user.id},
+    )
+    db.add(account)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Failed to store git server Account for {user.username}: {e}")
+
+
 # Token TTL configuration
 ACCESS_TOKEN_TTL = 60 * 60 # 1 hour
 REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 # 14 days
@@ -549,6 +606,9 @@ async def handle_sso_callback(
 
     user, account, is_new_user = await run_in_threadpool(_find_or_create_account)
 
+    if is_new_user:
+        await _provision_git_server_account(user, db)
+
     # Generate API session token for the user
     api_session_token = secrets.token_urlsafe(32)
     session_data = {
@@ -701,6 +761,7 @@ async def register_sso_user(
         return local_user
 
     local_user = await run_in_threadpool(_create_local_user)
+    await _provision_git_server_account(local_user, db)
 
     return {
         "user_id": str(local_user.id),
