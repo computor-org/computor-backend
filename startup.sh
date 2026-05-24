@@ -102,6 +102,13 @@ else
     export POSTGRES_MULTIPLE_DATABASES="computor"
 fi
 
+if [ "$KEYCLOAK_ENABLED" = "true" ]; then
+    echo -e "Keycloak: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.keycloak.yaml"
+else
+    echo -e "Keycloak: ${YELLOW}disabled${NC} (set KEYCLOAK_ENABLED=true in .env to enable)"
+fi
+
 # Function to safely create directories
 create_dir_if_needed() {
     local dir_path="$1"
@@ -193,13 +200,16 @@ fi
 # Optional: Create Keycloak directories if enabled
 if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     echo -e "\n${GREEN}Setting up Keycloak directories...${NC}"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak-db"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
 
-    # Copy Keycloak realm configuration if it exists
+    # Copy realm config, substituting the client secret from .env
     if [ -f "data/keycloak/computor-realm.json" ]; then
-        echo "  Copying Keycloak realm configuration..."
-        cp data/keycloak/computor-realm.json "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/"
+        echo "  Writing Keycloak realm configuration (substituting KEYCLOAK_CLIENT_SECRET)..."
+        sed "s/PLACEHOLDER_CLIENT_SECRET/${KEYCLOAK_CLIENT_SECRET}/g" \
+            data/keycloak/computor-realm.json \
+            > "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json"
     fi
 fi
 

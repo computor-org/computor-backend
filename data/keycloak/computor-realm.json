@@ -57,7 +57,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "computor-backend-secret",
+      "secret": "PLACEHOLDER_CLIENT_SECRET",
       "redirectUris": [
         "http://localhost:8000/*",
         "http://localhost:8080/*",

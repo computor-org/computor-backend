@@ -1,0 +1,90 @@
+# Keycloak SSO add-on Docker Compose configuration
+# Optional — include when KEYCLOAK_ENABLED=true in .env
+# Use together with base + dev/prod configuration
+#
+# Keycloak is available at http://localhost:${KEYCLOAK_PORT} (default 8180)
+# Admin console: http://localhost:${KEYCLOAK_PORT}/admin
+#
+# On first start the computor realm is imported from
+#   ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json
+# (startup.sh copies it there from data/keycloak/computor-realm.json,
+#  substituting KEYCLOAK_CLIENT_SECRET before the copy)
+
+networks:
+  computor-network:
+    external: true
+
+services:
+  keycloak-db:
+    image: postgres:16
+    networks:
+      - computor-network
+    container_name: computor-keycloak-db
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${KEYCLOAK_DB_PORT:-5438}:5438"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?must be set in .env}
+      POSTGRES_DB: keycloak
+      PGPORT: 5438
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -p 5438"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    networks:
+      - computor-network
+    container_name: computor-keycloak
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?must be set in .env}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?must be set in .env}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?must be set in .env}
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8180}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s

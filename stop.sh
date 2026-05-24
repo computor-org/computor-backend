@@ -53,6 +53,11 @@ detect_running_config() {
             CODER_DETECTED=true
         fi
 
+        # Check if Keycloak is running
+        if docker ps --format "{{.Names}}" | grep -q "computor-keycloak"; then
+            KEYCLOAK_DETECTED=true
+        fi
+
         return 0
     fi
 
@@ -143,14 +148,19 @@ else
     echo "Some features may not work correctly without environment variables."
 fi
 
-# Determine if Coder compose file should be included
-# Use CODER_ENABLED from .env, or auto-detected running Coder containers
+# Determine which optional stacks to include
 INCLUDE_CODER=false
 if [ "$CODER_ENABLED" = "true" ] || [ "$CODER_DETECTED" = true ]; then
     INCLUDE_CODER=true
 fi
 
+INCLUDE_KEYCLOAK=false
+if [ "$KEYCLOAK_ENABLED" = "true" ] || [ "$KEYCLOAK_DETECTED" = true ]; then
+    INCLUDE_KEYCLOAK=true
+fi
+
 echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
+echo -e "Keycloak: ${YELLOW}$([ "$INCLUDE_KEYCLOAK" = true ] && echo "enabled" || echo "disabled")${NC}"
 
 # Build docker-compose command (must match startup.sh)
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
@@ -159,6 +169,9 @@ if [ "$ENVIRONMENT" = "prod" ]; then
 fi
 if [ "$INCLUDE_CODER" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.coder.yaml"
+fi
+if [ "$INCLUDE_KEYCLOAK" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak.yaml"
 fi
 
 # Show what will be stopped
