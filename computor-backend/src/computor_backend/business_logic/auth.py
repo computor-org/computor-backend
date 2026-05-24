@@ -647,6 +647,9 @@ async def handle_sso_callback(
         "username": user_primitives["username"],
         "email": user_primitives["email"],
         "created_at": str(datetime.now(timezone.utc)),
+        # Stored so /auth/{provider}/logout can pass id_token_hint to Keycloak
+        # and skip its logout-confirmation prompt.
+        "id_token": (auth_result.session_data or {}).get("id_token"),
     }
 
     # Store session in Redis with TTL. authenticate_sso() in permissions/auth.py

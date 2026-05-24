@@ -260,7 +260,10 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 session_data={
                     "token_type": tokens.get("token_type", "Bearer"),
                     "expires_in": tokens.get("expires_in"),
-                    "scope": tokens.get("scope", "")
+                    "scope": tokens.get("scope", ""),
+                    # Kept so logout can pass id_token_hint to Keycloak's
+                    # end_session_endpoint and skip the logout confirmation page.
+                    "id_token": id_token,
                 }
             )
             

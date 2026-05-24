@@ -375,10 +375,19 @@ async def sso_logout(
     current_token = request.cookies.get("ct_access_token")
     refresh_token = request.cookies.get("ct_refresh_token")
 
-    # Best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
+    # Read the stored id_token (for id_token_hint) before deleting the session,
+    # then best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
+    id_token_hint = None
     try:
         if current_token:
-            await cache.delete(f"sso_session:{hash_token(current_token)}")
+            session_key = f"sso_session:{hash_token(current_token)}"
+            raw = await cache.get(session_key)
+            if raw:
+                try:
+                    id_token_hint = json.loads(raw).get("id_token")
+                except Exception:
+                    pass
+            await cache.delete(session_key)
         if refresh_token:
             await cache.delete(f"sso_session:{hash_token(refresh_token)}")
     except Exception as e:
@@ -395,6 +404,9 @@ async def sso_logout(
         params = {"client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")}
         if post_logout_redirect_uri:
             params["post_logout_redirect_uri"] = post_logout_redirect_uri
+        # id_token_hint lets Keycloak skip the "Do you want to log out?" prompt.
+        if id_token_hint:
+            params["id_token_hint"] = id_token_hint
         target = f"{end_session_endpoint}?{urlencode(params)}"
 
     redirect_response = RedirectResponse(url=target, status_code=302)
