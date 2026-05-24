@@ -55,6 +55,9 @@ async def _provision_git_server_account(
     if not settings.enabled:
         return
 
+    # When Keycloak OIDC is configured, Forgejo/GitLab handle auth — no local password needed
+    effective_password = None if settings.oidc_enabled else password
+
     def _check_existing():
         existing = (
             db.query(Account)
@@ -71,10 +74,10 @@ async def _provision_git_server_account(
     client = get_forgejo_client()
 
     if existing_git_username:
-        # Account already provisioned — sync the password if we have it
-        if password:
+        # Account already provisioned — sync the password if we have it (no-op when OIDC active)
+        if effective_password:
             try:
-                await client.set_user_password(existing_git_username, password)
+                await client.set_user_password(existing_git_username, effective_password)
             except (GitServerConnectionError, GitServerError) as e:
                 logger.warning(f"Failed to sync Forgejo password for {username}: {e}")
         return
@@ -84,7 +87,7 @@ async def _provision_git_server_account(
         username=username,
         email=email or f"{username}@noreply.local",
         display_name=display_name,
-        password=password,
+        password=effective_password,
     )
     try:
         git_user = await client.create_user(req)
