@@ -9,6 +9,8 @@ class GitServerSettings(BaseSettings):
     git_server_url: str = ""
     git_server_admin_username: str = ""
     git_server_admin_password: str = ""
+    git_server_keycloak_client_id: str = ""
+    git_server_keycloak_client_secret: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -17,6 +19,10 @@ class GitServerSettings(BaseSettings):
     @property
     def is_forgejo(self) -> bool:
         return self.git_server.lower() == "forgejo"
+
+    @property
+    def oidc_enabled(self) -> bool:
+        return bool(self.enabled and self.git_server_keycloak_client_id)
 
 
 @lru_cache(maxsize=1)
