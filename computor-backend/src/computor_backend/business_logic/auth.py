@@ -39,26 +39,20 @@ logger = logging.getLogger(__name__)
 async def _provision_git_server_account(
     user_id: str,
     username: str,
-    email: Optional[str],
-    given_name: Optional[str],
-    family_name: Optional[str],
     db: Session,
-    password: Optional[str] = None,
 ) -> None:
-    """Provision a user on the system git server (if configured) and store an Account row."""
+    """Record that this user has an account on the system git server.
+
+    With OIDC, Forgejo/GitLab create the actual account on first login.
+    This just ensures the Account row exists so the relationship is tracked.
+    """
     from ..git_server.config import get_git_server_settings
-    from ..git_server.forgejo import get_forgejo_client
-    from ..git_server.exceptions import GitUserAlreadyExistsError, GitServerConnectionError, GitServerError
-    from computor_types.git_server import CreateGitUserRequest
 
     settings = get_git_server_settings()
     if not settings.enabled:
         return
 
-    # When Keycloak OIDC is configured, Forgejo/GitLab handle auth — no local password needed
-    effective_password = None if settings.oidc_enabled else password
-
-    def _check_existing():
+    def _check_and_insert():
         existing = (
             db.query(Account)
             .filter(
@@ -68,57 +62,14 @@ async def _provision_git_server_account(
             )
             .first()
         )
-        return existing.provider_account_id if existing else None
-
-    existing_git_username = await run_in_threadpool(_check_existing)
-    client = get_forgejo_client()
-
-    if existing_git_username:
-        # Account already provisioned — sync the password if we have it (no-op when OIDC active)
-        if effective_password:
-            try:
-                await client.set_user_password(existing_git_username, effective_password)
-            except (GitServerConnectionError, GitServerError) as e:
-                logger.warning(f"Failed to sync Forgejo password for {username}: {e}")
-        return
-
-    display_name = (f"{given_name or ''} {family_name or ''}".strip()) or username
-    req = CreateGitUserRequest(
-        username=username,
-        email=email or f"{username}@noreply.local",
-        display_name=display_name,
-        password=effective_password,
-    )
-    try:
-        git_user = await client.create_user(req)
-    except GitUserAlreadyExistsError:
-        try:
-            git_user = await client.get_user(username)
-        except GitServerError as e:
-            logger.warning(f"Git user exists but fetch failed for {username}: {e}")
+        if existing:
             return
-    except (GitServerConnectionError, GitServerError) as e:
-        logger.warning(f"Git server provisioning skipped for {username}: {e}")
-        return
-
-    token: str | None = None
-    try:
-        token = await client.create_user_token(git_user.username)
-    except GitServerError as e:
-        logger.warning(f"Failed to create git token for {username}: {e}")
-
-    from computor_types.tokens import encrypt_api_key
-    properties: dict = {"git_user_id": git_user.id}
-    if token:
-        properties["token"] = encrypt_api_key(token)
-
-    def _store_account():
         account = Account(
             provider=settings.git_server_url,
             type=settings.git_server.lower(),
-            provider_account_id=git_user.username,
+            provider_account_id=username,
             user_id=user_id,
-            properties=properties,
+            properties={},
         )
         db.add(account)
         try:
@@ -127,7 +78,7 @@ async def _provision_git_server_account(
             db.rollback()
             logger.warning(f"Failed to store git server Account for {username}: {e}")
 
-    await run_in_threadpool(_store_account)
+    await run_in_threadpool(_check_and_insert)
 
 
 # Token TTL configuration
@@ -200,29 +151,17 @@ async def login_with_local_credentials(
         lambda: AuthenticationService.authenticate_basic(username, password, db)
     )
 
-    # Provision git server account on login (idempotent — skipped if already exists)
-    def _get_user_primitives():
+    # Record git server account link (idempotent — skipped if row already exists)
+    def _get_actual_username():
         user = db.query(User).filter(User.id == auth_result.user_id).first()
-        if user:
-            return {
-                "id": str(user.id),
-                "username": user.username,
-                "email": user.email,
-                "given_name": user.given_name,
-                "family_name": user.family_name,
-            }
-        return None
+        return user.username if user else None
 
-    user_primitives = await run_in_threadpool(_get_user_primitives)
-    if user_primitives:
+    actual_username = await run_in_threadpool(_get_actual_username)
+    if actual_username:
         await _provision_git_server_account(
-            user_id=user_primitives["id"],
-            username=user_primitives["username"],
-            email=user_primitives["email"],
-            given_name=user_primitives["given_name"],
-            family_name=user_primitives["family_name"],
+            user_id=str(auth_result.user_id),
+            username=actual_username,
             db=db,
-            password=password,
         )
 
     # Generate session tokens
@@ -681,9 +620,6 @@ async def handle_sso_callback(
     await _provision_git_server_account(
         user_id=user_primitives["id"],
         username=user_primitives["username"],
-        email=user_primitives["email"],
-        given_name=user_primitives["given_name"],
-        family_name=user_primitives["family_name"],
         db=db,
     )
 
@@ -843,9 +779,6 @@ async def register_sso_user(
     await _provision_git_server_account(
         user_id=local_user_id,
         username=username,
-        email=email,
-        given_name=given_name,
-        family_name=family_name,
         db=db,
     )
 

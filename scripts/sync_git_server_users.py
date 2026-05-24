@@ -2,26 +2,27 @@
 """
 Git Server User Sync
 
-Provisions all computor users onto the system git server (GIT_SERVER) and
-creates the corresponding Account rows. Safe to run multiple times — users
-who already have an Account row are skipped.
+Ensures every computor user has an Account row linking them to the system git
+server (GIT_SERVER). Safe to run multiple times — users who already have a row
+are skipped.
+
+With OIDC configured, the actual Forgejo/GitLab account is created on the
+user's first login. This script just pre-populates the Account table so the
+relationship is tracked from the start.
 
 Usage:
     python sync_git_server_users.py
     python sync_git_server_users.py --dry-run
     python sync_git_server_users.py --user theta
 
-Reads GIT_SERVER_URL / GIT_SERVER_ADMIN_USERNAME / GIT_SERVER_ADMIN_PASSWORD
-from the .env file in the repo root (or from the environment).
+Reads GIT_SERVER_URL / GIT_SERVER from the .env file in the repo root
+(or from the environment).
 """
 
 import argparse
-import secrets
-import string
 import sys
 from pathlib import Path
 
-# Resolve repo root and load .env
 _repo_root = Path(__file__).resolve().parents[1]
 _env_file = _repo_root / ".env"
 
@@ -30,26 +31,13 @@ try:
     if _env_file.exists():
         load_dotenv(_env_file)
 except ImportError:
-    pass  # dotenv optional; env vars may already be set
+    pass
 
 sys.path.insert(0, str(_repo_root / "computor-backend" / "src"))
 
 import json
 import os
-import httpx
 from sqlalchemy import text
-
-
-def _generate_password() -> str:
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    return "".join(secrets.choice(alphabet) for _ in range(24))
-
-
-def _create_user_token(client: httpx.Client, username: str) -> str | None:
-    resp = client.post(f"/api/v1/users/{username}/tokens", json={"name": "computor"})
-    if resp.is_success:
-        return resp.json().get("sha1")
-    return None
 
 
 def _get_db_session():
@@ -57,44 +45,23 @@ def _get_db_session():
     return get_db_session().__enter__()
 
 
-def _update_password(client: httpx.Client, username: str, password: str) -> bool:
-    resp = client.patch(
-        f"/api/v1/admin/users/{username}",
-        json={"source_id": 0, "login_name": username, "password": password},
-    )
-    return resp.is_success
-
-
-def sync_users(
-    dry_run: bool = False,
-    only_username: str | None = None,
-    update_passwords: bool = False,
-):
+def sync_users(dry_run: bool = False, only_username: str | None = None):
     git_server = os.environ.get("GIT_SERVER", "").strip()
     git_server_url = os.environ.get("GIT_SERVER_URL", "").strip()
-    admin_user = os.environ.get("GIT_SERVER_ADMIN_USERNAME", "").strip()
-    admin_pass = os.environ.get("GIT_SERVER_ADMIN_PASSWORD", "").strip()
-    default_password = os.environ.get("GIT_SERVER_DEFAULT_USER_PASSWORD", "").strip()
 
     if not git_server or not git_server_url:
         print("ERROR: GIT_SERVER and GIT_SERVER_URL must be set")
-        sys.exit(1)
-    if not admin_user or not admin_pass:
-        print("ERROR: GIT_SERVER_ADMIN_USERNAME and GIT_SERVER_ADMIN_PASSWORD must be set")
         sys.exit(1)
 
     provider_type = git_server.lower()
 
     print(f"Git server : {git_server_url}  (type={provider_type})")
-    if default_password:
-        print(f"Password   : GIT_SERVER_DEFAULT_USER_PASSWORD (set)")
     if dry_run:
         print("DRY RUN — no changes will be made")
     print()
 
     db = _get_db_session()
 
-    # Users that already have an account on this git server
     existing = {
         str(row[0])
         for row in db.execute(
@@ -103,8 +70,7 @@ def sync_users(
         )
     }
 
-    # All (non-service) users
-    query = 'SELECT id, username, email, given_name, family_name FROM "user" WHERE is_service = false'
+    query = 'SELECT id, username FROM "user" WHERE is_service = false'
     params: dict = {}
     if only_username:
         query += " AND username = :u"
@@ -115,154 +81,67 @@ def sync_users(
         print("No users found.")
         return
 
-    print(f"Total users: {len(users)}  |  Already provisioned: {len(existing)}")
     to_provision = [u for u in users if str(u[0]) not in existing]
-    print(f"To provision: {len(to_provision)}")
+    print(f"Total users: {len(users)}  |  Already linked: {len(existing)}")
+    print(f"To link    : {len(to_provision)}")
     print()
 
     if not to_provision:
         print("Nothing to do.")
         return
 
-    stats = {"created": 0, "already_exists": 0, "failed": 0, "skipped": 0}
+    inserted = skipped = failed = 0
 
-    with httpx.Client(base_url=git_server_url, auth=(admin_user, admin_pass), timeout=15.0) as client:
-        # Probe connectivity
+    for user_id, username in to_provision:
+        user_id = str(user_id)
+
+        if dry_run:
+            print(f"  [dry-run] would link  {username}")
+            skipped += 1
+            continue
+
         try:
-            probe = client.get("/api/v1/version")
-            if not probe.is_success:
-                print(f"ERROR: Git server returned {probe.status_code} — aborting")
-                sys.exit(1)
-            version = probe.json().get("version", "?")
-            print(f"Connected to git server  version={version}\n")
-        except Exception as e:
-            print(f"ERROR: Cannot reach git server: {e}")
-            sys.exit(1)
-
-        for user_id, username, email, given_name, family_name in to_provision:
-            user_id = str(user_id)
-            display_name = (f"{given_name or ''} {family_name or ''}".strip()) or username
-            safe_email = email or f"{username}@noreply.local"
-
-            if dry_run:
-                print(f"  [dry-run] would provision  {username} <{safe_email}>")
-                stats["skipped"] += 1
-                continue
-
-            # Try to create; fall back to fetching if already exists on the server
-            git_user_data = None
-            resp = client.post(
-                "/api/v1/admin/users",
-                json={
-                    "source_id": 0,
-                    "login_name": username,
-                    "username": username,
-                    "email": safe_email,
-                    "full_name": display_name,
-                    "password": default_password or _generate_password(),
-                    "must_change_password": False,
-                    "send_notify": False,
-                    "visibility": "private",
+            db.execute(
+                text(
+                    """
+                    INSERT INTO account (provider, type, provider_account_id, user_id, properties)
+                    VALUES (:provider, :type, :account_id, :user_id, CAST(:props AS jsonb))
+                    ON CONFLICT DO NOTHING
+                    """
+                ),
+                {
+                    "provider": git_server_url,
+                    "type": provider_type,
+                    "account_id": username,
+                    "user_id": user_id,
+                    "props": json.dumps({}),
                 },
             )
-            if resp.status_code == 422:
-                r2 = client.get(f"/api/v1/users/{username}")
-                if r2.is_success:
-                    git_user_data = r2.json()
-                    stats["already_exists"] += 1
-                    print(f"  already exists  {username}")
-                else:
-                    print(f"  FAILED (exists on server, fetch failed {r2.status_code})  {username}")
-                    stats["failed"] += 1
-                    continue
-            elif resp.is_success:
-                git_user_data = resp.json()
-                stats["created"] += 1
-                print(f"  created  {username}")
-            else:
-                print(f"  FAILED ({resp.status_code})  {username}: {resp.text[:120]}")
-                stats["failed"] += 1
-                continue
-
-            if not git_user_data:
-                continue
-
-            git_username = git_user_data.get("login", username)
-            git_user_id = git_user_data.get("id")
-
-            # Create a PAT so the user (and computor) can use HTTPS git operations
-            from computor_types.tokens import encrypt_api_key
-            token = _create_user_token(client, git_username)
-            props: dict = {"git_user_id": git_user_id}
-            if token:
-                props["token"] = encrypt_api_key(token)
-
-            try:
-                db.execute(
-                    text(
-                        """
-                        INSERT INTO account (provider, type, provider_account_id, user_id, properties)
-                        VALUES (:provider, :type, :account_id, :user_id, CAST(:props AS jsonb))
-                        ON CONFLICT DO NOTHING
-                        """
-                    ),
-                    {
-                        "provider": git_server_url,
-                        "type": provider_type,
-                        "account_id": git_username,
-                        "user_id": user_id,
-                        "props": json.dumps(props),
-                    },
-                )
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                print(f"  FAILED (DB insert)  {username}: {e}")
-                stats["failed"] += 1
+            db.commit()
+            print(f"  linked  {username}")
+            inserted += 1
+        except Exception as e:
+            db.rollback()
+            print(f"  FAILED  {username}: {e}")
+            failed += 1
 
     print()
     print("=" * 40)
     if dry_run:
-        print(f"Would provision: {stats['skipped']}")
+        print(f"Would link: {skipped}")
     else:
-        print(f"Created        : {stats['created']}")
-        print(f"Already existed: {stats['already_exists']}")
-        print(f"Failed         : {stats['failed']}")
-
-    # --update-passwords: reset Forgejo passwords for all provisioned accounts
-    if update_passwords and not dry_run:
-        if not default_password:
-            print("\nERROR: --update-passwords requires GIT_SERVER_DEFAULT_USER_PASSWORD to be set")
-            return
-        print(f"\nResetting passwords for all provisioned accounts...")
-        all_accounts = list(db.execute(
-            text("SELECT provider_account_id FROM account WHERE provider = :p AND type = :t"),
-            {"p": git_server_url, "t": provider_type},
-        ))
-        ok = fail = 0
-        with httpx.Client(base_url=git_server_url, auth=(admin_user, admin_pass), timeout=15.0) as client:
-            for (git_username,) in all_accounts:
-                if only_username and git_username != only_username:
-                    continue
-                if _update_password(client, git_username, default_password):
-                    ok += 1
-                else:
-                    print(f"  FAILED password reset for {git_username}")
-                    fail += 1
-        print(f"Passwords reset: {ok}  failed: {fail}")
+        print(f"Linked : {inserted}")
+        print(f"Failed : {failed}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sync computor users to the system git server")
-    parser.add_argument("--dry-run", action="store_true", help="Print what would happen without making changes")
-    parser.add_argument("--user", metavar="USERNAME", help="Sync a single user instead of all")
-    parser.add_argument(
-        "--update-passwords",
-        action="store_true",
-        help="Reset Forgejo passwords for all provisioned accounts to GIT_SERVER_DEFAULT_USER_PASSWORD",
+    parser = argparse.ArgumentParser(
+        description="Link computor users to the system git server in the Account table"
     )
+    parser.add_argument("--dry-run", action="store_true", help="Print what would happen without making changes")
+    parser.add_argument("--user", metavar="USERNAME", help="Link a single user instead of all")
     args = parser.parse_args()
-    sync_users(dry_run=args.dry_run, only_username=args.user, update_passwords=args.update_passwords)
+    sync_users(dry_run=args.dry_run, only_username=args.user)
 
 
 if __name__ == "__main__":
