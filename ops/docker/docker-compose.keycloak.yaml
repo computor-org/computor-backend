@@ -2,8 +2,10 @@
 # Optional — include when KEYCLOAK_ENABLED=true in .env
 # Use together with base + dev/prod configuration
 #
-# Keycloak is available at http://localhost:${KEYCLOAK_PORT} (default 8180)
-# Admin console: http://localhost:${KEYCLOAK_PORT}/admin
+# Dev:  Keycloak available at http://localhost:${KEYCLOAK_PORT:-8180}
+# Prod: Traefik routes /auth → computor-keycloak:8080
+#       Set KEYCLOAK_PUBLIC_URL=https://yourdomain.com/auth in .env
+#       (KC_HTTP_RELATIVE_PATH is set automatically from that value)
 #
 # On first start the computor realm is imported from
 #   ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json
@@ -77,8 +79,20 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: 8080
       KC_HEALTH_ENABLED: "true"
+      # Subpath Keycloak is mounted at. Dev: leave unset (defaults to /, direct port binding used).
+      # Prod: set KEYCLOAK_HTTP_RELATIVE_PATH=/auth so Keycloak builds correct internal links.
+      KC_HTTP_RELATIVE_PATH: "${KEYCLOAK_HTTP_RELATIVE_PATH:-/}"
     ports:
       - "${KEYCLOAK_PORT:-8180}:8080"
+    labels:
+      # Dev: traefik.enable=false — access via direct port binding (KEYCLOAK_PORT).
+      # Prod: set KEYCLOAK_TRAEFIK_ENABLED=true and KEYCLOAK_HTTP_RELATIVE_PATH=/auth in .env.
+      #       Traefik then routes PathPrefix(/auth) → this container on the shared network.
+      #       Also set KEYCLOAK_PUBLIC_URL=https://yourdomain.com/auth for correct redirect URIs.
+      - "traefik.enable=${KEYCLOAK_TRAEFIK_ENABLED:-false}"
+      - "traefik.http.routers.keycloak.rule=PathPrefix(`${KEYCLOAK_HTTP_RELATIVE_PATH:-/auth}`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
     command:
       - start-dev
       - --import-realm
