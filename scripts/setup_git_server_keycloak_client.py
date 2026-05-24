@@ -170,21 +170,20 @@ def _print_result(
     git_server_url: str,
 ) -> None:
     print(f"\nClient secret: {secret}")
-    print(f"\n# Add to computor-fullstack/.env:")
-    print(f"GIT_SERVER_KEYCLOAK_CLIENT_ID={client_id}")
-    print(f"GIT_SERVER_KEYCLOAK_CLIENT_SECRET={secret}")
     if provider == "forgejo":
         print(f"\n# Add to computor-git/forgejo/.env:")
         print(f"KEYCLOAK_URL={server_url}")
         print(f"KEYCLOAK_REALM={realm}")
         print(f"FORGEJO_KEYCLOAK_CLIENT_ID={client_id}")
         print(f"FORGEJO_KEYCLOAK_CLIENT_SECRET={secret}")
+        print(f"\nThen restart Forgejo: ./stop.sh && ./start.sh")
     elif provider == "gitlab":
         print(f"\n# Add to computor-git/gitlab/.env:")
         print(f"KEYCLOAK_URL={server_url}")
         print(f"KEYCLOAK_REALM={realm}")
         print(f"GITLAB_KEYCLOAK_CLIENT_ID={client_id}")
         print(f"GITLAB_KEYCLOAK_CLIENT_SECRET={secret}")
+        print(f"\nThen restart GitLab: ./stop.sh && ./start.sh")
 
 
 def main() -> None:
