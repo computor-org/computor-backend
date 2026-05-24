@@ -603,6 +603,21 @@ async def handle_sso_callback(
             )
             db.add(account)
 
+        # Bootstrap _admin from the Keycloak "administrators" group.
+        # Additive only: membership grants _admin, but we never revoke — admin
+        # can also be granted manually in the computor DB, which stays authoritative.
+        groups = user_info.groups or []
+        is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
+        if is_kc_admin:
+            from computor_backend.model.role import UserRole
+            existing_admin = (
+                db.query(UserRole)
+                .filter(UserRole.user_id == user.id, UserRole.role_id == "_admin")
+                .first()
+            )
+            if not existing_admin:
+                db.add(UserRole(user_id=user.id, role_id="_admin"))
+
         # Capture primitives before commit — attributes expire after commit
         user_primitives = {
             "id": str(user.id),
