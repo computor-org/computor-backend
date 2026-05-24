@@ -316,7 +316,26 @@ async def handle_callback(
         else:
             redirect_url = f"{redirect_uri}?{urlencode(params)}"
 
-        return RedirectResponse(url=redirect_url, status_code=302)
+        # Set the same HttpOnly cookies as the local /login flow so the frontend
+        # can authenticate to /user with credentials: 'include' after redirect.
+        redirect_response = RedirectResponse(url=redirect_url, status_code=302)
+        redirect_response.set_cookie(
+            key="ct_access_token",
+            value=result["token"],
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=3600,
+        )
+        redirect_response.set_cookie(
+            key="ct_refresh_token",
+            value=result["refresh_token"],
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=604800,
+        )
+        return redirect_response
 
     except Exception as e:
         logger.error(f"Failed to handle callback for {provider}: {e}")
@@ -330,6 +349,58 @@ async def handle_callback(
 async def sso_success():
     """Default success page after SSO authentication."""
     return {"message": "Authentication successful", "status": "success"}
+
+
+@auth_router.get("/{provider}/logout", name="sso_logout")
+async def sso_logout(
+    provider: str,
+    request: Request,
+    post_logout_redirect_uri: Optional[str] = Query(None),
+    cache=Depends(get_redis_client),
+) -> RedirectResponse:
+    """
+    SSO logout: clears the backend session cookies AND ends the Keycloak SSO
+    session by redirecting the browser to the provider's end_session_endpoint.
+
+    The frontend should navigate to this URL (browser redirect, not XHR) so
+    the cookie-clearing + Keycloak end-session flow completes properly.
+
+    Designed to be tolerant of an already-expired or missing local session —
+    we always clear cookies and forward to Keycloak so the user is fully
+    signed out at the IdP.
+    """
+    import os
+    from computor_backend.utils.token_hash import hash_token
+
+    current_token = request.cookies.get("ct_access_token")
+    refresh_token = request.cookies.get("ct_refresh_token")
+
+    # Best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
+    try:
+        if current_token:
+            await cache.delete(f"sso_session:{hash_token(current_token)}")
+        if refresh_token:
+            await cache.delete(f"sso_session:{hash_token(refresh_token)}")
+    except Exception as e:
+        logger.warning(f"Redis session cleanup failed during SSO logout: {e}")
+
+    registry = get_plugin_registry()
+    plugin = registry.get_plugin(provider)
+    end_session_endpoint = None
+    if plugin is not None and getattr(plugin, "_oidc_config", None):
+        end_session_endpoint = plugin._oidc_config.get("end_session_endpoint")
+
+    target = post_logout_redirect_uri or "/"
+    if end_session_endpoint:
+        params = {"client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")}
+        if post_logout_redirect_uri:
+            params["post_logout_redirect_uri"] = post_logout_redirect_uri
+        target = f"{end_session_endpoint}?{urlencode(params)}"
+
+    redirect_response = RedirectResponse(url=target, status_code=302)
+    redirect_response.delete_cookie(key="ct_access_token", samesite="lax")
+    redirect_response.delete_cookie(key="ct_refresh_token", samesite="lax")
+    return redirect_response
 
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(

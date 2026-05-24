@@ -634,8 +634,11 @@ async def handle_sso_callback(
         "created_at": str(datetime.now(timezone.utc)),
     }
 
-    # Store session in Redis with TTL
-    session_key = f"sso_session:{api_session_token}"
+    # Store session in Redis with TTL. authenticate_sso() in permissions/auth.py
+    # looks up the session by the HASH of the token, not the plain token, so
+    # we must store the hash (matching the local /login flow).
+    from computor_backend.utils.token_hash import hash_token
+    session_key = f"sso_session:{hash_token(api_session_token)}"
     await redis_client.set(session_key, json.dumps(session_data), ex=86400)  # 24 hours
 
     # Store tokens in Redis if available
@@ -871,8 +874,9 @@ async def refresh_sso_token(
             "refreshed_at": str(datetime.now(timezone.utc)),
         }
 
-        # Store new session in Redis
-        session_key = f"sso_session:{new_session_token}"
+        # Store new session in Redis — keyed by token HASH to match authenticate_sso() lookup.
+        from computor_backend.utils.token_hash import hash_token
+        session_key = f"sso_session:{hash_token(new_session_token)}"
         await redis_client.set(session_key, json.dumps(session_data), ex=86400)
 
         # Update stored provider tokens if available

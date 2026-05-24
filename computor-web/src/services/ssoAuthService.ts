@@ -112,16 +112,19 @@ export class SSOAuthService implements ISSOAuthProvider {
 
       const userInfo = await response.json();
 
-      // Transform backend user data to frontend format
+      // GET /user returns the User object directly (not wrapped in { user: ... }).
+      // user_roles is an array of { role_id: string, ... } — extract role_id strings.
+      const roleIds: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
+
       const user: AuthUser = {
-        id: userInfo.user.id,
-        username: userInfo.user.username || userInfo.user.email,
-        email: userInfo.user.email,
-        givenName: userInfo.user.given_name,
-        familyName: userInfo.user.family_name,
-        role: this.mapRolesToFrontend(userInfo.roles),
-        systemRoles: Array.isArray(userInfo.roles) ? userInfo.roles : [],
-        permissions: this.mapPermissions(userInfo.roles),
+        id: userInfo.id,
+        username: userInfo.username || userInfo.email,
+        email: userInfo.email,
+        givenName: userInfo.given_name,
+        familyName: userInfo.family_name,
+        role: this.mapRolesToFrontend(roleIds),
+        systemRoles: roleIds,
+        permissions: this.mapPermissions(roleIds),
         courses: [],
       };
 
@@ -186,22 +189,22 @@ export class SSOAuthService implements ISSOAuthProvider {
   }
 
   /**
-   * Logout user
-   * Instructs backend to clear HttpOnly cookies
+   * Logout user.
+   *
+   * Browser-navigates to the backend's SSO logout endpoint, which:
+   *   1. Clears the HttpOnly auth cookies
+   *   2. Redirects the browser to Keycloak's end_session_endpoint so the
+   *      SSO session at the IdP also ends. Without this, the next "Sign in
+   *      with Keycloak" silently re-logs the user in.
+   *   3. Keycloak then redirects back to post_logout_redirect_uri (the app home).
    */
   async logout(): Promise<void> {
-    try {
-      // Notify backend to clear cookies
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include', // Send cookies for logout
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-
-    // Clear local user data
+    // Clear local user data first — browser will navigate away after.
     this.clearSession();
+
+    const postLogoutRedirect = `${window.location.origin}/`;
+    const params = new URLSearchParams({ post_logout_redirect_uri: postLogoutRedirect });
+    window.location.href = `${API_BASE_URL}/auth/keycloak/logout?${params.toString()}`;
   }
 
   /**

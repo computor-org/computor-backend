@@ -186,8 +186,8 @@ async def startup_logic():
 
         await init_admin_user(db)
 
-    # Initialize plugin registry with configuration
-    # await initialize_plugin_registry_with_config()
+    # Initialize plugin registry with configuration (loads Keycloak provider, etc.)
+    await initialize_plugin_registry_with_config()
 
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):

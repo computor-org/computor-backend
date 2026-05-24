@@ -349,14 +349,23 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if not key:
             raise JWTError(f"No matching key found for kid: {kid}")
         
-        # Verify and decode the token
+        # Verify and decode the token.
+        # Use the issuer from the discovery doc rather than constructing one from
+        # server_url — when Keycloak is behind a reverse proxy / has KC_HOSTNAME set,
+        # the token's `iss` reflects the public URL (e.g. localhost:8080/auth)
+        # while server_url is the internal URL (e.g. localhost:8180/auth).
+        expected_issuer = (
+            self._oidc_config.get("issuer")
+            if self._oidc_config
+            else f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}"
+        )
         try:
             claims = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
                 audience=self.keycloak_config.client_id,
-                issuer=f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}",
+                issuer=expected_issuer,
                 options={"verify_at_hash": False}  # Skip at_hash verification
             )
             return claims
