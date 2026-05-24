@@ -137,7 +137,10 @@ def setup_client(dry_run: bool = False) -> None:
             "serviceAccountsEnabled": False,
             "attributes": {
                 "post.logout.redirect.uris": "+",
-                "pkce.code.challenge.method": "S256",
+                # PKCE is intentionally NOT enforced for Forgejo/GitLab:
+                # neither sends a code_challenge in its OIDC flow, and enforcing
+                # S256 makes Keycloak reject the authorization request with
+                # "Missing parameter: code_challenge_method".
             },
         }
 

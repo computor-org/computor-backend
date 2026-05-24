@@ -103,7 +103,10 @@ services:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      # Keycloak 25.x exposes health on the management interface (port 9000)
+      # under the same relative path as the main HTTP. Use bash /dev/tcp because
+      # the Keycloak image has no curl/wget.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET %s/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' \"$${KC_HTTP_RELATIVE_PATH%/}\" >&3 && grep -q 'UP' <&3"]
       interval: 10s
       timeout: 5s
       retries: 15
