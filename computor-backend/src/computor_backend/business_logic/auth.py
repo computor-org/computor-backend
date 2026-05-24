@@ -43,6 +43,7 @@ async def _provision_git_server_account(
     given_name: Optional[str],
     family_name: Optional[str],
     db: Session,
+    password: Optional[str] = None,
 ) -> None:
     """Provision a user on the system git server (if configured) and store an Account row."""
     from ..git_server.config import get_git_server_settings
@@ -54,7 +55,7 @@ async def _provision_git_server_account(
     if not settings.enabled:
         return
 
-    def _check_and_insert():
+    def _check_existing():
         existing = (
             db.query(Account)
             .filter(
@@ -64,17 +65,26 @@ async def _provision_git_server_account(
             )
             .first()
         )
-        return existing is not None
+        return existing.provider_account_id if existing else None
 
-    if await run_in_threadpool(_check_and_insert):
+    existing_git_username = await run_in_threadpool(_check_existing)
+    client = get_forgejo_client()
+
+    if existing_git_username:
+        # Account already provisioned — sync the password if we have it
+        if password:
+            try:
+                await client.set_user_password(existing_git_username, password)
+            except (GitServerConnectionError, GitServerError) as e:
+                logger.warning(f"Failed to sync Forgejo password for {username}: {e}")
         return
 
     display_name = (f"{given_name or ''} {family_name or ''}".strip()) or username
-    client = get_forgejo_client()
     req = CreateGitUserRequest(
         username=username,
         email=email or f"{username}@noreply.local",
         display_name=display_name,
+        password=password,
     )
     try:
         git_user = await client.create_user(req)
@@ -186,6 +196,31 @@ async def login_with_local_credentials(
     auth_result = await run_in_threadpool(
         lambda: AuthenticationService.authenticate_basic(username, password, db)
     )
+
+    # Provision git server account on login (idempotent — skipped if already exists)
+    def _get_user_primitives():
+        user = db.query(User).filter(User.id == auth_result.user_id).first()
+        if user:
+            return {
+                "id": str(user.id),
+                "username": user.username,
+                "email": user.email,
+                "given_name": user.given_name,
+                "family_name": user.family_name,
+            }
+        return None
+
+    user_primitives = await run_in_threadpool(_get_user_primitives)
+    if user_primitives:
+        await _provision_git_server_account(
+            user_id=user_primitives["id"],
+            username=user_primitives["username"],
+            email=user_primitives["email"],
+            given_name=user_primitives["given_name"],
+            family_name=user_primitives["family_name"],
+            db=db,
+            password=password,
+        )
 
     # Generate session tokens
     access_token = generate_token(32)

@@ -136,6 +136,17 @@ class ForgejoClient:
         if not resp.is_success:
             raise GitServerError(f"Activate user failed: {resp.status_code} {resp.text}")
 
+    async def set_user_password(self, username: str, password: str) -> None:
+        resp = await self._request(
+            "PATCH",
+            f"/admin/users/{username}",
+            json={"source_id": 0, "login_name": username, "password": password},
+        )
+        if resp.status_code == 404:
+            raise GitUserNotFoundError(username)
+        if not resp.is_success:
+            raise GitServerError(f"Set password failed for {username}: {resp.status_code} {resp.text}")
+
     async def create_user_token(self, username: str, token_name: str = "computor") -> str:
         """Create a personal access token for a user and return the token string (shown once)."""
         resp = await self._request(
