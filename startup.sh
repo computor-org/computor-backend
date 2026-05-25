@@ -109,6 +109,13 @@ else
     echo -e "Keycloak: ${YELLOW}disabled${NC} (set KEYCLOAK_ENABLED=true in .env to enable)"
 fi
 
+if [ "$GIT_SERVER" = "forgejo" ]; then
+    echo -e "Forgejo: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo.yaml"
+else
+    echo -e "Forgejo: ${YELLOW}disabled${NC} (set GIT_SERVER=forgejo in .env to enable)"
+fi
+
 # Function to safely create directories
 create_dir_if_needed() {
     local dir_path="$1"
@@ -197,6 +204,12 @@ if [ -d "computor-backend/src/defaults" ]; then
     cp -r computor-backend/src/defaults/* "${SYSTEM_DEPLOYMENT_PATH}/shared/defaults/" 2>/dev/null || true
 fi
 
+# Optional: Create Forgejo directories if enabled
+if [ "$GIT_SERVER" = "forgejo" ]; then
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/postgres"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/data"
+fi
+
 # Optional: Create Keycloak directories if enabled
 if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     echo -e "\n${GREEN}Setting up Keycloak directories...${NC}"
@@ -250,6 +263,10 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
 
     if [ "$CODER_ENABLED" = "true" ]; then
         echo "  • Coder: ${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
+    fi
+
+    if [ "$GIT_SERVER" = "forgejo" ]; then
+        echo "  • Forgejo: http://localhost:${FORGEJO_PORT:-3030}"
     fi
 
     echo -e "\n${GREEN}To stop services:${NC}"

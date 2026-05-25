@@ -58,6 +58,11 @@ detect_running_config() {
             KEYCLOAK_DETECTED=true
         fi
 
+        # Check if Forgejo is running
+        if docker ps --format "{{.Names}}" | grep -q "computor-forgejo"; then
+            FORGEJO_DETECTED=true
+        fi
+
         return 0
     fi
 
@@ -159,8 +164,14 @@ if [ "$KEYCLOAK_ENABLED" = "true" ] || [ "$KEYCLOAK_DETECTED" = true ]; then
     INCLUDE_KEYCLOAK=true
 fi
 
+INCLUDE_FORGEJO=false
+if [ "$GIT_SERVER" = "forgejo" ] || [ "$FORGEJO_DETECTED" = true ]; then
+    INCLUDE_FORGEJO=true
+fi
+
 echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
 echo -e "Keycloak: ${YELLOW}$([ "$INCLUDE_KEYCLOAK" = true ] && echo "enabled" || echo "disabled")${NC}"
+echo -e "Forgejo: ${YELLOW}$([ "$INCLUDE_FORGEJO" = true ] && echo "enabled" || echo "disabled")${NC}"
 
 # Build docker-compose command (must match startup.sh)
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
@@ -172,6 +183,9 @@ if [ "$INCLUDE_CODER" = true ]; then
 fi
 if [ "$INCLUDE_KEYCLOAK" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak.yaml"
+fi
+if [ "$INCLUDE_FORGEJO" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.forgejo.yaml"
 fi
 
 # Show what will be stopped
