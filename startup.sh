@@ -211,6 +211,12 @@ if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
             data/keycloak/computor-realm.json \
             > "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json"
     fi
+
+    # Sync custom login theme(s) into the mounted themes directory
+    if [ -d "data/keycloak/themes" ]; then
+        echo "  Syncing Keycloak themes..."
+        cp -r data/keycloak/themes/. "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes/"
+    fi
 fi
 
 # Make postgres init script executable

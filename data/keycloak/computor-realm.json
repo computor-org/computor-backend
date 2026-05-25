@@ -467,5 +467,6 @@
         "/students"
       ]
     }
-  ]
+  ],
+  "loginTheme": "computor"
 }
