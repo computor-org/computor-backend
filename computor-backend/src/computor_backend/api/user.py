@@ -10,7 +10,7 @@ from computor_types.course_member_accounts import (
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
-from computor_types.users import UserGet, UserPassword, UserScopes
+from computor_types.users import UserGet, UserScopes
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from fastapi import APIRouter, Depends
@@ -19,7 +19,6 @@ from fastapi import APIRouter, Depends
 from computor_backend.business_logic.users import (
     get_current_user,
     get_user_scopes_from_principal,
-    set_user_password,
     get_course_views_for_user,
     get_course_views_for_user_by_course,
     validate_user_course,
@@ -37,21 +36,6 @@ def get_current_user_endpoint(
 ):
     """Get the current authenticated user."""
     return get_current_user(permissions.user_id, db)
-
-@user_router.post("/password", status_code=204)
-def set_user_password_endpoint(
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    payload: UserPassword,
-    db: Session = Depends(get_db)
-):
-    """Set or update user password."""
-    set_user_password(
-        target_username=payload.username,
-        new_password=payload.password,
-        old_password=payload.password_old,
-        permissions=permissions,
-        db=db,
-    )
 
 @user_router.get(
     "/scopes",

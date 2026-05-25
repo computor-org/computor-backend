@@ -60,7 +60,7 @@ def list_all_users(
             user_map[uid] = WorkspaceRoleUser(
                 user_id=uid,
                 email=user.email,
-                username=user.username,
+                username=user.email,
                 given_name=user.given_name,
                 family_name=user.family_name,
             )
@@ -106,7 +106,7 @@ def assign_workspace_role(
     return WorkspaceRoleUser(
         user_id=str(user.id),
         email=user.email,
-        username=user.username,
+        username=user.email,
         given_name=user.given_name,
         family_name=user.family_name,
         roles=all_roles,

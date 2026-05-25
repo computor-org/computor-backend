@@ -26,7 +26,6 @@ from computor_types.services import (
     ServiceUpdate,
     ServiceQuery,
 )
-from computor_types.password_utils import create_password_hash
 
 logger = logging.getLogger(__name__)
 
@@ -59,28 +58,26 @@ def create_service_account(
     if existing_service:
         raise BadRequestException(detail=f"Service with slug '{service_data.slug}' already exists")
 
-    # Generate username from slug if not provided
-    username = service_data.username or service_data.slug
+    # Look up existing service user by email (if provided)
+    user = None
+    if service_data.email:
+        existing_user = db.query(User).filter(User.email == service_data.email).first()
+        if existing_user:
+            if not existing_user.is_service:
+                raise BadRequestException(detail=f"User with email '{service_data.email}' exists and is not a service account")
+            existing_service_for_user = db.query(Service).filter(
+                Service.user_id == existing_user.id, Service.archived_at.is_(None)
+            ).first()
+            if existing_service_for_user:
+                raise BadRequestException(
+                    detail=f"User '{service_data.email}' is already linked to service '{existing_service_for_user.slug}'"
+                )
+            user = existing_user
+            logger.info(f"Linking service to existing user: {service_data.email}")
 
-    # Check if username already exists
-    existing_user = db.query(User).filter(User.username == username).first()
-
-    if existing_user:
-        # If user exists and is a service user, link to it
-        if not existing_user.is_service:
-            raise BadRequestException(detail=f"User with username '{username}' already exists and is not a service account")
-
-        # Check if user is already linked to another service
-        existing_service_for_user = db.query(Service).filter(Service.user_id == existing_user.id, Service.archived_at.is_(None)).first()
-        if existing_service_for_user:
-            raise BadRequestException(detail=f"User '{username}' is already linked to service '{existing_service_for_user.slug}'")
-
-        user = existing_user
-        logger.info(f"Linking service to existing user: {username}")
-    else:
+    if user is None:
         # Create new service user
         try:
-            # Use explicit given_name/family_name if provided, otherwise derive from service name
             given_name = service_data.given_name
             if given_name is None:
                 given_name = service_data.name.split()[0] if service_data.name else service_data.slug
@@ -90,19 +87,17 @@ def create_service_account(
                 family_name = " ".join(service_data.name.split()[1:]) if len(service_data.name.split()) > 1 else ""
 
             user = User(
-                username=username,
                 email=service_data.email,
                 given_name=given_name,
                 family_name=family_name,
                 is_service=True,
-                password=create_password_hash(service_data.password) if service_data.password else None,
                 created_by=permissions.user_id,
                 properties={"service_type": service_data.service_type, "auto_created": False},
             )
 
             db.add(user)
-            db.flush()  # Get user ID
-            logger.info(f"Created new service user: {username}")
+            db.flush()
+            logger.info(f"Created new service user: {service_data.email or service_data.slug}")
         except Exception as e:
             raise BadRequestException(detail=f"Failed to create user: {str(e)}") from e
 

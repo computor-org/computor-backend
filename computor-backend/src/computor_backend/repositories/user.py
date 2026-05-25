@@ -43,15 +43,6 @@ class UserRepository(BaseRepository[User]):
         return 3600  # 1 hour
 
     def get_entity_tags(self, entity: User) -> Set[str]:
-        """
-        Get cache tags for a user.
-
-        Tags:
-        - user:{id} - The specific user
-        - user:list - All user list queries
-        - user:email:{email} - Email-based lookups
-        - user:username:{username} - Username-based lookups (if applicable)
-        """
         tags = {
             f"user:{entity.id}",
             "user:list",
@@ -60,21 +51,13 @@ class UserRepository(BaseRepository[User]):
         if entity.email:
             tags.add(f"user:email:{entity.email}")
 
-        # Add username tag if user has a username field
-        if hasattr(entity, 'username') and entity.username:
-            tags.add(f"user:username:{entity.username}")
-
         return tags
 
     def get_list_tags(self, **filters) -> Set[str]:
-        """Get cache tags for list queries."""
         tags = {"user:list"}
 
         if "email" in filters:
             tags.add(f"user:email:{filters['email']}")
-
-        if "username" in filters and filters.get("username"):
-            tags.add(f"user:username:{filters['username']}")
 
         return tags
 

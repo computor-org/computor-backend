@@ -1,9 +1,8 @@
 """
-Authentication API endpoints for both local and SSO authentication.
+Authentication API endpoints for SSO authentication.
 
 This module provides:
-- Local username/password authentication with Bearer tokens
-- SSO/OAuth authentication with multiple providers
+- SSO/OAuth authentication with multiple providers (Keycloak, GitLab, etc.)
 - Token refresh and logout functionality
 """
 
@@ -17,8 +16,6 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
@@ -26,139 +23,24 @@ from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
-    RateLimitException
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.redis_cache import get_redis_client
 from computor_types.auth import (
-    LocalLoginRequest,
-    LocalLoginResponse,
     LogoutResponse,
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
     ProviderInfo,
     LoginRequest,
-    UserRegistrationRequest,
-    UserRegistrationResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
 )
 
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter for this router
-limiter = Limiter(key_func=get_remote_address)
-
 auth_router = APIRouter(prefix="/auth")
-
-
-async def check_username_rate_limit(username: str, cache) -> bool:
-    """
-    Check username-based rate limiting using Redis.
-    Returns True if limit exceeded, False otherwise.
-    """
-    try:
-        rate_limit_key = f"rate_limit:username:{username}"
-        current_count = await cache.get(rate_limit_key)
-
-        if current_count is None:
-            # First attempt, set counter with 60 second expiry
-            await cache.set(rate_limit_key, "1", ex=60)
-            return False
-        else:
-            count = int(current_count)
-            if count >= 5:
-                # Rate limit exceeded
-                return True
-            else:
-                # Increment counter
-                await cache.incr(rate_limit_key)
-                return False
-    except Exception as e:
-        logger.error(f"Error checking username rate limit: {e}")
-        # On error, allow the request (fail open)
-        return False
-
-
-@auth_router.post("/login", response_model=LocalLoginResponse)
-@limiter.limit("100/minute")  # IP-based: 100 attempts per minute per IP (for shared networks)
-async def login_with_credentials(
-    login_request: LocalLoginRequest,
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-    cache = Depends(get_redis_client)
-) -> LocalLoginResponse:
-    """
-    Login with username and password to obtain Bearer tokens.
-
-    This endpoint authenticates users with local credentials and returns
-    access and refresh tokens that can be used for subsequent API requests.
-
-    The access token should be included in the Authorization header as:
-    `Authorization: Bearer <access_token>`
-
-    Alternatively, the access token is also set as an httponly cookie for
-    browser-based applications.
-
-    Rate Limits (to prevent brute-force attacks):
-    - 100 attempts per minute per IP address (allows multiple users on same network)
-    - 5 attempts per minute per username (prevents account takeover)
-
-    Returns 429 Too Many Requests if either limit is exceeded.
-    """
-    # Check username-based rate limit
-    username_limit_exceeded = await check_username_rate_limit(login_request.username, cache)
-    if username_limit_exceeded:
-        raise RateLimitException(
-            error_code="RATE_002",
-            detail=f"Too many login attempts for username '{login_request.username}'",
-            retry_after=60,
-            context={
-                "username": login_request.username,
-                "limit": 5,
-                "window_seconds": 60
-            }
-        )
-    from computor_backend.business_logic.auth import login_with_local_credentials
-    from computor_backend.utils.client_info import get_client_ip, get_user_agent
-
-    # Extract client information
-    ip_address = get_client_ip(request)
-    user_agent = get_user_agent(request)
-
-    result = await login_with_local_credentials(
-        username=login_request.username,
-        password=login_request.password,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        db=db,
-        cache=cache
-    )
-
-    # Set access token as httponly cookie
-    response.set_cookie(
-        key="ct_access_token",
-        value=result.access_token,
-        httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
-        max_age=3600  # 1 hour - should match token expiry
-    )
-
-    # Also set refresh token as httponly cookie
-    response.set_cookie(
-        key="ct_refresh_token",
-        value=result.refresh_token,
-        httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
-        max_age=604800  # 7 days - should match refresh token expiry
-    )
-
-    return result
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers() -> List[ProviderInfo]:
@@ -535,31 +417,6 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)) 
         "message": "Plugins reloaded",
         "loaded": registry.get_loaded_plugins()
     }
-
-@auth_router.post("/register", response_model=UserRegistrationResponse)
-async def register_user(
-    request: UserRegistrationRequest,
-    db: Session = Depends(get_db)
-) -> UserRegistrationResponse:
-    """
-    Register a new user with SSO provider.
-
-    Creates user in both the authentication provider and local database.
-    """
-    from computor_backend.business_logic.auth import register_sso_user
-
-    result = await register_sso_user(
-        username=request.username,
-        email=request.email,
-        password=request.password,
-        given_name=request.given_name,
-        family_name=request.family_name,
-        provider=request.provider,
-        send_verification_email=request.send_verification_email,
-        db=db
-    )
-
-    return UserRegistrationResponse(**result)
 
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(

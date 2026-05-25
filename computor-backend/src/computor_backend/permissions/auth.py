@@ -1,26 +1,13 @@
 """
 Authentication module for the Computor platform.
 
-This module provides authentication services and principal creation for three authentication methods:
+Supported authentication methods:
 
-1. **Bearer Token Authentication (Recommended)**
-   - Used after login via POST /auth/login
-   - Tokens stored in Redis with configurable TTL
-   - Supports both local and SSO authentication
-   - Format: `Authorization: Bearer <token>`
+1. **Bearer Token (SSO)** — tokens from Keycloak/OAuth flow (`Authorization: Bearer <token>`)
+2. **GitLab** — `GLP-CREDS` header with base64-encoded JSON
+3. **API Token** — `X-API-Token` header (services and automation)
 
-2. **Basic Authentication (For automation/scripts only)**
-   - Direct username/password authentication
-   - Should NOT be used by frontend applications
-   - Useful for API clients, CLI tools, CI/CD
-   - Format: `Authorization: Basic <base64(username:password)>`
-
-3. **SSO/OAuth Authentication**
-   - Keycloak, GitLab, and other OAuth providers
-   - Uses Bearer tokens after OAuth flow completes
-   - Managed through /auth/{provider}/login endpoints
-
-All authentication methods create a Principal object with user claims and permissions.
+All methods create a Principal with user claims and permissions.
 """
 
 import datetime
@@ -30,9 +17,7 @@ import base64
 import binascii
 from typing import Annotated, Optional, List
 from pydantic import BaseModel
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from fastapi.security import HTTPBasicCredentials
 from gitlab import Gitlab
 from fastapi import Depends, Request
 from fastapi.security.utils import get_authorization_scheme_param
@@ -40,9 +25,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 from computor_backend.database import get_db_session
 from computor_backend.gitlab_utils import gitlab_current_user
 from computor_types.auth import GLPAuthConfig
-from computor_types.tokens import decrypt_api_key  # TODO: Remove after migration complete
-from computor_types.password_utils import verify_password, is_argon2_hash
-from computor_backend.model.auth import Account, User
+from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.model.service import ApiToken
 from computor_backend.exceptions import NotFoundException, UnauthorizedException
@@ -79,55 +62,7 @@ class AuthenticationResult:
 
 class AuthenticationService:
     """Service for handling different authentication methods"""
-    
-    @staticmethod
-    def authenticate_basic(username: str, password: str, db: Session) -> AuthenticationResult:
-        """Authenticate using basic auth credentials"""
-        
-        results = (
-            db.query(
-                User.id,
-                User.password,
-                UserRole.role_id
-            )
-            .outerjoin(UserRole, UserRole.user_id == User.id)
-            .filter(or_(User.username == username, User.email == username))
-            .all()
-        )
 
-        if not results:
-            raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-
-        user_id, user_password = results[0][:2]
-
-        # Verify password using Argon2 or fallback to old encryption (migration support)
-        if user_password is None:
-            raise UnauthorizedException(error_code="AUTH_002", detail="No password set. Please contact administrator or use password reset.")
-
-        # Check if password is Argon2 hash (new format) or encrypted (old format)
-        if is_argon2_hash(user_password):
-            # New Argon2 verification
-            if not verify_password(password, user_password):
-                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-        else:
-            # Legacy encrypted password support (for migration period)
-            # TODO: Remove this branch after all passwords migrated
-            try:
-                if password != decrypt_api_key(user_password):
-                    raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials")
-                logger.warning(f"User '{username}' still using old password encryption. Should upgrade on next password change.")
-            except UnauthorizedException:
-                raise
-            except Exception as e:
-                # Catch decryption errors
-                logger.error(f"Password verification failed for user '{username}': {str(e)}")
-                raise UnauthorizedException(error_code="AUTH_002", detail="Invalid credentials") from e
-        
-        # Collect roles (role_id is now at index 2 after removing user_type and token_expiration)
-        role_ids = [res[2] for res in results if res[2] is not None]
-
-        return AuthenticationResult(user_id, role_ids, "basic")
-    
     @staticmethod
     def authenticate_gitlab(gitlab_config: GLPAuthConfig, db: Session) -> AuthenticationResult:
         """Authenticate using GitLab credentials"""
@@ -394,7 +329,7 @@ class ApiTokenCredentials(BaseModel):
     scheme: str = "ApiToken"
 
 
-def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials]:
+def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials]:
     """Parse authorization header to determine auth type"""
 
     # Check for API Token header (X-API-Token) - highest priority for services
@@ -429,39 +364,22 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | HTT
     if not param:
         raise UnauthorizedException("Invalid authorization format")
 
-    # Handle Bearer token (SSO only - API tokens use X-API-Token header)
     if scheme.lower() == "bearer":
         return SSOAuthCredentials(token=param, scheme="Bearer")
-
-    # Handle Basic auth
-    elif scheme.lower() == "basic":
-        try:
-            data = base64.b64decode(param).decode("ascii")
-            username, separator, password = data.partition(":")
-            if not separator:
-                raise UnauthorizedException("Invalid Basic auth format")
-            return HTTPBasicCredentials(username=username, password=password)
-        except (ValueError, UnicodeDecodeError, binascii.Error) as e:
-            logger.error(f"Failed to decode Basic auth: {e}")
-            raise UnauthorizedException("Invalid Basic auth encoding")
 
     raise UnauthorizedException(f"Unsupported auth scheme: {scheme}")
 
 
 async def get_current_principal(
     credentials: Annotated[
-        GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials,
+        GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
     ]
 ) -> Principal:
     """
     Main dependency for getting the current authenticated principal.
 
-    Supports multiple authentication methods:
-    - API Token (X-API-Token header)
-    - Basic Auth (Authorization: Basic)
-    - GitLab (GLP-CREDS header)
-    - SSO (Authorization: Bearer)
+    Supports: API Token (X-API-Token), GitLab (GLP-CREDS), SSO Bearer token.
     """
 
     # For cacheable auth methods, check cache FIRST before creating DB connection
@@ -500,12 +418,6 @@ async def get_current_principal(
             )
             principal = PrincipalBuilder.build(auth_result, db)
 
-        elif isinstance(credentials, HTTPBasicCredentials):
-            auth_result = AuthenticationService.authenticate_basic(
-                credentials.username, credentials.password, db
-            )
-            principal = PrincipalBuilder.build(auth_result, db)
-
         elif isinstance(credentials, GLPAuthConfig):
             auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
             principal = PrincipalBuilder.build(auth_result, db)
@@ -531,7 +443,7 @@ async def get_current_principal(
         return principal
 
 
-def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials | ApiTokenCredentials]:
+def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials]:
     """
     Parse authorization header but return None instead of raising exception.
     Used for endpoints that accept but don't require authentication (like token refresh).
@@ -545,28 +457,20 @@ def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthCon
 async def get_current_principal_optional(
     request: Request,
     credentials: Annotated[
-        Optional[GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials],
+        Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials],
         Depends(parse_authorization_header_optional)
     ] = None
 ) -> Optional[Principal]:
     """
     Get current principal if valid credentials are provided, None otherwise.
-    This allows endpoints to work with both authenticated and unauthenticated requests.
-    Used for token refresh where the access token may be expired.
+    Used for endpoints that accept but don't require authentication.
     """
     if not credentials:
         return None
 
     try:
         with get_db_session() as db:
-            # Route to appropriate authentication method
-            if isinstance(credentials, HTTPBasicCredentials):
-                auth_result = AuthenticationService.authenticate_basic(
-                    credentials.username, credentials.password, db
-                )
-                return PrincipalBuilder.build(auth_result, db)
-
-            elif isinstance(credentials, GLPAuthConfig):
+            if isinstance(credentials, GLPAuthConfig):
                 auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
                 cache_key = hashlib.sha256(
                     f"{credentials.url}::{credentials.token}".encode()
@@ -598,30 +502,30 @@ class HeaderAuthCredentials(BaseModel):
 
 def get_auth_credentials(
     credentials: Annotated[
-        GLPAuthConfig | HTTPBasicCredentials | SSOAuthCredentials,
+        GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
     ]
 ) -> HeaderAuthCredentials:
     """Get information about the authentication method used"""
-    
+
     if isinstance(credentials, GLPAuthConfig):
         return HeaderAuthCredentials(
             type="gitlab",
             credentials={"url": credentials.url}
         )
-    
-    elif isinstance(credentials, HTTPBasicCredentials):
-        return HeaderAuthCredentials(
-            type="basic",
-            credentials={"username": credentials.username}
-        )
-    
+
     elif isinstance(credentials, SSOAuthCredentials):
         return HeaderAuthCredentials(
             type="sso",
             credentials={"scheme": credentials.scheme}
         )
-    
+
+    elif isinstance(credentials, ApiTokenCredentials):
+        return HeaderAuthCredentials(
+            type="api_token",
+            credentials={}
+        )
+
     return HeaderAuthCredentials(type="unknown", credentials={})
 
 
@@ -637,7 +541,7 @@ def get_permissions_from_mockup(user_id: str) -> Principal:
                 db.query(User.id, UserRole.role_id)
                 .select_from(User)
                 .outerjoin(UserRole, UserRole.user_id == User.id)
-                .filter(or_(User.id == user_id, User.username == user_id))
+                .filter(User.id == user_id)
                 .all()
             )
             

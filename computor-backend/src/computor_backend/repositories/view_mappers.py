@@ -204,7 +204,7 @@ def _build_submission_group_payloads(
             id=str(member.id),
             user_id=str(member.course_member.user_id),
             course_member_id=str(member.course_member_id),
-            username=member.course_member.user.username if member.course_member.user else None,
+            username=member.course_member.user.email if member.course_member.user else None,
             full_name=(
                 f"{member.course_member.user.given_name} {member.course_member.user.family_name}".strip()
                 if member.course_member.user else None

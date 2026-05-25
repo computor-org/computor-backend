@@ -5,12 +5,11 @@ Admins and _user_manager role holders can create invite links.
 Invite acceptance is public (no authentication required).
 """
 
-import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
@@ -31,7 +30,6 @@ from computor_types.invites import (
     InviteLinkList,
     InviteLinkPublic,
 )
-from computor_types.password_utils import create_password_hash, PasswordValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -144,19 +142,18 @@ async def get_invite_public(
     )
 
 
-@invites_router.post("/invites/{token}/accept", response_model=dict)
+@invites_router.post("/invites/{token}/accept", response_model=dict, status_code=201)
 async def accept_invite(
     token: str,
     payload: InviteAccept,
-    request: Request,
-    response: Response,
     db: Session = Depends(get_db),
 ) -> dict:
     """
-    Accept an invite and create a new user account.
+    Accept an invite and pre-create a user account.
 
-    On success the response sets HttpOnly cookies (ct_access_token /
-    ct_refresh_token) so the browser is immediately authenticated.
+    Creates a User record with the provided name and email. The user then
+    logs in via SSO (Keycloak), which will find and link to this pre-created
+    account on first login.
     """
     invite = _resolve_token(token, db)
 
@@ -164,38 +161,18 @@ async def accept_invite(
     if invite.email and invite.email.lower() != payload.email.lower():
         raise BadRequestException("This invite is restricted to a different email address")
 
-    # Password confirmation
-    if payload.password != payload.confirm_password:
-        raise BadRequestException("Passwords do not match")
-
-    # Uniqueness checks
-    if db.query(User).filter(User.username == payload.username).first():
-        raise BadRequestException(f"Username '{payload.username}' is already taken")
+    # Duplicate email check
     if db.query(User).filter(User.email == payload.email).first():
         raise BadRequestException(f"Email '{payload.email}' is already registered")
 
-    # Hash password
-    try:
-        password_hash = create_password_hash(
-            payload.password,
-            validate=True,
-            username=payload.username,
-            email=payload.email,
-        )
-    except PasswordValidationError as e:
-        raise BadRequestException(str(e))
-
-    # Create user
+    # Create user (email-only, no password — authentication is via SSO)
     user = User(
-        username=payload.username,
         email=payload.email,
         given_name=payload.given_name,
         family_name=payload.family_name,
-        password=password_hash,
-        password_reset_required=False,
     )
     db.add(user)
-    db.flush()  # Get user.id without committing
+    db.flush()
 
     # Assign roles from invite
     for role_id in (invite.roles or []):
@@ -204,25 +181,12 @@ async def accept_invite(
     # Consume invite
     invite.use_count += 1
     db.commit()
-    db.refresh(user)
 
-    logger.info(f"User {user.id} ({user.username}) created via invite {invite.id}")
-
-    # Create session (auto-login)
-    from computor_backend.utils.client_info import get_client_ip, get_user_agent, make_device_label
-    access_token, refresh_token = await _create_session(
-        user_id=str(user.id),
-        ip_address=get_client_ip(request),
-        user_agent=get_user_agent(request),
-        db=db,
-    )
-
-    _set_auth_cookies(response, access_token, refresh_token)
+    logger.info(f"User {user.id} ({user.email}) pre-created via invite {invite.id}")
 
     return {
         "user_id": str(user.id),
-        "username": user.username,
-        "access_token": access_token,
+        "email": payload.email,
     }
 
 
@@ -246,68 +210,6 @@ def _resolve_token(token: str, db: Session) -> InviteLink:
     if invite.use_count >= invite.max_uses:
         raise BadRequestException("This invite has already been used the maximum number of times")
     return invite
-
-
-async def _create_session(
-    user_id: str,
-    ip_address: str,
-    user_agent: str,
-    db: Session,
-) -> tuple[str, str]:
-    """Create Redis + DB session for a user. Returns (access_token, refresh_token)."""
-    from computor_backend.utils.token_hash import generate_token, hash_token, hash_token_binary
-    from computor_backend.utils.client_info import make_device_label
-    from computor_backend.repositories.session_repo import SessionRepository
-    from computor_backend.redis_cache import get_redis_client
-    from computor_backend.model.auth import Session as SessionModel
-    from computor_backend.business_logic.auth import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
-
-    access_token = generate_token(32)
-    refresh_token = generate_token(32)
-    access_token_hash = hash_token(access_token)
-    refresh_token_hash_binary = hash_token_binary(refresh_token)
-
-    redis_client = await get_redis_client()
-    now = datetime.now(timezone.utc)
-
-    await redis_client.set(
-        f"sso_session:{access_token_hash}",
-        json.dumps({"user_id": user_id, "provider": "local", "created_at": str(now), "token_type": "access"}),
-        ex=ACCESS_TOKEN_TTL,
-    )
-    await redis_client.set(
-        f"refresh_token:{hash_token(refresh_token)}",
-        json.dumps({
-            "user_id": user_id,
-            "provider": "local",
-            "created_at": str(now),
-            "expires_at": str(now + timedelta(seconds=REFRESH_TOKEN_TTL)),
-            "token_type": "refresh",
-            "access_token_hash": access_token_hash,
-        }),
-        ex=REFRESH_TOKEN_TTL,
-    )
-
-    session_repo = SessionRepository(db, SessionModel, None)
-    session_repo.create(SessionModel(
-        user_id=user_id,
-        session_id=access_token_hash,
-        refresh_token_hash=refresh_token_hash_binary,
-        created_ip=ip_address,
-        last_ip=ip_address,
-        user_agent=user_agent,
-        device_label=make_device_label(user_agent),
-        expires_at=now + timedelta(seconds=ACCESS_TOKEN_TTL),
-        refresh_expires_at=now + timedelta(seconds=REFRESH_TOKEN_TTL),
-        properties={"provider": "local", "login_method": "invite"},
-    ))
-
-    return access_token, refresh_token
-
-
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
-    response.set_cookie(key="ct_access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=3600)
-    response.set_cookie(key="ct_refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800)
 
 
 def _to_get(invite: InviteLink) -> InviteLinkGet:

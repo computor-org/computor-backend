@@ -3,7 +3,6 @@ import os
 from computor_backend.exceptions.exceptions import NotFoundException
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager
 from computor_backend.permissions.core import db_apply_roles
-from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
@@ -16,7 +15,6 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
-from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -141,40 +139,6 @@ async def initialize_plugin_registry_with_config():
         except OSError:
             logger.debug("Failed to remove temporary plugin config %s", config_file, exc_info=True)
 
-async def init_admin_user(db: Session):
-
-    username = os.environ.get("API_ADMIN_USER")
-    password = os.environ.get("API_ADMIN_PASSWORD")
-
-    admin = db.query(User).filter(User.username == username).first()
-
-    if admin != None:
-        return
-    
-    try:
-        admin_user = User(
-            given_name="Admin",
-            family_name="System",
-            username=username,
-            password=create_password_hash(password, validate=False)
-        )
-
-        db.add(admin_user)
-        db.commit()
-        db.refresh(admin_user)
-
-        db.add(
-            UserRole(
-                user_id=admin_user.id,
-                role_id="_admin"
-            )
-        )
-        db.commit()
-
-    except Exception:
-        logger.critical("Admin user could not be created. The backend is shutting down.", exc_info=True)
-        quit(1)
-
 async def startup_logic():
 
     with get_db_session() as db:
@@ -183,8 +147,6 @@ async def startup_logic():
         db_apply_roles("_workspace_user",claims_workspace_user(),db)
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
         db_apply_roles("_git_manager",claims_git_manager(),db)
-
-        await init_admin_user(db)
 
     # Initialize plugin registry with configuration (loads Keycloak provider, etc.)
     await initialize_plugin_registry_with_config()
@@ -482,12 +444,6 @@ app.include_router(
 app.include_router(
     invites_router,
     tags=["invites", "user-management"]
-)
-
-app.include_router(
-    password_reset_router,
-    tags=["authentication", "password-management"],
-    dependencies=[Depends(get_redis_client)]  # Some endpoints require auth, handled individually
 )
 
 app.include_router(

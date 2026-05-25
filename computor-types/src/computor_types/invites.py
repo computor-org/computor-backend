@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
-import re
 
 
 class InviteLinkCreate(BaseModel):
@@ -54,19 +53,9 @@ class InviteLinkPublic(BaseModel):
 
 
 class InviteAccept(BaseModel):
-    username: str = Field(..., min_length=2, max_length=50)
     given_name: str = Field(..., min_length=1, max_length=100)
     family_name: str = Field(..., min_length=1, max_length=100)
     email: str = Field(..., description="Required; must match invite restriction if set")
-    password: str = Field(..., min_length=8)
-    confirm_password: str
-
-    @field_validator('username')
-    @classmethod
-    def username_valid(cls, v: str) -> str:
-        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', v):
-            raise ValueError("Username may only contain letters, digits, underscores, hyphens, and dots")
-        return v
 
     @field_validator('email')
     @classmethod

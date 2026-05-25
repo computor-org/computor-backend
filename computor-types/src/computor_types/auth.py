@@ -10,25 +10,6 @@ class GLPAuthConfig(AuthConfig):
     url: str
     token: str
 
-class BasicAuthConfig(AuthConfig):
-    username: str
-    password: str
-
-# Local authentication DTOs
-
-class LocalLoginRequest(BaseModel):
-    """Request model for local username/password login."""
-    username: str = Field(..., min_length=1, description="Username or email")
-    password: str = Field(..., min_length=1, description="Password")
-
-class LocalLoginResponse(BaseModel):
-    """Response model after successful local login."""
-    access_token: str = Field(..., description="Bearer access token for API requests")
-    refresh_token: str = Field(..., description="Refresh token to obtain new access token")
-    expires_in: int = Field(..., description="Access token expiration time in seconds")
-    user_id: str = Field(..., description="User ID")
-    token_type: str = Field(default="Bearer", description="Token type")
-
 class LogoutRequest(BaseModel):
     """Request model for logout."""
     provider: Optional[str] = Field(None, description="Provider name for SSO logout (optional)")

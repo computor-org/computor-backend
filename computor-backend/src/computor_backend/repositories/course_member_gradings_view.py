@@ -180,7 +180,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             member_info = (
                 self.db.query(
                     User.id.label("user_id"),
-                    User.username,
+                    User.email.label("username"),
                     User.given_name,
                     User.family_name,
                     StudentProfile.student_id,

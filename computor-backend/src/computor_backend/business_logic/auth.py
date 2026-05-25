@@ -26,8 +26,6 @@ from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 from computor_types.auth import (
-    LocalLoginRequest,
-    LocalLoginResponse,
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
     LogoutResponse,
@@ -38,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 async def _provision_git_server_account(
     user_id: str,
-    username: str,
+    email: str,
     db: Session,
 ) -> None:
     """Record that this user has an account on the system git server.
@@ -67,7 +65,7 @@ async def _provision_git_server_account(
         account = Account(
             provider=settings.git_server_url,
             type=settings.git_server.lower(),
-            provider_account_id=username,
+            provider_account_id=email,
             user_id=user_id,
             properties={},
         )
@@ -76,7 +74,7 @@ async def _provision_git_server_account(
             db.commit()
         except Exception as e:
             db.rollback()
-            logger.warning(f"Failed to store git server Account for {username}: {e}")
+            logger.warning(f"Failed to store git server Account for {email}: {e}")
 
     await run_in_threadpool(_check_and_insert)
 
@@ -115,132 +113,6 @@ async def invalidate_principal_cache_for_token(token: str, cache):
 
     except Exception as e:
         logger.warning(f"Error invalidating Principal cache: {e}")
-
-
-async def login_with_local_credentials(
-    username: str,
-    password: str,
-    ip_address: str,
-    user_agent: str,
-    db: Session,
-    cache = None,
-) -> LocalLoginResponse:
-    """
-    Authenticate user with local credentials and generate Bearer tokens.
-
-    Args:
-        username: Username or email
-        password: User password
-        ip_address: Client IP address
-        user_agent: User agent string
-        db: Database session
-        cache: Redis cache instance
-
-    Returns:
-        LocalLoginResponse with access and refresh tokens
-
-    Raises:
-        UnauthorizedException: If credentials are invalid
-    """
-    from computor_backend.utils.token_hash import generate_token, hash_token, hash_token_binary
-    from computor_backend.utils.client_info import make_device_label
-    from computor_backend.repositories.session_repo import SessionRepository
-
-    # Authenticate using the AuthenticationService (wrap blocking DB query)
-    auth_result = await run_in_threadpool(
-        lambda: AuthenticationService.authenticate_basic(username, password, db)
-    )
-
-    # Record git server account link (idempotent — skipped if row already exists)
-    def _get_actual_username():
-        user = db.query(User).filter(User.id == auth_result.user_id).first()
-        return user.username if user else None
-
-    actual_username = await run_in_threadpool(_get_actual_username)
-    if actual_username:
-        await _provision_git_server_account(
-            user_id=str(auth_result.user_id),
-            username=actual_username,
-            db=db,
-        )
-
-    # Generate session tokens
-    access_token = generate_token(32)
-    refresh_token = generate_token(32)
-
-    # Hash tokens for storage
-    access_token_hash = hash_token(access_token)
-    refresh_token_hash_binary = hash_token_binary(refresh_token)
-
-    # Store session in Redis
-    redis_client = await get_redis_client()
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(seconds=ACCESS_TOKEN_TTL)
-    refresh_expires_at = now + timedelta(seconds=REFRESH_TOKEN_TTL)
-
-    # Store HASHED access token in Redis
-    access_session_data = {
-        "user_id": str(auth_result.user_id),
-        "provider": "local",
-        "created_at": str(now),
-        "token_type": "access",
-    }
-
-    await redis_client.set(
-        f"sso_session:{access_token_hash}",  # Store hash, not plain token
-        json.dumps(access_session_data),
-        ex=ACCESS_TOKEN_TTL,
-    )
-
-    # Store HASHED refresh token in Redis
-    refresh_session_data = {
-        "user_id": str(auth_result.user_id),
-        "provider": "local",
-        "created_at": str(now),
-        "expires_at": str(now + timedelta(seconds=REFRESH_TOKEN_TTL)),  # Absolute expiration
-        "token_type": "refresh",
-        "access_token_hash": access_token_hash,  # Reference to access token
-    }
-
-    await redis_client.set(
-        f"refresh_token:{hash_token(refresh_token)}",  # Store hash
-        json.dumps(refresh_session_data),
-        ex=REFRESH_TOKEN_TTL,  # Redis TTL as backup
-    )
-
-    # Create Session in database with device tracking
-    from computor_backend.model.auth import Session as SessionModel
-
-    device_label = make_device_label(user_agent)
-    session_repo = SessionRepository(db, SessionModel, cache)
-
-    # Create session model instance
-    session = SessionModel(
-        user_id=str(auth_result.user_id),
-        session_id=access_token_hash,  # Store HASH in DB
-        refresh_token_hash=refresh_token_hash_binary,  # Binary hash
-        created_ip=ip_address,
-        last_ip=ip_address,
-        user_agent=user_agent,
-        device_label=device_label,
-        expires_at=expires_at,
-        refresh_expires_at=refresh_expires_at,
-        properties={
-            "provider": "local",
-            "login_method": "credentials"
-        }
-    )
-    session = session_repo.create(session)
-
-    logger.info(f"Local login successful for user {auth_result.user_id}, session {session.id}, device: {device_label}")
-
-    return LocalLoginResponse(
-        access_token=access_token,  # Return PLAIN token to client
-        refresh_token=refresh_token,  # Return PLAIN token to client
-        expires_in=ACCESS_TOKEN_TTL,
-        user_id=str(auth_result.user_id),
-        token_type="Bearer",
-    )
 
 
 async def refresh_local_token(
@@ -572,17 +444,20 @@ async def handle_sso_callback(
             # New account - create user
             is_new_user = True
 
-            # Create new user
-            user = User(
-                given_name=user_info.given_name or "",
-                family_name=user_info.family_name or "",
-                username=user_info.username
-                or user_info.email
-                or f"{provider}_{user_info.provider_id}",
-                email=user_info.email,
+            # Create new user — check for pre-existing user by email (e.g. from invite)
+            user = (
+                db.query(User).filter(User.email == user_info.email).first()
+                if user_info.email
+                else None
             )
-            db.add(user)
-            db.flush()
+            if user is None:
+                user = User(
+                    given_name=user_info.given_name or "",
+                    family_name=user_info.family_name or "",
+                    email=user_info.email,
+                )
+                db.add(user)
+                db.flush()
 
             # Create account
             account = Account(
@@ -622,7 +497,6 @@ async def handle_sso_callback(
         user_primitives = {
             "id": str(user.id),
             "account_id": str(account.id),
-            "username": user.username,
             "email": user.email,
             "given_name": user.given_name,
             "family_name": user.family_name,
@@ -634,7 +508,7 @@ async def handle_sso_callback(
 
     await _provision_git_server_account(
         user_id=user_primitives["id"],
-        username=user_primitives["username"],
+        email=user_primitives["email"],
         db=db,
     )
 
@@ -644,7 +518,6 @@ async def handle_sso_callback(
         "user_id": user_primitives["id"],
         "account_id": user_primitives["account_id"],
         "provider": provider,
-        "username": user_primitives["username"],
         "email": user_primitives["email"],
         "created_at": str(datetime.now(timezone.utc)),
         # Stored so /auth/{provider}/logout can pass id_token_hint to Keycloak
@@ -686,129 +559,6 @@ async def handle_sso_callback(
         "token": api_session_token,
         "refresh_token": auth_result.refresh_token if auth_result.refresh_token else "",
         "is_new_user": is_new_user,
-    }
-
-
-async def register_sso_user(
-    username: str,
-    email: str,
-    password: str,
-    given_name: str,
-    family_name: str,
-    provider: str,
-    send_verification_email: bool,
-    db: Session,
-) -> Dict[str, Any]:
-    """
-    Register a new user with SSO provider.
-
-    Args:
-        username: Username
-        email: Email address
-        password: Password
-        given_name: First name
-        family_name: Last name
-        provider: Authentication provider
-        send_verification_email: Whether to send verification email
-        db: Database session
-
-    Returns:
-        Dict with user_id, provider_user_id, username, email, message
-
-    Raises:
-        BadRequestException: If provider not enabled or user exists
-    """
-    # Validate provider
-    registry = get_plugin_registry()
-    if provider not in registry.get_enabled_plugins():
-        raise BadRequestException(f"Authentication provider not enabled: {provider}")
-
-    # Check if user already exists in local database (wrap blocking query)
-    existing_user = await run_in_threadpool(
-        lambda: db.query(User)
-        .filter((User.username == username) | (User.email == email))
-        .first()
-    )
-
-    if existing_user:
-        raise BadRequestException("User with this username or email already exists")
-
-    # Create user in authentication provider
-    if provider == "keycloak":
-        keycloak_admin = KeycloakAdminClient()
-
-        # Check if user exists in Keycloak
-        if await keycloak_admin.user_exists(username):
-            raise BadRequestException("User already exists in Keycloak")
-
-        # Create Keycloak user
-        keycloak_user = KeycloakUser(
-            username=username,
-            email=email,
-            firstName=given_name,
-            lastName=family_name,
-            enabled=True,
-            emailVerified=False,
-            credentials=[
-                {"type": "password", "value": password, "temporary": False}
-            ],
-        )
-
-        provider_user_id = await keycloak_admin.create_user(keycloak_user)
-
-        # Send verification email if requested
-        if send_verification_email and email:
-            try:
-                await keycloak_admin.send_verify_email(provider_user_id)
-            except Exception as e:
-                logger.warning(f"Failed to send verification email: {e}")
-    else:
-        raise BadRequestException(
-            f"Registration not implemented for provider: {provider}"
-        )
-
-    # Create user in local database (wrap blocking DB operations)
-    def _create_local_user():
-        local_user = User(
-            given_name=given_name,
-            family_name=family_name,
-            username=username,
-            email=email,
-        )
-        db.add(local_user)
-        db.flush()
-
-        # Create account linking to provider
-        account = Account(
-            provider=provider,
-            type="oidc",  # Keycloak uses OIDC
-            provider_account_id=provider_user_id,
-            user_id=local_user.id,
-            properties={
-                "email": email,
-                "username": username,
-                "registration_date": str(datetime.now(timezone.utc)),
-            },
-        )
-        db.add(account)
-
-        user_id = str(local_user.id)
-        db.commit()
-        return user_id
-
-    local_user_id = await run_in_threadpool(_create_local_user)
-    await _provision_git_server_account(
-        user_id=local_user_id,
-        username=username,
-        db=db,
-    )
-
-    return {
-        "user_id": local_user_id,
-        "provider_user_id": provider_user_id,
-        "username": username,
-        "email": email,
-        "message": f"User registered successfully. {'Verification email sent.' if send_verification_email else ''}",
     }
 
 
@@ -886,7 +636,6 @@ async def refresh_sso_token(
             "user_id": str(user.id),
             "account_id": str(account.id),
             "provider": provider,
-            "username": user.username,
             "email": user.email,
             "created_at": str(datetime.now(timezone.utc)),
             "refreshed_at": str(datetime.now(timezone.utc)),
@@ -1012,7 +761,7 @@ async def verify_user_with_gitlab_pat(
     user = db.query(User).filter(User.email == gitlab_email.lower()).first()
 
     if user:
-        logger.info(f"Found user {user.username} (ID: {user.id}) by User.email")
+        logger.info(f"Found user {user.email} (ID: {user.id}) by User.email")
     else:
         # If not found by User.email, try StudentProfile.student_email
         # Join with Organization and filter by GitLab URL in the query
@@ -1034,7 +783,7 @@ async def verify_user_with_gitlab_pat(
         if student_profile:
             user = student_profile.user
             logger.info(
-                f"Found user {user.username} (ID: {user.id}) via StudentProfile.student_email "
+                f"Found user {user.email} (ID: {user.id}) via StudentProfile.student_email "
                 f"in organization {student_profile.organization_id}"
             )
         else:
@@ -1042,7 +791,7 @@ async def verify_user_with_gitlab_pat(
                 f"No user found with email '{gitlab_email}' in any organization using {gitlab_url}"
             )
 
-    logger.info(f"Successfully verified user {user.username} (ID: {user.id}) with GitLab email {gitlab_email}")
+    logger.info(f"Successfully verified user {user.email} (ID: {user.id}) with GitLab email {gitlab_email}")
 
     # 5. Return user and GitLab info
     gitlab_user_data = {
@@ -1053,7 +802,7 @@ async def verify_user_with_gitlab_pat(
     }
 
     logger.info(
-        f"Successfully verified user {user.username} via GitLab PAT "
+        f"Successfully verified user {user.email} via GitLab PAT "
         f"(GitLab user: {gitlab_user.username}, instance: {gitlab_url})"
     )
 
@@ -1105,7 +854,7 @@ async def find_or_create_gitlab_account(
                 "name": gitlab_user_data['name'],
                 "last_verified": str(datetime.now(timezone.utc)),
             }
-            logger.info(f"Updated existing GitLab account for user {user.username}")
+            logger.info(f"Updated existing GitLab account for user {user.email}")
         else:
             # Create new account using CORRECT schema pattern
             account = Account(
@@ -1122,7 +871,7 @@ async def find_or_create_gitlab_account(
                 },
             )
             db.add(account)
-            logger.info(f"Created new GitLab account for user {user.username}")
+            logger.info(f"Created new GitLab account for user {user.email}")
 
         db.commit()
         db.refresh(account)

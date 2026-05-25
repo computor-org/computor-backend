@@ -268,5 +268,5 @@ async def _get_user_display_name(user_id: str) -> Optional[str]:
         if user:
             if user.given_name and user.family_name:
                 return f"{user.given_name} {user.family_name}"
-            return user.given_name or user.family_name or user.username
+            return user.given_name or user.family_name or user.email
     return None
