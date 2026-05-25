@@ -20,6 +20,7 @@ Reads GIT_SERVER_URL / GIT_SERVER from the .env file in the repo root
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -45,7 +46,15 @@ def _get_db_session():
     return get_db_session().__enter__()
 
 
-def sync_users(dry_run: bool = False, only_username: str | None = None):
+def _username_from_email(email: str) -> str:
+    """Derive a valid git server username from an email address."""
+    local = email.split("@")[0]
+    username = re.sub(r"[^a-zA-Z0-9._-]", "-", local)
+    username = re.sub(r"-{2,}", "-", username).strip("-")
+    return username or "user"
+
+
+def sync_users(dry_run: bool = False, only_email: str | None = None):
     git_server = os.environ.get("GIT_SERVER", "").strip()
     git_server_url = os.environ.get("GIT_SERVER_URL", "").strip()
 
@@ -70,11 +79,11 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
         )
     }
 
-    query = 'SELECT id, username FROM "user" WHERE is_service = false'
+    query = 'SELECT id, email FROM "user" WHERE is_service = false'
     params: dict = {}
-    if only_username:
-        query += " AND username = :u"
-        params["u"] = only_username
+    if only_email:
+        query += " AND email = :e"
+        params["e"] = only_email
     users = list(db.execute(text(query), params))
 
     if not users:
@@ -92,11 +101,12 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
 
     inserted = skipped = failed = 0
 
-    for user_id, username in to_provision:
+    for user_id, email in to_provision:
         user_id = str(user_id)
+        git_username = _username_from_email(email or user_id)
 
         if dry_run:
-            print(f"  [dry-run] would link  {username}")
+            print(f"  [dry-run] would link  {email}  (git: {git_username})")
             skipped += 1
             continue
 
@@ -112,17 +122,17 @@ def sync_users(dry_run: bool = False, only_username: str | None = None):
                 {
                     "provider": git_server_url,
                     "type": provider_type,
-                    "account_id": username,
+                    "account_id": git_username,
                     "user_id": user_id,
                     "props": json.dumps({}),
                 },
             )
             db.commit()
-            print(f"  linked  {username}")
+            print(f"  linked  {email}  (git: {git_username})")
             inserted += 1
         except Exception as e:
             db.rollback()
-            print(f"  FAILED  {username}: {e}")
+            print(f"  FAILED  {email}: {e}")
             failed += 1
 
     print()
@@ -139,9 +149,9 @@ def main():
         description="Link computor users to the system git server in the Account table"
     )
     parser.add_argument("--dry-run", action="store_true", help="Print what would happen without making changes")
-    parser.add_argument("--user", metavar="USERNAME", help="Link a single user instead of all")
+    parser.add_argument("--user", metavar="EMAIL", help="Link a single user by email instead of all")
     args = parser.parse_args()
-    sync_users(dry_run=args.dry_run, only_username=args.user)
+    sync_users(dry_run=args.dry_run, only_email=args.user)
 
 
 if __name__ == "__main__":

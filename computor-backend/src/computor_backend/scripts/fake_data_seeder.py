@@ -56,7 +56,6 @@ def create_users(session, count=50):
             given_name=fake.first_name(),
             family_name=fake.last_name(),
             email=fake.unique.email(),
-            username=fake.unique.user_name(),
         )
         session.add(user)
         users.append(user)
@@ -615,9 +614,8 @@ def clear_fake_data(session):
     # Delete all organizations - we'll recreate them
     session.query(Organization).delete(synchronize_session=False)
 
-    # Delete users except admin
-    admin_username = os.environ.get('API_ADMIN_USER', 'admin')
-    session.query(User).filter(User.username != admin_username).delete(synchronize_session=False)
+    # Delete all non-service users (service accounts are managed separately)
+    session.query(User).filter(User.is_service == False).delete(synchronize_session=False)
 
     session.commit()
     print("✅ Cleared existing fake data")

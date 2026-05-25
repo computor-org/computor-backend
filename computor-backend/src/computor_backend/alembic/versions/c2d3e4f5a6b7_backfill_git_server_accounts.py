@@ -14,6 +14,7 @@ from alembic import op
 import sqlalchemy as sa
 import os
 import json
+import re
 import secrets
 import string
 import logging
@@ -29,6 +30,13 @@ depends_on: Union[str, Sequence[str], None] = None
 def _generate_password() -> str:
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
     return "".join(secrets.choice(alphabet) for _ in range(24))
+
+
+def _username_from_email(email: str) -> str:
+    local = email.split("@")[0]
+    username = re.sub(r"[^a-zA-Z0-9._-]", "-", local)
+    username = re.sub(r"-{2,}", "-", username).strip("-")
+    return username or "user"
 
 
 def upgrade() -> None:
@@ -82,16 +90,18 @@ def upgrade() -> None:
             if user_id in existing_user_ids:
                 continue
 
-            display_name = (f"{given_name or ''} {family_name or ''}".strip()) or username
-            safe_email = email or f"{username}@noreply.local"
+            # username column may be NULL for Keycloak-SSO-only users; derive from email
+            git_username = username or (email and _username_from_email(email)) or str(user_id)
+            display_name = (f"{given_name or ''} {family_name or ''}".strip()) or git_username
+            safe_email = email or f"{git_username}@noreply.local"
 
             # Try to create; fall back to fetching if already exists
             git_user_data = None
             try:
                 payload = {
                     "source_id": 0,
-                    "login_name": username,
-                    "username": username,
+                    "login_name": git_username,
+                    "username": git_username,
                     "email": safe_email,
                     "full_name": display_name,
                     "password": _generate_password(),
@@ -102,25 +112,25 @@ def upgrade() -> None:
                 resp = client.post("/api/v1/admin/users", json=payload)
                 if resp.status_code == 422:
                     # Already exists — fetch
-                    r2 = client.get(f"/api/v1/users/{username}")
+                    r2 = client.get(f"/api/v1/users/{git_username}")
                     if r2.is_success:
                         git_user_data = r2.json()
                     else:
-                        logger.warning(f"User {username} exists on git server but fetch failed: {r2.status_code}")
+                        logger.warning(f"User {git_username} exists on git server but fetch failed: {r2.status_code}")
                         continue
                 elif resp.is_success:
                     git_user_data = resp.json()
                 else:
-                    logger.warning(f"Failed to create git user {username}: {resp.status_code} {resp.text[:200]}")
+                    logger.warning(f"Failed to create git user {git_username}: {resp.status_code} {resp.text[:200]}")
                     continue
             except Exception as e:
-                logger.warning(f"Git server error for {username}: {e}")
+                logger.warning(f"Git server error for {git_username}: {e}")
                 continue
 
             if not git_user_data:
                 continue
 
-            git_username = git_user_data.get("login", username)
+            git_username = git_user_data.get("login", git_username)
             git_user_id = git_user_data.get("id")
 
             try:
@@ -141,7 +151,7 @@ def upgrade() -> None:
                     },
                 )
             except Exception as e:
-                logger.warning(f"Failed to insert Account row for {username}: {e}")
+                logger.warning(f"Failed to insert Account row for {git_username}: {e}")
 
 
 def downgrade() -> None:

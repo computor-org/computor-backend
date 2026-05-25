@@ -181,7 +181,7 @@ def create_api_token(
         default_scopes = get_default_scopes_for_service(str(target_user_id), db, cache)
         if default_scopes:
             scopes = default_scopes
-            logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
+            logger.info(f"Using default scopes for service account {user.email}: {len(scopes)} scopes")
         else:
             scopes = []
 
@@ -208,7 +208,7 @@ def create_api_token(
             db.refresh(api_token)
 
             logger.info(
-                f"Created API token '{api_token.name}' for user {user.username} "
+                f"Created API token '{api_token.name}' for user {user.email} "
                 f"(prefix: {token_prefix})"
             )
 
@@ -495,7 +495,7 @@ def create_api_token_admin(
         default_scopes = get_default_scopes_for_service(token_data.user_id, db, cache)
         if default_scopes:
             scopes = default_scopes
-            logger.info(f"Using default scopes for service account {user.username}: {len(scopes)} scopes")
+            logger.info(f"Using default scopes for service account {user.email}: {len(scopes)} scopes")
         else:
             scopes = []
 
@@ -516,7 +516,7 @@ def create_api_token_admin(
         db.refresh(api_token)
 
         logger.info(
-            f"Created API token (admin-predefined) '{api_token.name}' for user {user.username} "
+            f"Created API token (admin-predefined) '{api_token.name}' for user {user.email} "
             f"(prefix: {token_prefix})"
         )
 

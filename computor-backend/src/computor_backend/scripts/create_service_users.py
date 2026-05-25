@@ -139,10 +139,10 @@ def create_service_user_with_token(
     """
     slug = service_def["slug"]
 
-    # Check if service user already exists
-    existing_user = db.query(User).filter(User.username == service_def["username"]).first()
+    # Check if service user already exists (by email)
+    existing_user = db.query(User).filter(User.email == service_def["email"]).first()
     if existing_user:
-        print(f"  ⚠️  Service user '{service_def['username']}' already exists (ID: {existing_user.id})")
+        print(f"  ⚠️  Service user '{service_def['email']}' already exists (ID: {existing_user.id})")
 
         # Check if service record exists
         existing_service = db.query(Service).filter(Service.user_id == existing_user.id).first()
@@ -162,12 +162,10 @@ def create_service_user_with_token(
         user_properties["language"] = service_def["language"]
 
     user = User(
-        username=service_def["username"],
         email=service_def["email"],
-        given_name=service_def["name"].split()[0],  # First word as given name
-        family_name=" ".join(service_def["name"].split()[1:]),  # Rest as family name
+        given_name=service_def["name"].split()[0],
+        family_name=" ".join(service_def["name"].split()[1:]),
         is_service=True,
-        password=None,  # Service users authenticate via API tokens
         created_by=admin_user_id,
         properties=user_properties
     )
@@ -175,7 +173,7 @@ def create_service_user_with_token(
     db.add(user)
     db.flush()  # Get user ID
 
-    print(f"  ✅ Created service user: {user.username} (ID: {user.id})")
+    print(f"  ✅ Created service user: {user.email} (ID: {user.id})")
 
     # Create service record
     # Look up ServiceType if specified
@@ -229,7 +227,7 @@ def create_service_user_with_token(
             db.rollback()
             return {
                 "user_id": str(user.id),
-                "username": user.username,
+                "email": user.email,
                 "service_id": str(service.id),
                 "service_slug": service.slug,
                 "token_id": str(existing_token.id),
@@ -291,7 +289,7 @@ def create_service_user_with_token(
 
     return {
         "user_id": str(user.id),
-        "username": user.username,
+        "email": user.email,
         "service_id": str(service.id),
         "service_slug": service.slug,
         "token_id": str(api_token.id),
@@ -319,12 +317,16 @@ def main():
     # Get database session
     with get_db_session() as db:
         # Get admin user (created by initialize_system_data.py)
-        admin_user = db.query(User).filter(User.username == "admin").first()
+        admin_email = os.environ.get("ADMIN_EMAIL", "")
+        if admin_email:
+            admin_user = db.query(User).filter(User.email == admin_email).first()
+        else:
+            admin_user = db.query(User).filter(User.is_service == False).first()
         if not admin_user:
-            print("❌ Error: Admin user not found. Run initialize_system.sh first.")
+            print("❌ Error: No user found. Set ADMIN_EMAIL env var or ensure a user exists.")
             return 1
 
-        print(f"👤 Using admin user for creation: {admin_user.username} (ID: {admin_user.id})")
+        print(f"👤 Using user for creation: {admin_user.email} (ID: {admin_user.id})")
         print()
 
         created_services = []
