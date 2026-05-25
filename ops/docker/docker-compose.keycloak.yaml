@@ -122,7 +122,7 @@ services:
     environment:
       ENABLE_KEYCLOAK: "true"
       # Internal container-to-container URL (same Docker network)
-      KEYCLOAK_SERVER_URL: "http://computor-keycloak:8080${KEYCLOAK_HTTP_RELATIVE_PATH:-/}"
-      KEYCLOAK_REALM: "${KEYCLOAK_REALM:-computor}"
-      KEYCLOAK_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:-computor-backend}"
+      KEYCLOAK_SERVER_URL: "${KEYCLOAK_SERVER_URL_INTERNAL:?must be set in .env}"
+      KEYCLOAK_REALM: "${KEYCLOAK_REALM:?must be set in .env}"
+      KEYCLOAK_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:?must be set in .env}"
       KEYCLOAK_CLIENT_SECRET: "${KEYCLOAK_CLIENT_SECRET:?must be set in .env}"
