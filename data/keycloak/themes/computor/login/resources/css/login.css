@@ -1,0 +1,180 @@
+/*
+ * Computor login theme — matches the computor-web UI design tokens:
+ *   gradient bg (blue-50 -> white -> indigo-50), white rounded-2xl card with
+ *   shadow, gray-900 primary button, blue-500 focus ring, Geist/Arial font.
+ * Targets the PatternFly markup of Keycloak's default "keycloak" parent theme.
+ */
+
+:root {
+  --ct-gray-900: #111827;
+  --ct-gray-800: #1f2937;
+  --ct-gray-700: #374151;
+  --ct-gray-600: #4b5563;
+  --ct-gray-300: #d1d5db;
+  --ct-gray-200: #e5e7eb;
+  --ct-blue-500: #3b82f6;
+  --ct-blue-600: #2563eb;
+  --ct-red-600: #dc2626;
+}
+
+/* ---- Page background ------------------------------------------------ */
+body.login-pf,
+.login-pf body {
+  background: linear-gradient(to bottom right, #eff6ff 0%, #ffffff 50%, #eef2ff 100%) !important;
+  font-family: "Geist", Arial, Helvetica, sans-serif;
+}
+
+.login-pf-page {
+  padding-top: 48px;
+}
+
+/* Remove the stock background image/overlay */
+.login-pf-page .login-pf-header {
+  margin-bottom: 24px;
+}
+
+/* ---- Logo ----------------------------------------------------------- */
+/* The header wrapper holds the realm display name text; replace it with the logo. */
+#kc-header-wrapper {
+  font-size: 0; /* hide realm text */
+  padding: 0;
+  background-image: url("../img/computor_logo.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  height: 56px;
+  margin-bottom: 8px;
+}
+
+/* ---- Card ----------------------------------------------------------- */
+.login-pf-page .card-pf {
+  background: #ffffff;
+  border: 1px solid var(--ct-gray-200);
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 32px;
+  max-width: 28rem;
+  margin: 0 auto;
+}
+
+#kc-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ct-gray-900);
+  text-align: center;
+}
+
+/* ---- Labels & inputs ------------------------------------------------ */
+.pf-c-form__label,
+label {
+  color: var(--ct-gray-700);
+  font-weight: 500;
+}
+
+.pf-c-form-control,
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+  border: 1px solid var(--ct-gray-300) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  height: auto !important;
+  font-size: 0.95rem;
+  width: 100%;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pf-c-form-control:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
+  border-color: var(--ct-blue-500) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35) !important;
+  outline: none !important;
+}
+
+/* ---- Primary button ------------------------------------------------- */
+.pf-c-button.pf-m-primary,
+input[type="submit"],
+#kc-login {
+  background: var(--ct-gray-900) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  padding: 12px 16px !important;
+  width: 100%;
+  transition: background-color 0.15s ease;
+}
+
+.pf-c-button.pf-m-primary:hover,
+input[type="submit"]:hover,
+#kc-login:hover {
+  background: var(--ct-gray-800) !important;
+}
+
+/* ---- Links ---------------------------------------------------------- */
+a,
+#kc-registration a,
+#kc-info-wrapper a {
+  color: var(--ct-blue-600);
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Password visibility toggle ------------------------------------- */
+/* Input inside a group: round only the left side */
+.pf-c-input-group .pf-c-form-control,
+.pf-c-input-group input[type="password"] {
+  border-radius: 8px 0 0 8px !important;
+  border-right: none !important;
+  flex: 1;
+}
+
+/* Toggle button: round only the right side, match input height/border */
+.pf-c-input-group .pf-c-button.pf-m-control {
+  background: #ffffff !important;
+  border: 1px solid var(--ct-gray-300) !important;
+  border-left: none !important;
+  border-radius: 0 8px 8px 0 !important;
+  color: var(--ct-gray-600) !important;
+  padding: 0 12px !important;
+  height: auto !important;
+  width: auto !important;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.pf-c-input-group .pf-c-button.pf-m-control:hover {
+  background: var(--ct-gray-200) !important;
+  color: var(--ct-gray-900) !important;
+}
+
+/* Keep the focus ring on the input even when toggle is adjacent */
+.pf-c-input-group:focus-within .pf-c-form-control,
+.pf-c-input-group:focus-within input[type="password"] {
+  border-color: var(--ct-blue-500) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35) !important;
+}
+
+.pf-c-input-group:focus-within .pf-c-button.pf-m-control {
+  border-color: var(--ct-blue-500) !important;
+}
+
+/* ---- Alerts / errors ------------------------------------------------ */
+.pf-c-alert.pf-m-danger,
+.alert-error {
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: var(--ct-red-600);
+}
+
+/* ---- Misc tidy-up --------------------------------------------------- */
+#kc-form-options,
+.checkbox label {
+  color: var(--ct-gray-600);
+}
