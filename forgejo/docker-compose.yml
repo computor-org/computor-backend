@@ -1,0 +1,132 @@
+# Forgejo — standalone self-hosted git server
+#
+# Runs independently of the main computor stack.
+# Start: ../forgejo_start.sh    Stop: ../forgejo_stop.sh
+#
+# Forgejo web UI and API: http://localhost:${FORGEJO_PORT:-3030}
+#
+# First-time setup:
+#   1. Copy .env.example → .env and fill in secrets.
+#   2. Run ../forgejo_start.sh — bootstrap creates the admin user automatically.
+#   3. (Optional) Configure Keycloak OIDC:
+#      python ../scripts/setup_git_server_keycloak_client.py
+#      Then add the OAuth source in the Forgejo admin panel:
+#        Admin > Site Administration > Identity & Access > OAuth2 Applications
+#        Provider: OpenID Connect
+#        Discovery URL: <KEYCLOAK_URL>/realms/<REALM>/.well-known/openid-configuration
+
+networks:
+  forgejo-internal:
+
+services:
+  forgejo-db:
+    image: postgres:16
+    container_name: computor-forgejo-db
+    networks:
+      - forgejo-internal
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${FORGEJO_DB_PORT:-5441}:5441"
+    volumes:
+      - ${FORGEJO_DATA_PATH:?}/postgres:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      PGPORT: 5441
+      POSTGRES_DB: forgejo
+      POSTGRES_USER: forgejo
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD:?}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgejo -p 5441"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo
+    networks:
+      - forgejo-internal
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${FORGEJO_PORT:-3030}:3030"
+    volumes:
+      - ${FORGEJO_DATA_PATH:?}/data:/data
+    environment:
+      TZ: UTC
+      # Skip the web installer (required for headless startup)
+      FORGEJO__security__INSTALL_LOCK: "true"
+      # Database
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: forgejo-db:5441
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: forgejo
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?}
+      # Server
+      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:-localhost}
+      FORGEJO__server__HTTP_PORT: 3030
+      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030}
+      FORGEJO__server__SSH_DOMAIN: ${FORGEJO_DOMAIN:-localhost}
+      FORGEJO__server__DISABLE_SSH: "true"
+      # Registration: disabled — users are managed via API or Keycloak SSO
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      # Allow OAuth2 SSO users to auto-create accounts (for Keycloak integration)
+      FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
+      FORGEJO__oauth2_client__UPDATE_AVATAR: "true"
+      FORGEJO__oauth2_client__OPENID_CONNECT_SCOPES: "email profile"
+      # Default repository visibility
+      FORGEJO__repository__DEFAULT_PRIVATE: "true"
+      FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE: "true"
+    depends_on:
+      forgejo-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3030/api/healthz 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # Runs once per `docker compose up` to create the admin user.
+  # Idempotent: forgejo returns non-zero if the user exists, which is ignored.
+  forgejo-bootstrap:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo-bootstrap
+    networks:
+      - forgejo-internal
+    restart: "no"
+    volumes:
+      - ${FORGEJO_DATA_PATH:?}/data:/data
+    environment:
+      GITEA_WORK_DIR: /data
+      FORGEJO_ADMIN_USERNAME: ${FORGEJO_ADMIN_USERNAME:?}
+      FORGEJO_ADMIN_PASSWORD: ${FORGEJO_ADMIN_PASSWORD:?}
+      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:-admin@computor.local}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Creating admin user '${FORGEJO_ADMIN_USERNAME}' (ignored if already exists)..."
+        forgejo admin user create \
+          --admin \
+          --username "${FORGEJO_ADMIN_USERNAME}" \
+          --password "${FORGEJO_ADMIN_PASSWORD}" \
+          --email "${FORGEJO_ADMIN_EMAIL}" \
+          --must-change-password=false 2>&1 || true
+        echo "Bootstrap complete."
+    depends_on:
+      forgejo:
+        condition: service_healthy
