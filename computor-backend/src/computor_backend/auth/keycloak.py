@@ -92,10 +92,12 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             logger.info("Keycloak plugin initialized successfully")
             self._available = True
             # Note: JWKS will be fetched on-demand when needed for token verification
-        except httpx.ConnectError as e:
-            # Keycloak service is not available - this is allowed
-            logger.warning(f"Keycloak service is not available: {e}")
-            logger.info("Keycloak authentication will be disabled. System will continue without SSO support.")
+        except httpx.TransportError as e:
+            # Any transport-level error (ConnectError, ReadError, TimeoutError, etc.)
+            # means Keycloak is temporarily unavailable — allow the server to start
+            # and retry lazily on the first login request.
+            logger.warning(f"Keycloak not ready at startup ({type(e).__name__}): {e}")
+            logger.info("Keycloak plugin will be retried on first login request.")
             self._available = False
             self._oidc_config = None
         except Exception as e:

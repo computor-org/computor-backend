@@ -169,14 +169,9 @@ async def list_providers() -> List[ProviderInfo]:
     """
     registry = get_plugin_registry()
     providers = []
-    
-    # Debug logging
-    logger.info(f"Registry enabled plugins: {registry.get_enabled_plugins()}")
-    logger.info(f"Registry loaded plugins: {registry.get_loaded_plugins()}")
-    
+
     for plugin_name in registry.get_enabled_plugins():
         metadata = registry.get_plugin_metadata(plugin_name)
-        logger.info(f"Plugin {plugin_name} metadata: {metadata}")
         if metadata:
             providers.append(ProviderInfo(
                 name=plugin_name,
@@ -200,21 +195,19 @@ async def initiate_login(
     Redirects the user to the provider's login page.
     """
     registry = get_plugin_registry()
-    
-    # Debug logging
-    logger.info(f"Attempting login for provider: {provider}")
-    logger.info(f"Provider type: {type(provider)}")
-    logger.info(f"Provider repr: {repr(provider)}")
-    enabled_plugins = registry.get_enabled_plugins()
-    logger.info(f"Enabled plugins: {enabled_plugins}")
-    logger.info(f"Enabled plugins type: {type(enabled_plugins)}")
-    logger.info(f"Loaded plugins: {registry.get_loaded_plugins()}")
-    logger.info(f"Provider in enabled_plugins: {provider in enabled_plugins}")
-    
+
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(f"Authentication provider not found or not enabled: {provider}")
-    
+
+    # If the plugin is enabled but not yet loaded (e.g. Keycloak wasn't ready at startup), try now
+    if registry.get_plugin(provider) is None:
+        try:
+            await registry.load_builtin_provider(provider)
+            logger.info(f"Lazily loaded provider: {provider}")
+        except Exception as e:
+            logger.warning(f"Could not lazily load provider {provider}: {e}")
+
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
 
