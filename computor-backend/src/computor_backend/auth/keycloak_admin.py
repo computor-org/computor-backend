@@ -209,6 +209,24 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to add user to group: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
+    async def get_group_id(self, name: str) -> Optional[str]:
+        """Return the id of a top-level realm group by exact name, or None."""
+        token = await self._get_admin_token()
+        groups_url = f"{self.server_url}/admin/realms/{self.realm}/groups"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                groups_url,
+                params={"search": name},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if response.status_code != 200:
+                response.raise_for_status()
+            for group in response.json():
+                if group.get("name") == name:
+                    return group["id"]
+        return None
+
     async def delete_user(self, user_id: str) -> None:
         """Delete a user from Keycloak."""
         token = await self._get_admin_token()

@@ -424,49 +424,6 @@
       "subGroups": []
     }
   ],
-  "users": [
-    {
-      "username": "demo_admin",
-      "enabled": true,
-      "email": "admin@computor.local",
-      "emailVerified": true,
-      "firstName": "Demo",
-      "lastName": "Admin",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "admin123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "admin"
-      ],
-      "groups": [
-        "/administrators"
-      ]
-    },
-    {
-      "username": "demo_student",
-      "enabled": true,
-      "email": "student@computor.local",
-      "emailVerified": true,
-      "firstName": "Demo",
-      "lastName": "Student",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "student123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "student"
-      ],
-      "groups": [
-        "/students"
-      ]
-    }
-  ],
+  "users": [],
   "loginTheme": "computor"
 }

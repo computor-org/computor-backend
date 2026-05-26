@@ -67,7 +67,7 @@ services:
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: true
-      API_ADMIN_USER: ${API_ADMIN_USER}
+      API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
       API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
@@ -161,7 +161,7 @@ services:
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - PYTHONPATH=/home/worker/computor-backend/src
       - API_URL=${API_URL}
-      - API_ADMIN_USER=${API_ADMIN_USER}
+      - API_ADMIN_EMAIL=${API_ADMIN_EMAIL}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?must be set in .env}

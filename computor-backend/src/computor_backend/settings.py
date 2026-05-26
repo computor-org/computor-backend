@@ -24,6 +24,10 @@ class BackendSettings:
         self.ENABLE_KEYCLOAK = os.environ.get("ENABLE_KEYCLOAK", "true").lower() in ["true", "1", "yes", "on"]
         self.AUTH_PLUGINS_CONFIG = os.environ.get("AUTH_PLUGINS_CONFIG", None)  # Path to plugin config file
 
+        # Bootstrap admin: provisioned in Keycloak on startup (email is the username).
+        self.API_ADMIN_EMAIL = os.environ.get("API_ADMIN_EMAIL", None)
+        self.API_ADMIN_PASSWORD = os.environ.get("API_ADMIN_PASSWORD", None)
+
         # Extension public download URL
         self.EXTENSION_PUBLIC_DOWNLOAD_URL = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
 

@@ -151,6 +151,28 @@ async def startup_logic():
     # Initialize plugin registry with configuration (loads Keycloak provider, etc.)
     await initialize_plugin_registry_with_config()
 
+    # If Keycloak is enabled, ensure the bootstrap admin exists (create-or-reset
+    # password + add to the 'administrators' group). The computor User row and
+    # _admin role follow on first login via the group claim. Non-fatal: retries
+    # briefly in case Keycloak is still coming up.
+    if settings.ENABLE_KEYCLOAK:
+        admin_email = settings.API_ADMIN_EMAIL
+        admin_password = settings.API_ADMIN_PASSWORD
+        if admin_email and admin_password:
+            import asyncio
+            from computor_backend.business_logic.auth import ensure_keycloak_admin
+            for attempt in range(1, 6):
+                try:
+                    await ensure_keycloak_admin(admin_email, admin_password)
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Admin provisioning failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
+        else:
+            print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
+
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient

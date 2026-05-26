@@ -716,6 +716,43 @@ async def provision_keycloak_login(
     return kc_user_id, True
 
 
+async def ensure_keycloak_admin(email: str, password: str) -> None:
+    """Ensure the bootstrap admin exists in Keycloak and is in the
+    'administrators' group.
+
+    The password is set only on initial creation — an existing admin's password
+    is never overwritten, so a password rotated in Keycloak survives restarts.
+    Group membership is (idempotently) ensured every time. The computor User row
+    and the _admin role are granted on first login via the group claim (see
+    handle_sso_callback), so this only touches Keycloak.
+    """
+    kc = KeycloakAdminClient()
+
+    if await kc.user_exists(email):
+        kc_user_id = await kc._get_user_id_by_username(email)
+        logger.info("Keycloak admin %s already exists — leaving password unchanged.", email)
+    else:
+        kc_user_id = await kc.create_user(KeycloakUser(
+            username=email,
+            email=email,
+            enabled=True,
+            emailVerified=True,
+            credentials=[{"type": "password", "value": password, "temporary": False}],
+        ))
+        logger.info("Created Keycloak admin %s.", email)
+
+    group_id = await kc.get_group_id("administrators")
+    if not group_id:
+        logger.error(
+            "Keycloak 'administrators' group not found — admin %s will not receive "
+            "the _admin role until added to that group.", email,
+        )
+        return
+
+    await kc.add_user_to_group(kc_user_id, group_id)
+    logger.info("Ensured Keycloak admin %s is in the 'administrators' group.", email)
+
+
 async def verify_user_with_gitlab_pat(
     access_token: str,
     gitlab_url: str,
