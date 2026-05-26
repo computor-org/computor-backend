@@ -14,8 +14,8 @@
 networks:
   forgejo-internal:
     driver: bridge
-  computor-network:
-    external: true
+  # computor-network is created by docker-compose.base.yaml (this overlay is
+  # always merged with base). Referenced by services below, not redeclared.
 
 services:
   forgejo-keycloak-setup:

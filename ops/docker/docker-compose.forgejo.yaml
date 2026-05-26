@@ -12,8 +12,8 @@
 networks:
   forgejo-internal:
     driver: bridge
-  computor-network:
-    external: true
+  # computor-network is created by docker-compose.base.yaml (this overlay is
+  # always merged with base). Referenced by services below, not redeclared.
 
 services:
   forgejo-db:
@@ -84,6 +84,11 @@ services:
       FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
       FORGEJO__oauth2_client__UPDATE_AVATAR: "true"
       FORGEJO__oauth2_client__OPENID_CONNECT_SCOPES: "email profile"
+      # Link a pre-provisioned local account to its OIDC identity on first login.
+      # Safe here: registration is disabled and usernames come from the
+      # admin-controlled Keycloak preferred_username claim.
+      FORGEJO__oauth2_client__ACCOUNT_LINKING: "auto"
+      FORGEJO__oauth2_client__USERNAME: "preferred_username"
       # Default repository visibility
       FORGEJO__repository__DEFAULT_PRIVATE: "true"
     labels:

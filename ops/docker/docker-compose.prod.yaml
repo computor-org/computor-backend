@@ -100,6 +100,12 @@ services:
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
+      # Git server integration (if enabled) — uses the internal container URL
+      # since uvicorn reaches Forgejo over computor-network, not localhost.
+      GIT_SERVER: ${GIT_SERVER}
+      GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
+      GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
+      GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
     depends_on:
       - postgres
       - minio

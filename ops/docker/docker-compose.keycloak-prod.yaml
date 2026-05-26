@@ -2,10 +2,6 @@
 # Only included when KEYCLOAK_ENABLED=true AND environment=prod.
 # startup.sh handles this automatically — do not include manually.
 
-networks:
-  computor-network:
-    external: true
-
 services:
   uvicorn:
     depends_on:

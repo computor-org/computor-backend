@@ -12,9 +12,8 @@
 # (startup.sh copies it there from data/keycloak/computor-realm.json,
 #  substituting KEYCLOAK_CLIENT_SECRET before the copy)
 
-networks:
-  computor-network:
-    external: true
+# computor-network is created by docker-compose.base.yaml; this overlay is
+# always merged with base, so services just reference it (no redeclaration).
 
 services:
   keycloak-db:
