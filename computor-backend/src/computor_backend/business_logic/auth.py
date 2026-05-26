@@ -727,8 +727,11 @@ async def verify_user_with_gitlab_pat(
     This function verifies that:
     1. The provided token is a valid Personal Access Token (not bot/project/group token)
     2. Fetches the email from GitLab user profile
-    3. Finds user in our system with matching email
-    4. Verifies user belongs to an organization that uses the specified GitLab instance
+    3. The GitLab instance URL is registered to an organization via git_provider
+       (anti-spoofing: a forged email on an unknown GitLab is rejected)
+    4. Finds a user in our system with that email (User.email, or a
+       StudentProfile.student_email within one of the matched organizations)
+    5. The user is enrolled in at least one course of a matched organization
 
     Args:
         access_token: GitLab Personal Access Token (glpat-...)
@@ -739,8 +742,9 @@ async def verify_user_with_gitlab_pat(
         Tuple of (User, gitlab_url_used, gitlab_user_data)
 
     Raises:
-        NotFoundException: If user not found
-        ForbiddenException: If user not in GitLab-enabled org
+        NotFoundException: If no user matches the GitLab email
+        ForbiddenException: If the GitLab URL is not registered to any organization,
+            or the user is not enrolled in a course of such an organization
         BadRequestException: If token is not a personal access token
         UnauthorizedException: If GitLab authentication fails
 
@@ -790,41 +794,85 @@ async def verify_user_with_gitlab_pat(
         logger.error(f"Unexpected error with GitLab: {str(e)}", exc_info=True)
         raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}") from e
 
-    # 3. Find user in our system by email (case-insensitive)
-    # Try User.email first - if found, user can link any GitLab instance
+    # 3. The GitLab instance must belong to a known organization. The
+    #    git_provider table (organization_id + url) is the source of truth.
+    #    Anti-spoofing guard: a forged email on some random GitLab is not enough
+    #    — the URL itself must be one a Computor organization is configured with.
     from computor_backend.model.auth import StudentProfile
+    from computor_backend.model.git_provider import GitProvider
+    from computor_backend.model.course import Course, CourseMember
 
+    normalized_gitlab_url = gitlab_url.rstrip('/')
+
+    org_ids = [
+        row[0]
+        for row in db.query(GitProvider.organization_id)
+        .filter(
+            GitProvider.type == 'gitlab',
+            GitProvider.url.in_([normalized_gitlab_url, normalized_gitlab_url + '/']),
+        )
+        .all()
+    ]
+    if not org_ids:
+        raise ForbiddenException(
+            f"GitLab instance {gitlab_url} is not registered with any organization."
+        )
+
+    # 4. Identify the user by email — their primary User.email, or a
+    #    StudentProfile.student_email belonging to one of the matched orgs.
     user = db.query(User).filter(User.email == gitlab_email.lower()).first()
 
     if user:
         logger.info(f"Found user {user.email} (ID: {user.id}) by User.email")
     else:
-        # If not found by User.email, try StudentProfile.student_email
-        # Join with Organization and filter by GitLab URL in the query
-        from computor_backend.model.organization import Organization
-
-        # Normalize GitLab URL (remove trailing slash if present)
-        normalized_gitlab_url = gitlab_url.rstrip('/')
-
         student_profile = (
             db.query(StudentProfile)
-            .join(Organization, StudentProfile.organization_id == Organization.id)
             .filter(
                 StudentProfile.student_email == gitlab_email.lower(),
-                Organization.properties["gitlab"].op("->>")("url") == normalized_gitlab_url
+                StudentProfile.organization_id.in_(org_ids),
             )
             .first()
         )
-
-        if student_profile:
-            user = student_profile.user
-            logger.info(
-                f"Found user {user.email} (ID: {user.id}) via StudentProfile.student_email "
-                f"in organization {student_profile.organization_id}"
-            )
-        else:
+        if not student_profile:
             raise NotFoundException(
-                f"No user found with email '{gitlab_email}' in any organization using {gitlab_url}"
+                f"No user found with email '{gitlab_email}' in any organization using {gitlab_url}."
+            )
+        user = student_profile.user
+        logger.info(
+            f"Found user {user.email} (ID: {user.id}) via StudentProfile.student_email "
+            f"in organization {student_profile.organization_id}"
+        )
+
+    # 5. Either the user already has a linked account on this GitLab — a prior,
+    #    validated onboarding (e.g. they just need a new password) — or, for a
+    #    fresh user, they must be enrolled in at least one course of a matched
+    #    organization. The enrollment gate ties a brand-new identity to the
+    #    trusted GitLab and prevents granting access on a bare email match alone.
+    has_existing_account = (
+        db.query(Account.id)
+        .filter(
+            Account.user_id == user.id,
+            Account.type == 'gitlab',
+            Account.provider.in_([normalized_gitlab_url, normalized_gitlab_url + '/']),
+        )
+        .first()
+        is not None
+    )
+
+    if not has_existing_account:
+        enrolled = (
+            db.query(CourseMember.id)
+            .join(Course, CourseMember.course_id == Course.id)
+            .filter(
+                CourseMember.user_id == user.id,
+                Course.organization_id.in_(org_ids),
+            )
+            .first()
+        )
+        if not enrolled:
+            raise ForbiddenException(
+                "You must be enrolled in at least one course in an organization "
+                f"that uses {gitlab_url} before you can set up your login."
             )
 
     logger.info(f"Successfully verified user {user.email} (ID: {user.id}) with GitLab email {gitlab_email}")
