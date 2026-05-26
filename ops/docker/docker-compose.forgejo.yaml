@@ -114,6 +114,11 @@ services:
   forgejo-bootstrap:
     image: codeberg.org/forgejo/forgejo:9
     container_name: computor-forgejo-bootstrap
+    # Run as the image's git user. The forgejo CLI refuses to run as root, and
+    # overriding the entrypoint skips the image's own privilege drop. Using the
+    # name (not a numeric uid) tracks whatever uid the image assigns to git, so
+    # it always matches the data volume owned by the main forgejo container.
+    user: "git"
     networks:
       - forgejo-internal
     restart: "no"
