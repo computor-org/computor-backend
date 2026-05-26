@@ -169,6 +169,11 @@ if [ "$GIT_SERVER" = "forgejo" ] || [ "$FORGEJO_DETECTED" = true ]; then
     INCLUDE_FORGEJO=true
 fi
 
+INCLUDE_FORGEJO_KEYCLOAK=false
+if [ "$INCLUDE_FORGEJO" = true ] && [ "$INCLUDE_KEYCLOAK" = true ]; then
+    INCLUDE_FORGEJO_KEYCLOAK=true
+fi
+
 echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
 echo -e "Keycloak: ${YELLOW}$([ "$INCLUDE_KEYCLOAK" = true ] && echo "enabled" || echo "disabled")${NC}"
 echo -e "Forgejo: ${YELLOW}$([ "$INCLUDE_FORGEJO" = true ] && echo "enabled" || echo "disabled")${NC}"
@@ -183,9 +188,15 @@ if [ "$INCLUDE_CODER" = true ]; then
 fi
 if [ "$INCLUDE_KEYCLOAK" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak.yaml"
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak-prod.yaml"
+    fi
 fi
 if [ "$INCLUDE_FORGEJO" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.forgejo.yaml"
+fi
+if [ "$INCLUDE_FORGEJO_KEYCLOAK" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.forgejo-keycloak.yaml"
 fi
 
 # Show what will be stopped

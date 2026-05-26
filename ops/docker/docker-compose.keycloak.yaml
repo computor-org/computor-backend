@@ -112,17 +112,3 @@ services:
       retries: 15
       start_period: 60s
 
-  # Patch the uvicorn (backend API) service to wait for Keycloak and inject
-  # the correct internal-network URL. Docker Compose merges this with the
-  # definition in docker-compose.prod.yaml when this overlay is included.
-  uvicorn:
-    depends_on:
-      keycloak:
-        condition: service_healthy
-    environment:
-      ENABLE_KEYCLOAK: "true"
-      # Internal container-to-container URL (same Docker network)
-      KEYCLOAK_SERVER_URL: "${KEYCLOAK_SERVER_URL_INTERNAL:?}"
-      KEYCLOAK_REALM: "${KEYCLOAK_REALM:?}"
-      KEYCLOAK_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:?}"
-      KEYCLOAK_CLIENT_SECRET: "${KEYCLOAK_CLIENT_SECRET:?}"

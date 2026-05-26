@@ -105,6 +105,9 @@ fi
 if [ "$KEYCLOAK_ENABLED" = "true" ]; then
     echo -e "Keycloak: ${YELLOW}enabled${NC}"
     COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.keycloak.yaml"
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.keycloak-prod.yaml"
+    fi
 else
     echo -e "Keycloak: ${YELLOW}disabled${NC} (set KEYCLOAK_ENABLED=true in .env to enable)"
 fi
@@ -114,6 +117,11 @@ if [ "$GIT_SERVER" = "forgejo" ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo.yaml"
 else
     echo -e "Forgejo: ${YELLOW}disabled${NC} (set GIT_SERVER=forgejo in .env to enable)"
+fi
+
+if [ "$GIT_SERVER" = "forgejo" ] && [ "$KEYCLOAK_ENABLED" = "true" ]; then
+    echo -e "Forgejo-Keycloak OIDC: ${YELLOW}auto-setup enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo-keycloak.yaml"
 fi
 
 # Function to safely create directories

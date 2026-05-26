@@ -114,39 +114,17 @@ services:
     restart: "no"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
+      - ../../computor-forgejo/scripts/bootstrap.sh:/bootstrap.sh:ro
     environment:
       GITEA_WORK_DIR: /data
-      FORGEJO_ADMIN_USERNAME: ${FORGEJO_ADMIN_USERNAME:?}
-      FORGEJO_ADMIN_PASSWORD: ${FORGEJO_ADMIN_PASSWORD:?}
+      FORGEJO_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?}
+      FORGEJO_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD:?}
       FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:-admin@computor.local}
       FORGEJO_KEYCLOAK_CLIENT_ID: ${FORGEJO_KEYCLOAK_CLIENT_ID:-}
       FORGEJO_KEYCLOAK_CLIENT_SECRET: ${FORGEJO_KEYCLOAK_CLIENT_SECRET:-}
-      KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-}
+      KEYCLOAK_URL: ${KEYCLOAK_SERVER_URL_INTERNAL:-}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        echo "Creating admin user '${FORGEJO_ADMIN_USERNAME}' (ignored if already exists)..."
-        forgejo admin user create \
-          --admin \
-          --username "${FORGEJO_ADMIN_USERNAME}" \
-          --password "${FORGEJO_ADMIN_PASSWORD}" \
-          --email "${FORGEJO_ADMIN_EMAIL}" \
-          --must-change-password=false 2>&1 || true
-
-        if [ -n "${FORGEJO_KEYCLOAK_CLIENT_ID}" ] && [ -n "${KEYCLOAK_URL}" ]; then
-          echo "Configuring Keycloak OIDC source..."
-          forgejo admin auth add-oauth \
-            --name Keycloak \
-            --provider openidConnect \
-            --key "${FORGEJO_KEYCLOAK_CLIENT_ID}" \
-            --secret "${FORGEJO_KEYCLOAK_CLIENT_SECRET}" \
-            --auto-discover-url "${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration" \
-            --scopes "email profile" 2>&1 || true
-        fi
-
-        echo "Bootstrap complete."
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
     depends_on:
       forgejo:
         condition: service_healthy

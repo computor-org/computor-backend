@@ -1,0 +1,19 @@
+# Keycloak production overlay — patches the uvicorn service.
+# Only included when KEYCLOAK_ENABLED=true AND environment=prod.
+# startup.sh handles this automatically — do not include manually.
+
+networks:
+  computor-network:
+    external: true
+
+services:
+  uvicorn:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      ENABLE_KEYCLOAK: "true"
+      KEYCLOAK_SERVER_URL: "${KEYCLOAK_SERVER_URL_INTERNAL:?}"
+      KEYCLOAK_REALM: "${KEYCLOAK_REALM:?}"
+      KEYCLOAK_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:?}"
+      KEYCLOAK_CLIENT_SECRET: "${KEYCLOAK_CLIENT_SECRET:?}"

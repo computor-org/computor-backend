@@ -1,0 +1,48 @@
+# Forgejo-Keycloak OIDC bridge
+# Include when BOTH GIT_SERVER=forgejo AND KEYCLOAK_ENABLED=true.
+# startup.sh adds this file automatically — do not include manually.
+#
+# What it does (idempotent on every `docker compose up`):
+#   1. Obtains a Keycloak admin token.
+#   2. Creates a confidential OIDC client for Forgejo in Keycloak (skips if exists).
+#   3. Registers that client as a Keycloak auth source in Forgejo via the admin CLI.
+#
+# The auto-discover URL stored in Forgejo uses KEYCLOAK_SERVER_URL_INTERNAL so
+# that the running Forgejo container (on computor-network) can reach Keycloak
+# directly for token validation — not via Traefik/localhost.
+
+networks:
+  forgejo-internal:
+    driver: bridge
+  computor-network:
+    external: true
+
+services:
+  forgejo-keycloak-setup:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo-keycloak-setup
+    networks:
+      - forgejo-internal
+      - computor-network
+    restart: "no"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
+      - ../../computor-forgejo/scripts/keycloak_setup.sh:/keycloak_setup.sh:ro
+    environment:
+      GITEA_WORK_DIR: /data
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030}
+      # Client ID used in Keycloak — defaults to "forgejo".
+      # Override via FORGEJO_KEYCLOAK_CLIENT_ID in .env if needed.
+      FORGEJO_KEYCLOAK_CLIENT_ID: ${FORGEJO_KEYCLOAK_CLIENT_ID:-forgejo}
+      # Optional: preset a known secret instead of generating one.
+      FORGEJO_KEYCLOAK_CLIENT_SECRET: ${FORGEJO_KEYCLOAK_CLIENT_SECRET:-}
+    entrypoint: ["/bin/sh", "/keycloak_setup.sh"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      forgejo:
+        condition: service_healthy
