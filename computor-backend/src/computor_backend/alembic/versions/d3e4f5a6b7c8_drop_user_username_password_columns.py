@@ -25,7 +25,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.drop_index('user_username_key', table_name='user', if_exists=True)
+    # user_username_key is a UNIQUE constraint; Postgres backs it with an index
+    # of the same name that cannot be dropped directly (DependentObjectsStillExist).
+    # Dropping the constraint removes the backing index too.
+    op.execute('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_username_key')
     op.drop_column('user', 'username')
     op.drop_column('user', 'password')
     op.drop_column('user', 'password_reset_required')
@@ -35,4 +38,4 @@ def downgrade() -> None:
     op.add_column('user', sa.Column('password_reset_required', sa.Boolean(), nullable=False, server_default=sa.text('false')))
     op.add_column('user', sa.Column('password', sa.String(length=512), nullable=True))
     op.add_column('user', sa.Column('username', sa.String(length=255), nullable=True))
-    op.create_index('user_username_key', 'user', ['username'], unique=True)
+    op.create_unique_constraint('user_username_key', 'user', ['username'])

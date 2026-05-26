@@ -149,11 +149,11 @@ async def accept_invite(
     db: Session = Depends(get_db),
 ) -> dict:
     """
-    Accept an invite and pre-create a user account.
+    Accept an invite, provision a Keycloak login, and pre-create the user.
 
-    Creates a User record with the provided name and email. The user then
-    logs in via SSO (Keycloak), which will find and link to this pre-created
-    account on first login.
+    The invite token is the authorization proof. We create the Keycloak user
+    (with the chosen password) first, then create the computor User. On first
+    SSO login Keycloak links to this pre-created account by email.
     """
     invite = _resolve_token(token, db)
 
@@ -165,7 +165,17 @@ async def accept_invite(
     if db.query(User).filter(User.email == payload.email).first():
         raise BadRequestException(f"Email '{payload.email}' is already registered")
 
-    # Create user (email-only, no password — authentication is via SSO)
+    # Provision the Keycloak login first (invite token is the authorization
+    # proof). If this fails we neither create the user nor consume the invite.
+    from computor_backend.business_logic.auth import provision_keycloak_login
+    await provision_keycloak_login(
+        email=payload.email,
+        password=payload.password,
+        given_name=payload.given_name,
+        family_name=payload.family_name,
+    )
+
+    # Create user (email-only, no local password — authentication is via Keycloak)
     user = User(
         email=payload.email,
         given_name=payload.given_name,

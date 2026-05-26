@@ -680,6 +680,42 @@ async def refresh_sso_token(
         )
 
 
+async def provision_keycloak_login(
+    email: str,
+    password: str,
+    given_name: str = "",
+    family_name: str = "",
+) -> Tuple[str, bool]:
+    """Create (or password-reset) a Keycloak login for ``email``.
+
+    Username == email is the single matching key across systems. If the Keycloak
+    user already exists its password is reset; otherwise it is created with the
+    password live (no temporary flag, no email round-trip).
+
+    This performs NO identity verification — the caller must first establish
+    authorization (a verified GitLab PAT, or a valid invite token).
+
+    Returns ``(keycloak_user_id, created)``.
+    """
+    kc = KeycloakAdminClient()
+
+    if await kc.user_exists(email):
+        kc_user_id = await kc._get_user_id_by_username(email)
+        await kc.set_user_password(kc_user_id, password, temporary=False)
+        return kc_user_id, False
+
+    kc_user_id = await kc.create_user(KeycloakUser(
+        username=email,
+        email=email,
+        firstName=given_name or "",
+        lastName=family_name or "",
+        enabled=True,
+        emailVerified=True,
+        credentials=[{"type": "password", "value": password, "temporary": False}],
+    ))
+    return kc_user_id, True
+
+
 async def verify_user_with_gitlab_pat(
     access_token: str,
     gitlab_url: str,

@@ -56,6 +56,7 @@ class InviteAccept(BaseModel):
     given_name: str = Field(..., min_length=1, max_length=100)
     family_name: str = Field(..., min_length=1, max_length=100)
     email: str = Field(..., description="Required; must match invite restriction if set")
+    password: str = Field(..., description="Password to set for Keycloak login (complexity enforced by Keycloak realm policy)")
 
     @field_validator('email')
     @classmethod
