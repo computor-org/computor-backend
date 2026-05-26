@@ -34,6 +34,12 @@ export default function LoginPage() {
         >
           Click here if you are not redirected automatically
         </button>
+        <p className="mt-6 text-sm text-gray-500">
+          First time here?{' '}
+          <a href="/register/gitlab" className="text-blue-600 hover:underline">
+            Set up your login
+          </a>
+        </p>
       </div>
     </div>
   );
