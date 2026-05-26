@@ -9,15 +9,7 @@ forgejo admin user create \
   --email "${FORGEJO_ADMIN_EMAIL}" \
   --must-change-password=false 2>&1 || true
 
-if [ -n "${FORGEJO_KEYCLOAK_CLIENT_ID}" ] && [ -n "${KEYCLOAK_URL}" ]; then
-  echo "Configuring Keycloak OIDC source..."
-  forgejo admin auth add-oauth \
-    --name Keycloak \
-    --provider openidConnect \
-    --key "${FORGEJO_KEYCLOAK_CLIENT_ID}" \
-    --secret "${FORGEJO_KEYCLOAK_CLIENT_SECRET}" \
-    --auto-discover-url "${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration" \
-    --scopes "email profile" 2>&1 || true
-fi
+# Keycloak OIDC setup is handled separately by keycloak_setup.sh (the
+# forgejo-keycloak overlay), which runs only when Keycloak is enabled.
 
 echo "Bootstrap complete."

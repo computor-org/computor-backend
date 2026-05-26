@@ -1,7 +1,10 @@
 #!/bin/sh
 set -e
 
-CLIENT_ID="${FORGEJO_KEYCLOAK_CLIENT_ID}"
+# Fixed client id — Forgejo always gets its own dedicated Keycloak client,
+# distinct from the backend's (its redirect URIs are different). Not configurable
+# on purpose: a custom value here is only ever a footgun.
+CLIENT_ID="forgejo"
 REDIRECT_URI="${FORGEJO_ROOT_URL}/user/oauth2/Keycloak/callback"
 DISCOVER_URL="${KEYCLOAK_INTERNAL_URL}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration"
 
@@ -31,7 +34,7 @@ if [ -n "${INTERNAL_ID}" ]; then
     | grep -o '"value":"[^"]*' | cut -d'"' -f4)
 else
   echo "Creating Keycloak client '${CLIENT_ID}'..."
-  SECRET="${FORGEJO_KEYCLOAK_CLIENT_SECRET:-$(openssl rand -hex 32)}"
+  SECRET="$(openssl rand -hex 32)"
   cat > /tmp/kc_client.json << EOF
 {
   "clientId": "${CLIENT_ID}",
