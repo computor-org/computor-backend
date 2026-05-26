@@ -34,7 +34,8 @@ if [ -n "${INTERNAL_ID}" ]; then
     | grep -o '"value":"[^"]*' | cut -d'"' -f4)
 else
   echo "Creating Keycloak client '${CLIENT_ID}'..."
-  SECRET="$(openssl rand -hex 32)"
+  # 64 hex chars from /dev/urandom — busybox only (the forgejo image has no openssl).
+  SECRET="$(tr -dc 'a-f0-9' < /dev/urandom | head -c 64)"
   cat > /tmp/kc_client.json << EOF
 {
   "clientId": "${CLIENT_ID}",
