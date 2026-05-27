@@ -109,9 +109,14 @@ async def initiate_login(
         ex=600  # 10 minutes
     )
     
-    # Get callback URL
-    callback_url = str(request.url_for("handle_callback", provider=provider))
-    
+    # Build callback URL. API_PUBLIC_URL overrides request-derived URL in
+    # production where HTTPS is terminated before Traefik (scheme would be http).
+    from computor_backend.settings import settings as _settings
+    if _settings.API_PUBLIC_URL:
+        callback_url = f"{_settings.API_PUBLIC_URL}/auth/{provider}/callback"
+    else:
+        callback_url = str(request.url_for("handle_callback", provider=provider))
+
     try:
         # Get login URL from provider
         login_url = registry.get_login_url(provider, callback_url, state)
@@ -163,8 +168,11 @@ async def handle_callback(
             raise BadRequestException("Provider mismatch in state parameter")
 
     try:
-        # Get the callback URL (same as used in the original authorization request)
-        callback_url = str(request.url_for("handle_callback", provider=provider))
+        from computor_backend.settings import settings as _settings
+        if _settings.API_PUBLIC_URL:
+            callback_url = f"{_settings.API_PUBLIC_URL}/auth/{provider}/callback"
+        else:
+            callback_url = str(request.url_for("handle_callback", provider=provider))
 
         # Delegate to business logic
         result = await handle_sso_callback(
