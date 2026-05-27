@@ -6,7 +6,7 @@ Invite acceptance is public (no authentication required).
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends
