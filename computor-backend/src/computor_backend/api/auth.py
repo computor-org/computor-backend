@@ -8,6 +8,7 @@ This module provides:
 
 import json
 import logging
+import os
 import secrets
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -109,12 +110,13 @@ async def initiate_login(
         ex=600  # 10 minutes
     )
     
-    # X-Forwarded-Proto is set by nginx (SSL terminator). Replace the scheme
-    # so the callback URI sent to Keycloak uses https, not http.
-    callback_url = str(request.url_for("handle_callback", provider=provider))
-    proto = request.headers.get("x-forwarded-proto")
-    if proto:
-        callback_url = callback_url.replace(f"{request.url.scheme}://", f"{proto}://", 1)
+    # Build the callback URL from NEXT_PUBLIC_API_URL when available so the
+    # scheme is correct even when HTTPS is terminated before Traefik (nginx).
+    _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+    if _api_base:
+        callback_url = f"{_api_base}/auth/{provider}/callback"
+    else:
+        callback_url = str(request.url_for("handle_callback", provider=provider))
 
     try:
         # Get login URL from provider
@@ -167,10 +169,11 @@ async def handle_callback(
             raise BadRequestException("Provider mismatch in state parameter")
 
     try:
-        callback_url = str(request.url_for("handle_callback", provider=provider))
-        proto = request.headers.get("x-forwarded-proto")
-        if proto:
-            callback_url = callback_url.replace(f"{request.url.scheme}://", f"{proto}://", 1)
+        _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        if _api_base:
+            callback_url = f"{_api_base}/auth/{provider}/callback"
+        else:
+            callback_url = str(request.url_for("handle_callback", provider=provider))
 
         # Delegate to business logic
         result = await handle_sso_callback(
