@@ -20,7 +20,8 @@ class BackendSettings:
         self.DISABLE_API_DEBUG_INFO = os.environ.get("DISABLE_API_DEBUG_INFO", "false").lower() in ["true", "1", "yes", "on"]
 
         # Authentication settings
-        self.ENABLE_KEYCLOAK = os.environ.get("ENABLE_KEYCLOAK", "true").lower() in ["true", "1", "yes", "on"]
+        # Env var is KEYCLOAK_ENABLED (same name used by the template, compose, and startup.sh).
+        self.ENABLE_KEYCLOAK = os.environ.get("KEYCLOAK_ENABLED", "true").lower() in ["true", "1", "yes", "on"]
         self.AUTH_PLUGINS_CONFIG = os.environ.get("AUTH_PLUGINS_CONFIG", None)  # Path to plugin config file
 
         # Bootstrap admin: provisioned in Keycloak on startup (email is the username).
