@@ -731,6 +731,7 @@ async def ensure_keycloak_admin(email: str, password: str) -> None:
     if await kc.user_exists(email):
         kc_user_id = await kc._get_user_id_by_username(email)
         logger.info("Keycloak admin %s already exists — leaving password unchanged.", email)
+        await kc.update_user(kc_user_id, {"requiredActions": [], "emailVerified": True})
     else:
         kc_user_id = await kc.create_user(KeycloakUser(
             username=email,
