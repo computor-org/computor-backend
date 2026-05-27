@@ -322,7 +322,6 @@ if [ "$SKIP_COMMON" != true ]; then
         fi
         PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash so we don't get //api
         set_env_var NEXT_PUBLIC_API_URL "$PUBLIC_DOMAIN/api"
-        set_env_var API_PUBLIC_URL "$PUBLIC_DOMAIN/api"
         # Keycloak: expose via Traefik at /auth, public URL derived from the same domain.
         set_env_var KEYCLOAK_TRAEFIK_ENABLED true
         set_env_var KEYCLOAK_HTTP_RELATIVE_PATH /auth

@@ -109,13 +109,12 @@ async def initiate_login(
         ex=600  # 10 minutes
     )
     
-    # Build callback URL. API_PUBLIC_URL overrides request-derived URL in
-    # production where HTTPS is terminated before Traefik (scheme would be http).
-    from computor_backend.settings import settings as _settings
-    if _settings.API_PUBLIC_URL:
-        callback_url = f"{_settings.API_PUBLIC_URL}/auth/{provider}/callback"
-    else:
-        callback_url = str(request.url_for("handle_callback", provider=provider))
+    # X-Forwarded-Proto is set by nginx (SSL terminator). Replace the scheme
+    # so the callback URI sent to Keycloak uses https, not http.
+    callback_url = str(request.url_for("handle_callback", provider=provider))
+    proto = request.headers.get("x-forwarded-proto")
+    if proto:
+        callback_url = callback_url.replace(f"{request.url.scheme}://", f"{proto}://", 1)
 
     try:
         # Get login URL from provider
@@ -168,11 +167,10 @@ async def handle_callback(
             raise BadRequestException("Provider mismatch in state parameter")
 
     try:
-        from computor_backend.settings import settings as _settings
-        if _settings.API_PUBLIC_URL:
-            callback_url = f"{_settings.API_PUBLIC_URL}/auth/{provider}/callback"
-        else:
-            callback_url = str(request.url_for("handle_callback", provider=provider))
+        callback_url = str(request.url_for("handle_callback", provider=provider))
+        proto = request.headers.get("x-forwarded-proto")
+        if proto:
+            callback_url = callback_url.replace(f"{request.url.scheme}://", f"{proto}://", 1)
 
         # Delegate to business logic
         result = await handle_sso_callback(

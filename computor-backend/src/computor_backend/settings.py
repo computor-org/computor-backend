@@ -28,12 +28,6 @@ class BackendSettings:
         self.API_ADMIN_EMAIL = os.environ.get("API_ADMIN_EMAIL", None)
         self.API_ADMIN_PASSWORD = os.environ.get("API_ADMIN_PASSWORD", None)
 
-        # Public base URL of the API as seen by browsers (e.g. https://domain.com/api).
-        # Used to build OAuth callback URIs in production where the scheme/host
-        # cannot be reliably inferred from the request (HTTPS terminated before Traefik).
-        # Leave empty in dev — the request URL is used as fallback.
-        self.API_PUBLIC_URL = os.environ.get("API_PUBLIC_URL", "").rstrip("/")
-
         # Extension public download URL
         self.EXTENSION_PUBLIC_DOWNLOAD_URL = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
 

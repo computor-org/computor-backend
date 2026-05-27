@@ -99,7 +99,6 @@ services:
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
-      API_PUBLIC_URL: ${API_PUBLIC_URL:?}
       # Git server integration (if enabled) — uses the internal container URL
       # since uvicorn reaches Forgejo over computor-network, not localhost.
       GIT_SERVER: ${GIT_SERVER}
