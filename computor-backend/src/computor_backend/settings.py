@@ -7,7 +7,6 @@ class BackendSettings:
 
     def __init__(self):
         self.DEBUG_MODE = os.environ.get("DEBUG_MODE","development")
-        self.API_LOCAL_STORAGE_DIR = os.environ.get("API_LOCAL_STORAGE_DIR",None)
 
         # Documents API: write side maintained by ``api/documents.py``,
         # read side served by the ``static-server`` container at /docs.

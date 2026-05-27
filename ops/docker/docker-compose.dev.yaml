@@ -86,7 +86,6 @@ services:
       - API_URL=${API_URL}
       - API_ADMIN_EMAIL=${API_ADMIN_EMAIL}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
-      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?must be set in .env}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?must be set in .env}

@@ -69,7 +69,6 @@ services:
       RUNNING_IN_DOCKER: true
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
-      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       DOCUMENTS_MAX_FILE_SIZE: ${DOCUMENTS_MAX_FILE_SIZE:-10485760}
       POSTGRES_HOST: postgres
@@ -167,7 +166,6 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?must be set in .env}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?must be set in .env}
       - MINIO_SECURE=false
-      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
     depends_on:

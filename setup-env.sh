@@ -267,9 +267,9 @@ if [ "$SKIP_COMMON" != true ]; then
     set_env_var KEYCLOAK_DB_PASSWORD "$KEYCLOAK_DB_PASSWORD"
     set_env_var KEYCLOAK_CLIENT_SECRET "$KEYCLOAK_CLIENT_SECRET"
 
-    # Deployment path (host side). DOCUMENTS_ROOT follows it so the new documents
-    # API and the host volume stay aligned. API_ROOT_PATH/API_LOCAL_STORAGE_DIR are
-    # container-side and left at their (now self-consistent) template defaults.
+    # Deployment path (host side). DOCUMENTS_ROOT follows it so the documents API
+    # and the host volume stay aligned. API_ROOT_PATH is container-side and left at
+    # its template default.
     set_env_var SYSTEM_DEPLOYMENT_PATH "$DEPLOY_PATH"
     set_env_var DOCUMENTS_ROOT "$DEPLOY_PATH/shared/documents"
 
