@@ -927,7 +927,7 @@ async def verify_user_with_gitlab_pat(
         f"(GitLab user: {gitlab_user.username}, instance: {gitlab_url})"
     )
 
-    return user, gitlab_url, gitlab_user_data
+    return user, normalized_gitlab_url, gitlab_user_data
 
 
 async def find_or_create_gitlab_account(
