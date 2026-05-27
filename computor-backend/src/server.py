@@ -205,11 +205,18 @@ if __name__ == "__main__":
         }
     }
 
+    is_production = settings.DEBUG_MODE == "production"
     uvicorn.run(
         "computor_backend.server:app",
         host="0.0.0.0",
         port=8000,
-        log_config=log_config,  # Use our custom log config
-        reload=True,
-        workers=1
+        log_config=log_config,
+        reload=not is_production,
+        workers=1,
+        # In production the app sits behind Traefik at /api.
+        # root_path makes url_for() include /api in generated URLs (e.g. OAuth
+        # callback URIs). forwarded_allow_ips lets uvicorn trust Traefik's
+        # X-Forwarded-Proto so generated URLs use https, not http.
+        root_path="/api" if is_production else "",
+        forwarded_allow_ips="*" if is_production else None,
     )
