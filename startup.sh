@@ -124,6 +124,13 @@ if [ "$GIT_SERVER" = "forgejo" ] && [ "$KEYCLOAK_ENABLED" = "true" ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo-keycloak.yaml"
 fi
 
+if [ "$MATLAB_ENABLED" = "true" ]; then
+    echo -e "MATLAB worker: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.matlab.yaml"
+else
+    echo -e "MATLAB worker: ${YELLOW}disabled${NC} (set MATLAB_ENABLED=true in .env to enable)"
+fi
+
 # Function to safely create directories
 create_dir_if_needed() {
     local dir_path="$1"

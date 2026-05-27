@@ -1,0 +1,62 @@
+# MATLAB Testing Worker — optional add-on stack
+# Include when MATLAB_ENABLED=true. startup.sh adds this file automatically.
+#
+# Required .env additions when enabling MATLAB:
+#   MATLAB_ENABLED=true
+#   MATLAB_BASE_IMAGE=matlab-base:latest
+#   MATLAB_TESTING_WORKER_REPLICAS=1
+#   MATLAB_WORKER_TOKEN=<generate with: openssl rand -hex 32>
+#   MATLAB_TEST_ENGINE_URL=
+#   MATLAB_TEST_ENGINE_TOKEN=
+#   MATLAB_TEST_ENGINE_VERSION=latest
+#   MATLAB_MLM_LICENSE_FILE=
+
+services:
+  temporal-worker-matlab:
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker-matlab/Dockerfile
+      args:
+        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:?}
+    networks:
+      - computor-network
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    command: ["--queues=testing-matlab"]
+    init: true
+    deploy:
+      replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - TZ=UTC
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - PYTHONPATH=/home/matlab/computor-backend/src
+      - API_URL=${API_URL}
+      - API_TOKEN=${MATLAB_WORKER_TOKEN:?}
+      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
+      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
+      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
+      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+      - minio
+    ulimits:
+      nproc: 2048
+      nofile:
+        soft: 8192
+        hard: 16384
+    pids_limit: 2048
+    labels:
+      - "traefik.enable=false"
