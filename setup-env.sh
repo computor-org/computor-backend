@@ -154,6 +154,7 @@ done
 
 # Default values
 ENVIRONMENT="dev"
+DEPLOY_PATH="/opt/computor"  # host directory for all persistent data
 ENABLE_CODER=false
 ENABLE_FORGEJO=false
 ENABLE_TESTING_WORKER=true  # --auto sets up a testing worker by default
@@ -180,8 +181,13 @@ if [ "$AUTO_MODE" != true ]; then
     done
     echo
 
+    # Deployment path — host directory holding all persistent data and bind mounts.
+    echo -e "${GREEN}2. Deployment path:${NC}"
+    DEPLOY_PATH=$(prompt_value "Host directory for persistent data (DBs, MinIO, shared, documents)" "/opt/computor" false)
+    echo
+
     # Git server setup (Keycloak is always enabled — it is the standard identity provider)
-    echo -e "${GREEN}2. Git Server Integration:${NC}"
+    echo -e "${GREEN}3. Git Server Integration:${NC}"
     read -p "Enable the Forgejo git server sidecar? (y/N): " enable_forgejo
     if [ "$enable_forgejo" = "y" ] || [ "$enable_forgejo" = "Y" ]; then
         ENABLE_FORGEJO=true
@@ -190,7 +196,7 @@ if [ "$AUTO_MODE" != true ]; then
 
     # Testing worker setup — generates a pre-shared API token a deployment uses
     # to create the testing-worker service user.
-    echo -e "${GREEN}3. Testing Worker:${NC}"
+    echo -e "${GREEN}4. Testing Worker:${NC}"
     read -p "Set up a testing worker (generate its API token)? (Y/n): " enable_tw
     if [ "$enable_tw" = "n" ] || [ "$enable_tw" = "N" ]; then
         ENABLE_TESTING_WORKER=false
@@ -198,7 +204,7 @@ if [ "$AUTO_MODE" != true ]; then
     echo
 
     # Coder setup
-    echo -e "${GREEN}4. Coder Integration:${NC}"
+    echo -e "${GREEN}5. Coder Integration:${NC}"
     read -p "Enable Coder workspace management? (y/N): " enable_coder
     if [ "$enable_coder" = "y" ] || [ "$enable_coder" = "Y" ]; then
         ENABLE_CODER=true
@@ -260,6 +266,12 @@ if [ "$SKIP_COMMON" != true ]; then
     set_env_var AUTH_SECRET "$AUTH_SECRET"
     set_env_var KEYCLOAK_DB_PASSWORD "$KEYCLOAK_DB_PASSWORD"
     set_env_var KEYCLOAK_CLIENT_SECRET "$KEYCLOAK_CLIENT_SECRET"
+
+    # Deployment path (host side). DOCUMENTS_ROOT follows it so the new documents
+    # API and the host volume stay aligned. API_ROOT_PATH/API_LOCAL_STORAGE_DIR are
+    # container-side and left at their (now self-consistent) template defaults.
+    set_env_var SYSTEM_DEPLOYMENT_PATH "$DEPLOY_PATH"
+    set_env_var DOCUMENTS_ROOT "$DEPLOY_PATH/shared/documents"
 
     echo -e "  ${GREEN}✓${NC} Generated secure passwords and tokens"
 
