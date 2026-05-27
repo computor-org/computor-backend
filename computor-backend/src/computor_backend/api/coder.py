@@ -464,11 +464,11 @@ def _build_template_parameters(settings: CoderSettings) -> dict:
     debug_mode = os.environ.get("DEBUG_MODE", "development")
     if debug_mode == "production":
         backend_internal = "http://uvicorn:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL_PROD", "")
+        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "")
         forward_ports = ""
     else:
         backend_internal = "http://host.docker.internal:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL_DEV", "http://host.docker.internal:8000")
+        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "http://host.docker.internal:8000")
         forward_ports = os.environ.get("DEV_FORWARD_PORTS", "")
 
     return {

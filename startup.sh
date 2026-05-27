@@ -270,7 +270,10 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
     fi
 
     if [ "$CODER_ENABLED" = "true" ]; then
-        echo "  • Coder: ${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
+        # Coder's server is internal-only (bound to 127.0.0.1, not behind Traefik);
+        # only workspaces are exposed, via Traefik.
+        echo "  • Coder API (local access only): http://localhost:7080"
+        echo "  • Coder workspaces: ${CODER_WORKSPACE_BASE_URL:-http://localhost:${TRAEFIK_HTTP_PORT:-8080}/coder}"
     fi
 
     if [ "$GIT_SERVER" = "forgejo" ]; then

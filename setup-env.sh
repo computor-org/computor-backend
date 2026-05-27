@@ -20,36 +20,27 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo ""
     echo "Options:"
     echo "  --auto          Non-interactive mode with defaults"
-    echo "  --force         Overwrite existing files without asking"
-    echo "  --preserve      Keep existing .env if present"
+    echo "  --force         Overwrite an existing .env.common without asking"
+    echo "  --preserve      Don't create/copy .env, only (re)generate .env.common"
     echo "  --help, -h      Show this help message"
+    echo ""
+    echo "An existing .env is NEVER overwritten by this script."
     echo ""
     echo "Examples:"
     echo "  $0              Interactive setup (recommended for first time)"
     echo "  $0 --auto       Quick setup with defaults"
-    echo "  $0 --preserve   Keep existing .env, only update .env.common"
-    echo "  $0 --force      Recreate all files (careful!)"
+    echo "  $0 --preserve   Regenerate .env.common only; leave .env handling to you"
+    echo "  $0 --force      Recreate .env.common (an existing .env is still kept)"
     exit 0
 fi
 
 echo -e "${GREEN}=== Computor Environment Setup ===${NC}"
 echo -e "This script creates a unified environment configuration.\n"
 
-# Check for --force across all args (not just $1, otherwise `setup-env.sh --auto --force`
-# wouldn't suppress this warning).
-HAS_FORCE_ARG=false
-for arg in "$@"; do
-    if [ "$arg" = "--force" ]; then
-        HAS_FORCE_ARG=true
-        break
-    fi
-done
-
 # Check for existing .env file
-if [ -f .env ] && [ "$HAS_FORCE_ARG" != true ]; then
-    echo -e "${YELLOW}⚠️  Warning: Existing .env file detected!${NC}"
-    echo -e "This file will be backed up and replaced."
-    echo -e "Your existing configuration will be preserved in a backup file.\n"
+if [ -f .env ]; then
+    echo -e "${YELLOW}ℹ️  Existing .env detected — it will NOT be modified.${NC}"
+    echo -e "Generated values go to .env.common; merge them into .env yourself.\n"
 fi
 
 # Function to generate secure random token
@@ -60,6 +51,17 @@ generate_token() {
 # Function to generate secure hex token
 generate_hex_token() {
     openssl rand -hex 32 2>/dev/null || cat /dev/urandom | head -c 32 | xxd -p -c 256
+}
+
+# Generate an API token in the backend's format: "ctp_" + 32 url-safe base64 chars.
+# Mirrors computor_cli.api_token_cli.generate_api_token (secrets.token_urlsafe(24)[:32]).
+# A deployment later registers this token's prefix + sha256 hash to create the
+# matching service user, so the format must match exactly.
+generate_api_token() {
+    local rnd
+    rnd=$(openssl rand -base64 24 2>/dev/null || cat /dev/urandom | head -c 24 | base64)
+    rnd=$(printf '%s' "$rnd" | tr '+/' '-_' | tr -d '=\n\r' | cut -c1-32)
+    printf 'ctp_%s' "$rnd"
 }
 
 # Function to prompt for value with default
@@ -88,6 +90,40 @@ prompt_value() {
     value=$(echo "$value" | tr -d '\n\r')
 
     echo "$value"
+}
+
+# Set KEY=value in $TARGET_FILE (OS-aware, anchored, | delimiter).
+# Anchoring on ^KEY= avoids matching commented lines or longer keys that share
+# a prefix (e.g. API_URL vs NEXT_PUBLIC_API_URL, KEYCLOAK_SERVER_URL vs ..._INTERNAL).
+set_env_var() {
+    local key="$1"
+    local val="$2"
+    # Escape characters that are special on the replacement side of sed s|||.
+    local esc
+    esc=$(printf '%s' "$val" | sed -e 's/[\\&|]/\\&/g')
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s|^${key}=.*|${key}=${esc}|" "$TARGET_FILE"
+    else
+        sed -i "s|^${key}=.*|${key}=${esc}|" "$TARGET_FILE"
+    fi
+}
+
+# Resolve an admin password: in interactive mode prompt (Enter = auto-generate);
+# in --auto mode always auto-generate. The chosen value is echoed to stdout so
+# the caller can both write it and report it in the final summary.
+get_admin_password() {
+    local label="$1"
+    local pw
+    if [ "$AUTO_MODE" = true ]; then
+        generate_token | tr -d '/+=' | cut -c1-16
+        return
+    fi
+    read -r -s -p "  ${label} (press Enter to auto-generate): " pw
+    echo >&2  # newline to stderr so stdout stays clean for capture
+    if [ -z "$pw" ]; then
+        pw=$(generate_token | tr -d '/+=' | cut -c1-16)
+    fi
+    printf '%s' "$pw" | tr -d '\n\r'
 }
 
 # Get script directory
@@ -119,6 +155,8 @@ done
 # Default values
 ENVIRONMENT="dev"
 ENABLE_CODER=false
+ENABLE_FORGEJO=false
+ENABLE_TESTING_WORKER=true  # --auto sets up a testing worker by default
 
 # Interactive mode
 if [ "$AUTO_MODE" != true ]; then
@@ -142,8 +180,25 @@ if [ "$AUTO_MODE" != true ]; then
     done
     echo
 
+    # Git server setup (Keycloak is always enabled — it is the standard identity provider)
+    echo -e "${GREEN}2. Git Server Integration:${NC}"
+    read -p "Enable the Forgejo git server sidecar? (y/N): " enable_forgejo
+    if [ "$enable_forgejo" = "y" ] || [ "$enable_forgejo" = "Y" ]; then
+        ENABLE_FORGEJO=true
+    fi
+    echo
+
+    # Testing worker setup — generates a pre-shared API token a deployment uses
+    # to create the testing-worker service user.
+    echo -e "${GREEN}3. Testing Worker:${NC}"
+    read -p "Set up a testing worker (generate its API token)? (Y/n): " enable_tw
+    if [ "$enable_tw" = "n" ] || [ "$enable_tw" = "N" ]; then
+        ENABLE_TESTING_WORKER=false
+    fi
+    echo
+
     # Coder setup
-    echo -e "${GREEN}2. Coder Integration:${NC}"
+    echo -e "${GREEN}4. Coder Integration:${NC}"
     read -p "Enable Coder workspace management? (y/N): " enable_coder
     if [ "$enable_coder" = "y" ] || [ "$enable_coder" = "Y" ]; then
         ENABLE_CODER=true
@@ -181,7 +236,7 @@ if [ "$SKIP_COMMON" != true ]; then
     echo -e "  Creating $TARGET_FILE from template..."
     cp "$TEMPLATE_FILE" "$TARGET_FILE"
 
-    # Generate secure tokens
+    # Generate secure internal secrets (never typed by a human)
     echo -e "  Generating secure tokens..."
 
     TOKEN_SECRET=$(generate_token)
@@ -190,152 +245,126 @@ if [ "$SKIP_COMMON" != true ]; then
     REDIS_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     MINIO_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     TEMPORAL_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
-    ADMIN_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-16)
-    TESTING_WORKER_TOKEN=$(generate_hex_token | cut -c1-32)
-    MATLAB_WORKER_TOKEN=$(generate_hex_token | cut -c1-32)
 
-    # Update tokens in .env.common using | as delimiter to avoid conflicts with special characters
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$POSTGRES_PASSWORD|" "$TARGET_FILE"
-        sed -i '' "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$REDIS_PASSWORD|" "$TARGET_FILE"
-        sed -i '' "s|MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=$MINIO_PASSWORD|" "$TARGET_FILE"
-        sed -i '' "s|TEMPORAL_POSTGRES_PASSWORD=.*|TEMPORAL_POSTGRES_PASSWORD=$TEMPORAL_PG_PASSWORD|" "$TARGET_FILE"
-        sed -i '' "s|TOKEN_SECRET=.*|TOKEN_SECRET=$TOKEN_SECRET|" "$TARGET_FILE"
-        sed -i '' "s|AUTH_SECRET=.*|AUTH_SECRET=$AUTH_SECRET|" "$TARGET_FILE"
-        sed -i '' "s|API_ADMIN_PASSWORD=.*|API_ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$TARGET_FILE"
-        sed -i '' "s|TESTING_WORKER_TOKEN=.*|TESTING_WORKER_TOKEN=$TESTING_WORKER_TOKEN|" "$TARGET_FILE"
-        sed -i '' "s|MATLAB_WORKER_TOKEN=.*|MATLAB_WORKER_TOKEN=$MATLAB_WORKER_TOKEN|" "$TARGET_FILE"
-    else
-        # Linux
-        sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$POSTGRES_PASSWORD|" "$TARGET_FILE"
-        sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$REDIS_PASSWORD|" "$TARGET_FILE"
-        sed -i "s|MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=$MINIO_PASSWORD|" "$TARGET_FILE"
-        sed -i "s|TEMPORAL_POSTGRES_PASSWORD=.*|TEMPORAL_POSTGRES_PASSWORD=$TEMPORAL_PG_PASSWORD|" "$TARGET_FILE"
-        sed -i "s|TOKEN_SECRET=.*|TOKEN_SECRET=$TOKEN_SECRET|" "$TARGET_FILE"
-        sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=$AUTH_SECRET|" "$TARGET_FILE"
-        sed -i "s|API_ADMIN_PASSWORD=.*|API_ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$TARGET_FILE"
-        sed -i "s|TESTING_WORKER_TOKEN=.*|TESTING_WORKER_TOKEN=$TESTING_WORKER_TOKEN|" "$TARGET_FILE"
-        sed -i "s|MATLAB_WORKER_TOKEN=.*|MATLAB_WORKER_TOKEN=$MATLAB_WORKER_TOKEN|" "$TARGET_FILE"
-    fi
+    # Keycloak internal secrets. KEYCLOAK_CLIENT_SECRET must be hex: startup.sh
+    # substitutes it into the realm config with a /-delimited sed, so it must
+    # not contain '/'.
+    KEYCLOAK_DB_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
+    KEYCLOAK_CLIENT_SECRET=$(generate_hex_token)
+
+    set_env_var POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
+    set_env_var REDIS_PASSWORD "$REDIS_PASSWORD"
+    set_env_var MINIO_ROOT_PASSWORD "$MINIO_PASSWORD"
+    set_env_var TEMPORAL_POSTGRES_PASSWORD "$TEMPORAL_PG_PASSWORD"
+    set_env_var TOKEN_SECRET "$TOKEN_SECRET"
+    set_env_var AUTH_SECRET "$AUTH_SECRET"
+    set_env_var KEYCLOAK_DB_PASSWORD "$KEYCLOAK_DB_PASSWORD"
+    set_env_var KEYCLOAK_CLIENT_SECRET "$KEYCLOAK_CLIENT_SECRET"
 
     echo -e "  ${GREEN}✓${NC} Generated secure passwords and tokens"
+
+    # Admin login passwords — prompt in interactive mode (Enter = auto-generate),
+    # auto-generate in --auto mode. Reported in the summary at the end.
+    if [ "$AUTO_MODE" != true ]; then
+        echo -e "\n${BLUE}Admin credentials${NC} (press Enter to auto-generate a strong value):"
+    fi
+    API_ADMIN_PASSWORD=$(get_admin_password "Computor API admin password (login: admin@computor.local)")
+    KEYCLOAK_ADMIN_PASSWORD=$(get_admin_password "Keycloak admin-console password (user: admin)")
+    set_env_var API_ADMIN_PASSWORD "$API_ADMIN_PASSWORD"
+    set_env_var KEYCLOAK_ADMIN_PASSWORD "$KEYCLOAK_ADMIN_PASSWORD"
 
     # Configure environment-specific settings
     echo -e "  Configuring for $ENVIRONMENT environment..."
 
     if [ "$ENVIRONMENT" = "dev" ]; then
         # Development settings
+        set_env_var DEBUG_MODE development
+        set_env_var DISABLE_API_DEBUG_INFO false
+        set_env_var TEMPORAL_WORKER_REPLICAS 1
+        set_env_var TESTING_WORKER_REPLICAS 1
+        # API_URL: Docker workers reach the host-run backend. Mac and Linux differ.
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|DEBUG_MODE=.*|DEBUG_MODE=development|" "$TARGET_FILE"
-            sed -i '' "s|DISABLE_API_DEBUG_INFO=.*|DISABLE_API_DEBUG_INFO=false|" "$TARGET_FILE"
-            sed -i '' "s|TEMPORAL_WORKER_REPLICAS=.*|TEMPORAL_WORKER_REPLICAS=1|" "$TARGET_FILE"
-            sed -i '' "s|TESTING_WORKER_REPLICAS=.*|TESTING_WORKER_REPLICAS=1|" "$TARGET_FILE"
+            set_env_var API_URL http://host.docker.internal:8000
         else
-            sed -i "s|DEBUG_MODE=.*|DEBUG_MODE=development|" "$TARGET_FILE"
-            sed -i "s|DISABLE_API_DEBUG_INFO=.*|DISABLE_API_DEBUG_INFO=false|" "$TARGET_FILE"
-            sed -i "s|TEMPORAL_WORKER_REPLICAS=.*|TEMPORAL_WORKER_REPLICAS=1|" "$TARGET_FILE"
-            sed -i "s|TESTING_WORKER_REPLICAS=.*|TESTING_WORKER_REPLICAS=1|" "$TARGET_FILE"
+            set_env_var API_URL http://172.17.0.1:8000
         fi
+        # Browser-facing API URL (web runs locally in dev).
+        set_env_var NEXT_PUBLIC_API_URL http://localhost:8000
+        # Backend reaches Coder on localhost; workspaces call back to the host.
+        set_env_var CODER_URL http://localhost:7080
+        set_env_var BACKEND_EXTERNAL_URL http://host.docker.internal:8000
     else
         # Production settings
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|DEBUG_MODE=.*|DEBUG_MODE=production|" "$TARGET_FILE"
-            sed -i '' "s|DISABLE_API_DEBUG_INFO=.*|DISABLE_API_DEBUG_INFO=true|" "$TARGET_FILE"
-            sed -i '' "s|TEMPORAL_WORKER_REPLICAS=.*|TEMPORAL_WORKER_REPLICAS=2|" "$TARGET_FILE"
-            sed -i '' "s|TESTING_WORKER_REPLICAS=.*|TESTING_WORKER_REPLICAS=2|" "$TARGET_FILE"
-            sed -i '' "s|API_URL=.*|API_URL=https://api.yourdomain.com|" "$TARGET_FILE"
-            sed -i '' "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://api.yourdomain.com|" "$TARGET_FILE"
+        set_env_var DEBUG_MODE production
+        set_env_var DISABLE_API_DEBUG_INFO true
+        set_env_var TEMPORAL_WORKER_REPLICAS 2
+        set_env_var TESTING_WORKER_REPLICAS 2
+        # API_URL: backend runs as the 'uvicorn' container on computor-network.
+        set_env_var API_URL http://uvicorn:8000
+        # NEXT_PUBLIC_API_URL is baked into the web build and must be browser-reachable:
+        # the public HTTPS domain with the /api path. Ask for the domain.
+        if [ "$AUTO_MODE" = true ]; then
+            PUBLIC_DOMAIN="https://yourdomain.com"
         else
-            sed -i "s|DEBUG_MODE=.*|DEBUG_MODE=production|" "$TARGET_FILE"
-            sed -i "s|DISABLE_API_DEBUG_INFO=.*|DISABLE_API_DEBUG_INFO=true|" "$TARGET_FILE"
-            sed -i "s|TEMPORAL_WORKER_REPLICAS=.*|TEMPORAL_WORKER_REPLICAS=2|" "$TARGET_FILE"
-            sed -i "s|TESTING_WORKER_REPLICAS=.*|TESTING_WORKER_REPLICAS=2|" "$TARGET_FILE"
-            sed -i "s|API_URL=.*|API_URL=https://api.yourdomain.com|" "$TARGET_FILE"
-            sed -i "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://api.yourdomain.com|" "$TARGET_FILE"
+            PUBLIC_DOMAIN=$(prompt_value "Public HTTPS domain for the web frontend (e.g. https://computor.example.com)" "https://yourdomain.com" false)
         fi
+        PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash so we don't get //api
+        set_env_var NEXT_PUBLIC_API_URL "$PUBLIC_DOMAIN/api"
+        # Backend reaches Coder over computor-network; workspaces call back via Traefik.
+        set_env_var CODER_URL http://coder:7080
+        set_env_var BACKEND_EXTERNAL_URL http://localhost:8080/api
     fi
 
-    # Configure Coder if enabled
+    # Configure the testing worker if requested. The token is pre-shared: a
+    # deployment registers its prefix + hash to create the worker's service user.
+    if [ "$ENABLE_TESTING_WORKER" = true ]; then
+        echo -e "  Configuring testing worker..."
+        TESTING_WORKER_TOKEN=$(generate_api_token)
+        set_env_var TESTING_WORKER_TOKEN "$TESTING_WORKER_TOKEN"
+        echo -e "  ${GREEN}✓${NC} Generated TESTING_WORKER_TOKEN"
+    fi
+
+    # Configure Forgejo git server if enabled
+    if [ "$ENABLE_FORGEJO" = true ]; then
+        echo -e "  Configuring Forgejo git server..."
+
+        # Internal Forgejo Postgres credential — fail-closed in the compose file,
+        # never typed by a human.
+        FORGEJO_DB_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
+
+        # Admin login for the Forgejo web UI (prompt / auto-generate like the others).
+        GIT_SERVER_ADMIN_PASSWORD=$(get_admin_password "Forgejo admin password (user: forgejo-admin)")
+
+        set_env_var GIT_SERVER forgejo
+        set_env_var FORGEJO_DB_PASSWORD "$FORGEJO_DB_PASSWORD"
+        set_env_var GIT_SERVER_ADMIN_PASSWORD "$GIT_SERVER_ADMIN_PASSWORD"
+
+        echo -e "  ${GREEN}✓${NC} Forgejo configuration complete"
+    fi
+
+    # Configure Coder if enabled. Coder's server is internal-only (bound to
+    # 127.0.0.1, not behind Traefik — only workspaces are exposed via Traefik),
+    # and all its credentials are backend-to-Coder-API, so everything here is
+    # generated automatically with nothing to prompt for.
     if [ "$ENABLE_CODER" = true ]; then
         echo -e "  Configuring Coder integration..."
 
-        # Generate internal Coder DB credential.
-        # CODER_POSTGRES_PASSWORD is required by docker-compose.coder.yaml's :?
-        # fail-closed check and never needs to be human-memorable.
+        # Internal credentials (all fail-closed / backend-only, never human-typed):
+        #   CODER_POSTGRES_PASSWORD  — Coder's database
+        #   CODER_ADMIN_PASSWORD     — backend's login to the Coder API
+        #   CODER_ADMIN_API_SECRET   — openssl rand -hex 32, as computor-coder expects
         CODER_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
+        CODER_ADMIN_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-16)
+        CODER_API_SECRET=$(openssl rand -hex 32 2>/dev/null || generate_hex_token)
 
-        # Enable Coder + write the generated credential
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
-            sed -i '' "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
-        else
-            sed -i "s|CODER_ENABLED=.*|CODER_ENABLED=true|" "$TARGET_FILE"
-            sed -i "s|CODER_POSTGRES_PASSWORD=.*|CODER_POSTGRES_PASSWORD=$CODER_PG_PASSWORD|" "$TARGET_FILE"
-        fi
+        # Coder's admin email always mirrors the platform admin email.
+        CODER_ADMIN_EMAIL=$(grep -E '^API_ADMIN_EMAIL=' "$TARGET_FILE" | cut -d= -f2-)
 
-        # Interactive Coder configuration
-        if [ "$AUTO_MODE" != true ]; then
-            echo -e "\n${BLUE}Coder Configuration:${NC}"
-
-            CODER_DOMAIN=$(prompt_value "Coder domain (e.g., coder.example.com)" "coder.localhost" false)
-            CODER_ADMIN_EMAIL=$(prompt_value "Coder admin email" "admin@example.com" false)
-            CODER_ADMIN_PASSWORD=$(prompt_value "Coder admin password" "" true)
-
-            if [ -z "$CODER_ADMIN_PASSWORD" ]; then
-                CODER_ADMIN_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-16)
-                echo -e "  Generated password: ${YELLOW}$CODER_ADMIN_PASSWORD${NC}"
-            fi
-
-            # Ask before generating CODER_ADMIN_API_SECRET (used by Traefik-protected
-            # endpoints; equivalent to ``openssl rand -hex 32``).
-            CODER_API_SECRET=""
-            read -r -p "Generate CODER_ADMIN_API_SECRET now via 'openssl rand -hex 32'? (Y/n): " gen_api_secret
-            if [ -z "$gen_api_secret" ] || [ "$gen_api_secret" = "y" ] || [ "$gen_api_secret" = "Y" ]; then
-                CODER_API_SECRET=$(openssl rand -hex 32 2>/dev/null || generate_hex_token)
-                echo -e "  ${GREEN}✓${NC} Generated CODER_ADMIN_API_SECRET"
-            else
-                echo -e "  ${YELLOW}Skipping CODER_ADMIN_API_SECRET — placeholder kept; fill it in manually.${NC}"
-            fi
-
-            # Escape any pipe characters in user input for sed
-            CODER_DOMAIN_ESCAPED=$(echo "$CODER_DOMAIN" | sed 's/|/\\|/g')
-            CODER_ADMIN_EMAIL_ESCAPED=$(echo "$CODER_ADMIN_EMAIL" | sed 's/|/\\|/g')
-            CODER_ADMIN_PASSWORD_ESCAPED=$(echo "$CODER_ADMIN_PASSWORD" | sed 's/|/\\|/g')
-
-            # Update Coder configuration using | delimiter
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s|CODER_DOMAIN=.*|CODER_DOMAIN=$CODER_DOMAIN_ESCAPED|" "$TARGET_FILE"
-                sed -i '' "s|CODER_ADMIN_EMAIL=.*|CODER_ADMIN_EMAIL=$CODER_ADMIN_EMAIL_ESCAPED|" "$TARGET_FILE"
-                sed -i '' "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD_ESCAPED|" "$TARGET_FILE"
-            else
-                sed -i "s|CODER_DOMAIN=.*|CODER_DOMAIN=$CODER_DOMAIN_ESCAPED|" "$TARGET_FILE"
-                sed -i "s|CODER_ADMIN_EMAIL=.*|CODER_ADMIN_EMAIL=$CODER_ADMIN_EMAIL_ESCAPED|" "$TARGET_FILE"
-                sed -i "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD_ESCAPED|" "$TARGET_FILE"
-            fi
-            # Only overwrite the CODER_ADMIN_API_SECRET line when the user said yes
-            # to generation; otherwise leave the placeholder intact.
-            if [ -n "$CODER_API_SECRET" ]; then
-                if [[ "$OSTYPE" == "darwin"* ]]; then
-                    sed -i '' "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
-                else
-                    sed -i "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
-                fi
-            fi
-        else
-            # Auto mode - generate Coder credentials
-            CODER_ADMIN_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-16)
-            # Use same method as computor-coder/deployment/generate-secret.sh
-            CODER_API_SECRET=$(openssl rand -hex 32 2>/dev/null || generate_hex_token)
-
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD|" "$TARGET_FILE"
-                sed -i '' "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
-            else
-                sed -i "s|CODER_ADMIN_PASSWORD=.*|CODER_ADMIN_PASSWORD=$CODER_ADMIN_PASSWORD|" "$TARGET_FILE"
-                sed -i "s|CODER_ADMIN_API_SECRET=.*|CODER_ADMIN_API_SECRET=$CODER_API_SECRET|" "$TARGET_FILE"
-            fi
-        fi
+        set_env_var CODER_ENABLED true
+        set_env_var CODER_POSTGRES_PASSWORD "$CODER_PG_PASSWORD"
+        set_env_var CODER_ADMIN_PASSWORD "$CODER_ADMIN_PASSWORD"
+        set_env_var CODER_ADMIN_API_SECRET "$CODER_API_SECRET"
+        set_env_var CODER_ADMIN_EMAIL "$CODER_ADMIN_EMAIL"
 
         echo -e "  ${GREEN}✓${NC} Coder configuration complete"
     fi
@@ -343,37 +372,55 @@ if [ "$SKIP_COMMON" != true ]; then
     echo -e "  ${GREEN}✓${NC} Created .env.common"
 fi
 
-# Note about .env file usage
+# Make .env usable by startup.sh — but NEVER overwrite an existing .env.
+# startup.sh reads .env only; .env.common is just the generated template.
+ENV_READY=false
 if [ -f .env ]; then
-    echo -e "\n${YELLOW}Note: Existing .env file found and preserved${NC}"
-    echo -e "  New configuration template saved to .env.common"
-    echo -e "  You may want to compare and update your .env with new variables from .env.common"
-else
-    echo -e "\n${YELLOW}Important: To use the configuration, copy .env.common to .env:${NC}"
+    # An existing .env is the source of truth — leave it untouched.
+    echo -e "\n${YELLOW}Existing .env found — left untouched.${NC}"
+    echo -e "  Generated values were written to .env.common only."
+    echo -e "  Diff and merge any new variables yourself: ${BLUE}diff .env .env.common${NC}"
+elif [ "$PRESERVE_EXISTING" = true ]; then
+    echo -e "\n${YELLOW}--preserve: not creating .env. Copy it yourself when ready:${NC}"
     echo -e "  cp .env.common .env"
+elif [ "$AUTO_MODE" = true ]; then
+    cp .env.common .env
+    ENV_READY=true
+    echo -e "\n  ${GREEN}✓${NC} Copied .env.common to .env"
+else
+    read -r -p "Copy .env.common to .env now so you can start the stack? (Y/n): " do_copy
+    if [ -z "$do_copy" ] || [ "$do_copy" = "y" ] || [ "$do_copy" = "Y" ]; then
+        cp .env.common .env
+        ENV_READY=true
+        echo -e "  ${GREEN}✓${NC} Copied .env.common to .env"
+    else
+        echo -e "  ${YELLOW}Skipped. Copy it yourself when ready:${NC} cp .env.common .env"
+    fi
 fi
-
-# No longer creating environment-specific override files
-# Everything should be in .env only
 
 # Final summary
 echo -e "\n${GREEN}=== Setup Complete ===${NC}"
-echo -e "Created the following file:"
-[ -f .env.common ] && echo -e "  ${GREEN}✓${NC} .env.common - Configuration template with ALL variables"
+echo -e "Created:"
+[ -f .env.common ] && echo -e "  ${GREEN}✓${NC} .env.common - configuration template with ALL variables"
+[ "$ENV_READY" = true ] && echo -e "  ${GREEN}✓${NC} .env - ready for ./startup.sh"
 
-if [ ! -f .env ]; then
-    echo -e "\n${YELLOW}Next step: Copy .env.common to .env${NC}"
-    echo -e "  cp .env.common .env"
-    echo -e "  Then edit .env with your specific configuration"
+# Report the admin credentials (generated or entered) so the user can log in.
+# Only populated when .env.common was (re)generated this run.
+if [ -n "$API_ADMIN_PASSWORD" ]; then
+    echo -e "\n${GREEN}Admin credentials${NC} (also stored in .env.common):"
+    echo -e "  Computor API admin:  admin@computor.local / ${YELLOW}${API_ADMIN_PASSWORD}${NC}"
+    echo -e "  Keycloak console:    admin / ${YELLOW}${KEYCLOAK_ADMIN_PASSWORD}${NC}"
+    if [ "$ENABLE_FORGEJO" = true ]; then
+        echo -e "  Forgejo admin:       forgejo-admin / ${YELLOW}${GIT_SERVER_ADMIN_PASSWORD}${NC}"
+    fi
+    # Coder admin credentials are intentionally omitted — they are internal
+    # (backend-to-Coder API) and not meant for human login.
 fi
 
-if [ "$ENABLE_CODER" = true ]; then
-    echo -e "\n${GREEN}Coder is ENABLED${NC}"
-    echo -e "  Domain: ${CODER_DOMAIN:-coder.localhost}"
-    echo -e "  Admin: ${CODER_ADMIN_EMAIL:-admin@example.com}"
-    if [ -n "$CODER_ADMIN_PASSWORD" ]; then
-        echo -e "  Password: ${YELLOW}$CODER_ADMIN_PASSWORD${NC}"
-    fi
+# Show the testing-worker token so a deployment can register its service user.
+if [ -n "$TESTING_WORKER_TOKEN" ]; then
+    echo -e "\n${GREEN}Testing worker token${NC} (give this to your deployment to create the worker user):"
+    echo -e "  TESTING_WORKER_TOKEN=${YELLOW}${TESTING_WORKER_TOKEN}${NC}"
 fi
 
 echo -e "\n${YELLOW}Important:${NC}"
