@@ -173,6 +173,25 @@ async def startup_logic():
         else:
             print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
 
+        # Register this deployment's callback URI on the Keycloak client so
+        # Keycloak accepts the redirect_uri in the authorization request.
+        # X-Forwarded-Proto from nginx gives us the correct scheme at request
+        # time, but we need the URI pre-registered. Use NEXT_PUBLIC_API_URL
+        # (already set to the public domain by setup-env.sh) as the base.
+        api_public_url = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        if api_public_url:
+            try:
+                from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+                kc = KeycloakAdminClient()
+                from urllib.parse import urlparse
+                origin = f"{urlparse(api_public_url).scheme}://{urlparse(api_public_url).netloc}"
+                await kc.ensure_client_redirect_uri(
+                    redirect_uri=f"{api_public_url}/auth/keycloak/callback",
+                    web_origin=origin,
+                )
+            except Exception as e:
+                print(f"[STARTUP] Keycloak redirect URI registration failed (non-fatal): {e}")
+
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient

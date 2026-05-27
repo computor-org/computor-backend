@@ -242,6 +242,45 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to delete user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
+    async def ensure_client_redirect_uri(self, redirect_uri: str, web_origin: str) -> None:
+        """Add redirect_uri and web_origin to the backend Keycloak client if not present."""
+        token = await self._get_admin_token()
+        clients_url = f"{self.server_url}/admin/realms/{self.realm}/clients"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            resp = await client.get(
+                clients_url,
+                params={"clientId": self.client_id, "search": "false"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            resp.raise_for_status()
+            clients = resp.json()
+            if not clients:
+                logger.warning(f"Keycloak client '{self.client_id}' not found — skipping redirect URI registration")
+                return
+
+            kc_client = clients[0]
+            internal_id = kc_client["id"]
+            current_uris = kc_client.get("redirectUris", [])
+            current_origins = kc_client.get("webOrigins", [])
+
+            if redirect_uri in current_uris and web_origin in current_origins:
+                return  # already registered
+
+            updated = {
+                "redirectUris": list(set(current_uris + [redirect_uri])),
+                "webOrigins": list(set(current_origins + [web_origin])),
+            }
+            put_resp = await client.put(
+                f"{clients_url}/{internal_id}",
+                json={**kc_client, **updated},
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            if put_resp.status_code not in (200, 204):
+                logger.error(f"Failed to update client redirect URIs: {put_resp.status_code} - {put_resp.text}")
+                put_resp.raise_for_status()
+            logger.info(f"Registered redirect URI '{redirect_uri}' on Keycloak client '{self.client_id}'")
+
     async def send_verify_email(self, user_id: str) -> None:
         """Send email verification to user."""
         token = await self._get_admin_token()
