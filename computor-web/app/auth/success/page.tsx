@@ -17,8 +17,16 @@ export default function AuthSuccessPage() {
         if (!result.success) {
           throw new Error(result.error || 'Sign-in failed');
         }
-        const redirect = sessionStorage.getItem('auth_redirect') || '/dashboard';
+        let redirect = sessionStorage.getItem('auth_redirect') || '/dashboard';
         sessionStorage.removeItem('auth_redirect');
+        // Don't bounce back to single-use or pre-auth pages: an invite link is
+        // consumed during this very sign-in (re-loading it 400s with "already
+        // used"), and login/register/auth pages are meaningless once logged in.
+        // Land on the dashboard instead. Genuine deep links (e.g. /courses/123)
+        // are preserved.
+        if (/^\/(invite|login|register|auth)(\/|$)/.test(redirect)) {
+          redirect = '/dashboard';
+        }
         window.location.replace(redirect);
       } catch (err) {
         console.error('SSO success handler failed:', err);
