@@ -362,6 +362,18 @@ if [ "$SKIP_COMMON" != true ]; then
         set_env_var FORGEJO_DB_PASSWORD "$FORGEJO_DB_PASSWORD"
         set_env_var GIT_SERVER_ADMIN_PASSWORD "$GIT_SERVER_ADMIN_PASSWORD"
 
+        # Public exposure. Dev: direct port (localhost:3030), no Traefik. Prod: served
+        # behind Traefik under the /forgejo subpath of PUBLIC_DOMAIN (FORGEJO_ROOT_URL
+        # must include the subpath and carry NO trailing slash — the Keycloak OIDC
+        # callback is built as ${FORGEJO_ROOT_URL}/user/oauth2/Keycloak/callback).
+        if [ "$ENVIRONMENT" = "prod" ]; then
+            FORGEJO_HOST="${PUBLIC_DOMAIN#*://}"   # strip scheme
+            FORGEJO_HOST="${FORGEJO_HOST%%/*}"     # strip any path
+            set_env_var FORGEJO_TRAEFIK_ENABLED true
+            set_env_var FORGEJO_DOMAIN "$FORGEJO_HOST"
+            set_env_var FORGEJO_ROOT_URL "$PUBLIC_DOMAIN/forgejo"
+        fi
+
         echo -e "  ${GREEN}✓${NC} Forgejo configuration complete"
     fi
 

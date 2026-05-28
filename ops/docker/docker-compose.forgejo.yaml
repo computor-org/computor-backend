@@ -93,11 +93,16 @@ services:
       FORGEJO__repository__DEFAULT_PRIVATE: "true"
     labels:
       # Dev: traefik.enable=false — access via direct port binding (FORGEJO_PORT).
-      # Prod: set FORGEJO_TRAEFIK_ENABLED=true and FORGEJO_DOMAIN in .env.
-      #       Traefik then routes by Host header → this container on the shared network.
+      # Prod: set FORGEJO_TRAEFIK_ENABLED=true in .env and expose Forgejo under the
+      #       /forgejo subpath of the main domain. Forgejo serves under that subpath
+      #       because FORGEJO_ROOT_URL=https://<domain>/forgejo — it derives its
+      #       sub-URL from ROOT_URL. The prefix is intentionally NOT stripped: Forgejo's
+      #       router is mounted under the sub-URL and expects the full /forgejo/... path
+      #       (this matches the official Forgejo/Gitea sub-path reverse-proxy setup).
       - "traefik.enable=${FORGEJO_TRAEFIK_ENABLED:-false}"
-      - "traefik.http.routers.forgejo.rule=Host(`${FORGEJO_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.forgejo.rule=PathPrefix(`/forgejo`)"
       - "traefik.http.routers.forgejo.entrypoints=web"
+      - "traefik.http.routers.forgejo.priority=10"
       - "traefik.http.services.forgejo.loadbalancer.server.port=3030"
     depends_on:
       forgejo-db:
