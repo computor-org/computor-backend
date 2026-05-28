@@ -35,6 +35,10 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
       - "--entrypoints.web.address=:80"
+      # Trust X-Forwarded-* headers from an upstream reverse proxy (e.g. nginx).
+      # Without this Traefik overwrites X-Forwarded-Proto with "http" (nginx→Traefik
+      # is plain HTTP on port 8080), which breaks HTTPS callback URLs in uvicorn.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
     depends_on:
