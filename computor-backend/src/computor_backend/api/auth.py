@@ -107,7 +107,11 @@ async def initiate_login(
     await redis_client.set(
         f"sso_state:{state}",
         json.dumps(state_data),
-        ex=600  # 10 minutes
+        # 30 minutes — generous headroom for first-login flows that include
+        # Keycloak required actions (update profile, set password) where the
+        # user may spend several minutes on intermediate forms before the
+        # callback fires. The state is single-use, so a longer TTL is low-risk.
+        ex=1800
     )
     
     # Build the callback URL from NEXT_PUBLIC_API_URL when available so the
@@ -157,7 +161,18 @@ async def handle_callback(
         state_data_raw = await redis_client.get(state_key)
 
         if not state_data_raw:
-            raise BadRequestException("Invalid or expired state parameter")
+            # State expired or already consumed — e.g. a slow first-login
+            # required-action flow that outran the TTL, or a duplicate callback
+            # (the first one succeeded and deleted the single-use state). The auth
+            # cookies were typically already set by that first callback, so send
+            # the user to the app home instead of a raw 4xx: they land logged in,
+            # or the app bounces them to a fresh login. Avoids the scary error page.
+            logger.warning("SSO callback with missing/expired state — redirecting to app home")
+            from urllib.parse import urlparse
+            _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+            _parsed = urlparse(_api_base) if _api_base else None
+            home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
+            return RedirectResponse(url=home, status_code=302)
 
         state_data = json.loads(state_data_raw)
 
