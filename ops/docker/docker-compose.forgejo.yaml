@@ -80,6 +80,11 @@ services:
       FORGEJO__server__DISABLE_SSH: "true"
       # Registration: disabled — users are managed via API or Keycloak SSO
       FORGEJO__service__DISABLE_REGISTRATION: "true"
+      # Require login to view ANY page (repos, users, /explore/*). Without this,
+      # /explore/users and /explore/repos are world-readable. This is a closed
+      # course platform (private repos, no self-registration), so anonymous
+      # browsing should not exist. Sign-in / OIDC endpoints stay reachable.
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
       # Allow OAuth2 SSO users to auto-create accounts (for Keycloak integration)
       FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
       FORGEJO__oauth2_client__UPDATE_AVATAR: "true"
