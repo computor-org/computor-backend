@@ -52,6 +52,17 @@ class ColoredFormatter(logging.Formatter):
         return formatted
 
 
+class SuppressSuccessfulRequests(logging.Filter):
+    """Suppress 200 and 204 access log entries from uvicorn."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn.access args: (client, method, path, http_ver, status_code, length)
+        if record.args and len(record.args) >= 5:
+            status_code = record.args[4]
+            if status_code in (200, 204):
+                return False
+        return True
+
+
 # Setup logging with colors and datetime
 def setup_logging():
     """Configure logging with colors and datetime."""
@@ -79,6 +90,7 @@ def setup_logging():
     access_logger.handlers = []  # Remove default handlers
     access_logger.addHandler(handler)  # Use our handler with colors
     access_logger.setLevel(logging.INFO)  # Keep access logs at INFO
+    access_logger.addFilter(SuppressSuccessfulRequests())
 
     # Configure uvicorn.error to use our formatter
     error_logger = logging.getLogger("uvicorn.error")
@@ -162,6 +174,11 @@ if __name__ == "__main__":
     log_config = {
         "version": 1,
         "disable_existing_loggers": False,
+        "filters": {
+            "suppress_ok": {
+                "()": SuppressSuccessfulRequests
+            }
+        },
         "formatters": {
             "colored": {
                 "()": ColoredFormatter,
@@ -183,7 +200,8 @@ if __name__ == "__main__":
             "access": {
                 "class": "logging.StreamHandler",
                 "formatter": "access",
-                "stream": "ext://sys.stdout"
+                "stream": "ext://sys.stdout",
+                "filters": ["suppress_ok"]
             }
         },
         "loggers": {
