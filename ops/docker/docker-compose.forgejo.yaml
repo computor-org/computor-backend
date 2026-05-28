@@ -94,15 +94,18 @@ services:
     labels:
       # Dev: traefik.enable=false — access via direct port binding (FORGEJO_PORT).
       # Prod: set FORGEJO_TRAEFIK_ENABLED=true in .env and expose Forgejo under the
-      #       /forgejo subpath of the main domain. Forgejo serves under that subpath
-      #       because FORGEJO_ROOT_URL=https://<domain>/forgejo — it derives its
-      #       sub-URL from ROOT_URL. The prefix is intentionally NOT stripped: Forgejo's
-      #       router is mounted under the sub-URL and expects the full /forgejo/... path
-      #       (this matches the official Forgejo/Gitea sub-path reverse-proxy setup).
+      #       /forgejo subpath of the main domain. FORGEJO_ROOT_URL=https://<domain>/forgejo
+      #       makes Forgejo PREFIX every generated link/asset/redirect with /forgejo.
+      #       Traefik then STRIPS /forgejo before forwarding, because Forgejo's router
+      #       serves from root and would otherwise double-count the prefix (assets 404,
+      #       redirect_to=/forgejo/forgejo). Same strip pattern as /api (uvicorn) and
+      #       /docs (static). This is the standard Forgejo/Gitea sub-path proxy setup.
       - "traefik.enable=${FORGEJO_TRAEFIK_ENABLED:-false}"
       - "traefik.http.routers.forgejo.rule=PathPrefix(`/forgejo`)"
       - "traefik.http.routers.forgejo.entrypoints=web"
       - "traefik.http.routers.forgejo.priority=10"
+      - "traefik.http.routers.forgejo.middlewares=forgejo-stripprefix"
+      - "traefik.http.middlewares.forgejo-stripprefix.stripprefix.prefixes=/forgejo"
       - "traefik.http.services.forgejo.loadbalancer.server.port=3030"
     depends_on:
       forgejo-db:
