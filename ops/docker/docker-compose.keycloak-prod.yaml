@@ -1,8 +1,17 @@
-# Keycloak production overlay — patches the uvicorn service.
+# Keycloak production overlay — patches the keycloak and uvicorn services.
 # Only included when KEYCLOAK_ENABLED=true AND environment=prod.
 # startup.sh handles this automatically — do not include manually.
 
 services:
+  keycloak:
+    environment:
+      # Behind a TLS-terminating reverse proxy (nginx → Traefik), Keycloak must be
+      # told to honor X-Forwarded-* headers. Without this it treats every request as
+      # plain HTTP on its internal port, derives an inconsistent frontend URL, and the
+      # login POST fails the auth-session check → "session not found" restart loop.
+      # Dev is unaffected (direct port access, no proxy) — this overlay is prod-only.
+      KC_PROXY_HEADERS: "xforwarded"
+
   uvicorn:
     depends_on:
       keycloak:
