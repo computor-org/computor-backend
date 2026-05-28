@@ -318,7 +318,14 @@ if [ "$SKIP_COMMON" != true ]; then
         if [ "$AUTO_MODE" = true ]; then
             PUBLIC_DOMAIN="https://yourdomain.com"
         else
-            PUBLIC_DOMAIN=$(prompt_value "Public HTTPS domain for the web frontend (e.g. https://computor.example.com)" "https://yourdomain.com" false)
+            while true; do
+                PUBLIC_DOMAIN=$(prompt_value "Public HTTPS domain for the web frontend (e.g. https://computor.example.com)" "https://yourdomain.com" false)
+                PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash
+                if [[ "$PUBLIC_DOMAIN" =~ ^https?:// ]]; then
+                    break
+                fi
+                echo "  Invalid URL — must start with http:// or https:// (got: $PUBLIC_DOMAIN)" >&2
+            done
         fi
         PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash so we don't get //api
         set_env_var NEXT_PUBLIC_API_URL "$PUBLIC_DOMAIN/api"
