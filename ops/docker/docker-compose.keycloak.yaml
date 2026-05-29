@@ -91,6 +91,10 @@ services:
       - "traefik.enable=${KEYCLOAK_TRAEFIK_ENABLED:-false}"
       - "traefik.http.routers.keycloak.rule=PathPrefix(`${KEYCLOAK_HTTP_RELATIVE_PATH:-/auth}`)"
       - "traefik.http.routers.keycloak.entrypoints=web"
+      # Explicit priority: above the frontend catch-all (1), below the frontend's
+      # exact /auth/success router (100). The frontend page lives under the /auth
+      # prefix Keycloak owns, so ordering must not rely on rule-length defaults.
+      - "traefik.http.routers.keycloak.priority=50"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
     command:
       - start-dev
