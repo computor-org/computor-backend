@@ -24,7 +24,8 @@ ops/
 │   └── startup.sh.old         # Old startup script for reference
 │
 └── docs/                      # Operational documentation
-    └── DOCKER_SETUP.md        # Complete Docker setup guide
+    ├── DOCKER_SETUP.md        # Complete Docker setup guide
+    └── REVERSE_PROXY.md       # nginx (TLS) → Traefik production setup
 ```
 
 ## Quick Reference
