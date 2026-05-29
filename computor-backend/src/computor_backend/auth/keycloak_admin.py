@@ -242,27 +242,32 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to delete user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
-    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str]) -> None:
-        """Add the given redirect URIs and web origins to the backend Keycloak client (idempotent).
+    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str], client_id: str | None = None) -> None:
+        """Add the given redirect URIs and web origins to a Keycloak client (idempotent).
 
-        Pass both the login callback and the app-root URI: the client's
-        post.logout.redirect.uris is "+", meaning it reuses the valid redirect URIs,
-        so the app-root entry here is also what makes logout's post_logout_redirect_uri
-        accepted (otherwise Keycloak rejects the post-logout redirect).
+        Defaults to this deployment's backend client (self.client_id); pass client_id
+        to reconcile a different client — e.g. the 'forgejo' OIDC client, whose redirect
+        URI otherwise goes stale when FORGEJO_ROOT_URL changes (the busybox-based
+        forgejo setup script can only POST-create, never update an existing client).
+
+        For the backend client, pass both the login callback and the app-root URI: its
+        post.logout.redirect.uris is "+", meaning it reuses the valid redirect URIs, so
+        the app-root entry is also what makes logout's post_logout_redirect_uri accepted.
         """
+        target_client_id = client_id or self.client_id
         token = await self._get_admin_token()
         clients_url = f"{self.server_url}/admin/realms/{self.realm}/clients"
 
         async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
             resp = await client.get(
                 clients_url,
-                params={"clientId": self.client_id, "search": "false"},
+                params={"clientId": target_client_id, "search": "false"},
                 headers={"Authorization": f"Bearer {token}"},
             )
             resp.raise_for_status()
             clients = resp.json()
             if not clients:
-                logger.warning(f"Keycloak client '{self.client_id}' not found — skipping redirect URI registration")
+                logger.warning(f"Keycloak client '{target_client_id}' not found — skipping redirect URI registration")
                 return
 
             kc_client = clients[0]
@@ -288,7 +293,7 @@ class KeycloakAdminClient:
             if put_resp.status_code not in (200, 204):
                 logger.error(f"Failed to update client redirect URIs: {put_resp.status_code} - {put_resp.text}")
                 put_resp.raise_for_status()
-            logger.info(f"Ensured redirect URIs {sorted(set(redirect_uris))} on Keycloak client '{self.client_id}'")
+            logger.info(f"Ensured redirect URIs {sorted(set(redirect_uris))} on Keycloak client '{target_client_id}'")
 
     async def send_verify_email(self, user_id: str) -> None:
         """Send email verification to user."""

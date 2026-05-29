@@ -203,6 +203,30 @@ async def startup_logic():
                     else:
                         await asyncio.sleep(3)
 
+        # If Forgejo is the git server, reconcile the 'forgejo' Keycloak client's
+        # redirect URI to the current public FORGEJO_ROOT_URL. The forgejo setup
+        # script (busybox wget) can only create the client, never update it, so a
+        # changed FORGEJO_ROOT_URL would otherwise leave a stale callback and break
+        # "Sign in with Keycloak" on Forgejo with invalid_redirect_uri. Best-effort:
+        # if the client doesn't exist yet (created by the setup container), skip.
+        forgejo_root = os.environ.get("FORGEJO_ROOT_URL", "").rstrip("/")
+        if os.environ.get("GIT_SERVER") == "forgejo" and forgejo_root:
+            import asyncio
+            from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+            for attempt in range(1, 6):
+                try:
+                    await KeycloakAdminClient().ensure_client_redirect_uris(
+                        redirect_uris=[f"{forgejo_root}/user/oauth2/Keycloak/callback"],
+                        web_origins=[],  # forgejo client uses webOrigins=["+"] — leave as is
+                        client_id="forgejo",
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Forgejo Keycloak redirect URI reconcile failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
+
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient

@@ -110,6 +110,9 @@ services:
       GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
+      # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
+      # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
+      FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
     depends_on:
       - postgres
       - minio
