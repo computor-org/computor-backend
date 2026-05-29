@@ -178,19 +178,27 @@ async def startup_logic():
         # X-Forwarded-Proto from nginx gives us the correct scheme at request
         # time, but we need the URI pre-registered. Use NEXT_PUBLIC_API_URL
         # (already set to the public domain by setup-env.sh) as the base.
+        # Retries because Keycloak may still be coming up (mirrors admin
+        # provisioning above): if this registration is skipped, every login
+        # fails with invalid_redirect_uri until the next clean restart.
         api_public_url = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
         if api_public_url:
-            try:
-                from computor_backend.auth.keycloak_admin import KeycloakAdminClient
-                kc = KeycloakAdminClient()
-                from urllib.parse import urlparse
-                origin = f"{urlparse(api_public_url).scheme}://{urlparse(api_public_url).netloc}"
-                await kc.ensure_client_redirect_uri(
-                    redirect_uri=f"{api_public_url}/auth/keycloak/callback",
-                    web_origin=origin,
-                )
-            except Exception as e:
-                print(f"[STARTUP] Keycloak redirect URI registration failed (non-fatal): {e}")
+            import asyncio
+            from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+            from urllib.parse import urlparse
+            origin = f"{urlparse(api_public_url).scheme}://{urlparse(api_public_url).netloc}"
+            for attempt in range(1, 6):
+                try:
+                    await KeycloakAdminClient().ensure_client_redirect_uri(
+                        redirect_uri=f"{api_public_url}/auth/keycloak/callback",
+                        web_origin=origin,
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Keycloak redirect URI registration failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
 
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
