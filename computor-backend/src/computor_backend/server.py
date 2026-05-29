@@ -173,11 +173,11 @@ async def startup_logic():
         else:
             print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
 
-        # Register this deployment's callback URI on the Keycloak client so
-        # Keycloak accepts the redirect_uri in the authorization request.
-        # X-Forwarded-Proto from nginx gives us the correct scheme at request
-        # time, but we need the URI pre-registered. Use NEXT_PUBLIC_API_URL
-        # (already set to the public domain by setup-env.sh) as the base.
+        # Register this deployment's redirect URIs on the Keycloak client so
+        # Keycloak accepts both (a) the login callback and (b) the post-logout
+        # redirect back to the app root. X-Forwarded-Proto from nginx gives the
+        # correct scheme at request time, but the URIs must be pre-registered.
+        # Use NEXT_PUBLIC_API_URL (the public domain, set by setup-env.sh) as base.
         # Retries because Keycloak may still be coming up (mirrors admin
         # provisioning above): if this registration is skipped, every login
         # fails with invalid_redirect_uri until the next clean restart.
@@ -189,9 +189,12 @@ async def startup_logic():
             origin = f"{urlparse(api_public_url).scheme}://{urlparse(api_public_url).netloc}"
             for attempt in range(1, 6):
                 try:
-                    await KeycloakAdminClient().ensure_client_redirect_uri(
-                        redirect_uri=f"{api_public_url}/auth/keycloak/callback",
-                        web_origin=origin,
+                    await KeycloakAdminClient().ensure_client_redirect_uris(
+                        redirect_uris=[
+                            f"{api_public_url}/auth/keycloak/callback",  # SSO login callback
+                            f"{origin}/",                                # post-logout redirect target
+                        ],
+                        web_origins=[origin],
                     )
                     break
                 except Exception as e:

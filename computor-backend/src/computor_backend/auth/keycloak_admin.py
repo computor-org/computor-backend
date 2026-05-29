@@ -242,8 +242,14 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to delete user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
-    async def ensure_client_redirect_uri(self, redirect_uri: str, web_origin: str) -> None:
-        """Add redirect_uri and web_origin to the backend Keycloak client if not present."""
+    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str]) -> None:
+        """Add the given redirect URIs and web origins to the backend Keycloak client (idempotent).
+
+        Pass both the login callback and the app-root URI: the client's
+        post.logout.redirect.uris is "+", meaning it reuses the valid redirect URIs,
+        so the app-root entry here is also what makes logout's post_logout_redirect_uri
+        accepted (otherwise Keycloak rejects the post-logout redirect).
+        """
         token = await self._get_admin_token()
         clients_url = f"{self.server_url}/admin/realms/{self.realm}/clients"
 
@@ -261,15 +267,18 @@ class KeycloakAdminClient:
 
             kc_client = clients[0]
             internal_id = kc_client["id"]
-            current_uris = kc_client.get("redirectUris", [])
-            current_origins = kc_client.get("webOrigins", [])
+            current_uris = set(kc_client.get("redirectUris", []))
+            current_origins = set(kc_client.get("webOrigins", []))
 
-            if redirect_uri in current_uris and web_origin in current_origins:
-                return  # already registered
+            merged_uris = current_uris | set(redirect_uris)
+            merged_origins = current_origins | set(web_origins)
+
+            if merged_uris == current_uris and merged_origins == current_origins:
+                return  # nothing new to add
 
             updated = {
-                "redirectUris": list(set(current_uris + [redirect_uri])),
-                "webOrigins": list(set(current_origins + [web_origin])),
+                "redirectUris": sorted(merged_uris),
+                "webOrigins": sorted(merged_origins),
             }
             put_resp = await client.put(
                 f"{clients_url}/{internal_id}",
@@ -279,7 +288,7 @@ class KeycloakAdminClient:
             if put_resp.status_code not in (200, 204):
                 logger.error(f"Failed to update client redirect URIs: {put_resp.status_code} - {put_resp.text}")
                 put_resp.raise_for_status()
-            logger.info(f"Registered redirect URI '{redirect_uri}' on Keycloak client '{self.client_id}'")
+            logger.info(f"Ensured redirect URIs {sorted(set(redirect_uris))} on Keycloak client '{self.client_id}'")
 
     async def send_verify_email(self, user_id: str) -> None:
         """Send email verification to user."""
