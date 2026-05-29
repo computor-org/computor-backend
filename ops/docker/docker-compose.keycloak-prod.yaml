@@ -4,6 +4,15 @@
 
 services:
   keycloak:
+    # Production runtime mode. The base compose uses `start-dev` (dev convenience:
+    # lenient hostname/proxy handling, dev cache, no optimized build) — explicitly
+    # unsupported for production and a source of inconsistent redirect behaviour.
+    # `start` applies the configured KC_HOSTNAME/KC_PROXY_HEADERS strictly. This
+    # override replaces the base command (compose replaces, not merges, command).
+    # First boot auto-builds (~30s; covered by the healthcheck start_period).
+    command:
+      - start
+      - --import-realm
     environment:
       # Behind a TLS-terminating reverse proxy (nginx → Traefik), Keycloak must be
       # told to honor X-Forwarded-* headers. Without this it treats every request as
