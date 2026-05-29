@@ -82,6 +82,22 @@ source .env && echo "  ✓ .env"
 
 set +a
 
+# In production, PUBLIC_DOMAIN is the single source of truth for the public URLs.
+# Derive the per-service public URLs from it here so the domain lives in exactly
+# one place. Each uses ${VAR:-...}, so an explicitly-set value in .env still wins
+# (per-service override). Dev is untouched: PUBLIC_DOMAIN is empty there and each
+# service keeps its own localhost:port URL from .env. setup-env.sh leaves these
+# four empty in a prod .env so PUBLIC_DOMAIN drives them.
+if [ "$ENVIRONMENT" = "prod" ] && [ -n "${PUBLIC_DOMAIN:-}" ]; then
+    PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"            # tolerate a trailing slash
+    _pd_host="${PUBLIC_DOMAIN#*://}"; _pd_host="${_pd_host%%/*}"  # strip scheme + path
+    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-${PUBLIC_DOMAIN}/api}"
+    export KEYCLOAK_PUBLIC_URL="${KEYCLOAK_PUBLIC_URL:-${PUBLIC_DOMAIN}/auth}"
+    export FORGEJO_ROOT_URL="${FORGEJO_ROOT_URL:-${PUBLIC_DOMAIN}/forgejo}"
+    export FORGEJO_DOMAIN="${FORGEJO_DOMAIN:-${_pd_host}}"
+    echo -e "  ${GREEN}✓${NC} Derived public URLs from PUBLIC_DOMAIN=${PUBLIC_DOMAIN}"
+fi
+
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
 

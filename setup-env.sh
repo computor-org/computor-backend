@@ -328,11 +328,16 @@ if [ "$SKIP_COMMON" != true ]; then
             done
         fi
         PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash so we don't get //api
-        set_env_var NEXT_PUBLIC_API_URL "$PUBLIC_DOMAIN/api"
-        # Keycloak: expose via Traefik at /auth, public URL derived from the same domain.
+        # Single source of truth for the public URLs. startup.sh derives
+        # NEXT_PUBLIC_API_URL / KEYCLOAK_PUBLIC_URL / FORGEJO_ROOT_URL / FORGEJO_DOMAIN
+        # from this at launch, so leave those empty here (a domain change is then a
+        # one-line edit). Set any of them explicitly later to override its derivation.
+        set_env_var PUBLIC_DOMAIN "$PUBLIC_DOMAIN"
+        set_env_var NEXT_PUBLIC_API_URL ""
+        # Keycloak: expose via Traefik at /auth; the public URL itself comes from PUBLIC_DOMAIN.
         set_env_var KEYCLOAK_TRAEFIK_ENABLED true
         set_env_var KEYCLOAK_HTTP_RELATIVE_PATH /auth
-        set_env_var KEYCLOAK_PUBLIC_URL "$PUBLIC_DOMAIN/auth"
+        set_env_var KEYCLOAK_PUBLIC_URL ""
         # Backend reaches Coder over computor-network; workspaces call back via Traefik.
         set_env_var CODER_URL http://coder:7080
         set_env_var BACKEND_EXTERNAL_URL http://localhost:8080/api
@@ -363,15 +368,14 @@ if [ "$SKIP_COMMON" != true ]; then
         set_env_var GIT_SERVER_ADMIN_PASSWORD "$GIT_SERVER_ADMIN_PASSWORD"
 
         # Public exposure. Dev: direct port (localhost:3030), no Traefik. Prod: served
-        # behind Traefik under the /forgejo subpath of PUBLIC_DOMAIN (FORGEJO_ROOT_URL
-        # must include the subpath and carry NO trailing slash — the Keycloak OIDC
-        # callback is built as ${FORGEJO_ROOT_URL}/user/oauth2/Keycloak/callback).
+        # behind Traefik under the /forgejo subpath. FORGEJO_ROOT_URL and FORGEJO_DOMAIN
+        # are derived from PUBLIC_DOMAIN by startup.sh, so leave them empty here (set
+        # explicitly to override). startup.sh strips the scheme for FORGEJO_DOMAIN and
+        # appends /forgejo for FORGEJO_ROOT_URL.
         if [ "$ENVIRONMENT" = "prod" ]; then
-            FORGEJO_HOST="${PUBLIC_DOMAIN#*://}"   # strip scheme
-            FORGEJO_HOST="${FORGEJO_HOST%%/*}"     # strip any path
             set_env_var FORGEJO_TRAEFIK_ENABLED true
-            set_env_var FORGEJO_DOMAIN "$FORGEJO_HOST"
-            set_env_var FORGEJO_ROOT_URL "$PUBLIC_DOMAIN/forgejo"
+            set_env_var FORGEJO_DOMAIN ""
+            set_env_var FORGEJO_ROOT_URL ""
         fi
 
         echo -e "  ${GREEN}✓${NC} Forgejo configuration complete"
