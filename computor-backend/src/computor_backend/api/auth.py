@@ -29,6 +29,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.settings import settings
 from computor_types.auth import (
     LogoutResponse,
     LocalTokenRefreshRequest,
@@ -42,6 +43,11 @@ from computor_types.auth import (
 )
 
 logger = logging.getLogger(__name__)
+
+# SSO cookies must be marked Secure in production (served over HTTPS via nginx),
+# but NOT in dev where the app is plain http://localhost — a Secure cookie set
+# over http is silently dropped by the browser, breaking local login.
+_COOKIE_SECURE = settings.DEBUG_MODE == "production"
 
 auth_router = APIRouter(prefix="/auth")
 
@@ -224,7 +230,7 @@ async def handle_callback(
             key="ct_access_token",
             value=result["token"],
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
+            secure=_COOKIE_SECURE,
             samesite="lax",
             max_age=3600,
         )
@@ -232,7 +238,7 @@ async def handle_callback(
             key="ct_refresh_token",
             value=result["refresh_token"],
             httponly=True,
-            secure=False,
+            secure=_COOKIE_SECURE,
             samesite="lax",
             max_age=604800,
         )
@@ -311,8 +317,8 @@ async def sso_logout(
         target = f"{end_session_endpoint}?{urlencode(params)}"
 
     redirect_response = RedirectResponse(url=target, status_code=302)
-    redirect_response.delete_cookie(key="ct_access_token", samesite="lax")
-    redirect_response.delete_cookie(key="ct_refresh_token", samesite="lax")
+    redirect_response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
+    redirect_response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
     return redirect_response
 
 @auth_router.post("/logout", response_model=LogoutResponse)
@@ -353,8 +359,8 @@ async def logout(
     )
 
     # Clear cookies
-    response.delete_cookie(key="ct_access_token", samesite="lax")
-    response.delete_cookie(key="ct_refresh_token", samesite="lax")
+    response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
+    response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
 
     return result
 
