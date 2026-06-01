@@ -257,6 +257,11 @@ if [ "$SKIP_COMMON" != true ]; then
     # not contain '/'.
     KEYCLOAK_DB_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     KEYCLOAK_CLIENT_SECRET=$(generate_hex_token)
+    # Forgejo's Keycloak OIDC client secret. Declared up-front in the realm import
+    # (computor-realm.json) AND handed to Forgejo's login source, so both sides share
+    # one fixed value — no runtime secret exchange. Hex for the same /-delimited sed
+    # substitution reason as KEYCLOAK_CLIENT_SECRET.
+    FORGEJO_KEYCLOAK_CLIENT_SECRET=$(generate_hex_token)
 
     set_env_var POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
     set_env_var REDIS_PASSWORD "$REDIS_PASSWORD"
@@ -266,6 +271,7 @@ if [ "$SKIP_COMMON" != true ]; then
     set_env_var AUTH_SECRET "$AUTH_SECRET"
     set_env_var KEYCLOAK_DB_PASSWORD "$KEYCLOAK_DB_PASSWORD"
     set_env_var KEYCLOAK_CLIENT_SECRET "$KEYCLOAK_CLIENT_SECRET"
+    set_env_var FORGEJO_KEYCLOAK_CLIENT_SECRET "$FORGEJO_KEYCLOAK_CLIENT_SECRET"
 
     # Deployment path (host side). DOCUMENTS_ROOT follows it so the documents API
     # and the host volume stay aligned. API_ROOT_PATH is container-side and left at

@@ -152,6 +152,45 @@
         "offline_access",
         "microprofile-jwt"
       ]
+    },
+    {
+      "clientId": "forgejo",
+      "name": "Computor Forgejo",
+      "description": "OIDC login client for the Forgejo git server",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "PLACEHOLDER_FORGEJO_CLIENT_SECRET",
+      "redirectUris": [
+        "http://localhost:3030/user/oauth2/Keycloak/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "openid",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
     }
   ],
   "clientScopes": [

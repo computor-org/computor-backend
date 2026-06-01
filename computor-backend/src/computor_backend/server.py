@@ -204,11 +204,11 @@ async def startup_logic():
                         await asyncio.sleep(3)
 
         # If Forgejo is the git server, reconcile the 'forgejo' Keycloak client's
-        # redirect URI to the current public FORGEJO_ROOT_URL. The forgejo setup
-        # script (busybox wget) can only create the client, never update it, so a
-        # changed FORGEJO_ROOT_URL would otherwise leave a stale callback and break
-        # "Sign in with Keycloak" on Forgejo with invalid_redirect_uri. Best-effort:
-        # if the client doesn't exist yet (created by the setup container), skip.
+        # redirect URI to the current public FORGEJO_ROOT_URL. The client itself is
+        # declared in the realm import with its scopes and a localhost dev callback,
+        # but the realm is imported only on Keycloak's first boot and can't know the
+        # public domain — so the prod callback is added here on every startup (the
+        # same pattern the backend client uses). Best-effort and idempotent.
         forgejo_root = os.environ.get("FORGEJO_ROOT_URL", "").rstrip("/")
         if os.environ.get("GIT_SERVER") == "forgejo" and forgejo_root:
             import asyncio

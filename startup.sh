@@ -248,10 +248,13 @@ if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
 
-    # Copy realm config, substituting the client secret from .env
+    # Copy realm config, substituting the client secrets from .env. Both placeholders
+    # are hex (no '/'), so the /-delimited sed is safe. PLACEHOLDER_CLIENT_SECRET is not
+    # a substring of PLACEHOLDER_FORGEJO_CLIENT_SECRET, so the two never collide.
     if [ -f "data/keycloak/computor-realm.json" ]; then
-        echo "  Writing Keycloak realm configuration (substituting KEYCLOAK_CLIENT_SECRET)..."
-        sed "s/PLACEHOLDER_CLIENT_SECRET/${KEYCLOAK_CLIENT_SECRET}/g" \
+        echo "  Writing Keycloak realm configuration (substituting client secrets)..."
+        sed -e "s/PLACEHOLDER_CLIENT_SECRET/${KEYCLOAK_CLIENT_SECRET}/g" \
+            -e "s/PLACEHOLDER_FORGEJO_CLIENT_SECRET/${FORGEJO_KEYCLOAK_CLIENT_SECRET}/g" \
             data/keycloak/computor-realm.json \
             > "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json"
     fi
