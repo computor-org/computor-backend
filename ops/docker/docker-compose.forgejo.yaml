@@ -67,6 +67,9 @@ services:
       TZ: UTC
       # Skip the web installer (required for headless startup)
       FORGEJO__security__INSTALL_LOCK: "true"
+      # nginx → Traefik → Forgejo is two proxy hops; trust both so Forgejo derives
+      # the real client IP from X-Forwarded-For (default is 1).
+      FORGEJO__security__REVERSE_PROXY_LIMIT: "2"
       # Database
       FORGEJO__database__DB_TYPE: postgres
       FORGEJO__database__HOST: forgejo-db:5441
@@ -78,6 +81,13 @@ services:
       FORGEJO__server__HTTP_PORT: 3030
       FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030}
       FORGEJO__server__DISABLE_SSH: "true"
+      # Store sessions in Postgres, not the default file provider. The bind-mounted
+      # /data/gitea/sessions isn't writable by the git user, so file-based sessions
+      # are silently dropped — which breaks the OAuth login round-trip (the state/PKCE
+      # saved before the Keycloak redirect is gone on the callback → 500 "could not
+      # find a matching session"). The DB is always writable and survives restarts.
+      FORGEJO__session__PROVIDER: "db"
+      FORGEJO__session__PROVIDER_CONFIG: ""
       # Registration: disabled — users are managed via API or Keycloak SSO
       FORGEJO__service__DISABLE_REGISTRATION: "true"
       # Require login to view ANY page (repos, users, /explore/*). Without this,
