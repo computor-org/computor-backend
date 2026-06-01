@@ -153,6 +153,20 @@ else
     echo "Some features may not work correctly without environment variables."
 fi
 
+# In prod the public URLs are derived from PUBLIC_DOMAIN at launch and left empty
+# in .env. docker compose requires NEXT_PUBLIC_API_URL non-empty
+# (${NEXT_PUBLIC_API_URL:?} in docker-compose.prod.yaml), so without deriving them
+# here even `down` fails interpolation and the stack can't be stopped. Mirror the
+# derivation in startup.sh so up/down agree on the environment.
+if [ "$ENVIRONMENT" = "prod" ] && [ -n "${PUBLIC_DOMAIN:-}" ]; then
+    PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"            # tolerate a trailing slash
+    _pd_host="${PUBLIC_DOMAIN#*://}"; _pd_host="${_pd_host%%/*}"  # strip scheme + path
+    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-${PUBLIC_DOMAIN}/api}"
+    export KEYCLOAK_PUBLIC_URL="${KEYCLOAK_PUBLIC_URL:-${PUBLIC_DOMAIN}/auth}"
+    export FORGEJO_ROOT_URL="${FORGEJO_ROOT_URL:-${PUBLIC_DOMAIN}/forgejo}"
+    export FORGEJO_DOMAIN="${FORGEJO_DOMAIN:-${_pd_host}}"
+fi
+
 # Determine which optional stacks to include
 INCLUDE_CODER=false
 if [ "$CODER_ENABLED" = "true" ] || [ "$CODER_DETECTED" = true ]; then

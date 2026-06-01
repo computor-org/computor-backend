@@ -319,7 +319,10 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
     fi
 
     echo -e "\n${GREEN}To stop services:${NC}"
-    echo "  docker compose $COMPOSE_FILES down"
+    # Use stop.sh, not raw `docker compose down`: in prod the public URLs are derived
+    # from PUBLIC_DOMAIN and left empty in .env, so a bare compose command fails on
+    # ${NEXT_PUBLIC_API_URL:?}. stop.sh re-derives them.
+    echo "  ./stop.sh $ENVIRONMENT"
 
     echo -e "\n${GREEN}To view logs:${NC}"
     echo "  docker compose $COMPOSE_FILES logs -f [service-name]"
