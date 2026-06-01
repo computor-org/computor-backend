@@ -8,6 +8,7 @@
 | --- | --- | --- | --- | --- |
 | `listAccountsAccountsGet` | GET | `/accounts` | — | `AccountList[]` |
 | `createAccountsAccountsPost` | POST | `/accounts` | `AccountCreate` | `AccountGet` |
+| `listAccountProvidersAccountsProvidersGet` | GET | `/accounts/providers` | — | `AccountProvider[]` |
 | `deleteAccountsAccountsIdDelete` | DELETE | `/accounts/{id}` | — | `void` |
 | `getAccountsAccountsIdGet` | GET | `/accounts/{id}` | — | `AccountGet` |
 | `updateAccountsAccountsIdPatch` | PATCH | `/accounts/{id}` | `AccountUpdate` | `AccountGet` |
@@ -22,30 +23,16 @@
 | `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `loginWithCredentialsAuthLoginPost` | POST | `/auth/login` | `LocalLoginRequest` | `LocalLoginResponse` |
+| `registerViaGitlabAuthGitlabRegisterPost` | POST | `/auth/gitlab/register` | `GitLabRegisterRequest` | `GitLabRegisterResponse` |
 | `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
 | `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
 | `refreshTokenAuthRefreshPost` | POST | `/auth/refresh` | `TokenRefreshRequest` | `TokenRefreshResponse` |
 | `refreshLocalTokenAuthRefreshLocalPost` | POST | `/auth/refresh/local` | `LocalTokenRefreshRequest` | `LocalTokenRefreshResponse` |
-| `registerUserAuthRegisterPost` | POST | `/auth/register` | `UserRegistrationRequest` | `UserRegistrationResponse` |
 | `ssoSuccessAuthSuccessGet` | GET | `/auth/success` | — | `void` |
 | `verifyCoderAccessAuthVerifyCoderAccessGet` | GET | `/auth/verify-coder-access` | — | `void` |
 | `handleCallbackAuthProviderCallbackGet` | GET | `/auth/{provider}/callback` | — | `void` |
 | `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
-
-## AuthenticationClient
-- Base path: `/password`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `adminResetPasswordPasswordAdminResetPost` | POST | `/password/admin/reset` | `AdminResetPasswordRequest` | `PasswordOperationResponse` |
-| `adminSetPasswordPasswordAdminSetPost` | POST | `/password/admin/set` | `AdminSetPasswordRequest` | `PasswordOperationResponse` |
-| `adminGetUserPasswordStatusPasswordAdminStatusUsernameGet` | GET | `/password/admin/status/{username}` | — | `PasswordStatusResponse` |
-| `changePasswordPasswordChangePost` | POST | `/password/change` | `ChangePasswordRequest` | `PasswordOperationResponse` |
-| `userManagerResetPasswordPasswordResetPost` | POST | `/password/reset` | `UserManagerResetPasswordRequest` | `PasswordOperationResponse` |
-| `setInitialPasswordPasswordSetPost` | POST | `/password/set` | `SetPasswordRequest` | `PasswordOperationResponse` |
-| `getPasswordStatusPasswordStatusGet` | GET | `/password/status` | — | `PasswordStatusResponse` |
+| `ssoLogoutAuthProviderLogoutGet` | GET | `/auth/{provider}/logout` | — | `void` |
 
 ## CourseContentKindsClient
 - Base path: `/course-content-kinds`
@@ -240,6 +227,7 @@
 | `removeDependencyExamplesDependenciesDependencyIdDelete` | DELETE | `/examples/dependencies/{dependency_id}` | — | `void` |
 | `downloadExampleVersionExamplesDownloadVersionIdGet` | GET | `/examples/download/{version_id}` | — | `ExampleDownloadResponse` |
 | `uploadExampleExamplesUploadPost` | POST | `/examples/upload` | `ExampleUploadRequest` | `ExampleVersionGet` |
+| `deleteExampleVersionEndpointExamplesVersionsVersionIdDelete` | DELETE | `/examples/versions/{version_id}` | — | `ExampleVersionDeleteResult` |
 | `getVersionExamplesVersionsVersionIdGet` | GET | `/examples/versions/{version_id}` | — | `ExampleVersionGet` |
 | `getExampleExamplesExampleIdGet` | GET | `/examples/{example_id}` | — | `ExampleGet` |
 | `getExampleDependenciesExamplesExampleIdDependenciesGet` | GET | `/examples/{example_id}/dependencies` | — | `ExampleDependencyGet[]` |
@@ -289,6 +277,26 @@
 | `deleteGroupsGroupsIdDelete` | DELETE | `/groups/{id}` | — | `void` |
 | `getGroupsGroupsIdGet` | GET | `/groups/{id}` | — | `GroupGet` |
 | `updateGroupsGroupsIdPatch` | PATCH | `/groups/{id}` | `GroupUpdate` | `GroupGet` |
+
+## InvitesClient
+- Base path: `/admin`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listInvitesAdminInvitesGet` | GET | `/admin/invites` | — | `InviteLinkList[]` |
+| `createInviteAdminInvitesPost` | POST | `/admin/invites` | `InviteLinkCreate` | `InviteLinkGet` |
+| `revokeInviteAdminInvitesInviteIdDelete` | DELETE | `/admin/invites/{invite_id}` | — | `void` |
+| `getInviteAdminInvitesInviteIdGet` | GET | `/admin/invites/{invite_id}` | — | `InviteLinkGet` |
+
+## InvitesClient
+- Base path: `/invites`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getInvitePublicInvitesTokenGet` | GET | `/invites/{token}` | — | `InviteLinkPublic` |
+| `acceptInviteInvitesTokenAcceptPost` | POST | `/invites/{token}/accept` | `InviteAccept` | `Record<string, unknown> & Record<string, unknown>` |
 
 ## LanguagesClient
 - Base path: `/languages`
@@ -565,7 +573,6 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
-| `syncDocumentsRepositorySystemCourseFamiliesCourseFamilyIdSyncDocumentsPost` | POST | `/system/course-families/{course_family_id}/sync-documents` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost` | POST | `/system/courses/{course_id}/generate-assignments` | `GenerateAssignmentsRequest` | `GenerateAssignmentsResponse` |
 | `generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost` | POST | `/system/courses/{course_id}/generate-student-template` | `GenerateTemplateRequest` | `GenerateTemplateResponse` |
 | `getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet` | GET | `/system/courses/{course_id}/gitlab-status` | — | `Record<string, unknown> & Record<string, unknown>` |
@@ -653,7 +660,6 @@
 | `getCurrentUserEndpointUserGet` | GET | `/user` | — | `UserGet` |
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
-| `setUserPasswordEndpointUserPasswordPost` | POST | `/user/password` | `UserPassword` | `void` |
 | `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
 | `getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet` | GET | `/user/views/{course_id}` | — | `string[]` |

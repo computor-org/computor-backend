@@ -3,7 +3,7 @@
  * Endpoint: /examples
  */
 
-import type { ExampleBulkDeleteResult, ExampleDependencyCreate, ExampleDependencyGet, ExampleDownloadResponse, ExampleGet, ExampleList, ExampleUploadRequest, ExampleVersionCreate, ExampleVersionGet, ExampleVersionList, ForceLevel } from 'types/generated';
+import type { ExampleBulkDeleteResult, ExampleDependencyCreate, ExampleDependencyGet, ExampleDownloadResponse, ExampleGet, ExampleList, ExampleUploadRequest, ExampleVersionCreate, ExampleVersionDeleteResult, ExampleVersionGet, ExampleVersionList, ForceLevel } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -86,6 +86,18 @@ export class ExamplesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<ExampleVersionGet>(this.buildPath('upload'), body, { params: queryParams });
+  }
+
+  /**
+   * Delete a single example version
+   * Delete one ExampleVersion (and its MinIO storage) by id. Refuses if any course_content_deployment row currently has its example_version_id pointing at this version. DeploymentHistory rows are NOT a blocker — those FKs SET NULL on delete and the audit record (action, timestamp, example_identifier, version_tag) is preserved. No force flag — active deployments must be cleared first.
+   */
+  async deleteExampleVersionEndpointExamplesVersionsVersionIdDelete({ versionId, dryRun, userId }: { versionId: string; dryRun?: boolean; userId?: string | null }): Promise<ExampleVersionDeleteResult> {
+    const queryParams: Record<string, unknown> = {
+      dry_run: dryRun,
+      user_id: userId,
+    };
+    return this.client.delete<ExampleVersionDeleteResult>(this.buildPath('versions', versionId), { params: queryParams });
   }
 
   /**

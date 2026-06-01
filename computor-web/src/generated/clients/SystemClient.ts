@@ -13,28 +13,6 @@ export class SystemClient extends BaseEndpointClient {
   }
 
   /**
-   * Sync Documents Repository
-   * Sync the documents repository from GitLab to shared filesystem.
-   * This endpoint triggers a Temporal workflow that:
-   * 1. Clones the documents repository from the course family's GitLab group
-   * 2. Removes the .git directory
-   * 3. Syncs files to ${SYSTEM_DEPLOYMENT_PATH}/shared/documents/{org}/{family}/
-   * 4. Files become accessible via the static-server at /docs/{org}/{family}/
-   * Args:
-   * course_family_id: The CourseFamily ID
-   * force_update: If True, delete existing files and re-clone; if False, update incrementally
-   * Returns:
-   * Dict with workflow_id and status
-   */
-  async syncDocumentsRepositorySystemCourseFamiliesCourseFamilyIdSyncDocumentsPost({ courseFamilyId, forceUpdate, userId }: { courseFamilyId: string; forceUpdate?: boolean; userId?: string | null }): Promise<Record<string, unknown> & Record<string, unknown>> {
-    const queryParams: Record<string, unknown> = {
-      force_update: forceUpdate,
-      user_id: userId,
-    };
-    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('course-families', courseFamilyId, 'sync-documents'), { params: queryParams });
-  }
-
-  /**
    * Generate Assignments
    */
   async generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost({ courseId, userId, body }: { courseId: string; userId?: string | null; body: GenerateAssignmentsRequest }): Promise<GenerateAssignmentsResponse> {

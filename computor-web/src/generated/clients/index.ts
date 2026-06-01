@@ -5,7 +5,6 @@
 export * from './baseClient';
 export * from './AccountsClient';
 export * from './AuthenticationClient';
-export * from './AuthenticationClient';
 export * from './CourseContentKindsClient';
 export * from './CourseContentTypesClient';
 export * from './CourseContentsClient';
@@ -26,6 +25,8 @@ export * from './ExtensionsClient';
 export * from './ExtensionsGettingStartedClient';
 export * from './ExtensionsPublicClient';
 export * from './GroupsClient';
+export * from './InvitesClient';
+export * from './InvitesClient';
 export * from './LanguagesClient';
 export * from './LecturersClient';
 export * from './MessagesClient';
