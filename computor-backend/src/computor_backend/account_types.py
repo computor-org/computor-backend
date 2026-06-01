@@ -7,18 +7,12 @@ without changing the endpoint URL or response shape.
 """
 
 from typing import List
-from pydantic import BaseModel
 
+# AccountProvider lives in computor_types so the codegen emits its TypeScript type.
+# This module keeps the runtime data (ACCOUNT_PROVIDERS) and re-exports the model.
+from computor_types.accounts import AccountProvider
 
-class AccountProvider(BaseModel):
-    """A supported external provider that can be linked to a user account."""
-    id: str           # short key, e.g. "gitlab"
-    display_name: str
-    description: str
-    provider: str     # value written to account.provider, e.g. "gitlab.com"
-    type: str         # value written to account.type, e.g. "gitlab"
-    field_label: str  # label for the provider_account_id input
-    placeholder: str  # placeholder for the provider_account_id input
+__all__ = ["AccountProvider", "ACCOUNT_PROVIDERS"]
 
 
 ACCOUNT_PROVIDERS: List[AccountProvider] = [

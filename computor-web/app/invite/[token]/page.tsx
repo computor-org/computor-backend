@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { PublicInvitesClient, InviteLinkPublic } from '@/src/generated/clients/InvitesClient';
+import { InvitesClient } from '@/src/generated/clients/InvitesClient';
+import type { InviteLinkPublic } from 'types/generated';
 import { OnboardingClient } from '@/src/clients/OnboardingClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 
-const invitesClient = new PublicInvitesClient();
+const invitesClient = new InvitesClient();
 const onboarding = new OnboardingClient();
 
 export default function InvitePage() {
@@ -30,7 +31,7 @@ export default function InvitePage() {
 
   useEffect(() => {
     if (!token) return;
-    invitesClient.getInvitePublic(token)
+    invitesClient.getInvitePublicInvitesTokenGet({ token })
       .then(data => { setInvite(data); setForm(f => ({ ...f, email: data.email ?? '' })); })
       .catch(e => setLoadError(e instanceof Error ? e.message : 'Invalid or expired invite link'))
       .finally(() => setLoading(false));

@@ -86,7 +86,23 @@ class AccountQuery(ListQuery):
     type: Optional[str] = None
     provider_account_id: Optional[str] = None
     user_id: Optional[str] = None
-    
+
+
+class AccountProvider(BaseModel):
+    """A supported external provider that can be linked to a user account.
+
+    Returned by GET /accounts/providers so the UI can render the correct linking
+    form. Currently backed by a static list in the backend; the shape is stable
+    if that becomes a DB query later.
+    """
+    id: str = Field(description="Short provider key, e.g. 'gitlab'")
+    display_name: str = Field(description="Human-readable provider name")
+    description: str = Field(description="What linking this provider is used for")
+    provider: str = Field(description="Value written to account.provider, e.g. 'gitlab.com'")
+    type: str = Field(description="Value written to account.type, e.g. 'gitlab'")
+    field_label: str = Field(description="Label for the provider_account_id input")
+    placeholder: str = Field(description="Placeholder for the provider_account_id input")
+
 
 class AccountInterface(EntityInterface):
     create = AccountCreate

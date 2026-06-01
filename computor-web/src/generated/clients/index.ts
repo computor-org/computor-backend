@@ -3,6 +3,7 @@
  */
 
 export * from './baseClient';
+export * from './RoleClaimClient';
 export * from './AccountsClient';
 export * from './AuthenticationClient';
 export * from './CourseContentKindsClient';
@@ -36,7 +37,6 @@ export * from './OrganizationRolesClient';
 export * from './OrganizationsClient';
 export * from './ProfilesClient';
 export * from './ResultsClient';
-export * from './RolesClient';
 export * from './RolesClient';
 export * from './ServiceTypesClient';
 export * from './ServicesClient';

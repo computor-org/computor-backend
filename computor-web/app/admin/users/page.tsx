@@ -6,13 +6,11 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
-import { AccountProvidersClient, AccountProvider } from '@/src/generated/clients/AccountProvidersClient';
-import type { UserList, UserGet, UserCreate, RoleList, AccountList } from 'types/generated';
+import type { UserList, UserGet, UserCreate, RoleList, AccountList, AccountProvider } from 'types/generated';
 
 const usersClient = new UsersClient();
 const rolesClient = new RolesClient();
 const accountsClient = new AccountsClient();
-const accountProvidersClient = new AccountProvidersClient();
 
 const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 
@@ -115,7 +113,7 @@ export default function UsersPage() {
     if (!isUserManager) return;
     fetchUsers();
     rolesClient.listRolesRolesGet({ builtin: true }).then(setAllRoles).catch(() => {});
-    accountProvidersClient.listProviders().then(setProviders).catch(() => {});
+    accountsClient.listAccountProvidersAccountsProvidersGet().then(setProviders).catch(() => {});
   }, [authLoading, isAuthenticated, isUserManager, fetchUsers]);
 
   // Guard

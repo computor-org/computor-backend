@@ -1,5 +1,13 @@
 # API Client Endpoint Summary
 
+## RoleClaimClient
+- Base path: `/role-claims`
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `get` | GET | `/role-claims/{id}` | — | `RoleClaimGet` |
+| `list` | GET | `/role-claims` | `RoleClaimQuery` | `RoleClaimList[]` |
+
 ## AccountsClient
 - Base path: `/accounts`
 - Note: custom operations discovered from OpenAPI schema
@@ -413,14 +421,6 @@
 | `downloadResultArtifactsResultsResultIdArtifactsDownloadGet` | GET | `/results/{result_id}/artifacts/download` | — | `void` |
 | `uploadResultArtifactsResultsResultIdArtifactsUploadPost` | POST | `/results/{result_id}/artifacts/upload` | — | `void` |
 | `resultStatusResultsResultIdStatusGet` | GET | `/results/{result_id}/status` | — | `TaskStatus` |
-
-## RolesClient
-- Base path: `/role-claims`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `listRoleClaimRoleClaimsGet` | GET | `/role-claims` | — | `RoleClaimList[]` |
 
 ## RolesClient
 - Base path: `/roles`

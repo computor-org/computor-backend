@@ -222,6 +222,30 @@ export interface AccountQuery {
   user_id?: string | null;
 }
 
+/**
+ * A supported external provider that can be linked to a user account.
+ * 
+ * Returned by GET /accounts/providers so the UI can render the correct linking
+ * form. Currently backed by a static list in the backend; the shape is stable
+ * if that becomes a DB query later.
+ */
+export interface AccountProvider {
+  /** Short provider key, e.g. 'gitlab' */
+  id: string;
+  /** Human-readable provider name */
+  display_name: string;
+  /** What linking this provider is used for */
+  description: string;
+  /** Value written to account.provider, e.g. 'gitlab.com' */
+  provider: string;
+  /** Value written to account.type, e.g. 'gitlab' */
+  type: string;
+  /** Label for the provider_account_id input */
+  field_label: string;
+  /** Placeholder for the provider_account_id input */
+  placeholder: string;
+}
+
 export interface CreateGitUserRequest {
   username: string;
   email: any;

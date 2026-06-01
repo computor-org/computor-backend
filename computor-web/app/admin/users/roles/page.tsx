@@ -4,13 +4,13 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
-import { RoleClaimsClient } from '@/src/generated/clients/RoleClaimsClient';
+import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { RoleList, RoleGet, RoleClaimList, UserRoleList, UserList } from 'types/generated';
 
 const rolesClient = new RolesClient();
-const roleClaimsClient = new RoleClaimsClient();
+const roleClaimsClient = new RoleClaimClient();
 const userRolesClient = new UserClient();
 const usersClient = new UsersClient();
 
@@ -111,7 +111,7 @@ export default function RolesPage() {
     try {
       const [detail, roleClaims, userRoles] = await Promise.all([
         rolesClient.getRolesRolesIdGet({ id: roleId }),
-        roleClaimsClient.listClaims({ roleId, limit: 500 }),
+        roleClaimsClient.list({ role_id: roleId, limit: 500 }),
         userRolesClient.listUserRolesUserRolesGet({ roleId, limit: 500 }),
       ]);
       setRoleDetail(detail);
