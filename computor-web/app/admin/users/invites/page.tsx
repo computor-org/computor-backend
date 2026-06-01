@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { InvitesClient, InviteLinkList, InviteLinkCreate } from '@/src/generated/clients/InvitesClient';
+import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
+import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 
-const invitesClient = new InvitesClient();
+const invitesClient = new InviteLinkClient();
 
 const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 
@@ -58,7 +59,7 @@ export default function InvitesPage() {
   const fetchInvites = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await invitesClient.listInvites();
+      const data = await invitesClient.list();
       setInvites(data);
       setError(null);
     } catch (e) {
@@ -101,7 +102,7 @@ export default function InvitesPage() {
         roles: createModal.roles,
         note: createModal.note.trim() || undefined,
       };
-      await invitesClient.createInvite(payload);
+      await invitesClient.create(payload);
       setCreateModal(m => ({ ...m, open: false, email: '', maxUses: 1, expiresInDays: 7, roles: [], note: '', saving: false }));
       notify('Invite link created', 'success');
       fetchInvites();
@@ -112,7 +113,7 @@ export default function InvitesPage() {
 
   const handleRevoke = async (id: string) => {
     try {
-      await invitesClient.revokeInvite(id);
+      await invitesClient.delete(id);
       notify('Invite revoked', 'success');
       fetchInvites();
     } catch (e) {
@@ -172,7 +173,7 @@ export default function InvitesPage() {
                     <td className="px-4 py-3 text-sm text-gray-600">{new Date(inv.expires_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {inv.roles.length > 0
+                        {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
                               <span key={r} className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">{r}</span>
                             ))

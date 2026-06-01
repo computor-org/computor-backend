@@ -127,7 +127,7 @@ export default function InvitePage() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-xs text-blue-800 space-y-1">
             <div>Expires: <strong>{formatDate(invite.expires_at)}</strong></div>
             {invite.email && <div>This invite is restricted to <strong>{invite.email}</strong></div>}
-            {invite.roles.length > 0 && (
+            {invite.roles && invite.roles.length > 0 && (
               <div>Roles granted: <strong>{invite.roles.join(', ')}</strong></div>
             )}
             {invite.note && <div>Note: {invite.note}</div>}

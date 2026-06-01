@@ -1,5 +1,15 @@
 # API Client Endpoint Summary
 
+## InviteLinkClient
+- Base path: `/admin/invites`
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `create` | POST | `/admin/invites` | `InviteLinkCreate` | `InviteLinkGet` |
+| `get` | GET | `/admin/invites/{id}` | — | `InviteLinkGet` |
+| `list` | GET | `/admin/invites` | — | `InviteLinkList[]` |
+| `delete` | DELETE | `/admin/invites/{id}` | — | `void` |
+
 ## RoleClaimClient
 - Base path: `/role-claims`
 
@@ -285,17 +295,6 @@
 | `deleteGroupsGroupsIdDelete` | DELETE | `/groups/{id}` | — | `void` |
 | `getGroupsGroupsIdGet` | GET | `/groups/{id}` | — | `GroupGet` |
 | `updateGroupsGroupsIdPatch` | PATCH | `/groups/{id}` | `GroupUpdate` | `GroupGet` |
-
-## InvitesClient
-- Base path: `/admin`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `listInvitesAdminInvitesGet` | GET | `/admin/invites` | — | `InviteLinkList[]` |
-| `createInviteAdminInvitesPost` | POST | `/admin/invites` | `InviteLinkCreate` | `InviteLinkGet` |
-| `revokeInviteAdminInvitesInviteIdDelete` | DELETE | `/admin/invites/{invite_id}` | — | `void` |
-| `getInviteAdminInvitesInviteIdGet` | GET | `/admin/invites/{invite_id}` | — | `InviteLinkGet` |
 
 ## InvitesClient
 - Base path: `/invites`

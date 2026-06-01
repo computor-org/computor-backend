@@ -3,6 +3,7 @@
  */
 
 export * from './baseClient';
+export * from './InviteLinkClient';
 export * from './RoleClaimClient';
 export * from './AccountsClient';
 export * from './AuthenticationClient';
@@ -26,7 +27,6 @@ export * from './ExtensionsClient';
 export * from './ExtensionsGettingStartedClient';
 export * from './ExtensionsPublicClient';
 export * from './GroupsClient';
-export * from './InvitesClient';
 export * from './InvitesClient';
 export * from './LanguagesClient';
 export * from './LecturersClient';

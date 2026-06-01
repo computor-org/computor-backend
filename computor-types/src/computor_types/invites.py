@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 
+from computor_types.base import EntityInterface
+
 
 class InviteLinkCreate(BaseModel):
     email: Optional[str] = Field(None, description="If set, only this email may accept the invite")
@@ -64,3 +66,15 @@ class InviteAccept(BaseModel):
         if '@' not in v or ' ' in v:
             raise ValueError("Invalid email address")
         return v.lower().strip()
+
+
+class InviteLinkInterface(EntityInterface):
+    # Admin invite-management CRUD, mounted at /admin/invites in the backend.
+    # The public token endpoints (/invites/{token}) are separate and stay in the
+    # hand-grouped InvitesClient — they are not part of this CRUD interface.
+    endpoint = "admin/invites"
+    create = InviteLinkCreate
+    get = InviteLinkGet
+    list = InviteLinkList
+    update = None
+    query = None

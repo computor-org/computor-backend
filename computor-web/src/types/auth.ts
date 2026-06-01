@@ -10,8 +10,8 @@
  * and extend/complement the generated backend types.
  */
 
-// Re-export relevant generated types
-export type { LocalLoginRequest, LocalLoginResponse } from '../generated/types/auth';
+// Local password auth was removed (Keycloak SSO is the only identity provider);
+// LocalLoginRequest/LocalLoginResponse no longer exist in the generated types.
 
 /**
  * Login credentials for authentication

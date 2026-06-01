@@ -126,8 +126,15 @@ class APIClient {
     return this.request<T>(endpoint, { ...(options ?? {}), method: 'PATCH', data });
   }
 
-  async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
-    return this.request<T>(endpoint, { ...(options ?? {}), method: 'DELETE' });
+  async delete<T>(endpoint: string, options?: RequestOptions): Promise<T>;
+  async delete<T>(endpoint: string, data: any, options?: RequestOptions): Promise<T>;
+  async delete<T>(endpoint: string, dataOrOptions?: any, options?: RequestOptions): Promise<T> {
+    // 3-arg form (endpoint, data, options): DELETE with a request body.
+    // 1/2-arg form (endpoint, options): options carries params, no body.
+    if (options !== undefined) {
+      return this.request<T>(endpoint, { ...options, method: 'DELETE', data: dataOrOptions });
+    }
+    return this.request<T>(endpoint, { ...((dataOrOptions as RequestOptions) ?? {}), method: 'DELETE' });
   }
 
   async request<T>(
