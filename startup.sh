@@ -98,6 +98,18 @@ if [ "$ENVIRONMENT" = "prod" ] && [ -n "${PUBLIC_DOMAIN:-}" ]; then
     echo -e "  ${GREEN}✓${NC} Derived public URLs from PUBLIC_DOMAIN=${PUBLIC_DOMAIN}"
 fi
 
+# Ensure the shared Forgejo<->Keycloak client secret exists and is persisted in .env.
+# It must be stable (the realm import and the compose env have to agree on one value)
+# and is only needed when both Keycloak and Forgejo are enabled. This self-heals .env
+# files created before the secret existed, so upgrading never needs a manual edit.
+if [ "$KEYCLOAK_ENABLED" = "true" ] && [ "$GIT_SERVER" = "forgejo" ] && [ -z "${FORGEJO_KEYCLOAK_CLIENT_SECRET:-}" ]; then
+    FORGEJO_KEYCLOAK_CLIENT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 256)
+    sed -i.bak '/^FORGEJO_KEYCLOAK_CLIENT_SECRET=/d' .env && rm -f .env.bak
+    printf 'FORGEJO_KEYCLOAK_CLIENT_SECRET=%s\n' "$FORGEJO_KEYCLOAK_CLIENT_SECRET" >> .env
+    export FORGEJO_KEYCLOAK_CLIENT_SECRET
+    echo -e "  ${GREEN}✓${NC} Generated and persisted FORGEJO_KEYCLOAK_CLIENT_SECRET to .env"
+fi
+
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
 
