@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional, List
 import httpx
 from pydantic import BaseModel, Field
 
+from computor_backend.utils.git_username import username_candidates
+
 logger = logging.getLogger(__name__)
 
 
@@ -143,12 +145,80 @@ class KeycloakAdminClient:
             return users[0]["id"]
     
     async def user_exists(self, username: str) -> bool:
-        """Check if a user exists in Keycloak."""
+        """Check if a user exists in Keycloak (by username)."""
         try:
             await self._get_user_id_by_username(username)
             return True
         except ValueError:
             return False
+
+    async def _get_user_id_by_email(self, email: str) -> Optional[str]:
+        """Return the Keycloak user id for an exact email match, or None.
+
+        Safe to treat as unique: the realm sets ``duplicateEmailsAllowed=false``.
+        This is the cross-system matching key now that the Keycloak username is a
+        generated handle rather than the email.
+        """
+        token = await self._get_admin_token()
+        users_url = f"{self.server_url}/admin/realms/{self.realm}/users"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                users_url,
+                params={"email": email, "exact": "true"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if response.status_code != 200:
+                response.raise_for_status()
+            users = response.json()
+            return users[0]["id"] if users else None
+
+    async def user_exists_by_email(self, email: str) -> bool:
+        """Check if a user exists in Keycloak (by email)."""
+        return await self._get_user_id_by_email(email) is not None
+
+    async def get_username(self, user_id: str) -> Optional[str]:
+        """Return the current Keycloak username for a user id (authoritative live read)."""
+        token = await self._get_admin_token()
+        user_url = f"{self.server_url}/admin/realms/{self.realm}/users/{user_id}"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                user_url, headers={"Authorization": f"Bearer {token}"}
+            )
+            if response.status_code == 404:
+                return None
+            if response.status_code != 200:
+                response.raise_for_status()
+            return response.json().get("username")
+
+    async def generate_unique_username(
+        self,
+        given_name: Optional[str],
+        family_name: Optional[str],
+        email: Optional[str] = None,
+    ) -> str:
+        """Pick the first Forgejo-safe candidate handle not taken in Keycloak.
+
+        Candidates come from the user's name (falling back to the email
+        local-part); if every candidate collides, a numeric suffix is appended.
+        Keycloak enforces realm-wide username uniqueness, so the chosen handle is
+        safe to use as the Forgejo account name.
+        """
+        candidates = username_candidates(given_name, family_name, email)
+        for candidate in candidates:
+            if not await self.user_exists(candidate):
+                return candidate
+
+        base = candidates[0]
+        suffix = 2
+        while await self.user_exists(f"{base}{suffix}"):
+            suffix += 1
+            if suffix > 9999:
+                raise ValueError(
+                    f"Could not allocate a unique username from base '{base}'"
+                )
+        return f"{base}{suffix}"
     
     async def update_user(self, user_id: str, updates: Dict[str, Any]) -> None:
         """Update an existing user in Keycloak."""

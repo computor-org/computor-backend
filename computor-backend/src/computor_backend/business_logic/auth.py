@@ -699,13 +699,18 @@ async def provision_keycloak_login(
     """
     kc = KeycloakAdminClient()
 
-    if await kc.user_exists(email):
-        kc_user_id = await kc._get_user_id_by_username(email)
-        await kc.set_user_password(kc_user_id, password, temporary=False)
-        return kc_user_id, False
+    # Match existing users by email — the Keycloak username is a generated handle,
+    # not the email, so it can't be used as the lookup key.
+    existing_id = await kc._get_user_id_by_email(email)
+    if existing_id:
+        await kc.set_user_password(existing_id, password, temporary=False)
+        return existing_id, False
 
+    # Username is a generated, Forgejo-safe handle (never the email) so that
+    # Forgejo's OIDC preferred_username maps to a valid Forgejo account name.
+    handle = await kc.generate_unique_username(given_name, family_name, email)
     kc_user_id = await kc.create_user(KeycloakUser(
-        username=email,
+        username=handle,
         email=email,
         firstName=given_name or "",
         lastName=family_name or "",
@@ -728,19 +733,21 @@ async def ensure_keycloak_admin(email: str, password: str) -> None:
     """
     kc = KeycloakAdminClient()
 
-    if await kc.user_exists(email):
-        kc_user_id = await kc._get_user_id_by_username(email)
+    existing_id = await kc._get_user_id_by_email(email)
+    if existing_id:
+        kc_user_id = existing_id
         logger.info("Keycloak admin %s already exists — leaving password unchanged.", email)
         await kc.update_user(kc_user_id, {"requiredActions": [], "emailVerified": True})
     else:
+        handle = await kc.generate_unique_username(None, None, email)
         kc_user_id = await kc.create_user(KeycloakUser(
-            username=email,
+            username=handle,
             email=email,
             enabled=True,
             emailVerified=True,
             credentials=[{"type": "password", "value": password, "temporary": False}],
         ))
-        logger.info("Created Keycloak admin %s.", email)
+        logger.info("Created Keycloak admin %s (handle=%s).", email, handle)
 
     group_id = await kc.get_group_id("administrators")
     if not group_id:
