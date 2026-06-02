@@ -311,6 +311,12 @@ if [ "$SKIP_COMMON" != true ]; then
         # Backend reaches Coder on localhost; workspaces call back to the host.
         set_env_var CODER_URL http://localhost:7080
         set_env_var BACKEND_EXTERNAL_URL http://host.docker.internal:8000
+        # Keycloak runs at the ROOT path in dev (KEYCLOAK_HTTP_RELATIVE_PATH=/),
+        # so its URLs must NOT carry the /auth prefix the template ships (that
+        # prefix is for prod, which serves Keycloak under /auth behind Traefik).
+        # Backend on host -> :8180; containers (idp-setup, etc.) -> :8080.
+        set_env_var KEYCLOAK_SERVER_URL http://localhost:8180
+        set_env_var KEYCLOAK_SERVER_URL_INTERNAL http://computor-keycloak:8080
     else
         # Production settings
         set_env_var DEBUG_MODE production
