@@ -64,27 +64,6 @@ class APIClient {
    */
   private async handleResponse<T>(response: Response, method?: string): Promise<T> {
     if (!response.ok) {
-      if (response.status === 401) {
-        // Try to refresh session with any available provider
-        let refreshed = false;
-
-        for (const provider of this.authProviders) {
-          if (provider.isAuthenticated()) {
-            const refreshResult = await provider.refreshSession();
-            if (refreshResult.success) {
-              refreshed = true;
-              break;
-            }
-          }
-        }
-
-        // If refresh failed, clear sessions and trigger auth error callback
-        if (!refreshed) {
-          this.authProviders.forEach(p => p.clearSession());
-          this.onAuthError();
-        }
-      }
-
       const error = await response.text();
       throw new Error(error || `HTTP error! status: ${response.status}`);
     }
@@ -108,6 +87,54 @@ class APIClient {
     }
 
     return text as unknown as T;
+  }
+
+  /**
+   * Attempt to refresh the access token after a 401.
+   * Returns 'refreshed' on success, 'unreachable' if the backend could not be
+   * reached (network error — the caller must NOT log out), or 'failed' if the
+   * backend refused the refresh (the session is genuinely dead).
+   */
+  private async tryRefresh(): Promise<'refreshed' | 'failed' | 'unreachable'> {
+    // Prefer a wired auth provider so cached user data is refreshed in step.
+    for (const provider of this.authProviders) {
+      if (provider.isAuthenticated()) {
+        try {
+          const result = await provider.refreshSession();
+          if (result.success) return 'refreshed';
+          if (result.error === 'unreachable') return 'unreachable';
+          return 'failed';
+        } catch {
+          // Fall through to the direct refresh below.
+        }
+      }
+    }
+
+    // Fallback: hit the refresh endpoint directly (providers may be unset/stale).
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return response.ok ? 'refreshed' : 'failed';
+    } catch {
+      return 'unreachable';
+    }
+  }
+
+  /**
+   * Clear cached session data and notify the app of an auth failure.
+   * Clears sessionStorage directly (key shared with SSOAuthService) so the UI
+   * cannot keep showing a logged-in state even when no providers were wired in.
+   */
+  private handleAuthFailure(): void {
+    this.authProviders.forEach((p) => {
+      try { p.clearSession(); } catch { /* ignore */ }
+    });
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.removeItem('auth_user'); } catch { /* ignore */ }
+    }
+    this.onAuthError();
   }
 
   async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
@@ -161,7 +188,7 @@ class APIClient {
 
     const methodUpper = method.toUpperCase();
 
-    const response = await fetch(url, {
+    const fetchInit: RequestInit = {
       ...restOptions,
       method: methodUpper,
       headers: {
@@ -171,7 +198,25 @@ class APIClient {
       body: ['GET', 'HEAD'].includes(methodUpper) ? undefined : body,
       // CRITICAL: Include credentials (cookies) in all requests
       credentials: 'include',
-    });
+    };
+
+    let response = await fetch(url, fetchInit);
+
+    // On 401, refresh the access token once and retry the original request.
+    // A thrown network error never reaches here — it propagates to the caller,
+    // so an offline / VPN-down state surfaces as an inline error in the page
+    // rather than a logout or a redirect.
+    if (response.status === 401 && !skipAuth) {
+      const outcome = await this.tryRefresh();
+      if (outcome === 'refreshed') {
+        response = await fetch(url, fetchInit);
+      } else if (outcome === 'failed') {
+        // Genuine auth failure: clear the cached session and notify the app.
+        this.handleAuthFailure();
+      }
+      // outcome === 'unreachable': fall through and let the 401 be thrown below;
+      // the session stays intact so a network blip never forces a logout.
+    }
 
     return this.handleResponse<T>(response, methodUpper);
   }

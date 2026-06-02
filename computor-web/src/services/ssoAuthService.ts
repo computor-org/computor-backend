@@ -1,5 +1,6 @@
 import { LoginCredentials, AuthResponse, AuthUser } from '../types/auth';
 import { ISSOAuthProvider } from '../interfaces/IAuthProvider';
+import { apiFetch } from '../utils/apiClient';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -111,22 +112,7 @@ export class SSOAuthService implements ISSOAuthProvider {
       }
 
       const userInfo = await response.json();
-
-      // GET /user returns the User object directly (not wrapped in { user: ... }).
-      // user_roles is an array of { role_id: string, ... } — extract role_id strings.
-      const roleIds: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
-
-      const user: AuthUser = {
-        id: userInfo.id,
-        username: userInfo.username || userInfo.email,
-        email: userInfo.email,
-        givenName: userInfo.given_name,
-        familyName: userInfo.family_name,
-        role: this.mapRolesToFrontend(roleIds),
-        systemRoles: roleIds,
-        permissions: this.mapPermissions(roleIds),
-        courses: [],
-      };
+      const user = this.mapUserResponse(userInfo);
 
       // Store ONLY user data (not tokens!)
       this.saveUserToStorage(user);
@@ -145,6 +131,76 @@ export class SSOAuthService implements ISSOAuthProvider {
         error: 'Failed to complete authentication',
       };
     }
+  }
+
+  /**
+   * Build an AuthUser from a backend `GET /user` payload.
+   *
+   * GET /user returns the User object directly (not wrapped in { user: ... }).
+   * user_roles is an array of { role_id: string, ... } — extract role_id strings.
+   */
+  private mapUserResponse(userInfo: any): AuthUser {
+    const roleIds: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
+    return {
+      id: userInfo.id,
+      username: userInfo.username || userInfo.email,
+      email: userInfo.email,
+      givenName: userInfo.given_name,
+      familyName: userInfo.family_name,
+      role: this.mapRolesToFrontend(roleIds),
+      systemRoles: roleIds,
+      permissions: this.mapPermissions(roleIds),
+      courses: [],
+    };
+  }
+
+  /**
+   * Validate the cached session against the backend.
+   *
+   * The auth tokens live in HttpOnly cookies; the cached user in sessionStorage
+   * can outlive them — e.g. Firefox restores sessionStorage after a restart while
+   * the cookies have already expired. Without this check the UI keeps showing a
+   * logged-in state (the "Sign Out" button) for a session that is actually dead.
+   *
+   * Returns:
+   *  - 'valid'       session is good (cached user refreshed from the backend)
+   *  - 'invalid'     backend rejected us (401/403) — session cleared
+   *  - 'unreachable' backend could not be reached (e.g. off VPN) — session kept
+   */
+  async validateSession(): Promise<'valid' | 'invalid' | 'unreachable'> {
+    if (!this.currentUser) {
+      return 'invalid';
+    }
+
+    let response: Response;
+    try {
+      // apiFetch transparently refreshes the access token on a 401 and retries,
+      // so a merely-expired access token (with a still-valid refresh token) is
+      // renewed here instead of being treated as a dead session.
+      response = await apiFetch(`${API_BASE_URL}/user`);
+    } catch {
+      // Network error: the backend is unreachable. Keep the cached session —
+      // being off VPN must not look like being logged out.
+      return 'unreachable';
+    }
+
+    if (response.ok) {
+      try {
+        const userInfo = await response.json();
+        this.saveUserToStorage(this.mapUserResponse(userInfo));
+      } catch {
+        // A body-parse hiccup must not drop an otherwise-valid session.
+      }
+      return 'valid';
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      this.clearSession();
+      return 'invalid';
+    }
+
+    // Server-side error (5xx) etc. — don't punish the user for it; keep session.
+    return 'unreachable';
   }
 
   /**
@@ -212,8 +268,12 @@ export class SSOAuthService implements ISSOAuthProvider {
    * Backend will refresh HttpOnly cookies automatically
    */
   async refreshSession(): Promise<AuthResponse> {
+    // NOTE: error === 'unreachable' is a signal to callers that the backend
+    // could not be reached (e.g. off VPN). In that case the session is left
+    // intact on purpose — a transient network failure must not log the user out.
+    let response: Response;
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -223,46 +283,44 @@ export class SSOAuthService implements ISSOAuthProvider {
           provider: 'keycloak',
         }),
       });
+    } catch (error) {
+      console.warn('Session refresh skipped (backend unreachable):', error);
+      return { success: false, error: 'unreachable' };
+    }
 
-      if (!response.ok) {
-        throw new Error('Token refresh failed');
-      }
+    if (!response.ok) {
+      // The backend explicitly refused the refresh token — the session is dead.
+      this.clearSession();
+      return { success: false, error: 'Failed to refresh session' };
+    }
 
-      // Fetch updated user info
-      const userResponse = await fetch(`${API_BASE_URL}/user`, {
+    // Fetch updated user info
+    let userResponse: Response;
+    try {
+      userResponse = await fetch(`${API_BASE_URL}/user`, {
         credentials: 'include',
       });
-
-      if (!userResponse.ok) {
-        throw new Error('Failed to fetch user info');
-      }
-
-      const userInfo = await userResponse.json();
-      const user: AuthUser = {
-        id: userInfo.user.id,
-        username: userInfo.user.username || userInfo.user.email,
-        email: userInfo.user.email,
-        givenName: userInfo.user.given_name,
-        familyName: userInfo.user.family_name,
-        role: this.mapRolesToFrontend(userInfo.roles),
-        systemRoles: Array.isArray(userInfo.roles) ? userInfo.roles : [],
-        permissions: this.mapPermissions(userInfo.roles),
-        courses: [],
-      };
-
-      this.saveUserToStorage(user);
-
-      return {
-        success: true,
-        user,
-      };
     } catch (error) {
-      console.error('Session refresh error:', error);
-      this.clearSession();
-      return {
-        success: false,
-        error: 'Failed to refresh session',
-      };
+      console.warn('User fetch after refresh skipped (backend unreachable):', error);
+      return { success: false, error: 'unreachable' };
+    }
+
+    if (!userResponse.ok) {
+      if (userResponse.status === 401 || userResponse.status === 403) {
+        this.clearSession();
+        return { success: false, error: 'Failed to refresh session' };
+      }
+      return { success: false, error: 'unreachable' };
+    }
+
+    try {
+      const userInfo = await userResponse.json();
+      const user = this.mapUserResponse(userInfo);
+      this.saveUserToStorage(user);
+      return { success: true, user };
+    } catch (error) {
+      console.warn('User payload parse failed after refresh:', error);
+      return { success: false, error: 'unreachable' };
     }
   }
 
