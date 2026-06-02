@@ -72,7 +72,7 @@ export default function RolesPage() {
   const [addSearch, setAddSearch] = useState('');
   const [addUserId, setAddUserId] = useState('');
   const [addingMember, setAddingMember] = useState(false);
-  const [removeConfirm, setRemoveConfirm] = useState<{ userId: string; username: string } | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<{ userId: string; email: string } | null>(null);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -180,7 +180,8 @@ export default function RolesPage() {
     return allUsers.filter(u =>
       !memberUserIds.has(u.id) &&
       !u.archived_at &&
-      (u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+      ((u.email?.toLowerCase().includes(q) ?? false)
+        || `${u.given_name ?? ''} ${u.family_name ?? ''}`.toLowerCase().includes(q))
     ).slice(0, 8);
   }, [allUsers, memberUserIds, addSearch]);
 
@@ -314,13 +315,12 @@ export default function RolesPage() {
                       return (
                         <div key={m.user_id} className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg">
                           <div>
-                            <span className="text-sm font-medium text-gray-900">{u?.username ?? m.user_id}</span>
-                            {u?.email && <span className="ml-2 text-xs text-gray-500">{u.email}</span>}
+                            <span className="text-sm font-medium text-gray-900">{u?.email ?? m.user_id}</span>
                             {u?.given_name && <span className="ml-2 text-xs text-gray-400">{u.given_name} {u.family_name}</span>}
                           </div>
                           {canRemove && (
                             <button
-                              onClick={() => setRemoveConfirm({ userId: m.user_id, username: u?.username ?? m.user_id })}
+                              onClick={() => setRemoveConfirm({ userId: m.user_id, email: u?.email ?? m.user_id })}
                               className="text-xs text-red-500 hover:text-red-700 transition-colors ml-4"
                             >
                               Remove
@@ -338,7 +338,7 @@ export default function RolesPage() {
                     <p className="text-xs font-medium text-gray-600 mb-1.5">Add user to role</p>
                     <input
                       type="text"
-                      placeholder="Search by username or email…"
+                      placeholder="Search by email or name…"
                       value={addSearch}
                       onChange={e => { setAddSearch(e.target.value); setAddUserId(''); }}
                       className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -348,11 +348,11 @@ export default function RolesPage() {
                         {addCandidates.map(u => (
                           <button
                             key={u.id}
-                            onClick={() => { setAddUserId(u.id); setAddSearch(u.username ?? u.email ?? u.id); }}
+                            onClick={() => { setAddUserId(u.id); setAddSearch(u.email ?? u.id); }}
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
                           >
-                            <span className="font-medium text-gray-900">{u.username}</span>
-                            <span className="text-xs text-gray-400">{u.email}</span>
+                            <span className="font-medium text-gray-900">{u.email}</span>
+                            <span className="text-xs text-gray-400">{u.given_name} {u.family_name}</span>
                           </button>
                         ))}
                       </div>
@@ -387,7 +387,7 @@ export default function RolesPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Remove from role?</h2>
             <p className="text-sm text-gray-600 mb-4">
-              Remove <strong>{removeConfirm.username}</strong> from <strong>{selectedRoleId}</strong>?
+              Remove <strong>{removeConfirm.email}</strong> from <strong>{selectedRoleId}</strong>?
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setRemoveConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>

@@ -31,7 +31,6 @@ function RoleBadge({ roleId }: { roleId: string }) {
 
 interface CreateUserModal {
   open: boolean;
-  username: string;
   email: string;
   givenName: string;
   familyName: string;
@@ -59,14 +58,14 @@ export default function UsersPage() {
   const [allRoles, setAllRoles] = useState<RoleList[]>([]);
 
   const [createModal, setCreateModal] = useState<CreateUserModal>({
-    open: false, username: '', email: '', givenName: '', familyName: '', roles: [], error: null, saving: false,
+    open: false, email: '', givenName: '', familyName: '', roles: [], error: null, saving: false,
   });
 
   const [rolesModal, setRolesModal] = useState<RolesModal>({
     open: false, user: null, selectedRoles: [], saving: false, error: null,
   });
 
-  const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; username: string; managerPassword: string } | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<{ open: boolean; userId: string; email: string; managerPassword: string } | null>(null);
   const [archiveConfirm, setArchiveConfirm] = useState<{ open: boolean; user: UserList } | null>(null);
 
   const [accountsModal, setAccountsModal] = useState<{
@@ -95,7 +94,6 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const data = await usersClient.listUsersUsersGet({
-        username: search || undefined,
         archived: showArchived ? true : undefined,
         limit: 200,
       });
@@ -106,7 +104,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, showArchived]);
+  }, [showArchived]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -130,7 +128,6 @@ export default function UsersPage() {
     setCreateModal(m => ({ ...m, error: null, saving: true }));
     try {
       const payload: UserCreate = {
-        username: createModal.username,
         email: createModal.email,
         given_name: createModal.givenName || undefined,
         family_name: createModal.familyName || undefined,
@@ -142,8 +139,8 @@ export default function UsersPage() {
         await fetch(`/api/user-roles-proxy?user_id=${created.id}&role_id=${roleId}`, { method: 'POST' }).catch(() => {});
       }
 
-      setCreateModal(m => ({ ...m, open: false, username: '', email: '', givenName: '', familyName: '', roles: [], saving: false }));
-      notify(`User ${created.username} created`, 'success');
+      setCreateModal(m => ({ ...m, open: false, email: '', givenName: '', familyName: '', roles: [], saving: false }));
+      notify(`User ${created.email} created`, 'success');
       fetchUsers();
     } catch (e) {
       setCreateModal(m => ({ ...m, error: e instanceof Error ? e.message : 'Failed to create user', saving: false }));
@@ -154,10 +151,10 @@ export default function UsersPage() {
     try {
       if (u.archived_at) {
         await usersClient.unarchiveUsersUsersIdUnarchivePatch({ id: u.id });
-        notify(`${u.username} unarchived`, 'success');
+        notify(`${u.email} unarchived`, 'success');
       } else {
         await usersClient.routeUsersUsersIdArchivePatch({ id: u.id });
-        notify(`${u.username} archived`, 'success');
+        notify(`${u.email} archived`, 'success');
       }
       fetchUsers();
     } catch (e) {
@@ -263,11 +260,12 @@ export default function UsersPage() {
     }
   };
 
-  const filtered = users.filter(u =>
-    !search ||
-    u.username?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter(u => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (u.email?.toLowerCase().includes(q) ?? false)
+      || `${u.given_name ?? ''} ${u.family_name ?? ''}`.toLowerCase().includes(q);
+  });
 
   return (
     <AuthenticatedLayout>
@@ -299,7 +297,7 @@ export default function UsersPage() {
         <div className="mb-4 flex items-center gap-3">
           <input
             type="text"
-            placeholder="Search by username or email…"
+            placeholder="Search by email or name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -326,7 +324,6 @@ export default function UsersPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -336,10 +333,9 @@ export default function UsersPage() {
                 {filtered.map(u => (
                   <tr key={u.id} className={u.archived_at ? 'opacity-50' : ''}>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 text-sm">{u.username}</div>
+                      <div className="font-medium text-gray-900 text-sm">{u.email ?? '—'}</div>
                       <div className="text-xs text-gray-500">{u.given_name} {u.family_name}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{u.email ?? '—'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${u.archived_at ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-800'}`}>
                         {u.archived_at ? 'Archived' : 'Active'}
@@ -373,7 +369,7 @@ export default function UsersPage() {
                         </button>
                         {isAdmin && (
                           <button
-                            onClick={() => setResetConfirm({ open: true, userId: u.id, username: u.username ?? '', managerPassword: '' })}
+                            onClick={() => setResetConfirm({ open: true, userId: u.id, email: u.email ?? '', managerPassword: '' })}
                             className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                           >
                             Reset PW
@@ -385,7 +381,7 @@ export default function UsersPage() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">No users found</td>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">No users found</td>
                   </tr>
                 )}
               </tbody>
@@ -405,7 +401,6 @@ export default function UsersPage() {
               )}
               <div className="space-y-3">
                 {[
-                  { label: 'Username *', key: 'username', placeholder: 'john.doe' },
                   { label: 'Email *', key: 'email', placeholder: 'john@example.com' },
                   { label: 'Given Name', key: 'givenName', placeholder: 'John' },
                   { label: 'Family Name', key: 'familyName', placeholder: 'Doe' },
@@ -451,7 +446,7 @@ export default function UsersPage() {
               </button>
               <button
                 onClick={handleCreateUser}
-                disabled={createModal.saving || !createModal.username || !createModal.email}
+                disabled={createModal.saving || !createModal.email}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {createModal.saving ? 'Creating…' : 'Create'}
@@ -466,8 +461,8 @@ export default function UsersPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Roles for {rolesModal.user.username}</h2>
-              <p className="text-xs text-gray-500 mb-4">{rolesModal.user.email}</p>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Roles for {rolesModal.user.email}</h2>
+              <p className="text-xs text-gray-500 mb-4">{rolesModal.user.given_name} {rolesModal.user.family_name}</p>
               {rolesModal.error && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{rolesModal.error}</div>
               )}
@@ -517,8 +512,8 @@ export default function UsersPage() {
             </h2>
             <p className="text-sm text-gray-600 mb-4">
               {archiveConfirm.user.archived_at
-                ? <>Restore <strong>{archiveConfirm.user.username}</strong> so they can log in again?</>
-                : <>Archive <strong>{archiveConfirm.user.username}</strong>? They will no longer be able to log in.</>
+                ? <>Restore <strong>{archiveConfirm.user.email}</strong> so they can log in again?</>
+                : <>Archive <strong>{archiveConfirm.user.email}</strong>? They will no longer be able to log in.</>
               }
             </p>
             <div className="flex justify-end gap-2">
@@ -540,7 +535,7 @@ export default function UsersPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Reset Password?</h2>
             <p className="text-sm text-gray-600 mb-4">
-              This will clear <strong>{resetConfirm.username}</strong>'s password. They will need to set a new one via invite link or admin.
+              This will clear <strong>{resetConfirm.email}</strong>'s password. They will need to set a new one via invite link or admin.
             </p>
             <div className="mb-4">
               <label className="block text-xs font-medium text-gray-700 mb-1">Your password (to confirm)</label>
@@ -572,8 +567,8 @@ export default function UsersPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
             <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Accounts — {accountsModal.user.username}</h2>
-              <p className="text-xs text-gray-500 mt-0.5">{accountsModal.user.email}</p>
+              <h2 className="text-lg font-semibold text-gray-900">Accounts — {accountsModal.user.email}</h2>
+              <p className="text-xs text-gray-500 mt-0.5">{accountsModal.user.given_name} {accountsModal.user.family_name}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
