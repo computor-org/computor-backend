@@ -115,3 +115,34 @@ services:
       retries: 15
       start_period: 60s
 
+  # One-shot: registers any brokered external OIDC identity providers in Keycloak,
+  # idempotently, after Keycloak is healthy. Providers come from the operator-managed
+  # (gitignored) data/keycloak/identity-providers.json, staged by startup.sh to
+  # ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp. No file / no enabled providers -> no-op.
+  # Runs on a plain python image (stdlib-only script) so it works in BOTH dev (backend
+  # on host) and prod (backend containerized) without needing the backend image.
+  # Secrets reach it via env_file (.env): each provider names its IDP_*_CLIENT_SECRET.
+  keycloak-idp-setup:
+    image: python:3.13-slim
+    container_name: computor-keycloak-idp-setup
+    networks:
+      - computor-network
+    restart: "no"
+    security_opt:
+      - "no-new-privileges:true"
+    env_file:
+      - ../../.env
+    environment:
+      KEYCLOAK_SERVER_URL_INTERNAL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      IDENTITY_PROVIDERS_FILE: /idp/identity-providers.json
+    volumes:
+      - ../../scripts/setup_identity_providers.py:/setup_identity_providers.py:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp:/idp:ro
+    entrypoint: ["python3", "/setup_identity_providers.py"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+

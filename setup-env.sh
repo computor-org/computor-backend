@@ -473,6 +473,16 @@ echo "1. Review and edit .env.common as needed"
 echo "2. Keep these files secure - they contain passwords"
 echo "3. Never commit .env files to version control"
 
+# External SSO is intentionally NOT prompted here: a brokered IdP's client secret
+# is issued by the institute's provider (we don't generate it), and the provider
+# list is operator-managed and local-only. Just point the way.
+echo -e "\n${BLUE}Optional — external SSO (brokered through Keycloak):${NC}"
+echo "  To let users sign in via an institute IdP (config stays local, not committed):"
+echo "    1. cp data/keycloak/identity-providers.example.json data/keycloak/identity-providers.json"
+echo "       then set alias / discoveryUrl / clientId and \"enabled\": true"
+echo "    2. add its secret to .env:  IDP_<ALIAS>_CLIENT_SECRET=..."
+echo "    3. ./startup.sh — the keycloak-idp-setup step registers it (idempotent)"
+
 echo -e "\n${GREEN}To start Computor:${NC}"
 echo "  ./startup.sh $ENVIRONMENT -d"
 if [ "$ENABLE_CODER" = true ]; then

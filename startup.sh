@@ -276,6 +276,19 @@ if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
         echo "  Syncing Keycloak themes..."
         cp -r data/keycloak/themes/. "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes/"
     fi
+
+    # Brokered external identity providers (optional). The real provider list is
+    # local-only (gitignored), like .env: seed it from the committed example on
+    # first run, then stage it to the deploy path where the keycloak-idp-setup
+    # one-shot reads it. Secrets are NOT in this file — they stay in .env.
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp"
+    if [ ! -f "data/keycloak/identity-providers.json" ] && [ -f "data/keycloak/identity-providers.example.json" ]; then
+        echo "  Seeding data/keycloak/identity-providers.json from example (edit it to add providers)..."
+        cp "data/keycloak/identity-providers.example.json" "data/keycloak/identity-providers.json"
+    fi
+    if [ -f "data/keycloak/identity-providers.json" ]; then
+        cp "data/keycloak/identity-providers.json" "${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp/identity-providers.json"
+    fi
 fi
 
 # Make postgres init script executable
