@@ -27,22 +27,22 @@ paths**. A single catch-all `location /` is correct.
 
 ## nginx configuration
 
-Replace `code.tugraz.at` with your domain and point the cert paths at your files.
+Replace `code.example.com` with your domain and point the cert paths at your files.
 
 ```nginx
 # Redirect all HTTP to HTTPS
 server {
     listen 80;
-    server_name code.tugraz.at;
+    server_name code.example.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name code.tugraz.at;
+    server_name code.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/code.tugraz.at/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/code.tugraz.at/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/code.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/code.example.com/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     # Allow large git pushes over HTTP (Forgejo). Default is 1m → "413" on push.
