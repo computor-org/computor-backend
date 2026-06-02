@@ -317,6 +317,18 @@ if [ "$SKIP_COMMON" != true ]; then
         # Backend on host -> :8180; containers (idp-setup, etc.) -> :8080.
         set_env_var KEYCLOAK_SERVER_URL http://localhost:8180
         set_env_var KEYCLOAK_SERVER_URL_INTERNAL http://computor-keycloak:8080
+        # The dev backend runs on the HOST (api.sh), not in Docker, so it must reach
+        # the dockerized datastores via their published localhost ports — NOT the
+        # container names. Container names only resolve inside Docker's network; on
+        # the host a bare name like "postgres" gets a DNS search domain appended and
+        # leaks to corporate DNS. Prod is unaffected: its containers set these to the
+        # container names directly in the compose env, ignoring these .env values.
+        DEV_PG_PORT=$(grep -E '^POSTGRES_EXTERNAL_PORT=' "$TARGET_FILE" | cut -d= -f2-)
+        set_env_var POSTGRES_HOST localhost
+        set_env_var POSTGRES_PORT "${DEV_PG_PORT:-5432}"
+        set_env_var REDIS_HOST localhost
+        set_env_var TEMPORAL_HOST localhost
+        set_env_var MINIO_ENDPOINT localhost:9000
     else
         # Production settings
         set_env_var DEBUG_MODE production
