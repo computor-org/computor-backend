@@ -441,20 +441,62 @@ async def handle_sso_callback(
             }
 
         else:
-            # New account - create user
+            # New keycloak account — link to an existing user if we recognise the
+            # email, otherwise create a fresh user.
             is_new_user = True
 
-            # Create new user — check for pre-existing user by email (e.g. from invite)
-            user = (
-                db.query(User).filter(User.email == user_info.email).first()
-                if user_info.email
-                else None
+            # Match case-insensitively. The DB enforces one-user-per-email across
+            # both User.email AND StudentProfile.student_email (the
+            # check_email_uniqueness_across_users trigger, also case-insensitive),
+            # so a single match is unambiguous.
+            normalized_email = (
+                user_info.email.strip().lower() if user_info.email else None
             )
+
+            user = None
+            if normalized_email:
+                # 1) Primary email on the User record (e.g. from an invite).
+                user = (
+                    db.query(User)
+                    .filter(func.lower(User.email) == normalized_email)
+                    .first()
+                )
+
+                # 2) Fall back to a student-profile email: a person may receive the
+                #    external IdP under a different address than their User.email.
+                #    Without this the User insert below would trip the uniqueness
+                #    trigger and the login would fail outright.
+                if user is None:
+                    from computor_backend.model.auth import StudentProfile
+
+                    profile_user_ids = {
+                        uid
+                        for (uid,) in db.query(StudentProfile.user_id)
+                        .filter(
+                            func.lower(StudentProfile.student_email) == normalized_email
+                        )
+                        .distinct()
+                        .all()
+                    }
+                    if len(profile_user_ids) == 1:
+                        user = (
+                            db.query(User)
+                            .filter(User.id == next(iter(profile_user_ids)))
+                            .first()
+                        )
+                    elif len(profile_user_ids) > 1:
+                        # Data predating the uniqueness trigger could map one email
+                        # to several users — never guess which to log in as.
+                        raise BadRequestException(
+                            f"Email '{user_info.email}' is associated with multiple "
+                            "accounts; SSO login cannot be resolved automatically."
+                        )
+
             if user is None:
                 user = User(
                     given_name=user_info.given_name or "",
                     family_name=user_info.family_name or "",
-                    email=user_info.email,
+                    email=normalized_email,
                 )
                 db.add(user)
                 db.flush()
