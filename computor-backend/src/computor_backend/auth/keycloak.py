@@ -92,10 +92,12 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             logger.info("Keycloak plugin initialized successfully")
             self._available = True
             # Note: JWKS will be fetched on-demand when needed for token verification
-        except httpx.ConnectError as e:
-            # Keycloak service is not available - this is allowed
-            logger.warning(f"Keycloak service is not available: {e}")
-            logger.info("Keycloak authentication will be disabled. System will continue without SSO support.")
+        except httpx.TransportError as e:
+            # Any transport-level error (ConnectError, ReadError, TimeoutError, etc.)
+            # means Keycloak is temporarily unavailable — allow the server to start
+            # and retry lazily on the first login request.
+            logger.warning(f"Keycloak not ready at startup ({type(e).__name__}): {e}")
+            logger.info("Keycloak plugin will be retried on first login request.")
             self._available = False
             self._oidc_config = None
         except Exception as e:
@@ -260,7 +262,10 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 session_data={
                     "token_type": tokens.get("token_type", "Bearer"),
                     "expires_in": tokens.get("expires_in"),
-                    "scope": tokens.get("scope", "")
+                    "scope": tokens.get("scope", ""),
+                    # Kept so logout can pass id_token_hint to Keycloak's
+                    # end_session_endpoint and skip the logout confirmation page.
+                    "id_token": id_token,
                 }
             )
             
@@ -349,14 +354,23 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if not key:
             raise JWTError(f"No matching key found for kid: {kid}")
         
-        # Verify and decode the token
+        # Verify and decode the token.
+        # Use the issuer from the discovery doc rather than constructing one from
+        # server_url — when Keycloak is behind a reverse proxy / has KC_HOSTNAME set,
+        # the token's `iss` reflects the public URL (e.g. localhost:8080/auth)
+        # while server_url is the internal URL (e.g. localhost:8180/auth).
+        expected_issuer = (
+            self._oidc_config.get("issuer")
+            if self._oidc_config
+            else f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}"
+        )
         try:
             claims = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
                 audience=self.keycloak_config.client_id,
-                issuer=f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}",
+                issuer=expected_issuer,
                 options={"verify_at_hash": False}  # Skip at_hash verification
             )
             return claims

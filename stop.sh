@@ -53,6 +53,16 @@ detect_running_config() {
             CODER_DETECTED=true
         fi
 
+        # Check if Keycloak is running
+        if docker ps --format "{{.Names}}" | grep -q "computor-keycloak"; then
+            KEYCLOAK_DETECTED=true
+        fi
+
+        # Check if Forgejo is running
+        if docker ps --format "{{.Names}}" | grep -q "computor-forgejo"; then
+            FORGEJO_DETECTED=true
+        fi
+
         return 0
     fi
 
@@ -143,14 +153,44 @@ else
     echo "Some features may not work correctly without environment variables."
 fi
 
-# Determine if Coder compose file should be included
-# Use CODER_ENABLED from .env, or auto-detected running Coder containers
+# In prod the public URLs are derived from PUBLIC_DOMAIN at launch and left empty
+# in .env. docker compose requires NEXT_PUBLIC_API_URL non-empty
+# (${NEXT_PUBLIC_API_URL:?} in docker-compose.prod.yaml), so without deriving them
+# here even `down` fails interpolation and the stack can't be stopped. Mirror the
+# derivation in startup.sh so up/down agree on the environment.
+if [ "$ENVIRONMENT" = "prod" ] && [ -n "${PUBLIC_DOMAIN:-}" ]; then
+    PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"            # tolerate a trailing slash
+    _pd_host="${PUBLIC_DOMAIN#*://}"; _pd_host="${_pd_host%%/*}"  # strip scheme + path
+    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-${PUBLIC_DOMAIN}/api}"
+    export KEYCLOAK_PUBLIC_URL="${KEYCLOAK_PUBLIC_URL:-${PUBLIC_DOMAIN}/auth}"
+    export FORGEJO_ROOT_URL="${FORGEJO_ROOT_URL:-${PUBLIC_DOMAIN}/forgejo}"
+    export FORGEJO_DOMAIN="${FORGEJO_DOMAIN:-${_pd_host}}"
+fi
+
+# Determine which optional stacks to include
 INCLUDE_CODER=false
 if [ "$CODER_ENABLED" = "true" ] || [ "$CODER_DETECTED" = true ]; then
     INCLUDE_CODER=true
 fi
 
+INCLUDE_KEYCLOAK=false
+if [ "$KEYCLOAK_ENABLED" = "true" ] || [ "$KEYCLOAK_DETECTED" = true ]; then
+    INCLUDE_KEYCLOAK=true
+fi
+
+INCLUDE_FORGEJO=false
+if [ "$GIT_SERVER" = "forgejo" ] || [ "$FORGEJO_DETECTED" = true ]; then
+    INCLUDE_FORGEJO=true
+fi
+
+INCLUDE_FORGEJO_KEYCLOAK=false
+if [ "$INCLUDE_FORGEJO" = true ] && [ "$INCLUDE_KEYCLOAK" = true ]; then
+    INCLUDE_FORGEJO_KEYCLOAK=true
+fi
+
 echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo "disabled")${NC}"
+echo -e "Keycloak: ${YELLOW}$([ "$INCLUDE_KEYCLOAK" = true ] && echo "enabled" || echo "disabled")${NC}"
+echo -e "Forgejo: ${YELLOW}$([ "$INCLUDE_FORGEJO" = true ] && echo "enabled" || echo "disabled")${NC}"
 
 # Build docker-compose command (must match startup.sh)
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
@@ -159,6 +199,18 @@ if [ "$ENVIRONMENT" = "prod" ]; then
 fi
 if [ "$INCLUDE_CODER" = true ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.coder.yaml"
+fi
+if [ "$INCLUDE_KEYCLOAK" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak.yaml"
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.keycloak-prod.yaml"
+    fi
+fi
+if [ "$INCLUDE_FORGEJO" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.forgejo.yaml"
+fi
+if [ "$INCLUDE_FORGEJO_KEYCLOAK" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f ${OPS_DIR}/docker/docker-compose.forgejo-keycloak.yaml"
 fi
 
 # Show what will be stopped

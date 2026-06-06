@@ -1,0 +1,19 @@
+[
+  {
+    "alias": "example-oidc",
+    "displayName": "Example Institute SSO",
+    "enabled": false,
+    "providerId": "oidc",
+    "discoveryUrl": "https://idp.example.edu/.well-known/openid-configuration",
+    "clientId": "computor",
+    "clientSecretEnv": "IDP_EXAMPLE_CLIENT_SECRET",
+    "defaultScopes": "openid email profile",
+    "trustEmail": true,
+    "syncMode": "FORCE",
+    "mappers": {
+      "email": "email",
+      "givenName": "given_name",
+      "familyName": "family_name"
+    }
+  }
+]

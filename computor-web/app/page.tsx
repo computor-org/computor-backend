@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../src/contexts/AuthContext';
 import { API_BASE_URL } from '../src/utils/apiClient';
+import SetupLoginMenu from '../src/components/SetupLoginMenu';
 
 export default function Home() {
   const router = useRouter();
@@ -92,12 +93,15 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Sign In
-            </Link>
+            <div className="flex items-center space-x-3">
+              <SetupLoginMenu />
+              <Link
+                href="/login"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Sign In
+              </Link>
+            </div>
           )}
         </div>
       </header>

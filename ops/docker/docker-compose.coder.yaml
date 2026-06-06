@@ -150,8 +150,7 @@ services:
       # also auto-treated by docker as an insecure (HTTP) registry, so no TLS.
       CODER_REGISTRY_HOST: localhost:5000
       DEBUG_MODE: ${DEBUG_MODE:-development}
-      BACKEND_EXTERNAL_URL_DEV: ${BACKEND_EXTERNAL_URL_DEV:-http://host.docker.internal:8000}
-      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
+      BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-http://host.docker.internal:8000}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
       MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     extra_hosts:

@@ -27,6 +27,9 @@ class RoleClaimQuery(ListQuery):
 
 
 class RoleClaimInterface(EntityInterface):
+    # endpoint drives the TypeScript client codegen (discover_interfaces reads it),
+    # matching the backend router mounted at /role-claims. Read-only: list + get.
+    endpoint = "role-claims"
     create = None
     get = RoleClaimGet
     list = RoleClaimList

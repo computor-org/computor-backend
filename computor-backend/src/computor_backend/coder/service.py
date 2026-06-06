@@ -117,7 +117,7 @@ def get_user_email(user) -> str:
     Returns:
         Email string
     """
-    return user.email if user.email else f"{user.username}@computor.local"
+    return user.email or f"user_{user.id}@computor.local"
 
 
 def get_user_fullname(user) -> Optional[str]:

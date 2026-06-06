@@ -22,9 +22,6 @@ class User(Base):
     given_name = Column(String(255))
     family_name = Column(String(255))
     email = Column(String(320), unique=True)
-    username = Column(String(255), unique=True)
-    password = Column(String(512))  # Increased for Argon2 hashes (was 255)
-    password_reset_required = Column(Boolean, nullable=False, server_default=text("false"))  # Track password reset status
 
     # Service user flag (added via migration 19266bf266e9)
     is_service = Column(Boolean, nullable=False, server_default=text("false"))

@@ -1,123 +1,187 @@
 /**
  * Auto-generated client for AuthenticationClient.
- * Endpoint: /password
+ * Endpoint: /auth
  */
 
-import type { AdminResetPasswordRequest, AdminSetPasswordRequest, ChangePasswordRequest, PasswordOperationResponse, PasswordStatusResponse, SetPasswordRequest, UserManagerResetPasswordRequest } from 'types/generated';
+import type { GitLabRegisterRequest, GitLabRegisterResponse, LocalTokenRefreshRequest, LocalTokenRefreshResponse, LogoutResponse, ProviderInfo, TokenRefreshRequest, TokenRefreshResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
 export class AuthenticationClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
-    super(client, '/password');
+    super(client, '/auth');
   }
 
   /**
-   * Admin Reset Password
-   * Admin endpoint to invalidate user's password and require reset.
-   * This does NOT set a new password, it:
-   * 1. Marks password as requiring reset
-   * 2. User must use password reset flow or admin must set new password
-   * Requires admin privileges.
+   * List All Plugins
+   * List all available plugins (admin only).
+   * Shows both enabled and disabled plugins with full metadata.
    */
-  async adminResetPasswordPasswordAdminResetPost({ userId, body }: { userId?: string | null; body: AdminResetPasswordRequest }): Promise<PasswordOperationResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<PasswordOperationResponse>(this.buildPath('admin', 'reset'), body, { params: queryParams });
+  async listAllPluginsAuthAdminPluginsGet(): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins'));
   }
 
   /**
-   * Admin Set Password
-   * Admin endpoint to set another user's password.
-   * Requires admin privileges.
-   * Optionally can force user to change password on next login.
+   * Reload Plugins
+   * Reload all plugins (admin only).
    */
-  async adminSetPasswordPasswordAdminSetPost({ userId, body }: { userId?: string | null; body: AdminSetPasswordRequest }): Promise<PasswordOperationResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<PasswordOperationResponse>(this.buildPath('admin', 'set'), body, { params: queryParams });
+  async reloadPluginsAuthAdminPluginsReloadPost(): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', 'reload'));
   }
 
   /**
-   * Admin Get User Password Status
-   * Admin endpoint to check password status for any user.
-   * Requires admin privileges.
+   * Disable Plugin
+   * Disable a plugin (admin only).
    */
-  async adminGetUserPasswordStatusPasswordAdminStatusUsernameGet({ username, userId }: { username: string; userId?: string | null }): Promise<PasswordStatusResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.get<PasswordStatusResponse>(this.buildPath('admin', 'status', username), { params: queryParams });
+  async disablePluginAuthAdminPluginsPluginNameDisablePost({ pluginName }: { pluginName: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', pluginName, 'disable'));
   }
 
   /**
-   * Change Password
-   * Change user's own password.
-   * Requires current password for verification.
-   * User must know their current password.
+   * Enable Plugin
+   * Enable a plugin (admin only).
    */
-  async changePasswordPasswordChangePost({ userId, body }: { userId?: string | null; body: ChangePasswordRequest }): Promise<PasswordOperationResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<PasswordOperationResponse>(this.buildPath('change'), body, { params: queryParams });
+  async enablePluginAuthAdminPluginsPluginNameEnablePost({ pluginName }: { pluginName: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
+    return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', pluginName, 'enable'));
   }
 
   /**
-   * User Manager Reset Password
-   * User manager endpoint to reset a user's password to NULL.
-   * This endpoint:
-   * 1. Sets the user's password to NULL (no password)
-   * 2. Sets password_reset_required to True
-   * 3. User must then set a new password via /password/set (with GitLab PAT or other method)
-   * Security requirements:
-   * - User must have _user_manager role OR be an admin
-   * - User manager must provide their own password for verification
-   * - Critical operation - requires password confirmation
-   * Requires _user_manager role or admin privileges.
+   * Register Via Gitlab
+   * Provision (or reset) a user's Keycloak login using a GitLab PAT as proof.
+   * Idempotent by design: if the Keycloak user already exists, its password is
+   * reset — so a user who forgot their credentials simply re-runs this with a
+   * new password. The Keycloak account links to the existing computor user on
+   * first SSO login via the email match in handle_sso_callback.
    */
-  async userManagerResetPasswordPasswordResetPost({ userId, body }: { userId?: string | null; body: UserManagerResetPasswordRequest }): Promise<PasswordOperationResponse> {
+  async registerViaGitlabAuthGitlabRegisterPost({ userId, body }: { userId?: string | null; body: GitLabRegisterRequest }): Promise<GitLabRegisterResponse> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.post<PasswordOperationResponse>(this.buildPath('reset'), body, { params: queryParams });
+    return this.client.post<GitLabRegisterResponse>(this.buildPath('gitlab', 'register'), body, { params: queryParams });
   }
 
   /**
-   * Set Initial Password
-   * Set password for first time or after admin reset.
-   * Authentication Methods:
-   * 1. Bearer token (user already authenticated)
-   * 2. Provider authentication (e.g., GitLab PAT for users without password)
-   * Use this endpoint when:
-   * - User logging in for first time (password_reset_required = true)
-   * - Admin reset user's password
-   * - User has no password set
-   * This endpoint does NOT require old password.
-   * Security Note:
-   * - GitLab PAT is only used for verification, NEVER stored (GDPR/DSGVO compliant)
+   * Logout
+   * Logout from current session.
+   * This endpoint works with any authentication type:
+   * - Local authentication (Bearer tokens)
+   * - SSO authentication (provider tokens)
+   * The Bearer token from the Authorization header will be invalidated.
+   * Cookies will also be cleared.
    */
-  async setInitialPasswordPasswordSetPost({ userId, body }: { userId?: string | null; body: SetPasswordRequest }): Promise<PasswordOperationResponse> {
+  async logoutAuthLogoutPost({ userId }: { userId?: string | null }): Promise<LogoutResponse> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.post<PasswordOperationResponse>(this.buildPath('set'), body, { params: queryParams });
+    return this.client.post<LogoutResponse>(this.buildPath('logout'), { params: queryParams });
   }
 
   /**
-   * Get Password Status
-   * Get password status for current user.
-   * Returns information about password state:
-   * - Whether password is set
-   * - Whether password reset is required
-   * - Type of password (Argon2, legacy encrypted, or none)
+   * List Providers
+   * List available authentication providers.
+   * Returns all enabled authentication providers with their metadata.
    */
-  async getPasswordStatusPasswordStatusGet({ userId }: { userId?: string | null }): Promise<PasswordStatusResponse> {
+  async listProvidersAuthProvidersGet(): Promise<ProviderInfo[]> {
+    return this.client.get<ProviderInfo[]>(this.buildPath('providers'));
+  }
+
+  /**
+   * Refresh Token
+   * Refresh SSO access token using refresh token.
+   * This endpoint allows users to refresh their session token using
+   * the refresh token obtained during initial SSO authentication.
+   * Requires authentication to ensure only the token owner can refresh it.
+   */
+  async refreshTokenAuthRefreshPost({ userId, body }: { userId?: string | null; body: TokenRefreshRequest }): Promise<TokenRefreshResponse> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.get<PasswordStatusResponse>(this.buildPath('status'), { params: queryParams });
+    return this.client.post<TokenRefreshResponse>(this.buildPath('refresh'), body, { params: queryParams });
+  }
+
+  /**
+   * Refresh Local Token
+   * Refresh local access token using refresh token.
+   * This endpoint allows users to refresh their session token for local
+   * (username/password) authentication using the refresh token obtained
+   * during initial login.
+   * Authentication is not required for this endpoint since the access token
+   * may be expired. The refresh token itself is validated to ensure security.
+   */
+  async refreshLocalTokenAuthRefreshLocalPost({ userId, body }: { userId?: string | null; body: LocalTokenRefreshRequest }): Promise<LocalTokenRefreshResponse> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<LocalTokenRefreshResponse>(this.buildPath('refresh', 'local'), body, { params: queryParams });
+  }
+
+  /**
+   * Sso Success
+   * Default success page after SSO authentication.
+   */
+  async ssoSuccessAuthSuccessGet(): Promise<void> {
+    return this.client.get<void>(this.buildPath('success'));
+  }
+
+  /**
+   * Verify Coder Access
+   * Traefik ForwardAuth endpoint for Coder workspace access control.
+   * This endpoint is called by Traefik before forwarding requests to code-server workspaces.
+   * It verifies that:
+   * 1. The user is authenticated (via Bearer token, Basic auth, or API token)
+   * 2. The authenticated user matches the user ID in the workspace URL
+   * URL Format: /coder/u{user_id}/{workspace_name}/...
+   * Example: /coder/u0232de59-e05d-4bc2-898f-b879c06/{workspace}/
+   * The 'u' prefix is required for Coder username compatibility, so we strip it to get the actual user ID.
+   * Returns:
+   * - 200 OK: User is authorized to access this workspace
+   * - 401 Unauthorized: User is not authenticated
+   * - 403 Forbidden: User is authenticated but not authorized for this workspace
+   */
+  async verifyCoderAccessAuthVerifyCoderAccessGet(): Promise<void> {
+    return this.client.get<void>(this.buildPath('verify-coder-access'));
+  }
+
+  /**
+   * Handle Callback
+   * Handle OAuth callback from provider.
+   * Exchanges the authorization code for tokens and creates/updates user account.
+   */
+  async handleCallbackAuthProviderCallbackGet({ provider, code, state, userId }: { provider: string; code: string; state?: string | null; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      code,
+      state,
+      user_id: userId,
+    };
+    return this.client.get<void>(this.buildPath(provider, 'callback'), { params: queryParams });
+  }
+
+  /**
+   * Initiate Login
+   * Initiate SSO login for a specific provider.
+   * Redirects the user to the provider's login page.
+   */
+  async initiateLoginAuthProviderLoginGet({ provider, redirectUri }: { provider: string; redirectUri?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      redirect_uri: redirectUri,
+    };
+    return this.client.get<void>(this.buildPath(provider, 'login'), { params: queryParams });
+  }
+
+  /**
+   * Sso Logout
+   * SSO logout: clears the backend session cookies AND ends the Keycloak SSO
+   * session by redirecting the browser to the provider's end_session_endpoint.
+   * The frontend should navigate to this URL (browser redirect, not XHR) so
+   * the cookie-clearing + Keycloak end-session flow completes properly.
+   * Designed to be tolerant of an already-expired or missing local session —
+   * we always clear cookies and forward to Keycloak so the user is fully
+   * signed out at the IdP.
+   */
+  async ssoLogoutAuthProviderLogoutGet({ provider, postLogoutRedirectUri }: { provider: string; postLogoutRedirectUri?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      post_logout_redirect_uri: postLogoutRedirectUri,
+    };
+    return this.client.get<void>(this.buildPath(provider, 'logout'), { params: queryParams });
   }
 }

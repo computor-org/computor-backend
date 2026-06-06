@@ -56,7 +56,6 @@ def create_users(session, count=50):
             given_name=fake.first_name(),
             family_name=fake.last_name(),
             email=fake.unique.email(),
-            username=fake.unique.user_name(),
         )
         session.add(user)
         users.append(user)
@@ -66,32 +65,15 @@ def create_users(session, count=50):
     return users
 
 def create_organizations(session, users):
-    """Create organizations with GitLab integration."""
+    """Create organizations."""
     organizations = []
-    
-    # GitLab configuration from environment
-    gitlab_url = os.environ.get('TEST_GITLAB_URL', 'http://localhost:8084')
-    gitlab_token = os.environ.get('TEST_GITLAB_TOKEN')
-    gitlab_parent_id = os.environ.get('TEST_GITLAB_GROUP_ID')
-    
-    if not gitlab_token:
-        print("⚠️  TEST_GITLAB_TOKEN not set - GitLab integration will be skipped")
-    
+
     # Check if main university already exists
     existing_main = session.query(Organization).filter(Organization.path == Ltree('university')).first()
     if existing_main:
         print("ℹ️  University organization already exists, using existing one")
         organizations.append(existing_main)
     else:
-        # Create a main university organization with GitLab integration
-        properties = {
-            'gitlab': {
-                'url': gitlab_url,
-                'token': gitlab_token,
-                'parent': int(gitlab_parent_id) if gitlab_parent_id else None
-            }
-        } if gitlab_token else {}
-        
         main_org = Organization(
             title="Example University",
             description="A leading institution for computing education",
@@ -103,33 +85,12 @@ def create_organizations(session, users):
             locality='Example City',
             region='Example State',
             country='Example Country',
-            properties=properties,
+            properties={},
             created_by=random.choice(users).id
         )
         session.add(main_org)
         session.flush()
         organizations.append(main_org)
-        
-        # Create GitLab group via Temporal if configured
-        if gitlab_token and get_temporal_client:
-            try:
-                print("🔄 Creating GitLab group for university organization...")
-                temporal_client = get_temporal_client()
-                result = temporal_client.execute_workflow(
-                    'create_organization',
-                    {
-                        'organization_id': str(main_org.id),
-                        'organization_name': main_org.title,
-                        'organization_path': str(main_org.path),
-                        'gitlab_config': properties['gitlab']
-                    },
-                    id=f"create_org_{main_org.id}",
-                    task_queue='computor-tasks'
-                )
-                print(f"✅ GitLab organization creation task started: {result.id}")
-            except Exception as e:
-                print(f"⚠️  GitLab organization creation failed: {e}")
-        
         print("✅ Created main university organization")
     
     # Create departments if they don't exist
@@ -615,9 +576,8 @@ def clear_fake_data(session):
     # Delete all organizations - we'll recreate them
     session.query(Organization).delete(synchronize_session=False)
 
-    # Delete users except admin
-    admin_username = os.environ.get('API_ADMIN_USER', 'admin')
-    session.query(User).filter(User.username != admin_username).delete(synchronize_session=False)
+    # Delete all non-service users (service accounts are managed separately)
+    session.query(User).filter(User.is_service == False).delete(synchronize_session=False)
 
     session.commit()
     print("✅ Cleared existing fake data")
@@ -685,16 +645,6 @@ def main():
                         content_type = "📁" if "week_" in str(content.path) and "." not in str(content.path) else "📝"
                         print(f"    {indent}{content_type} {content.path} - {content.title}")
             
-            # Show GitLab integration status
-            gitlab_token = os.environ.get('TEST_GITLAB_TOKEN')
-            if gitlab_token and get_temporal_client:
-                print("\n🦊 GitLab Integration:")
-                print(f"  - GitLab URL: {os.environ.get('TEST_GITLAB_URL', 'http://localhost:8084')}")
-                print(f"  - Parent Group ID: {os.environ.get('TEST_GITLAB_GROUP_ID', 'not set')}")
-                print(f"  - Temporal tasks created for organization, course families, and courses")
-                print(f"  - Check Temporal UI at http://localhost:8088 to monitor GitLab creation progress")
-            else:
-                print("\n⚠️  GitLab Integration: Disabled (missing TEST_GITLAB_TOKEN or Temporal client)")
             
         except Exception as e:
             print(f"❌ Error seeding data: {e}")

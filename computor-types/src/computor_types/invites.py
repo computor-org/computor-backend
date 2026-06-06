@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
-import re
+
+from computor_types.base import EntityInterface
 
 
 class InviteLinkCreate(BaseModel):
@@ -54,19 +55,10 @@ class InviteLinkPublic(BaseModel):
 
 
 class InviteAccept(BaseModel):
-    username: str = Field(..., min_length=2, max_length=50)
     given_name: str = Field(..., min_length=1, max_length=100)
     family_name: str = Field(..., min_length=1, max_length=100)
     email: str = Field(..., description="Required; must match invite restriction if set")
-    password: str = Field(..., min_length=8)
-    confirm_password: str
-
-    @field_validator('username')
-    @classmethod
-    def username_valid(cls, v: str) -> str:
-        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', v):
-            raise ValueError("Username may only contain letters, digits, underscores, hyphens, and dots")
-        return v
+    password: str = Field(..., description="Password to set for Keycloak login (complexity enforced by Keycloak realm policy)")
 
     @field_validator('email')
     @classmethod
@@ -74,3 +66,15 @@ class InviteAccept(BaseModel):
         if '@' not in v or ' ' in v:
             raise ValueError("Invalid email address")
         return v.lower().strip()
+
+
+class InviteLinkInterface(EntityInterface):
+    # Admin invite-management CRUD, mounted at /admin/invites in the backend.
+    # The public token endpoints (/invites/{token}) are separate and stay in the
+    # hand-grouped InvitesClient — they are not part of this CRUD interface.
+    endpoint = "admin/invites"
+    create = InviteLinkCreate
+    get = InviteLinkGet
+    list = InviteLinkList
+    update = None
+    query = None

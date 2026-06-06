@@ -20,59 +20,12 @@ export interface CoderLoginRequest {
   redirect_url?: string | null;
 }
 
-/**
- * Query parameters for updating organization token.
- */
-export interface OrganizationUpdateTokenQuery {
-  /** Token type (e.g., 'gitlab', 'github') */
-  type: string;
-}
-
-/**
- * Payload for updating organization provider token.
- */
-export interface OrganizationUpdateTokenUpdate {
-  /** Provider access token */
-  token: string;
-}
-
 export interface AuthConfig {
 }
 
 export interface GLPAuthConfig {
   url: string;
   token: string;
-}
-
-export interface BasicAuthConfig {
-  username: string;
-  password: string;
-}
-
-/**
- * Request model for local username/password login.
- */
-export interface LocalLoginRequest {
-  /** Username or email */
-  username: string;
-  /** Password */
-  password: string;
-}
-
-/**
- * Response model after successful local login.
- */
-export interface LocalLoginResponse {
-  /** Bearer access token for API requests */
-  access_token: string;
-  /** Refresh token to obtain new access token */
-  refresh_token: string;
-  /** Access token expiration time in seconds */
-  expires_in: number;
-  /** User ID */
-  user_id: string;
-  /** Token type */
-  token_type?: string;
 }
 
 /**
@@ -199,6 +152,39 @@ export interface TokenRefreshResponse {
   refresh_token?: string | null;
 }
 
+export interface GradingAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
+/**
+ * Alternative authentication via external provider for password initialization.
+ */
+export interface ProviderAuthCredentials {
+  /** Authentication method */
+  method: "gitlab_pat";
+  /** Provider-specific credentials */
+  credentials: GitLabPATCredentials;
+}
+
+/**
+ * Query parameters for updating organization token.
+ */
+export interface OrganizationUpdateTokenQuery {
+  /** Token type (e.g., 'gitlab', 'github') */
+  type: string;
+}
+
+/**
+ * Payload for updating organization provider token.
+ */
+export interface OrganizationUpdateTokenUpdate {
+  /** Provider access token */
+  token: string;
+}
+
 /**
  * Author information for a message.
  */
@@ -221,23 +207,6 @@ export interface MessageAuthorCourseMember {
   course_role_id: string;
   /** Course ID */
   course_id: string;
-}
-
-export interface GradingAuthor {
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
-/**
- * Alternative authentication via external provider for password initialization.
- */
-export interface ProviderAuthCredentials {
-  /** Authentication method */
-  method: "gitlab_pat";
-  /** Provider-specific credentials */
-  credentials: GitLabPATCredentials;
 }
 
 /**

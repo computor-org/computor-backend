@@ -23,7 +23,7 @@ export class DocumentsClient extends BaseEndpointClient {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.delete<void>(this.buildPath('directories'), { data: body, params: queryParams });
+    return this.client.delete<void>(this.buildPath('directories'), body, { params: queryParams });
   }
 
   /**
@@ -61,7 +61,7 @@ export class DocumentsClient extends BaseEndpointClient {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.delete<void>(this.buildPath('files'), { data: body, params: queryParams });
+    return this.client.delete<void>(this.buildPath('files'), body, { params: queryParams });
   }
 
   /**

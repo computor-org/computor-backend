@@ -24,6 +24,18 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
+      # Explicit service definition so both routers can reference it by name.
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      # Catch-all router (lowest priority — handles every path not claimed above).
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
       - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.routers.frontend.priority=1"  # Lower priority than API
+      - "traefik.http.routers.frontend.service=frontend"
+      - "traefik.http.routers.frontend.priority=1"
+      # /auth/success must reach the frontend, not Keycloak. Keycloak owns
+      # PathPrefix(`/auth`); this exact-Path router must outrank it. Priorities are
+      # set explicitly with a wide gap (100 here vs Keycloak's 50) rather than
+      # relying on Traefik's default rule-length tiebreak, where the margin was 1.
+      - "traefik.http.routers.frontend-auth-success.rule=Path(`/auth/success`)"
+      - "traefik.http.routers.frontend-auth-success.entrypoints=web"
+      - "traefik.http.routers.frontend-auth-success.service=frontend"
+      - "traefik.http.routers.frontend-auth-success.priority=100"

@@ -147,9 +147,10 @@ class PluginRegistry:
             
         except Exception as e:
             logger.error(f"Failed to load built-in provider {provider_name}: {e}")
-            # Don't raise for Keycloak connection errors - allow system to continue
-            if provider_name == "keycloak" and "connection" in str(e).lower():
-                logger.warning(f"Continuing without {provider_name} provider - service unavailable")
+            # For keycloak, transport errors are transient — don't raise so the server continues.
+            # The login endpoint will retry lazy-loading on the first request.
+            if provider_name == "keycloak":
+                logger.warning(f"Keycloak provider not loaded — will retry on demand")
             else:
                 raise
     

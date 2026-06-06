@@ -6,6 +6,7 @@ This ServiceType is used by all temporal testing workers (Python, MATLAB, etc.).
 Individual services are differentiated by their properties (e.g., language).
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -81,13 +82,17 @@ def main():
 
     # Get database session
     with get_db_session() as db:
-        # Get admin user
-        admin_user = db.query(User).filter(User.username == "admin").first()
+        # Get any non-service user to use as the creator (admin login via Keycloak)
+        admin_email = os.environ.get("ADMIN_EMAIL", "")
+        if admin_email:
+            admin_user = db.query(User).filter(User.email == admin_email).first()
+        else:
+            admin_user = db.query(User).filter(User.is_service == False).first()
         if not admin_user:
-            print("❌ Error: Admin user not found. Run initialize_system.sh first.")
+            print("❌ Error: No user found. Set ADMIN_EMAIL env var or ensure a user exists.")
             return 1
 
-        print(f"👤 Using admin user: {admin_user.username} (ID: {admin_user.id})")
+        print(f"👤 Using user: {admin_user.email} (ID: {admin_user.id})")
         print()
 
         # Create the service type

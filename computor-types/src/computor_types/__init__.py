@@ -95,7 +95,6 @@ from .users import (
 
 # Auth
 from .auth import (
-    BasicAuthConfig,
     GLPAuthConfig,
 )
 
@@ -215,7 +214,6 @@ __all__ = [
     "UserCreate",
     "UserGet",
     # Auth
-    "BasicAuthConfig",
     "GLPAuthConfig",
     # Deployments / GitLab
     "BaseDeployment",

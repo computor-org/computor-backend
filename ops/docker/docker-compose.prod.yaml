@@ -35,6 +35,10 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
       - "--entrypoints.web.address=:80"
+      # Trust X-Forwarded-* headers from an upstream reverse proxy (e.g. nginx).
+      # Without this Traefik overwrites X-Forwarded-Proto with "http" (nginx→Traefik
+      # is plain HTTP on port 8080), which breaks HTTPS callback URLs in uvicorn.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
     depends_on:
@@ -67,9 +71,8 @@ services:
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: true
-      API_ADMIN_USER: ${API_ADMIN_USER}
+      API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
-      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       DOCUMENTS_MAX_FILE_SIZE: ${DOCUMENTS_MAX_FILE_SIZE:-10485760}
       POSTGRES_HOST: postgres
@@ -99,7 +102,17 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
-      BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
+      BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
+      # Git server integration (if enabled) — uses the internal container URL
+      # since uvicorn reaches Forgejo over computor-network, not localhost.
+      GIT_SERVER: ${GIT_SERVER}
+      GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
+      GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
+      GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
+      # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
+      # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
+      FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
     depends_on:
       - postgres
       - minio
@@ -155,13 +168,16 @@ services:
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - PYTHONPATH=/home/worker/computor-backend/src
       - API_URL=${API_URL}
-      - API_ADMIN_USER=${API_ADMIN_USER}
+      - API_ADMIN_EMAIL=${API_ADMIN_EMAIL}
       - API_ADMIN_PASSWORD=${API_ADMIN_PASSWORD}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?must be set in .env}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?must be set in .env}
       - MINIO_SECURE=false
-      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+      - GIT_SERVER=${GIT_SERVER}
+      - GIT_SERVER_URL=${GIT_SERVER_URL_INTERNAL}
+      - GIT_SERVER_ADMIN_USERNAME=${GIT_SERVER_ADMIN_USERNAME}
+      - GIT_SERVER_ADMIN_PASSWORD=${GIT_SERVER_ADMIN_PASSWORD}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
     depends_on:
@@ -207,54 +223,6 @@ services:
       - postgres
       - redis
       - minio
-    labels:
-      - "traefik.enable=false"
-
-  # MATLAB Testing Worker
-  temporal-worker-matlab:
-    build:
-      context: ../../
-      dockerfile: ./docker/temporal-worker-matlab/Dockerfile
-      args:
-        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
-    networks:
-      - computor-network
-    restart: unless-stopped
-    security_opt:
-      - "no-new-privileges:true"
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    command: ["--queues=testing-matlab"]
-    init: true  # Use tini as PID 1 to properly reap zombie processes
-    deploy:
-      replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
-    environment:
-      - TZ=UTC
-      - RUNNING_IN_DOCKER=true
-      - TEMPORAL_HOST=temporal
-      - TEMPORAL_PORT=7233
-      - TEMPORAL_NAMESPACE=default
-      - PYTHONPATH=/home/matlab/computor-backend/src
-      - API_URL=${API_URL}
-      - API_TOKEN=${MATLAB_WORKER_TOKEN}
-      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
-      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
-      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
-      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
-    depends_on:
-      - temporal
-      - postgres
-      - redis
-      - minio
-    ulimits:
-      nproc: 2048       # Limit number of processes (MATLAB needs more)
-      nofile:
-        soft: 8192      # Limit file descriptors
-        hard: 16384
-    pids_limit: 2048    # Limit total PIDs (MATLAB spawns many subprocesses)
     labels:
       - "traefik.enable=false"
 

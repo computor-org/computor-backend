@@ -3,8 +3,9 @@
  */
 
 export * from './baseClient';
+export * from './InviteLinkClient';
+export * from './RoleClaimClient';
 export * from './AccountsClient';
-export * from './AuthenticationClient';
 export * from './AuthenticationClient';
 export * from './CourseContentKindsClient';
 export * from './CourseContentTypesClient';
@@ -26,6 +27,7 @@ export * from './ExtensionsClient';
 export * from './ExtensionsGettingStartedClient';
 export * from './ExtensionsPublicClient';
 export * from './GroupsClient';
+export * from './InvitesClient';
 export * from './LanguagesClient';
 export * from './LecturersClient';
 export * from './MessagesClient';
@@ -35,7 +37,6 @@ export * from './OrganizationRolesClient';
 export * from './OrganizationsClient';
 export * from './ProfilesClient';
 export * from './ResultsClient';
-export * from './RolesClient';
 export * from './RolesClient';
 export * from './ServiceTypesClient';
 export * from './ServicesClient';

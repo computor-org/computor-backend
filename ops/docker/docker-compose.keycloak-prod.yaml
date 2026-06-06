@@ -1,0 +1,35 @@
+# Keycloak production overlay — patches the keycloak and uvicorn services.
+# Only included when KEYCLOAK_ENABLED=true AND environment=prod.
+# startup.sh handles this automatically — do not include manually.
+
+services:
+  keycloak:
+    # Production runtime mode. The base compose uses `start-dev` (dev convenience:
+    # lenient hostname/proxy handling, dev cache, no optimized build) — explicitly
+    # unsupported for production and a source of inconsistent redirect behaviour.
+    # `start` applies the configured KC_HOSTNAME/KC_PROXY_HEADERS strictly. This
+    # override replaces the base command (compose replaces, not merges, command).
+    # First boot auto-builds (~30s; covered by the healthcheck start_period).
+    command:
+      - start
+      - --import-realm
+    environment:
+      # Behind a TLS-terminating reverse proxy (nginx → Traefik), Keycloak must be
+      # told to honor X-Forwarded-* headers. Without this it treats every request as
+      # plain HTTP on its internal port, derives an inconsistent frontend URL, and the
+      # login POST fails the auth-session check → "session not found" restart loop.
+      # Dev is unaffected (direct port access, no proxy) — this overlay is prod-only.
+      KC_PROXY_HEADERS: "xforwarded"
+
+  uvicorn:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      ENABLE_KEYCLOAK: "true"
+      KEYCLOAK_SERVER_URL: "${KEYCLOAK_SERVER_URL_INTERNAL:?}"
+      KEYCLOAK_REALM: "${KEYCLOAK_REALM:?}"
+      KEYCLOAK_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:?}"
+      KEYCLOAK_CLIENT_SECRET: "${KEYCLOAK_CLIENT_SECRET:?}"
+      KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN:?}"
+      KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:?}"

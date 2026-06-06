@@ -1,9 +1,8 @@
 from contextlib import asynccontextmanager
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
-from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer
+from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager
 from computor_backend.permissions.core import db_apply_roles
-from computor_types.password_utils import create_password_hash
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.redis_cache import get_redis_client
@@ -16,7 +15,6 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
-from computor_backend.api.password_reset import password_reset_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -89,6 +87,9 @@ from pathlib import Path
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
 
+# Git server integration
+from computor_backend.api.git_server import router as git_server_router
+
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
     import logging
@@ -138,40 +139,6 @@ async def initialize_plugin_registry_with_config():
         except OSError:
             logger.debug("Failed to remove temporary plugin config %s", config_file, exc_info=True)
 
-async def init_admin_user(db: Session):
-
-    username = os.environ.get("API_ADMIN_USER")
-    password = os.environ.get("API_ADMIN_PASSWORD")
-
-    admin = db.query(User).filter(User.username == username).first()
-
-    if admin != None:
-        return
-    
-    try:
-        admin_user = User(
-            given_name="Admin",
-            family_name="System",
-            username=username,
-            password=create_password_hash(password, validate=False)
-        )
-
-        db.add(admin_user)
-        db.commit()
-        db.refresh(admin_user)
-
-        db.add(
-            UserRole(
-                user_id=admin_user.id,
-                role_id="_admin"
-            )
-        )
-        db.commit()
-
-    except Exception:
-        logger.critical("Admin user could not be created. The backend is shutting down.", exc_info=True)
-        quit(1)
-
 async def startup_logic():
 
     with get_db_session() as db:
@@ -179,11 +146,86 @@ async def startup_logic():
         db_apply_roles("_organization_manager",claims_organization_manager(),db)
         db_apply_roles("_workspace_user",claims_workspace_user(),db)
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
+        db_apply_roles("_git_manager",claims_git_manager(),db)
 
-        await init_admin_user(db)
+    # Initialize plugin registry with configuration (loads Keycloak provider, etc.)
+    await initialize_plugin_registry_with_config()
 
-    # Initialize plugin registry with configuration
-    # await initialize_plugin_registry_with_config()
+    # If Keycloak is enabled, ensure the bootstrap admin exists (create-or-reset
+    # password + add to the 'administrators' group). The computor User row and
+    # _admin role follow on first login via the group claim. Non-fatal: retries
+    # briefly in case Keycloak is still coming up.
+    if settings.ENABLE_KEYCLOAK:
+        admin_email = settings.API_ADMIN_EMAIL
+        admin_password = settings.API_ADMIN_PASSWORD
+        if admin_email and admin_password:
+            import asyncio
+            from computor_backend.business_logic.auth import ensure_keycloak_admin
+            for attempt in range(1, 6):
+                try:
+                    await ensure_keycloak_admin(admin_email, admin_password)
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Admin provisioning failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
+        else:
+            print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
+
+        # Register this deployment's redirect URIs on the Keycloak client so
+        # Keycloak accepts both (a) the login callback and (b) the post-logout
+        # redirect back to the app root. X-Forwarded-Proto from nginx gives the
+        # correct scheme at request time, but the URIs must be pre-registered.
+        # Use NEXT_PUBLIC_API_URL (the public domain, set by setup-env.sh) as base.
+        # Retries because Keycloak may still be coming up (mirrors admin
+        # provisioning above): if this registration is skipped, every login
+        # fails with invalid_redirect_uri until the next clean restart.
+        api_public_url = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        if api_public_url:
+            import asyncio
+            from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+            from urllib.parse import urlparse
+            origin = f"{urlparse(api_public_url).scheme}://{urlparse(api_public_url).netloc}"
+            for attempt in range(1, 6):
+                try:
+                    await KeycloakAdminClient().ensure_client_redirect_uris(
+                        redirect_uris=[
+                            f"{api_public_url}/auth/keycloak/callback",  # SSO login callback
+                            f"{origin}/",                                # post-logout redirect target
+                        ],
+                        web_origins=[origin],
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Keycloak redirect URI registration failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
+
+        # If Forgejo is the git server, reconcile the 'forgejo' Keycloak client's
+        # redirect URI to the current public FORGEJO_ROOT_URL. The client itself is
+        # declared in the realm import with its scopes and a localhost dev callback,
+        # but the realm is imported only on Keycloak's first boot and can't know the
+        # public domain — so the prod callback is added here on every startup (the
+        # same pattern the backend client uses). Best-effort and idempotent.
+        forgejo_root = os.environ.get("FORGEJO_ROOT_URL", "").rstrip("/")
+        if os.environ.get("GIT_SERVER") == "forgejo" and forgejo_root:
+            import asyncio
+            from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+            for attempt in range(1, 6):
+                try:
+                    await KeycloakAdminClient().ensure_client_redirect_uris(
+                        redirect_uris=[f"{forgejo_root}/user/oauth2/Keycloak/callback"],
+                        web_origins=[],  # forgejo client uses webOrigins=["+"] — leave as is
+                        client_id="forgejo",
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Forgejo Keycloak redirect URI reconcile failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
 
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
@@ -481,12 +523,6 @@ app.include_router(
 )
 
 app.include_router(
-    password_reset_router,
-    tags=["authentication", "password-management"],
-    dependencies=[Depends(get_redis_client)]  # Some endpoints require auth, handled individually
-)
-
-app.include_router(
     storage_router,
     tags=["storage"],
     dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
@@ -546,6 +582,10 @@ app.include_router(
 # Coder integration API (only registered when CODER_ENABLED=true)
 if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
     app.include_router(coder_api_router)
+
+# Git server API (registered whenever GIT_SERVER is set)
+if os.environ.get("GIT_SERVER", ""):
+    app.include_router(git_server_router)
 
 
 @app.head("/", status_code=204)

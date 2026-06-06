@@ -3,7 +3,7 @@
  * Endpoint: /accounts
  */
 
-import type { AccountCreate, AccountGet, AccountList, AccountUpdate } from 'types/generated';
+import type { AccountCreate, AccountGet, AccountList, AccountProvider, AccountUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -36,6 +36,16 @@ export class AccountsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<AccountGet>(this.basePath, body, { params: queryParams });
+  }
+
+  /**
+   * List Account Providers
+   * Return the list of supported account providers.
+   * Public — no authentication required. The frontend uses this to render
+   * the correct form when linking a provider account to a user.
+   */
+  async listAccountProvidersAccountsProvidersGet(): Promise<AccountProvider[]> {
+    return this.client.get<AccountProvider[]>(this.buildPath('providers'));
   }
 
   /**

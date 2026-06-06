@@ -23,7 +23,11 @@ services:
     networks:
       - computor-network
     ports:
-      - "${TRAEFIK_HTTP_PORT:-8080}:80"
+      # Bind to loopback by default: a co-located nginx terminates TLS and reaches
+      # Traefik via 127.0.0.1:8080. This prevents clients from hitting Traefik
+      # directly over plain HTTP and bypassing TLS. Set TRAEFIK_BIND_ADDRESS=0.0.0.0
+      # only if nginx runs on a different host — and firewall 8080 to that host.
+      - "${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTP_PORT:-8080}:80"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic:/etc/traefik/dynamic:ro
     labels:

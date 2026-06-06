@@ -1,5 +1,5 @@
 import { IAuthProviderWithLogin, AuthResponse, AuthUser } from '../interfaces/IAuthProvider';
-import { LocalLoginRequest, LocalLoginResponse, LogoutResponse } from '../generated/types/auth';
+import { LogoutResponse } from '../generated/types/auth';
 import { UserGet } from '../generated/types/users';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -101,7 +101,7 @@ export class AuthService implements IAuthProviderWithLogin {
    */
   async login(credentials: { username: string; password: string }): Promise<AuthResponse> {
     try {
-      const loginRequest: LocalLoginRequest = {
+      const loginRequest = {
         username: credentials.username,
         password: credentials.password,
       };
@@ -131,8 +131,6 @@ export class AuthService implements IAuthProviderWithLogin {
           error: errorMessage,
         };
       }
-
-      const loginResponse: LocalLoginResponse = await response.json();
 
       // Fetch user info and views
       const [userInfo, views] = await Promise.all([

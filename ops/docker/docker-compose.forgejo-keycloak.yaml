@@ -1,0 +1,51 @@
+# Forgejo-Keycloak OIDC bridge
+# Include when BOTH GIT_SERVER=forgejo AND KEYCLOAK_ENABLED=true.
+# startup.sh adds this file automatically — do not include manually.
+#
+# The Keycloak 'forgejo' client is declared in the realm import
+# (data/keycloak/computor-realm.json) with a fixed secret shared via
+# FORGEJO_KEYCLOAK_CLIENT_SECRET — no client is created here and no admin token
+# is needed. This container only registers the matching login source inside
+# Forgejo (a DB row with no declarative equivalent), idempotently on every boot.
+#
+# The auto-discover URL stored in Forgejo uses KEYCLOAK_SERVER_URL_INTERNAL so
+# that the running Forgejo container (on computor-network) can reach Keycloak
+# directly for token validation — not via Traefik/localhost.
+
+networks:
+  forgejo-internal:
+    driver: bridge
+  # computor-network is created by docker-compose.base.yaml (this overlay is
+  # always merged with base). Referenced by services below, not redeclared.
+
+services:
+  forgejo-keycloak-setup:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo-keycloak-setup
+    # Run as the image's git user: the forgejo CLI (admin auth add-oauth)
+    # refuses to run as root, and the overridden entrypoint skips the image's
+    # own privilege drop. The name tracks whatever uid the image assigns to git.
+    user: "git"
+    networks:
+      - forgejo-internal
+      - computor-network
+    restart: "no"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
+      - ../../computor-forgejo/scripts/keycloak_setup.sh:/keycloak_setup.sh:ro
+    environment:
+      GITEA_WORK_DIR: /data
+      # Used only to build the Forgejo login source's auto-discover URL.
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      # Shared secret for the 'forgejo' Keycloak client (declared in the realm
+      # import). Same value on both sides — no runtime secret exchange.
+      FORGEJO_KEYCLOAK_CLIENT_SECRET: ${FORGEJO_KEYCLOAK_CLIENT_SECRET:?}
+    entrypoint: ["/bin/sh", "/keycloak_setup.sh"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      forgejo:
+        condition: service_healthy
+      forgejo-bootstrap:
+        condition: service_completed_successfully

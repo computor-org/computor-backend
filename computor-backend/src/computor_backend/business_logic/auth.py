@@ -26,14 +26,58 @@ from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 from computor_types.auth import (
-    LocalLoginRequest,
-    LocalLoginResponse,
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
     LogoutResponse,
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _provision_git_server_account(
+    user_id: str,
+    email: str,
+    db: Session,
+) -> None:
+    """Record that this user has an account on the system git server.
+
+    With OIDC, Forgejo/GitLab create the actual account on first login.
+    This just ensures the Account row exists so the relationship is tracked.
+    """
+    from ..git_server.config import get_git_server_settings
+
+    settings = get_git_server_settings()
+    if not settings.enabled:
+        return
+
+    def _check_and_insert():
+        existing = (
+            db.query(Account)
+            .filter(
+                Account.provider == settings.git_server_url,
+                Account.type == settings.git_server.lower(),
+                Account.user_id == user_id,
+            )
+            .first()
+        )
+        if existing:
+            return
+        account = Account(
+            provider=settings.git_server_url,
+            type=settings.git_server.lower(),
+            provider_account_id=email,
+            user_id=user_id,
+            properties={},
+        )
+        db.add(account)
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Failed to store git server Account for {email}: {e}")
+
+    await run_in_threadpool(_check_and_insert)
+
 
 # Token TTL configuration
 ACCESS_TOKEN_TTL = 60 * 60 # 1 hour
@@ -69,119 +113,6 @@ async def invalidate_principal_cache_for_token(token: str, cache):
 
     except Exception as e:
         logger.warning(f"Error invalidating Principal cache: {e}")
-
-
-async def login_with_local_credentials(
-    username: str,
-    password: str,
-    ip_address: str,
-    user_agent: str,
-    db: Session,
-    cache = None,
-) -> LocalLoginResponse:
-    """
-    Authenticate user with local credentials and generate Bearer tokens.
-
-    Args:
-        username: Username or email
-        password: User password
-        ip_address: Client IP address
-        user_agent: User agent string
-        db: Database session
-        cache: Redis cache instance
-
-    Returns:
-        LocalLoginResponse with access and refresh tokens
-
-    Raises:
-        UnauthorizedException: If credentials are invalid
-    """
-    from computor_backend.utils.token_hash import generate_token, hash_token, hash_token_binary
-    from computor_backend.utils.client_info import make_device_label
-    from computor_backend.repositories.session_repo import SessionRepository
-
-    # Authenticate using the AuthenticationService (wrap blocking DB query)
-    auth_result = await run_in_threadpool(
-        lambda: AuthenticationService.authenticate_basic(username, password, db)
-    )
-
-    # Generate session tokens
-    access_token = generate_token(32)
-    refresh_token = generate_token(32)
-
-    # Hash tokens for storage
-    access_token_hash = hash_token(access_token)
-    refresh_token_hash_binary = hash_token_binary(refresh_token)
-
-    # Store session in Redis
-    redis_client = await get_redis_client()
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(seconds=ACCESS_TOKEN_TTL)
-    refresh_expires_at = now + timedelta(seconds=REFRESH_TOKEN_TTL)
-
-    # Store HASHED access token in Redis
-    access_session_data = {
-        "user_id": str(auth_result.user_id),
-        "provider": "local",
-        "created_at": str(now),
-        "token_type": "access",
-    }
-
-    await redis_client.set(
-        f"sso_session:{access_token_hash}",  # Store hash, not plain token
-        json.dumps(access_session_data),
-        ex=ACCESS_TOKEN_TTL,
-    )
-
-    # Store HASHED refresh token in Redis
-    refresh_session_data = {
-        "user_id": str(auth_result.user_id),
-        "provider": "local",
-        "created_at": str(now),
-        "expires_at": str(now + timedelta(seconds=REFRESH_TOKEN_TTL)),  # Absolute expiration
-        "token_type": "refresh",
-        "access_token_hash": access_token_hash,  # Reference to access token
-    }
-
-    await redis_client.set(
-        f"refresh_token:{hash_token(refresh_token)}",  # Store hash
-        json.dumps(refresh_session_data),
-        ex=REFRESH_TOKEN_TTL,  # Redis TTL as backup
-    )
-
-    # Create Session in database with device tracking
-    from computor_backend.model.auth import Session as SessionModel
-
-    device_label = make_device_label(user_agent)
-    session_repo = SessionRepository(db, SessionModel, cache)
-
-    # Create session model instance
-    session = SessionModel(
-        user_id=str(auth_result.user_id),
-        session_id=access_token_hash,  # Store HASH in DB
-        refresh_token_hash=refresh_token_hash_binary,  # Binary hash
-        created_ip=ip_address,
-        last_ip=ip_address,
-        user_agent=user_agent,
-        device_label=device_label,
-        expires_at=expires_at,
-        refresh_expires_at=refresh_expires_at,
-        properties={
-            "provider": "local",
-            "login_method": "credentials"
-        }
-    )
-    session = session_repo.create(session)
-
-    logger.info(f"Local login successful for user {auth_result.user_id}, session {session.id}, device: {device_label}")
-
-    return LocalLoginResponse(
-        access_token=access_token,  # Return PLAIN token to client
-        refresh_token=refresh_token,  # Return PLAIN token to client
-        expires_in=ACCESS_TOKEN_TTL,
-        user_id=str(auth_result.user_id),
-        token_type="Bearer",
-    )
 
 
 async def refresh_local_token(
@@ -510,20 +441,65 @@ async def handle_sso_callback(
             }
 
         else:
-            # New account - create user
+            # New keycloak account — link to an existing user if we recognise the
+            # email, otherwise create a fresh user.
             is_new_user = True
 
-            # Create new user
-            user = User(
-                given_name=user_info.given_name or "",
-                family_name=user_info.family_name or "",
-                username=user_info.username
-                or user_info.email
-                or f"{provider}_{user_info.provider_id}",
-                email=user_info.email,
+            # Match case-insensitively. The DB enforces one-user-per-email across
+            # both User.email AND StudentProfile.student_email (the
+            # check_email_uniqueness_across_users trigger, also case-insensitive),
+            # so a single match is unambiguous.
+            normalized_email = (
+                user_info.email.strip().lower() if user_info.email else None
             )
-            db.add(user)
-            db.flush()
+
+            user = None
+            if normalized_email:
+                # 1) Primary email on the User record (e.g. from an invite).
+                user = (
+                    db.query(User)
+                    .filter(func.lower(User.email) == normalized_email)
+                    .first()
+                )
+
+                # 2) Fall back to a student-profile email: a person may receive the
+                #    external IdP under a different address than their User.email.
+                #    Without this the User insert below would trip the uniqueness
+                #    trigger and the login would fail outright.
+                if user is None:
+                    from computor_backend.model.auth import StudentProfile
+
+                    profile_user_ids = {
+                        uid
+                        for (uid,) in db.query(StudentProfile.user_id)
+                        .filter(
+                            func.lower(StudentProfile.student_email) == normalized_email
+                        )
+                        .distinct()
+                        .all()
+                    }
+                    if len(profile_user_ids) == 1:
+                        user = (
+                            db.query(User)
+                            .filter(User.id == next(iter(profile_user_ids)))
+                            .first()
+                        )
+                    elif len(profile_user_ids) > 1:
+                        # Data predating the uniqueness trigger could map one email
+                        # to several users — never guess which to log in as.
+                        raise BadRequestException(
+                            f"Email '{user_info.email}' is associated with multiple "
+                            "accounts; SSO login cannot be resolved automatically."
+                        )
+
+            if user is None:
+                user = User(
+                    given_name=user_info.given_name or "",
+                    family_name=user_info.family_name or "",
+                    email=normalized_email,
+                )
+                db.add(user)
+                db.flush()
 
             # Create account
             account = Account(
@@ -544,29 +520,63 @@ async def handle_sso_callback(
             )
             db.add(account)
 
-        db.commit()
-        return user, account, is_new_user
+        # Bootstrap _admin from the Keycloak "administrators" group.
+        # Additive only: membership grants _admin, but we never revoke — admin
+        # can also be granted manually in the computor DB, which stays authoritative.
+        groups = user_info.groups or []
+        is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
+        if is_kc_admin:
+            from computor_backend.model.role import UserRole
+            existing_admin = (
+                db.query(UserRole)
+                .filter(UserRole.user_id == user.id, UserRole.role_id == "_admin")
+                .first()
+            )
+            if not existing_admin:
+                db.add(UserRole(user_id=user.id, role_id="_admin"))
 
-    user, account, is_new_user = await run_in_threadpool(_find_or_create_account)
+        # Capture primitives before commit — attributes expire after commit
+        user_primitives = {
+            "id": str(user.id),
+            "account_id": str(account.id),
+            "email": user.email,
+            "given_name": user.given_name,
+            "family_name": user.family_name,
+        }
+        db.commit()
+        return is_new_user, user_primitives
+
+    is_new_user, user_primitives = await run_in_threadpool(_find_or_create_account)
+
+    await _provision_git_server_account(
+        user_id=user_primitives["id"],
+        email=user_primitives["email"],
+        db=db,
+    )
 
     # Generate API session token for the user
     api_session_token = secrets.token_urlsafe(32)
     session_data = {
-        "user_id": str(user.id),
-        "account_id": str(account.id),
+        "user_id": user_primitives["id"],
+        "account_id": user_primitives["account_id"],
         "provider": provider,
-        "username": user.username,
-        "email": user.email,
+        "email": user_primitives["email"],
         "created_at": str(datetime.now(timezone.utc)),
+        # Stored so /auth/{provider}/logout can pass id_token_hint to Keycloak
+        # and skip its logout-confirmation prompt.
+        "id_token": (auth_result.session_data or {}).get("id_token"),
     }
 
-    # Store session in Redis with TTL
-    session_key = f"sso_session:{api_session_token}"
+    # Store session in Redis with TTL. authenticate_sso() in permissions/auth.py
+    # looks up the session by the HASH of the token, not the plain token, so
+    # we must store the hash (matching the local /login flow).
+    from computor_backend.utils.token_hash import hash_token
+    session_key = f"sso_session:{hash_token(api_session_token)}"
     await redis_client.set(session_key, json.dumps(session_data), ex=86400)  # 24 hours
 
     # Store tokens in Redis if available
     if auth_result.access_token:
-        token_key = f"sso_token:{provider}:{user.id}"
+        token_key = f"sso_token:{provider}:{user_primitives['id']}"
         token_data = {
             "access_token": auth_result.access_token,
             "refresh_token": auth_result.refresh_token,
@@ -586,128 +596,11 @@ async def handle_sso_callback(
         await redis_client.set(token_key, json.dumps(token_data), ex=expiration)
 
     return {
-        "user_id": str(user.id),
-        "account_id": str(account.id),
+        "user_id": user_primitives["id"],
+        "account_id": user_primitives["account_id"],
         "token": api_session_token,
         "refresh_token": auth_result.refresh_token if auth_result.refresh_token else "",
         "is_new_user": is_new_user,
-    }
-
-
-async def register_sso_user(
-    username: str,
-    email: str,
-    password: str,
-    given_name: str,
-    family_name: str,
-    provider: str,
-    send_verification_email: bool,
-    db: Session,
-) -> Dict[str, Any]:
-    """
-    Register a new user with SSO provider.
-
-    Args:
-        username: Username
-        email: Email address
-        password: Password
-        given_name: First name
-        family_name: Last name
-        provider: Authentication provider
-        send_verification_email: Whether to send verification email
-        db: Database session
-
-    Returns:
-        Dict with user_id, provider_user_id, username, email, message
-
-    Raises:
-        BadRequestException: If provider not enabled or user exists
-    """
-    # Validate provider
-    registry = get_plugin_registry()
-    if provider not in registry.get_enabled_plugins():
-        raise BadRequestException(f"Authentication provider not enabled: {provider}")
-
-    # Check if user already exists in local database (wrap blocking query)
-    existing_user = await run_in_threadpool(
-        lambda: db.query(User)
-        .filter((User.username == username) | (User.email == email))
-        .first()
-    )
-
-    if existing_user:
-        raise BadRequestException("User with this username or email already exists")
-
-    # Create user in authentication provider
-    if provider == "keycloak":
-        keycloak_admin = KeycloakAdminClient()
-
-        # Check if user exists in Keycloak
-        if await keycloak_admin.user_exists(username):
-            raise BadRequestException("User already exists in Keycloak")
-
-        # Create Keycloak user
-        keycloak_user = KeycloakUser(
-            username=username,
-            email=email,
-            firstName=given_name,
-            lastName=family_name,
-            enabled=True,
-            emailVerified=False,
-            credentials=[
-                {"type": "password", "value": password, "temporary": False}
-            ],
-        )
-
-        provider_user_id = await keycloak_admin.create_user(keycloak_user)
-
-        # Send verification email if requested
-        if send_verification_email and email:
-            try:
-                await keycloak_admin.send_verify_email(provider_user_id)
-            except Exception as e:
-                logger.warning(f"Failed to send verification email: {e}")
-    else:
-        raise BadRequestException(
-            f"Registration not implemented for provider: {provider}"
-        )
-
-    # Create user in local database (wrap blocking DB operations)
-    def _create_local_user():
-        local_user = User(
-            given_name=given_name,
-            family_name=family_name,
-            username=username,
-            email=email,
-        )
-        db.add(local_user)
-        db.flush()
-
-        # Create account linking to provider
-        account = Account(
-            provider=provider,
-            type="oidc",  # Keycloak uses OIDC
-            provider_account_id=provider_user_id,
-            user_id=local_user.id,
-            properties={
-                "email": email,
-                "username": username,
-                "registration_date": str(datetime.now(timezone.utc)),
-            },
-        )
-        db.add(account)
-
-        db.commit()
-        return local_user
-
-    local_user = await run_in_threadpool(_create_local_user)
-
-    return {
-        "user_id": str(local_user.id),
-        "provider_user_id": provider_user_id,
-        "username": username,
-        "email": email,
-        "message": f"User registered successfully. {'Verification email sent.' if send_verification_email else ''}",
     }
 
 
@@ -785,14 +678,14 @@ async def refresh_sso_token(
             "user_id": str(user.id),
             "account_id": str(account.id),
             "provider": provider,
-            "username": user.username,
             "email": user.email,
             "created_at": str(datetime.now(timezone.utc)),
             "refreshed_at": str(datetime.now(timezone.utc)),
         }
 
-        # Store new session in Redis
-        session_key = f"sso_session:{new_session_token}"
+        # Store new session in Redis — keyed by token HASH to match authenticate_sso() lookup.
+        from computor_backend.utils.token_hash import hash_token
+        session_key = f"sso_session:{hash_token(new_session_token)}"
         await redis_client.set(session_key, json.dumps(session_data), ex=86400)
 
         # Update stored provider tokens if available
@@ -829,6 +722,87 @@ async def refresh_sso_token(
         )
 
 
+async def provision_keycloak_login(
+    email: str,
+    password: str,
+    given_name: str = "",
+    family_name: str = "",
+) -> Tuple[str, bool]:
+    """Create (or password-reset) a Keycloak login for ``email``.
+
+    Username == email is the single matching key across systems. If the Keycloak
+    user already exists its password is reset; otherwise it is created with the
+    password live (no temporary flag, no email round-trip).
+
+    This performs NO identity verification — the caller must first establish
+    authorization (a verified GitLab PAT, or a valid invite token).
+
+    Returns ``(keycloak_user_id, created)``.
+    """
+    kc = KeycloakAdminClient()
+
+    # Match existing users by email — the Keycloak username is a generated handle,
+    # not the email, so it can't be used as the lookup key.
+    existing_id = await kc._get_user_id_by_email(email)
+    if existing_id:
+        await kc.set_user_password(existing_id, password, temporary=False)
+        return existing_id, False
+
+    # Username is a generated, Forgejo-safe handle (never the email) so that
+    # Forgejo's OIDC preferred_username maps to a valid Forgejo account name.
+    handle = await kc.generate_unique_username(given_name, family_name, email)
+    kc_user_id = await kc.create_user(KeycloakUser(
+        username=handle,
+        email=email,
+        firstName=given_name or "",
+        lastName=family_name or "",
+        enabled=True,
+        emailVerified=True,
+        credentials=[{"type": "password", "value": password, "temporary": False}],
+    ))
+    return kc_user_id, True
+
+
+async def ensure_keycloak_admin(email: str, password: str) -> None:
+    """Ensure the bootstrap admin exists in Keycloak and is in the
+    'administrators' group.
+
+    The password is set only on initial creation — an existing admin's password
+    is never overwritten, so a password rotated in Keycloak survives restarts.
+    Group membership is (idempotently) ensured every time. The computor User row
+    and the _admin role are granted on first login via the group claim (see
+    handle_sso_callback), so this only touches Keycloak.
+    """
+    kc = KeycloakAdminClient()
+
+    existing_id = await kc._get_user_id_by_email(email)
+    if existing_id:
+        kc_user_id = existing_id
+        logger.info("Keycloak admin %s already exists — leaving password unchanged.", email)
+        await kc.update_user(kc_user_id, {"requiredActions": [], "emailVerified": True})
+    else:
+        handle = await kc.generate_unique_username(None, None, email)
+        kc_user_id = await kc.create_user(KeycloakUser(
+            username=handle,
+            email=email,
+            enabled=True,
+            emailVerified=True,
+            credentials=[{"type": "password", "value": password, "temporary": False}],
+        ))
+        logger.info("Created Keycloak admin %s (handle=%s).", email, handle)
+
+    group_id = await kc.get_group_id("administrators")
+    if not group_id:
+        logger.error(
+            "Keycloak 'administrators' group not found — admin %s will not receive "
+            "the _admin role until added to that group.", email,
+        )
+        return
+
+    await kc.add_user_to_group(kc_user_id, group_id)
+    logger.info("Ensured Keycloak admin %s is in the 'administrators' group.", email)
+
+
 async def verify_user_with_gitlab_pat(
     access_token: str,
     gitlab_url: str,
@@ -840,8 +814,11 @@ async def verify_user_with_gitlab_pat(
     This function verifies that:
     1. The provided token is a valid Personal Access Token (not bot/project/group token)
     2. Fetches the email from GitLab user profile
-    3. Finds user in our system with matching email
-    4. Verifies user belongs to an organization that uses the specified GitLab instance
+    3. The GitLab instance URL is registered to an organization via git_provider
+       (anti-spoofing: a forged email on an unknown GitLab is rejected)
+    4. Finds a user in our system with that email (User.email, or a
+       StudentProfile.student_email within one of the matched organizations)
+    5. The user is enrolled in at least one course of a matched organization
 
     Args:
         access_token: GitLab Personal Access Token (glpat-...)
@@ -852,8 +829,9 @@ async def verify_user_with_gitlab_pat(
         Tuple of (User, gitlab_url_used, gitlab_user_data)
 
     Raises:
-        NotFoundException: If user not found
-        ForbiddenException: If user not in GitLab-enabled org
+        NotFoundException: If no user matches the GitLab email
+        ForbiddenException: If the GitLab URL is not registered to any organization,
+            or the user is not enrolled in a course of such an organization
         BadRequestException: If token is not a personal access token
         UnauthorizedException: If GitLab authentication fails
 
@@ -903,44 +881,88 @@ async def verify_user_with_gitlab_pat(
         logger.error(f"Unexpected error with GitLab: {str(e)}", exc_info=True)
         raise UnauthorizedException(f"Failed to verify GitLab token: {str(e)}") from e
 
-    # 3. Find user in our system by email (case-insensitive)
-    # Try User.email first - if found, user can link any GitLab instance
+    # 3. The GitLab instance must belong to a known organization. The
+    #    git_provider table (organization_id + url) is the source of truth.
+    #    Anti-spoofing guard: a forged email on some random GitLab is not enough
+    #    — the URL itself must be one a Computor organization is configured with.
     from computor_backend.model.auth import StudentProfile
+    from computor_backend.model.git_provider import GitProvider
+    from computor_backend.model.course import Course, CourseMember
 
+    normalized_gitlab_url = gitlab_url.rstrip('/')
+
+    org_ids = [
+        row[0]
+        for row in db.query(GitProvider.organization_id)
+        .filter(
+            GitProvider.type == 'gitlab',
+            GitProvider.url.in_([normalized_gitlab_url, normalized_gitlab_url + '/']),
+        )
+        .all()
+    ]
+    if not org_ids:
+        raise ForbiddenException(
+            f"GitLab instance {gitlab_url} is not registered with any organization."
+        )
+
+    # 4. Identify the user by email — their primary User.email, or a
+    #    StudentProfile.student_email belonging to one of the matched orgs.
     user = db.query(User).filter(User.email == gitlab_email.lower()).first()
 
     if user:
-        logger.info(f"Found user {user.username} (ID: {user.id}) by User.email")
+        logger.info(f"Found user {user.email} (ID: {user.id}) by User.email")
     else:
-        # If not found by User.email, try StudentProfile.student_email
-        # Join with Organization and filter by GitLab URL in the query
-        from computor_backend.model.organization import Organization
-
-        # Normalize GitLab URL (remove trailing slash if present)
-        normalized_gitlab_url = gitlab_url.rstrip('/')
-
         student_profile = (
             db.query(StudentProfile)
-            .join(Organization, StudentProfile.organization_id == Organization.id)
             .filter(
                 StudentProfile.student_email == gitlab_email.lower(),
-                Organization.properties["gitlab"].op("->>")("url") == normalized_gitlab_url
+                StudentProfile.organization_id.in_(org_ids),
             )
             .first()
         )
-
-        if student_profile:
-            user = student_profile.user
-            logger.info(
-                f"Found user {user.username} (ID: {user.id}) via StudentProfile.student_email "
-                f"in organization {student_profile.organization_id}"
-            )
-        else:
+        if not student_profile:
             raise NotFoundException(
-                f"No user found with email '{gitlab_email}' in any organization using {gitlab_url}"
+                f"No user found with email '{gitlab_email}' in any organization using {gitlab_url}."
+            )
+        user = student_profile.user
+        logger.info(
+            f"Found user {user.email} (ID: {user.id}) via StudentProfile.student_email "
+            f"in organization {student_profile.organization_id}"
+        )
+
+    # 5. Either the user already has a linked account on this GitLab — a prior,
+    #    validated onboarding (e.g. they just need a new password) — or, for a
+    #    fresh user, they must be enrolled in at least one course of a matched
+    #    organization. The enrollment gate ties a brand-new identity to the
+    #    trusted GitLab and prevents granting access on a bare email match alone.
+    has_existing_account = (
+        db.query(Account.id)
+        .filter(
+            Account.user_id == user.id,
+            Account.type == 'gitlab',
+            Account.provider.in_([normalized_gitlab_url, normalized_gitlab_url + '/']),
+        )
+        .first()
+        is not None
+    )
+
+    if not has_existing_account:
+        enrolled = (
+            db.query(CourseMember.id)
+            .join(Course, CourseMember.course_id == Course.id)
+            .filter(
+                CourseMember.user_id == user.id,
+                Course.organization_id.in_(org_ids),
+            )
+            .first()
+        )
+        if not enrolled:
+            raise ForbiddenException(
+                "You must be enrolled in at least one course in an organization "
+                f"that uses {gitlab_url} before you can set up your login."
             )
 
-    logger.info(f"Successfully verified user {user.username} (ID: {user.id}) with GitLab email {gitlab_email}")
+    logger.info(f"Successfully verified user {user.email} (ID: {user.id}) with GitLab email {gitlab_email}")
 
     # 5. Return user and GitLab info
     gitlab_user_data = {
@@ -951,11 +973,11 @@ async def verify_user_with_gitlab_pat(
     }
 
     logger.info(
-        f"Successfully verified user {user.username} via GitLab PAT "
+        f"Successfully verified user {user.email} via GitLab PAT "
         f"(GitLab user: {gitlab_user.username}, instance: {gitlab_url})"
     )
 
-    return user, gitlab_url, gitlab_user_data
+    return user, normalized_gitlab_url, gitlab_user_data
 
 
 async def find_or_create_gitlab_account(
@@ -1003,7 +1025,7 @@ async def find_or_create_gitlab_account(
                 "name": gitlab_user_data['name'],
                 "last_verified": str(datetime.now(timezone.utc)),
             }
-            logger.info(f"Updated existing GitLab account for user {user.username}")
+            logger.info(f"Updated existing GitLab account for user {user.email}")
         else:
             # Create new account using CORRECT schema pattern
             account = Account(
@@ -1020,7 +1042,7 @@ async def find_or_create_gitlab_account(
                 },
             )
             db.add(account)
-            logger.info(f"Created new GitLab account for user {user.username}")
+            logger.info(f"Created new GitLab account for user {user.email}")
 
         db.commit()
         db.refresh(account)

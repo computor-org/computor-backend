@@ -4,13 +4,13 @@
   "displayName": "Computor",
   "displayNameHtml": "<strong>Computor</strong>",
   "sslRequired": "external",
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "registrationEmailAsUsername": false,
   "rememberMe": true,
   "verifyEmail": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "resetPasswordAllowed": true,
+  "resetPasswordAllowed": false,
   "editUsernameAllowed": true,
   "bruteForceProtected": true,
   "permanentLockout": false,
@@ -57,7 +57,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "computor-backend-secret",
+      "secret": "PLACEHOLDER_CLIENT_SECRET",
       "redirectUris": [
         "http://localhost:8000/*",
         "http://localhost:8080/*",
@@ -83,11 +83,101 @@
         "backchannel.logout.session.required": "true",
         "display.on.consent.screen": "false",
         "oauth2.device.authorization.grant.enabled": "false",
-        "backchannel.logout.revoke.offline.tokens": "false"
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "post.logout.redirect.uris": "+"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "openid",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "computor-vscode",
+      "name": "Computor VS Code Extension",
+      "description": "Public client for the Computor VS Code extension (OAuth 2.0 Device Authorization Grant)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
+        "use.refresh.tokens": "true",
+        "client_credentials.use_refresh_token": "false",
+        "display.on.consent.screen": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "openid",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "forgejo",
+      "name": "Computor Forgejo",
+      "description": "OIDC login client for the Forgejo git server",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "PLACEHOLDER_FORGEJO_CLIENT_SECRET",
+      "redirectUris": [
+        "http://localhost:3030/user/oauth2/Keycloak/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "+"
+      },
+      "fullScopeAllowed": true,
       "defaultClientScopes": [
         "web-origins",
         "openid",
@@ -336,7 +426,9 @@
       "name": "students",
       "path": "/students",
       "attributes": {},
-      "realmRoles": ["student"],
+      "realmRoles": [
+        "student"
+      ],
       "clientRoles": {},
       "subGroups": []
     },
@@ -344,7 +436,9 @@
       "name": "tutors",
       "path": "/tutors",
       "attributes": {},
-      "realmRoles": ["tutor"],
+      "realmRoles": [
+        "tutor"
+      ],
       "clientRoles": {},
       "subGroups": []
     },
@@ -352,7 +446,9 @@
       "name": "lecturers",
       "path": "/lecturers",
       "attributes": {},
-      "realmRoles": ["lecturer"],
+      "realmRoles": [
+        "lecturer"
+      ],
       "clientRoles": {},
       "subGroups": []
     },
@@ -360,45 +456,13 @@
       "name": "administrators",
       "path": "/administrators",
       "attributes": {},
-      "realmRoles": ["admin"],
+      "realmRoles": [
+        "admin"
+      ],
       "clientRoles": {},
       "subGroups": []
     }
   ],
-  "users": [
-    {
-      "username": "demo_admin",
-      "enabled": true,
-      "email": "admin@computor.local",
-      "emailVerified": true,
-      "firstName": "Demo",
-      "lastName": "Admin",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "admin123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["admin"],
-      "groups": ["/administrators"]
-    },
-    {
-      "username": "demo_student",
-      "enabled": true,
-      "email": "student@computor.local",
-      "emailVerified": true,
-      "firstName": "Demo",
-      "lastName": "Student",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "student123",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["student"],
-      "groups": ["/students"]
-    }
-  ]
+  "users": [],
+  "loginTheme": "computor"
 }

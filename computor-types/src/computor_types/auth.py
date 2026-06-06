@@ -10,25 +10,6 @@ class GLPAuthConfig(AuthConfig):
     url: str
     token: str
 
-class BasicAuthConfig(AuthConfig):
-    username: str
-    password: str
-
-# Local authentication DTOs
-
-class LocalLoginRequest(BaseModel):
-    """Request model for local username/password login."""
-    username: str = Field(..., min_length=1, description="Username or email")
-    password: str = Field(..., min_length=1, description="Password")
-
-class LocalLoginResponse(BaseModel):
-    """Response model after successful local login."""
-    access_token: str = Field(..., description="Bearer access token for API requests")
-    refresh_token: str = Field(..., description="Refresh token to obtain new access token")
-    expires_in: int = Field(..., description="Access token expiration time in seconds")
-    user_id: str = Field(..., description="User ID")
-    token_type: str = Field(default="Bearer", description="Token type")
-
 class LogoutRequest(BaseModel):
     """Request model for logout."""
     provider: Optional[str] = Field(None, description="Provider name for SSO logout (optional)")
@@ -98,3 +79,23 @@ class TokenRefreshResponse(BaseModel):
     access_token: str = Field(..., description="New access token")
     expires_in: Optional[int] = Field(None, description="Token expiration time in seconds")
     refresh_token: Optional[str] = Field(None, description="New refresh token if rotated")
+
+
+class GitLabRegisterRequest(BaseModel):
+    """Self-service migration: set a Keycloak password, gated by a GitLab PAT.
+
+    The PAT proves the caller controls a GitLab account whose email matches an
+    existing computor user (by User.email or the org-scoped StudentProfile email).
+    No password is read from our database (local auth is gone); the PAT is only
+    used for verification and is never stored.
+    """
+    gitlab_url: str = Field(..., description="GitLab instance URL the PAT was issued on")
+    gitlab_pat: str = Field(..., description="GitLab Personal Access Token (verification only, not stored)")
+    new_password: str = Field(..., description="Password to set for Keycloak login")
+
+
+class GitLabRegisterResponse(BaseModel):
+    """Response after provisioning/resetting a Keycloak login via GitLab PAT."""
+    user_id: str = Field(..., description="User ID in Computor")
+    email: str = Field(..., description="Email address (Keycloak username)")
+    created: bool = Field(..., description="True if the Keycloak user was created, False if its password was reset")

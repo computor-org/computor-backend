@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional, List
 import httpx
 from pydantic import BaseModel, Field
 
+from computor_backend.utils.git_username import username_candidates
+
 logger = logging.getLogger(__name__)
 
 
@@ -143,12 +145,80 @@ class KeycloakAdminClient:
             return users[0]["id"]
     
     async def user_exists(self, username: str) -> bool:
-        """Check if a user exists in Keycloak."""
+        """Check if a user exists in Keycloak (by username)."""
         try:
             await self._get_user_id_by_username(username)
             return True
         except ValueError:
             return False
+
+    async def _get_user_id_by_email(self, email: str) -> Optional[str]:
+        """Return the Keycloak user id for an exact email match, or None.
+
+        Safe to treat as unique: the realm sets ``duplicateEmailsAllowed=false``.
+        This is the cross-system matching key now that the Keycloak username is a
+        generated handle rather than the email.
+        """
+        token = await self._get_admin_token()
+        users_url = f"{self.server_url}/admin/realms/{self.realm}/users"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                users_url,
+                params={"email": email, "exact": "true"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if response.status_code != 200:
+                response.raise_for_status()
+            users = response.json()
+            return users[0]["id"] if users else None
+
+    async def user_exists_by_email(self, email: str) -> bool:
+        """Check if a user exists in Keycloak (by email)."""
+        return await self._get_user_id_by_email(email) is not None
+
+    async def get_username(self, user_id: str) -> Optional[str]:
+        """Return the current Keycloak username for a user id (authoritative live read)."""
+        token = await self._get_admin_token()
+        user_url = f"{self.server_url}/admin/realms/{self.realm}/users/{user_id}"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                user_url, headers={"Authorization": f"Bearer {token}"}
+            )
+            if response.status_code == 404:
+                return None
+            if response.status_code != 200:
+                response.raise_for_status()
+            return response.json().get("username")
+
+    async def generate_unique_username(
+        self,
+        given_name: Optional[str],
+        family_name: Optional[str],
+        email: Optional[str] = None,
+    ) -> str:
+        """Pick the first Forgejo-safe candidate handle not taken in Keycloak.
+
+        Candidates come from the user's name (falling back to the email
+        local-part); if every candidate collides, a numeric suffix is appended.
+        Keycloak enforces realm-wide username uniqueness, so the chosen handle is
+        safe to use as the Forgejo account name.
+        """
+        candidates = username_candidates(given_name, family_name, email)
+        for candidate in candidates:
+            if not await self.user_exists(candidate):
+                return candidate
+
+        base = candidates[0]
+        suffix = 2
+        while await self.user_exists(f"{base}{suffix}"):
+            suffix += 1
+            if suffix > 9999:
+                raise ValueError(
+                    f"Could not allocate a unique username from base '{base}'"
+                )
+        return f"{base}{suffix}"
     
     async def update_user(self, user_id: str, updates: Dict[str, Any]) -> None:
         """Update an existing user in Keycloak."""
@@ -209,6 +279,24 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to add user to group: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
+    async def get_group_id(self, name: str) -> Optional[str]:
+        """Return the id of a top-level realm group by exact name, or None."""
+        token = await self._get_admin_token()
+        groups_url = f"{self.server_url}/admin/realms/{self.realm}/groups"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            response = await client.get(
+                groups_url,
+                params={"search": name},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if response.status_code != 200:
+                response.raise_for_status()
+            for group in response.json():
+                if group.get("name") == name:
+                    return group["id"]
+        return None
+
     async def delete_user(self, user_id: str) -> None:
         """Delete a user from Keycloak."""
         token = await self._get_admin_token()
@@ -224,6 +312,59 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to delete user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
+    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str], client_id: str | None = None) -> None:
+        """Add the given redirect URIs and web origins to a Keycloak client (idempotent).
+
+        Defaults to this deployment's backend client (self.client_id); pass client_id
+        to reconcile a different client — e.g. the 'forgejo' OIDC client, whose redirect
+        URI otherwise goes stale when FORGEJO_ROOT_URL changes (the busybox-based
+        forgejo setup script can only POST-create, never update an existing client).
+
+        For the backend client, pass both the login callback and the app-root URI: its
+        post.logout.redirect.uris is "+", meaning it reuses the valid redirect URIs, so
+        the app-root entry is also what makes logout's post_logout_redirect_uri accepted.
+        """
+        target_client_id = client_id or self.client_id
+        token = await self._get_admin_token()
+        clients_url = f"{self.server_url}/admin/realms/{self.realm}/clients"
+
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            resp = await client.get(
+                clients_url,
+                params={"clientId": target_client_id, "search": "false"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            resp.raise_for_status()
+            clients = resp.json()
+            if not clients:
+                logger.warning(f"Keycloak client '{target_client_id}' not found — skipping redirect URI registration")
+                return
+
+            kc_client = clients[0]
+            internal_id = kc_client["id"]
+            current_uris = set(kc_client.get("redirectUris", []))
+            current_origins = set(kc_client.get("webOrigins", []))
+
+            merged_uris = current_uris | set(redirect_uris)
+            merged_origins = current_origins | set(web_origins)
+
+            if merged_uris == current_uris and merged_origins == current_origins:
+                return  # nothing new to add
+
+            updated = {
+                "redirectUris": sorted(merged_uris),
+                "webOrigins": sorted(merged_origins),
+            }
+            put_resp = await client.put(
+                f"{clients_url}/{internal_id}",
+                json={**kc_client, **updated},
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            if put_resp.status_code not in (200, 204):
+                logger.error(f"Failed to update client redirect URIs: {put_resp.status_code} - {put_resp.text}")
+                put_resp.raise_for_status()
+            logger.info(f"Ensured redirect URIs {sorted(set(redirect_uris))} on Keycloak client '{target_client_id}'")
+
     async def send_verify_email(self, user_id: str) -> None:
         """Send email verification to user."""
         token = await self._get_admin_token()

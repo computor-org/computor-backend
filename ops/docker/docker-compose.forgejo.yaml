@@ -1,0 +1,159 @@
+# Forgejo git server add-on Docker Compose configuration
+# Optional — include when GIT_SERVER=forgejo in .env
+# Use together with base + dev/prod configuration
+#
+# Dev:  Forgejo available at http://localhost:${FORGEJO_PORT:-3030}
+# Prod: Set FORGEJO_TRAEFIK_ENABLED=true and FORGEJO_DOMAIN in .env
+#       Traefik then routes requests by host to this container on the shared network.
+#
+# On first start forgejo-bootstrap creates the admin user and (optionally)
+# configures Keycloak OIDC automatically.
+
+networks:
+  forgejo-internal:
+    driver: bridge
+  # computor-network is created by docker-compose.base.yaml (this overlay is
+  # always merged with base). Referenced by services below, not redeclared.
+
+services:
+  forgejo-db:
+    image: postgres:16
+    container_name: computor-forgejo-db
+    networks:
+      - forgejo-internal
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${FORGEJO_DB_PORT:-5441}:5441"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/postgres:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      PGPORT: 5441
+      POSTGRES_DB: forgejo
+      POSTGRES_USER: forgejo
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD:?}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgejo -p 5441"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo
+    networks:
+      - forgejo-internal
+      - computor-network
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${FORGEJO_PORT:-3030}:3030"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
+    environment:
+      TZ: UTC
+      # Skip the web installer (required for headless startup)
+      FORGEJO__security__INSTALL_LOCK: "true"
+      # nginx → Traefik → Forgejo is two proxy hops; trust both so Forgejo derives
+      # the real client IP from X-Forwarded-For (default is 1).
+      FORGEJO__security__REVERSE_PROXY_LIMIT: "2"
+      # Database
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: forgejo-db:5441
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: forgejo
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?}
+      # Server
+      FORGEJO__server__DOMAIN: ${FORGEJO_DOMAIN:-localhost}
+      FORGEJO__server__HTTP_PORT: 3030
+      FORGEJO__server__ROOT_URL: ${FORGEJO_ROOT_URL:-http://localhost:3030}
+      FORGEJO__server__DISABLE_SSH: "true"
+      # Store sessions in Postgres, not the default file provider. The bind-mounted
+      # /data/gitea/sessions isn't writable by the git user, so file-based sessions
+      # are silently dropped — which breaks the OAuth login round-trip (the state/PKCE
+      # saved before the Keycloak redirect is gone on the callback → 500 "could not
+      # find a matching session"). The DB is always writable and survives restarts.
+      FORGEJO__session__PROVIDER: "db"
+      FORGEJO__session__PROVIDER_CONFIG: ""
+      # Registration: disabled — users are managed via API or Keycloak SSO
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      # Require login to view ANY page (repos, users, /explore/*). Without this,
+      # /explore/users and /explore/repos are world-readable. This is a closed
+      # course platform (private repos, no self-registration), so anonymous
+      # browsing should not exist. Sign-in / OIDC endpoints stay reachable.
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      # Allow OAuth2 SSO users to auto-create accounts (for Keycloak integration)
+      FORGEJO__oauth2_client__ENABLE_AUTO_REGISTRATION: "true"
+      FORGEJO__oauth2_client__UPDATE_AVATAR: "true"
+      FORGEJO__oauth2_client__OPENID_CONNECT_SCOPES: "email profile"
+      # Link a pre-provisioned local account to its OIDC identity on first login.
+      # Safe here: registration is disabled and usernames come from the
+      # admin-controlled Keycloak preferred_username claim.
+      FORGEJO__oauth2_client__ACCOUNT_LINKING: "auto"
+      FORGEJO__oauth2_client__USERNAME: "preferred_username"
+      # Default repository visibility
+      FORGEJO__repository__DEFAULT_PRIVATE: "true"
+    labels:
+      # Dev: traefik.enable=false — access via direct port binding (FORGEJO_PORT).
+      # Prod: set FORGEJO_TRAEFIK_ENABLED=true in .env and expose Forgejo under the
+      #       /forgejo subpath of the main domain. FORGEJO_ROOT_URL=https://<domain>/forgejo
+      #       makes Forgejo PREFIX every generated link/asset/redirect with /forgejo.
+      #       Traefik then STRIPS /forgejo before forwarding, because Forgejo's router
+      #       serves from root and would otherwise double-count the prefix (assets 404,
+      #       redirect_to=/forgejo/forgejo). Same strip pattern as /api (uvicorn) and
+      #       /docs (static). This is the standard Forgejo/Gitea sub-path proxy setup.
+      - "traefik.enable=${FORGEJO_TRAEFIK_ENABLED:-false}"
+      - "traefik.http.routers.forgejo.rule=PathPrefix(`/forgejo`)"
+      - "traefik.http.routers.forgejo.entrypoints=web"
+      - "traefik.http.routers.forgejo.priority=10"
+      - "traefik.http.routers.forgejo.middlewares=forgejo-stripprefix"
+      - "traefik.http.middlewares.forgejo-stripprefix.stripprefix.prefixes=/forgejo"
+      - "traefik.http.services.forgejo.loadbalancer.server.port=3030"
+    depends_on:
+      forgejo-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3030/api/healthz 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # Runs once per `docker compose up` to create the admin user and configure OIDC.
+  # Idempotent: forgejo returns non-zero if the user/auth-source exists, which is ignored.
+  forgejo-bootstrap:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: computor-forgejo-bootstrap
+    # Run as the image's git user. The forgejo CLI refuses to run as root, and
+    # overriding the entrypoint skips the image's own privilege drop. Using the
+    # name (not a numeric uid) tracks whatever uid the image assigns to git, so
+    # it always matches the data volume owned by the main forgejo container.
+    user: "git"
+    networks:
+      - forgejo-internal
+    restart: "no"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
+      - ../../computor-forgejo/scripts/bootstrap.sh:/bootstrap.sh:ro
+    environment:
+      GITEA_WORK_DIR: /data
+      FORGEJO_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?}
+      FORGEJO_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD:?}
+      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:-admin@computor.local}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    depends_on:
+      forgejo:
+        condition: service_healthy

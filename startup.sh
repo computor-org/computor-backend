@@ -82,6 +82,34 @@ source .env && echo "  ✓ .env"
 
 set +a
 
+# In production, PUBLIC_DOMAIN is the single source of truth for the public URLs.
+# Derive the per-service public URLs from it here so the domain lives in exactly
+# one place. Each uses ${VAR:-...}, so an explicitly-set value in .env still wins
+# (per-service override). Dev is untouched: PUBLIC_DOMAIN is empty there and each
+# service keeps its own localhost:port URL from .env. setup-env.sh leaves these
+# four empty in a prod .env so PUBLIC_DOMAIN drives them.
+if [ "$ENVIRONMENT" = "prod" ] && [ -n "${PUBLIC_DOMAIN:-}" ]; then
+    PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"            # tolerate a trailing slash
+    _pd_host="${PUBLIC_DOMAIN#*://}"; _pd_host="${_pd_host%%/*}"  # strip scheme + path
+    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-${PUBLIC_DOMAIN}/api}"
+    export KEYCLOAK_PUBLIC_URL="${KEYCLOAK_PUBLIC_URL:-${PUBLIC_DOMAIN}/auth}"
+    export FORGEJO_ROOT_URL="${FORGEJO_ROOT_URL:-${PUBLIC_DOMAIN}/forgejo}"
+    export FORGEJO_DOMAIN="${FORGEJO_DOMAIN:-${_pd_host}}"
+    echo -e "  ${GREEN}✓${NC} Derived public URLs from PUBLIC_DOMAIN=${PUBLIC_DOMAIN}"
+fi
+
+# Ensure the shared Forgejo<->Keycloak client secret exists and is persisted in .env.
+# It must be stable (the realm import and the compose env have to agree on one value)
+# and is only needed when both Keycloak and Forgejo are enabled. This self-heals .env
+# files created before the secret existed, so upgrading never needs a manual edit.
+if [ "$KEYCLOAK_ENABLED" = "true" ] && [ "$GIT_SERVER" = "forgejo" ] && [ -z "${FORGEJO_KEYCLOAK_CLIENT_SECRET:-}" ]; then
+    FORGEJO_KEYCLOAK_CLIENT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 256)
+    sed -i.bak '/^FORGEJO_KEYCLOAK_CLIENT_SECRET=/d' .env && rm -f .env.bak
+    printf 'FORGEJO_KEYCLOAK_CLIENT_SECRET=%s\n' "$FORGEJO_KEYCLOAK_CLIENT_SECRET" >> .env
+    export FORGEJO_KEYCLOAK_CLIENT_SECRET
+    echo -e "  ${GREEN}✓${NC} Generated and persisted FORGEJO_KEYCLOAK_CLIENT_SECRET to .env"
+fi
+
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
 
@@ -100,6 +128,35 @@ if [ "$CODER_ENABLED" = "true" ]; then
 else
     echo -e "Coder: ${YELLOW}disabled${NC} (set CODER_ENABLED=true in .env to enable)"
     export POSTGRES_MULTIPLE_DATABASES="computor"
+fi
+
+if [ "$KEYCLOAK_ENABLED" = "true" ]; then
+    echo -e "Keycloak: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.keycloak.yaml"
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.keycloak-prod.yaml"
+    fi
+else
+    echo -e "Keycloak: ${YELLOW}disabled${NC} (set KEYCLOAK_ENABLED=true in .env to enable)"
+fi
+
+if [ "$GIT_SERVER" = "forgejo" ]; then
+    echo -e "Forgejo: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo.yaml"
+else
+    echo -e "Forgejo: ${YELLOW}disabled${NC} (set GIT_SERVER=forgejo in .env to enable)"
+fi
+
+if [ "$GIT_SERVER" = "forgejo" ] && [ "$KEYCLOAK_ENABLED" = "true" ]; then
+    echo -e "Forgejo-Keycloak OIDC: ${YELLOW}auto-setup enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.forgejo-keycloak.yaml"
+fi
+
+if [ "$MATLAB_ENABLED" = "true" ]; then
+    echo -e "MATLAB worker: ${YELLOW}enabled${NC}"
+    COMPOSE_FILES="$COMPOSE_FILES -f ops/docker/docker-compose.matlab.yaml"
+else
+    echo -e "MATLAB worker: ${YELLOW}disabled${NC} (set MATLAB_ENABLED=true in .env to enable)"
 fi
 
 # Function to safely create directories
@@ -190,16 +247,47 @@ if [ -d "computor-backend/src/defaults" ]; then
     cp -r computor-backend/src/defaults/* "${SYSTEM_DEPLOYMENT_PATH}/shared/defaults/" 2>/dev/null || true
 fi
 
+# Optional: Create Forgejo directories if enabled
+if [ "$GIT_SERVER" = "forgejo" ]; then
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/postgres"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/data"
+fi
+
 # Optional: Create Keycloak directories if enabled
 if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     echo -e "\n${GREEN}Setting up Keycloak directories...${NC}"
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak-db"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
 
-    # Copy Keycloak realm configuration if it exists
+    # Copy realm config, substituting the client secrets from .env. Both placeholders
+    # are hex (no '/'), so the /-delimited sed is safe. PLACEHOLDER_CLIENT_SECRET is not
+    # a substring of PLACEHOLDER_FORGEJO_CLIENT_SECRET, so the two never collide.
     if [ -f "data/keycloak/computor-realm.json" ]; then
-        echo "  Copying Keycloak realm configuration..."
-        cp data/keycloak/computor-realm.json "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/"
+        echo "  Writing Keycloak realm configuration (substituting client secrets)..."
+        sed -e "s/PLACEHOLDER_CLIENT_SECRET/${KEYCLOAK_CLIENT_SECRET}/g" \
+            -e "s/PLACEHOLDER_FORGEJO_CLIENT_SECRET/${FORGEJO_KEYCLOAK_CLIENT_SECRET}/g" \
+            data/keycloak/computor-realm.json \
+            > "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json"
+    fi
+
+    # Sync custom login theme(s) into the mounted themes directory
+    if [ -d "data/keycloak/themes" ]; then
+        echo "  Syncing Keycloak themes..."
+        cp -r data/keycloak/themes/. "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes/"
+    fi
+
+    # Brokered external identity providers (optional). The real provider list is
+    # local-only (gitignored), like .env: seed it from the committed example on
+    # first run, then stage it to the deploy path where the keycloak-idp-setup
+    # one-shot reads it. Secrets are NOT in this file — they stay in .env.
+    create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp"
+    if [ ! -f "data/keycloak/identity-providers.json" ] && [ -f "data/keycloak/identity-providers.example.json" ]; then
+        echo "  Seeding data/keycloak/identity-providers.json from example (edit it to add providers)..."
+        cp "data/keycloak/identity-providers.example.json" "data/keycloak/identity-providers.json"
+    fi
+    if [ -f "data/keycloak/identity-providers.json" ]; then
+        cp "data/keycloak/identity-providers.json" "${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp/identity-providers.json"
     fi
 fi
 
@@ -233,11 +321,21 @@ if [[ "$DOCKER_ARGS" == *"-d"* ]]; then
     fi
 
     if [ "$CODER_ENABLED" = "true" ]; then
-        echo "  • Coder: ${CODER_PROTOCOL:-https}://${CODER_DOMAIN}:${CODER_EXTERNAL_PORT:-8446}"
+        # Coder's server is internal-only (bound to 127.0.0.1, not behind Traefik);
+        # only workspaces are exposed, via Traefik.
+        echo "  • Coder API (local access only): http://localhost:7080"
+        echo "  • Coder workspaces: ${CODER_WORKSPACE_BASE_URL:-http://localhost:${TRAEFIK_HTTP_PORT:-8080}/coder}"
+    fi
+
+    if [ "$GIT_SERVER" = "forgejo" ]; then
+        echo "  • Forgejo: http://localhost:${FORGEJO_PORT:-3030}"
     fi
 
     echo -e "\n${GREEN}To stop services:${NC}"
-    echo "  docker compose $COMPOSE_FILES down"
+    # Use stop.sh, not raw `docker compose down`: in prod the public URLs are derived
+    # from PUBLIC_DOMAIN and left empty in .env, so a bare compose command fails on
+    # ${NEXT_PUBLIC_API_URL:?}. stop.sh re-derives them.
+    echo "  ./stop.sh $ENVIRONMENT"
 
     echo -e "\n${GREEN}To view logs:${NC}"
     echo "  docker compose $COMPOSE_FILES logs -f [service-name]"

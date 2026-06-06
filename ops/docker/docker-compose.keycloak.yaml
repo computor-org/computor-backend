@@ -1,0 +1,148 @@
+# Keycloak SSO add-on Docker Compose configuration
+# Optional — include when KEYCLOAK_ENABLED=true in .env
+# Use together with base + dev/prod configuration
+#
+# Dev:  Keycloak available at http://localhost:${KEYCLOAK_PORT:-8180}
+# Prod: Traefik routes /auth → computor-keycloak:8080
+#       Set KEYCLOAK_PUBLIC_URL=https://yourdomain.com/auth in .env
+#       (KC_HTTP_RELATIVE_PATH is set automatically from that value)
+#
+# On first start the computor realm is imported from
+#   ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json
+# (startup.sh copies it there from data/keycloak/computor-realm.json,
+#  substituting KEYCLOAK_CLIENT_SECRET before the copy)
+
+# computor-network is created by docker-compose.base.yaml; this overlay is
+# always merged with base, so services just reference it (no redeclaration).
+
+services:
+  keycloak-db:
+    image: postgres:16
+    networks:
+      - computor-network
+    container_name: computor-keycloak-db
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${KEYCLOAK_DB_PORT:-5438}:5438"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
+    environment:
+      TZ: UTC
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      POSTGRES_DB: keycloak
+      PGPORT: 5438
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -p 5438"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    networks:
+      - computor-network
+    container_name: computor-keycloak
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      # Full public URL Keycloak uses for browser-facing redirect URIs and frontend discovery endpoints.
+      # Dev default: http://localhost:8180. Production: KEYCLOAK_PUBLIC_URL=https://keycloak.yourdomain.com
+      # KC_HOSTNAME_BACKCHANNEL_DYNAMIC requires a full URL (scheme + host + port), so KC_HOSTNAME
+      # carries the whole thing rather than splitting it across KC_HOSTNAME + KC_HOSTNAME_PORT.
+      KC_HOSTNAME: "${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}"
+      # Lets server-to-server callers (e.g. Forgejo on computor-network) reach Keycloak via container
+      # name — their token endpoint URLs are derived from the request Host header, not KC_HOSTNAME.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      # Subpath Keycloak is mounted at. Dev: leave unset (defaults to /, direct port binding used).
+      # Prod: set KEYCLOAK_HTTP_RELATIVE_PATH=/auth so Keycloak builds correct internal links.
+      KC_HTTP_RELATIVE_PATH: "${KEYCLOAK_HTTP_RELATIVE_PATH:-/}"
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    labels:
+      # Dev: traefik.enable=false — access via direct port binding (KEYCLOAK_PORT).
+      # Prod: set KEYCLOAK_TRAEFIK_ENABLED=true and KEYCLOAK_HTTP_RELATIVE_PATH=/auth in .env.
+      #       Traefik then routes PathPrefix(/auth) → this container on the shared network.
+      #       Also set KEYCLOAK_PUBLIC_URL=https://yourdomain.com/auth for correct redirect URIs.
+      - "traefik.enable=${KEYCLOAK_TRAEFIK_ENABLED:-false}"
+      - "traefik.http.routers.keycloak.rule=PathPrefix(`${KEYCLOAK_HTTP_RELATIVE_PATH:-/auth}`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      # Explicit priority: above the frontend catch-all (1), below the frontend's
+      # exact /auth/success router (100). The frontend page lives under the /auth
+      # prefix Keycloak owns, so ordering must not rely on rule-length defaults.
+      - "traefik.http.routers.keycloak.priority=50"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak 25.x exposes health on the management interface (port 9000)
+      # under the same relative path as the main HTTP. Use bash /dev/tcp because
+      # the Keycloak image has no curl/wget.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET %s/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' \"$${KC_HTTP_RELATIVE_PATH%/}\" >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  # One-shot: registers any brokered external OIDC identity providers in Keycloak,
+  # idempotently, after Keycloak is healthy. Providers come from the operator-managed
+  # (gitignored) data/keycloak/identity-providers.json, staged by startup.sh to
+  # ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp. No file / no enabled providers -> no-op.
+  # Runs on a plain python image (stdlib-only script) so it works in BOTH dev (backend
+  # on host) and prod (backend containerized) without needing the backend image.
+  # Secrets reach it via env_file (.env): each provider names its IDP_*_CLIENT_SECRET.
+  keycloak-idp-setup:
+    image: python:3.13-slim
+    container_name: computor-keycloak-idp-setup
+    networks:
+      - computor-network
+    restart: "no"
+    security_opt:
+      - "no-new-privileges:true"
+    env_file:
+      - ../../.env
+    environment:
+      KEYCLOAK_SERVER_URL_INTERNAL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      IDENTITY_PROVIDERS_FILE: /idp/identity-providers.json
+    volumes:
+      - ../../scripts/setup_identity_providers.py:/setup_identity_providers.py:ro
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp:/idp:ro
+    entrypoint: ["python3", "/setup_identity_providers.py"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+

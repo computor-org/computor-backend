@@ -245,7 +245,7 @@ class CourseMemberGradingsRepository:
             self.db.query(
                 CourseMember.id.label("course_member_id"),
                 CourseMember.user_id.label("user_id"),
-                User.username.label("username"),
+                User.email.label("username"),
                 User.given_name.label("given_name"),
                 User.family_name.label("family_name"),
                 StudentProfile.student_id.label("student_id"),
@@ -599,7 +599,7 @@ class CourseMemberGradingsRepository:
             SELECT
                 cm.id as course_member_id,
                 cm.user_id,
-                u.username,
+                u.email AS username,
                 u.given_name,
                 u.family_name,
                 sp.student_id

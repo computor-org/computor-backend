@@ -1,14 +1,14 @@
 """
-Authentication API endpoints for both local and SSO authentication.
+Authentication API endpoints for SSO authentication.
 
 This module provides:
-- Local username/password authentication with Bearer tokens
-- SSO/OAuth authentication with multiple providers
+- SSO/OAuth authentication with multiple providers (Keycloak, GitLab, etc.)
 - Token refresh and logout functionality
 """
 
 import json
 import logging
+import os
 import secrets
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -17,8 +17,6 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
@@ -26,139 +24,32 @@ from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
-    RateLimitException
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.settings import settings
 from computor_types.auth import (
-    LocalLoginRequest,
-    LocalLoginResponse,
     LogoutResponse,
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
     ProviderInfo,
     LoginRequest,
-    UserRegistrationRequest,
-    UserRegistrationResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
+    GitLabRegisterRequest,
+    GitLabRegisterResponse,
 )
 
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter for this router
-limiter = Limiter(key_func=get_remote_address)
+# SSO cookies must be marked Secure in production (served over HTTPS via nginx),
+# but NOT in dev where the app is plain http://localhost — a Secure cookie set
+# over http is silently dropped by the browser, breaking local login.
+_COOKIE_SECURE = settings.DEBUG_MODE == "production"
 
 auth_router = APIRouter(prefix="/auth")
-
-
-async def check_username_rate_limit(username: str, cache) -> bool:
-    """
-    Check username-based rate limiting using Redis.
-    Returns True if limit exceeded, False otherwise.
-    """
-    try:
-        rate_limit_key = f"rate_limit:username:{username}"
-        current_count = await cache.get(rate_limit_key)
-
-        if current_count is None:
-            # First attempt, set counter with 60 second expiry
-            await cache.set(rate_limit_key, "1", ex=60)
-            return False
-        else:
-            count = int(current_count)
-            if count >= 5:
-                # Rate limit exceeded
-                return True
-            else:
-                # Increment counter
-                await cache.incr(rate_limit_key)
-                return False
-    except Exception as e:
-        logger.error(f"Error checking username rate limit: {e}")
-        # On error, allow the request (fail open)
-        return False
-
-
-@auth_router.post("/login", response_model=LocalLoginResponse)
-@limiter.limit("100/minute")  # IP-based: 100 attempts per minute per IP (for shared networks)
-async def login_with_credentials(
-    login_request: LocalLoginRequest,
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-    cache = Depends(get_redis_client)
-) -> LocalLoginResponse:
-    """
-    Login with username and password to obtain Bearer tokens.
-
-    This endpoint authenticates users with local credentials and returns
-    access and refresh tokens that can be used for subsequent API requests.
-
-    The access token should be included in the Authorization header as:
-    `Authorization: Bearer <access_token>`
-
-    Alternatively, the access token is also set as an httponly cookie for
-    browser-based applications.
-
-    Rate Limits (to prevent brute-force attacks):
-    - 100 attempts per minute per IP address (allows multiple users on same network)
-    - 5 attempts per minute per username (prevents account takeover)
-
-    Returns 429 Too Many Requests if either limit is exceeded.
-    """
-    # Check username-based rate limit
-    username_limit_exceeded = await check_username_rate_limit(login_request.username, cache)
-    if username_limit_exceeded:
-        raise RateLimitException(
-            error_code="RATE_002",
-            detail=f"Too many login attempts for username '{login_request.username}'",
-            retry_after=60,
-            context={
-                "username": login_request.username,
-                "limit": 5,
-                "window_seconds": 60
-            }
-        )
-    from computor_backend.business_logic.auth import login_with_local_credentials
-    from computor_backend.utils.client_info import get_client_ip, get_user_agent
-
-    # Extract client information
-    ip_address = get_client_ip(request)
-    user_agent = get_user_agent(request)
-
-    result = await login_with_local_credentials(
-        username=login_request.username,
-        password=login_request.password,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        db=db,
-        cache=cache
-    )
-
-    # Set access token as httponly cookie
-    response.set_cookie(
-        key="ct_access_token",
-        value=result.access_token,
-        httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
-        max_age=3600  # 1 hour - should match token expiry
-    )
-
-    # Also set refresh token as httponly cookie
-    response.set_cookie(
-        key="ct_refresh_token",
-        value=result.refresh_token,
-        httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
-        max_age=604800  # 7 days - should match refresh token expiry
-    )
-
-    return result
 
 @auth_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers() -> List[ProviderInfo]:
@@ -169,14 +60,9 @@ async def list_providers() -> List[ProviderInfo]:
     """
     registry = get_plugin_registry()
     providers = []
-    
-    # Debug logging
-    logger.info(f"Registry enabled plugins: {registry.get_enabled_plugins()}")
-    logger.info(f"Registry loaded plugins: {registry.get_loaded_plugins()}")
-    
+
     for plugin_name in registry.get_enabled_plugins():
         metadata = registry.get_plugin_metadata(plugin_name)
-        logger.info(f"Plugin {plugin_name} metadata: {metadata}")
         if metadata:
             providers.append(ProviderInfo(
                 name=plugin_name,
@@ -200,21 +86,19 @@ async def initiate_login(
     Redirects the user to the provider's login page.
     """
     registry = get_plugin_registry()
-    
-    # Debug logging
-    logger.info(f"Attempting login for provider: {provider}")
-    logger.info(f"Provider type: {type(provider)}")
-    logger.info(f"Provider repr: {repr(provider)}")
-    enabled_plugins = registry.get_enabled_plugins()
-    logger.info(f"Enabled plugins: {enabled_plugins}")
-    logger.info(f"Enabled plugins type: {type(enabled_plugins)}")
-    logger.info(f"Loaded plugins: {registry.get_loaded_plugins()}")
-    logger.info(f"Provider in enabled_plugins: {provider in enabled_plugins}")
-    
+
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(f"Authentication provider not found or not enabled: {provider}")
-    
+
+    # If the plugin is enabled but not yet loaded (e.g. Keycloak wasn't ready at startup), try now
+    if registry.get_plugin(provider) is None:
+        try:
+            await registry.load_builtin_provider(provider)
+            logger.info(f"Lazily loaded provider: {provider}")
+        except Exception as e:
+            logger.warning(f"Could not lazily load provider {provider}: {e}")
+
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
 
@@ -229,12 +113,21 @@ async def initiate_login(
     await redis_client.set(
         f"sso_state:{state}",
         json.dumps(state_data),
-        ex=600  # 10 minutes
+        # 30 minutes — generous headroom for first-login flows that include
+        # Keycloak required actions (update profile, set password) where the
+        # user may spend several minutes on intermediate forms before the
+        # callback fires. The state is single-use, so a longer TTL is low-risk.
+        ex=1800
     )
     
-    # Get callback URL
-    callback_url = str(request.url_for("handle_callback", provider=provider))
-    
+    # Build the callback URL from NEXT_PUBLIC_API_URL when available so the
+    # scheme is correct even when HTTPS is terminated before Traefik (nginx).
+    _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+    if _api_base:
+        callback_url = f"{_api_base}/auth/{provider}/callback"
+    else:
+        callback_url = str(request.url_for("handle_callback", provider=provider))
+
     try:
         # Get login URL from provider
         login_url = registry.get_login_url(provider, callback_url, state)
@@ -274,7 +167,18 @@ async def handle_callback(
         state_data_raw = await redis_client.get(state_key)
 
         if not state_data_raw:
-            raise BadRequestException("Invalid or expired state parameter")
+            # State expired or already consumed — e.g. a slow first-login
+            # required-action flow that outran the TTL, or a duplicate callback
+            # (the first one succeeded and deleted the single-use state). The auth
+            # cookies were typically already set by that first callback, so send
+            # the user to the app home instead of a raw 4xx: they land logged in,
+            # or the app bounces them to a fresh login. Avoids the scary error page.
+            logger.warning("SSO callback with missing/expired state — redirecting to app home")
+            from urllib.parse import urlparse
+            _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+            _parsed = urlparse(_api_base) if _api_base else None
+            home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
+            return RedirectResponse(url=home, status_code=302)
 
         state_data = json.loads(state_data_raw)
 
@@ -286,8 +190,11 @@ async def handle_callback(
             raise BadRequestException("Provider mismatch in state parameter")
 
     try:
-        # Get the callback URL (same as used in the original authorization request)
-        callback_url = str(request.url_for("handle_callback", provider=provider))
+        _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        if _api_base:
+            callback_url = f"{_api_base}/auth/{provider}/callback"
+        else:
+            callback_url = str(request.url_for("handle_callback", provider=provider))
 
         # Delegate to business logic
         result = await handle_sso_callback(
@@ -316,7 +223,26 @@ async def handle_callback(
         else:
             redirect_url = f"{redirect_uri}?{urlencode(params)}"
 
-        return RedirectResponse(url=redirect_url, status_code=302)
+        # Set the same HttpOnly cookies as the local /login flow so the frontend
+        # can authenticate to /user with credentials: 'include' after redirect.
+        redirect_response = RedirectResponse(url=redirect_url, status_code=302)
+        redirect_response.set_cookie(
+            key="ct_access_token",
+            value=result["token"],
+            httponly=True,
+            secure=_COOKIE_SECURE,
+            samesite="lax",
+            max_age=3600,
+        )
+        redirect_response.set_cookie(
+            key="ct_refresh_token",
+            value=result["refresh_token"],
+            httponly=True,
+            secure=_COOKIE_SECURE,
+            samesite="lax",
+            max_age=604800,
+        )
+        return redirect_response
 
     except Exception as e:
         logger.error(f"Failed to handle callback for {provider}: {e}")
@@ -330,6 +256,70 @@ async def handle_callback(
 async def sso_success():
     """Default success page after SSO authentication."""
     return {"message": "Authentication successful", "status": "success"}
+
+
+@auth_router.get("/{provider}/logout", name="sso_logout")
+async def sso_logout(
+    provider: str,
+    request: Request,
+    post_logout_redirect_uri: Optional[str] = Query(None),
+    cache=Depends(get_redis_client),
+) -> RedirectResponse:
+    """
+    SSO logout: clears the backend session cookies AND ends the Keycloak SSO
+    session by redirecting the browser to the provider's end_session_endpoint.
+
+    The frontend should navigate to this URL (browser redirect, not XHR) so
+    the cookie-clearing + Keycloak end-session flow completes properly.
+
+    Designed to be tolerant of an already-expired or missing local session —
+    we always clear cookies and forward to Keycloak so the user is fully
+    signed out at the IdP.
+    """
+    import os
+    from computor_backend.utils.token_hash import hash_token
+
+    current_token = request.cookies.get("ct_access_token")
+    refresh_token = request.cookies.get("ct_refresh_token")
+
+    # Read the stored id_token (for id_token_hint) before deleting the session,
+    # then best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
+    id_token_hint = None
+    try:
+        if current_token:
+            session_key = f"sso_session:{hash_token(current_token)}"
+            raw = await cache.get(session_key)
+            if raw:
+                try:
+                    id_token_hint = json.loads(raw).get("id_token")
+                except Exception:
+                    pass
+            await cache.delete(session_key)
+        if refresh_token:
+            await cache.delete(f"sso_session:{hash_token(refresh_token)}")
+    except Exception as e:
+        logger.warning(f"Redis session cleanup failed during SSO logout: {e}")
+
+    registry = get_plugin_registry()
+    plugin = registry.get_plugin(provider)
+    end_session_endpoint = None
+    if plugin is not None and getattr(plugin, "_oidc_config", None):
+        end_session_endpoint = plugin._oidc_config.get("end_session_endpoint")
+
+    target = post_logout_redirect_uri or "/"
+    if end_session_endpoint:
+        params = {"client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")}
+        if post_logout_redirect_uri:
+            params["post_logout_redirect_uri"] = post_logout_redirect_uri
+        # id_token_hint lets Keycloak skip the "Do you want to log out?" prompt.
+        if id_token_hint:
+            params["id_token_hint"] = id_token_hint
+        target = f"{end_session_endpoint}?{urlencode(params)}"
+
+    redirect_response = RedirectResponse(url=target, status_code=302)
+    redirect_response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
+    redirect_response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
+    return redirect_response
 
 @auth_router.post("/logout", response_model=LogoutResponse)
 async def logout(
@@ -369,8 +359,8 @@ async def logout(
     )
 
     # Clear cookies
-    response.delete_cookie(key="ct_access_token", samesite="lax")
-    response.delete_cookie(key="ct_refresh_token", samesite="lax")
+    response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
+    response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
 
     return result
 
@@ -459,31 +449,6 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)) 
         "message": "Plugins reloaded",
         "loaded": registry.get_loaded_plugins()
     }
-
-@auth_router.post("/register", response_model=UserRegistrationResponse)
-async def register_user(
-    request: UserRegistrationRequest,
-    db: Session = Depends(get_db)
-) -> UserRegistrationResponse:
-    """
-    Register a new user with SSO provider.
-
-    Creates user in both the authentication provider and local database.
-    """
-    from computor_backend.business_logic.auth import register_sso_user
-
-    result = await register_sso_user(
-        username=request.username,
-        email=request.email,
-        password=request.password,
-        given_name=request.given_name,
-        family_name=request.family_name,
-        provider=request.provider,
-        send_verification_email=request.send_verification_email,
-        db=db
-    )
-
-    return UserRegistrationResponse(**result)
 
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
@@ -618,3 +583,56 @@ async def verify_coder_access(
         status_code=200,
         content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
     )
+
+
+@auth_router.post("/gitlab/register", response_model=GitLabRegisterResponse)
+async def register_via_gitlab(
+    request: GitLabRegisterRequest,
+    db: Session = Depends(get_db),
+) -> GitLabRegisterResponse:
+    """Provision (or reset) a user's Keycloak login using a GitLab PAT as proof.
+
+    Idempotent by design: if the Keycloak user already exists, its password is
+    reset — so a user who forgot their credentials simply re-runs this with a
+    new password. The Keycloak account links to the existing computor user on
+    first SSO login via the email match in handle_sso_callback.
+    """
+    from computor_backend.business_logic.auth import (
+        verify_user_with_gitlab_pat,
+        find_or_create_gitlab_account,
+        provision_keycloak_login,
+    )
+
+    # 1. Prove identity. Matches the GitLab-profile email against User.email or
+    #    the org-scoped StudentProfile.student_email; raises if no match.
+    user, gitlab_url, gitlab_user_data = await verify_user_with_gitlab_pat(
+        access_token=request.gitlab_pat,
+        gitlab_url=request.gitlab_url,
+        db=db,
+    )
+
+    if not user.email:
+        raise BadRequestException("Verified user has no email on record; cannot provision Keycloak login.")
+
+    # 2. Create or reset the Keycloak login (PAT was the authorization proof).
+    email = user.email
+    kc_user_id, created = await provision_keycloak_login(
+        email=email,
+        password=request.new_password,
+        given_name=user.given_name,
+        family_name=user.family_name,
+    )
+
+    # 3. Link the GitLab account (PAT is not stored).
+    await find_or_create_gitlab_account(
+        user=user,
+        gitlab_url=gitlab_url,
+        gitlab_user_data=gitlab_user_data,
+        db=db,
+    )
+
+    logger.info(
+        f"GitLab-PAT Keycloak provisioning for {email} "
+        f"(user {user.id}, kc {kc_user_id}, created={created})"
+    )
+    return GitLabRegisterResponse(user_id=str(user.id), email=email, created=created)

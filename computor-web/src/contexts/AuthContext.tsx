@@ -4,6 +4,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { AuthUser, AuthResponse } from '../types/auth';
 import { SSOAuthService } from '../services/ssoAuthService';
 import { AuthService } from '../services/authService';
+// Side-effect import: wires the auth providers into the shared `apiClient`
+// singleton (used by all generated clients) so a 401 there refreshes the token
+// and clears the cached session on failure instead of bailing out blindly.
+import '../config/apiConfig';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -35,12 +39,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try SSO first
       const ssoUser = ssoAuthService.getCurrentUser();
       if (ssoUser) {
+        // Show the cached user immediately to avoid a flash of "logged out",
+        // then verify the session is actually still alive on the backend.
+        // The cached user can outlive its HttpOnly cookies (e.g. Firefox
+        // restores sessionStorage after a restart), so trusting it blindly
+        // leaves a stale "Sign Out" button for a dead session.
         setUser(ssoUser);
-        // SSO doesn't have views method, use auth service
-        const authUser = authService.getCurrentUser();
-        if (authUser) {
-          setViews(authService.getCurrentViews());
+        setViews(authService.getCurrentViews());
+
+        const status = await ssoAuthService.validateSession();
+        if (status === 'invalid') {
+          // Cookies are gone/expired — reflect the real logged-out state.
+          setUser(null);
+          setViews([]);
+        } else if (status === 'valid') {
+          // Refresh from the (possibly updated) stored user.
+          setUser(ssoAuthService.getCurrentUser());
         }
+        // status === 'unreachable' (e.g. off VPN): keep the cached user as-is.
+
         setIsLoading(false);
         return;
       }
@@ -132,14 +149,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response?.success && response.user) {
         setUser(response.user);
         return response;
-      } else {
-        setUser(null);
-        setViews([]);
-        return {
-          success: false,
-          error: 'Session refresh failed',
-        };
       }
+
+      // Backend unreachable (e.g. off VPN): keep the current session intact —
+      // a transient network failure must not log the user out.
+      if (response?.error === 'unreachable') {
+        return response;
+      }
+
+      // Genuine auth failure: drop the session.
+      setUser(null);
+      setViews([]);
+      return response ?? {
+        success: false,
+        error: 'Session refresh failed',
+      };
     } catch (error) {
       console.error('Session refresh failed:', error);
       setUser(null);
