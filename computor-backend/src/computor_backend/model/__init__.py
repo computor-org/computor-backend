@@ -29,6 +29,7 @@ from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, Submi
 from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
 from .git_provider import GitProvider
+from .git_server import GitServer, CourseGitBinding, CourseMemberRepository
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -48,6 +49,7 @@ from . import (
     artifact,
     service,
     invite,
+    git_server,
 )
 
 __all__ = [
@@ -116,6 +118,10 @@ __all__ = [
     'ApiToken',
     # Invite link
     'InviteLink',
-    # Git provider
+    # Git provider (legacy, organization-scoped)
     'GitProvider',
+    # Course-level git: server registry + per-course binding + student repo
+    'GitServer',
+    'CourseGitBinding',
+    'CourseMemberRepository',
 ]
