@@ -65,14 +65,18 @@ async def get_current_user_scopes(
 )
 async def get_course_views_for_current_user(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
 ):
-    """Get available views based on roles across all courses for the current user."""
-    user_id = permissions.get_user_id()
-    if not user_id:
+    """Get available views for the current user.
+
+    The ``lecturer`` view is the org → course-family → course creation
+    pipeline, so it is granted to ``_admin``, ``_organization_manager``,
+    any organization- or course-family-scoped role, and course lecturers
+    (or higher). Computed purely from the principal — no DB hit.
+    """
+    if not permissions.get_user_id():
         return []
 
-    return get_course_views_for_user(user_id, db)
+    return get_course_views_for_user(permissions)
 
 @user_router.get(
     "/views/{course_id}",

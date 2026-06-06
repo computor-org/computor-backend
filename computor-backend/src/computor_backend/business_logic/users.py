@@ -84,45 +84,53 @@ def get_user_scopes_from_principal(principal: Principal) -> UserScopes:
     )
 
 
-def get_course_views_for_user(user_id: str, db: Session) -> List[str]:
-    """Get available views based on roles across all courses for the user."""
-    from computor_backend.model.role import UserRole
+def get_course_views_for_user(principal: Principal) -> List[str]:
+    """Available client views for the current principal.
 
-    # Collect all unique views
+    Pure projection of the already-resolved principal claims — no DB hit,
+    mirroring ``get_user_scopes_from_principal``.
+
+    The ``lecturer`` view is the *org → course-family → course creation
+    pipeline*, NOT "lecturer of one course". It is therefore granted to
+    anyone who can create or manage any of those scopes:
+
+      * global ``_admin`` or ``_organization_manager`` — manage ALL
+        organizations, families and courses;
+      * any organization-scoped role (``_owner``/``_manager``/``_developer``);
+      * any course-family-scoped role (same three);
+      * a course role of ``_lecturer`` or higher.
+
+    A plain lecturer who holds none of the above still gets the view — they
+    simply can't create top-level scopes inside it. The view is the same;
+    the permissions differ.
+    """
     views = set()
 
-    # 1. Check global user roles (e.g., _user_manager)
-    user_roles = (
-        db.query(UserRole)
-        .filter(UserRole.user_id == user_id)
-        .all()
-    )
+    # 1. Global roles. _admin and _organization_manager manage every scope,
+    #    so they always get the full pipeline (lecturer) view.
+    if principal.is_admin or "_organization_manager" in principal.roles:
+        views.add("lecturer")
+    if "_user_manager" in principal.roles:
+        views.add("user_manager")
 
-    for user_role in user_roles:
-        if user_role.role_id == "_user_manager":
-            views.add("user_manager")
-        # Add more global role mappings here if needed
+    dependent = principal.claims.dependent if principal.claims else {}
 
-    # 2. Query all course memberships for the current user
-    course_members = (
-        db.query(CourseMember)
-        .filter(CourseMember.user_id == user_id)
-        .all()
-    )
+    # 2. Any organization- or course-family-scoped role means the user can
+    #    create/manage courses in that scope → lecturer (pipeline) view.
+    if dependent.get("organization") or dependent.get("course_family"):
+        views.add("lecturer")
 
-    # 3. Collect views from course roles
-    for course_member in course_members:
-        if not course_member.course_role_id:
-            continue
+    # 3. Course roles → student / tutor / lecturer (one set of roles per
+    #    course; iterate defensively in case a course carries several).
+    for course_roles in dependent.get("course", {}).values():
+        for role in course_roles:
+            role = role.lower()
+            if role in COURSE_ROLE_VIEW_MAP:
+                views.update(COURSE_ROLE_VIEW_MAP[role])
+            elif role in ELEVATED_COURSE_ROLES:
+                views.update(["student", "tutor", "lecturer"])
 
-        role = course_member.course_role_id.lower()
-
-        if role in COURSE_ROLE_VIEW_MAP:
-            views.update(COURSE_ROLE_VIEW_MAP[role])
-        elif role in ELEVATED_COURSE_ROLES:
-            views.update(["student", "tutor", "lecturer"])
-
-    return sorted(list(views))
+    return sorted(views)
 
 
 def get_course_views_for_user_by_course(user_id: str, course_id: UUID | str, db: Session) -> List[str]:
