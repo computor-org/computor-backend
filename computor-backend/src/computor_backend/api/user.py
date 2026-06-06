@@ -11,6 +11,7 @@ from computor_types.course_member_accounts import (
     CourseMemberValidationRequest,
 )
 from computor_types.users import UserGet, UserScopes
+from computor_types.course_git import CourseGitDescriptor
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from fastapi import APIRouter, Depends
@@ -24,6 +25,7 @@ from computor_backend.business_logic.users import (
     validate_user_course,
     register_user_course_account,
 )
+from computor_backend.business_logic.course_git import get_course_git_descriptor
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,25 @@ async def get_course_views_for_current_user_by_course(
         return []
 
     return get_course_views_for_user_by_course(user_id, course_id, db)
+
+@user_router.get(
+    "/courses/{course_id}/git",
+    response_model=CourseGitDescriptor,
+)
+async def get_course_git_descriptor_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """How the current user obtains their repository for a course.
+
+    Returns the course's git binding — delivery mode, allowed student-repo
+    backends (Forgejo babysat / GitLab BYO / download), and the
+    ``student-template`` location. Gated on course membership; returns an
+    ``unconfigured`` descriptor when the course has no git binding yet.
+    """
+    return get_course_git_descriptor(course_id, permissions, db)
+
 
 @user_router.post(
     "/courses/{course_id}/validate",
