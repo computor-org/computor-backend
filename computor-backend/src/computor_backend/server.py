@@ -70,6 +70,8 @@ from computor_backend.api.messages import messages_router
 from computor_backend.api.team_management import team_management_router
 from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
+from computor_backend.api.git_servers import git_servers_router
+from computor_backend.api.course_git import course_git_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.workspace_roles import workspace_roles_router
@@ -480,6 +482,11 @@ app.include_router(
     tags=["tokens", "authentication"],
     dependencies=[Depends(get_current_principal)]
 )
+
+# Course-level git: server registry (admin/_organization_manager) and the
+# lecturer-facing per-course binding. Auth is enforced per-endpoint.
+app.include_router(git_servers_router, tags=["git-servers"])
+app.include_router(course_git_router, tags=["course-git"])
 
 # app.include_router(
 #     info_router,

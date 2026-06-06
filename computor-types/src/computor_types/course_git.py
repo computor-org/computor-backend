@@ -10,9 +10,11 @@ Plain response models (not registered CRUD entities).
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+_VALID_STUDENT_REPO_MODES = {"forgejo", "gitlab_byo", "download"}
 
 
 class GitTemplateRef(BaseModel):
@@ -43,3 +45,40 @@ class CourseGitDescriptor(BaseModel):
     template: Optional[GitTemplateRef] = Field(
         None, description="Template location (absent for pure download or unconfigured courses)"
     )
+
+
+class CourseGitBindingUpsert(BaseModel):
+    """Lecturer-facing payload to set/replace a course's git binding."""
+
+    delivery: Literal['git', 'download'] = 'git'
+    git_server_id: Optional[str] = Field(None, description="Registry server hosting the student-template")
+    template_repo: Optional[str] = Field(None, description="Repo/project reference of the student-template")
+    template_url: Optional[str] = Field(None, description="Clone/web URL of the student-template")
+    default_branch: Optional[str] = Field(None, description="Default branch (defaults to 'main')")
+    student_repo_modes: List[str] = Field(
+        default_factory=list,
+        description="Allowed student-repo backends: subset of ['forgejo', 'gitlab_byo', 'download']",
+    )
+
+    @field_validator("student_repo_modes")
+    @classmethod
+    def _validate_modes(cls, v: List[str]) -> List[str]:
+        bad = [m for m in (v or []) if m not in _VALID_STUDENT_REPO_MODES]
+        if bad:
+            raise ValueError(
+                f"invalid student_repo_modes {bad}; allowed: {sorted(_VALID_STUDENT_REPO_MODES)}"
+            )
+        return v
+
+
+class CourseGitBindingGet(BaseModel):
+    """Lecturer-facing view of a course's git binding (full config)."""
+
+    id: str
+    course_id: str
+    delivery: str
+    git_server_id: Optional[str] = None
+    template_repo: Optional[str] = None
+    template_url: Optional[str] = None
+    default_branch: Optional[str] = None
+    student_repo_modes: List[str] = Field(default_factory=list)
