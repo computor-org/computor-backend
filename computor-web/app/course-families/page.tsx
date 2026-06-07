@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -131,12 +132,12 @@ export default function CourseFamiliesPage() {
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg divide-y">
             {families.map((f) => (
-              <div key={f.id} className="px-4 py-3">
+              <Link key={f.id} href={`/course-families/${f.id}`} className="block px-4 py-3 hover:bg-gray-50">
                 <div className="text-sm font-medium text-gray-900">{f.title || f.path}</div>
                 <div className="text-xs text-gray-500">
                   {f.path} · {orgLabel(f.organization_id)}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

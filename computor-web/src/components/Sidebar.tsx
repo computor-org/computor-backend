@@ -60,6 +60,7 @@ const managementNavigation: NavItem[] = [
     subItems: [
       { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
       { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
+      { id: 'mgmt-gitservers', label: 'Git Servers', path: '/admin/git-servers' },
     ],
   },
 ];
@@ -195,7 +196,7 @@ const icons: Record<string, React.ReactElement> = {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, views } = useAuth();
-  const { isAdmin, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
+  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
@@ -451,7 +452,15 @@ export default function Sidebar() {
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(coursesNavigation)}
         {isWorkspaceUser && renderNavItems(workspacesNavigation)}
-        {showManagement && renderNavItems(managementNavigation)}
+        {showManagement &&
+          renderNavItems(
+            isAdmin || isOrganizationManager
+              ? managementNavigation
+              : managementNavigation.map((n) => ({
+                  ...n,
+                  subItems: n.subItems?.filter((s) => s.id !== 'mgmt-gitservers'),
+                })),
+          )}
         {isAdmin && renderNavItems(adminNavigation)}
         {isUserManager && renderNavItems(userMgmtNavigation)}
       </nav>
