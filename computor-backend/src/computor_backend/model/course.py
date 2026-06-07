@@ -605,6 +605,25 @@ def _sync_course_content_kind(connection, type_id):
     return row[0], bool(row[1])
 
 
+@_sa_event.listens_for(Course, "before_insert")
+def _course_before_insert(mapper, connection, target):
+    """Derive ``organization_id`` from the parent course family on insert.
+
+    ``Course.organization_id`` is NOT NULL, but ``CourseCreate`` carries only
+    ``course_family_id`` (a course's org is always its family's org). Filling it
+    here keeps every create path consistent — the CRUD API, scripts, and
+    workflows all go through the ORM insert.
+    """
+    if target.organization_id is None and target.course_family_id is not None:
+        row = connection.execute(
+            _sa_select(CourseFamily.organization_id).where(
+                CourseFamily.id == target.course_family_id
+            )
+        ).first()
+        if row is not None:
+            target.organization_id = row[0]
+
+
 @_sa_event.listens_for(CourseContent, "before_insert")
 def _course_content_before_insert(mapper, connection, target):
     kind_id, submittable = _sync_course_content_kind(
