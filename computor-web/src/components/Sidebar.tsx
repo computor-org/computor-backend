@@ -60,7 +60,6 @@ const managementNavigation: NavItem[] = [
     subItems: [
       { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
       { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
-      { id: 'mgmt-courses', label: 'Courses', path: '/courses' },
       { id: 'mgmt-gitservers', label: 'Git Servers', path: '/admin/git-servers' },
     ],
   },

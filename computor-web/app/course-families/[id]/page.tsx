@@ -7,7 +7,6 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import CourseGitSettingsModal from '@/src/components/CourseGitSettingsModal';
 import type { CourseFamilyGet, CourseList } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
 
@@ -50,7 +49,6 @@ export default function CourseFamilyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [create, setCreate] = useState<CreateState>(emptyCreate);
-  const [gitModal, setGitModal] = useState<{ courseId: string; courseLabel: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,22 +154,17 @@ export default function CourseFamilyDetailPage() {
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg divide-y">
             {courses.map((c) => (
-              <div key={c.id} className="flex items-center justify-between px-4 py-3">
-                <Link href={`/courses/${c.id}`} className="min-w-0 group">
+              <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 group hover:bg-gray-50">
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
                     {c.title || c.path}
                   </div>
                   <div className="text-xs text-gray-500">{c.path}</div>
-                </Link>
-                {canConfigureGit && (
-                  <button
-                    onClick={() => setGitModal({ courseId: c.id, courseLabel: c.title || c.path })}
-                    className="text-sm text-blue-600 hover:underline ml-4 whitespace-nowrap"
-                  >
-                    Git settings
-                  </button>
-                )}
-              </div>
+                </div>
+                <span className="text-sm text-blue-600 ml-4 whitespace-nowrap opacity-0 group-hover:opacity-100">
+                  Open →
+                </span>
+              </Link>
             ))}
           </div>
         )}
@@ -250,15 +243,6 @@ export default function CourseFamilyDetailPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {gitModal && (
-        <CourseGitSettingsModal
-          courseId={gitModal.courseId}
-          courseLabel={gitModal.courseLabel}
-          onClose={() => setGitModal(null)}
-          onSaved={load}
-        />
       )}
     </AuthenticatedLayout>
   );
