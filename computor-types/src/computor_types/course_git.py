@@ -98,6 +98,21 @@ class CourseMemberRepositoryGet(BaseModel):
     web_url: Optional[str] = None
 
 
+class StudentRepositoryProvisioned(CourseMemberRepositoryGet):
+    """Provisioning result — the repo plus a **one-time** clone credential.
+
+    Returned only by `provision-repository`. `clone_token` is a fresh repo-scoped
+    Forgejo PAT minted (and rotated) on each call; it is NOT persisted and NOT
+    returned by `GET .../repository`. Authenticate git as:
+    `https://<clone_username>:<clone_token>@<host>/<owner>/<repo>.git`.
+    `clone_token` is null until the student has logged into Forgejo once
+    (re-call after their first login to obtain it).
+    """
+
+    clone_token: Optional[str] = Field(None, description="One-time repo-scoped Forgejo PAT; store securely")
+    clone_username: Optional[str] = Field(None, description="Forgejo username to pair with clone_token")
+
+
 class CourseMemberRepositoryRegister(BaseModel):
     """Client-supplied location of a student's BYO repository (e.g. a repo the
     VSCode extension created on the student's own GitLab with their PAT).

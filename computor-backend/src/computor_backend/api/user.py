@@ -15,6 +15,7 @@ from computor_types.course_git import (
     CourseGitDescriptor,
     CourseMemberRepositoryGet,
     CourseMemberRepositoryRegister,
+    StudentRepositoryProvisioned,
 )
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -144,7 +145,7 @@ async def get_student_repository_endpoint(
 
 @user_router.post(
     "/courses/{course_id}/provision-repository",
-    response_model=CourseMemberRepositoryGet,
+    response_model=StudentRepositoryProvisioned,
 )
 async def provision_student_repository_endpoint(
     course_id: UUID | str,
@@ -155,8 +156,10 @@ async def provision_student_repository_endpoint(
 
     Forks the course's student-template into the student's own repository and
     records it. Idempotent — returns the existing repo if already provisioned.
-    Requires the course to be bound to a managed Forgejo server offering the
-    ``forgejo`` mode.
+    Also returns a **one-time** repo-scoped Forgejo clone token (`clone_token` +
+    `clone_username`) so `git clone`/push authenticates; it is rotated on each
+    call and never returned by `GET .../repository`. Requires the course to be
+    bound to a managed Forgejo server offering the ``forgejo`` mode.
     """
     return provision_student_repository(course_id, permissions, db)
 

@@ -308,6 +308,39 @@ class ForgejoProviderClient:
         )
         return False
 
+    def mint_user_clone_token(
+        self,
+        username: str,
+        admin_username: str,
+        admin_password: str,
+        name: str = "computor-vscode",
+    ) -> str | None:
+        """Mint a repo-scoped personal access token for ``username`` so they can
+        clone/push their repo over HTTP.
+
+        Token creation requires **basic auth** (a token cannot create another
+        token), so the caller passes the managed instance's admin credentials.
+        Rotates: deletes any same-named token first, so every call returns a
+        fresh, usable token. Returns the token (shown once) or ``None`` on
+        failure — e.g. the student has not completed their first Forgejo login
+        yet, so a later retry will succeed.
+        """
+        auth = (admin_username, admin_password)
+        with httpx.Client(base_url=self._url, auth=auth, timeout=30.0) as client:
+            # Rotate: a name collision would otherwise 400, and the old secret
+            # is unrecoverable, so drop it first (ignore 404).
+            client.delete(f"{_BASE}/users/{username}/tokens/{name}")
+            r = client.post(
+                f"{_BASE}/users/{username}/tokens",
+                json={"name": name, "scopes": ["read:repository", "write:repository"]},
+            )
+        if r.status_code in (200, 201):
+            return r.json().get("sha1")
+        logger.warning(
+            "Forgejo: could not mint clone token for %s (status %s)", username, r.status_code
+        )
+        return None
+
     def sync_member_permissions(
         self,
         org: Organization,

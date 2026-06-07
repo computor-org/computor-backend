@@ -36,6 +36,7 @@ from computor_types.course_git import (
     CourseMemberRepositoryGet,
     CourseMemberRepositoryRegister,
     GitTemplateRef,
+    StudentRepositoryProvisioned,
 )
 
 logger = logging.getLogger(__name__)
@@ -328,6 +329,51 @@ def get_student_repository(
     return _member_repo_to_get(rec) if rec is not None else None
 
 
+def _forgejo_admin_basic_auth_for(server: GitServer):
+    """Admin basic-auth creds for ``server`` IF it is our configured managed
+    Forgejo, else ``None``.
+
+    Minting a per-user clone token needs basic auth (a token can't create a
+    token), so we use the ``git_server`` settings admin credentials — but ONLY
+    when the registry server is in fact our configured git_server (matched by
+    base_url), so our admin password is never sent to some other registered
+    instance.
+    """
+    from computor_backend.git_server.config import get_git_server_settings
+
+    settings = get_git_server_settings()
+    if not (settings.is_forgejo and settings.git_server_admin_username and settings.git_server_admin_password):
+        return None
+    if (server.base_url or "").rstrip("/") != (settings.git_server_url or "").rstrip("/"):
+        return None
+    return (settings.git_server_admin_username, settings.git_server_admin_password)
+
+
+def _provisioned_response(
+    rec: CourseMemberRepository, user_id: str, db: Session
+) -> StudentRepositoryProvisioned:
+    """Wrap a repo record with a freshly-minted one-time clone credential.
+
+    For a managed-Forgejo repo we mint (rotating) a repo-scoped PAT for the
+    student so `git clone`/push authenticates. The token is never persisted and
+    is returned only here. Null until the student exists in Forgejo.
+    """
+    base = _member_repo_to_get(rec).model_dump()
+    clone_token = None
+    clone_username = None
+    if rec.mode == "forgejo" and rec.git_server_id:
+        server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
+        handle = _resolve_forgejo_handle(user_id, db)
+        creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
+        if server is not None and handle and creds:
+            client = get_provider_client_for_server(server)
+            if hasattr(client, "mint_user_clone_token"):
+                clone_token = client.mint_user_clone_token(handle, creds[0], creds[1])
+                if clone_token:
+                    clone_username = handle
+    return StudentRepositoryProvisioned(**base, clone_token=clone_token, clone_username=clone_username)
+
+
 def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGet:
     return CourseMemberRepositoryGet(
         id=str(rec.id),
@@ -345,7 +391,7 @@ def provision_student_repository(
     course_id: UUID | str,
     permissions: Principal,
     db: Session,
-) -> CourseMemberRepositoryGet:
+) -> StudentRepositoryProvisioned:
     """Babysat Forgejo provisioning: fork the course's student-template into a
     repo for the calling student and record it. Idempotent.
 
@@ -374,7 +420,7 @@ def provision_student_repository(
     )
     if existing is not None:
         _maybe_heal_forgejo_collaborator(existing, user_id, db)
-        return _member_repo_to_get(existing)
+        return _provisioned_response(existing, user_id, db)
 
     binding = (
         db.query(CourseGitBinding)
@@ -422,7 +468,7 @@ def provision_student_repository(
     db.commit()
     db.refresh(rec)
     logger.info("Provisioned Forgejo repo %s/%s for course_member %s", owner, new_name, member.id)
-    return _member_repo_to_get(rec)
+    return _provisioned_response(rec, user_id, db)
 
 
 def register_byo_repository(
