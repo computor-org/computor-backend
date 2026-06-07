@@ -168,7 +168,7 @@ export default function CourseFamiliesPage() {
                 </select>
                 {creatableOrgs.length === 0 && (
                   <p className="mt-1 text-xs text-amber-600">
-                    You don't have permission to create a course family in any organization.
+                    You do not have permission to create a course family in any organization.
                   </p>
                 )}
               </div>
