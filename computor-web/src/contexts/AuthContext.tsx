@@ -2,8 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AuthUser, AuthResponse } from '../types/auth';
+import { UserScopes } from '../generated/types/users';
 import { SSOAuthService } from '../services/ssoAuthService';
 import { AuthService } from '../services/authService';
+import { apiFetch } from '../utils/apiClient';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
 // and clears the cached session on failure instead of bailing out blindly.
@@ -12,6 +16,7 @@ import '../config/apiConfig';
 interface AuthContextType {
   user: AuthUser | null;
   views: string[];
+  scopes: UserScopes | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<AuthResponse>;
@@ -25,7 +30,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [views, setViews] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<UserScopes | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch the authoritative per-scope role maps + view list from the backend.
+  // `/user/scopes` (is_admin + organization/course_family/course role maps) and
+  // `/user/views` (lecturer/student/tutor/user_manager) drive all role-gated UI.
+  const loadPermissions = async () => {
+    try {
+      const [viewsRes, scopesRes] = await Promise.all([
+        apiFetch(`${API_BASE_URL}/user/views`),
+        apiFetch(`${API_BASE_URL}/user/scopes`),
+      ]);
+      if (viewsRes.ok) setViews(await viewsRes.json());
+      if (scopesRes.ok) setScopes(await scopesRes.json());
+    } catch {
+      // Transient failure — keep whatever we already have rather than wiping gating.
+    }
+  };
 
   // Initialize auth services
   const ssoAuthService = new SSOAuthService();
@@ -52,9 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Cookies are gone/expired — reflect the real logged-out state.
           setUser(null);
           setViews([]);
+          setScopes(null);
         } else if (status === 'valid') {
           // Refresh from the (possibly updated) stored user.
           setUser(ssoAuthService.getCurrentUser());
+          await loadPermissions();
         }
         // status === 'unreachable' (e.g. off VPN): keep the cached user as-is.
 
@@ -67,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authUser) {
         setUser(authUser);
         setViews(authService.getCurrentViews());
+        await loadPermissions();
       }
 
       setIsLoading(false);
@@ -104,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.success && response.user) {
         setUser(response.user);
         setViews(authService.getCurrentViews());
+        await loadPermissions();
       }
 
       return response;
@@ -128,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(null);
       setViews([]);
+      setScopes(null);
     } finally {
       setIsLoading(false);
     }
@@ -178,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextType = {
     user,
     views,
+    scopes,
     isAuthenticated: !!user,
     isLoading,
     login,

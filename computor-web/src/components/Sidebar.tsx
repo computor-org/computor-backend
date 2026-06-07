@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface SubItem {
   id: string;
@@ -22,14 +23,18 @@ interface NavItem {
   view?: string;
 }
 
-// Default navigation (when NOT in a course context)
-const defaultNavigation: NavItem[] = [
+// Always-visible navigation (every authenticated user sees their courses).
+const coursesNavigation: NavItem[] = [
   {
     id: 'courses',
     label: 'Courses',
     path: '/courses',
     icon: 'courses',
   },
+];
+
+// Workspaces — gated by workspace access (_workspace_user / admin).
+const workspacesNavigation: NavItem[] = [
   {
     id: 'workspaces',
     label: 'Workspaces',
@@ -39,6 +44,22 @@ const defaultNavigation: NavItem[] = [
       { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
       { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
       { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
+    ],
+  },
+];
+
+// Management — the org → course-family → course pipeline. Shown to the
+// lecturer-view cohort (admins, organization managers, org/family role holders);
+// the actual create actions on each page are gated finer.
+const managementNavigation: NavItem[] = [
+  {
+    id: 'management',
+    label: 'Management',
+    path: '/organizations',
+    icon: 'lecturer',
+    subItems: [
+      { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
+      { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
     ],
   },
 ];
@@ -174,16 +195,15 @@ const icons: Record<string, React.ReactElement> = {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, views } = useAuth();
+  const { isAdmin, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
-  const isAdmin = user?.role === 'admin';
-  const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
 
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
     const cMatch = pathname.match(/^\/courses\/([^/]+)/);
     const cId = cMatch ? cMatch[1] : null;
     const items = cId
       ? getViewNavigation(cId)
-      : [...defaultNavigation, ...adminNavigation, ...userMgmtNavigation];
+      : [...coursesNavigation, ...workspacesNavigation, ...managementNavigation, ...adminNavigation, ...userMgmtNavigation];
     return computeAutoExpanded(items, pathname);
   });
   const [courseViews, setCourseViews] = useState<string[]>([]);
@@ -225,7 +245,7 @@ export default function Sidebar() {
   useEffect(() => {
     const items = currentCourseId
       ? getViewNavigation(currentCourseId)
-      : [...defaultNavigation, ...(isAdmin ? adminNavigation : []), ...(isUserManager ? userMgmtNavigation : [])];
+      : [...coursesNavigation, ...workspacesNavigation, ...managementNavigation, ...adminNavigation, ...userMgmtNavigation];
 
     const autoExpanded = computeAutoExpanded(items, pathname);
 
@@ -429,7 +449,9 @@ export default function Sidebar() {
 
       {/* Navigation - Main Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {renderNavItems(defaultNavigation)}
+        {renderNavItems(coursesNavigation)}
+        {isWorkspaceUser && renderNavItems(workspacesNavigation)}
+        {showManagement && renderNavItems(managementNavigation)}
         {isAdmin && renderNavItems(adminNavigation)}
         {isUserManager && renderNavItems(userMgmtNavigation)}
       </nav>
