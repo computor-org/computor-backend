@@ -34,6 +34,7 @@ from computor_types.course_git import (
     CourseGitBindingUpsert,
     CourseGitDescriptor,
     CourseMemberRepositoryGet,
+    CourseMemberRepositoryRegister,
     GitTemplateRef,
 )
 
@@ -337,4 +338,61 @@ def provision_student_repository(
     db.commit()
     db.refresh(rec)
     logger.info("Provisioned Forgejo repo %s/%s for course_member %s", owner, new_name, member.id)
+    return _member_repo_to_get(rec)
+
+
+def register_byo_repository(
+    course_id: UUID | str,
+    data: CourseMemberRepositoryRegister,
+    permissions: Principal,
+    db: Session,
+) -> CourseMemberRepositoryGet:
+    """Record where a student's BYO repository lives (e.g. a GitLab repo the
+    VSCode extension created with the student's PAT). Upserts the per-member
+    record. Tracking only — the backend never reads the repo.
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if binding is None or data.mode not in (binding.student_repo_modes or []):
+        raise BadRequestException(
+            f"This course does not offer the '{data.mode}' student-repo mode"
+        )
+
+    rec = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == member.id)
+        .first()
+    )
+    if rec is None:
+        rec = CourseMemberRepository(course_member_id=member.id, created_by=user_id)
+        db.add(rec)
+
+    rec.mode = data.mode
+    # BYO repos live on the student's own instance, not a managed registry server.
+    rec.git_server_id = None
+    rec.server_url = data.server_url
+    rec.repo_ref = data.repo_ref
+    rec.http_url = data.http_url
+    rec.ssh_url = data.ssh_url
+    rec.web_url = data.web_url
+    rec.updated_by = user_id
+
+    db.commit()
+    db.refresh(rec)
+    logger.info("Registered %s repo for course_member %s", data.mode, member.id)
     return _member_repo_to_get(rec)

@@ -11,7 +11,11 @@ from computor_types.course_member_accounts import (
     CourseMemberValidationRequest,
 )
 from computor_types.users import UserGet, UserScopes
-from computor_types.course_git import CourseGitDescriptor, CourseMemberRepositoryGet
+from computor_types.course_git import (
+    CourseGitDescriptor,
+    CourseMemberRepositoryGet,
+    CourseMemberRepositoryRegister,
+)
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from fastapi import APIRouter, Depends
@@ -28,6 +32,7 @@ from computor_backend.business_logic.users import (
 from computor_backend.business_logic.course_git import (
     get_course_git_descriptor,
     provision_student_repository,
+    register_byo_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -135,6 +140,25 @@ async def provision_student_repository_endpoint(
     ``forgejo`` mode.
     """
     return provision_student_repository(course_id, permissions, db)
+
+
+@user_router.post(
+    "/courses/{course_id}/register-repository",
+    response_model=CourseMemberRepositoryGet,
+)
+async def register_student_repository_endpoint(
+    course_id: UUID | str,
+    payload: CourseMemberRepositoryRegister,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Record where the current student's BYO repository lives (e.g. a GitLab
+    repo created by the VSCode extension with the student's own PAT).
+
+    Tracking only — the backend never reads the repo (grading is API upload).
+    Upserts the per-membership record; the course must offer the given mode.
+    """
+    return register_byo_repository(course_id, payload, permissions, db)
 
 
 @user_router.post(

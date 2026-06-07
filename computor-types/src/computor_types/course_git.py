@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 _VALID_STUDENT_REPO_MODES = {"forgejo", "gitlab_byo", "download"}
 
@@ -96,3 +96,24 @@ class CourseMemberRepositoryGet(BaseModel):
     http_url: Optional[str] = None
     ssh_url: Optional[str] = None
     web_url: Optional[str] = None
+
+
+class CourseMemberRepositoryRegister(BaseModel):
+    """Client-supplied location of a student's BYO repository (e.g. a repo the
+    VSCode extension created on the student's own GitLab with their PAT).
+
+    Tracking only — the backend never reads this repo (grading is API upload).
+    """
+
+    mode: Literal['gitlab_byo', 'forgejo', 'download'] = 'gitlab_byo'
+    server_url: Optional[str] = Field(None, description="Base URL of the git instance hosting the repo")
+    repo_ref: Optional[str] = Field(None, description="Provider project/repo reference (e.g. group/path or id)")
+    http_url: Optional[str] = None
+    ssh_url: Optional[str] = None
+    web_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_a_location(self):
+        if not (self.http_url or self.web_url or self.ssh_url):
+            raise ValueError("at least one of http_url / web_url / ssh_url is required")
+        return self
