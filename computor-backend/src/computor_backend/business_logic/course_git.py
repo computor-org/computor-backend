@@ -189,10 +189,35 @@ def upsert_course_git_binding(
     course = _load_course_or_404(course_id, db)
     _require_course_git_manage(permissions, course)
 
+    server = None
     if data.git_server_id:
         server = db.query(GitServer).filter(GitServer.id == data.git_server_id).first()
         if not server:
             raise NotFoundException("git_server_id does not reference a known git server")
+
+    template_repo = (data.template_repo or "").strip() or None
+    template_url = (data.template_url or "").strip() or None
+
+    # For a managed Forgejo, make the binding immediately usable: default the
+    # template repo from the course's org + path, ensure it actually exists in
+    # Forgejo, and default its clone URL — so a course is never bound-but-broken.
+    if data.delivery == "git" and server is not None and server.type == "forgejo" and server.managed:
+        if not template_repo:
+            from computor_backend.model.organization import Organization
+
+            org = db.query(Organization).filter(Organization.id == course.organization_id).first()
+            owner = str(org.path).replace(".", "-") if org and org.path is not None else "courses"
+            template_repo = f"{owner}/{str(course.path).replace('.', '-')}--template"
+        owner, _, repo = template_repo.partition("/")
+        if owner and repo:
+            try:
+                client = get_provider_client_for_server(server)
+                if hasattr(client, "ensure_template_repo"):
+                    client.ensure_template_repo(owner, repo)
+            except Exception as exc:  # best-effort — don't block binding on a Forgejo hiccup
+                logger.warning("Could not ensure Forgejo template repo %s: %s", template_repo, exc)
+        if not template_url:
+            template_url = f"{server.base_url.rstrip('/')}/{template_repo}.git"
 
     binding = (
         db.query(CourseGitBinding)
@@ -205,8 +230,8 @@ def upsert_course_git_binding(
 
     binding.delivery = data.delivery
     binding.git_server_id = data.git_server_id
-    binding.template_repo = data.template_repo
-    binding.template_url = data.template_url
+    binding.template_repo = template_repo
+    binding.template_url = template_url
     binding.default_branch = data.default_branch or "main"
     binding.student_repo_modes = list(data.student_repo_modes or [])
     binding.updated_by = permissions.get_user_id()

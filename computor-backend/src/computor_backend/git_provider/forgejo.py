@@ -341,6 +341,14 @@ class ForgejoProviderClient:
         )
         return None
 
+    def ensure_template_repo(self, owner: str, repo: str) -> dict:
+        """Ensure the Forgejo org + student-template repo exist (create if
+        missing), so a course bound to this managed Forgejo has a real template
+        students can fork. Returns the repo dict."""
+        with self._client() as client:
+            self._get_or_create_org(client, owner, "Computor courses")
+            return self._get_or_create_repo(client, owner, repo, "Student template")
+
     def sync_member_permissions(
         self,
         org: Organization,
