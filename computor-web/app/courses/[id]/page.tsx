@@ -5,11 +5,14 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseGet } from 'types/generated';
 
 export default function CoursePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAdmin, isOrganizationManager } = usePermissions();
+  const canManage = isAdmin || isOrganizationManager;
   const params = useParams();
   const courseId = params.id as string;
   const [course, setCourse] = useState<CourseGet | null>(null);
@@ -99,12 +102,22 @@ export default function CoursePage() {
               )}
             </p>
           </div>
-          <Link
-            href="/courses"
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            ← Back to Courses
-          </Link>
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <Link
+                href={`/courses/${courseId}/settings`}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Settings
+              </Link>
+            )}
+            <Link
+              href="/courses"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              ← Back to Courses
+            </Link>
+          </div>
         </div>
 
         {/* Course Description */}
