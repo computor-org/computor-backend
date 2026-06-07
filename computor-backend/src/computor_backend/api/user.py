@@ -31,6 +31,7 @@ from computor_backend.business_logic.users import (
 )
 from computor_backend.business_logic.course_git import (
     get_course_git_descriptor,
+    get_student_repository,
     provision_student_repository,
     register_byo_repository,
 )
@@ -121,6 +122,24 @@ async def get_course_git_descriptor_endpoint(
     ``unconfigured`` descriptor when the course has no git binding yet.
     """
     return get_course_git_descriptor(course_id, permissions, db)
+
+
+@user_router.get(
+    "/courses/{course_id}/repository",
+    response_model=Optional[CourseMemberRepositoryGet],
+)
+async def get_student_repository_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """The current student's repository for a course, or ``null`` if none yet.
+
+    The babysitting "do I already have a repo?" check — returns the recorded
+    repo (Forgejo babysat or BYO) without creating one. 404 only when the caller
+    is not a member of the course.
+    """
+    return get_student_repository(course_id, permissions, db)
 
 
 @user_router.post(

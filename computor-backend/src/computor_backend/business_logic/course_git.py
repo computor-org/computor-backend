@@ -263,6 +263,71 @@ def _resolve_forgejo_handle(user_id: str, db: Session) -> Optional[str]:
     return None
 
 
+def _maybe_heal_forgejo_collaborator(
+    rec: CourseMemberRepository, user_id: str, db: Session
+) -> None:
+    """Retry granting the Forgejo write-collaborator when it failed at first
+    provision (the student's Forgejo account didn't exist yet). No-op once the
+    collaborator is recorded as added, or for non-Forgejo repos.
+    """
+    if rec.mode != "forgejo" or not rec.git_server_id:
+        return
+    props = rec.properties or {}
+    if (props.get("forgejo") or {}).get("collaborator_added"):
+        return
+    server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
+    if server is None:
+        return
+    handle = _resolve_forgejo_handle(user_id, db)
+    if not handle:
+        return
+    owner, _, repo = (rec.repo_ref or "").partition("/")
+    if not owner or not repo:
+        return
+    client = get_provider_client_for_server(server)
+    if not hasattr(client, "ensure_collaborator"):
+        return
+    if client.ensure_collaborator(owner, repo, handle):
+        rec.properties = {**props, "forgejo": {**(props.get("forgejo") or {}), "collaborator_added": True}}
+        rec.updated_by = user_id
+        db.commit()
+        logger.info(
+            "Healed Forgejo collaborator for course_member %s on %s/%s",
+            rec.course_member_id, owner, repo,
+        )
+
+
+def get_student_repository(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> Optional[CourseMemberRepositoryGet]:
+    """The current student's recorded repository for a course, or ``None`` if
+    they have none yet (the babysitting "do I already have a repo?" check).
+
+    Membership-gated; raises 404 only when the caller is not a course member,
+    so the client can distinguish "no repo yet" (null) from "not your course".
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    rec = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == member.id)
+        .first()
+    )
+    return _member_repo_to_get(rec) if rec is not None else None
+
+
 def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGet:
     return CourseMemberRepositoryGet(
         id=str(rec.id),
@@ -299,13 +364,16 @@ def provision_student_repository(
     if member is None:
         raise NotFoundException("You are not a member of this course")
 
-    # Idempotent: one working repo per course membership.
+    # Idempotent: one working repo per course membership. On re-provision,
+    # self-heal a Forgejo write-collaborator that couldn't be granted the first
+    # time (student hadn't logged into Forgejo yet).
     existing = (
         db.query(CourseMemberRepository)
         .filter(CourseMemberRepository.course_member_id == member.id)
         .first()
     )
     if existing is not None:
+        _maybe_heal_forgejo_collaborator(existing, user_id, db)
         return _member_repo_to_get(existing)
 
     binding = (

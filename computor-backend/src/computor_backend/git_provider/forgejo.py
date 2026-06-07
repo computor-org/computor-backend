@@ -267,19 +267,11 @@ class ForgejoProviderClient:
                 r.raise_for_status()
                 repo = r.json()
 
-            collaborator_added = False
-            if student_username:
-                cr = client.put(
-                    f"{_BASE}/repos/{target_owner}/{new_name}/collaborators/{student_username}",
-                    json={"permission": "write"},
-                )
-                if cr.status_code == 204:
-                    collaborator_added = True
-                else:
-                    logger.warning(
-                        "Forgejo: could not add collaborator %s to %s/%s (status %s)",
-                        student_username, target_owner, new_name, cr.status_code,
-                    )
+        collaborator_added = (
+            self.ensure_collaborator(target_owner, new_name, student_username)
+            if student_username
+            else False
+        )
 
         return StudentRepoResult(
             http_url=repo.get("clone_url", ""),
@@ -293,6 +285,28 @@ class ForgejoProviderClient:
                 "collaborator_added": collaborator_added,
             }},
         )
+
+    def ensure_collaborator(
+        self, owner: str, repo: str, username: str, permission: str = "write"
+    ) -> bool:
+        """Idempotently grant a user collaborator access on a repo.
+
+        Returns True on success; False (logged) if the user does not exist in
+        Forgejo yet — e.g. they have not completed their first OIDC login — so
+        the caller can retry on a later provision (self-healing).
+        """
+        with self._client() as client:
+            r = client.put(
+                f"{_BASE}/repos/{owner}/{repo}/collaborators/{username}",
+                json={"permission": permission},
+            )
+        if r.status_code == 204:
+            return True
+        logger.warning(
+            "Forgejo: could not add collaborator %s to %s/%s (status %s)",
+            username, owner, repo, r.status_code,
+        )
+        return False
 
     def sync_member_permissions(
         self,
