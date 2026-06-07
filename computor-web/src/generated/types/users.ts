@@ -22,6 +22,197 @@ export interface CourseMemberProviderAccountUpdate {
   provider_access_token?: string | null;
 }
 
+export interface CreateGitUserRequest {
+  username: string;
+  email: any;
+  display_name: string;
+  password?: any;
+}
+
+export interface UpdateGitUserRequest {
+  email?: any;
+  display_name?: any;
+}
+
+export interface GitUser {
+  id: number;
+  username: string;
+  email: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+export interface AccountCreate {
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Account unique identifier */
+  id: string;
+  /** Authentication provider name */
+  provider: string;
+  /** Type of authentication account */
+  type: string;
+  /** Account ID from the provider */
+  provider_account_id: string;
+  /** Associated user ID */
+  user_id: string;
+}
+
+export interface AccountUpdate {
+  /** Authentication provider name */
+  provider?: string | null;
+  /** Type of authentication account */
+  type?: string | null;
+  /** Account ID from the provider */
+  provider_account_id?: string | null;
+  /** Provider-specific properties */
+  properties?: any | null;
+}
+
+export interface AccountQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  provider?: string | null;
+  type?: string | null;
+  provider_account_id?: string | null;
+  user_id?: string | null;
+}
+
+/**
+ * A supported external provider that can be linked to a user account.
+ * 
+ * Returned by GET /accounts/providers so the UI can render the correct linking
+ * form. Currently backed by a static list in the backend; the shape is stable
+ * if that becomes a DB query later.
+ */
+export interface AccountProvider {
+  /** Short provider key, e.g. 'gitlab' */
+  id: string;
+  /** Human-readable provider name */
+  display_name: string;
+  /** What linking this provider is used for */
+  description: string;
+  /** Value written to account.provider, e.g. 'gitlab.com' */
+  provider: string;
+  /** Value written to account.type, e.g. 'gitlab' */
+  type: string;
+  /** Label for the provider_account_id input */
+  field_label: string;
+  /** Placeholder for the provider_account_id input */
+  placeholder: string;
+}
+
+/**
+ * A user with their workspace roles.
+ */
+export interface WorkspaceRoleUser {
+  user_id: string;
+  email: any;
+  username: any;
+  given_name: any;
+  family_name: any;
+  roles?: string[];
+}
+
+/**
+ * User manager request to reset a user's password (sets to NULL).
+ */
+export interface UserManagerResetPasswordRequest {
+  /** Target user ID to reset */
+  user_id: string;
+  /** User manager's own password for verification */
+  manager_password: string;
+}
+
+export interface UserGroupCreate {
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is a transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupUpdate {
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by user ID */
+  user_id?: string | null;
+  /** Filter by group ID */
+  group_id?: string | null;
+  /** Filter by transient status */
+  transient?: boolean | null;
+}
+
 export interface UserCreate {
   /** User ID (UUID will be generated if not provided) */
   id?: string | null;
@@ -150,132 +341,6 @@ export interface UserScopes {
   course?: Record<string, string[]>;
 }
 
-export interface AccountCreate {
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** Account unique identifier */
-  id: string;
-  /** Authentication provider name */
-  provider: string;
-  /** Type of authentication account */
-  type: string;
-  /** Account ID from the provider */
-  provider_account_id: string;
-  /** Associated user ID */
-  user_id: string;
-}
-
-export interface AccountUpdate {
-  /** Authentication provider name */
-  provider?: string | null;
-  /** Type of authentication account */
-  type?: string | null;
-  /** Account ID from the provider */
-  provider_account_id?: string | null;
-  /** Provider-specific properties */
-  properties?: any | null;
-}
-
-export interface AccountQuery {
-  skip?: number | null;
-  limit?: number | null;
-  id?: string | null;
-  provider?: string | null;
-  type?: string | null;
-  provider_account_id?: string | null;
-  user_id?: string | null;
-}
-
-/**
- * A supported external provider that can be linked to a user account.
- * 
- * Returned by GET /accounts/providers so the UI can render the correct linking
- * form. Currently backed by a static list in the backend; the shape is stable
- * if that becomes a DB query later.
- */
-export interface AccountProvider {
-  /** Short provider key, e.g. 'gitlab' */
-  id: string;
-  /** Human-readable provider name */
-  display_name: string;
-  /** What linking this provider is used for */
-  description: string;
-  /** Value written to account.provider, e.g. 'gitlab.com' */
-  provider: string;
-  /** Value written to account.type, e.g. 'gitlab' */
-  type: string;
-  /** Label for the provider_account_id input */
-  field_label: string;
-  /** Placeholder for the provider_account_id input */
-  placeholder: string;
-}
-
-export interface CreateGitUserRequest {
-  username: string;
-  email: any;
-  display_name: string;
-  password?: any;
-}
-
-export interface UpdateGitUserRequest {
-  email?: any;
-  display_name?: any;
-}
-
-export interface GitUser {
-  id: number;
-  username: string;
-  email: string;
-  display_name: string;
-  is_active: boolean;
-}
-
-/**
- * User manager request to reset a user's password (sets to NULL).
- */
-export interface UserManagerResetPasswordRequest {
-  /** Target user ID to reset */
-  user_id: string;
-  /** User manager's own password for verification */
-  manager_password: string;
-}
-
 export interface UserRoleCreate {
   user_id: string;
   role_id: string;
@@ -306,69 +371,4 @@ export interface UserRoleQuery {
   limit?: number | null;
   user_id?: string | null;
   role_id?: string | null;
-}
-
-export interface UserGroupCreate {
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is a transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupUpdate {
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupQuery {
-  skip?: number | null;
-  limit?: number | null;
-  /** Filter by user ID */
-  user_id?: string | null;
-  /** Filter by group ID */
-  group_id?: string | null;
-  /** Filter by transient status */
-  transient?: boolean | null;
-}
-
-/**
- * A user with their workspace roles.
- */
-export interface WorkspaceRoleUser {
-  user_id: string;
-  email: any;
-  username: any;
-  given_name: any;
-  family_name: any;
-  roles?: string[];
 }

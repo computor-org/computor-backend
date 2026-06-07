@@ -13,96 +13,6 @@ import type { ForceLevel } from './common';
 
 
 /**
- * Preview of a single example that would be deleted.
- */
-export interface ExampleDeletePreview {
-  example_id: string;
-  identifier: string;
-  title: string;
-  directory: string;
-  repository_id: string;
-  repository_name: string;
-  /** Number of versions to delete */
-  version_count: number;
-  /** MinIO storage paths for versions */
-  storage_paths?: string[];
-  /** Count of CourseContentDeployments referencing this example */
-  deployment_references?: number;
-}
-
-/**
- * Request to delete examples by identifier prefix pattern.
- */
-export interface ExampleBulkDeleteRequest {
-  /** Ltree pattern to match (e.g., 'itpcp.progphys.py.*'). Uses * for single-level wildcard. */
-  identifier_pattern: string;
-  /** Optional: scope deletion to specific repository */
-  repository_id?: string | null;
-  /** If true, only returns preview without deleting */
-  dry_run?: boolean;
-  /** Force level: 'none' blocks if active deployments, 'old' allows archived/failed, 'all' deletes active (requires confirmation) */
-  force_level?: ForceLevel;
-}
-
-/**
- * A single course_content_deployment row that references an example_version.
- */
-export interface ExampleVersionReference {
-  deployment_id: string;
-  course_id: string;
-  course_path?: string | null;
-  course_content_id: string;
-  course_content_path?: string | null;
-  /** Which FK references the version: 'current' (example_version_id) or 'previous' (previous_example_version_id) */
-  relation: string;
-}
-
-/**
- * Result of a single example-version deletion.
- */
-export interface ExampleVersionDeleteResult {
-  /** Whether this was a preview only */
-  dry_run: boolean;
-  /** True if the version row was deleted (or would be, on dry run with no references) */
-  deleted: boolean;
-  version_id: string;
-  example_identifier?: string | null;
-  version_tag?: string | null;
-  storage_path?: string | null;
-  /** MinIO objects removed */
-  storage_objects_deleted?: number;
-  /** Deployment rows blocking the delete; non-empty means deletion was refused */
-  references?: ExampleVersionReference[];
-  errors?: string[];
-}
-
-/**
- * Result of bulk example deletion operation.
- */
-export interface ExampleBulkDeleteResult {
-  /** Whether this was a preview only */
-  dry_run: boolean;
-  /** Pattern that was used for matching */
-  pattern_matched: string;
-  /** Repository scope if specified */
-  repository_id?: string | null;
-  /** Number of examples deleted */
-  examples_affected?: number;
-  /** Total versions deleted */
-  versions_deleted?: number;
-  /** Example dependencies deleted */
-  dependencies_deleted?: number;
-  /** MinIO objects deleted */
-  storage_objects_deleted?: number;
-  /** Deployments with example_version_id set to NULL */
-  deployment_references_orphaned?: number;
-  /** Details of examples affected */
-  examples?: ExampleDeletePreview[];
-  /** Errors encountered during deletion */
-  errors?: string[];
-}
-
-/**
  * Create a new example repository.
  */
 export interface ExampleRepositoryCreate {
@@ -423,6 +333,96 @@ export interface ExampleDownloadResponse {
   test?: Record<string, any> | null;
   /** Dependency examples when with_dependencies=True */
   dependencies?: ExampleFileSet[] | null;
+}
+
+/**
+ * Preview of a single example that would be deleted.
+ */
+export interface ExampleDeletePreview {
+  example_id: string;
+  identifier: string;
+  title: string;
+  directory: string;
+  repository_id: string;
+  repository_name: string;
+  /** Number of versions to delete */
+  version_count: number;
+  /** MinIO storage paths for versions */
+  storage_paths?: string[];
+  /** Count of CourseContentDeployments referencing this example */
+  deployment_references?: number;
+}
+
+/**
+ * Request to delete examples by identifier prefix pattern.
+ */
+export interface ExampleBulkDeleteRequest {
+  /** Ltree pattern to match (e.g., 'itpcp.progphys.py.*'). Uses * for single-level wildcard. */
+  identifier_pattern: string;
+  /** Optional: scope deletion to specific repository */
+  repository_id?: string | null;
+  /** If true, only returns preview without deleting */
+  dry_run?: boolean;
+  /** Force level: 'none' blocks if active deployments, 'old' allows archived/failed, 'all' deletes active (requires confirmation) */
+  force_level?: ForceLevel;
+}
+
+/**
+ * A single course_content_deployment row that references an example_version.
+ */
+export interface ExampleVersionReference {
+  deployment_id: string;
+  course_id: string;
+  course_path?: string | null;
+  course_content_id: string;
+  course_content_path?: string | null;
+  /** Which FK references the version: 'current' (example_version_id) or 'previous' (previous_example_version_id) */
+  relation: string;
+}
+
+/**
+ * Result of a single example-version deletion.
+ */
+export interface ExampleVersionDeleteResult {
+  /** Whether this was a preview only */
+  dry_run: boolean;
+  /** True if the version row was deleted (or would be, on dry run with no references) */
+  deleted: boolean;
+  version_id: string;
+  example_identifier?: string | null;
+  version_tag?: string | null;
+  storage_path?: string | null;
+  /** MinIO objects removed */
+  storage_objects_deleted?: number;
+  /** Deployment rows blocking the delete; non-empty means deletion was refused */
+  references?: ExampleVersionReference[];
+  errors?: string[];
+}
+
+/**
+ * Result of bulk example deletion operation.
+ */
+export interface ExampleBulkDeleteResult {
+  /** Whether this was a preview only */
+  dry_run: boolean;
+  /** Pattern that was used for matching */
+  pattern_matched: string;
+  /** Repository scope if specified */
+  repository_id?: string | null;
+  /** Number of examples deleted */
+  examples_affected?: number;
+  /** Total versions deleted */
+  versions_deleted?: number;
+  /** Example dependencies deleted */
+  dependencies_deleted?: number;
+  /** MinIO objects deleted */
+  storage_objects_deleted?: number;
+  /** Deployments with example_version_id set to NULL */
+  deployment_references_orphaned?: number;
+  /** Details of examples affected */
+  examples?: ExampleDeletePreview[];
+  /** Errors encountered during deletion */
+  errors?: string[];
 }
 
 /**

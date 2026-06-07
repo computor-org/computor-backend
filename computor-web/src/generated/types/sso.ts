@@ -8,15 +8,6 @@
 
 
 
-/**
- * Git provider connection credentials — provider-agnostic.
- */
-export interface GitProviderCredentials {
-  type: string;
-  url: string;
-  token: string;
-}
-
 export interface GitProviderCreate {
   organization_id: string;
   type: "gitlab" | "forgejo" | "github";
@@ -39,4 +30,13 @@ export interface OrgProviderResult {
 export interface FamilyProviderResult {
   provider_entity_id: string;
   properties: any;
+}
+
+/**
+ * Git provider connection credentials — provider-agnostic.
+ */
+export interface GitProviderCredentials {
+  type: string;
+  url: string;
+  token: string;
 }

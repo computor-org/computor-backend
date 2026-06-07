@@ -3,7 +3,7 @@
  * Endpoint: /courses
  */
 
-import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseList, CourseUpdate } from 'types/generated';
+import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CourseUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -60,6 +60,28 @@ export class CoursesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.delete<CascadeDeleteResult>(this.buildPath(courseId), { params: queryParams });
+  }
+
+  /**
+   * Get Course Git Binding Endpoint
+   * Full git binding for a course (lecturer cohort only).
+   */
+  async getCourseGitBindingEndpointCoursesCourseIdGitGet({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseGitBindingGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<CourseGitBindingGet>(this.buildPath(courseId, 'git'), { params: queryParams });
+  }
+
+  /**
+   * Upsert Course Git Binding Endpoint
+   * Create or replace the course's git binding (lecturer cohort only).
+   */
+  async upsertCourseGitBindingEndpointCoursesCourseIdGitPut({ courseId, userId, body }: { courseId: string | string; userId?: string | null; body: CourseGitBindingUpsert }): Promise<CourseGitBindingGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.put<CourseGitBindingGet>(this.buildPath(courseId, 'git'), body, { params: queryParams });
   }
 
   /**

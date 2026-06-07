@@ -203,6 +203,8 @@
 | `listCoursesCoursesGet` | GET | `/courses` | — | `CourseList[]` |
 | `createCoursesCoursesPost` | POST | `/courses` | `CourseCreate` | `CourseGet` |
 | `deleteCourseEndpointCoursesCourseIdDelete` | DELETE | `/courses/{course_id}` | — | `CascadeDeleteResult` |
+| `getCourseGitBindingEndpointCoursesCourseIdGitGet` | GET | `/courses/{course_id}/git` | — | `CourseGitBindingGet` |
+| `upsertCourseGitBindingEndpointCoursesCourseIdGitPut` | PUT | `/courses/{course_id}/git` | `CourseGitBindingUpsert` | `CourseGitBindingGet` |
 | `deleteCoursesCoursesIdDelete` | DELETE | `/courses/{id}` | — | `void` |
 | `getCoursesCoursesIdGet` | GET | `/courses/{id}` | — | `CourseGet` |
 | `updateCoursesCoursesIdPatch` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
@@ -283,6 +285,18 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `getPublicExtensionUrlExtensionsPublicGet` | GET | `/extensions-public` | — | `string` |
+
+## GitServersClient
+- Base path: `/git-servers`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `listGitServersEndpointGitServersGet` | GET | `/git-servers` | — | `GitServerGet[]` |
+| `createGitServerEndpointGitServersPost` | POST | `/git-servers` | `GitServerCreate` | `GitServerGet` |
+| `deleteGitServerEndpointGitServersServerIdDelete` | DELETE | `/git-servers/{server_id}` | — | `void` |
+| `getGitServerEndpointGitServersServerIdGet` | GET | `/git-servers/{server_id}` | — | `GitServerGet` |
+| `updateGitServerEndpointGitServersServerIdPatch` | PATCH | `/git-servers/{server_id}` | `GitServerUpdate` | `GitServerGet` |
 
 ## GroupsClient
 - Base path: `/groups`
@@ -657,7 +671,11 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `getCurrentUserEndpointUserGet` | GET | `/user` | — | `UserGet` |
+| `getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet` | GET | `/user/courses/{course_id}/git` | — | `CourseGitDescriptor` |
+| `provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost` | POST | `/user/courses/{course_id}/provision-repository` | — | `StudentRepositoryProvisioned` |
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
+| `registerStudentRepositoryEndpointUserCoursesCourseIdRegisterRepositoryPost` | POST | `/user/courses/{course_id}/register-repository` | `CourseMemberRepositoryRegister` | `CourseMemberRepositoryGet` |
+| `getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet` | GET | `/user/courses/{course_id}/repository` | — | `CourseMemberRepositoryGet | null` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
 | `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |

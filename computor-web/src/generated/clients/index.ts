@@ -26,6 +26,7 @@ export * from './ExamplesClient';
 export * from './ExtensionsClient';
 export * from './ExtensionsGettingStartedClient';
 export * from './ExtensionsPublicClient';
+export * from './GitServersClient';
 export * from './GroupsClient';
 export * from './InvitesClient';
 export * from './LanguagesClient';

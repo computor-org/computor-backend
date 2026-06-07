@@ -13,15 +13,6 @@ import type { Repository } from './common';
 
 
 /**
- * Response with task ID for async operation.
- */
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message: string;
-}
-
-/**
  * Task execution result container.
  */
 export interface TaskResult {
@@ -103,6 +94,15 @@ export interface TestJob {
   testing_service_type_path: string;
   module: Repository;
   reference?: Repository | null;
+}
+
+/**
+ * Response with task ID for async operation.
+ */
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
 }
 
 
