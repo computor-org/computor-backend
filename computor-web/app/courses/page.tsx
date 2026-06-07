@@ -6,11 +6,14 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import CourseGitSettingsModal from '@/src/components/CourseGitSettingsModal';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { courseRole } = usePermissions();
+  const { courseRole, isAdmin, isOrganizationManager } = usePermissions();
+  const canConfigureGit = isAdmin || isOrganizationManager;
+  const [gitModal, setGitModal] = useState<{ courseId: string; courseLabel: string } | null>(null);
   const [courses, setCourses] = useState<CourseList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,16 +102,32 @@ export default function CoursesPage() {
         {!loading && !error && courses.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} role={courseRole(course.id)} />
+              <CourseCard
+                key={course.id}
+                course={course}
+                role={courseRole(course.id)}
+                onGit={
+                  canConfigureGit
+                    ? () => setGitModal({ courseId: course.id, courseLabel: course.title || course.path })
+                    : undefined
+                }
+              />
             ))}
           </div>
         )}
       </div>
+      {gitModal && (
+        <CourseGitSettingsModal
+          courseId={gitModal.courseId}
+          courseLabel={gitModal.courseLabel}
+          onClose={() => setGitModal(null)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }
 
-function CourseCard({ course, role }: { course: CourseList; role: string | null }) {
+function CourseCard({ course, role, onGit }: { course: CourseList; role: string | null; onGit?: () => void }) {
   return (
     <Link href={`/courses/${course.id}`}>
       <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer h-full flex flex-col">
@@ -147,7 +166,21 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
           )}
         </div>
 
-        <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-auto">
+          {onGit ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onGit();
+              }}
+              className="text-sm text-gray-500 hover:text-blue-600 font-medium"
+            >
+              Git settings
+            </button>
+          ) : (
+            <span />
+          )}
           <span className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
             View Course
             <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
