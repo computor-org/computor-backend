@@ -136,17 +136,11 @@ const getViewNavigation = (courseId: string): NavItem[] => [
  * Given a list of nav items and the current pathname, return which
  * item IDs should be auto-expanded (pathname is inside a sub-item).
  */
-function computeAutoExpanded(items: NavItem[], pathname: string): Record<string, boolean> {
-  const expanded: Record<string, boolean> = {};
-  for (const item of items) {
-    if (item.subItems && item.subItems.length > 0) {
-      if (pathname === item.path || pathname.startsWith(item.path + '/')) {
-        expanded[item.id] = true;
-      }
-    }
-  }
-  return expanded;
+/** Is `pathname` on this item's own path or anywhere beneath it? */
+function pathMatches(itemPath: string, pathname: string): boolean {
+  return pathname === itemPath || pathname.startsWith(itemPath + '/');
 }
+
 
 const icons: Record<string, React.ReactElement> = {
   courses: (
@@ -199,14 +193,10 @@ export default function Sidebar() {
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
-  const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>(() => {
-    const cMatch = pathname.match(/^\/courses\/([^/]+)/);
-    const cId = cMatch ? cMatch[1] : null;
-    const items = cId
-      ? getViewNavigation(cId)
-      : [...coursesNavigation, ...workspacesNavigation, ...managementNavigation, ...adminNavigation, ...userMgmtNavigation];
-    return computeAutoExpanded(items, pathname);
-  });
+  // Sub-sections the user has explicitly toggled open. The section containing
+  // the active route is always rendered expanded (see renderNavItems), so this
+  // only needs to track manual expand/collapse.
+  const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>({});
   const [courseViews, setCourseViews] = useState<string[]>([]);
 
   // Detect if we're in a course context
@@ -237,34 +227,8 @@ export default function Sidebar() {
         }
       }
       fetchCourseViews();
-    } else {
-      setCourseViews([]);
     }
   }, [currentCourseId, views, user]);
-
-  // Auto-expand sidebar sections when navigating into a sub-page
-  useEffect(() => {
-    const items = currentCourseId
-      ? getViewNavigation(currentCourseId)
-      : [...coursesNavigation, ...workspacesNavigation, ...managementNavigation, ...adminNavigation, ...userMgmtNavigation];
-
-    const autoExpanded = computeAutoExpanded(items, pathname);
-
-    // Merge: only set to true, never force-collapse something the user opened
-    if (Object.keys(autoExpanded).length > 0) {
-      setExpandedViews(prev => {
-        const next = { ...prev };
-        let changed = false;
-        for (const [key, val] of Object.entries(autoExpanded)) {
-          if (val && !prev[key]) {
-            next[key] = true;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }
-  }, [pathname, currentCourseId]);
 
   const toggleView = (viewId: string) => {
     setExpandedViews(prev => ({
@@ -276,10 +240,20 @@ export default function Sidebar() {
   /** Render a list of nav items with expand/collapse sub-items */
   const renderNavItems = (items: NavItem[]) =>
     items.map((navItem) => {
-      const hasSubItems = navItem.subItems && navItem.subItems.length > 0;
-      const isExpanded = expandedViews[navItem.id];
+      const hasSubItems = !!navItem.subItems && navItem.subItems.length > 0;
+      // A section is "active" when the current route is one of its sub-items
+      // (paths may be unrelated to the parent's own path).
+      const sectionActive = hasSubItems
+        ? navItem.subItems!.some((s) => pathMatches(s.path, pathname))
+        : false;
+      // While a child is the active page the section stays expanded — it can't
+      // be collapsed out from under the selected item.
+      const isExpanded = expandedViews[navItem.id] || sectionActive;
       const isExactActive = pathname === navItem.path;
-      const isChildActive = pathname.startsWith(navItem.path + '/');
+      // A parent with sub-items is "active" only when one of ITS OWN sub-items
+      // matches — never just because the route sits under its path prefix (e.g.
+      // /admin/git-servers is under System's /admin but belongs to Management).
+      const isChildActive = hasSubItems ? sectionActive : pathname.startsWith(navItem.path + '/');
 
       return (
         <div key={navItem.id} className="space-y-1">
@@ -303,7 +277,7 @@ export default function Sidebar() {
               )}
             </Link>
 
-            {!collapsed && hasSubItems && (
+            {!collapsed && hasSubItems && !sectionActive && (
               <button
                 onClick={() => toggleView(navItem.id)}
                 className="p-2 hover:bg-gray-100 rounded transition-colors"
