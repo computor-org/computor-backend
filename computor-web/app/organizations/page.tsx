@@ -36,6 +36,7 @@ export default function OrganizationsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canCreateOrganization } = usePermissions();
   const [orgs, setOrgs] = useState<OrganizationList[]>([]);
+  const [familyCounts, setFamilyCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [create, setCreate] = useState<CreateState>(emptyCreate);
@@ -44,9 +45,18 @@ export default function OrganizationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/organizations`);
-      if (!res.ok) throw new Error('Failed to load organizations');
-      setOrgs(await res.json());
+      const [orgRes, famRes] = await Promise.all([
+        apiFetch(`${API_BASE_URL}/organizations`),
+        apiFetch(`${API_BASE_URL}/course-families`),
+      ]);
+      if (!orgRes.ok) throw new Error('Failed to load organizations');
+      setOrgs(await orgRes.json());
+      if (famRes.ok) {
+        const fams: Array<{ organization_id: string }> = await famRes.json();
+        const counts: Record<string, number> = {};
+        for (const f of fams) counts[f.organization_id] = (counts[f.organization_id] ?? 0) + 1;
+        setFamilyCounts(counts);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An error occurred');
     } finally {
@@ -122,7 +132,7 @@ export default function OrganizationsPage() {
                   href={`/course-families?organization_id=${o.id}`}
                   className="text-sm text-blue-600 hover:underline whitespace-nowrap ml-4"
                 >
-                  Course families →
+                  {familyCounts[o.id] ?? 0} course {(familyCounts[o.id] ?? 0) === 1 ? 'family' : 'families'} →
                 </Link>
               </div>
             ))}

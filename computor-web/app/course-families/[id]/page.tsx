@@ -193,7 +193,9 @@ export default function CourseFamilyDetailPage() {
           <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
         )}
 
-        <h2 className="text-xl font-semibold text-gray-900">Courses</h2>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Courses {!loading && <span className="text-gray-400 font-normal">({courses.length})</span>}
+        </h2>
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : courses.length === 0 ? (

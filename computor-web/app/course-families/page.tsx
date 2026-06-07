@@ -37,6 +37,7 @@ export default function CourseFamiliesPage() {
   const { canCreateCourseFamily } = usePermissions();
   const [families, setFamilies] = useState<CourseFamilyList[]>([]);
   const [orgs, setOrgs] = useState<OrganizationList[]>([]);
+  const [courseCounts, setCourseCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [create, setCreate] = useState<CreateState>(emptyCreate);
@@ -45,13 +46,22 @@ export default function CourseFamiliesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [fRes, oRes] = await Promise.all([
+      const [fRes, oRes, cRes] = await Promise.all([
         apiFetch(`${API_BASE_URL}/course-families`),
         apiFetch(`${API_BASE_URL}/organizations`),
+        apiFetch(`${API_BASE_URL}/courses`),
       ]);
       if (!fRes.ok) throw new Error('Failed to load course families');
       setFamilies(await fRes.json());
       if (oRes.ok) setOrgs(await oRes.json());
+      if (cRes.ok) {
+        const courses: Array<{ course_family_id?: string | null }> = await cRes.json();
+        const counts: Record<string, number> = {};
+        for (const c of courses) {
+          if (c.course_family_id) counts[c.course_family_id] = (counts[c.course_family_id] ?? 0) + 1;
+        }
+        setCourseCounts(counts);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An error occurred');
     } finally {
@@ -133,7 +143,12 @@ export default function CourseFamiliesPage() {
           <div className="bg-white border border-gray-200 rounded-lg divide-y">
             {families.map((f) => (
               <Link key={f.id} href={`/course-families/${f.id}`} className="block px-4 py-3 hover:bg-gray-50">
-                <div className="text-sm font-medium text-gray-900">{f.title || f.path}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-gray-900">{f.title || f.path}</div>
+                  <span className="shrink-0 text-xs text-gray-500">
+                    {courseCounts[f.id] ?? 0} {(courseCounts[f.id] ?? 0) === 1 ? 'course' : 'courses'}
+                  </span>
+                </div>
                 <div className="text-xs text-gray-500">
                   {f.path} · {orgLabel(f.organization_id)}
                 </div>
