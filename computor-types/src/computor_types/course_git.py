@@ -82,6 +82,14 @@ class CourseGitBindingGet(BaseModel):
     template_url: Optional[str] = None
     default_branch: Optional[str] = None
     student_repo_modes: List[str] = Field(default_factory=list)
+    locked: bool = Field(
+        False,
+        description="True once the binding has materialized a template or student repos; "
+        "its identity is then immutable (changing it would orphan student repositories).",
+    )
+    lock_reason: Optional[str] = Field(
+        None, description="Human-readable reason the binding is locked, when locked."
+    )
 
 
 class CourseMemberRepositoryGet(BaseModel):

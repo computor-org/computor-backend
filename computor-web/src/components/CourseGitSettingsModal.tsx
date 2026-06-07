@@ -35,6 +35,8 @@ export default function CourseGitSettingsModal({
   const [templateUrl, setTemplateUrl] = useState('');
   const [branch, setBranch] = useState('main');
   const [modes, setModes] = useState<string[]>([]);
+  const [locked, setLocked] = useState(false);
+  const [lockReason, setLockReason] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +55,8 @@ export default function CourseGitSettingsModal({
           setTemplateUrl(b.template_url || '');
           setBranch(b.default_branch || 'main');
           setModes(b.student_repo_modes || []);
+          setLocked(!!b.locked);
+          setLockReason(b.lock_reason || null);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load git settings');
@@ -99,6 +103,12 @@ export default function CourseGitSettingsModal({
         <div className="p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Git settings — {courseLabel}</h2>
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+          {locked && (
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+              {lockReason || 'This course’s git configuration is locked.'} Changing the server or
+              template would orphan students’ existing repositories, so it can no longer be edited.
+            </div>
+          )}
           {loading ? (
             <div className="text-gray-500">Loading…</div>
           ) : (
@@ -158,7 +168,8 @@ export default function CourseGitSettingsModal({
           </button>
           <button
             onClick={save}
-            disabled={saving || loading}
+            disabled={saving || loading || locked}
+            title={locked ? 'Git configuration is locked' : undefined}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}

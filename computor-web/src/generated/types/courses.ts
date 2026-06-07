@@ -1025,6 +1025,10 @@ export interface CourseGitBindingGet {
   template_url?: string | null;
   default_branch?: string | null;
   student_repo_modes?: string[];
+  /** True once the binding has materialized a template or student repos; its identity is then immutable (changing it would orphan student repositories). */
+  locked?: boolean;
+  /** Human-readable reason the binding is locked, when locked. */
+  lock_reason?: string | null;
 }
 
 /**

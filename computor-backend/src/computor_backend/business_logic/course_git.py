@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from computor_backend.exceptions import (
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     NotFoundException,
 )
@@ -166,7 +167,33 @@ def _load_course_or_404(course_id: UUID | str, db: Session) -> Course:
     return course
 
 
-def _binding_to_get(b: CourseGitBinding) -> CourseGitBindingGet:
+def _binding_lock_state(binding: Optional[CourseGitBinding], db: Session) -> tuple[bool, Optional[str]]:
+    """Whether a course's git binding is locked (its identity is immutable).
+
+    A binding locks once it has *materialized* something a change would destroy:
+    a created git template, or any provisioned student repository. After that,
+    repointing ``git_server_id`` or renaming ``template_repo`` would orphan every
+    student's ``origin`` remote, so the binding becomes read-only. A binding that
+    has not yet produced anything (no template, no student repos — e.g. a fresh
+    or download-only course) stays editable.
+    """
+    if binding is None:
+        return False, None
+    student_repos = (
+        db.query(CourseMemberRepository)
+        .join(CourseMember, CourseMemberRepository.course_member_id == CourseMember.id)
+        .filter(CourseMember.course_id == binding.course_id)
+        .count()
+    )
+    if student_repos > 0:
+        return True, "Student repositories have already been provisioned for this course."
+    if binding.delivery == "git" and binding.template_repo:
+        return True, "The git template has already been created for this course."
+    return False, None
+
+
+def _binding_to_get(b: CourseGitBinding, db: Session) -> CourseGitBindingGet:
+    locked, lock_reason = _binding_lock_state(b, db)
     return CourseGitBindingGet(
         id=str(b.id),
         course_id=str(b.course_id),
@@ -176,6 +203,8 @@ def _binding_to_get(b: CourseGitBinding) -> CourseGitBindingGet:
         template_url=b.template_url,
         default_branch=b.default_branch,
         student_repo_modes=list(b.student_repo_modes or []),
+        locked=locked,
+        lock_reason=lock_reason,
     )
 
 
@@ -188,6 +217,21 @@ def upsert_course_git_binding(
     """Create or replace a course's git binding (lecturer-cohort only)."""
     course = _load_course_or_404(course_id, db)
     _require_course_git_manage(permissions, course)
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course.id)
+        .first()
+    )
+    # Once a binding has materialized a template or student repos, its identity
+    # is frozen — changing the server/template/delivery would orphan students'
+    # repositories. Reject before any side effects (e.g. Forgejo template calls).
+    locked, lock_reason = _binding_lock_state(binding, db)
+    if locked:
+        raise ConflictException(
+            detail=lock_reason
+            or "This course's git configuration is locked and cannot be changed."
+        )
 
     server = None
     if data.git_server_id:
@@ -219,11 +263,6 @@ def upsert_course_git_binding(
         if not template_url:
             template_url = f"{server.base_url.rstrip('/')}/{template_repo}.git"
 
-    binding = (
-        db.query(CourseGitBinding)
-        .filter(CourseGitBinding.course_id == course.id)
-        .first()
-    )
     if binding is None:
         binding = CourseGitBinding(course_id=course.id, created_by=permissions.get_user_id())
         db.add(binding)
@@ -238,7 +277,7 @@ def upsert_course_git_binding(
 
     db.commit()
     db.refresh(binding)
-    return _binding_to_get(binding)
+    return _binding_to_get(binding, db)
 
 
 def get_course_git_binding(
@@ -256,7 +295,7 @@ def get_course_git_binding(
     )
     if not binding:
         raise NotFoundException("This course has no git binding")
-    return _binding_to_get(binding)
+    return _binding_to_get(binding, db)
 
 
 # ---------------------------------------------------------------------------

@@ -106,6 +106,7 @@ export default function CourseSettingsPage() {
     return s ? `${s.name || s.base_url} (${s.type})` : id || '—';
   };
   const gitConfigured = binding && binding.delivery;
+  const gitLocked = !!binding?.locked;
 
   return (
     <AuthenticatedLayout>
@@ -163,13 +164,29 @@ export default function CourseSettingsPage() {
             <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Git</h2>
-                <button
-                  onClick={() => setGitOpen(true)}
-                  className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
-                >
-                  {gitConfigured ? 'Edit' : 'Configure'}
-                </button>
+                {gitLocked ? (
+                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded inline-flex items-center gap-1">
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Locked
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setGitOpen(true)}
+                    className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                  >
+                    {gitConfigured ? 'Edit' : 'Configure'}
+                  </button>
+                )}
               </div>
+              {gitLocked && (
+                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">
+                  {binding?.lock_reason || 'This course’s git configuration is locked.'} Changing the
+                  server or template would orphan students’ existing repositories, so these settings are
+                  read-only.
+                </p>
+              )}
               {gitConfigured ? (
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                   <div>
