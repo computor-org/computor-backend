@@ -22,6 +22,22 @@ import { useAuth } from '../contexts/AuthContext';
 // organization / course_family scope role hierarchy (owner > manager > developer).
 const SCOPE_RANK: Record<string, number> = { _owner: 3, _manager: 2, _developer: 1 };
 
+// course role hierarchy + friendly labels for per-course badges.
+const COURSE_ROLE_RANK: Record<string, number> = {
+  _owner: 5,
+  _maintainer: 4,
+  _lecturer: 3,
+  _tutor: 2,
+  _student: 1,
+};
+const COURSE_ROLE_LABEL: Record<string, string> = {
+  _owner: 'Owner',
+  _maintainer: 'Maintainer',
+  _lecturer: 'Lecturer',
+  _tutor: 'Tutor',
+  _student: 'Student',
+};
+
 export function usePermissions() {
   const { user, views, scopes } = useAuth();
   const systemRoles = user?.systemRoles ?? [];
@@ -77,6 +93,16 @@ export function usePermissions() {
       ? scopeHasAtLeast(familyRoles, familyId, '_manager')
       : Object.keys(familyRoles).length > 0);
 
+  // The user's highest role on a course → friendly label for a badge, or null.
+  const courseRole = (courseId: string): string | null => {
+    const roles = courseRoles[courseId] ?? [];
+    if (roles.length === 0) return null;
+    const top = roles.reduce((best, r) =>
+      (COURSE_ROLE_RANK[r] ?? 0) > (COURSE_ROLE_RANK[best] ?? 0) ? r : best,
+    );
+    return COURSE_ROLE_LABEL[top] ?? top.replace(/^_/, '');
+  };
+
   return {
     isAdmin,
     isOrganizationManager,
@@ -92,5 +118,6 @@ export function usePermissions() {
     canCreateOrganization,
     canCreateCourseFamily,
     canCreateCourse,
+    courseRole,
   };
 }

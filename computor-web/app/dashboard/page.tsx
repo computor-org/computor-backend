@@ -10,7 +10,7 @@ import type { CourseList } from '@/src/generated/types/courses';
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { showManagement, isWorkspaceUser, isUserManager, isAdmin } = usePermissions();
+  const { showManagement, isWorkspaceUser, isUserManager, isAdmin, courseRole } = usePermissions();
   const [courses, setCourses] = useState<CourseList[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,16 +80,26 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-500">No courses yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {courses.slice(0, 6).map((c) => (
-                    <Link
-                      key={c.id}
-                      href={`/courses/${c.id}`}
-                      className="block p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                    >
-                      <p className="text-sm font-medium text-gray-900">{c.title || c.path}</p>
-                      {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
-                    </Link>
-                  ))}
+                  {courses.slice(0, 6).map((c) => {
+                    const role = courseRole(c.id);
+                    return (
+                      <Link
+                        key={c.id}
+                        href={`/courses/${c.id}`}
+                        className="block p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-900 truncate">{c.title || c.path}</p>
+                          {role && (
+                            <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                              {role}
+                            </span>
+                          )}
+                        </div>
+                        {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>

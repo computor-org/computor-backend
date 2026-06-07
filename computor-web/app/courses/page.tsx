@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { courseRole } = usePermissions();
   const [courses, setCourses] = useState<CourseList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function CoursesPage() {
             </svg>
             <h3 className="mt-4 text-lg font-medium text-gray-900">No courses found</h3>
             <p className="mt-2 text-sm text-gray-500">
-              You don't have access to any courses yet.
+              You do not have access to any courses yet.
             </p>
           </div>
         )}
@@ -97,7 +99,7 @@ export default function CoursesPage() {
         {!loading && !error && courses.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} />
+              <CourseCard key={course.id} course={course} role={courseRole(course.id)} />
             ))}
           </div>
         )}
@@ -106,14 +108,19 @@ export default function CoursesPage() {
   );
 }
 
-function CourseCard({ course }: { course: CourseList }) {
+function CourseCard({ course, role }: { course: CourseList; role: string | null }) {
   return (
     <Link href={`/courses/${course.id}`}>
       <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer h-full flex flex-col">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-4 gap-2">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
             {course.title || 'Untitled Course'}
           </h3>
+          {role && (
+            <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+              {role}
+            </span>
+          )}
         </div>
 
         <div className="space-y-2 mb-4 flex-grow">
