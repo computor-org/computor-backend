@@ -73,6 +73,22 @@ def build_course_git_descriptor(
     )
 
 
+def course_uses_course_level_git(db: Session, course_id: UUID | str) -> bool:
+    """True if the course is on the new course-level git model (has a binding).
+
+    Gates the legacy eager GitLab provisioning: bound courses provision student
+    repos lazily (Forgejo babysat or BYO), so the legacy enrollment workflow
+    must not fire for them. Un-migrated courses (org-level GitLab, no binding)
+    keep the existing behaviour.
+    """
+    return (
+        db.query(CourseGitBinding.id)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+        is not None
+    )
+
+
 def get_course_git_descriptor(
     course_id: UUID | str,
     permissions: Principal,

@@ -192,7 +192,24 @@ async def course_member_post_create(
         f"course member {course_member.id}"
     )
 
-    # Step 4: Trigger StudentRepositoryCreationWorkflow
+    # Step 4: Trigger StudentRepositoryCreationWorkflow (LEGACY — GitLab-only, eager).
+    #
+    # Courses on the new course-level git model carry a CourseGitBinding and
+    # provision student repos lazily (Forgejo babysat via
+    # /user/courses/{id}/provision-repository, or BYO registration), so the eager
+    # legacy workflow must NOT fire for them. Un-migrated courses (org-level
+    # GitLab, no binding) keep the existing behaviour until migrated.
+    from computor_backend.business_logic.course_git import course_uses_course_level_git
+
+    if course_uses_course_level_git(db, course_member.course_id):
+        logger.info(
+            "Course %s uses course-level git (binding present); skipping legacy "
+            "StudentRepositoryCreationWorkflow for course member %s (lazy provisioning).",
+            course_member.course_id,
+            course_member.id,
+        )
+        return None
+
     try:
         from computor_backend.task_tracker import get_task_tracker
         from computor_types.tasks import TaskSubmission
