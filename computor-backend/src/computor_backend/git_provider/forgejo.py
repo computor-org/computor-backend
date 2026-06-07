@@ -341,6 +341,38 @@ class ForgejoProviderClient:
         )
         return None
 
+    def mint_admin_service_token(
+        self,
+        admin_username: str,
+        admin_password: str,
+        name: str = "computor-service",
+    ) -> str | None:
+        """Mint a rotating service token for the admin user via **basic auth**.
+
+        The course-level registry stores a service token per managed server which
+        the backend uses to create orgs/repos and fork student templates — but a
+        token cannot create a token, so seeding one requires the admin's basic-auth
+        credentials. Scoped to org + repo + user operations. Rotates (drops any
+        same-named token first, whose secret is unrecoverable). Returns the token
+        (shown once) or ``None`` on failure — e.g. Forgejo not up yet.
+        """
+        auth = (admin_username, admin_password)
+        with httpx.Client(base_url=self._url, auth=auth, timeout=30.0) as client:
+            client.delete(f"{_BASE}/users/{admin_username}/tokens/{name}")
+            r = client.post(
+                f"{_BASE}/users/{admin_username}/tokens",
+                json={
+                    "name": name,
+                    "scopes": ["write:organization", "write:repository", "write:user"],
+                },
+            )
+        if r.status_code in (200, 201):
+            return r.json().get("sha1")
+        logger.warning(
+            "Forgejo: could not mint admin service token (status %s)", r.status_code
+        )
+        return None
+
     def ensure_template_repo(self, owner: str, repo: str) -> dict:
         """Ensure the Forgejo org + student-template repo exist (create if
         missing), so a course bound to this managed Forgejo has a real template

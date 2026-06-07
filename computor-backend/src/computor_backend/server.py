@@ -229,6 +229,17 @@ async def startup_logic():
                     else:
                         await asyncio.sleep(3)
 
+    # Register the managed Forgejo in the git-server registry so it is offered
+    # when creating courses (mints the service token on first run). Independent
+    # of Keycloak; best-effort + idempotent; off-thread since it does sync HTTP.
+    if os.environ.get("GIT_SERVER") == "forgejo":
+        import asyncio
+        from computor_backend.business_logic.git_registry import ensure_managed_forgejo_registered
+        try:
+            await asyncio.to_thread(ensure_managed_forgejo_registered)
+        except Exception as e:
+            print(f"[STARTUP] Managed Forgejo registry seeding failed (non-fatal): {e}")
+
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient

@@ -28,6 +28,70 @@ from computor_types.encryption import encrypt_secret
 logger = logging.getLogger(__name__)
 
 
+def ensure_managed_forgejo_registered() -> None:
+    """Idempotently register the configured managed Forgejo as a git server.
+
+    Course creation offers git servers from this registry, but the Forgejo we
+    operate — described in the environment (``GIT_SERVER=forgejo``,
+    ``GIT_SERVER_URL``, admin user/pass) — is never turned into a registry row,
+    so the dropdown would be empty until an admin registered it by hand. This
+    seeds that row at startup and mints the service token the backend needs to
+    provision course/student repos (a token cannot mint another token, so we use
+    the admin's basic-auth credentials once). Best-effort and idempotent: a row
+    that already carries a token is left untouched; if Forgejo is unreachable we
+    log and leave it for the next startup.
+    """
+    from computor_backend.database import get_db_session
+    from computor_backend.git_server.config import get_git_server_settings
+    from computor_backend.git_provider.forgejo import ForgejoProviderClient
+
+    cfg = get_git_server_settings()
+    if not (
+        cfg.is_forgejo
+        and cfg.git_server_url
+        and cfg.git_server_admin_username
+        and cfg.git_server_admin_password
+    ):
+        return
+
+    base_url = cfg.git_server_url.rstrip("/")
+    with get_db_session() as db:
+        server = (
+            db.query(GitServer)
+            .filter(GitServer.type == "forgejo", GitServer.base_url == base_url)
+            .first()
+        )
+        if server is not None and server.token:
+            return  # already registered and usable
+
+        token = ForgejoProviderClient(base_url, "").mint_admin_service_token(
+            cfg.git_server_admin_username, cfg.git_server_admin_password
+        )
+        if not token:
+            logger.warning(
+                "Managed Forgejo at %s not registered yet — service token mint failed "
+                "(Forgejo may still be starting); will retry next startup.",
+                base_url,
+            )
+            return
+
+        if server is None:
+            server = GitServer(
+                type="forgejo",
+                base_url=base_url,
+                name="Computor Forgejo",
+                managed=True,
+                token=encrypt_secret(token),
+            )
+            db.add(server)
+            logger.info("Registered managed Forgejo git server %s", base_url)
+        else:
+            server.token = encrypt_secret(token)
+            server.managed = True
+            logger.info("Backfilled service token for managed Forgejo git server %s", base_url)
+        db.commit()
+
+
 def is_registry_admin(principal: Principal) -> bool:
     """Who may manage the git server registry: admins and ``_organization_manager``."""
     return bool(principal.is_admin or "_organization_manager" in (principal.roles or []))
