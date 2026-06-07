@@ -17,6 +17,25 @@ def get_provider_client(git_provider) -> GitProviderClient:
     raise ValueError(f"Unsupported git provider type: {git_provider.type!r}")
 
 
+def get_provider_client_for_server(git_server) -> GitProviderClient:
+    """Return a provider client for a ``GitServer`` registry row (course-level model).
+
+    Unlike ``get_provider_client`` (legacy organization-scoped ``GitProvider``),
+    this reads the registry's reversibly-encrypted service token via the
+    non-deprecated ``decrypt_secret`` (wire-compatible with the legacy tokens).
+    """
+    from computor_types.encryption import decrypt_secret
+
+    token = decrypt_secret(git_server.token) if git_server.token else ""
+    if git_server.type == 'forgejo':
+        from .forgejo import ForgejoProviderClient
+        return ForgejoProviderClient(git_server.base_url, token)
+    if git_server.type == 'gitlab':
+        from .gitlab import GitLabProviderClient
+        return GitLabProviderClient(git_server.base_url, token, None)
+    raise ValueError(f"Unsupported git server type: {git_server.type!r}")
+
+
 def get_provider_client_from_db(organization_id: str, db) -> GitProviderClient:
     """Load the git provider for an organization from DB and return its client."""
     from ..model.git_provider import GitProvider

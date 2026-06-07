@@ -7,22 +7,37 @@ registration land here in later increments.
 Invariant: nothing here is in the grading path — submissions are uploaded over
 the API; the backend never reads a student's repo. See COURSE_LEVEL_GIT_REFACTOR.md.
 """
+import logging
+import re
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import (
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+)
+from computor_backend.git_provider import get_provider_client_for_server
+from computor_backend.model.auth import Account
 from computor_backend.model.course import Course, CourseMember
-from computor_backend.model.git_server import CourseGitBinding, GitServer
+from computor_backend.model.git_server import (
+    CourseGitBinding,
+    CourseMemberRepository,
+    GitServer,
+)
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.course_git import (
     CourseGitBindingGet,
     CourseGitBindingUpsert,
     CourseGitDescriptor,
+    CourseMemberRepositoryGet,
     GitTemplateRef,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def build_course_git_descriptor(
@@ -199,3 +214,127 @@ def get_course_git_binding(
     if not binding:
         raise NotFoundException("This course has no git binding")
     return _binding_to_get(binding)
+
+
+# ---------------------------------------------------------------------------
+# Forgejo babysat student-repo provisioning
+# ---------------------------------------------------------------------------
+
+
+def student_repo_name(template_repo: str, handle: str) -> str:
+    """Collision-free student repo name from a template repo name + a handle.
+
+    Strips a trailing ``template`` token (the legacy bug used the bare
+    ``username``, colliding across courses). E.g.
+    ``("math--algo--template", "mmusterm") -> "math--algo-mmusterm"``.
+    """
+    base = re.sub(r"[-_]*template$", "", template_repo, flags=re.IGNORECASE)
+    base = base.rstrip("-_.") or "repo"
+    return f"{base}-{handle}"
+
+
+def _resolve_forgejo_handle(user_id: str, db: Session) -> Optional[str]:
+    """The student's Forgejo username == their Keycloak handle (preferred_username),
+    stored on the OIDC ``Account.properties['username']`` after SSO login."""
+    account = (
+        db.query(Account)
+        .filter(Account.user_id == user_id, Account.type == "oidc")
+        .first()
+    )
+    if account and account.properties:
+        return account.properties.get("username")
+    return None
+
+
+def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGet:
+    return CourseMemberRepositoryGet(
+        id=str(rec.id),
+        course_member_id=str(rec.course_member_id),
+        mode=rec.mode,
+        server_url=rec.server_url,
+        repo_ref=rec.repo_ref,
+        http_url=rec.http_url,
+        ssh_url=rec.ssh_url,
+        web_url=rec.web_url,
+    )
+
+
+def provision_student_repository(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> CourseMemberRepositoryGet:
+    """Babysat Forgejo provisioning: fork the course's student-template into a
+    repo for the calling student and record it. Idempotent.
+
+    Requires the course to be bound (``delivery='git'``) to a *managed* Forgejo
+    server offering the ``forgejo`` student-repo mode, with a template set.
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    # Idempotent: one working repo per course membership.
+    existing = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == member.id)
+        .first()
+    )
+    if existing is not None:
+        return _member_repo_to_get(existing)
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if binding is None or binding.delivery != "git":
+        raise BadRequestException("This course is not configured for git provisioning")
+    if "forgejo" not in (binding.student_repo_modes or []):
+        raise BadRequestException("This course does not offer Forgejo-hosted repositories")
+
+    server = binding.git_server
+    if server is None or server.type != "forgejo" or not server.managed or not server.token:
+        raise BadRequestException("No managed Forgejo server is bound to this course")
+    if not binding.template_repo:
+        raise BadRequestException("This course has no Forgejo template configured")
+
+    owner, _, repo = binding.template_repo.partition("/")
+    if not owner or not repo:
+        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+
+    handle = _resolve_forgejo_handle(user_id, db)
+    if not handle:
+        raise BadRequestException(
+            "You have no Forgejo identity yet; sign in once via SSO before provisioning."
+        )
+
+    new_name = student_repo_name(repo, handle)
+    client = get_provider_client_for_server(server)
+    result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
+
+    rec = CourseMemberRepository(
+        course_member_id=member.id,
+        mode="forgejo",
+        git_server_id=server.id,
+        server_url=server.base_url,
+        repo_ref=f"{owner}/{new_name}",
+        http_url=result.http_url,
+        ssh_url=result.ssh_url,
+        web_url=result.web_url,
+        properties=result.properties,
+        created_by=user_id,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    logger.info("Provisioned Forgejo repo %s/%s for course_member %s", owner, new_name, member.id)
+    return _member_repo_to_get(rec)

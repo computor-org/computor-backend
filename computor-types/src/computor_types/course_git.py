@@ -82,3 +82,17 @@ class CourseGitBindingGet(BaseModel):
     template_url: Optional[str] = None
     default_branch: Optional[str] = None
     student_repo_modes: List[str] = Field(default_factory=list)
+
+
+class CourseMemberRepositoryGet(BaseModel):
+    """A student's repository for a course (the result of provisioning, or the
+    recorded BYO location). Tracking only — never read for grading."""
+
+    id: str
+    course_member_id: str
+    mode: str = Field(..., description="forgejo | gitlab_byo | download")
+    server_url: Optional[str] = None
+    repo_ref: Optional[str] = None
+    http_url: Optional[str] = None
+    ssh_url: Optional[str] = None
+    web_url: Optional[str] = None

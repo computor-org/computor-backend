@@ -237,6 +237,63 @@ class ForgejoProviderClient:
             }},
         )
 
+    def provision_student_fork(
+        self,
+        template_owner: str,
+        template_repo: str,
+        target_owner: str,
+        new_name: str,
+        student_username: str | None = None,
+    ) -> StudentRepoResult:
+        """Fork ``template_owner/template_repo`` into ``target_owner/new_name``.
+
+        Course-level (binding-driven) replacement for ``create_student_repository``
+        — takes explicit refs instead of reading ``course.properties.forgejo``, and
+        the caller supplies a collision-free ``new_name`` (fixing the legacy
+        bare-username collision). Idempotent: if the target already exists it is
+        returned as-is. The student is added as a write collaborator when their
+        Forgejo username is known (best-effort — a 404 means they have not logged
+        into Forgejo yet, so access is granted on a later retry).
+        """
+        with self._client() as client:
+            existing = client.get(f"{_BASE}/repos/{target_owner}/{new_name}")
+            if existing.status_code == 200:
+                repo = existing.json()
+            else:
+                r = client.post(
+                    f"{_BASE}/repos/{template_owner}/{template_repo}/forks",
+                    json={"organization": target_owner, "name": new_name},
+                )
+                r.raise_for_status()
+                repo = r.json()
+
+            collaborator_added = False
+            if student_username:
+                cr = client.put(
+                    f"{_BASE}/repos/{target_owner}/{new_name}/collaborators/{student_username}",
+                    json={"permission": "write"},
+                )
+                if cr.status_code == 204:
+                    collaborator_added = True
+                else:
+                    logger.warning(
+                        "Forgejo: could not add collaborator %s to %s/%s (status %s)",
+                        student_username, target_owner, new_name, cr.status_code,
+                    )
+
+        return StudentRepoResult(
+            http_url=repo.get("clone_url", ""),
+            ssh_url=repo.get("ssh_url", ""),
+            web_url=repo.get("html_url", ""),
+            provider_project_id=str(repo.get("id", "")),
+            properties={"forgejo": {
+                "owner": target_owner,
+                "repo_name": new_name,
+                "repo_id": repo.get("id"),
+                "collaborator_added": collaborator_added,
+            }},
+        )
+
     def sync_member_permissions(
         self,
         org: Organization,
