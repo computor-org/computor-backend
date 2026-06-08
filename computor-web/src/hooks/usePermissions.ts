@@ -46,6 +46,9 @@ export function usePermissions() {
     Boolean(scopes?.is_admin) || systemRoles.includes('_admin') || user?.role === 'admin';
   const isOrganizationManager = systemRoles.includes('_organization_manager');
   const isUserManager = isAdmin || systemRoles.includes('_user_manager');
+  // The cohort allowed to manage the org → family → course → git/examples
+  // registry surfaces (the manage/edit/delete actions on those pages).
+  const canManageHierarchy = isAdmin || isOrganizationManager;
   // Coder/workspace access is controlled by the _workspace_user system role
   // (admins bypass). Gates the Workspaces sidebar section.
   const isWorkspaceUser = isAdmin || systemRoles.includes('_workspace_user');
@@ -107,6 +110,7 @@ export function usePermissions() {
     isAdmin,
     isOrganizationManager,
     isUserManager,
+    canManageHierarchy,
     isWorkspaceUser,
     hasView,
     views,
