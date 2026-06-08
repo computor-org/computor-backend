@@ -81,44 +81,35 @@ CACHE_TTL_GET = 600   # 10 minutes
 # Helpers
 # ------------------------------------------------------------------------------
 
-def _resolve_testing_service_id(db: Session, meta: dict) -> str:
-    """Resolve ``example_version.testing_service_id`` from parsed meta.
+def _resolve_testing_service_id(db: Session, meta: dict) -> Optional[str]:
+    """Best-effort resolve ``example_version.testing_service_id`` from parsed meta.
 
-    The slug at ``properties.executionBackend.slug`` is the contract
-    between an example and the platform's testing infrastructure. We
-    resolve it once at upload — every later assignment just copies the
-    FK — so a missing or stale slug must fail loudly here instead of
-    silently producing assignable-but-untestable content downstream.
-
-    Raises BadRequestException if meta lacks the field, or if the
-    declared slug doesn't resolve to an enabled, non-archived Service.
+    The executionBackend slug is preserved verbatim in the version's
+    ``execution_backend`` column regardless, so this resolution is a fast-path
+    optimization — NOT an upload gate. An example must be uploadable before its
+    execution backend exists in this deployment, so a missing or as-yet-unknown
+    slug returns ``None`` (``testing_service_id`` stays NULL) instead of raising.
+    The canonical, blocking check runs later at assignment time
+    (``business_logic.lecturer_deployment``), which re-resolves the slug from
+    ``execution_backend`` and fails there if the backend is still unregistered —
+    so we never silently ship an untestable *assignment*, but we never block an
+    *upload* either.
     """
     eb = ExampleVersion.extract_execution_backend(meta)
     slug = eb.get('slug') if eb else None
     if not slug:
-        raise BadRequestException(
-            error_code="EXAMPLE_VERSION_NO_BACKEND",
-            detail=(
-                "meta.yaml is missing properties.executionBackend.slug. "
-                "Add an executionBackend declaration so the platform "
-                "knows which service should run tests for this example."
-            ),
-        )
+        return None
     service = db.query(Service).filter(
         Service.slug == slug,
         Service.enabled == True,  # noqa: E712 — SQLAlchemy column comparison
         Service.archived_at.is_(None),
     ).first()
     if not service:
-        raise BadRequestException(
-            error_code="EXAMPLE_VERSION_UNKNOWN_BACKEND",
-            detail=(
-                f"meta.yaml references execution backend slug '{slug}', "
-                "which does not match any enabled, non-archived service. "
-                "Register the service or fix the slug in meta.yaml."
-            ),
-            context={"slug": slug},
+        logger.info(
+            "Example upload: executionBackend slug %r has no enabled service yet; "
+            "storing testing_service_id=NULL (resolved at assignment time).", slug
         )
+        return None
     return service.id
 
 

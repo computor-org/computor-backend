@@ -114,20 +114,15 @@ def _link_testing_service(
 ) -> None:
     """Copy ``example_version.testing_service_id`` onto the course content.
 
-    The canonical resolution from meta.yaml's executionBackend slug to a
-    Service.id happens once at example-version upload (see
-    ``api.examples._resolve_testing_service_id``). At assignment time we
-    just propagate the already-validated FK — O(1) and cannot silently
-    fail.
-
-    Legacy fallback: rows uploaded before the FK existed (or whose
-    backfill couldn't resolve at migration time) still have
-    ``example_version.testing_service_id = NULL``. For those, we
-    attempt the slug→service lookup once and write the result back to
-    ``example_version`` so subsequent assignments take the fast path.
-    Truly unresolvable versions raise BadRequestException — the lecturer
-    sees the failure here instead of getting an assignment that can't
-    run tests.
+    Resolution from meta.yaml's executionBackend slug to a Service.id is
+    best-effort at upload (``api.examples._resolve_testing_service_id``): an
+    example may be uploaded before its execution backend is registered, leaving
+    ``testing_service_id = NULL``. **Assignment time is the canonical gate.** If
+    the FK is already set we propagate it (O(1)); if it is NULL we re-resolve the
+    slug from ``execution_backend`` once and write it back so later assignments
+    take the fast path. Truly unresolvable versions raise BadRequestException —
+    the lecturer sees the failure here, when the content actually needs to run
+    tests, instead of being blocked at upload.
     """
     if example_version.testing_service_id is not None:
         if course_content.testing_service_id != example_version.testing_service_id:
@@ -136,8 +131,8 @@ def _link_testing_service(
             course_content.updated_at = datetime.now(timezone.utc)
         return
 
-    # Legacy fallback — only reached for example_versions predating the
-    # upload-time resolver, or where backfill couldn't match the slug.
+    # NULL FK: an example uploaded before its backend was registered, or a
+    # legacy/backfilled row. Resolve the slug now and cache it back.
     slug = example_version.get_execution_backend_slug()
     if not slug:
         raise BadRequestException(
