@@ -143,7 +143,7 @@ def list_git_servers(principal: Principal, db: Session) -> List[GitServerGet]:
 
 def get_git_server(server_id: UUID | str, principal: Principal, db: Session) -> GitServerGet:
     _require_registry_admin(principal)
-    server = db.query(GitServer).filter(GitServer.id == server_id).first()
+    server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
         raise NotFoundException("Git server not found")
     return _to_get(server)
@@ -153,7 +153,7 @@ def update_git_server(
     server_id: UUID | str, data: GitServerUpdate, principal: Principal, db: Session
 ) -> GitServerGet:
     _require_registry_admin(principal)
-    server = db.query(GitServer).filter(GitServer.id == server_id).first()
+    server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
         raise NotFoundException("Git server not found")
 
@@ -173,7 +173,7 @@ def update_git_server(
 
 def delete_git_server(server_id: UUID | str, principal: Principal, db: Session) -> None:
     _require_registry_admin(principal)
-    server = db.query(GitServer).filter(GitServer.id == server_id).first()
+    server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
         raise NotFoundException("Git server not found")
     try:
