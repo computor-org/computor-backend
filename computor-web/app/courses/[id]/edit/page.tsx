@@ -7,6 +7,7 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import NotFound from '@/src/components/NotFound';
 import CourseGitSettingsModal from '@/src/components/CourseGitSettingsModal';
 import type { CourseGet, CourseGitBindingGet, GitServerGet } from 'types/generated';
@@ -112,10 +113,14 @@ export default function CourseSettingsPage() {
     <AuthenticatedLayout>
       <div className="p-6 space-y-6 max-w-3xl">
         <div>
-          <Link href={`/courses/${courseId}`} className="text-sm text-blue-600 hover:underline">
-            ← {course?.title || course?.path || 'Course'}
-          </Link>
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">Course Settings</h1>
+          <Breadcrumbs
+            items={[
+              { label: 'Courses', href: '/courses' },
+              { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+              { label: 'Edit' },
+            ]}
+          />
+          <h1 className="text-3xl font-bold text-gray-900">Edit course</h1>
           {course && <p className="mt-1 text-sm text-gray-500 font-mono">{course.path}</p>}
         </div>
 

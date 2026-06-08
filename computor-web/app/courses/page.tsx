@@ -6,11 +6,12 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { courseRole } = usePermissions();
+  const { courseRole, canCreateCourse } = usePermissions();
   const [courses, setCourses] = useState<CourseList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,17 +45,25 @@ export default function CoursesPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
+        <Breadcrumbs items={[{ label: 'Courses' }]} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Courses</h1>
             <p className="mt-2 text-gray-600">Browse and access all courses where you have permissions</p>
           </div>
-          {!loading && (
-            <div className="text-sm text-gray-500">
-              {courses.length} {courses.length === 1 ? 'course' : 'courses'}
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {!loading && (
+              <span className="text-sm text-gray-500">
+                {courses.length} {courses.length === 1 ? 'course' : 'courses'}
+              </span>
+            )}
+            {canCreateCourse() && (
+              <Link href="/courses/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                New Course
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Loading State */}

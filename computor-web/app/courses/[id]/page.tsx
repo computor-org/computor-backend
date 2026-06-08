@@ -7,6 +7,7 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import type { CourseGet } from 'types/generated';
 
 export default function CoursePage() {
@@ -89,6 +90,7 @@ export default function CoursePage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
+        <Breadcrumbs items={[{ label: 'Courses', href: '/courses' }, { label: course.title || course.path }]} />
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -102,22 +104,14 @@ export default function CoursePage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {canManage && (
-              <Link
-                href={`/courses/${courseId}/settings`}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Settings
-              </Link>
-            )}
+          {canManage && (
             <Link
-              href="/courses"
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              href={`/courses/${courseId}/edit`}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              ← Back to Courses
+              Edit
             </Link>
-          </div>
+          )}
         </div>
 
         {/* Course Description */}
