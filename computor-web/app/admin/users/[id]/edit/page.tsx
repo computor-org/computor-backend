@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { UserGet } from 'types/generated';
@@ -65,11 +65,7 @@ export default function UserEditPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="Requires admin or _user_manager role." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." />;
   }
 
   return (

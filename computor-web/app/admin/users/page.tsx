@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
+import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Forbidden from '@/src/components/Forbidden';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { UserList } from 'types/generated';
 
@@ -16,36 +19,18 @@ export default function UsersPage() {
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
 
-  const [users, setUsers] = useState<UserList[]>([]);
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await usersClient.listUsersUsersGet({ archived: showArchived ? true : undefined, limit: 200 });
-      setUsers(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  }, [showArchived]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    fetchUsers();
-  }, [authLoading, isAuthenticated, canManage, fetchUsers]);
+  const { data, loading, error } = useResource(
+    () => usersClient.listUsersUsersGet({ archived: showArchived ? true : undefined, limit: 200 }),
+    [showArchived],
+    { enabled: canManage },
+  );
+  const users = data ?? [];
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-8 text-red-600 font-medium">Access denied. Requires admin or _user_manager role.</div>
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Access denied. Requires admin or _user_manager role." />;
   }
 
   const filtered = users.filter((u) => {
@@ -56,19 +41,21 @@ export default function UsersPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6">
-        <Breadcrumbs items={[{ label: 'Users' }]} />
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-            <p className="text-sm text-gray-500 mt-1">{users.length} total</p>
-          </div>
-          <Link href="/admin/users/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            New User
-          </Link>
-        </div>
+      <div className="p-6 space-y-6">
+        <PageHeader
+          breadcrumbs={[{ label: 'Users' }]}
+          title="Users"
+          subtitle={`${users.length} total`}
+          actions={
+            <Link href="/admin/users/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+              New User
+            </Link>
+          }
+        />
 
-        <div className="mb-4 flex items-center gap-3">
+        <ErrorBanner>{error}</ErrorBanner>
+
+        <div className="flex items-center gap-3">
           <input
             type="text"
             placeholder="Search by email or name…"
@@ -84,8 +71,6 @@ export default function UsersPage() {
 
         {loading ? (
           <div className="text-gray-500 py-8 text-center">Loading users…</div>
-        ) : error ? (
-          <div className="text-red-600 py-8 text-center">{error}</div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">

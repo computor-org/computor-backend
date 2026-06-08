@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { UserCreate } from 'types/generated';
@@ -40,11 +40,7 @@ export default function UserCreatePage() {
       };
       const created = await usersClient.createUsersUsersPost({ body: payload });
       for (const roleId of roles) {
-        await apiFetch(`${API_BASE_URL}/user-roles`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: created.id, role_id: roleId }),
-        }).catch(() => {});
+        await api.post('/user-roles', { user_id: created.id, role_id: roleId }).catch(() => {});
       }
       router.push(`/admin/users/${created.id}`);
     } catch (e) {
@@ -54,11 +50,7 @@ export default function UserCreatePage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="Requires admin or _user_manager role." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." />;
   }
 
   return (

@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
@@ -74,14 +74,10 @@ export default function UserDetailPage() {
     const toRemove = current.filter((r) => !roles.includes(r));
     try {
       for (const roleId of toAdd) {
-        await apiFetch(`${API_BASE_URL}/user-roles`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, role_id: roleId }),
-        });
+        await api.post('/user-roles', { user_id: userId, role_id: roleId });
       }
       for (const roleId of toRemove) {
-        await apiFetch(`${API_BASE_URL}/user-roles/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
+        await api.del(`/user-roles/users/${userId}/roles/${roleId}`);
       }
       setMsg('Roles updated.');
       await load();
@@ -136,11 +132,7 @@ export default function UserDetailPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="Requires admin or _user_manager role." backLink="/admin/users" backText="Back" />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." backLink="/admin/users" backText="Back" />;
   }
 
   return (
