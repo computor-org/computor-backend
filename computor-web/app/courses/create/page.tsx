@@ -1,28 +1,28 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { CourseFamilyList } from '@/src/generated/types/courses';
+import type { CourseFamilyList, CourseGet } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
 
 const ALL_MODES = ['forgejo', 'gitlab_byo', 'download'];
 
 function CreateInner() {
   const router = useRouter();
-  const params = useSearchParams();
+  const familyIdParam = useSearchParam('familyId');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager, canCreateCourse } = usePermissions();
-  const canConfigureGit = isAdmin || isOrganizationManager; // listing git servers is registry-admin only
+  const { canManageHierarchy: canConfigureGit, canCreateCourse } = usePermissions();
 
   const [families, setFamilies] = useState<CourseFamilyList[]>([]);
   const [servers, setServers] = useState<GitServerGet[]>([]);
-  const [familyId, setFamilyId] = useState(params.get('familyId') || '');
+  const [familyId, setFamilyId] = useState(familyIdParam);
   const [path, setPath] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -35,53 +35,40 @@ function CreateInner() {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
     (async () => {
-      const reqs = [apiFetch(`${API_BASE_URL}/course-families`)];
-      if (canConfigureGit) reqs.push(apiFetch(`${API_BASE_URL}/git-servers`));
-      const [fRes, sRes] = await Promise.all(reqs);
-      if (fRes.ok) {
-        const all: CourseFamilyList[] = await fRes.json();
-        const creatable = all.filter((f) => canCreateCourse(f.organization_id, f.id));
-        setFamilies(creatable);
-        if (!familyId && creatable.length === 1) setFamilyId(creatable[0].id);
-      }
-      if (sRes && sRes.ok) {
-        const srv: GitServerGet[] = await sRes.json();
+      const fams = await api.get<CourseFamilyList[]>('/course-families');
+      const creatable = fams.filter((f) => canCreateCourse(f.organization_id, f.id));
+      setFamilies(creatable);
+      if (!familyIdParam && creatable.length === 1) setFamilyId(creatable[0].id);
+      if (canConfigureGit) {
+        const srv = await api.get<GitServerGet[]>('/git-servers');
         setServers(srv);
         const def = srv.find((s) => s.type === 'forgejo' && s.managed)?.id ?? srv[0]?.id ?? '';
         setServerId(def);
         setGitEnabled(!!def);
       }
-    })();
+    })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, canConfigureGit]);
 
-  const mayCreate = useMemo(() => canCreateCourse(), [canCreateCourse]);
   const toggleMode = (m: string) => setModes((ms) => (ms.includes(m) ? ms.filter((x) => x !== m) : [...ms, m]));
 
   async function save() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/courses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: path.trim(),
-          course_family_id: familyId,
-          title: title.trim() || null,
-          description: description.trim() || null,
-        }),
+      const course = await api.post<CourseGet>('/courses', {
+        path: path.trim(),
+        course_family_id: familyId,
+        title: title.trim() || null,
+        description: description.trim() || null,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Create failed (${res.status})`);
-      const course = await res.json();
       // One step: configure git immediately so a course is never left without it.
       if (canConfigureGit && gitEnabled && serverId) {
-        const gres = await apiFetch(`${API_BASE_URL}/courses/${course.id}/git`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ delivery: 'git', git_server_id: serverId, student_repo_modes: modes }),
-        });
-        if (!gres.ok) throw new Error('Course created, but git setup failed: ' + ((await gres.text()) || gres.status));
+        try {
+          await api.put(`/courses/${course.id}/git`, { delivery: 'git', git_server_id: serverId, student_repo_modes: modes });
+        } catch (e) {
+          throw new Error('Course created, but git setup failed: ' + (e instanceof Error ? e.message : ''));
+        }
       }
       router.push(`/courses/${course.id}`);
     } catch (e) {
@@ -90,12 +77,8 @@ function CreateInner() {
     }
   }
 
-  if (!authLoading && isAuthenticated && !mayCreate) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have permission to create courses." />
-      </AuthenticatedLayout>
-    );
+  if (!authLoading && isAuthenticated && !canCreateCourse()) {
+    return <Forbidden message="You do not have permission to create courses." />;
   }
 
   return (

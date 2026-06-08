@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseGet, CourseGitBindingGet, GitServerGet } from 'types/generated';
 
@@ -16,9 +16,8 @@ const ALL_MODES = ['forgejo', 'gitlab_byo', 'download'];
 export default function CourseEditPage() {
   const courseId = useParams().id as string;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
   // The git binding is registry-backed (manager-only).
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [course, setCourse] = useState<CourseGet | null>(null);
   const [binding, setBinding] = useState<CourseGitBindingGet | null>(null);
@@ -47,20 +46,15 @@ export default function CourseEditPage() {
     setLoading(true);
     setError(null);
     try {
-      const [cRes, gRes, sRes] = await Promise.all([
-        apiFetch(`${API_BASE_URL}/courses/${courseId}`),
-        apiFetch(`${API_BASE_URL}/courses/${courseId}/git`),
-        apiFetch(`${API_BASE_URL}/git-servers`),
-      ]);
-      if (!cRes.ok) throw new Error('Failed to load course');
-      const c: CourseGet = await cRes.json();
+      const c = await api.get<CourseGet>(`/courses/${courseId}`);
       setCourse(c);
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
-      const srv: GitServerGet[] = sRes.ok ? await sRes.json() : [];
+      const srv = await api.get<GitServerGet[]>('/git-servers').catch(() => [] as GitServerGet[]);
       setServers(srv);
-      const b: CourseGitBindingGet | null = gRes.ok ? await gRes.json() : null;
+      // The binding endpoint 404s when a course has none yet — treat as null.
+      const b = await api.get<CourseGitBindingGet>(`/courses/${courseId}/git`).catch(() => null);
       setBinding(b);
       if (b && b.delivery) {
         setDelivery(b.delivery === 'download' ? 'download' : 'git');
@@ -90,17 +84,12 @@ export default function CourseEditPage() {
     setSavingGeneral(true);
     setGeneralMsg(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/courses/${courseId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim() || null,
-          description: description.trim() || null,
-          language_code: language.trim() || null,
-        }),
+      const updated = await api.patch<CourseGet>(`/courses/${courseId}`, {
+        title: title.trim() || null,
+        description: description.trim() || null,
+        language_code: language.trim() || null,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Save failed (${res.status})`);
-      setCourse(await res.json());
+      setCourse(updated);
       setGeneralMsg('Saved.');
     } catch (e) {
       setGeneralMsg(e instanceof Error ? e.message : 'Save failed');
@@ -115,19 +104,14 @@ export default function CourseEditPage() {
     setSavingGit(true);
     setGitMsg(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/courses/${courseId}/git`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          delivery,
-          git_server_id: gitServerId || null,
-          template_repo: templateRepo.trim() || null,
-          template_url: templateUrl.trim() || null,
-          default_branch: branch.trim() || 'main',
-          student_repo_modes: modes,
-        }),
+      await api.put(`/courses/${courseId}/git`, {
+        delivery,
+        git_server_id: gitServerId || null,
+        template_repo: templateRepo.trim() || null,
+        template_url: templateUrl.trim() || null,
+        default_branch: branch.trim() || 'main',
+        student_repo_modes: modes,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Save failed (${res.status})`);
       setGitMsg('Saved.');
       await load();
     } catch (e) {
@@ -138,11 +122,7 @@ export default function CourseEditPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to this course's settings." backLink={`/courses/${courseId}`} backText="Back to course" />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to this course's settings." backLink={`/courses/${courseId}`} backText="Back to course" />;
   }
 
   const serverLabel = (id?: string | null) => {

@@ -2,20 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import type { GitServerGet } from '@/src/generated/types/common';
 
 type GitServerType = 'forgejo' | 'gitlab';
 
 export default function GitServerCreatePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [type, setType] = useState<GitServerType>('forgejo');
   const [baseUrl, setBaseUrl] = useState('');
@@ -29,19 +29,13 @@ export default function GitServerCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/git-servers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          base_url: baseUrl.trim(),
-          name: name.trim() || null,
-          managed,
-          token: token.trim() || null,
-        }),
+      const server = await api.post<GitServerGet>('/git-servers', {
+        type,
+        base_url: baseUrl.trim(),
+        name: name.trim() || null,
+        managed,
+        token: token.trim() || null,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Create failed (${res.status})`);
-      const server = await res.json();
       router.push(`/admin/git-servers/${server.id}`);
     } catch (e) {
       setSaving(false);
@@ -50,11 +44,7 @@ export default function GitServerCreatePage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="Admin or organization-manager access is required." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Admin or organization-manager access is required." />;
   }
 
   return (

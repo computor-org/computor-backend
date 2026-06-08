@@ -1,60 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { api } from '@/src/utils/api';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import type { CourseGet } from 'types/generated';
 
 export default function CoursePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
-  const params = useParams();
-  const courseId = params.id as string;
-  const [course, setCourse] = useState<CourseGet | null>(null);
-  const [courseViews, setCourseViews] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { canManageHierarchy: canManage } = usePermissions();
+  const courseId = useParams().id as string;
 
-  useEffect(() => {
-    // Don't fetch until authentication is confirmed
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-
-    async function fetchCourseData() {
-      try {
-        // Fetch course details
-        const courseResponse = await apiFetch(`${API_BASE_URL}/courses/${courseId}`);
-
-        if (!courseResponse.ok) {
-          throw new Error('Failed to fetch course');
-        }
-
-        const courseData = await courseResponse.json();
-        setCourse(courseData);
-
-        // Fetch course-specific views
-        const viewsResponse = await apiFetch(`${API_BASE_URL}/user/views/${courseId}`);
-
-        if (viewsResponse.ok) {
-          const viewsData = await viewsResponse.json();
-          setCourseViews(viewsData);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCourseData();
-  }, [courseId, authLoading, isAuthenticated]);
+  const { data, loading, error } = useResource(
+    async () => ({
+      course: await api.get<CourseGet>(`/courses/${courseId}`),
+      courseViews: await api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
+    }),
+    [courseId],
+  );
+  const course = data?.course ?? null;
+  const courseViews = data?.courseViews ?? [];
 
   if (loading) {
     return (

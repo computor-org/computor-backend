@@ -1,46 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { api } from '@/src/utils/api';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { courseRole, canCreateCourse } = usePermissions();
-  const [courses, setCourses] = useState<CourseList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Don't fetch until authentication is confirmed
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-
-    async function fetchCourses() {
-      try {
-        const response = await apiFetch(`${API_BASE_URL}/courses`);
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch courses');
-        }
-
-        const data = await response.json();
-        setCourses(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCourses();
-  }, [authLoading, isAuthenticated]);
+  const { data, loading, error } = useResource(() => api.get<CourseList[]>('/courses'), []);
+  const courses = data ?? [];
 
   return (
     <AuthenticatedLayout>

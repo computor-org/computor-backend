@@ -1,76 +1,42 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Forbidden from '@/src/components/Forbidden';
 import type { GitServerGet } from '@/src/generated/types/common';
 
 export default function GitServersPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
-  const [servers, setServers] = useState<GitServerGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/git-servers`);
-      if (!res.ok) throw new Error('Failed to load git servers');
-      setServers(await res.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    if (!canManage) {
-      setLoading(false);
-      return;
-    }
-    load();
-  }, [authLoading, isAuthenticated, canManage, load]);
+  const { data, loading, error } = useResource(() => api.get<GitServerGet[]>('/git-servers'), [], { enabled: canManage });
+  const servers = data ?? [];
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-6">
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-            Admin or organization-manager access is required to manage git servers.
-          </div>
-        </div>
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Admin or organization-manager access is required to manage git servers." />;
   }
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Git Servers' }]} />
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Git Servers</h1>
-            <p className="mt-2 text-gray-600">
-              The registry of git instances courses can bind to. Managed instances hold a service token used for
-              babysat student-repo provisioning.
-            </p>
-          </div>
-          <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            Register Server
-          </Link>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Git Servers' }]}
+          title="Git Servers"
+          subtitle="The registry of git instances courses can bind to. Managed instances hold a service token used for babysat student-repo provisioning."
+          actions={
+            <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+              Register Server
+            </Link>
+          }
+        />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>

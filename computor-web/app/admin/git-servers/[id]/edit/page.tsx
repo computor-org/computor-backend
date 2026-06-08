@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { GitServerGet } from '@/src/generated/types/common';
 
@@ -14,8 +14,7 @@ export default function GitServerEditPage() {
   const serverId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [server, setServer] = useState<GitServerGet | null>(null);
   const [name, setName] = useState('');
@@ -28,21 +27,16 @@ export default function GitServerEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(`${API_BASE_URL}/git-servers/${serverId}`);
-        if (!res.ok) throw new Error('Failed to load git server');
-        const s: GitServerGet = await res.json();
+    api
+      .get<GitServerGet>(`/git-servers/${serverId}`)
+      .then((s) => {
         if (cancelled) return;
         setServer(s);
         setName(s.name || '');
         setManaged(!!s.managed);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'An error occurred');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
+      .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
@@ -52,16 +46,10 @@ export default function GitServerEditPage() {
     setSaving(true);
     setError(null);
     try {
-      // Only send token when the field was touched: undefined keeps the existing
-      // token; an empty string would clear it on the backend.
+      // Only send token when touched: undefined keeps the existing one; "" would clear it.
       const body: Record<string, unknown> = { name: name.trim() || null, managed };
       if (token.length > 0) body.token = token.trim();
-      const res = await apiFetch(`${API_BASE_URL}/git-servers/${serverId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error((await res.text()) || `Save failed (${res.status})`);
+      await api.patch(`/git-servers/${serverId}`, body);
       router.push(`/admin/git-servers/${serverId}`);
     } catch (e) {
       setSaving(false);
@@ -70,11 +58,7 @@ export default function GitServerEditPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="Admin or organization-manager access is required." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Admin or organization-manager access is required." />;
   }
 
   return (
