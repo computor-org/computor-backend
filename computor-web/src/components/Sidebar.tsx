@@ -21,6 +21,12 @@ interface NavItem {
   subItems?: SubItem[];
   /** Only used for course view navigation — matched against user's available views */
   view?: string;
+  /**
+   * Set when the parent has its own landing page at `path`. Default (unset) for a
+   * parent WITH sub-items means "no dedicated page" — clicking it hops to the
+   * first sub-item instead (e.g. System → Maintenance).
+   */
+  ownPage?: boolean;
 }
 
 // Always-visible navigation (every authenticated user sees their courses).
@@ -40,6 +46,7 @@ const workspacesNavigation: NavItem[] = [
     label: 'Workspaces',
     path: '/workspaces',
     icon: 'workspaces',
+    ownPage: true,
     subItems: [
       { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
       { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
@@ -54,9 +61,10 @@ const workspacesNavigation: NavItem[] = [
 const managementNavigation: NavItem[] = [
   {
     id: 'management',
-    label: 'Management',
+    label: 'Organizations',
     path: '/organizations',
     icon: 'lecturer',
+    ownPage: true,
     subItems: [
       { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
       { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
@@ -84,9 +92,10 @@ const adminNavigation: NavItem[] = [
 const userMgmtNavigation: NavItem[] = [
   {
     id: 'user-management',
-    label: 'User Management',
+    label: 'Users',
     path: '/admin/users',
     icon: 'users',
+    ownPage: true,
     subItems: [
       { id: 'um-users', label: 'Users', path: '/admin/users' },
       { id: 'um-invites', label: 'Invite Links', path: '/admin/users/invites' },
@@ -103,6 +112,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     label: 'Student',
     path: `/courses/${courseId}/student`,
     icon: 'student',
+    ownPage: true,
     subItems: [
       { id: 'student-course-contents', label: 'Course Contents', path: `/courses/${courseId}/student/course-contents` },
     ],
@@ -113,6 +123,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     label: 'Tutor',
     path: `/courses/${courseId}/tutor`,
     icon: 'tutor',
+    ownPage: true,
     subItems: [
       { id: 'tutor-students', label: 'Students', path: `/courses/${courseId}/tutor/students` },
       { id: 'tutor-submissions', label: 'Submissions', path: `/courses/${courseId}/tutor/submissions` },
@@ -125,6 +136,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     label: 'Lecturer',
     path: `/courses/${courseId}/lecturer`,
     icon: 'lecturer',
+    ownPage: true,
     subItems: [
       { id: 'lecturer-content', label: 'Course Contents', path: `/courses/${courseId}/lecturer/content` },
       { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
@@ -256,12 +268,15 @@ export default function Sidebar() {
       // matches — never just because the route sits under its path prefix (e.g.
       // /admin/git-servers is under System's /admin but belongs to Management).
       const isChildActive = hasSubItems ? sectionActive : pathname.startsWith(navItem.path + '/');
+      // A parent with sub-items but no dedicated page of its own hops to its
+      // first sub-item (e.g. System has no /admin page → go to Maintenance).
+      const linkHref = hasSubItems && !navItem.ownPage ? navItem.subItems![0].path : navItem.path;
 
       return (
         <div key={navItem.id} className="space-y-1">
           <div className="flex items-center">
             <Link
-              href={navItem.path}
+              href={linkHref}
               className={`flex-1 flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
                 isExactActive
                   ? 'bg-blue-50 text-blue-600'
@@ -427,7 +442,6 @@ export default function Sidebar() {
       {/* Navigation - Main Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(coursesNavigation)}
-        {isWorkspaceUser && renderNavItems(workspacesNavigation)}
         {showManagement &&
           renderNavItems(
             isAdmin || isOrganizationManager
@@ -437,8 +451,9 @@ export default function Sidebar() {
                   subItems: n.subItems?.filter((s) => s.id !== 'mgmt-gitservers'),
                 })),
           )}
-        {isAdmin && renderNavItems(adminNavigation)}
         {isUserManager && renderNavItems(userMgmtNavigation)}
+        {isWorkspaceUser && renderNavItems(workspacesNavigation)}
+        {isAdmin && renderNavItems(adminNavigation)}
       </nav>
 
       {/* Footer - Logo & Version */}
