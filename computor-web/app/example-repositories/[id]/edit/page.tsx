@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { ExampleRepositoryGet } from 'types/generated';
 
@@ -14,8 +14,7 @@ export default function ExampleRepositoryEditPage() {
   const repoId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [repo, setRepo] = useState<ExampleRepositoryGet | null>(null);
   const [name, setName] = useState('');
@@ -27,21 +26,16 @@ export default function ExampleRepositoryEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(`${API_BASE_URL}/example-repositories/${repoId}`);
-        if (!res.ok) throw new Error('Failed to load repository');
-        const r: ExampleRepositoryGet = await res.json();
+    api
+      .get<ExampleRepositoryGet>(`/example-repositories/${repoId}`)
+      .then((r) => {
         if (cancelled) return;
         setRepo(r);
         setName(r.name || '');
         setDescription(r.description || '');
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'An error occurred');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
+      .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
@@ -51,12 +45,7 @@ export default function ExampleRepositoryEditPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/example-repositories/${repoId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
-      });
-      if (!res.ok) throw new Error((await res.text()) || `Save failed (${res.status})`);
+      await api.patch(`/example-repositories/${repoId}`, { name: name.trim(), description: description.trim() || null });
       router.push(`/example-repositories/${repoId}`);
     } catch (e) {
       setSaving(false);
@@ -65,11 +54,7 @@ export default function ExampleRepositoryEditPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to example repositories." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to example repositories." />;
   }
 
   return (

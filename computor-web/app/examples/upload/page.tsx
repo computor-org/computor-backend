@@ -2,13 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { useRouter } from 'next/navigation';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import { discoverExamplesInZip, type DiscoveredExample } from '@/src/utils/exampleZip';
 import type { ExampleRepositoryList } from 'types/generated';
 
@@ -21,13 +22,11 @@ interface UploadRow extends DiscoveredExample {
 
 function UploadInner() {
   const router = useRouter();
-  const params = useSearchParams();
-  const initialRepo = params.get('repository') || '';
-  const forcedDirectory = params.get('directory') || '';
+  const initialRepo = useSearchParam('repository');
+  const forcedDirectory = useSearchParam('directory');
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [repos, setRepos] = useState<ExampleRepositoryList[]>([]);
   const [repoId, setRepoId] = useState(initialRepo);
@@ -39,13 +38,10 @@ function UploadInner() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/example-repositories?limit=200`);
-      if (res.ok) {
-        const all: ExampleRepositoryList[] = await res.json();
-        const uploadable = all.filter((r) => r.source_type === 'minio' || r.source_type === 's3');
-        setRepos(uploadable);
-        if (!initialRepo && uploadable.length === 1) setRepoId(uploadable[0].id);
-      }
+      const all = await api.get<ExampleRepositoryList[]>('/example-repositories?limit=200');
+      const uploadable = all.filter((r) => r.source_type === 'minio' || r.source_type === 's3');
+      setRepos(uploadable);
+      if (!initialRepo && uploadable.length === 1) setRepoId(uploadable[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load repositories');
     }
@@ -82,13 +78,11 @@ function UploadInner() {
       const row = rows[i];
       setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'uploading', message: undefined } : r)));
       try {
-        const res = await apiFetch(`${API_BASE_URL}/examples/upload`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_id: repoId, directory: row.directory, files: row.files }),
+        const v = await api.post<{ version_tag?: string }>('/examples/upload', {
+          repository_id: repoId,
+          directory: row.directory,
+          files: row.files,
         });
-        if (!res.ok) throw new Error((await res.text()) || `Upload failed (${res.status})`);
-        const v = await res.json();
         setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'ok', message: `v${v.version_tag ?? ''}` } : r)));
       } catch (e) {
         setRows((rs) =>
@@ -100,11 +94,7 @@ function UploadInner() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to examples." backLink="/examples" backText="Back" />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to examples." backLink="/examples" backText="Back" />;
   }
 
   const dirsValid = rows.length > 0 && rows.every((r) => DIR_OK.test(r.directory));

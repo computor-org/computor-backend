@@ -2,18 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import type { ExampleRepositoryGet } from 'types/generated';
 
 export default function ExampleRepositoryCreatePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [name, setName] = useState('');
   const [sourceType, setSourceType] = useState<'minio' | 's3' | 'git'>('minio');
@@ -26,18 +26,12 @@ export default function ExampleRepositoryCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/example-repositories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          source_type: sourceType,
-          source_url: sourceUrl.trim(),
-        }),
+      const repo = await api.post<ExampleRepositoryGet>('/example-repositories', {
+        name: name.trim(),
+        description: description.trim() || null,
+        source_type: sourceType,
+        source_url: sourceUrl.trim(),
       });
-      if (!res.ok) throw new Error((await res.text()) || `Create failed (${res.status})`);
-      const repo = await res.json();
       router.push(`/example-repositories/${repo.id}`);
     } catch (e) {
       setSaving(false);
@@ -46,11 +40,7 @@ export default function ExampleRepositoryCreatePage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to example repositories." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to example repositories." />;
   }
 
   return (

@@ -1,66 +1,42 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
-import NotFound from '@/src/components/NotFound';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Forbidden from '@/src/components/Forbidden';
 import type { ExampleRepositoryList } from 'types/generated';
 
 export default function ExampleRepositoriesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
-  const [repos, setRepos] = useState<ExampleRepositoryList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/example-repositories?limit=200`);
-      if (!res.ok) throw new Error('Failed to load example repositories');
-      setRepos(await res.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    load();
-  }, [authLoading, isAuthenticated, canManage, load]);
+  const { data, loading, error } = useResource(() => api.get<ExampleRepositoryList[]>('/example-repositories?limit=200'), [], { enabled: canManage });
+  const repos = data ?? [];
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to example repositories." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to example repositories." />;
   }
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Example Repositories' }]} />
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Example Repositories</h1>
-            <p className="mt-1 text-gray-600">Storage backends that hold examples. Upload examples into a MinIO repository.</p>
-          </div>
-          <Link href="/example-repositories/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            New repository
-          </Link>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Example Repositories' }]}
+          title="Example Repositories"
+          subtitle="Storage backends that hold examples. Upload examples into a MinIO repository."
+          actions={
+            <Link href="/example-repositories/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+              New repository
+            </Link>
+          }
+        />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>

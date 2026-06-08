@@ -1,64 +1,44 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
-import NotFound from '@/src/components/NotFound';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Forbidden from '@/src/components/Forbidden';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { ExampleGet, ExampleVersionList } from 'types/generated';
 
 export default function ExampleDetailPage() {
   const exampleId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const [example, setExample] = useState<ExampleGet | null>(null);
-  const [versions, setVersions] = useState<ExampleVersionList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error } = useResource(
+    async () => ({
+      example: await api.get<ExampleGet>(`/examples/${exampleId}`),
+      versions: await api.get<ExampleVersionList[]>(`/examples/${exampleId}/versions?limit=200`).catch(() => [] as ExampleVersionList[]),
+    }),
+    [exampleId],
+    { enabled: canManage },
+  );
+  const example = data?.example ?? null;
+  const versions = data?.versions ?? [];
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [eRes, vRes] = await Promise.all([
-        apiFetch(`${API_BASE_URL}/examples/${exampleId}`),
-        apiFetch(`${API_BASE_URL}/examples/${exampleId}/versions?limit=200`),
-      ]);
-      if (!eRes.ok) throw new Error('Failed to load example');
-      setExample(await eRes.json());
-      if (vRes.ok) setVersions(await vRes.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [exampleId]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    load();
-  }, [authLoading, isAuthenticated, canManage, load]);
-
-  async function remove() {
-    if (!confirm('Delete this example and all its versions?')) return;
-    const res = await apiFetch(`${API_BASE_URL}/examples/${exampleId}`, { method: 'DELETE' });
-    if (res.ok) router.push('/examples');
-    else setError((await res.text()) || 'Delete failed');
+  async function doDelete() {
+    await api.del(`/examples/${exampleId}`);
+    router.push('/examples');
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have access to examples." backLink="/examples" backText="Back" />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have access to examples." backLink="/examples" backText="Back" />;
   }
 
   const repoId = example?.example_repository_id;
@@ -69,29 +49,26 @@ export default function ExampleDetailPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Examples', href: '/examples' }, { label: example?.title || example?.directory || 'Example' }]} />
+        <PageHeader
+          breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: example?.title || example?.directory || 'Example' }]}
+          title={example?.title || example?.directory || 'Example'}
+          subtitle={example && <span className="font-mono text-sm text-gray-400">{example.identifier}</span>}
+          actions={
+            example ? (
+              <>
+                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Upload new version</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+              </>
+            ) : undefined
+          }
+        />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : example ? (
           <>
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{example.title || example.directory}</h1>
-                <p className="mt-1 text-sm text-gray-400 font-mono">{example.identifier}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                  Upload new version
-                </Link>
-                <button onClick={remove} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
-                  Delete
-                </button>
-              </div>
-            </div>
-
             <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
                 <dt className="text-gray-500">Directory</dt>
@@ -100,9 +77,7 @@ export default function ExampleDetailPage() {
               <div>
                 <dt className="text-gray-500">Repository</dt>
                 <dd className="text-gray-900">
-                  {repoId ? (
-                    <Link href={`/example-repositories/${repoId}`} className="text-blue-600 hover:underline">View repository</Link>
-                  ) : '—'}
+                  {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-blue-600 hover:underline">View repository</Link> : '—'}
                 </dd>
               </div>
               {example.description && (
@@ -144,6 +119,16 @@ export default function ExampleDetailPage() {
           </>
         ) : null}
       </div>
+
+      {confirmDelete && example && (
+        <ConfirmDeleteDialog
+          title={`Delete example “${example.title || example.directory}”?`}
+          message="This permanently deletes the example and all its versions."
+          confirmWord={example.directory}
+          onConfirm={doDelete}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }
