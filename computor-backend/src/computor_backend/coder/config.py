@@ -97,6 +97,14 @@ class CoderSettings(BaseSettings):
         description="Docker registry host for workspace images"
     )
 
+    # Workspace auto-login token (the COMPUTOR_AUTH_TOKEN injected into the workspace)
+    workspace_token_ttl_days: int = Field(
+        default=30,
+        description="Lifetime in days of the auto-minted workspace API token "
+                    "(COMPUTOR_AUTH_TOKEN). Re-minted (rotated) on each provision; "
+                    "set <= 0 to never expire."
+    )
+
 
 # Singleton instance
 _settings: Optional[CoderSettings] = None

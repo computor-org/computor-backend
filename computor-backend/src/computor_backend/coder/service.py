@@ -6,6 +6,7 @@ require access to backend repositories and utilities.
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -22,18 +23,25 @@ def mint_workspace_token(
     cache,
     target_user_id: str,
     created_by: str,
+    ttl_days: Optional[int] = 30,
 ) -> Optional[str]:
     """
     Mint an API token for workspace auto-login.
 
     This creates a singleton token named "workspace-auto-login" for the user.
-    If a token with this name already exists, it is revoked first.
+    If a token with this name already exists, it is revoked first (rotation), so
+    each provision hands the workspace a fresh token and invalidates the old one.
+
+    The token is given a bounded lifetime (``ttl_days``) so a leaked
+    COMPUTOR_AUTH_TOKEN cannot be used indefinitely; an actively-used workspace
+    is re-provisioned (and thus re-minted) well within that window.
 
     Args:
         db: Database session
         cache: Redis cache instance
         target_user_id: User ID to create the token for
         created_by: User ID of the admin creating the token
+        ttl_days: Token lifetime in days; ``None`` or <= 0 means never expire
 
     Returns:
         The full token string if successful, None if failed
@@ -51,6 +59,9 @@ def mint_workspace_token(
 
         # Generate and create new token
         full_token, token_prefix, token_hash = generate_api_token()
+        expires_at = None
+        if ttl_days and ttl_days > 0:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=ttl_days)
         api_token = ApiToken(
             name=token_name,
             description="Auto-generated token for VSCode extension in workspace",
@@ -58,6 +69,7 @@ def mint_workspace_token(
             token_hash=token_hash,
             token_prefix=token_prefix,
             scopes=[],
+            expires_at=expires_at,
             created_by=created_by,
         )
         db.add(api_token)
