@@ -44,17 +44,14 @@ export class StudentsClient extends BaseEndpointClient {
   /**
    * Student List Courses Endpoint
    */
-  async studentListCoursesEndpointStudentsCoursesGet({ courseFamilyId, description, fullPath, fullPathStudent, id, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; fullPathStudent?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
+  async studentListCoursesEndpointStudentsCoursesGet({ courseFamilyId, description, id, limit, organizationId, path, skip, title }: { courseFamilyId?: string | null; description?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
-      full_path: fullPath,
-      full_path_student: fullPathStudent,
       id,
       limit,
       organization_id: organizationId,
       path,
-      provider_url: providerUrl,
       skip,
       title,
     };

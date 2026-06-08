@@ -293,7 +293,6 @@ SCHEMA_TO_MODULE = {
     "CourseStudentInterface": "student_courses",
     "CourseStudentList": "student_courses",
     "CourseStudentQuery": "student_courses",
-    "CourseStudentRepository": "student_courses",
     "CourseTaskRequest": "system",
     "CourseTutorGet": "tutor_courses",
     "CourseTutorInterface": "tutor_courses",

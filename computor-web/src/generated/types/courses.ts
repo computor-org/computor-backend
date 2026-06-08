@@ -923,11 +923,6 @@ export interface CourseFamilyQuery {
   organization_id?: string | null;
 }
 
-export interface CourseStudentRepository {
-  provider_url?: string | null;
-  full_path?: string | null;
-}
-
 export interface CourseStudentGet {
   id: string;
   title?: string | null;
@@ -935,7 +930,6 @@ export interface CourseStudentGet {
   organization_id?: string | null;
   course_content_types: CourseContentTypeGet[];
   path: string;
-  repository: CourseStudentRepository;
 }
 
 export interface CourseStudentList {
@@ -944,7 +938,6 @@ export interface CourseStudentList {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
-  repository: CourseStudentRepository;
 }
 
 export interface CourseStudentQuery {
@@ -956,9 +949,6 @@ export interface CourseStudentQuery {
   path?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  provider_url?: string | null;
-  full_path?: string | null;
-  full_path_student?: string | null;
 }
 
 /**
