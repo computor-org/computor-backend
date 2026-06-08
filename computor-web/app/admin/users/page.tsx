@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
@@ -249,6 +250,7 @@ export default function UsersPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6">
+        <Breadcrumbs items={[{ label: 'Users' }]} />
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

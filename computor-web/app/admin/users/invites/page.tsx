@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
@@ -125,6 +126,7 @@ export default function InvitesPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6">
+        <Breadcrumbs items={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]} />
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

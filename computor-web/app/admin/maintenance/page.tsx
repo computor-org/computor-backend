@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
 import Notification from '@/src/components/workspaces/Notification';
@@ -131,6 +132,7 @@ export default function MaintenancePage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
+        <Breadcrumbs items={[{ label: 'Maintenance' }]} />
         {notification && (
           <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
         )}
