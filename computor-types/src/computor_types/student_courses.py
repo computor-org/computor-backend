@@ -16,7 +16,9 @@ class CourseStudentGet(BaseModel):
     course_content_types: list[CourseContentTypeGet]
     path: str
 
-    repository: CourseStudentRepository
+    # Optional: a course may have no git binding exposed to the student (e.g. courses
+    # using the managed Forgejo binding rather than legacy `properties.gitlab`).
+    repository: Optional[CourseStudentRepository] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,7 +34,8 @@ class CourseStudentList(BaseModel):
     organization_id: Optional[str] = None
     path: str
 
-    repository: CourseStudentRepository
+    # Optional: see CourseStudentGet.repository.
+    repository: Optional[CourseStudentRepository] = None
 
     model_config = ConfigDict(from_attributes=True)
 
