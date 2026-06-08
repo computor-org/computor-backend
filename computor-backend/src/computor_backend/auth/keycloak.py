@@ -219,55 +219,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             tokens = await self._exchange_code_for_tokens(code, redirect_uri)
             print(f"[DEBUG] Token exchange completed")
             
-            # Parse ID token to get user info
-            id_token = tokens.get("id_token")
-            print(f"[DEBUG] ID token present: {bool(id_token)}")
-            if not id_token:
-                return AuthResult(
-                    status=AuthStatus.FAILED,
-                    error_message="No ID token received from Keycloak"
-                )
-            
-            # Decode and verify ID token
-            claims = await self._verify_and_decode_token(id_token)
-            
-            # Extract user info from claims
-            user_info = UserInfo(
-                provider_id=claims.get("sub", ""),
-                email=claims.get("email"),
-                username=claims.get("preferred_username", claims.get("email", "").split("@")[0]),
-                given_name=claims.get("given_name"),
-                family_name=claims.get("family_name"),
-                full_name=claims.get("name"),
-                picture=claims.get("picture"),
-                groups=claims.get("groups", []),
-                attributes={
-                    "email_verified": claims.get("email_verified", False),
-                    "realm_access": claims.get("realm_access", {}),
-                    "resource_access": claims.get("resource_access", {})
-                }
-            )
-            
-            # Calculate token expiration
-            expires_at = None
-            if "exp" in claims:
-                expires_at = datetime.fromtimestamp(claims["exp"], tz=timezone.utc)
-            
-            return AuthResult(
-                status=AuthStatus.SUCCESS,
-                user_info=user_info,
-                access_token=tokens.get("access_token"),
-                refresh_token=tokens.get("refresh_token"),
-                expires_at=expires_at,
-                session_data={
-                    "token_type": tokens.get("token_type", "Bearer"),
-                    "expires_in": tokens.get("expires_in"),
-                    "scope": tokens.get("scope", ""),
-                    # Kept so logout can pass id_token_hint to Keycloak's
-                    # end_session_endpoint and skip the logout confirmation page.
-                    "id_token": id_token,
-                }
-            )
+            return await self._build_auth_result_from_tokens(tokens)
             
         except Exception as e:
             logger.error(f"Failed to handle Keycloak callback: {e}")
@@ -276,6 +228,62 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 error_message=str(e)
             )
     
+    async def _build_auth_result_from_tokens(self, tokens: Dict[str, Any]) -> AuthResult:
+        """Build an ``AuthResult`` from a Keycloak token response.
+
+        Shared by the authorization-code, password, and refresh-token grants:
+        each obtains the token dict its own way, then defers ID-token verification,
+        user-info extraction, and ``AuthResult`` assembly to here.
+        """
+        # Parse ID token to get user info
+        id_token = tokens.get("id_token")
+        if not id_token:
+            return AuthResult(
+                status=AuthStatus.FAILED,
+                error_message="No ID token received from Keycloak"
+            )
+
+        # Decode and verify ID token
+        claims = await self._verify_and_decode_token(id_token)
+
+        # Extract user info from claims
+        user_info = UserInfo(
+            provider_id=claims.get("sub", ""),
+            email=claims.get("email"),
+            username=claims.get("preferred_username", claims.get("email", "").split("@")[0]),
+            given_name=claims.get("given_name"),
+            family_name=claims.get("family_name"),
+            full_name=claims.get("name"),
+            picture=claims.get("picture"),
+            groups=claims.get("groups", []),
+            attributes={
+                "email_verified": claims.get("email_verified", False),
+                "realm_access": claims.get("realm_access", {}),
+                "resource_access": claims.get("resource_access", {})
+            }
+        )
+
+        # Calculate token expiration
+        expires_at = None
+        if "exp" in claims:
+            expires_at = datetime.fromtimestamp(claims["exp"], tz=timezone.utc)
+
+        return AuthResult(
+            status=AuthStatus.SUCCESS,
+            user_info=user_info,
+            access_token=tokens.get("access_token"),
+            refresh_token=tokens.get("refresh_token"),
+            expires_at=expires_at,
+            session_data={
+                "token_type": tokens.get("token_type", "Bearer"),
+                "expires_in": tokens.get("expires_in"),
+                "scope": tokens.get("scope", ""),
+                # Kept so logout can pass id_token_hint to Keycloak's
+                # end_session_endpoint and skip the logout confirmation page.
+                "id_token": id_token,
+            }
+        )
+
     async def _exchange_code_for_tokens(self, code: str, redirect_uri: Optional[str] = None) -> Dict[str, Any]:
         """Exchange authorization code for tokens."""
         if not self._oidc_config:
@@ -428,9 +436,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 
                 response.raise_for_status()
                 tokens = response.json()
-                
-                # Handle the tokens like in callback
-                return await self.handle_callback("", "")  # Reuse token processing logic
+
+                # Build the auth result from the password-grant tokens
+                return await self._build_auth_result_from_tokens(tokens)
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"Authentication failed: {e}")
@@ -503,9 +511,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 )
                 response.raise_for_status()
                 tokens = response.json()
-                
-                # Process the new tokens
-                return await self.handle_callback("", "")  # Reuse token processing logic
+
+                # Build the auth result from the freshly issued tokens
+                return await self._build_auth_result_from_tokens(tokens)
                 
         except Exception as e:
             logger.error(f"Token refresh failed: {e}")
