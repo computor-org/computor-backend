@@ -27,8 +27,14 @@ def get_minio_endpoint() -> str:
 
 # Environment configuration
 MINIO_ENDPOINT = get_minio_endpoint()
-MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
-MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', 'minioadmin')
+# Auth: prefer an explicit MINIO_ACCESS_KEY/SECRET_KEY (a dedicated service
+# account), else fall back to the instance root credentials the MinIO container
+# is provisioned with (MINIO_ROOT_USER/PASSWORD). Without this fallback the
+# backend silently used 'minioadmin'/'minioadmin' while the container root
+# password came from MINIO_ROOT_PASSWORD — so every bucket op failed with
+# AccessDenied. The minioadmin last-resort keeps a bare dev MinIO usable.
+MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY') or os.environ.get('MINIO_ROOT_USER') or 'minioadmin'
+MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY') or os.environ.get('MINIO_ROOT_PASSWORD') or 'minioadmin'
 MINIO_SECURE = os.environ.get('MINIO_SECURE', 'false').lower() == 'true'
 MINIO_REGION = os.environ.get('MINIO_REGION', 'us-east-1')
 MINIO_DEFAULT_BUCKET = os.environ.get('MINIO_DEFAULT_BUCKET', 'computor-storage')
