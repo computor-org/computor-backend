@@ -1,23 +1,25 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import type { CourseFamilyGet } from '@/src/generated/types/courses';
 import type { OrganizationList } from '@/src/generated/types/organizations';
 
 function CreateInner() {
   const router = useRouter();
-  const params = useSearchParams();
+  const organizationIdParam = useSearchParam('organization_id');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canCreateCourseFamily } = usePermissions();
 
   const [orgs, setOrgs] = useState<OrganizationList[]>([]);
-  const [organizationId, setOrganizationId] = useState(params.get('organization_id') || '');
+  const [organizationId, setOrganizationId] = useState(organizationIdParam);
   const [path, setPath] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -26,36 +28,27 @@ function CreateInner() {
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
-    (async () => {
-      const res = await apiFetch(`${API_BASE_URL}/organizations`);
-      if (res.ok) {
-        const all: OrganizationList[] = await res.json();
+    api
+      .get<OrganizationList[]>('/organizations')
+      .then((all) => {
         const creatable = all.filter((o) => canCreateCourseFamily(o.id));
         setOrgs(creatable);
-        if (!organizationId && creatable.length === 1) setOrganizationId(creatable[0].id);
-      }
-    })();
+        if (!organizationIdParam && creatable.length === 1) setOrganizationId(creatable[0].id);
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated]);
-
-  const mayCreate = useMemo(() => canCreateCourseFamily(), [canCreateCourseFamily]);
 
   async function save() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/course-families`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: path.trim(),
-          organization_id: organizationId,
-          title: title.trim() || null,
-          description: description.trim() || null,
-        }),
+      const fam = await api.post<CourseFamilyGet>('/course-families', {
+        path: path.trim(),
+        organization_id: organizationId,
+        title: title.trim() || null,
+        description: description.trim() || null,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Create failed (${res.status})`);
-      const fam = await res.json();
       router.push(`/course-families/${fam.id}`);
     } catch (e) {
       setSaving(false);
@@ -63,12 +56,8 @@ function CreateInner() {
     }
   }
 
-  if (!authLoading && isAuthenticated && !mayCreate) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have permission to create course families." />
-      </AuthenticatedLayout>
-    );
+  if (!authLoading && isAuthenticated && !canCreateCourseFamily()) {
+    return <Forbidden message="You do not have permission to create course families." />;
   }
 
   return (

@@ -1,90 +1,62 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { api } from '@/src/utils/api';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { CourseFamilyGet, CourseList } from '@/src/generated/types/courses';
 
 export default function CourseFamilyDetailPage() {
   const familyId = useParams().id as string;
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager, canCreateCourse } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
-
-  const [family, setFamily] = useState<CourseFamilyGet | null>(null);
-  const [courses, setCourses] = useState<CourseList[]>([]);
+  const { canManageHierarchy: canManage, canCreateCourse } = usePermissions();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [famRes, courseRes] = await Promise.all([
-        apiFetch(`${API_BASE_URL}/course-families/${familyId}`),
-        apiFetch(`${API_BASE_URL}/courses?course_family_id=${familyId}`),
-      ]);
-      if (!famRes.ok) throw new Error('Failed to load course family');
-      setFamily(await famRes.json());
-      if (courseRes.ok) setCourses(await courseRes.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [familyId]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    load();
-  }, [authLoading, isAuthenticated, load]);
-
+  const { data, loading, error } = useResource(
+    async () => ({
+      family: await api.get<CourseFamilyGet>(`/course-families/${familyId}`),
+      courses: await api.get<CourseList[]>(`/courses?course_family_id=${familyId}`),
+    }),
+    [familyId],
+  );
+  const family = data?.family ?? null;
+  const courses = data?.courses ?? [];
   const mayCreateCourse = family ? canCreateCourse(family.organization_id, familyId) : false;
 
   async function doDelete() {
-    const res = await apiFetch(`${API_BASE_URL}/course-families/${familyId}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.text()) || `Delete failed (${res.status})`);
+    await api.del(`/course-families/${familyId}`);
     router.push('/course-families');
   }
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Course Families', href: '/course-families' }, { label: family?.title || family?.path || 'Course Family' }]} />
+        <PageHeader
+          breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: family?.title || family?.path || 'Course Family' }]}
+          title={family?.title || family?.path || 'Course Family'}
+          subtitle={family && <span className="font-mono text-sm text-gray-500">{family.path}</span>}
+          actions={
+            <>
+              {mayCreateCourse && (
+                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">New Course</Link>
+              )}
+              {family && canManage && (
+                <>
+                  <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                  <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                </>
+              )}
+            </>
+          }
+        />
 
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{family?.title || family?.path || 'Course Family'}</h1>
-            {family && <p className="mt-1 text-sm text-gray-500 font-mono">{family.path}</p>}
-          </div>
-          <div className="flex items-center gap-2">
-            {mayCreateCourse && (
-              <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                New Course
-              </Link>
-            )}
-            {canManage && (
-              <>
-                <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  Edit
-                </Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {family?.description && (
           <div className="bg-white border border-gray-200 rounded-lg p-5">

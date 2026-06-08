@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { OrganizationType } from '@/src/generated/types/organizations';
+import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
 
 const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
@@ -28,18 +28,12 @@ export default function OrganizationCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/organizations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: path.trim(),
-          organization_type: orgType,
-          title: title.trim() || null,
-          description: description.trim() || null,
-        }),
+      const org = await api.post<OrganizationGet>('/organizations', {
+        path: path.trim(),
+        organization_type: orgType,
+        title: title.trim() || null,
+        description: description.trim() || null,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Create failed (${res.status})`);
-      const org = await res.json();
       router.push(`/organizations/${org.id}`);
     } catch (e) {
       setSaving(false);
@@ -48,11 +42,7 @@ export default function OrganizationCreatePage() {
   }
 
   if (!authLoading && isAuthenticated && !canCreateOrganization) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have permission to create organizations." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have permission to create organizations." />;
   }
 
   return (

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
+import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
 
@@ -16,8 +16,7 @@ export default function OrganizationEditPage() {
   const orgId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
+  const { canManageHierarchy: canManage } = usePermissions();
 
   const [org, setOrg] = useState<OrganizationGet | null>(null);
   const [title, setTitle] = useState('');
@@ -30,22 +29,17 @@ export default function OrganizationEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(`${API_BASE_URL}/organizations/${orgId}`);
-        if (!res.ok) throw new Error('Failed to load organization');
-        const o: OrganizationGet = await res.json();
+    api
+      .get<OrganizationGet>(`/organizations/${orgId}`)
+      .then((o) => {
         if (cancelled) return;
         setOrg(o);
         setTitle(o.title || '');
         setDescription(o.description || '');
         setOrgType((o.organization_type as OrganizationType) || 'organization');
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'An error occurred');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
+      .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
@@ -55,16 +49,11 @@ export default function OrganizationEditPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await apiFetch(`${API_BASE_URL}/organizations/${orgId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim() || null,
-          description: description.trim() || null,
-          organization_type: orgType,
-        }),
+      await api.patch(`/organizations/${orgId}`, {
+        title: title.trim() || null,
+        description: description.trim() || null,
+        organization_type: orgType,
       });
-      if (!res.ok) throw new Error((await res.text()) || `Save failed (${res.status})`);
       router.push(`/organizations/${orgId}`);
     } catch (e) {
       setSaving(false);
@@ -73,11 +62,7 @@ export default function OrganizationEditPage() {
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return (
-      <AuthenticatedLayout>
-        <NotFound title="Not available" message="You do not have permission to edit organizations." />
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="You do not have permission to edit organizations." />;
   }
 
   return (

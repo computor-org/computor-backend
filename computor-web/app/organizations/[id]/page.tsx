@@ -1,86 +1,61 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { api } from '@/src/utils/api';
+import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { OrganizationGet, CourseFamilyList } from 'types/generated';
 
 export default function OrganizationDetailPage() {
   const orgId = useParams().id as string;
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin, isOrganizationManager, canCreateCourseFamily } = usePermissions();
-  const canManage = isAdmin || isOrganizationManager;
-
-  const [org, setOrg] = useState<OrganizationGet | null>(null);
-  const [families, setFamilies] = useState<CourseFamilyList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { canManageHierarchy: canManage, canCreateCourseFamily } = usePermissions();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [oRes, fRes] = await Promise.all([
-        apiFetch(`${API_BASE_URL}/organizations/${orgId}`),
-        apiFetch(`${API_BASE_URL}/course-families?organization_id=${orgId}`),
-      ]);
-      if (!oRes.ok) throw new Error('Failed to load organization');
-      setOrg(await oRes.json());
-      if (fRes.ok) setFamilies(await fRes.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    load();
-  }, [authLoading, isAuthenticated, load]);
+  const { data, loading, error } = useResource(
+    async () => ({
+      org: await api.get<OrganizationGet>(`/organizations/${orgId}`),
+      families: await api.get<CourseFamilyList[]>(`/course-families?organization_id=${orgId}`),
+    }),
+    [orgId],
+  );
+  const org = data?.org ?? null;
+  const families = data?.families ?? [];
 
   async function doDelete() {
-    const res = await apiFetch(`${API_BASE_URL}/organizations/${orgId}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.text()) || `Delete failed (${res.status})`);
+    await api.del(`/organizations/${orgId}`);
     router.push('/organizations');
   }
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Organizations', href: '/organizations' }, { label: org?.title || org?.path || 'Organization' }]} />
+        <PageHeader
+          breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: org?.title || org?.path || 'Organization' }]}
+          title={org?.title || org?.path || 'Organization'}
+          subtitle={org && <span className="font-mono text-sm text-gray-500">{org.path} · {org.organization_type}</span>}
+          actions={
+            org && canManage ? (
+              <>
+                <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+              </>
+            ) : undefined
+          }
+        />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : org ? (
           <>
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{org.title || org.path}</h1>
-                <p className="mt-1 text-sm text-gray-500 font-mono">{org.path} · {org.organization_type}</p>
-              </div>
-              {canManage && (
-                <div className="flex items-center gap-2">
-                  <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    Edit
-                  </Link>
-                  <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-
             {org.description && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
                 <p className="text-gray-700">{org.description}</p>
@@ -93,9 +68,7 @@ export default function OrganizationDetailPage() {
                   Course Families <span className="text-gray-400 font-normal">({families.length})</span>
                 </h2>
                 {canCreateCourseFamily(orgId) && (
-                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-blue-600 hover:underline">
-                    New course family
-                  </Link>
+                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-blue-600 hover:underline">New course family</Link>
                 )}
               </div>
               {families.length === 0 ? (
