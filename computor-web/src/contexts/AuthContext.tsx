@@ -100,12 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  // Proactive token refresh: refresh every 50 minutes (before 1-hour expiration)
+  // Proactive token refresh. This MUST fire well within Keycloak's SSO Session
+  // Idle (30 min on the computor realm): only /auth/refresh resets that idle timer
+  // — ordinary API calls hit the backend's own session, not Keycloak — so if we
+  // wait longer than the idle window the Keycloak session expires and the refresh
+  // (and thus the user's session) dies. 15 min gives two attempts per idle window.
   useEffect(() => {
     if (!user) return;
 
-    // Refresh interval: 50 minutes (3000000 ms)
-    const REFRESH_INTERVAL = 50 * 60 * 1000;
+    // Refresh interval: 15 minutes — comfortably under the 30-min Keycloak SSO idle.
+    const REFRESH_INTERVAL = 15 * 60 * 1000;
 
     // Set up interval to refresh token periodically
     const refreshInterval = setInterval(async () => {
