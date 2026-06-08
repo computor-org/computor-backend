@@ -219,7 +219,10 @@ async def provision_workspace(
             computor_auth_token=workspace_token,
         )
         return result
-    except HTTPException:
+    except ComputorException:
+        # Typed exceptions (ServiceUnavailableException, NotFoundException, …) already
+        # carry the right status — let them propagate untouched. (The old clause named
+        # an unimported HTTPException, which raised NameError and masked these.)
         raise
     except Exception as e:
         raise _handle_coder_error(e) from e
