@@ -70,7 +70,9 @@ class UserRegistrationResponse(BaseModel):
 
 class TokenRefreshRequest(BaseModel):
     """Token refresh request for SSO."""
-    refresh_token: str = Field(..., description="Refresh token from initial authentication")
+    # Optional: cookie-based clients (web UI) omit this and rely on the HttpOnly
+    # ct_refresh_token cookie, which the endpoint reads as a fallback.
+    refresh_token: Optional[str] = Field(None, description="Refresh token from initial authentication; falls back to the ct_refresh_token cookie")
     provider: str = Field("keycloak", description="Authentication provider")
 
 

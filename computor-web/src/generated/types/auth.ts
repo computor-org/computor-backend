@@ -150,8 +150,8 @@ export interface UserRegistrationResponse {
  * Token refresh request for SSO.
  */
 export interface TokenRefreshRequest {
-  /** Refresh token from initial authentication */
-  refresh_token: string;
+  /** Refresh token from initial authentication; falls back to the ct_refresh_token cookie */
+  refresh_token?: string | null;
   /** Authentication provider */
   provider?: string;
 }

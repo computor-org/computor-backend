@@ -477,26 +477,55 @@ async def refresh_local_token(
 
 @auth_router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(
-    request: TokenRefreshRequest,
+    body: TokenRefreshRequest,
+    request: Request,
+    response: Response,
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> TokenRefreshResponse:
     """
     Refresh SSO access token using refresh token.
 
-    This endpoint allows users to refresh their session token using
-    the refresh token obtained during initial SSO authentication.
+    Cookie-based clients (the web UI) omit ``refresh_token`` from the body and
+    send the HttpOnly ``ct_refresh_token`` cookie instead — JS cannot read that
+    cookie, so we read it server-side. On success we re-set both HttpOnly cookies
+    so the browser session is renewed (otherwise the original ``ct_access_token``
+    max_age expires ~1h after login regardless of activity and the user is logged
+    out, and the rotated refresh token never reaches the client).
 
     Requires authentication to ensure only the token owner can refresh it.
     """
     from computor_backend.business_logic.auth import refresh_sso_token
 
+    refresh_token_value = body.refresh_token or request.cookies.get("ct_refresh_token")
+    if not refresh_token_value:
+        raise UnauthorizedException("No refresh token provided")
+
     result = await refresh_sso_token(
-        refresh_token=request.refresh_token,
-        provider=request.provider,
+        refresh_token=refresh_token_value,
+        provider=body.provider,
         principal=principal,
         db=db
     )
+
+    # Renew the HttpOnly cookies so cookie-based clients stay logged in.
+    response.set_cookie(
+        key="ct_access_token",
+        value=result["access_token"],
+        httponly=True,
+        secure=_COOKIE_SECURE,
+        samesite="lax",
+        max_age=3600,
+    )
+    if result.get("refresh_token"):
+        response.set_cookie(
+            key="ct_refresh_token",
+            value=result["refresh_token"],
+            httponly=True,
+            secure=_COOKIE_SECURE,
+            samesite="lax",
+            max_age=604800,
+        )
 
     return TokenRefreshResponse(**result)
 

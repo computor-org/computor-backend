@@ -88,8 +88,12 @@ export class AuthenticationClient extends BaseEndpointClient {
   /**
    * Refresh Token
    * Refresh SSO access token using refresh token.
-   * This endpoint allows users to refresh their session token using
-   * the refresh token obtained during initial SSO authentication.
+   * Cookie-based clients (the web UI) omit ``refresh_token`` from the body and
+   * send the HttpOnly ``ct_refresh_token`` cookie instead — JS cannot read that
+   * cookie, so we read it server-side. On success we re-set both HttpOnly cookies
+   * so the browser session is renewed (otherwise the original ``ct_access_token``
+   * max_age expires ~1h after login regardless of activity and the user is logged
+   * out, and the rotated refresh token never reaches the client).
    * Requires authentication to ensure only the token owner can refresh it.
    */
   async refreshTokenAuthRefreshPost({ userId, body }: { userId?: string | null; body: TokenRefreshRequest }): Promise<TokenRefreshResponse> {
