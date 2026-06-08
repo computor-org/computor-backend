@@ -7,13 +7,14 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
 from computor_backend.api.api_builder import CrudRouter
-from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import ConflictException, ForbiddenException, NotFoundException
 
 # Import business logic
 from computor_backend.business_logic.organizations import update_organization_token
 from computor_backend.business_logic.cascade_deletion import delete_organization_cascade
+from computor_backend.api.course_families import _may_delete_hierarchy
 from computor_backend.interfaces import OrganizationInterface
-from computor_backend.model import Organization
+from computor_backend.model import CourseFamily, Organization
 from computor_backend.services.storage_service import get_storage_service
 
 # Import DTOs from computor_types
@@ -69,14 +70,26 @@ async def delete_organization_endpoint(
         description="If true, only returns preview without deleting"
     ),
 ) -> CascadeDeleteResult:
-    """Delete organization and all descendant data."""
-    if not permissions.is_admin:
-        raise ForbiddenException("Deletion requires admin permissions")
+    """Delete organization — only when it has no course families left."""
+    if not _may_delete_hierarchy(permissions):
+        raise ForbiddenException("Deletion requires admin or _organization_manager.")
 
     # Verify organization exists
     org = db.query(Organization).filter(Organization.id == str(organization_id)).first()
     if not org:
         raise NotFoundException(f"Organization not found: {organization_id}")
+
+    # Guard: never cascade through course families (and their courses / Forgejo
+    # repos / members). The organization must be emptied top-down first.
+    family_count = db.query(CourseFamily).filter(CourseFamily.organization_id == str(organization_id)).count()
+    if family_count > 0 and not dry_run:
+        raise ConflictException(
+            detail=(
+                f"This organization still has {family_count} course "
+                f"{'families' if family_count != 1 else 'family'}. Delete "
+                f"{'them' if family_count != 1 else 'it'} first (and their courses), then delete the organization."
+            )
+        )
 
     storage = get_storage_service()
     result = await delete_organization_cascade(

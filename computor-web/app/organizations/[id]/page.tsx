@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { OrganizationGet, CourseFamilyList } from 'types/generated';
 
 export default function OrganizationDetailPage() {
@@ -21,6 +22,7 @@ export default function OrganizationDetailPage() {
   const [families, setFamilies] = useState<CourseFamilyList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,11 +47,10 @@ export default function OrganizationDetailPage() {
     load();
   }, [authLoading, isAuthenticated, load]);
 
-  async function remove() {
-    if (!confirm('Delete this organization? Its course families must be removed first.')) return;
+  async function doDelete() {
     const res = await apiFetch(`${API_BASE_URL}/organizations/${orgId}`, { method: 'DELETE' });
-    if (res.ok) router.push('/organizations');
-    else setError((await res.text()) || 'Delete failed');
+    if (!res.ok) throw new Error((await res.text()) || `Delete failed (${res.status})`);
+    router.push('/organizations');
   }
 
   return (
@@ -73,7 +74,7 @@ export default function OrganizationDetailPage() {
                   <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
                     Edit
                   </Link>
-                  <button onClick={remove} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
+                  <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
                     Delete
                   </button>
                 </div>
@@ -116,6 +117,16 @@ export default function OrganizationDetailPage() {
           </>
         ) : null}
       </div>
+
+      {confirmDelete && org && (
+        <ConfirmDeleteDialog
+          title={`Delete organization “${org.title || org.path}”?`}
+          message="This permanently deletes the organization and is irreversible. It must have no course families first."
+          confirmWord={org.path}
+          onConfirm={doDelete}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }

@@ -7,12 +7,19 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
 from computor_backend.api.api_builder import CrudRouter
-from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import ConflictException, ForbiddenException, NotFoundException
 from computor_backend.interfaces import CourseFamilyInterface
-from computor_backend.model import CourseFamily
+from computor_backend.model import Course, CourseFamily
 from computor_backend.services.storage_service import get_storage_service
 from computor_backend.business_logic.cascade_deletion import delete_course_family_cascade
 from computor_types.cascade_deletion import CascadeDeleteResult
+
+
+def _may_delete_hierarchy(permissions: Principal) -> bool:
+    """Deleting an organization / course family requires admin or the global
+    cross-org ``_organization_manager`` role."""
+    return bool(permissions.is_admin or "_organization_manager" in (permissions.roles or []))
+
 
 course_family_router = CrudRouter(CourseFamilyInterface)
 
@@ -39,14 +46,27 @@ async def delete_course_family_endpoint(
         description="If true, only returns preview without deleting"
     ),
 ) -> CascadeDeleteResult:
-    """Delete course family and all descendant courses."""
-    if not permissions.is_admin:
-        raise ForbiddenException("Deletion requires admin permissions")
+    """Delete course family — only when it has no courses left."""
+    if not _may_delete_hierarchy(permissions):
+        raise ForbiddenException("Deletion requires admin or _organization_manager.")
 
     # Verify course family exists
     family = db.query(CourseFamily).filter(CourseFamily.id == str(course_family_id)).first()
     if not family:
         raise NotFoundException(f"Course family not found: {course_family_id}")
+
+    # Guard: never cascade through courses. A family with courses must be emptied
+    # first (deleting a course tears down its Forgejo repos and members properly),
+    # otherwise an org/family delete silently orphans student repositories.
+    course_count = db.query(Course).filter(Course.course_family_id == str(course_family_id)).count()
+    if course_count > 0 and not dry_run:
+        raise ConflictException(
+            detail=(
+                f"This course family still has {course_count} course"
+                f"{'s' if course_count != 1 else ''}. Delete "
+                f"{'them' if course_count != 1 else 'it'} first, then delete the family."
+            )
+        )
 
     storage = get_storage_service()
     result = await delete_course_family_cascade(

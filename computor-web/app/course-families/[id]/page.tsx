@@ -2,22 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { CourseFamilyGet, CourseList } from '@/src/generated/types/courses';
 
 export default function CourseFamilyDetailPage() {
   const familyId = useParams().id as string;
+  const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, canCreateCourse } = usePermissions();
   const canManage = isAdmin || isOrganizationManager;
 
   const [family, setFamily] = useState<CourseFamilyGet | null>(null);
   const [courses, setCourses] = useState<CourseList[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +49,12 @@ export default function CourseFamilyDetailPage() {
 
   const mayCreateCourse = family ? canCreateCourse(family.organization_id, familyId) : false;
 
+  async function doDelete() {
+    const res = await apiFetch(`${API_BASE_URL}/course-families/${familyId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.text()) || `Delete failed (${res.status})`);
+    router.push('/course-families');
+  }
+
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
@@ -63,9 +72,14 @@ export default function CourseFamilyDetailPage() {
               </Link>
             )}
             {canManage && (
-              <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                Edit
-              </Link>
+              <>
+                <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  Edit
+                </Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
+                  Delete
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -99,6 +113,16 @@ export default function CourseFamilyDetailPage() {
           </div>
         )}
       </div>
+
+      {confirmDelete && family && (
+        <ConfirmDeleteDialog
+          title={`Delete course family “${family.title || family.path}”?`}
+          message="This permanently deletes the course family and is irreversible. It must have no courses first."
+          confirmWord={family.path}
+          onConfirm={doDelete}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }

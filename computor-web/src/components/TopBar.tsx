@@ -14,35 +14,30 @@ export default function TopBar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [courseTitle, setCourseTitle] = useState<string | null>(null);
 
-  // Detect if we're in a course context
-  const courseMatch = pathname.match(/^\/courses\/([^/]+)/);
+  // Detect a course context — only a real course id (UUID), so static segments
+  // like /courses/create don't get fetched as a bogus course (→ backend VAL_001).
+  const courseMatch = pathname.match(/^\/courses\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
   const currentCourseId = courseMatch ? courseMatch[1] : null;
 
-  // Fetch course title when in course context
+  // Fetch course title when in course context. No synchronous reset on leave —
+  // the title is gated on currentCourseId at render, so a stale value can't show.
   useEffect(() => {
-    // Only fetch if user is authenticated
-    if (!user) {
-      return;
-    }
-
-    if (currentCourseId) {
-      async function fetchCourseTitle() {
-        try {
-          const response = await apiFetch(
-            `${API_BASE_URL}/courses/${currentCourseId}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setCourseTitle(data.title || 'Untitled Course');
-          }
-        } catch (error) {
-          console.error('Failed to fetch course title:', error);
+    if (!user || !currentCourseId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiFetch(`${API_BASE_URL}/courses/${currentCourseId}`);
+        if (!cancelled && response.ok) {
+          const data = await response.json();
+          setCourseTitle(data.title || 'Untitled Course');
         }
+      } catch (error) {
+        console.error('Failed to fetch course title:', error);
       }
-      fetchCourseTitle();
-    } else {
-      setCourseTitle(null);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [currentCourseId, user]);
 
   // Close menu when clicking outside
@@ -79,7 +74,7 @@ export default function TopBar() {
 
       {/* Right Side - Course Title & User Menu */}
       <div className="flex items-center space-x-4">
-        {courseTitle && (
+        {currentCourseId && courseTitle && (
           <>
             <h2 className="text-lg font-medium text-gray-700">{courseTitle}</h2>
             <div className="h-6 w-px bg-gray-300"></div>
