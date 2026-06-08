@@ -750,7 +750,6 @@ except Exception as e:
     'CourseRoleList': 'course_roles',
     'CourseStudentGet': 'student_courses',
     'CourseStudentList': 'student_courses',
-    'CourseStudentRepository': 'student_courses',
     'CourseTaskRequest': 'system',
     'CourseTutorGet': 'tutor_courses',
     'CourseTutorList': 'tutor_courses',

@@ -29,7 +29,6 @@ from computor_types.student_courses import (
     CourseStudentGet,
     CourseStudentList,
     CourseStudentQuery,
-    CourseStudentRepository,
 )
 from computor_backend.interfaces.student_courses import CourseStudentInterface
 from ..model.course import Course
@@ -294,10 +293,6 @@ class StudentViewRepository(ViewRepository):
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
                 path=course.path,
-                repository=CourseStudentRepository(
-                    provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                    full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
-                ) if course.properties and course.properties.get("gitlab") else None
             ))
 
         # Cache result with query-aware key
@@ -349,10 +344,6 @@ class StudentViewRepository(ViewRepository):
             organization_id=course.organization_id,
             course_content_types=course.course_content_types,
             path=course.path,
-            repository=CourseStudentRepository(
-                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
-                full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
-            ) if course.properties and course.properties.get("gitlab") else None
         )
 
         # Cache result
