@@ -542,9 +542,11 @@ async def verify_coder_access(
             logger.info(f"  {header_name}: {header_value}")
     logger.info("=========================")
 
-    # Extract username from URL path: /coder/u{user_id}/{workspace}/...
-    # Pattern: /coder/u<uuid>/<workspace>/*
-    pattern = r"/coder/u([a-f0-9\-]+)/([^/]+)"
+    # Extract owner + workspace from the URL path: /coder/{owner}/{workspace}/...
+    # Regular users get a Coder username of u{backend_uuid}; the shared admin/service
+    # account keeps its plain username (e.g. "admin"), which is not the u{uuid} form.
+    # Accept any owner segment here and decide authorization below.
+    pattern = r"/coder/([^/]+)/([^/]+)"
     match = re.match(pattern, original_uri)
 
     if not match:
@@ -554,23 +556,33 @@ async def verify_coder_access(
             content={"detail": "Invalid workspace URL format"}
         )
 
-    url_user_id = match.group(1)  # Extract user ID without 'u' prefix
+    url_owner = match.group(1)  # e.g. "u0232de59-..." (regular user) or "admin"
     workspace_name = match.group(2)
 
-    logger.debug(f"URL user_id: {url_user_id}, workspace: {workspace_name}")
+    logger.debug(f"URL owner: {url_owner}, workspace: {workspace_name}")
 
-    # Check if the authenticated user matches the workspace owner
-    # Note: Coder may truncate usernames due to length limits, so we check if the
-    # authenticated user ID starts with the URL user ID (which may be truncated)
-    if not principal.user_id.startswith(url_user_id):
+    # Admins may access any workspace. This also covers the admin/service account,
+    # whose Coder username is not the u{uuid} form and so would never match the
+    # owner check below. Consistent with the system-wide is_admin bypass.
+    if principal.is_admin:
+        logger.info(f"Admin {principal.user_id} authorized for workspace {url_owner}/{workspace_name}")
+        return JSONResponse(
+            status_code=200,
+            content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
+        )
+
+    # Regular users: the owner segment must be the u{backend_uuid} form and resolve to
+    # the authenticated principal. Coder may truncate the username, so compare by prefix.
+    url_user_id = url_owner[1:] if url_owner.startswith("u") else url_owner
+    if not (url_owner.startswith("u") and principal.user_id.startswith(url_user_id)):
         logger.warning(
-            f"User {principal.user_id} attempted to access workspace belonging to {url_user_id}"
+            f"User {principal.user_id} attempted to access workspace belonging to {url_owner}"
         )
         return JSONResponse(
             status_code=403,
             content={
                 "detail": "You are not authorized to access this workspace",
-                "workspace_owner": url_user_id,
+                "workspace_owner": url_owner,
                 "authenticated_user": principal.user_id
             }
         )
