@@ -169,7 +169,7 @@ async def list_templates(
 async def provision_workspace(
     request: WorkspaceProvisionRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db)],
     cache: Annotated[object, Depends(get_cache)],
@@ -200,8 +200,11 @@ async def provision_workspace(
         else:
             target_user = get_user_by_id(db, cache, str(permissions.user_id))
 
-        # Mint workspace token
-        workspace_token = mint_workspace_token(db, cache, str(target_user.id), str(permissions.user_id))
+        # Mint workspace token (bounded lifetime; rotated on each provision)
+        workspace_token = mint_workspace_token(
+            db, cache, str(target_user.id), str(permissions.user_id),
+            ttl_days=settings.workspace_token_ttl_days,
+        )
         if workspace_token:
             logger.info(f"Token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
         else:
