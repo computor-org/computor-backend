@@ -38,17 +38,6 @@ class CourseStudentInterface(CourseStudentInterfaceBase, BackendEntityInterface)
         if params.organization_id is not None:
             query = query.filter(Course.organization_id == params.organization_id)
 
-        # GitLab-specific filters
-        if params.provider_url is not None:
-            query = query.filter(Course.properties["gitlab"].op("->>")("url") == params.provider_url)
-        if params.full_path is not None:
-            query = query.filter(Course.properties["gitlab"].op("->>")("full_path") == params.full_path)
-        if params.full_path_student is not None:
-            from computor_backend.model.course import CourseMember
-            query = query.join(CourseMember, CourseMember.course_id == Course.id).filter(
-                CourseMember.properties["gitlab"].op("->>")("full_path") == params.full_path_student
-            )
-
         # Sort by path, then by title as secondary sort
         query = query.order_by(Course.path, Course.title)
 

@@ -47,3 +47,19 @@ def test_query_drops_legacy_gitlab_filters():
 def test_course_student_repository_dto_is_gone():
     import computor_types.student_courses as sc
     assert not hasattr(sc, "CourseStudentRepository")
+
+
+def test_student_course_search_only_touches_existing_query_fields():
+    """Guards the regression where search() referenced removed legacy params
+    (params.provider_url / full_path / full_path_student) -> AttributeError 500."""
+    from unittest.mock import MagicMock
+    from computor_backend.interfaces.student_courses import CourseStudentInterface
+
+    params = CourseStudentQuery(
+        id=None, title="Algorithms", description=None,
+        path="org.fam.course", course_family_id=None, organization_id=None,
+    )
+    query = MagicMock()
+    # Must not raise AttributeError for fields that no longer exist on the DTO.
+    result = CourseStudentInterface.search(MagicMock(), query, params)
+    assert result is not None
