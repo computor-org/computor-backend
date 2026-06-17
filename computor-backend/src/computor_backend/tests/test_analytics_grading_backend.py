@@ -2,12 +2,25 @@ from datetime import datetime, timezone
 
 import duckdb
 import pandas as pd
+import pytest
+from fastapi import BackgroundTasks
 
 from computor_backend.analytics import (
     AnalyticsCutoffs,
     AnalyticsDuckDbGradingRepository,
+    AnalyticsDuckDbReportRepository,
     AnalyticsDuckDbStore,
+    AnalyticsStorageConfig,
 )
+from computor_backend.analytics.service import AnalyticsService
+from computor_backend.api.analytics import (
+    ANALYTICS_READ_ROLE,
+    ANALYTICS_REFRESH_ROLE,
+    _require_course_role,
+)
+from computor_backend.exceptions import BadRequestException, ForbiddenException
+from computor_backend.permissions.principal import Principal
+from computor_types.analytics import AnalyticsRefreshRequest
 from computor_backend.services.course_member_grading_read import (
     build_course_member_grading_list_response,
     build_course_member_grading_response,
@@ -98,6 +111,136 @@ def test_duckdb_store_round_trips_parquet_snapshot(tmp_path):
         store.close()
 
 
+def test_report_repository_tracks_actual_grading_checkpoint_counts():
+    repo = _report_repo_with_fixture(
+        submission_cutoff=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading_cutoff=datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc),
+    )
+
+    rows = repo.get_student_checkpoint_rows(COURSE_ID)
+    by_member = {row["course_member_id"]: row for row in rows}
+
+    alice = by_member[ALICE_MEMBER_ID]
+    assert alice["total_max_assignments"] == 2
+    assert alice["total_submitted_assignments"] == 2
+    assert alice["total_graded_assignments"] == 1
+    assert alice["average_grading"] == 0.85
+
+    bob = by_member[BOB_MEMBER_ID]
+    assert bob["total_max_assignments"] == 2
+    assert bob["total_submitted_assignments"] == 1
+    assert bob["total_graded_assignments"] == 1
+    assert bob["late_submission_count"] == 1
+    assert bob["average_grading"] == 0.70
+
+
+def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
+    config = AnalyticsStorageConfig(root=tmp_path)
+    config.duckdb_path.parent.mkdir(parents=True)
+    conn = duckdb.connect(str(config.duckdb_path))
+    _create_schema(conn)
+    _insert_fixture(conn)
+    conn.close()
+
+    service = AnalyticsService(config)
+    cutoffs = AnalyticsCutoffs(
+        submission=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading=datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc),
+    ).normalized()
+
+    summary = service.course_summary(COURSE_ID, cutoffs)
+    assert summary.total_students == 2
+    assert summary.total_max_assignments == 4
+    assert summary.total_submitted_assignments == 3
+    assert summary.submitted_percentage == 75.0
+    assert summary.total_graded_assignments == 2
+    assert summary.graded_percentage == 50.0
+    assert summary.average_grading == 0.775
+
+    timeline = service.student_timeline(COURSE_ID, BOB_MEMBER_ID, cutoffs)
+    event_types = [event.event_type for event in timeline.events]
+    assert "official_submission" in event_types
+    assert "test_submission" in event_types
+    assert "test_result" in event_types
+    assert "grading" in event_types
+    assert timeline.events[-1].relation_to_submission_cutoff == "after_submission_cutoff"
+
+
+def test_analytics_access_is_denied_for_default_registered_user(monkeypatch):
+    def deny_all(*args):
+        return _FakeCoursePermissionQuery(None)
+
+    monkeypatch.setattr("computor_backend.api.analytics.check_course_permissions", deny_all)
+
+    with pytest.raises(ForbiddenException):
+        _require_course_role(
+            Principal(user_id="10000000-0000-4000-8000-000000000901"),
+            object(),
+            COURSE_ID,
+            ANALYTICS_READ_ROLE,
+        )
+
+
+def test_analytics_access_allows_admin_without_course_query(monkeypatch):
+    def fail_if_called(*args):
+        raise AssertionError("admin should bypass course query")
+
+    monkeypatch.setattr(
+        "computor_backend.api.analytics.check_course_permissions",
+        fail_if_called,
+    )
+
+    _require_course_role(
+        Principal(is_admin=True, user_id="10000000-0000-4000-8000-000000000001"),
+        object(),
+        COURSE_ID,
+        ANALYTICS_READ_ROLE,
+    )
+
+
+def test_analytics_access_uses_separate_read_and_refresh_roles(monkeypatch):
+    calls = []
+
+    def allow_course_role(_permissions, _entity, course_role_id, _db):
+        calls.append(course_role_id)
+        return _FakeCoursePermissionQuery(object())
+
+    monkeypatch.setattr(
+        "computor_backend.api.analytics.check_course_permissions",
+        allow_course_role,
+    )
+
+    principal = Principal(user_id="10000000-0000-4000-8000-000000000002")
+    _require_course_role(principal, object(), COURSE_ID, ANALYTICS_READ_ROLE)
+    _require_course_role(principal, object(), COURSE_ID, ANALYTICS_REFRESH_ROLE)
+
+    assert calls == [ANALYTICS_READ_ROLE, ANALYTICS_REFRESH_ROLE]
+    assert ANALYTICS_READ_ROLE == "_tutor"
+    assert ANALYTICS_REFRESH_ROLE == "_lecturer"
+
+
+def test_analytics_rejects_invalid_job_id(tmp_path):
+    service = AnalyticsService(AnalyticsStorageConfig(root=tmp_path))
+
+    with pytest.raises(BadRequestException):
+        service.get_job("../secret")
+
+
+def test_analytics_refresh_rejects_unknown_tables(tmp_path):
+    service = AnalyticsService(
+        AnalyticsStorageConfig(root=tmp_path),
+        source_database_url="postgresql+psycopg2://user:pass@example.invalid/db",
+    )
+
+    with pytest.raises(BadRequestException):
+        service.trigger_refresh(
+            course_id=COURSE_ID,
+            request=AnalyticsRefreshRequest(tables=["submission_artifact;drop"]),
+            requested_by_user_id="10000000-0000-4000-8000-000000000001",
+            background_tasks=BackgroundTasks(),
+        )
+
+
 def _repo_with_fixture(
     submission_cutoff: datetime | None,
     grading_cutoff: datetime | None,
@@ -106,6 +249,33 @@ def _repo_with_fixture(
     _create_schema(conn)
     _insert_fixture(conn)
     return AnalyticsDuckDbGradingRepository(
+        conn,
+        cutoffs=AnalyticsCutoffs(
+            submission=submission_cutoff,
+            grading=grading_cutoff,
+        ),
+    )
+
+
+class _FakeCoursePermissionQuery:
+    def __init__(self, result):
+        self.result = result
+
+    def filter(self, *args):
+        return self
+
+    def first(self):
+        return self.result
+
+
+def _report_repo_with_fixture(
+    submission_cutoff: datetime | None,
+    grading_cutoff: datetime | None,
+) -> AnalyticsDuckDbReportRepository:
+    conn = duckdb.connect(":memory:")
+    _create_schema(conn)
+    _insert_fixture(conn)
+    return AnalyticsDuckDbReportRepository(
         conn,
         cutoffs=AnalyticsCutoffs(
             submission=submission_cutoff,
