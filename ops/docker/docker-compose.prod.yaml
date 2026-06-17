@@ -62,6 +62,7 @@ services:
     command: ["sh", "startup.bash"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
+      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:${ANALYTICS_ROOT:-/srv/computor/analytics}
       # Documents tree shared with static-server (which mounts the same host
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
@@ -75,6 +76,10 @@ services:
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       DOCUMENTS_MAX_FILE_SIZE: ${DOCUMENTS_MAX_FILE_SIZE:-10485760}
+      ANALYTICS_ROOT: ${ANALYTICS_ROOT:-/srv/computor/analytics}
+      ANALYTICS_SOURCE_NAME: ${ANALYTICS_SOURCE_NAME:-green}
+      ANALYTICS_SOURCE_DATABASE_URL: ${ANALYTICS_SOURCE_DATABASE_URL:-}
+      ANALYTICS_EXPORT_CHUNK_SIZE: ${ANALYTICS_EXPORT_CHUNK_SIZE:-100000}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5437
       POSTGRES_USER: ${POSTGRES_USER}

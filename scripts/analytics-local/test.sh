@@ -44,4 +44,6 @@ if psql_source_reader -c \
     exit 1
 fi
 
-echo "Analytics local harness smoke test passed"
+bash "${SCRIPT_DIR}/system-test.sh"
+
+echo "Analytics local harness system test passed"
