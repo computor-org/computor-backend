@@ -1,0 +1,58 @@
+# Local analytics instance used by scripts/analytics-local.
+#
+# The harness starts this file twice with different compose project names:
+# one source instance that mimics green and one blue instance that hosts the
+# analytics side. Keep service names generic so compose project isolation owns
+# the container, network, and volume names.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ANALYTICS_LOCAL_POSTGRES_PORT:?set ANALYTICS_LOCAL_POSTGRES_PORT}:5432"
+    environment:
+      TZ: UTC
+      POSTGRES_USER: ${ANALYTICS_LOCAL_POSTGRES_USER:-computor}
+      POSTGRES_PASSWORD: ${ANALYTICS_LOCAL_POSTGRES_PASSWORD:-computor_secret}
+      POSTGRES_DB: ${ANALYTICS_LOCAL_POSTGRES_DB:-computor}
+    volumes:
+      - ${ANALYTICS_LOCAL_INSTANCE_DATA_ROOT:?set ANALYTICS_LOCAL_INSTANCE_DATA_ROOT}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ANALYTICS_LOCAL_REDIS_PORT:?set ANALYTICS_LOCAL_REDIS_PORT}:6379"
+    volumes:
+      - ${ANALYTICS_LOCAL_INSTANCE_DATA_ROOT:?set ANALYTICS_LOCAL_INSTANCE_DATA_ROOT}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ANALYTICS_LOCAL_MINIO_API_PORT:?set ANALYTICS_LOCAL_MINIO_API_PORT}:9000"
+      - "127.0.0.1:${ANALYTICS_LOCAL_MINIO_CONSOLE_PORT:?set ANALYTICS_LOCAL_MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${ANALYTICS_LOCAL_MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${ANALYTICS_LOCAL_MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${ANALYTICS_LOCAL_INSTANCE_DATA_ROOT:?set ANALYTICS_LOCAL_INSTANCE_DATA_ROOT}/minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
