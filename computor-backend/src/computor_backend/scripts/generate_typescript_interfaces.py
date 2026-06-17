@@ -53,7 +53,7 @@ class TypeScriptGenerator:
             'datetime': 'string',  # ISO string
             'date': 'string',      # ISO string
             'UUID': 'string',
-            'Any': 'any',
+            'Any': 'unknown',
             'None': 'null',
             'NoneType': 'null',
         }

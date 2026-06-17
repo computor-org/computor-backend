@@ -26,7 +26,7 @@ export interface AnalyticsJobStatus {
   source_name: string;
   requested_by_user_id?: string | null;
   status: string;
-  progress?: Record<string, any>;
+  progress?: Record<string, unknown>;
   submission_cutoff?: string | null;
   grading_cutoff?: string | null;
   created_at: string;
