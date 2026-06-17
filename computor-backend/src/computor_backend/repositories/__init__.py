@@ -1,69 +1,18 @@
 """
 Repository layer for direct database access with optional caching.
 
-This module provides repository classes for accessing database entities
-with transparent write-through caching. All repositories support optional
-caching via the cache parameter in their constructor.
-
-Repositories included:
-- BaseRepository: Abstract base class for entity repositories
-- ViewRepository: Abstract base class for view repositories
-- Entity repositories: Single-entity CRUD operations
-- View repositories: Complex aggregated queries for student/tutor/lecturer views
-
-Usage:
-    # Entity repository (without cache)
-    repo = OrganizationRepository(db)
-
-    # Entity repository (with cache)
-    from computor_backend.redis_cache import get_cache
-    cache = get_cache()
-    repo = OrganizationRepository(db, cache)
-
-    # View repository (with cache)
-    student_view = StudentViewRepository(db, cache)
-    courses = student_view.list_courses(permissions, params)
+The package root exposes the historical repository names lazily. Importing one
+repository must not import every view repository and external integration.
 """
 
-from .base import (
-    BaseRepository,
-    RepositoryError,
-    NotFoundError,
-    DuplicateError
-)
-from .view_base import ViewRepository
-from .organization import OrganizationRepository
-from .course import CourseRepository
-from .course_family import CourseFamilyRepository
-from .course_member import CourseMemberRepository
-from .user import UserRepository
-from .submission_group import SubmissionGroupRepository
-from .submission_artifact import SubmissionArtifactRepository
-from .result import ResultRepository
-from .message import MessageRepository
-from .example import ExampleRepository
-from .course_content_repo import CourseContentRepository
-from .example_version_repo import ExampleVersionRepository
-from .submission_grade_repo import SubmissionGradeRepository
-from .submission_group_member_repo import SubmissionGroupMemberRepository
-from .course_content_deployment_repo import CourseContentDeploymentRepository
-from .example_dependency_repo import ExampleDependencyRepository
-from .api_token import ApiTokenRepository
-from .service import ServiceRepository
-from .service_type import ServiceTypeRepository
-from .student_view import StudentViewRepository
-from .tutor_view import TutorViewRepository
-from .lecturer_view import LecturerViewRepository
-from .course_member_gradings_view import CourseMemberGradingsViewRepository
+from importlib import import_module
 
 __all__ = [
-    # Base classes
     "BaseRepository",
     "ViewRepository",
     "RepositoryError",
     "NotFoundError",
     "DuplicateError",
-    # Entity repositories
     "OrganizationRepository",
     "CourseRepository",
     "CourseFamilyRepository",
@@ -83,9 +32,59 @@ __all__ = [
     "ApiTokenRepository",
     "ServiceRepository",
     "ServiceTypeRepository",
-    # View repositories
     "StudentViewRepository",
     "TutorViewRepository",
     "LecturerViewRepository",
     "CourseMemberGradingsViewRepository",
 ]
+
+_EXPORTS = {
+    "BaseRepository": ("base", "BaseRepository"),
+    "RepositoryError": ("base", "RepositoryError"),
+    "NotFoundError": ("base", "NotFoundError"),
+    "DuplicateError": ("base", "DuplicateError"),
+    "ViewRepository": ("view_base", "ViewRepository"),
+    "OrganizationRepository": ("organization", "OrganizationRepository"),
+    "CourseRepository": ("course", "CourseRepository"),
+    "CourseFamilyRepository": ("course_family", "CourseFamilyRepository"),
+    "CourseMemberRepository": ("course_member", "CourseMemberRepository"),
+    "UserRepository": ("user", "UserRepository"),
+    "SubmissionGroupRepository": ("submission_group", "SubmissionGroupRepository"),
+    "SubmissionArtifactRepository": ("submission_artifact", "SubmissionArtifactRepository"),
+    "ResultRepository": ("result", "ResultRepository"),
+    "MessageRepository": ("message", "MessageRepository"),
+    "ExampleRepository": ("example", "ExampleRepository"),
+    "CourseContentRepository": ("course_content_repo", "CourseContentRepository"),
+    "ExampleVersionRepository": ("example_version_repo", "ExampleVersionRepository"),
+    "SubmissionGradeRepository": ("submission_grade_repo", "SubmissionGradeRepository"),
+    "SubmissionGroupMemberRepository": (
+        "submission_group_member_repo",
+        "SubmissionGroupMemberRepository",
+    ),
+    "CourseContentDeploymentRepository": (
+        "course_content_deployment_repo",
+        "CourseContentDeploymentRepository",
+    ),
+    "ExampleDependencyRepository": ("example_dependency_repo", "ExampleDependencyRepository"),
+    "ApiTokenRepository": ("api_token", "ApiTokenRepository"),
+    "ServiceRepository": ("service", "ServiceRepository"),
+    "ServiceTypeRepository": ("service_type", "ServiceTypeRepository"),
+    "StudentViewRepository": ("student_view", "StudentViewRepository"),
+    "TutorViewRepository": ("tutor_view", "TutorViewRepository"),
+    "LecturerViewRepository": ("lecturer_view", "LecturerViewRepository"),
+    "CourseMemberGradingsViewRepository": (
+        "course_member_gradings_view",
+        "CourseMemberGradingsViewRepository",
+    ),
+}
+
+
+def __getattr__(name):
+    try:
+        module_name, export_name = _EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+    module = import_module(f".{module_name}", __name__)
+    value = getattr(module, export_name)
+    globals()[name] = value
+    return value
