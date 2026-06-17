@@ -19,41 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 def _aggregate_grading_status(statuses: List[str]) -> Optional[str]:
-    """
-    Aggregate multiple grading statuses following priority rules.
+    from ..services.course_member_grading_stats import aggregate_grading_status
 
-    Rules:
-    1. If ANY 'correction_necessary' exists -> 'correction_necessary'
-    2. Else if ANY 'improvement_possible' exists -> 'improvement_possible'
-    3. Else if ALL are 'corrected' -> 'corrected'
-    4. Else -> 'not_reviewed' (mix of corrected/not_reviewed, or all not_reviewed, or empty)
-
-    Args:
-        statuses: List of grading status strings (can include None values)
-
-    Returns:
-        Aggregated status string, or None if no valid statuses
-    """
-    # Filter out None values
-    valid_statuses = [s for s in statuses if s is not None]
-
-    if not valid_statuses:
-        return None
-
-    # Check for correction_necessary (highest priority)
-    if "correction_necessary" in valid_statuses:
-        return "correction_necessary"
-
-    # Check for improvement_possible
-    if "improvement_possible" in valid_statuses:
-        return "improvement_possible"
-
-    # Check if ALL are corrected
-    if all(s == "corrected" for s in valid_statuses):
-        return "corrected"
-
-    # Default: not_reviewed (mix or all not_reviewed)
-    return "not_reviewed"
+    return aggregate_grading_status(statuses, default=None)
 
 
 class ViewRepository(ABC):
