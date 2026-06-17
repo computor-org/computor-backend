@@ -13,3 +13,4 @@ export * from './sso';
 export * from './tasks';
 export * from './users';
 export * from './websocket';
+export * from './analytics';

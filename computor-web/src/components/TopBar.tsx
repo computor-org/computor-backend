@@ -65,7 +65,7 @@ export default function TopBar() {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40">
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40 print:hidden">
       {/* Logo / Title */}
       <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
         <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />

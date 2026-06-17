@@ -9,6 +9,7 @@ TypeScript interfaces for use in the React frontend.
 import os
 import sys
 import ast
+import types
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Set, Any, Optional, Union
@@ -25,6 +26,11 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from typing import get_origin, get_args, Literal
 import inspect
+
+# Both union spellings: `Optional[X]`/`Union[...]` (typing.Union) and the PEP 604
+# `X | None` form (types.UnionType). Kept module-level because a local variable
+# named `types` inside the converter shadows the `types` module.
+_UNION_ORIGINS = (Union, types.UnionType)
 
 
 class TypeScriptGenerator:
@@ -69,8 +75,9 @@ class TypeScriptGenerator:
         # Get the origin type for generics
         origin = get_origin(py_type)
         
-        # Handle Optional types
-        if origin is Union:
+        # Handle Optional/Union types, including PEP 604 (`X | None`) unions,
+        # whose origin is `types.UnionType` rather than `typing.Union`.
+        if origin in _UNION_ORIGINS:
             args = get_args(py_type)
             # Check if it's Optional (Union with None)
             if type(None) in args:
@@ -171,7 +178,13 @@ class TypeScriptGenerator:
             return ""
 
         self.processed_models.add(model_name)
-        
+
+        # Resolve any deferred (PEP 563) string annotations before reading fields.
+        try:
+            model_class.model_rebuild(force=True)
+        except Exception:
+            pass
+
         # Start interface
         lines = []
         
@@ -291,6 +304,13 @@ class TypeScriptGenerator:
                 spec = importlib.util.spec_from_file_location(module_path, py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
+                    # Register under the real dotted name BEFORE exec so that
+                    # models using `from __future__ import annotations` (PEP 563)
+                    # can resolve their string annotations against this module's
+                    # globals; otherwise datetime/Optional/nested refs collapse
+                    # to `any`.
+                    if module_path:
+                        sys.modules[module_path] = module
                     spec.loader.exec_module(module)
             except Exception as e:
                 print(f"Warning: Could not import module {py_file}: {e}")
@@ -363,8 +383,20 @@ class TypeScriptGenerator:
         
         return '\n'.join(lines).strip()
     
-    def generate_all(self, scan_dirs: List[Path], output_dir: Path):
-        """Generate TypeScript interfaces for all models found."""
+    def generate_all(
+        self,
+        scan_dirs: List[Path],
+        output_dir: Path,
+        only_categories: Optional[Set[str]] = None,
+    ):
+        """Generate TypeScript interfaces for all models found.
+
+        When `only_categories` is given, only those category files are written
+        and the index merges (rather than replaces) their exports. This lets a
+        single category (e.g. analytics) be regenerated without a full backend
+        import environment, which would otherwise empty the other category files
+        whose models failed to import.
+        """
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if self.include_timestamp:
@@ -382,6 +414,7 @@ class TypeScriptGenerator:
             'tasks': [],
             'examples': [],
             'messages': [],
+            'analytics': [],
             'websocket': [],
             'common': [],
         }
@@ -410,9 +443,13 @@ class TypeScriptGenerator:
             # Determine category
             category = 'common'  # default
 
+            # Analytics models take priority: their names carry 'course'/'job'
+            # substrings that would otherwise scatter them into courses/tasks.
+            if 'analytics' in module_name or model_name.startswith('analytics'):
+                category = 'analytics'
             # WebSocket models take priority (module-level check prevents
             # WSDeployment* being categorized as 'common' by the deployment rule)
-            if 'websocket' in module_name or model_name.startswith('ws'):
+            elif 'websocket' in module_name or model_name.startswith('ws'):
                 category = 'websocket'
             # Special handling for GitLab and deployment configs
             elif 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
@@ -444,7 +481,9 @@ class TypeScriptGenerator:
             module_name = enum.__module__.lower() if hasattr(enum, '__module__') else ''
 
             category = 'common'
-            if 'websocket' in module_name or enum_name.startswith('ws'):
+            if 'analytics' in module_name or enum_name.startswith('analytics'):
+                category = 'analytics'
+            elif 'websocket' in module_name or enum_name.startswith('ws'):
                 category = 'websocket'
             elif 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
                 category = 'common'
@@ -474,6 +513,9 @@ class TypeScriptGenerator:
         generated_files = []
         
         for category, models in model_categories.items():
+            if only_categories and category not in only_categories:
+                continue
+
             enums = enum_categories.get(category, [])
 
             if not models and not enums:
@@ -561,22 +603,41 @@ class TypeScriptGenerator:
         
         # Generate index file
         if generated_files:
-            index_content = []
-            index_content.append("/**")
-            index_content.append(" * Auto-generated TypeScript interfaces from Pydantic models")
-            if self.include_timestamp:
-                index_content.append(f" * Generated on: {self._current_timestamp()}")
-            index_content.append(" */")
-            index_content.append("")
-            
-            for category in sorted(model_categories.keys()):
-                if model_categories[category] or enum_categories[category]:
-                    index_content.append(f"export * from './{category}';")
-            
             index_file = output_dir / "index.ts"
+
+            written_categories = sorted(
+                category
+                for category in model_categories.keys()
+                if (model_categories[category] or enum_categories[category])
+                and (not only_categories or category in only_categories)
+            )
+
+            if only_categories and index_file.exists():
+                # Targeted run: merge the new exports into the existing index so
+                # untouched categories keep their exports.
+                existing = index_file.read_text(encoding='utf-8').splitlines()
+                lines = list(existing)
+                for category in written_categories:
+                    export_line = f"export * from './{category}';"
+                    if export_line not in lines:
+                        lines.append(export_line)
+                index_content = lines
+            else:
+                index_content = [
+                    "/**",
+                    " * Auto-generated TypeScript interfaces from Pydantic models",
+                ]
+                if self.include_timestamp:
+                    index_content.append(f" * Generated on: {self._current_timestamp()}")
+                index_content.append(" */")
+                index_content.append("")
+                for category in sorted(model_categories.keys()):
+                    if model_categories[category] or enum_categories[category]:
+                        index_content.append(f"export * from './{category}';")
+
             with open(index_file, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(index_content))
-            
+
             print(f"✅ Generated {index_file}")
         
         return generated_files
@@ -584,6 +645,24 @@ class TypeScriptGenerator:
 
 def main():
     """Main entry point."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--categories",
+        help=(
+            "Comma-separated category names to (re)generate in isolation, e.g. "
+            "'analytics'. Other category files and their index exports are left "
+            "untouched. Omit to regenerate everything."
+        ),
+    )
+    cli_args = parser.parse_args()
+    only_categories: Optional[Set[str]] = (
+        {c.strip() for c in cli_args.categories.split(",") if c.strip()}
+        if cli_args.categories
+        else None
+    )
+
     # Determine paths
     backend_dir = Path(__file__).parent.parent  # computor_backend
     src_dir = backend_dir.parent  # src
@@ -611,10 +690,17 @@ def main():
     
     # Generate interfaces
     generator = TypeScriptGenerator()
-    generated_files = generator.generate_all(scan_dirs, output_dir)
-    
+    generated_files = generator.generate_all(
+        scan_dirs, output_dir, only_categories=only_categories
+    )
+
     print("=" * 50)
     print(f"✅ Generated {len(generated_files)} TypeScript files")
+
+    if only_categories:
+        # Targeted run: leave the README (a full-catalog doc) untouched.
+        print(f"🎯 Regenerated categories: {', '.join(sorted(only_categories))}")
+        return
     
     # Generate a README for the generated files
     timestamp_line = ""
