@@ -2,6 +2,29 @@
 # Extends docker-compose.base.yaml with production services and configuration
 
 services:
+  analytics-permissions:
+    image: alpine:3.20
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /analytics/raw /analytics/duckdb /analytics/jobs
+        chown -R "${ANALYTICS_CONTAINER_UID:-1000}:${ANALYTICS_CONTAINER_GID:-1000}" /analytics
+        chmod -R u+rwX,go-rwx /analytics
+    volumes:
+      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:/analytics
+    restart: "no"
+    labels:
+      - "traefik.enable=false"
+
   # Restricted Docker API proxy. Traefik talks to this instead of the raw
   # socket, so a compromised Traefik can't drive arbitrary Docker actions.
   socket-proxy:
@@ -119,10 +142,16 @@ services:
       # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
       FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
     depends_on:
-      - postgres
-      - minio
-      - redis
-      - temporal
+      analytics-permissions:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      temporal:
+        condition: service_started
     labels:
       - "traefik.enable=true"
       # Service definition (required for proper routing)

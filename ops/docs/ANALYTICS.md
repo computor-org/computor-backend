@@ -26,9 +26,12 @@ Set these variables on the analytics host:
 ```text
 ANALYTICS_ROOT=/srv/computor/analytics
 ANALYTICS_HOST_ROOT=/srv/computor/analytics
+ANALYTICS_CONTAINER_UID=1000
+ANALYTICS_CONTAINER_GID=1000
 ANALYTICS_SOURCE_NAME=green
 ANALYTICS_SOURCE_DATABASE_URL=
 ANALYTICS_EXPORT_CHUNK_SIZE=100000
+ANALYTICS_REFRESH_COURSE_ID=
 ```
 
 `ANALYTICS_SOURCE_DATABASE_URL` must use a read-only source database account.
@@ -38,6 +41,57 @@ browser-visible configuration.
 `ANALYTICS_ROOT` is the path inside the backend container. `ANALYTICS_HOST_ROOT`
 is the host bind mount. In a single-host deployment they can point to the same
 directory.
+
+`analytics-permissions` prepares `ANALYTICS_HOST_ROOT` before the backend starts.
+It creates `raw`, `duckdb`, and `jobs`, then assigns them to
+`ANALYTICS_CONTAINER_UID:ANALYTICS_CONTAINER_GID`. The production API image runs
+as UID/GID `1000`.
+
+## Production Refresh
+
+Run the checked-in wrapper on the analytics host:
+
+```bash
+bash scripts/analytics-prod/refresh.sh
+```
+
+The wrapper reads `.env`, verifies compose configuration, runs the
+`analytics-permissions` service, and executes
+`computor_backend.scripts.analytics_refresh` inside the backend container. The
+backend service writes the same job JSON and DuckDB/Parquet files as the API
+refresh endpoint.
+
+Set `ANALYTICS_REFRESH_COURSE_ID` in `.env` before running it. Optional refresh
+settings are also env-only:
+
+```text
+ANALYTICS_REFRESH_SOURCE_NAME=green
+ANALYTICS_REFRESH_RUN_ID=
+ANALYTICS_REFRESH_SUBMISSION_CUTOFF=
+ANALYTICS_REFRESH_GRADING_CUTOFF=
+ANALYTICS_REFRESH_TABLES=
+```
+
+If the source database is only reachable through SSH, set the tunnel variables
+in `.env` and keep the database password in `ANALYTICS_SOURCE_DATABASE_URL`:
+
+```text
+ANALYTICS_SOURCE_TUNNEL_ENABLED=true
+ANALYTICS_SOURCE_TUNNEL_SSH_TARGET=
+ANALYTICS_SOURCE_TUNNEL_BIND=
+ANALYTICS_SOURCE_TUNNEL_LOCAL_PORT=15432
+ANALYTICS_SOURCE_TUNNEL_REMOTE_HOST=127.0.0.1
+ANALYTICS_SOURCE_TUNNEL_REMOTE_PORT=5432
+ANALYTICS_SOURCE_TUNNEL_GSSAPI=true
+ANALYTICS_SOURCE_TUNNEL_IDENTITY_FILE=
+```
+
+For a persistent tunnel, install
+`ops/systemd/computor-analytics-source-tunnel.service` and put host-specific
+values in `/etc/computor/analytics-source-tunnel.env`. That file must define
+`COMPUTOR_DEPLOY_DIR` and the same `ANALYTICS_SOURCE_TUNNEL_*` variables. The
+systemd unit loads that file after `.env`, so host-local values override blank
+template entries.
 
 ## Storage Layout
 

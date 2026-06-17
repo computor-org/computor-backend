@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -40,6 +40,7 @@ class PostgresAnalyticsSource:
         snapshot_root: Path | str,
         run_id: str | None = None,
         tables: Iterable[str] = ANALYTICS_TABLES,
+        progress: Callable[[str, dict[str, object]], None] | None = None,
     ) -> Path:
         run = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         root = Path(snapshot_root) / f"run={run}"
@@ -53,12 +54,16 @@ class PostgresAnalyticsSource:
                     "tables": {},
                 }
                 for table in tables:
+                    if progress:
+                        progress(table, {"stage": "exporting"})
                     manifest["tables"][table] = self._export_table(
                         conn.execution_options(stream_results=True),
                         store,
                         root,
                         table,
                     )
+                    if progress:
+                        progress(table, manifest["tables"][table])
                 manifest["finished_at"] = datetime.now(timezone.utc).isoformat()
                 (root / "manifest.json").write_text(
                     json.dumps(manifest, indent=2, sort_keys=True),

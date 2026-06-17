@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
+from typing import Callable
 from uuid import uuid4
 
 from fastapi import BackgroundTasks
@@ -97,12 +98,14 @@ class AnalyticsService:
         self,
         job_id: str,
         request: AnalyticsRefreshRequest,
+        progress_callback: Callable[[AnalyticsJobStatus], None] | None = None,
     ) -> None:
         job = self._require_job(job_id)
         job.status = "running"
         job.started_at = _utc_now()
         job.progress = {"stage": "exporting"}
         self.job_store.save(job)
+        _notify_progress(progress_callback, job)
 
         source_config = AnalyticsStorageConfig(
             root=self.storage_config.root,
@@ -115,11 +118,18 @@ class AnalyticsService:
                 application_name="computor_analytics_blue",
                 chunk_size=self.export_chunk_size,
             )
+
+            def save_progress(table: str, state: dict[str, object]) -> None:
+                job.progress = {"stage": "exporting", "table": table, **state}
+                self.job_store.save(job)
+                _notify_progress(progress_callback, job)
+
             snapshot_path = source.export_snapshot(
                 store,
                 source_config.raw_root,
                 run_id=request.run_id,
                 tables=tuple(request.tables or ANALYTICS_TABLES),
+                progress=save_progress,
             )
             row_counts, high_water_marks = _read_manifest(snapshot_path)
             job.status = "succeeded"
@@ -129,12 +139,14 @@ class AnalyticsService:
             job.high_water_marks = high_water_marks
             job.finished_at = _utc_now()
             self.job_store.save(job)
+            _notify_progress(progress_callback, job)
         except Exception as exc:
             job.status = "failed"
             job.progress = {"stage": "failed"}
             job.error = f"{exc.__class__.__name__}: refresh failed"
             job.finished_at = _utc_now()
             self.job_store.save(job)
+            _notify_progress(progress_callback, job)
         finally:
             store.close()
 
@@ -352,6 +364,14 @@ def _read_manifest(snapshot_path: Path) -> tuple[dict[str, int], dict[str, dict[
         row_counts[table] = int(table_manifest.get("rows", 0))
         high_water_marks[table] = table_manifest.get("high_water_marks", {})
     return row_counts, high_water_marks
+
+
+def _notify_progress(
+    callback: Callable[[AnalyticsJobStatus], None] | None,
+    job: AnalyticsJobStatus,
+) -> None:
+    if callback is not None:
+        callback(job)
 
 
 def _validate_slug(value: str) -> None:
