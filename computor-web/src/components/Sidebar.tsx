@@ -344,7 +344,7 @@ export default function Sidebar() {
       <aside
         className={`${
           collapsed ? 'w-16' : 'w-64'
-        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}
+        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col print:hidden`}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
@@ -412,7 +412,7 @@ export default function Sidebar() {
     <aside
       className={`${
         collapsed ? 'w-16' : 'w-64'
-      } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}
+      } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col print:hidden`}
     >
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">

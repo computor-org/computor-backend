@@ -96,6 +96,18 @@ export function usePermissions() {
       ? scopeHasAtLeast(familyRoles, familyId, '_manager')
       : Object.keys(familyRoles).length > 0);
 
+  // True when the user holds at least `minRole` on the course (admins bypass).
+  // Mirrors the backend course-role hierarchy so refresh/read surfaces gate the
+  // same way the API enforces them (e.g. analytics: read `_tutor`, refresh
+  // `_lecturer`).
+  const courseHasAtLeast = (courseId: string, minRole: string): boolean => {
+    if (isAdmin) return true;
+    const want = COURSE_ROLE_RANK[minRole] ?? COURSE_ROLE_RANK._owner;
+    return (courseRoles[courseId] ?? []).some(
+      (r) => (COURSE_ROLE_RANK[r] ?? 0) >= want,
+    );
+  };
+
   // The user's highest role on a course → friendly label for a badge, or null.
   const courseRole = (courseId: string): string | null => {
     const roles = courseRoles[courseId] ?? [];
@@ -123,5 +135,6 @@ export function usePermissions() {
     canCreateCourseFamily,
     canCreateCourse,
     courseRole,
+    courseHasAtLeast,
   };
 }
