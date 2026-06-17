@@ -192,6 +192,70 @@ def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     assert timeline.events[-1].relation_to_submission_cutoff == "after_submission_cutoff"
 
 
+def test_analytics_service_lists_snapshot_courses_by_staff_role(tmp_path):
+    service = _service_with_fixture(tmp_path)
+
+    lecturer_courses = service.list_courses(
+        user_email="lecturer@example.test",
+        minimum_role=ANALYTICS_READ_ROLE,
+    )
+    tutor_courses = service.list_courses(
+        user_email="tutor@example.test",
+        minimum_role=ANALYTICS_READ_ROLE,
+    )
+    student_courses = service.list_courses(
+        user_email="alice@example.test",
+        minimum_role=ANALYTICS_READ_ROLE,
+    )
+
+    assert len(lecturer_courses) == 1
+    assert lecturer_courses[0].course_id == COURSE_ID
+    assert lecturer_courses[0].title == "Analytics cutoff fixture"
+    assert lecturer_courses[0].path == "fixture.course"
+    assert lecturer_courses[0].source_name == "green"
+    assert lecturer_courses[0].role == "_lecturer"
+    assert lecturer_courses[0].total_students == 2
+    assert len(tutor_courses) == 1
+    assert tutor_courses[0].role == "_tutor"
+    assert student_courses == []
+
+
+def test_analytics_service_checks_snapshot_role_hierarchy(tmp_path):
+    service = _service_with_fixture(tmp_path)
+
+    assert service.has_course_role(
+        COURSE_ID,
+        "tutor@example.test",
+        ANALYTICS_READ_ROLE,
+    )
+    assert not service.has_course_role(
+        COURSE_ID,
+        "tutor@example.test",
+        ANALYTICS_REFRESH_ROLE,
+    )
+    assert service.has_course_role(
+        COURSE_ID,
+        "lecturer@example.test",
+        ANALYTICS_REFRESH_ROLE,
+    )
+    assert not service.has_course_role(
+        COURSE_ID,
+        "alice@example.test",
+        ANALYTICS_READ_ROLE,
+    )
+
+
+def test_analytics_service_admin_course_list_includes_all_snapshot_courses(tmp_path):
+    service = _service_with_fixture(tmp_path)
+
+    courses = service.list_courses(include_all=True)
+
+    assert len(courses) == 1
+    assert courses[0].course_id == COURSE_ID
+    assert courses[0].role is None
+    assert courses[0].total_students == 2
+
+
 def test_analytics_access_is_denied_for_default_registered_user(monkeypatch):
     def deny_all(*args):
         return _FakeCoursePermissionQuery(None)
@@ -205,6 +269,33 @@ def test_analytics_access_is_denied_for_default_registered_user(monkeypatch):
             COURSE_ID,
             ANALYTICS_READ_ROLE,
         )
+
+
+def test_analytics_access_falls_back_to_snapshot_staff_role(monkeypatch):
+    def deny_local_course_role(*args):
+        return _FakeCoursePermissionQuery(None)
+
+    class FakeAnalyticsService:
+        def has_course_role(self, _course_id, _email, minimum_role):
+            return minimum_role == ANALYTICS_READ_ROLE
+
+    monkeypatch.setattr(
+        "computor_backend.api.analytics.check_course_permissions",
+        deny_local_course_role,
+    )
+    monkeypatch.setattr(
+        "computor_backend.api.analytics._principal_email",
+        lambda *_args: "tutor@example.test",
+    )
+    monkeypatch.setattr(
+        "computor_backend.api.analytics.AnalyticsService.from_settings",
+        lambda **_kwargs: FakeAnalyticsService(),
+    )
+
+    principal = Principal(user_id="10000000-0000-4000-8000-000000000002")
+    _require_course_role(principal, object(), COURSE_ID, ANALYTICS_READ_ROLE)
+    with pytest.raises(ForbiddenException):
+        _require_course_role(principal, object(), COURSE_ID, ANALYTICS_REFRESH_ROLE)
 
 
 def test_analytics_access_allows_admin_without_course_query(monkeypatch):
@@ -283,6 +374,16 @@ def _repo_with_fixture(
     )
 
 
+def _service_with_fixture(tmp_path) -> AnalyticsService:
+    config = AnalyticsStorageConfig(root=tmp_path)
+    config.duckdb_path.parent.mkdir(parents=True)
+    conn = duckdb.connect(str(config.duckdb_path))
+    _create_schema(conn)
+    _insert_fixture(conn)
+    conn.close()
+    return AnalyticsService(config)
+
+
 class _FakeCoursePermissionQuery:
     def __init__(self, result):
         self.result = result
@@ -325,7 +426,8 @@ def _create_schema(conn):
     );
     CREATE TABLE course (
         id VARCHAR,
-        title VARCHAR
+        title VARCHAR,
+        path VARCHAR
     );
     CREATE TABLE course_content_kind (
         id VARCHAR,
@@ -416,7 +518,7 @@ def _insert_fixture(conn):
     INSERT INTO student_profile VALUES
         ('11000000-0000-4000-8000-000000000101', '10000000-0000-4000-8000-000000000101', 'm101'),
         ('11000000-0000-4000-8000-000000000102', '10000000-0000-4000-8000-000000000102', 'm102');
-    INSERT INTO course VALUES ('{COURSE_ID}', 'Analytics cutoff fixture');
+    INSERT INTO course VALUES ('{COURSE_ID}', 'Analytics cutoff fixture', 'fixture.course');
     INSERT INTO course_content_kind VALUES ('unit', false), ('assignment', true);
     INSERT INTO course_content_type VALUES
         ('30000000-0000-4000-8000-000000000001', 'mandatory', 'Mandatory', '#2563eb', 'assignment'),

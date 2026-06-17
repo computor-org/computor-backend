@@ -6,6 +6,7 @@ import type { Page, Route } from '@playwright/test';
  */
 
 export const COURSE_ID = '11111111-1111-1111-1111-111111111111';
+export const LOCAL_COURSE_ID = '44444444-4444-4444-4444-444444444444';
 export const MEMBER_ID = '22222222-2222-2222-2222-222222222222';
 const API_ORIGIN = 'http://localhost:8000';
 
@@ -127,6 +128,20 @@ const USER = {
 };
 
 const COURSE = { id: COURSE_ID, title: 'Test Course', path: 'test.course' };
+const LOCAL_COURSE = {
+  id: LOCAL_COURSE_ID,
+  title: 'Local Blue Course',
+  path: 'local.blue',
+};
+const ANALYTICS_COURSE = {
+  course_id: COURSE_ID,
+  title: COURSE.title,
+  path: COURSE.path,
+  source_name: 'green',
+  role: '_lecturer',
+  total_students: 2,
+  latest_job: null,
+};
 
 type Role = '_lecturer' | '_tutor';
 type Scenario = 'data' | 'empty';
@@ -166,9 +181,16 @@ export async function setupAnalytics(
 
     if (path.endsWith('/user/views')) return json(route, ['lecturer']);
     if (path.endsWith('/user/scopes'))
-      return json(route, { is_admin: false, course: { [COURSE_ID]: [role] } });
+      return json(route, {
+        is_admin: false,
+        course: { [LOCAL_COURSE_ID]: ['_student'] },
+      });
     if (path.endsWith('/user')) return json(route, USER);
-    if (path === `/courses/${COURSE_ID}`) return json(route, COURSE);
+    if (path === '/courses') return json(route, [LOCAL_COURSE]);
+    if (path === `/courses/${COURSE_ID}`) return json(route, { detail: 'not found' }, 404);
+    if (path === '/analytics/courses') {
+      return json(route, [{ ...ANALYTICS_COURSE, role }]);
+    }
 
     if (path.endsWith('/refresh') && method === 'POST') return json(route, RUNNING_JOB);
     if (path.includes('/analytics/jobs/')) return json(route, COMPLETED_JOB);

@@ -2,6 +2,17 @@ import { expect, test } from '@playwright/test';
 import { analyticsUrl, setupAnalytics } from './fixtures';
 
 test.describe('lecturer analytics', () => {
+  test('dashboard shows local and analytics snapshot courses', async ({ page }) => {
+    await setupAnalytics(page, { role: '_lecturer', scenario: 'data' });
+    await page.goto('/dashboard');
+
+    await expect(page.getByText('Local Blue Course')).toBeVisible();
+    await expect(page.getByText('Test Course')).toBeVisible();
+    await expect(page.getByText('Local', { exact: true })).toBeVisible();
+    await expect(page.getByText('Analytics snapshot')).toBeVisible();
+    await expect(page.getByText('Source green')).toBeVisible();
+  });
+
   test('lecturer sees the checkpoint, opens a timeline, and updates data', async ({ page }) => {
     await setupAnalytics(page, { role: '_lecturer', scenario: 'data' });
     await page.goto(analyticsUrl());

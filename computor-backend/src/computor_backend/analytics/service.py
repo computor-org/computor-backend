@@ -15,8 +15,10 @@ from computor_backend.exceptions import (
     ConfigurationException,
     NotFoundException,
 )
+from computor_backend.permissions.principal import course_role_hierarchy
 from computor_backend.settings import settings
 from computor_types.analytics import (
+    AnalyticsCourseAccess,
     AnalyticsCourseSummary,
     AnalyticsJobStatus,
     AnalyticsRefreshRequest,
@@ -155,6 +157,46 @@ class AnalyticsService:
 
     def list_jobs(self, course_id: str, limit: int = 20) -> list[AnalyticsJobStatus]:
         return self.job_store.list(course_id=str(course_id), limit=limit)
+
+    def list_courses(
+        self,
+        *,
+        user_email: str | None = None,
+        minimum_role: str = "_tutor",
+        include_all: bool = False,
+    ) -> list[AnalyticsCourseAccess]:
+        connection = self._read_connection()
+        try:
+            repo = AnalyticsDuckDbReportRepository(connection)
+            if include_all:
+                rows = repo.get_course_rows()
+            elif user_email:
+                rows = [
+                    row
+                    for row in repo.get_course_rows_for_user_email(user_email)
+                    if _role_allows(str(row.get("role")), minimum_role)
+                ]
+            else:
+                rows = []
+            return self._course_access_from_rows(rows, include_role=not include_all)
+        finally:
+            connection.close()
+
+    def has_course_role(
+        self,
+        course_id: str,
+        user_email: str | None,
+        minimum_role: str,
+    ) -> bool:
+        if not user_email:
+            return False
+        connection = self._read_connection()
+        try:
+            repo = AnalyticsDuckDbReportRepository(connection)
+            roles = repo.get_course_roles_for_user_email(course_id, user_email)
+            return any(_role_allows(role, minimum_role) for role in roles)
+        finally:
+            connection.close()
 
     def course_summary(
         self,
@@ -321,6 +363,35 @@ class AnalyticsService:
             raise NotFoundException("Analytics database has not been built")
         return duckdb.connect(str(path), read_only=True)
 
+    def _course_access_from_rows(
+        self,
+        rows: list[dict[str, object]],
+        *,
+        include_role: bool,
+    ) -> list[AnalyticsCourseAccess]:
+        courses: dict[str, AnalyticsCourseAccess] = {}
+        for row in rows:
+            course_id = str(row["course_id"])
+            role = str(row["role"]) if include_role and row.get("role") else None
+            current = courses.get(course_id)
+            if current and (
+                current.role is None
+                or role is None
+                or course_role_hierarchy.get_role_level(current.role)
+                >= course_role_hierarchy.get_role_level(role)
+            ):
+                continue
+            courses[course_id] = AnalyticsCourseAccess(
+                course_id=course_id,
+                title=row.get("title"),
+                path=row.get("path"),
+                source_name=self.storage_config.source_name,
+                role=role,
+                total_students=int(row.get("total_students") or 0),
+                latest_job=self.job_store.latest_for_course(course_id),
+            )
+        return list(courses.values())
+
     def _require_job(self, job_id: str) -> AnalyticsJobStatus:
         job = self.job_store.get(job_id)
         if job is None:
@@ -389,3 +460,9 @@ def _percentage(value: int, total: int) -> float:
 
 def _average(value: float, count: int) -> float | None:
     return round(value / count, 4) if count > 0 else None
+
+
+def _role_allows(role: str | None, minimum_role: str) -> bool:
+    if not role:
+        return False
+    return course_role_hierarchy.has_role_permission(role, minimum_role)

@@ -38,6 +38,16 @@ export interface AnalyticsJobStatus {
   error?: string | null;
 }
 
+export interface AnalyticsCourseAccess {
+  course_id: string;
+  title?: string | null;
+  path?: string | null;
+  source_name: string;
+  role?: string | null;
+  total_students?: number;
+  latest_job?: AnalyticsJobStatus | null;
+}
+
 export interface AnalyticsCourseSummary {
   course_id: string;
   total_students: number;

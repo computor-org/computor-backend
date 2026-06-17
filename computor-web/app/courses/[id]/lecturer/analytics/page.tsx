@@ -10,8 +10,11 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseGet } from 'types/generated';
 import {
   AnalyticsApiError,
+  analyticsRoleAtLeast,
   getCourseSummary,
+  listAnalyticsCourses,
   listStudents,
+  type AnalyticsCourseAccess,
   type AnalyticsCourseSummary,
   type AnalyticsCutoffs,
   type AnalyticsStudentCheckpoint,
@@ -26,9 +29,9 @@ export default function LecturerAnalyticsPage() {
   const courseId = useParams().id as string;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { courseHasAtLeast } = usePermissions();
-  const canRefresh = courseHasAtLeast(courseId, '_lecturer');
 
   const [course, setCourse] = useState<CourseGet | null>(null);
+  const [analyticsCourse, setAnalyticsCourse] = useState<AnalyticsCourseAccess | null>(null);
   const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>({});
   const [summary, setSummary] = useState<AnalyticsCourseSummary | null>(null);
   const [students, setStudents] = useState<AnalyticsStudentCheckpoint[]>([]);
@@ -38,6 +41,9 @@ export default function LecturerAnalyticsPage() {
     'none',
   );
   const [errorText, setErrorText] = useState<string | null>(null);
+  const canRefresh =
+    courseHasAtLeast(courseId, '_lecturer') ||
+    analyticsRoleAtLeast(analyticsCourse?.role, '_lecturer');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,8 +77,19 @@ export default function LecturerAnalyticsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(`${API_BASE_URL}/courses/${courseId}`);
-        if (!cancelled && res.ok) setCourse(await res.json());
+        const [localRes, analyticsRes] = await Promise.allSettled([
+          apiFetch(`${API_BASE_URL}/courses/${courseId}`),
+          listAnalyticsCourses(),
+        ]);
+        if (cancelled) return;
+        if (localRes.status === 'fulfilled' && localRes.value.ok) {
+          setCourse(await localRes.value.json());
+        }
+        if (analyticsRes.status === 'fulfilled') {
+          setAnalyticsCourse(
+            analyticsRes.value.find((entry) => entry.course_id === courseId) ?? null,
+          );
+        }
       } catch {
         /* header is best-effort */
       }
@@ -100,10 +117,15 @@ export default function LecturerAnalyticsPage() {
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
-              href={`/courses/${courseId}/lecturer`}
+              href={course ? `/courses/${courseId}/lecturer` : '/lecturer/analytics'}
               className="text-sm text-blue-600 hover:underline print:hidden"
             >
-              ← {course?.title || course?.path || 'Lecturer View'}
+              Back to{' '}
+              {course?.title ||
+                analyticsCourse?.title ||
+                course?.path ||
+                analyticsCourse?.path ||
+                'Analytics'}
             </Link>
             <h1 className="mt-2 text-3xl font-bold text-gray-900">Course Analytics</h1>
             <p className="mt-1 text-sm text-gray-500">

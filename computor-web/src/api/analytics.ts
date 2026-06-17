@@ -13,6 +13,7 @@
 
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import type {
+  AnalyticsCourseAccess,
   AnalyticsCourseSummary,
   AnalyticsJobStatus,
   AnalyticsRefreshRequest,
@@ -22,6 +23,7 @@ import type {
 } from '@/src/generated/types/analytics';
 
 export type {
+  AnalyticsCourseAccess,
   AnalyticsCourseSummary,
   AnalyticsJobStatus,
   AnalyticsRefreshRequest,
@@ -53,6 +55,22 @@ export class AnalyticsApiError extends Error {
 const base = (courseId: string) =>
   `${API_BASE_URL}/analytics/courses/${encodeURIComponent(courseId)}`;
 
+const COURSE_ROLE_RANK: Record<string, number> = {
+  _owner: 5,
+  _maintainer: 4,
+  _lecturer: 3,
+  _tutor: 2,
+  _student: 1,
+};
+
+const COURSE_ROLE_LABEL: Record<string, string> = {
+  _owner: 'Owner',
+  _maintainer: 'Maintainer',
+  _lecturer: 'Lecturer',
+  _tutor: 'Tutor',
+  _student: 'Student',
+};
+
 function cutoffQuery(cutoffs?: AnalyticsCutoffs): string {
   const params = new URLSearchParams();
   if (cutoffs?.submissionCutoff) params.set('submission_cutoff', cutoffs.submissionCutoff);
@@ -82,6 +100,10 @@ export function getCourseSummary(
   cutoffs?: AnalyticsCutoffs,
 ): Promise<AnalyticsCourseSummary> {
   return getJson(`${base(courseId)}/summary${cutoffQuery(cutoffs)}`);
+}
+
+export function listAnalyticsCourses(): Promise<AnalyticsCourseAccess[]> {
+  return getJson(`${API_BASE_URL}/analytics/courses`);
 }
 
 export function listStudents(
@@ -143,4 +165,17 @@ export function isTerminalJob(status: string): boolean {
 
 export function isFailedJob(status: string): boolean {
   return ['failed', 'error', 'cancelled'].includes(status.toLowerCase());
+}
+
+export function analyticsRoleAtLeast(
+  role: string | null | undefined,
+  minRole: string,
+): boolean {
+  if (!role) return false;
+  return (COURSE_ROLE_RANK[role] ?? 0) >= (COURSE_ROLE_RANK[minRole] ?? Number.MAX_SAFE_INTEGER);
+}
+
+export function analyticsRoleLabel(role: string | null | undefined): string | null {
+  if (!role) return null;
+  return COURSE_ROLE_LABEL[role] ?? role.replace(/^_/, '');
 }

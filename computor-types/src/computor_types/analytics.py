@@ -41,6 +41,18 @@ class AnalyticsJobStatus(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AnalyticsCourseAccess(BaseModel):
+    course_id: str
+    title: str | None = None
+    path: str | None = None
+    source_name: str
+    role: str | None = None
+    total_students: int = 0
+    latest_job: AnalyticsJobStatus | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AnalyticsCourseSummary(BaseModel):
     course_id: str
     total_students: int

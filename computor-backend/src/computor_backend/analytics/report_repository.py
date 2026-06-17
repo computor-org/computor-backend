@@ -16,6 +16,64 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
     ):
         super().__init__(connection, cutoffs=cutoffs)
 
+    def get_course_rows(self) -> list[dict[str, Any]]:
+        return self._rows(
+            f"""
+            SELECT
+                c.id AS course_id,
+                c.title,
+                {self._course_path_expression()} AS path,
+                COUNT(DISTINCT CASE
+                    WHEN students.course_role_id = '_student' THEN students.id
+                    ELSE NULL
+                END) AS total_students
+            FROM course c
+            LEFT JOIN course_member students ON students.course_id = c.id
+            GROUP BY c.id, c.title{self._course_path_group()}
+            ORDER BY c.title NULLS LAST, path NULLS LAST
+            """,
+        )
+
+    def get_course_rows_for_user_email(self, email: str) -> list[dict[str, Any]]:
+        return self._rows(
+            f"""
+            SELECT
+                c.id AS course_id,
+                c.title,
+                {self._course_path_expression()} AS path,
+                cm.course_role_id AS role,
+                COUNT(DISTINCT CASE
+                    WHEN students.course_role_id = '_student' THEN students.id
+                    ELSE NULL
+                END) AS total_students
+            FROM course c
+            JOIN course_member cm ON cm.course_id = c.id
+            JOIN "user" u ON u.id = cm.user_id
+            LEFT JOIN course_member students ON students.course_id = c.id
+            WHERE lower(u.email) = lower(?)
+            GROUP BY c.id, c.title{self._course_path_group()}, cm.course_role_id
+            ORDER BY c.title NULLS LAST, path NULLS LAST
+            """,
+            [email],
+        )
+
+    def get_course_roles_for_user_email(
+        self,
+        course_id: str,
+        email: str,
+    ) -> list[str]:
+        rows = self._rows(
+            """
+            SELECT cm.course_role_id AS role
+            FROM course_member cm
+            JOIN "user" u ON u.id = cm.user_id
+            WHERE cm.course_id = ?
+              AND lower(u.email) = lower(?)
+            """,
+            [str(course_id), email],
+        )
+        return [str(row["role"]) for row in rows if row.get("role")]
+
     def get_student_checkpoint_rows(self, course_id: str) -> list[dict[str, Any]]:
         submittable_filter, submittable_params = self._submittable_filter(course_id)
         profile_join, profile_params = self._student_profile_join(course_id)
@@ -281,3 +339,13 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
         if occurred_at <= self.cutoffs.submission:
             return "before_submission_cutoff"
         return "after_submission_cutoff"
+
+    def _course_path_expression(self) -> str:
+        if self._has_column("course", "path"):
+            return "CAST(c.path AS VARCHAR)"
+        return "NULL"
+
+    def _course_path_group(self) -> str:
+        if self._has_column("course", "path"):
+            return ", c.path"
+        return ""

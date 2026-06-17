@@ -9,12 +9,14 @@ from sqlalchemy.orm import Session
 from computor_backend.analytics import AnalyticsCutoffs
 from computor_backend.analytics.service import AnalyticsService
 from computor_backend.database import get_db
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.model.auth import User
 from computor_backend.model.course import CourseMember
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.analytics import (
+    AnalyticsCourseAccess,
     AnalyticsCourseSummary,
     AnalyticsJobStatus,
     AnalyticsRefreshRequest,
@@ -29,6 +31,21 @@ ANALYTICS_READ_ROLE = "_tutor"
 ANALYTICS_REFRESH_ROLE = "_lecturer"
 
 
+@analytics_router.get(
+    "/courses",
+    response_model=list[AnalyticsCourseAccess],
+)
+async def list_analytics_courses(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+) -> list[AnalyticsCourseAccess]:
+    return AnalyticsService.from_settings().list_courses(
+        user_email=_principal_email(permissions, db),
+        minimum_role=ANALYTICS_READ_ROLE,
+        include_all=permissions.is_admin,
+    )
+
+
 @analytics_router.post(
     "/courses/{course_id}/refresh",
     response_model=AnalyticsJobStatus,
@@ -40,7 +57,13 @@ async def refresh_course_analytics(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ) -> AnalyticsJobStatus:
-    _require_course_role(permissions, db, course_id, ANALYTICS_REFRESH_ROLE)
+    _require_course_role(
+        permissions,
+        db,
+        course_id,
+        ANALYTICS_REFRESH_ROLE,
+        source_name=request.source_name,
+    )
     service = AnalyticsService.from_settings(source_name=request.source_name)
     return service.trigger_refresh(
         course_id=course_id,
@@ -159,6 +182,7 @@ def _require_course_role(
     db: Session,
     course_id: str,
     minimum_role: str,
+    source_name: str | None = None,
 ) -> None:
     if permissions.is_admin:
         return
@@ -171,8 +195,31 @@ def _require_course_role(
         CourseMember.course_id == course_id,
         CourseMember.user_id == permissions.get_user_id(),
     ).first()
-    if not has_course_role:
+    if has_course_role:
+        return
+
+    email = _principal_email(permissions, db)
+    if email is None:
         raise ForbiddenException("Analytics access requires course staff role")
+    try:
+        has_analytics_role = AnalyticsService.from_settings(
+            source_name=source_name,
+        ).has_course_role(course_id, email, minimum_role)
+    except NotFoundException:
+        has_analytics_role = False
+    if not has_analytics_role:
+        raise ForbiddenException("Analytics access requires course staff role")
+
+
+def _principal_email(permissions: Principal, db: Session) -> str | None:
+    user_id = permissions.get_user_id()
+    if not user_id or not hasattr(db, "query"):
+        return None
+    row = db.query(User.email).filter(User.id == user_id).first()
+    if row is None:
+        return None
+    email = row[0] if hasattr(row, "__getitem__") else getattr(row, "email", None)
+    return str(email) if email else None
 
 
 def _cutoffs(
