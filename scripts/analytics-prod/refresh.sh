@@ -68,26 +68,5 @@ fi
 docker compose "${compose_files[@]}" config --quiet
 docker compose "${compose_files[@]}" up -d analytics-permissions
 
-exec_env=(
-    -e "ANALYTICS_ROOT=${ANALYTICS_ROOT:-/srv/computor/analytics}"
-    -e "ANALYTICS_SOURCE_NAME=${ANALYTICS_SOURCE_NAME:-green}"
-    -e "ANALYTICS_SOURCE_DATABASE_URL=${ANALYTICS_SOURCE_DATABASE_URL}"
-    -e "ANALYTICS_EXPORT_CHUNK_SIZE=${ANALYTICS_EXPORT_CHUNK_SIZE:-100000}"
-    -e "ANALYTICS_REFRESH_COURSE_ID=${ANALYTICS_REFRESH_COURSE_ID}"
-    -e "ANALYTICS_REFRESH_SOURCE_NAME=${ANALYTICS_REFRESH_SOURCE_NAME:-${ANALYTICS_SOURCE_NAME:-green}}"
-    -e "ANALYTICS_REFRESH_REQUESTED_BY_USER_ID=${ANALYTICS_REFRESH_REQUESTED_BY_USER_ID:-ops}"
-)
-
-for name in \
-    ANALYTICS_REFRESH_RUN_ID \
-    ANALYTICS_REFRESH_SUBMISSION_CUTOFF \
-    ANALYTICS_REFRESH_GRADING_CUTOFF \
-    ANALYTICS_REFRESH_TABLES
-do
-    if [ -n "${!name:-}" ]; then
-        exec_env+=(-e "${name}=${!name}")
-    fi
-done
-
-docker compose "${compose_files[@]}" exec -T "${exec_env[@]}" \
+docker compose "${compose_files[@]}" run --rm --no-deps \
     uvicorn python -m computor_backend.scripts.analytics_refresh

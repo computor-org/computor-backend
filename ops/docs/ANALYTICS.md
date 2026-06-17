@@ -56,8 +56,9 @@ bash scripts/analytics-prod/refresh.sh
 ```
 
 The wrapper reads `.env`, verifies compose configuration, runs the
-`analytics-permissions` service, and executes
-`computor_backend.scripts.analytics_refresh` inside the backend container. The
+`analytics-permissions` service, and starts a short-lived backend container for
+`computor_backend.scripts.analytics_refresh`. The source database URL stays in
+the service environment from `.env`; it is not passed as a command argument. The
 backend service writes the same job JSON and DuckDB/Parquet files as the API
 refresh endpoint.
 
