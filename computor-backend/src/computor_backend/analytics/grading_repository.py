@@ -395,6 +395,16 @@ class AnalyticsDuckDbGradingRepository:
         course_content_type_id: str | None = None,
     ) -> list[dict[str, Any]]:
         archived_filter = self._archived_filter()
+        max_test_runs_column = (
+            "cc.max_test_runs"
+            if self._has_column("course_content", "max_test_runs")
+            else "NULL"
+        )
+        max_submissions_column = (
+            "cc.max_submissions"
+            if self._has_column("course_content", "max_submissions")
+            else "NULL"
+        )
         params: list[Any] = [str(course_id)]
         filters = []
         if path_prefix:
@@ -416,8 +426,8 @@ class AnalyticsDuckDbGradingRepository:
                 cct.title AS content_type_title,
                 cct.color AS content_type_color,
                 cc.position,
-                cc.max_test_runs,
-                cc.max_submissions
+                {max_test_runs_column} AS max_test_runs,
+                {max_submissions_column} AS max_submissions
             FROM course_content cc
             JOIN course_content_type cct ON cct.id = cc.course_content_type_id
             JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id

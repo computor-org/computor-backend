@@ -18,6 +18,12 @@ bash scripts/analytics-local/test.sh
 bash scripts/analytics-local/teardown.sh
 ```
 
+Run the complete setup, seed, test, and teardown cycle with:
+
+```bash
+bash scripts/analytics-local/run-system-test.sh
+```
+
 Default local ports:
 
 | Instance | Postgres | Redis | MinIO API | MinIO Console |
@@ -42,3 +48,8 @@ password: analytics_reader_secret
 ```
 
 These credentials are local test credentials only.
+
+`test.sh` checks the read-only source role, exports the seeded source snapshot
+through the analytics service, writes Parquet and DuckDB files under the local
+blue data root, and validates the summary, student list, timeline, and report
+read models.

@@ -85,6 +85,32 @@ def test_shared_builder_uses_duckdb_backend_for_member_detail():
     assert by_path["week1.assignment2"].latest_result_grade == 0.95
 
 
+def test_duckdb_assignment_details_use_submission_group_limits_without_content_columns():
+    conn = duckdb.connect(":memory:")
+    _create_schema(conn)
+    _insert_fixture(conn)
+    conn.execute("ALTER TABLE course_content DROP COLUMN max_test_runs")
+    conn.execute("ALTER TABLE course_content DROP COLUMN max_submissions")
+    repo = AnalyticsDuckDbGradingRepository(conn)
+
+    result = build_course_member_grading_response(
+        repo,
+        BOB_MEMBER_ID,
+        COURSE_ID,
+        {
+            "user_id": "10000000-0000-4000-8000-000000000102",
+            "username": "bob@example.test",
+            "given_name": "Bob",
+            "family_name": "Beta",
+            "student_id": "m102",
+        },
+    )
+
+    by_path = {node.path: node for node in result.nodes}
+    assert by_path["week1.assignment2"].max_test_runs == 20
+    assert by_path["week1.assignment2"].max_submissions == 3
+
+
 def test_duckdb_store_round_trips_parquet_snapshot(tmp_path):
     store = AnalyticsDuckDbStore(":memory:")
     try:
