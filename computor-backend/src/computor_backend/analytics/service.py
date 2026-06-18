@@ -406,7 +406,9 @@ def _checkpoint_from_row(
     total_max = int(row["total_max_assignments"] or 0)
     submitted = int(row["total_submitted_assignments"] or 0)
     graded = int(row["total_graded_assignments"] or 0)
+    passed = int(row.get("standard_passed") or 0)
     average = row.get("average_grading")
+    average_value = round(float(average), 4) if average is not None else None
     return AnalyticsStudentCheckpoint(
         course_member_id=str(row["course_member_id"]),
         course_id=str(course_id),
@@ -420,9 +422,13 @@ def _checkpoint_from_row(
         submitted_percentage=_percentage(submitted, total_max),
         total_graded_assignments=graded,
         graded_percentage=_percentage(graded, total_max),
-        average_grading=round(float(average), 4) if average is not None else None,
+        average_grading=average_value,
         latest_submission_at=row.get("latest_submission_at"),
         late_submission_count=int(row.get("late_submission_count") or 0),
+        standard_total=total_max,
+        standard_passed=passed,
+        pass_rate=_percentage(passed, total_max),
+        average_score=average_value,
     )
 
 

@@ -160,6 +160,32 @@ def test_report_repository_tracks_actual_grading_checkpoint_counts():
     assert bob["average_grading"] == 0.70
 
 
+def test_report_repository_counts_score_pass_at_threshold():
+    # A pass over a standard example means the latest grade reached 60%, not
+    # merely that the student submitted or was graded. Add a graded-but-failing
+    # second assignment for Bob so passed (1) differs from graded (2).
+    conn = duckdb.connect(":memory:")
+    _create_schema(conn)
+    _insert_fixture(conn)
+    conn.execute(
+        "INSERT INTO submission_grade VALUES "
+        "('80000000-0000-4000-8000-000000000199', "
+        "'70000000-0000-4000-8000-000000000122', "
+        "'50000000-0000-4000-8000-000000000002', "
+        "'2026-06-25 08:00:00+00', 0.30, 2)"
+    )
+    repo = AnalyticsDuckDbReportRepository(conn, cutoffs=AnalyticsCutoffs(None, None))
+    by_member = {row["course_member_id"]: row for row in repo.get_student_checkpoint_rows(COURSE_ID)}
+
+    alice = by_member[ALICE_MEMBER_ID]
+    assert alice["total_graded_assignments"] == 2
+    assert alice["standard_passed"] == 2  # 0.85 and 0.90 both clear 60%
+
+    bob = by_member[BOB_MEMBER_ID]
+    assert bob["total_graded_assignments"] == 2
+    assert bob["standard_passed"] == 1  # 0.70 passes, 0.30 does not
+
+
 def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     config = AnalyticsStorageConfig(root=tmp_path)
     config.duckdb_path.parent.mkdir(parents=True)

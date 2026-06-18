@@ -183,6 +183,8 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
                 COUNT(sc.content_id) AS total_max_assignments,
                 COUNT(sub.course_content_id) AS total_submitted_assignments,
                 COUNT(grd.course_content_id) AS total_graded_assignments,
+                COUNT(CASE WHEN grd.grade >= 0.6 THEN grd.course_content_id END)
+                    AS standard_passed,
                 AVG(grd.grade) AS average_grading,
                 MAX(sub.latest_submission_at) AS latest_submission_at,
                 COALESCE(MAX(late.late_submission_count), 0) AS late_submission_count
