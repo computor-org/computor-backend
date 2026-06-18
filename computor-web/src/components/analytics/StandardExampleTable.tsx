@@ -1,19 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { FLAG_LABEL, FLAG_TITLE, PASS_THRESHOLD, type StandardExampleResult } from './integrity';
+import {
+  FLAG_LABEL,
+  FLAG_TITLE,
+  PASS_THRESHOLD,
+  groupByUnit,
+  type StandardExampleResult,
+  type UnitGroup,
+} from './integrity';
 import { formatDateTime } from './format';
 
 /**
- * Per-example evidence for one student: the score-pass row plus the integrity
- * signals (test rounds, lateness, flags) and tutor comments. This is what a
- * lecturer judges on, so it replaces the old flat event log. Each row links
- * straight into the example for one-click review.
+ * Per-example evidence for one student, grouped by week/unit with per-unit
+ * subtotals: the score-pass row plus the integrity signals (test rounds,
+ * lateness, flags) and tutor comments. This is what a lecturer judges on, so it
+ * replaces the old flat event log. Each row links into the example for review.
  */
 export default function StandardExampleTable({ examples }: { examples: StandardExampleResult[] }) {
   if (examples.length === 0) {
     return <p className="text-sm text-gray-500">No standard examples in this snapshot.</p>;
   }
+  const units = groupByUnit(examples);
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -29,13 +37,37 @@ export default function StandardExampleTable({ examples }: { examples: StandardE
             <th className="px-3 py-2 text-left">Flags</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
-          {examples.map((ex) => (
-            <ExampleRow key={ex.content_id} ex={ex} />
-          ))}
-        </tbody>
+        {units.map((unit) => (
+          <tbody key={unit.key} className="divide-y divide-gray-100">
+            <UnitHeader unit={unit} />
+            {unit.examples.map((ex) => (
+              <ExampleRow key={ex.content_id} ex={ex} />
+            ))}
+          </tbody>
+        ))}
       </table>
     </div>
+  );
+}
+
+/** Per-unit subtotal banner: passed/attempted, average score, flag count. */
+function UnitHeader({ unit }: { unit: UnitGroup }) {
+  const avg = unit.averageScore === null ? null : Math.round(unit.averageScore * 100);
+  return (
+    <tr className="bg-gray-100/70">
+      <th scope="rowgroup" className="px-3 py-1.5 text-left text-sm font-semibold text-gray-700">
+        {unit.label}
+      </th>
+      <td className="px-3 py-1.5 text-right text-xs text-gray-500">{avg === null ? '' : `${avg}%`}</td>
+      <td className="px-3 py-1.5 text-center text-xs font-medium text-gray-600" title="passed / attempted">
+        {unit.passed}/{unit.total}
+      </td>
+      <td />
+      <td />
+      <td className="px-3 py-1.5 text-left text-xs text-gray-500">
+        {unit.flagTotal > 0 ? `${unit.flagTotal} flag${unit.flagTotal === 1 ? '' : 's'}` : ''}
+      </td>
+    </tr>
   );
 }
 

@@ -45,6 +45,9 @@ export interface StandardExampleResult {
   path: string;
   title: string;
   category: string;
+  /** Week/unit the example belongs to, for grouped reporting. Falls back to the
+   * path prefix (`week_3.loops` -> `week_3`) when the backend omits it. */
+  unit?: string | null;
   /** Best official score as a fraction of the possible points (0..1). */
   score: number | null;
   passed: boolean;
@@ -91,6 +94,62 @@ export function countFlags(examples: StandardExampleResult[]): IntegrityFlagCoun
     }
   }
   return counts;
+}
+
+/** Unit key for an example: explicit `unit`, else the path prefix before the
+ * first dot (`week_3.loops` -> `week_3`), else `ungrouped`. */
+export function unitOf(ex: StandardExampleResult): string {
+  if (ex.unit) return ex.unit;
+  const dot = ex.path.indexOf('.');
+  return dot > 0 ? ex.path.slice(0, dot) : ex.path || 'ungrouped';
+}
+
+/** Turn a key like `week_3` into `Week 3`; leave anything unexpected as-is. */
+export function unitLabel(key: string): string {
+  const m = /^([a-zA-Z]+)[_-]?(\d+)$/.exec(key);
+  if (!m) return key;
+  return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}`;
+}
+
+export interface UnitGroup {
+  key: string;
+  label: string;
+  examples: StandardExampleResult[];
+  attempted: number;
+  passed: number;
+  total: number;
+  averageScore: number | null;
+  flagTotal: number;
+}
+
+/** Group a student's examples by week/unit with per-unit subtotals, in stable
+ * path order. The detail view renders one block per unit. */
+export function groupByUnit(examples: StandardExampleResult[]): UnitGroup[] {
+  const order: string[] = [];
+  const byKey = new Map<string, StandardExampleResult[]>();
+  for (const ex of examples) {
+    const key = unitOf(ex);
+    if (!byKey.has(key)) {
+      byKey.set(key, []);
+      order.push(key);
+    }
+    byKey.get(key)!.push(ex);
+  }
+  return order.map((key) => {
+    const group = byKey.get(key)!;
+    const official = group.filter((e) => e.official);
+    const scored = official.map((e) => e.score).filter((v): v is number => v !== null);
+    return {
+      key,
+      label: unitLabel(key),
+      examples: group,
+      attempted: official.length,
+      passed: official.filter((e) => e.passed).length,
+      total: group.length,
+      averageScore: scored.length ? scored.reduce((a, b) => a + b, 0) / scored.length : null,
+      flagTotal: group.reduce((a, e) => a + e.flags.length, 0),
+    };
+  });
 }
 
 /** Mark the worst `quantile` fraction of students by total flag count. Numbers
