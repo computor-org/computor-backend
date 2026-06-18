@@ -223,6 +223,38 @@ def test_analytics_service_student_examples_derives_flags(tmp_path):
     assert b2.late is True
 
 
+def test_burst_flag_ignores_steady_work_and_marks_steep_clusters():
+    from datetime import timedelta
+
+    from computor_backend.analytics.service import _tag_velocity
+    from computor_types.analytics import AnalyticsStandardExample
+
+    base = datetime(2026, 5, 1, tzinfo=timezone.utc)
+
+    def make(i, when):
+        return AnalyticsStandardExample(
+            content_id=f"c{i}",
+            path=f"week_{i}.ex",
+            title=f"Example {i}",
+            score=0.8,
+            passed=True,
+            test_rounds=3,
+            submitted_at=when,
+            official=True,
+            late=False,
+        )
+
+    # One submission per week is the vertical ladder, not a burst.
+    steady = [make(i, base + timedelta(weeks=i)) for i in range(6)]
+    _tag_velocity(steady)
+    assert all("velocity" not in e.flags for e in steady)
+
+    # Six examples inside a day and a half is a genuine burst.
+    crammed = [make(i, base + timedelta(hours=6 * i)) for i in range(6)]
+    _tag_velocity(crammed)
+    assert all("velocity" in e.flags for e in crammed)
+
+
 def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     config = AnalyticsStorageConfig(root=tmp_path)
     config.duckdb_path.parent.mkdir(parents=True)
