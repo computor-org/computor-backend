@@ -17,10 +17,31 @@ import type {
   AnalyticsCourseSummary,
   AnalyticsJobStatus,
   AnalyticsRefreshRequest,
+  AnalyticsStudentCheckpoint,
   AnalyticsStudentList,
   AnalyticsStudentReport,
   AnalyticsStudentTimeline,
 } from '@/src/generated/types/analytics';
+import type {
+  ExampleSource,
+  StandardExampleResult,
+  StudentIntegrity,
+} from '@/src/components/analytics/integrity';
+import {
+  DEMO_COURSE_ID,
+  demoExampleSource,
+  demoStudentDetail,
+  demoStudents,
+  demoSummary,
+} from '@/src/components/analytics/demoData';
+
+/** Roster row: the checkpoint plus the integrity rollup once the backend
+ * provides it (optional until those aggregations land). */
+export type RosterStudent = AnalyticsStudentCheckpoint & Partial<StudentIntegrity>;
+
+/** Local UI testing against synthetic data, no backend. Set
+ * NEXT_PUBLIC_ANALYTICS_DEMO=1 (see computor-web/.env.local.example). */
+export const IS_DEMO = process.env.NEXT_PUBLIC_ANALYTICS_DEMO === '1';
 
 export type {
   AnalyticsCourseAccess,
@@ -99,10 +120,18 @@ export function getCourseSummary(
   courseId: string,
   cutoffs?: AnalyticsCutoffs,
 ): Promise<AnalyticsCourseSummary> {
+  if (IS_DEMO) return Promise.resolve(demoSummary());
   return getJson(`${base(courseId)}/summary${cutoffQuery(cutoffs)}`);
 }
 
 export function listAnalyticsCourses(): Promise<AnalyticsCourseAccess[]> {
+  if (IS_DEMO) {
+    return Promise.resolve([
+      { course_id: DEMO_COURSE_ID, title: 'Demo: Programming in the AI Era', path: 'demo',
+        source_name: 'demo', role: '_lecturer', total_students: demoStudents().length,
+        latest_job: null },
+    ]);
+  }
   return getJson(`${API_BASE_URL}/analytics/courses`);
 }
 
@@ -110,7 +139,40 @@ export function listStudents(
   courseId: string,
   cutoffs?: AnalyticsCutoffs,
 ): Promise<AnalyticsStudentList> {
+  if (IS_DEMO) return Promise.resolve({ students: demoStudents(), gradings: [] });
   return getJson(`${base(courseId)}/students${cutoffQuery(cutoffs)}`);
+}
+
+/** Source files of one example, shown in a modal so the lecturer reads the code
+ * without leaving the student detail. Demo returns synthetic source; the real
+ * endpoint lands with the backend aggregations. */
+export function getExampleSource(
+  courseId: string,
+  contentId: string,
+): Promise<ExampleSource | null> {
+  if (IS_DEMO) return Promise.resolve(demoExampleSource(contentId));
+  return getJson<ExampleSource>(
+    `${base(courseId)}/examples/${encodeURIComponent(contentId)}/source`,
+  ).catch((e) => {
+    if (e instanceof AnalyticsApiError && e.status === 404) return null;
+    throw e;
+  });
+}
+
+/** Per-student standard-example evidence (score-pass, test rounds, flags,
+ * comments) for the detail view. Empty until the backend endpoint lands; the
+ * demo generator fills it for local testing. */
+export function getStudentExamples(
+  courseId: string,
+  courseMemberId: string,
+): Promise<StandardExampleResult[]> {
+  if (IS_DEMO) return Promise.resolve(demoStudentDetail(courseMemberId)?.examples ?? []);
+  return getJson<StandardExampleResult[]>(
+    `${base(courseId)}/students/${encodeURIComponent(courseMemberId)}/examples`,
+  ).catch((e) => {
+    if (e instanceof AnalyticsApiError && e.status === 404) return [];
+    throw e;
+  });
 }
 
 export function getStudentReport(
@@ -128,6 +190,11 @@ export function getStudentTimeline(
   courseMemberId: string,
   cutoffs?: AnalyticsCutoffs,
 ): Promise<AnalyticsStudentTimeline> {
+  if (IS_DEMO) {
+    const detail = demoStudentDetail(courseMemberId);
+    if (!detail) return Promise.reject(new AnalyticsApiError(404, 'no demo student'));
+    return Promise.resolve(detail.timeline);
+  }
   return getJson(
     `${base(courseId)}/students/${encodeURIComponent(courseMemberId)}/timeline${cutoffQuery(cutoffs)}`,
   );

@@ -3,19 +3,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AnalyticsApiError,
+  getStudentExamples,
   getStudentTimeline,
   type AnalyticsCutoffs,
-  type AnalyticsStudentCheckpoint,
   type AnalyticsStudentTimeline,
   type AnalyticsTimelineEvent,
+  type RosterStudent,
 } from '@/src/api/analytics';
-import { cutoffRelationTone, formatDateTime, formatGrade, formatStudentName } from './format';
+import { countFlags, type StandardExampleResult } from './integrity';
+import IntegrityBadges from './IntegrityBadges';
+import StandardExampleTable from './StandardExampleTable';
+import { formatDateTime, formatPercent, formatStudentName } from './format';
 
 /**
  * Per-student evidence. The cumulative curve of official submissions over time,
- * read against the submission cutoff, is the one view that distinguishes steady
- * work from a last-minute rush — so it is the panel's hero. Everything else is a
- * plain event log beneath it.
+ * read against the submission cutoff, distinguishes steady work from a
+ * last-minute rush. Beneath it, the standard-example table carries the score,
+ * pass status, test rounds, flags, and tutor comments the lecturer judges on.
  */
 export default function StudentTimelinePanel({
   courseId,
@@ -23,10 +27,11 @@ export default function StudentTimelinePanel({
   cutoffs,
 }: {
   courseId: string;
-  student: AnalyticsStudentCheckpoint;
+  student: RosterStudent;
   cutoffs: AnalyticsCutoffs;
 }) {
   const [timeline, setTimeline] = useState<AnalyticsStudentTimeline | null>(null);
+  const [examples, setExamples] = useState<StandardExampleResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +41,15 @@ export default function StudentTimelinePanel({
       setLoading(true);
       setError(null);
       setTimeline(null);
+      setExamples([]);
       try {
-        const t = await getStudentTimeline(courseId, student.course_member_id, cutoffs);
-        if (!cancelled) setTimeline(t);
+        const [t, ex] = await Promise.all([
+          getStudentTimeline(courseId, student.course_member_id, cutoffs),
+          getStudentExamples(courseId, student.course_member_id),
+        ]);
+        if (cancelled) return;
+        setTimeline(t);
+        setExamples(ex);
       } catch (e) {
         if (cancelled) return;
         if (e instanceof AnalyticsApiError && e.status === 404) {
@@ -63,31 +74,53 @@ export default function StudentTimelinePanel({
     [timeline],
   );
 
+  const flags = student.flags ?? countFlags(examples);
+  const passText =
+    student.standard_passed !== undefined && student.standard_total !== undefined
+      ? `${student.standard_passed}/${student.standard_total} standard passed`
+      : null;
+
   return (
     <section
       className="rounded-lg border-2 border-gray-200 bg-white p-5"
       data-testid="analytics-timeline"
-      aria-label={`Timeline for ${formatStudentName(student)}`}
+      aria-label={`Evidence for ${formatStudentName(student)}`}
     >
-      <header className="mb-4 flex items-baseline justify-between gap-4">
+      <header className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{formatStudentName(student)}</h3>
           {student.student_id && (
             <p className="font-mono text-xs text-gray-400">{student.student_id}</p>
           )}
         </div>
-        <p className="text-xs text-gray-500">
-          {events.length} event{events.length === 1 ? '' : 's'}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+          {passText && (
+            <span className="text-gray-700">
+              {passText}{' '}
+              <span className="text-gray-400">({formatPercent(student.pass_rate)})</span>
+            </span>
+          )}
+          {student.average_score !== undefined && student.average_score !== null && (
+            <span className="text-gray-700">
+              avg score{' '}
+              <span className="font-medium">{Math.round(student.average_score * 100)}%</span>
+            </span>
+          )}
+          <IntegrityBadges flags={flags} worstBand={student.worst_band} size="md" />
+        </div>
       </header>
 
-      {loading && <p className="text-sm text-gray-500">Loading timeline…</p>}
+      {loading && <p className="text-sm text-gray-500">Loading evidence…</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!loading && !error && (
         <>
           <CumulativeCurve events={events} cutoff={timeline?.submission_cutoff ?? null} />
-          <EventLog events={events} />
+          <StandardExampleTable
+            examples={examples}
+            courseId={courseId}
+            courseMemberId={student.course_member_id}
+          />
         </>
       )}
     </section>
@@ -145,10 +178,10 @@ function CumulativeCurve({
     <figure className="mb-4">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-48 w-full"
+        className="block w-full"
+        style={{ height: 'auto' }}
         role="img"
         aria-label="Cumulative official submissions over time"
-        preserveAspectRatio="none"
       >
         {/* baseline + 100% gridline */}
         <line x1={PAD.left} y1={y(0)} x2={W - PAD.right} y2={y(0)} stroke="#e5e7eb" />
@@ -197,36 +230,5 @@ function CumulativeCurve({
         Cumulative official submissions ({total}) against the submission cutoff
       </figcaption>
     </figure>
-  );
-}
-
-function EventLog({ events }: { events: AnalyticsTimelineEvent[] }) {
-  if (events.length === 0) {
-    return <p className="text-sm text-gray-500">No events recorded.</p>;
-  }
-  return (
-    <ol className="divide-y divide-gray-100">
-      {events.map((e, i) => {
-        const tone = cutoffRelationTone(e.relation_to_submission_cutoff);
-        return (
-          <li key={`${e.occurred_at}-${i}`} className="flex items-center gap-3 py-2 text-sm">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden />
-            <span className="w-36 shrink-0 text-xs text-gray-500">{formatDateTime(e.occurred_at)}</span>
-            <span className="flex-1 truncate text-gray-800">
-              {e.title || e.path || e.event_type}
-              {e.submit === true && (
-                <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                  official
-                </span>
-              )}
-            </span>
-            {e.grade !== null && e.grade !== undefined && (
-              <span className="shrink-0 tabular-nums text-gray-600">{formatGrade(e.grade)}</span>
-            )}
-            {tone.label && <span className="shrink-0 text-xs text-gray-400">{tone.label}</span>}
-          </li>
-        );
-      })}
-    </ol>
   );
 }

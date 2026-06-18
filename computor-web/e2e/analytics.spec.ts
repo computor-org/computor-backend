@@ -23,14 +23,38 @@ test.describe('lecturer analytics', () => {
     await expect(summary.getByText('70%')).toBeVisible(); // submitted
     await expect(summary.getByText('50%')).toBeVisible(); // graded
 
+    // Master list is names only: no matrikelnummer, no flags, no scores. A
+    // passing student must not read another student's standing off the screen.
+    const roster = page.getByTestId('analytics-roster');
+    await expect(roster.getByText('Ada Lovelace')).toBeVisible();
+    await expect(roster.getByText('01234567')).toHaveCount(0);
+    await expect(roster.getByText('Burst')).toHaveCount(0);
+
     // Roster row -> per-student timeline (the signature curve).
-    const row = page.getByText('Ada Lovelace');
+    const row = roster.getByText('Ada Lovelace');
     await expect(row).toBeVisible();
     await row.click();
     const timeline = page.getByTestId('analytics-timeline');
     await expect(timeline).toBeVisible();
     await expect(
       timeline.getByRole('img', { name: 'Cumulative official submissions over time' }),
+    ).toBeVisible();
+
+    // Detail leads with the score-pass summary, then the per-example evidence
+    // table (with a tutor comment), which replaced the old flat event log.
+    await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
+    await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
+
+    // Clicking an example opens its full source page (syntax-highlighted), and
+    // "Back" returns to this student's detail.
+    await timeline.getByRole('link', { name: 'Week 2 · Loops' }).click();
+    await expect(page).toHaveURL(/\/lecturer\/analytics\/examples\/cc-2\?student=/);
+    await expect(page.getByText('def loops(values):')).toBeVisible();
+    await page.getByRole('button', { name: 'test_loops.py' }).click();
+    await expect(page.getByText('def test_loops():')).toBeVisible();
+    await page.getByRole('link', { name: /Back to student/ }).click();
+    await expect(
+      page.getByTestId('analytics-timeline').getByText('8/10 standard passed'),
     ).toBeVisible();
 
     // Update button triggers a job and polls it to completion.
@@ -46,7 +70,7 @@ test.describe('lecturer analytics', () => {
     await setupAnalytics(page, { role: '_tutor', scenario: 'data' });
     await page.goto(analyticsUrl());
 
-    await expect(page.getByText('Ada Lovelace')).toBeVisible();
+    await expect(page.getByTestId('analytics-roster').getByText('Ada Lovelace')).toBeVisible();
     await expect(page.getByTestId('analytics-refresh')).toHaveCount(0);
   });
 
