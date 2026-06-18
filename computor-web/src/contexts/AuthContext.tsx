@@ -58,6 +58,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       setIsLoading(true);
 
+      // Demo mode (NEXT_PUBLIC_ANALYTICS_DEMO=1): skip the real auth backend so
+      // the analytics dashboard renders against synthetic data with no server.
+      // Off by default; never set in production.
+      if (process.env.NEXT_PUBLIC_ANALYTICS_DEMO === '1') {
+        setUser({
+          id: 'demo-lecturer',
+          username: 'demo.lecturer',
+          email: 'demo@example.org',
+          givenName: 'Demo',
+          familyName: 'Lecturer',
+          role: 'lecturer',
+          systemRoles: [],
+          permissions: [],
+          courses: [],
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Try SSO first
       const ssoUser = ssoAuthService.getCurrentUser();
       if (ssoUser) {

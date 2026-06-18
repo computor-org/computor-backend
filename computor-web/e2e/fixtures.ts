@@ -45,6 +45,12 @@ const STUDENTS = {
       average_grading: 91,
       latest_submission_at: '2026-06-18T20:30:00.000Z',
       late_submission_count: 1,
+      standard_passed: 8,
+      standard_total: 10,
+      pass_rate: 80,
+      average_score: 0.84,
+      flags: { velocity: 2, low_iteration: 1, tutor_concern: 1, total: 4 },
+      worst_band: true,
     },
     {
       course_member_id: '33333333-3333-3333-3333-333333333333',
@@ -62,10 +68,55 @@ const STUDENTS = {
       average_grading: 64,
       latest_submission_at: '2026-06-17T10:00:00.000Z',
       late_submission_count: 0,
+      standard_passed: 4,
+      standard_total: 10,
+      pass_rate: 40,
+      average_score: 0.55,
+      flags: { velocity: 0, low_iteration: 0, tutor_concern: 0, total: 0 },
+      worst_band: false,
     },
   ],
   gradings: [],
 };
+
+const EXAMPLES = [
+  {
+    content_id: 'cc-1',
+    path: 'week_1.intro',
+    title: 'Week 1 · Intro',
+    category: 'standard',
+    score: 0.92,
+    passed: true,
+    test_rounds: 4,
+    submitted_at: '2026-06-15T09:00:00.000Z',
+    official: true,
+    late: false,
+    flags: [],
+    comments: [],
+    href: `/courses/${COURSE_ID}/contents/cc-1`,
+  },
+  {
+    content_id: 'cc-2',
+    path: 'week_2.loops',
+    title: 'Week 2 · Loops',
+    category: 'standard',
+    score: 0.7,
+    passed: true,
+    test_rounds: 0,
+    submitted_at: '2026-06-18T21:30:00.000Z',
+    official: true,
+    late: false,
+    flags: ['low_iteration', 'velocity'],
+    comments: [
+      {
+        author_role: 'tutor',
+        text: 'Solution style differs from earlier submissions; asked to explain in lab.',
+        created_at: '2026-06-18T22:30:00.000Z',
+      },
+    ],
+    href: `/courses/${COURSE_ID}/contents/cc-2`,
+  },
+];
 
 const TIMELINE = {
   course_id: COURSE_ID,
@@ -199,6 +250,7 @@ export async function setupAnalytics(
       return scenario === 'empty' ? json(route, { detail: 'no snapshot' }, 404) : json(route, SUMMARY);
     }
     if (path.endsWith('/timeline')) return json(route, TIMELINE);
+    if (path.endsWith('/examples')) return json(route, scenario === 'empty' ? [] : EXAMPLES);
     if (path === studentsBase) {
       return scenario === 'empty' ? json(route, { detail: 'no snapshot' }, 404) : json(route, STUDENTS);
     }

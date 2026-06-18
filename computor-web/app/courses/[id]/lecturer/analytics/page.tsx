@@ -17,7 +17,7 @@ import {
   type AnalyticsCourseAccess,
   type AnalyticsCourseSummary,
   type AnalyticsCutoffs,
-  type AnalyticsStudentCheckpoint,
+  type RosterStudent,
 } from '@/src/api/analytics';
 import SummaryCards from '@/src/components/analytics/SummaryCards';
 import CutoffControls from '@/src/components/analytics/CutoffControls';
@@ -34,8 +34,8 @@ export default function LecturerAnalyticsPage() {
   const [analyticsCourse, setAnalyticsCourse] = useState<AnalyticsCourseAccess | null>(null);
   const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>({});
   const [summary, setSummary] = useState<AnalyticsCourseSummary | null>(null);
-  const [students, setStudents] = useState<AnalyticsStudentCheckpoint[]>([]);
-  const [selected, setSelected] = useState<AnalyticsStudentCheckpoint | null>(null);
+  const [students, setStudents] = useState<RosterStudent[]>([]);
+  const [selected, setSelected] = useState<RosterStudent | null>(null);
   const [loading, setLoading] = useState(true);
   const [emptyReason, setEmptyReason] = useState<'none' | 'no-snapshot' | 'forbidden' | 'error'>(
     'none',
@@ -104,11 +104,17 @@ export default function LecturerAnalyticsPage() {
     load();
   }, [authLoading, isAuthenticated, load]);
 
-  // Keep the selected student in sync with the latest roster (drop if gone).
+  // Keep a student selected: drop a stale pick, and default to the first row so
+  // the detail pane is never empty when there is data to show.
   useEffect(() => {
-    if (!selected) return;
-    const match = students.find((s) => s.course_member_id === selected.course_member_id);
-    if (!match) setSelected(null);
+    if (students.length === 0) {
+      if (selected) setSelected(null);
+      return;
+    }
+    const match = selected
+      ? students.find((s) => s.course_member_id === selected.course_member_id)
+      : null;
+    if (!match) setSelected(students[0]);
   }, [students, selected]);
 
   return (
@@ -185,14 +191,24 @@ export default function LecturerAnalyticsPage() {
         {!loading && summary && emptyReason === 'none' && (
           <>
             <SummaryCards summary={summary} />
-            <StudentCheckpointTable
-              students={students}
-              selectedId={selected?.course_member_id ?? null}
-              onSelect={setSelected}
-            />
-            {selected && (
-              <StudentTimelinePanel courseId={courseId} student={selected} cutoffs={cutoffs} />
-            )}
+            <div className="grid gap-6 lg:grid-cols-[minmax(360px,460px)_1fr] print:block">
+              <div className="lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto print:max-h-none print:overflow-visible">
+                <StudentCheckpointTable
+                  students={students}
+                  selectedId={selected?.course_member_id ?? null}
+                  onSelect={setSelected}
+                />
+              </div>
+              <div className="lg:sticky lg:top-4 lg:self-start">
+                {selected ? (
+                  <StudentTimelinePanel courseId={courseId} student={selected} cutoffs={cutoffs} />
+                ) : (
+                  <p className="rounded-lg border-2 border-dashed border-gray-200 p-10 text-center text-sm text-gray-400">
+                    Select a student to see their evidence.
+                  </p>
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>

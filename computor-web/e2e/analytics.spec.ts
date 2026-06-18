@@ -24,7 +24,7 @@ test.describe('lecturer analytics', () => {
     await expect(summary.getByText('50%')).toBeVisible(); // graded
 
     // Roster row -> per-student timeline (the signature curve).
-    const row = page.getByText('Ada Lovelace');
+    const row = page.getByTestId('analytics-roster').getByText('Ada Lovelace');
     await expect(row).toBeVisible();
     await row.click();
     const timeline = page.getByTestId('analytics-timeline');
@@ -32,6 +32,12 @@ test.describe('lecturer analytics', () => {
     await expect(
       timeline.getByRole('img', { name: 'Cumulative official submissions over time' }),
     ).toBeVisible();
+
+    // Detail leads with the score-pass summary, then the per-example evidence
+    // table (with a tutor comment), which replaced the old flat event log.
+    await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
+    await expect(timeline.getByRole('link', { name: 'Week 2 · Loops' })).toBeVisible();
+    await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
 
     // Update button triggers a job and polls it to completion.
     const refresh = page.getByTestId('analytics-refresh');
@@ -46,7 +52,7 @@ test.describe('lecturer analytics', () => {
     await setupAnalytics(page, { role: '_tutor', scenario: 'data' });
     await page.goto(analyticsUrl());
 
-    await expect(page.getByText('Ada Lovelace')).toBeVisible();
+    await expect(page.getByTestId('analytics-roster').getByText('Ada Lovelace')).toBeVisible();
     await expect(page.getByTestId('analytics-refresh')).toHaveCount(0);
   });
 
