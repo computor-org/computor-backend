@@ -291,9 +291,10 @@ if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     fi
 fi
 
-# Make postgres init script executable
+# Make postgres init script executable. Tolerate a deploy user who is not the
+# file owner (the file ships executable from git, so this is only a touch-up).
 if [ -f "docker/postgres-init/01-create-multiple-databases.sh" ]; then
-    chmod +x docker/postgres-init/01-create-multiple-databases.sh
+    chmod +x docker/postgres-init/01-create-multiple-databases.sh 2>/dev/null || true
 fi
 
 # Start services

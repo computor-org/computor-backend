@@ -453,8 +453,13 @@ def _checkpoint_from_row(
 # already-ingested snapshot with no extra requests or statistics.
 _PASS_THRESHOLD = 0.6
 _LOW_ITERATION_MAX_ROUNDS = 1
-_VELOCITY_WINDOW_SECONDS = 24 * 3600
-_VELOCITY_MIN_IN_WINDOW = 5
+# Burst = a steep stretch of the submission curve: this many consecutive
+# official submissions (capped at how many the student has) completed within the
+# span below. Measuring the gradient over many examples avoids flagging steady
+# one-per-week work.
+_BURST_WINDOW_EXAMPLES = 15
+_BURST_MIN_WINDOW = 3
+_BURST_MAX_SPAN_SECONDS = 7 * 24 * 3600
 _GRADING_STATUS_CORRECTION_NECESSARY = 2
 
 
@@ -507,18 +512,32 @@ def _examples_from_rows(rows: list[dict[str, Any]]) -> list[AnalyticsStandardExa
 
 
 def _tag_velocity(examples: list[AnalyticsStandardExample]) -> None:
-    """Flag a submission burst: an official example whose submission time sits in
-    a 24h window holding at least _VELOCITY_MIN_IN_WINDOW official submissions."""
-    official = [ex for ex in examples if ex.official and ex.submitted_at is not None]
-    for ex in official:
-        in_window = sum(
-            1
-            for other in official
-            if abs((other.submitted_at - ex.submitted_at).total_seconds())
-            <= _VELOCITY_WINDOW_SECONDS
-        )
-        if in_window >= _VELOCITY_MIN_IN_WINDOW and "velocity" not in ex.flags:
-            ex.flags.append("velocity")
+    """Flag a submission burst by the steepness of the submission curve, not by a
+    count of threshold crossings. Take a window of consecutive official
+    submissions (a gradient over many examples) and flag the single steepest one
+    when those examples were completed within a short span. Steady weekly work
+    spreads the window over weeks and never triggers; one busy late week does."""
+    official = sorted(
+        (ex for ex in examples if ex.official and ex.submitted_at is not None),
+        key=lambda ex: ex.submitted_at,
+    )
+    n = len(official)
+    window = min(_BURST_WINDOW_EXAMPLES, n)
+    if window < _BURST_MIN_WINDOW:
+        return
+    best_span: float | None = None
+    best_start = 0
+    for start in range(0, n - window + 1):
+        span = (
+            official[start + window - 1].submitted_at - official[start].submitted_at
+        ).total_seconds()
+        if best_span is None or span < best_span:
+            best_span = span
+            best_start = start
+    if best_span is not None and best_span <= _BURST_MAX_SPAN_SECONDS:
+        for ex in official[best_start : best_start + window]:
+            if "velocity" not in ex.flags:
+                ex.flags.append("velocity")
 
 
 def _read_manifest(snapshot_path: Path) -> tuple[dict[str, int], dict[str, dict[str, str]]]:
