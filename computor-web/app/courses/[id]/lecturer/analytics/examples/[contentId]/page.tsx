@@ -35,7 +35,6 @@ export default function ExampleSourcePage() {
         const s = await getExampleSource(courseId, contentId);
         if (cancelled) return;
         setSource(s);
-        if (!s) setError('No source available for this example.');
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load source.');
       } finally {
@@ -62,6 +61,13 @@ export default function ExampleSourcePage() {
 
         {loading && <p className="text-sm text-gray-500">Loading source…</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
+
+        {!loading && !error && (!source || source.files.length === 0) && (
+          <p className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500">
+            The example source isn’t available in this analytics snapshot. It is served
+            from the deployed example repository, which this snapshot doesn’t include yet.
+          </p>
+        )}
 
         {source && source.files.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white">
