@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { usePathname, useParams, useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -30,6 +30,8 @@ import StudentTimelinePanel from '@/src/components/analytics/StudentTimelinePane
 export default function LecturerAnalyticsPage() {
   const courseId = useParams().id as string;
   const requestedMember = useSearchParams().get('student');
+  const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { courseHasAtLeast } = usePermissions();
 
@@ -124,6 +126,15 @@ export default function LecturerAnalyticsPage() {
       : null;
     setSelected(requested ?? students[0]);
   }, [students, selected, requestedMember]);
+
+  // Mirror the selected student into the URL so the browser back button (and the
+  // "Back to student" link from an example page) restore this exact selection.
+  useEffect(() => {
+    if (!selected || requestedMember === selected.course_member_id) return;
+    router.replace(`${pathname}?student=${encodeURIComponent(selected.course_member_id)}`, {
+      scroll: false,
+    });
+  }, [selected, requestedMember, pathname, router]);
 
   return (
     <AuthenticatedLayout>
