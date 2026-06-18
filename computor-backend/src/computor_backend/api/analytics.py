@@ -12,14 +12,21 @@ from computor_backend.database import get_db
 from computor_backend.exceptions import ForbiddenException, NotFoundException
 from computor_backend.model.auth import User
 from computor_backend.model.course import CourseMember
+from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
+from computor_backend.redis_cache import get_cache
+from computor_backend.repositories import ExampleVersionRepository
+from computor_backend.services.storage_service import get_storage_service
 from computor_types.analytics import (
     AnalyticsCourseAccess,
     AnalyticsCourseSummary,
+    AnalyticsExampleSource,
+    AnalyticsExampleSourceFile,
     AnalyticsJobStatus,
     AnalyticsRefreshRequest,
+    AnalyticsStandardExample,
     AnalyticsStudentList,
     AnalyticsStudentReport,
     AnalyticsStudentTimeline,
@@ -175,6 +182,96 @@ async def get_course_analytics_student_timeline(
         course_member_id,
         _cutoffs(submission_cutoff, grading_cutoff),
     )
+
+
+@analytics_router.get(
+    "/courses/{course_id}/students/{course_member_id}/examples",
+    response_model=list[AnalyticsStandardExample],
+)
+async def list_course_analytics_student_examples(
+    course_id: str,
+    course_member_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    submission_cutoff: datetime | None = None,
+    grading_cutoff: datetime | None = None,
+) -> list[AnalyticsStandardExample]:
+    _require_course_role(permissions, db, course_id, ANALYTICS_READ_ROLE)
+    return AnalyticsService.from_settings().student_examples(
+        course_id,
+        course_member_id,
+        _cutoffs(submission_cutoff, grading_cutoff),
+    )
+
+
+@analytics_router.get(
+    "/courses/{course_id}/examples/{content_id}/source",
+    response_model=AnalyticsExampleSource,
+)
+async def get_analytics_example_source(
+    course_id: str,
+    content_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    storage_service=Depends(get_storage_service),
+) -> AnalyticsExampleSource:
+    """Source files of the example deployed to a course content. Gated by the
+    analytics read role, so course staff see the source without needing the
+    global example-download permission. Reads the live deployment + storage."""
+    _require_course_role(permissions, db, course_id, ANALYTICS_READ_ROLE)
+
+    deployment = (
+        db.query(CourseContentDeployment)
+        .filter(CourseContentDeployment.course_content_id == content_id)
+        .first()
+    )
+    if deployment is None or deployment.example_version_id is None:
+        raise NotFoundException("No example deployed for this content")
+
+    version = ExampleVersionRepository(db, get_cache()).get_with_relationships(
+        str(deployment.example_version_id)
+    )
+    if version is None:
+        raise NotFoundException("Example version not found")
+
+    repository = version.example.repository
+    if repository.source_type not in ("minio", "s3"):
+        raise NotFoundException("Source view is only available for stored examples")
+
+    bucket_name = repository.source_url.split("/")[0]
+    objects = await storage_service.list_objects(
+        bucket_name=bucket_name,
+        prefix=version.storage_path,
+    )
+    files: list[AnalyticsExampleSourceFile] = []
+    for obj in objects:
+        if obj.object_name.endswith("/"):
+            continue
+        data = await storage_service.download_file(
+            bucket_name=bucket_name,
+            object_key=obj.object_name,
+        )
+        text = _as_text(data)
+        if text is None:
+            continue  # skip binaries; the source view shows code only
+        name = obj.object_name.replace(f"{version.storage_path}/", "")
+        files.append(AnalyticsExampleSourceFile(name=name, content=text))
+
+    files.sort(key=lambda file: file.name)
+    return AnalyticsExampleSource(
+        content_id=str(content_id),
+        title=version.example.title or "Example source",
+        files=files,
+    )
+
+
+def _as_text(data: bytes) -> str | None:
+    if isinstance(data, str):
+        return data
+    try:
+        return data.decode("utf-8")
+    except (UnicodeDecodeError, AttributeError):
+        return None
 
 
 def _require_course_role(

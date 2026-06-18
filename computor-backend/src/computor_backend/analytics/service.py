@@ -22,11 +22,13 @@ from computor_types.analytics import (
     AnalyticsCourseSummary,
     AnalyticsJobStatus,
     AnalyticsRefreshRequest,
+    AnalyticsStandardExample,
     AnalyticsStudentCheckpoint,
     AnalyticsStudentList,
     AnalyticsStudentReport,
     AnalyticsStudentTimeline,
     AnalyticsTimelineEvent,
+    AnalyticsTutorComment,
 )
 
 from .config import ANALYTICS_TABLES, AnalyticsCutoffs, AnalyticsStorageConfig
@@ -345,6 +347,21 @@ class AnalyticsService:
         finally:
             connection.close()
 
+    def student_examples(
+        self,
+        course_id: str,
+        course_member_id: str,
+        cutoffs: AnalyticsCutoffs,
+    ) -> list[AnalyticsStandardExample]:
+        connection = self._read_connection()
+        try:
+            repo = AnalyticsDuckDbReportRepository(connection, cutoffs)
+            return _examples_from_rows(
+                repo.get_student_examples(course_id, course_member_id)
+            )
+        finally:
+            connection.close()
+
     def _student_checkpoints_from_connection(
         self,
         connection: duckdb.DuckDBPyConnection,
@@ -406,7 +423,9 @@ def _checkpoint_from_row(
     total_max = int(row["total_max_assignments"] or 0)
     submitted = int(row["total_submitted_assignments"] or 0)
     graded = int(row["total_graded_assignments"] or 0)
+    passed = int(row.get("standard_passed") or 0)
     average = row.get("average_grading")
+    average_value = round(float(average), 4) if average is not None else None
     return AnalyticsStudentCheckpoint(
         course_member_id=str(row["course_member_id"]),
         course_id=str(course_id),
@@ -420,10 +439,86 @@ def _checkpoint_from_row(
         submitted_percentage=_percentage(submitted, total_max),
         total_graded_assignments=graded,
         graded_percentage=_percentage(graded, total_max),
-        average_grading=round(float(average), 4) if average is not None else None,
+        average_grading=average_value,
         latest_submission_at=row.get("latest_submission_at"),
         late_submission_count=int(row.get("late_submission_count") or 0),
+        standard_total=total_max,
+        standard_passed=passed,
+        pass_rate=_percentage(passed, total_max),
+        average_score=average_value,
     )
+
+
+# Score-pass and integrity heuristics. Deliberately simple: derivable from the
+# already-ingested snapshot with no extra requests or statistics.
+_PASS_THRESHOLD = 0.6
+_LOW_ITERATION_MAX_ROUNDS = 1
+_VELOCITY_WINDOW_SECONDS = 24 * 3600
+_VELOCITY_MIN_IN_WINDOW = 5
+_GRADING_STATUS_CORRECTION_NECESSARY = 2
+
+
+def _examples_from_rows(rows: list[dict[str, Any]]) -> list[AnalyticsStandardExample]:
+    examples: list[AnalyticsStandardExample] = []
+    for row in rows:
+        grade = row.get("grade")
+        score = float(grade) if grade is not None else None
+        passed = score is not None and score >= _PASS_THRESHOLD
+        submitted_at = row.get("submitted_at")
+        official = submitted_at is not None
+        test_rounds = int(row.get("test_rounds") or 0)
+        status = int(row.get("grade_status") or 0)
+        comment_text = row.get("comment")
+
+        comments: list[AnalyticsTutorComment] = []
+        if comment_text:
+            comments.append(
+                AnalyticsTutorComment(
+                    author_role="tutor",
+                    text=str(comment_text),
+                    created_at=row.get("graded_at"),
+                )
+            )
+
+        flags: list[str] = []
+        if passed and test_rounds <= _LOW_ITERATION_MAX_ROUNDS:
+            flags.append("low_iteration")
+        if comment_text and status == _GRADING_STATUS_CORRECTION_NECESSARY:
+            flags.append("tutor_concern")
+
+        examples.append(
+            AnalyticsStandardExample(
+                content_id=str(row["content_id"]),
+                path=str(row["path"]),
+                title=row.get("title") or str(row["path"]),
+                category=row.get("category"),
+                score=score,
+                passed=passed,
+                test_rounds=test_rounds,
+                submitted_at=submitted_at,
+                official=official,
+                late=bool(row.get("late")),
+                flags=flags,
+                comments=comments,
+            )
+        )
+    _tag_velocity(examples)
+    return examples
+
+
+def _tag_velocity(examples: list[AnalyticsStandardExample]) -> None:
+    """Flag a submission burst: an official example whose submission time sits in
+    a 24h window holding at least _VELOCITY_MIN_IN_WINDOW official submissions."""
+    official = [ex for ex in examples if ex.official and ex.submitted_at is not None]
+    for ex in official:
+        in_window = sum(
+            1
+            for other in official
+            if abs((other.submitted_at - ex.submitted_at).total_seconds())
+            <= _VELOCITY_WINDOW_SECONDS
+        )
+        if in_window >= _VELOCITY_MIN_IN_WINDOW and "velocity" not in ex.flags:
+            ex.flags.append("velocity")
 
 
 def _read_manifest(snapshot_path: Path) -> tuple[dict[str, int], dict[str, dict[str, str]]]:
