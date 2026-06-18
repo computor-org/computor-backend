@@ -13,6 +13,7 @@ import {
 import { countFlags, type StandardExampleResult } from './integrity';
 import IntegrityBadges from './IntegrityBadges';
 import StandardExampleTable from './StandardExampleTable';
+import ExampleSourceModal from './ExampleSourceModal';
 import { formatDateTime, formatPercent, formatStudentName } from './format';
 
 /**
@@ -32,6 +33,7 @@ export default function StudentTimelinePanel({
 }) {
   const [timeline, setTimeline] = useState<AnalyticsStudentTimeline | null>(null);
   const [examples, setExamples] = useState<StandardExampleResult[]>([]);
+  const [sourceExample, setSourceExample] = useState<StandardExampleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -116,8 +118,16 @@ export default function StudentTimelinePanel({
       {!loading && !error && (
         <>
           <CumulativeCurve events={events} cutoff={timeline?.submission_cutoff ?? null} />
-          <StandardExampleTable examples={examples} />
+          <StandardExampleTable examples={examples} onOpenExample={setSourceExample} />
         </>
+      )}
+
+      {sourceExample && (
+        <ExampleSourceModal
+          courseId={courseId}
+          example={sourceExample}
+          onClose={() => setSourceExample(null)}
+        />
       )}
     </section>
   );
@@ -174,10 +184,10 @@ function CumulativeCurve({
     <figure className="mb-4">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-48 w-full"
+        className="block w-full"
+        style={{ height: 'auto' }}
         role="img"
         aria-label="Cumulative official submissions over time"
-        preserveAspectRatio="none"
       >
         {/* baseline + 100% gridline */}
         <line x1={PAD.left} y1={y(0)} x2={W - PAD.right} y2={y(0)} stroke="#e5e7eb" />

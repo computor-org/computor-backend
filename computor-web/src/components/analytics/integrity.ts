@@ -62,6 +62,20 @@ export interface StandardExampleResult {
   href?: string | null;
 }
 
+export interface ExampleSourceFile {
+  name: string;
+  content: string;
+}
+
+/** Source bundle for one example, shown when a lecturer clicks it. */
+export interface ExampleSource {
+  content_id: string;
+  title: string;
+  files: ExampleSourceFile[];
+  /** Full example page in the app, if the lecturer wants the complete view. */
+  href?: string | null;
+}
+
 export interface IntegrityFlagCounts {
   velocity: number;
   low_iteration: number;

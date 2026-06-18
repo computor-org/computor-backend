@@ -22,9 +22,14 @@ import type {
   AnalyticsStudentReport,
   AnalyticsStudentTimeline,
 } from '@/src/generated/types/analytics';
-import type { StandardExampleResult, StudentIntegrity } from '@/src/components/analytics/integrity';
+import type {
+  ExampleSource,
+  StandardExampleResult,
+  StudentIntegrity,
+} from '@/src/components/analytics/integrity';
 import {
   DEMO_COURSE_ID,
+  demoExampleSource,
   demoStudentDetail,
   demoStudents,
   demoSummary,
@@ -136,6 +141,22 @@ export function listStudents(
 ): Promise<AnalyticsStudentList> {
   if (IS_DEMO) return Promise.resolve({ students: demoStudents(), gradings: [] });
   return getJson(`${base(courseId)}/students${cutoffQuery(cutoffs)}`);
+}
+
+/** Source files of one example, shown in a modal so the lecturer reads the code
+ * without leaving the student detail. Demo returns synthetic source; the real
+ * endpoint lands with the backend aggregations. */
+export function getExampleSource(
+  courseId: string,
+  contentId: string,
+): Promise<ExampleSource | null> {
+  if (IS_DEMO) return Promise.resolve(demoExampleSource(contentId));
+  return getJson<ExampleSource>(
+    `${base(courseId)}/examples/${encodeURIComponent(contentId)}/source`,
+  ).catch((e) => {
+    if (e instanceof AnalyticsApiError && e.status === 404) return null;
+    throw e;
+  });
 }
 
 /** Per-student standard-example evidence (score-pass, test rounds, flags,

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   FLAG_LABEL,
   FLAG_TITLE,
@@ -15,9 +14,16 @@ import { formatDateTime } from './format';
  * Per-example evidence for one student, grouped by week/unit with per-unit
  * subtotals: the score-pass row plus the integrity signals (test rounds,
  * lateness, flags) and tutor comments. This is what a lecturer judges on, so it
- * replaces the old flat event log. Each row links into the example for review.
+ * replaces the old flat event log. Clicking an example opens its source code in
+ * a modal over the page, so the student detail is never lost.
  */
-export default function StandardExampleTable({ examples }: { examples: StandardExampleResult[] }) {
+export default function StandardExampleTable({
+  examples,
+  onOpenExample,
+}: {
+  examples: StandardExampleResult[];
+  onOpenExample: (example: StandardExampleResult) => void;
+}) {
   if (examples.length === 0) {
     return <p className="text-sm text-gray-500">No standard examples in this snapshot.</p>;
   }
@@ -41,7 +47,7 @@ export default function StandardExampleTable({ examples }: { examples: StandardE
           <tbody key={unit.key} className="divide-y divide-gray-100">
             <UnitHeader unit={unit} />
             {unit.examples.map((ex) => (
-              <ExampleRow key={ex.content_id} ex={ex} />
+              <ExampleRow key={ex.content_id} ex={ex} onOpen={onOpenExample} />
             ))}
           </tbody>
         ))}
@@ -71,19 +77,26 @@ function UnitHeader({ unit }: { unit: UnitGroup }) {
   );
 }
 
-function ExampleRow({ ex }: { ex: StandardExampleResult }) {
+function ExampleRow({
+  ex,
+  onOpen,
+}: {
+  ex: StandardExampleResult;
+  onOpen: (example: StandardExampleResult) => void;
+}) {
   const scorePct = ex.score === null ? null : Math.round(ex.score * 100);
   return (
     <>
       <tr className={ex.flags.length ? 'bg-rose-50/40' : undefined}>
         <td className="px-3 py-2">
-          {ex.href ? (
-            <Link href={ex.href} className="font-medium text-blue-600 hover:underline">
-              {ex.title}
-            </Link>
-          ) : (
-            <span className="font-medium text-gray-900">{ex.title}</span>
-          )}
+          <button
+            type="button"
+            onClick={() => onOpen(ex)}
+            className="text-left font-medium text-blue-600 hover:underline"
+            title="View source code"
+          >
+            {ex.title}
+          </button>
           <div className="font-mono text-[11px] text-gray-400">{ex.path}</div>
         </td>
         <td className="px-3 py-2 text-right tabular-nums">

@@ -43,8 +43,20 @@ test.describe('lecturer analytics', () => {
     // Detail leads with the score-pass summary, then the per-example evidence
     // table (with a tutor comment), which replaced the old flat event log.
     await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
-    await expect(timeline.getByRole('link', { name: 'Week 2 · Loops' })).toBeVisible();
     await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
+
+    // Clicking an example opens its source code in a modal over the page, so the
+    // student detail is never lost.
+    await timeline.getByRole('button', { name: 'Week 2 · Loops' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('def loops(values):')).toBeVisible();
+    await dialog.getByText('test_loops.py').click();
+    await expect(dialog.getByText('def test_loops():')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    // The student detail is still there underneath.
+    await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
 
     // Update button triggers a job and polls it to completion.
     const refresh = page.getByTestId('analytics-refresh');

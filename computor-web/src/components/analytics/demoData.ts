@@ -18,6 +18,7 @@ import {
   PASS_THRESHOLD,
   countFlags,
   markWorstBand,
+  type ExampleSource,
   type IntegrityFlagKind,
   type StandardExampleResult,
   type StudentIntegrity,
@@ -284,6 +285,54 @@ export function demoStudents(): DemoStudent[] {
 
 export function demoStudentDetail(courseMemberId: string): DemoStudentDetail | null {
   return build().find((r) => r.student.course_member_id === courseMemberId)?.detail ?? null;
+}
+
+/** Synthetic source for an example, so the click-through shows real code in the
+ * demo. Looked up by content_id across the generated roster. */
+export function demoExampleSource(contentId: string): ExampleSource | null {
+  for (const rec of build()) {
+    const ex = rec.detail.examples.find((e) => e.content_id === contentId);
+    if (!ex) continue;
+    const fn = ex.path.split('.').pop() ?? 'solution';
+    return {
+      content_id: contentId,
+      title: ex.title,
+      href: ex.href ?? null,
+      files: [
+        {
+          name: `${fn}.py`,
+          content:
+            `"""${ex.title} - reference solution."""\n\n` +
+            `def ${fn}(values):\n` +
+            `    """Return the running total of values."""\n` +
+            `    total = 0\n` +
+            `    for v in values:\n` +
+            `        total += v\n` +
+            `    return total\n\n\n` +
+            `if __name__ == "__main__":\n` +
+            `    print(${fn}([1, 2, 3, 4]))\n`,
+        },
+        {
+          name: `test_${fn}.py`,
+          content:
+            `import pytest\n\n` +
+            `from ${fn} import ${fn}\n\n\n` +
+            `@pytest.mark.parametrize("values,expected", [\n` +
+            `    ([], 0),\n` +
+            `    ([1, 2, 3], 6),\n` +
+            `    ([-1, 1], 0),\n` +
+            `])\n` +
+            `def test_${fn}(values, expected):\n` +
+            `    assert ${fn}(values) == expected\n`,
+        },
+        {
+          name: 'README.md',
+          content: `# ${ex.title}\n\nImplement \`${fn}\` so the tests pass. Path: \`${ex.path}\`.\n`,
+        },
+      ],
+    };
+  }
+  return null;
 }
 
 export function demoSummary(): AnalyticsCourseSummary {

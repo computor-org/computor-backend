@@ -148,6 +148,16 @@ const TIMELINE = {
   ],
 };
 
+const EXAMPLE_SOURCE = {
+  content_id: 'cc-2',
+  title: 'Week 2 · Loops',
+  href: `/courses/${COURSE_ID}/contents/cc-2`,
+  files: [
+    { name: 'loops.py', content: 'def loops(values):\n    return sum(values)\n' },
+    { name: 'test_loops.py', content: 'def test_loops():\n    assert loops([1, 2]) == 3\n' },
+  ],
+};
+
 const RUNNING_JOB = {
   job_id: 'job-1',
   course_id: COURSE_ID,
@@ -250,6 +260,7 @@ export async function setupAnalytics(
       return scenario === 'empty' ? json(route, { detail: 'no snapshot' }, 404) : json(route, SUMMARY);
     }
     if (path.endsWith('/timeline')) return json(route, TIMELINE);
+    if (path.endsWith('/source')) return json(route, EXAMPLE_SOURCE);
     if (path.endsWith('/examples')) return json(route, scenario === 'empty' ? [] : EXAMPLES);
     if (path === studentsBase) {
       return scenario === 'empty' ? json(route, { detail: 'no snapshot' }, 404) : json(route, STUDENTS);
