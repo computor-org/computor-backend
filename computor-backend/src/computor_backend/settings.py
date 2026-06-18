@@ -55,6 +55,18 @@ class BackendSettings:
         self.ANALYTICS_EXPORT_CHUNK_SIZE = int(
             os.environ.get("ANALYTICS_EXPORT_CHUNK_SIZE", "100000")
         )
+        # Read-only access to the source instance's API, used to fetch an
+        # example's source files live when a lecturer opens it. The browser
+        # never calls the source directly; this analytics backend does, server
+        # side. Empty token leaves the source view gracefully unavailable.
+        self.ANALYTICS_SOURCE_API_URL = os.environ.get(
+            "ANALYTICS_SOURCE_API_URL",
+            None,
+        )
+        self.ANALYTICS_SOURCE_API_TOKEN = os.environ.get(
+            "ANALYTICS_SOURCE_API_TOKEN",
+            None,
+        )
 
     def __new__(cls):
         if cls._instance is None:

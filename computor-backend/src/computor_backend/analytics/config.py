@@ -18,6 +18,9 @@ ANALYTICS_TABLES = (
     "submission_artifact",
     "submission_grade",
     "result",
+    # Small mapping tables so the source view can resolve a content to its
+    # deployed example version locally; the files are fetched live from source.
+    "course_content_deployment",
 )
 
 

@@ -255,6 +255,23 @@ def test_burst_flag_ignores_steady_work_and_marks_steep_clusters():
     assert all("velocity" in e.flags for e in crammed)
 
 
+def test_source_files_from_payload_keeps_text_and_skips_binaries():
+    from computor_backend.analytics.service import _source_files_from_payload
+
+    payload = {
+        "files": {
+            "solution.py": "print(1)\n",
+            "diagram.png": "data:image/png;base64,AAAA",
+            "README.md": "# Title\n",
+        }
+    }
+    files = _source_files_from_payload(payload)
+    # Sorted by name, base64 binary dropped.
+    assert [f.name for f in files] == ["README.md", "solution.py"]
+    assert any("print(1)" in f.content for f in files)
+    assert _source_files_from_payload({}) == []
+
+
 def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     config = AnalyticsStorageConfig(root=tmp_path)
     config.duckdb_path.parent.mkdir(parents=True)

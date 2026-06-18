@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import BackgroundTasks
 import duckdb
+import httpx
 
 from computor_backend.exceptions import (
     BadRequestException,
@@ -20,6 +21,8 @@ from computor_backend.settings import settings
 from computor_types.analytics import (
     AnalyticsCourseAccess,
     AnalyticsCourseSummary,
+    AnalyticsExampleSource,
+    AnalyticsExampleSourceFile,
     AnalyticsJobStatus,
     AnalyticsRefreshRequest,
     AnalyticsStandardExample,
@@ -362,6 +365,33 @@ class AnalyticsService:
         finally:
             connection.close()
 
+    def example_source(
+        self,
+        course_id: str,
+        content_id: str,
+    ) -> AnalyticsExampleSource | None:
+        """Source files of the example deployed to a content. The deployment
+        mapping comes from the snapshot; the files are fetched live from the
+        source instance's API, server side, so the browser never touches it."""
+        connection = self._read_connection()
+        try:
+            repo = AnalyticsDuckDbReportRepository(connection)
+            deployment = repo.get_example_deployment(content_id)
+        finally:
+            connection.close()
+        if not deployment or not deployment.get("example_version_id"):
+            return None
+
+        files = _fetch_source_files(str(deployment["example_version_id"]))
+        if files is None:
+            return None
+        title = deployment.get("example_identifier") or "Example source"
+        return AnalyticsExampleSource(
+            content_id=str(content_id),
+            title=str(title),
+            files=files,
+        )
+
     def _student_checkpoints_from_connection(
         self,
         connection: duckdb.DuckDBPyConnection,
@@ -538,6 +568,41 @@ def _tag_velocity(examples: list[AnalyticsStandardExample]) -> None:
         for ex in official[best_start : best_start + window]:
             if "velocity" not in ex.flags:
                 ex.flags.append("velocity")
+
+
+def _fetch_source_files(version_id: str) -> list[AnalyticsExampleSourceFile] | None:
+    """Download an example version's files from the source instance's API. None
+    when the source API is not configured or the request fails, which the UI
+    renders as a calm 'source not available' notice."""
+    base = settings.ANALYTICS_SOURCE_API_URL
+    token = settings.ANALYTICS_SOURCE_API_TOKEN
+    if not base or not token:
+        return None
+    url = f"{base.rstrip('/')}/examples/download/{version_id}"
+    try:
+        response = httpx.get(url, headers={"X-API-Token": token}, timeout=20.0)
+    except httpx.HTTPError:
+        return None
+    if response.status_code != 200:
+        return None
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    return _source_files_from_payload(payload)
+
+
+def _source_files_from_payload(payload: object) -> list[AnalyticsExampleSourceFile]:
+    """Map an ExampleDownloadResponse `files` map to source files, keeping only
+    text (skipping base64 data-URI binaries the code view cannot show)."""
+    files = payload.get("files") if isinstance(payload, dict) else None
+    if not isinstance(files, dict):
+        return []
+    return [
+        AnalyticsExampleSourceFile(name=str(name), content=content)
+        for name, content in sorted(files.items())
+        if isinstance(content, str) and not content.startswith("data:")
+    ]
 
 
 def _read_manifest(snapshot_path: Path) -> tuple[dict[str, int], dict[str, dict[str, str]]]:

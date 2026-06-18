@@ -323,6 +323,23 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
             ],
         )
 
+    def get_example_deployment(self, content_id: str) -> dict[str, Any] | None:
+        """Resolve a course content to its deployed example version from the
+        snapshot. Returns None when the snapshot has no deployment mapping (an
+        older snapshot, or content with no example). Files are fetched live."""
+        if not self._has_column("course_content_deployment", "example_version_id"):
+            return None
+        rows = self._rows(
+            """
+            SELECT example_version_id, example_identifier
+            FROM course_content_deployment
+            WHERE course_content_id = ?
+            LIMIT 1
+            """,
+            [str(content_id)],
+        )
+        return rows[0] if rows else None
+
     def get_timeline_events(
         self,
         course_id: str,
