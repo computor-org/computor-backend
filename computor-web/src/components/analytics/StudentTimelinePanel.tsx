@@ -13,7 +13,6 @@ import {
 import { countFlags, type StandardExampleResult } from './integrity';
 import IntegrityBadges from './IntegrityBadges';
 import StandardExampleTable from './StandardExampleTable';
-import ExampleSourceModal from './ExampleSourceModal';
 import { formatDateTime, formatPercent, formatStudentName } from './format';
 
 /**
@@ -33,7 +32,6 @@ export default function StudentTimelinePanel({
 }) {
   const [timeline, setTimeline] = useState<AnalyticsStudentTimeline | null>(null);
   const [examples, setExamples] = useState<StandardExampleResult[]>([]);
-  const [sourceExample, setSourceExample] = useState<StandardExampleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -118,16 +116,12 @@ export default function StudentTimelinePanel({
       {!loading && !error && (
         <>
           <CumulativeCurve events={events} cutoff={timeline?.submission_cutoff ?? null} />
-          <StandardExampleTable examples={examples} onOpenExample={setSourceExample} />
+          <StandardExampleTable
+            examples={examples}
+            courseId={courseId}
+            courseMemberId={student.course_member_id}
+          />
         </>
-      )}
-
-      {sourceExample && (
-        <ExampleSourceModal
-          courseId={courseId}
-          example={sourceExample}
-          onClose={() => setSourceExample(null)}
-        />
       )}
     </section>
   );

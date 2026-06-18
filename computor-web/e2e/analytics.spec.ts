@@ -45,18 +45,17 @@ test.describe('lecturer analytics', () => {
     await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
     await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
 
-    // Clicking an example opens its source code in a modal over the page, so the
-    // student detail is never lost.
-    await timeline.getByRole('button', { name: 'Week 2 · Loops' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('def loops(values):')).toBeVisible();
-    await dialog.getByText('test_loops.py').click();
-    await expect(dialog.getByText('def test_loops():')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    // The student detail is still there underneath.
-    await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
+    // Clicking an example opens its full source page (syntax-highlighted), and
+    // "Back" returns to this student's detail.
+    await timeline.getByRole('link', { name: 'Week 2 · Loops' }).click();
+    await expect(page).toHaveURL(/\/lecturer\/analytics\/examples\/cc-2\?student=/);
+    await expect(page.getByText('def loops(values):')).toBeVisible();
+    await page.getByRole('button', { name: 'test_loops.py' }).click();
+    await expect(page.getByText('def test_loops():')).toBeVisible();
+    await page.getByRole('link', { name: /Back to student/ }).click();
+    await expect(
+      page.getByTestId('analytics-timeline').getByText('8/10 standard passed'),
+    ).toBeVisible();
 
     // Update button triggers a job and polls it to completion.
     const refresh = page.getByTestId('analytics-refresh');

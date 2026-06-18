@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   FLAG_LABEL,
   FLAG_TITLE,
@@ -14,20 +15,26 @@ import { formatDateTime } from './format';
  * Per-example evidence for one student, grouped by week/unit with per-unit
  * subtotals: the score-pass row plus the integrity signals (test rounds,
  * lateness, flags) and tutor comments. This is what a lecturer judges on, so it
- * replaces the old flat event log. Clicking an example opens its source code in
- * a modal over the page, so the student detail is never lost.
+ * replaces the old flat event log. The example title links to its full source
+ * page; the student id rides along so "Back" returns to this student's detail.
  */
 export default function StandardExampleTable({
   examples,
-  onOpenExample,
+  courseId,
+  courseMemberId,
 }: {
   examples: StandardExampleResult[];
-  onOpenExample: (example: StandardExampleResult) => void;
+  courseId: string;
+  courseMemberId: string;
 }) {
   if (examples.length === 0) {
     return <p className="text-sm text-gray-500">No standard examples in this snapshot.</p>;
   }
   const units = groupByUnit(examples);
+  const sourceHref = (ex: StandardExampleResult) =>
+    `/courses/${courseId}/lecturer/analytics/examples/${encodeURIComponent(
+      ex.content_id,
+    )}?student=${encodeURIComponent(courseMemberId)}`;
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -47,7 +54,7 @@ export default function StandardExampleTable({
           <tbody key={unit.key} className="divide-y divide-gray-100">
             <UnitHeader unit={unit} />
             {unit.examples.map((ex) => (
-              <ExampleRow key={ex.content_id} ex={ex} onOpen={onOpenExample} />
+              <ExampleRow key={ex.content_id} ex={ex} href={sourceHref(ex)} />
             ))}
           </tbody>
         ))}
@@ -77,26 +84,15 @@ function UnitHeader({ unit }: { unit: UnitGroup }) {
   );
 }
 
-function ExampleRow({
-  ex,
-  onOpen,
-}: {
-  ex: StandardExampleResult;
-  onOpen: (example: StandardExampleResult) => void;
-}) {
+function ExampleRow({ ex, href }: { ex: StandardExampleResult; href: string }) {
   const scorePct = ex.score === null ? null : Math.round(ex.score * 100);
   return (
     <>
       <tr className={ex.flags.length ? 'bg-rose-50/40' : undefined}>
         <td className="px-3 py-2">
-          <button
-            type="button"
-            onClick={() => onOpen(ex)}
-            className="text-left font-medium text-blue-600 hover:underline"
-            title="View source code"
-          >
+          <Link href={href} className="font-medium text-blue-600 hover:underline" title="View source code">
             {ex.title}
-          </button>
+          </Link>
           <div className="font-mono text-[11px] text-gray-400">{ex.path}</div>
         </td>
         <td className="px-3 py-2 text-right tabular-nums">

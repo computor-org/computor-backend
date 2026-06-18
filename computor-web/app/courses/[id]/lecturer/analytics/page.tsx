@@ -1,8 +1,10 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -27,6 +29,7 @@ import StudentTimelinePanel from '@/src/components/analytics/StudentTimelinePane
 
 export default function LecturerAnalyticsPage() {
   const courseId = useParams().id as string;
+  const requestedMember = useSearchParams().get('student');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { courseHasAtLeast } = usePermissions();
 
@@ -104,8 +107,9 @@ export default function LecturerAnalyticsPage() {
     load();
   }, [authLoading, isAuthenticated, load]);
 
-  // Keep a student selected: drop a stale pick, and default to the first row so
-  // the detail pane is never empty when there is data to show.
+  // Keep a student selected: drop a stale pick, honour the `student` query param
+  // (set when returning from an example's source page), else default to the
+  // first row so the detail pane is never empty when there is data to show.
   useEffect(() => {
     if (students.length === 0) {
       if (selected) setSelected(null);
@@ -114,8 +118,12 @@ export default function LecturerAnalyticsPage() {
     const match = selected
       ? students.find((s) => s.course_member_id === selected.course_member_id)
       : null;
-    if (!match) setSelected(students[0]);
-  }, [students, selected]);
+    if (match) return;
+    const requested = requestedMember
+      ? students.find((s) => s.course_member_id === requestedMember)
+      : null;
+    setSelected(requested ?? students[0]);
+  }, [students, selected, requestedMember]);
 
   return (
     <AuthenticatedLayout>
