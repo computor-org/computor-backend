@@ -23,8 +23,15 @@ test.describe('lecturer analytics', () => {
     await expect(summary.getByText('70%')).toBeVisible(); // submitted
     await expect(summary.getByText('50%')).toBeVisible(); // graded
 
+    // Master list is names only: no matrikelnummer, no flags, no scores. A
+    // passing student must not read another student's standing off the screen.
+    const roster = page.getByTestId('analytics-roster');
+    await expect(roster.getByText('Ada Lovelace')).toBeVisible();
+    await expect(roster.getByText('01234567')).toHaveCount(0);
+    await expect(roster.getByText('Burst')).toHaveCount(0);
+
     // Roster row -> per-student timeline (the signature curve).
-    const row = page.getByTestId('analytics-roster').getByText('Ada Lovelace');
+    const row = roster.getByText('Ada Lovelace');
     await expect(row).toBeVisible();
     await row.click();
     const timeline = page.getByTestId('analytics-timeline');

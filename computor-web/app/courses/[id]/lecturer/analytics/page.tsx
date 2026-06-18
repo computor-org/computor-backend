@@ -22,7 +22,7 @@ import {
 import SummaryCards from '@/src/components/analytics/SummaryCards';
 import CutoffControls from '@/src/components/analytics/CutoffControls';
 import RefreshControl from '@/src/components/analytics/RefreshControl';
-import StudentCheckpointTable from '@/src/components/analytics/StudentCheckpointTable';
+import RosterList from '@/src/components/analytics/RosterList';
 import StudentTimelinePanel from '@/src/components/analytics/StudentTimelinePanel';
 
 export default function LecturerAnalyticsPage() {
@@ -191,9 +191,9 @@ export default function LecturerAnalyticsPage() {
         {!loading && summary && emptyReason === 'none' && (
           <>
             <SummaryCards summary={summary} />
-            <div className="grid gap-6 lg:grid-cols-[minmax(360px,460px)_1fr] print:block">
+            <div className="grid gap-6 lg:grid-cols-[minmax(200px,260px)_1fr] print:block">
               <div className="lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto print:max-h-none print:overflow-visible">
-                <StudentCheckpointTable
+                <RosterList
                   students={students}
                   selectedId={selected?.course_member_id ?? null}
                   onSelect={setSelected}
