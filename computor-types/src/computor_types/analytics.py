@@ -96,6 +96,49 @@ class AnalyticsStudentCheckpoint(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AnalyticsTutorComment(BaseModel):
+    author_role: str
+    text: str
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnalyticsStandardExample(BaseModel):
+    content_id: str
+    path: str
+    title: str
+    category: str | None = None
+    unit: str | None = None
+    score: float | None = None
+    passed: bool = False
+    test_rounds: int = 0
+    submitted_at: datetime | None = None
+    official: bool = False
+    late: bool = False
+    flags: list[str] = Field(default_factory=list)
+    comments: list[AnalyticsTutorComment] = Field(default_factory=list)
+    href: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnalyticsExampleSourceFile(BaseModel):
+    name: str
+    content: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnalyticsExampleSource(BaseModel):
+    content_id: str
+    title: str
+    files: list[AnalyticsExampleSourceFile] = Field(default_factory=list)
+    href: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AnalyticsTimelineEvent(BaseModel):
     occurred_at: datetime
     event_type: str

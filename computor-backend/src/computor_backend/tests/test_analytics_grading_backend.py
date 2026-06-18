@@ -186,6 +186,43 @@ def test_report_repository_counts_score_pass_at_threshold():
     assert bob["standard_passed"] == 1  # 0.70 passes, 0.30 does not
 
 
+def test_report_repository_lists_student_examples_with_rounds_and_lateness():
+    repo = _report_repo_with_fixture(
+        submission_cutoff=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading_cutoff=None,
+    )
+    by_path = {
+        row["path"]: row for row in repo.get_student_examples(COURSE_ID, BOB_MEMBER_ID)
+    }
+    # Bob's assignment 2: late official submission preceded by three test runs.
+    a2 = by_path["week1.assignment2"]
+    assert a2["test_rounds"] == 3
+    assert a2["submitted_at"] is not None
+    assert bool(a2["late"]) is True
+
+
+def test_analytics_service_student_examples_derives_flags(tmp_path):
+    service = _service_with_fixture(tmp_path)
+    cutoffs = AnalyticsCutoffs(
+        submission=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading=None,
+    )
+
+    alice = {ex.path: ex for ex in service.student_examples(COURSE_ID, ALICE_MEMBER_ID, cutoffs)}
+    a1 = alice["week1.assignment1"]
+    # Passed with no test runs -> low-iteration flag.
+    assert a1.passed is True
+    assert a1.test_rounds == 0
+    assert "low_iteration" in a1.flags
+
+    bob = {ex.path: ex for ex in service.student_examples(COURSE_ID, BOB_MEMBER_ID, cutoffs)}
+    b2 = bob["week1.assignment2"]
+    # Three test rounds before submitting -> not a low-iteration pass.
+    assert b2.test_rounds == 3
+    assert "low_iteration" not in b2.flags
+    assert b2.late is True
+
+
 def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     config = AnalyticsStorageConfig(root=tmp_path)
     config.duckdb_path.parent.mkdir(parents=True)

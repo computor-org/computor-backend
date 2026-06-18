@@ -217,6 +217,112 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
             ],
         )
 
+    def get_student_examples(
+        self,
+        course_id: str,
+        course_member_id: str,
+    ) -> list[dict[str, Any]]:
+        """Per standard example for one student: latest grade/score, official
+        submission time, test-run count, lateness, and the latest tutor comment.
+        Flags are derived in the service from these raw signals."""
+        submittable_filter, submittable_params = self._submittable_filter(course_id)
+        time_column = self._submission_time_column()
+        comment_inner = (
+            "sgd.comment" if self._has_column("submission_grade", "comment") else "NULL"
+        )
+
+        # The evidence view shows the actual latest official submission and marks
+        # it late, rather than hiding submissions made after the cutoff.
+        late_params: list[Any] = []
+        late_filter = self._after_cutoff_filter(
+            f"sa.{time_column}", self.cutoffs.submission, late_params
+        )
+        grade_params: list[Any] = []
+        grading_cutoff = self._cutoff_filter("sgd.graded_at", self.cutoffs.grading, grade_params)
+
+        return self._rows(
+            f"""
+            WITH submittable AS (
+                SELECT cc.id AS content_id, CAST(cc.path AS VARCHAR) AS path,
+                       cc.title, cct.slug AS category
+                FROM course_content cc
+                JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+                JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+                WHERE {submittable_filter}
+            ),
+            official AS (
+                SELECT sg.course_content_id, MAX(sa.{time_column}) AS submitted_at
+                FROM submission_group sg
+                JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+                JOIN submission_artifact sa ON sa.submission_group_id = sg.id
+                WHERE sgm.course_member_id = ?
+                  AND sa.submit = true
+                GROUP BY sg.course_content_id
+            ),
+            late_official AS (
+                SELECT DISTINCT sg.course_content_id
+                FROM submission_group sg
+                JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+                JOIN submission_artifact sa ON sa.submission_group_id = sg.id
+                WHERE sgm.course_member_id = ?
+                  AND sa.submit = true
+                  {late_filter}
+            ),
+            tests AS (
+                SELECT sg.course_content_id, COUNT(DISTINCT sa.id) AS test_rounds
+                FROM submission_group sg
+                JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+                JOIN submission_artifact sa ON sa.submission_group_id = sg.id
+                WHERE sgm.course_member_id = ?
+                  AND sa.submit = false
+                GROUP BY sg.course_content_id
+            ),
+            latest_grade AS (
+                SELECT course_content_id, grade, status, comment, graded_at
+                FROM (
+                    SELECT sg.course_content_id, sgd.grade, sgd.status,
+                           {comment_inner} AS comment, sgd.graded_at,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY sg.course_content_id
+                               ORDER BY sgd.graded_at DESC
+                           ) AS rn
+                    FROM submission_group sg
+                    JOIN submission_group_member sgm ON sgm.submission_group_id = sg.id
+                    JOIN submission_artifact sa ON sa.submission_group_id = sg.id
+                    JOIN submission_grade sgd ON sgd.artifact_id = sa.id
+                    WHERE sgm.course_member_id = ?
+                      AND sa.submit = true
+                      {grading_cutoff}
+                ) ranked
+                WHERE ranked.rn = 1
+            )
+            SELECT
+                s.content_id, s.path, s.title, s.category,
+                o.submitted_at,
+                COALESCE(t.test_rounds, 0) AS test_rounds,
+                g.grade,
+                g.status AS grade_status,
+                g.comment AS comment,
+                g.graded_at,
+                (lo.course_content_id IS NOT NULL) AS late
+            FROM submittable s
+            LEFT JOIN official o ON o.course_content_id = s.content_id
+            LEFT JOIN late_official lo ON lo.course_content_id = s.content_id
+            LEFT JOIN tests t ON t.course_content_id = s.content_id
+            LEFT JOIN latest_grade g ON g.course_content_id = s.content_id
+            ORDER BY s.path
+            """,
+            [
+                *submittable_params,
+                str(course_member_id),
+                str(course_member_id),
+                *late_params,
+                str(course_member_id),
+                str(course_member_id),
+                *grade_params,
+            ],
+        )
+
     def get_timeline_events(
         self,
         course_id: str,
