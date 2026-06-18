@@ -370,26 +370,35 @@ class AnalyticsService:
         course_id: str,
         content_id: str,
     ) -> AnalyticsExampleSource | None:
-        """Source files of the example deployed to a content. The deployment
-        mapping comes from the snapshot; the files are fetched live from the
-        source instance's API, server side, so the browser never touches it."""
-        connection = self._read_connection()
-        try:
-            repo = AnalyticsDuckDbReportRepository(connection)
-            deployment = repo.get_example_deployment(content_id)
-        finally:
-            connection.close()
-        if not deployment or not deployment.get("example_version_id"):
+        """Source files of the example deployed to a content, fetched live from
+        the source instance's API server side, so the browser never touches the
+        source. Resolves the content's deployed example version, then downloads
+        its files. None (a calm 'not available' notice) when the source API is
+        unconfigured/unreachable or the content has no deployment."""
+        base = settings.ANALYTICS_SOURCE_API_URL
+        token = settings.ANALYTICS_SOURCE_API_TOKEN
+        if not base or not token:
+            return None
+        base = base.rstrip("/")
+
+        content = _source_get_json(base, token, f"course-contents/{content_id}")
+        deployment = (content or {}).get("deployment") or {}
+        version_id = deployment.get("example_version_id")
+        if not version_id:
             return None
 
-        files = _fetch_source_files(str(deployment["example_version_id"]))
-        if files is None:
+        payload = _source_get_json(base, token, f"examples/download/{version_id}")
+        if payload is None:
             return None
-        title = deployment.get("example_identifier") or "Example source"
+        title = (
+            deployment.get("example_identifier")
+            or (payload.get("identifier") if isinstance(payload, dict) else None)
+            or "Example source"
+        )
         return AnalyticsExampleSource(
             content_id=str(content_id),
             title=str(title),
-            files=files,
+            files=_source_files_from_payload(payload),
         )
 
     def _student_checkpoints_from_connection(
@@ -570,26 +579,23 @@ def _tag_velocity(examples: list[AnalyticsStandardExample]) -> None:
                 ex.flags.append("velocity")
 
 
-def _fetch_source_files(version_id: str) -> list[AnalyticsExampleSourceFile] | None:
-    """Download an example version's files from the source instance's API. None
-    when the source API is not configured or the request fails, which the UI
-    renders as a calm 'source not available' notice."""
-    base = settings.ANALYTICS_SOURCE_API_URL
-    token = settings.ANALYTICS_SOURCE_API_TOKEN
-    if not base or not token:
-        return None
-    url = f"{base.rstrip('/')}/examples/download/{version_id}"
+def _source_get_json(base: str, token: str, path: str) -> object | None:
+    """GET a JSON resource from the source instance API with the read-only
+    service token. None on any error, so the source view degrades quietly."""
     try:
-        response = httpx.get(url, headers={"X-API-Token": token}, timeout=20.0)
+        response = httpx.get(
+            f"{base}/{path}",
+            headers={"X-API-Token": token},
+            timeout=20.0,
+        )
     except httpx.HTTPError:
         return None
     if response.status_code != 200:
         return None
     try:
-        payload = response.json()
+        return response.json()
     except ValueError:
         return None
-    return _source_files_from_payload(payload)
 
 
 def _source_files_from_payload(payload: object) -> list[AnalyticsExampleSourceFile]:
