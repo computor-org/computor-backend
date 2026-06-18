@@ -599,16 +599,61 @@ def _source_get_json(base: str, token: str, path: str) -> object | None:
 
 
 def _source_files_from_payload(payload: object) -> list[AnalyticsExampleSourceFile]:
-    """Map an ExampleDownloadResponse `files` map to source files, keeping only
-    text (skipping base64 data-URI binaries the code view cannot show)."""
+    """Map an ExampleDownloadResponse `files` map to readable source. Plain text
+    passes through; data-URI files are decoded and kept when they are UTF-8 text
+    (e.g. notebooks, which the download wraps as base64 octet-stream); genuine
+    binaries (images) are skipped. Notebooks render as their cell sources."""
     files = payload.get("files") if isinstance(payload, dict) else None
     if not isinstance(files, dict):
         return []
-    return [
-        AnalyticsExampleSourceFile(name=str(name), content=content)
-        for name, content in sorted(files.items())
-        if isinstance(content, str) and not content.startswith("data:")
-    ]
+    result: list[AnalyticsExampleSourceFile] = []
+    for name, content in sorted(files.items()):
+        if not isinstance(content, str):
+            continue
+        text = _decode_source_text(content) if content.startswith("data:") else content
+        if text is None:
+            continue
+        if str(name).endswith(".ipynb"):
+            text = _notebook_to_source(text)
+        result.append(AnalyticsExampleSourceFile(name=str(name), content=text))
+    return result
+
+
+def _decode_source_text(data_uri: str) -> str | None:
+    """Decode a data: URI to UTF-8 text, or None when it is binary."""
+    import base64
+    from urllib.parse import unquote_to_bytes
+
+    try:
+        header, _, data = data_uri.partition(",")
+        raw = base64.b64decode(data) if ";base64" in header else unquote_to_bytes(data)
+        return raw.decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+
+
+def _notebook_to_source(text: str) -> str:
+    """Flatten a Jupyter notebook to its code and markdown cells, so the source
+    view shows the actual code rather than raw notebook JSON."""
+    try:
+        notebook = json.loads(text)
+    except ValueError:
+        return text
+    cells = notebook.get("cells") if isinstance(notebook, dict) else None
+    if not isinstance(cells, list):
+        return text
+    blocks: list[str] = []
+    for cell in cells:
+        if not isinstance(cell, dict):
+            continue
+        source = cell.get("source", "")
+        body = "".join(source) if isinstance(source, list) else str(source)
+        if not body.strip():
+            continue
+        if cell.get("cell_type") == "markdown":
+            body = "\n".join(f"# {line}" for line in body.splitlines())
+        blocks.append(body)
+    return "\n\n".join(blocks) if blocks else text
 
 
 def _read_manifest(snapshot_path: Path) -> tuple[dict[str, int], dict[str, dict[str, str]]]:
