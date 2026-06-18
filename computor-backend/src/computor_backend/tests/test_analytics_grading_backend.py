@@ -255,20 +255,27 @@ def test_burst_flag_ignores_steady_work_and_marks_steep_clusters():
     assert all("velocity" in e.flags for e in crammed)
 
 
-def test_source_files_from_payload_keeps_text_and_skips_binaries():
+def test_source_files_decode_text_datauris_and_skip_binaries():
+    import base64
+
     from computor_backend.analytics.service import _source_files_from_payload
 
+    png = base64.b64encode(b"\x89PNG\x00\x01\x02").decode()
+    notebook = base64.b64encode(
+        b'{"cells":[{"cell_type":"code","source":["x = 1\\n"]}]}'
+    ).decode()
     payload = {
         "files": {
             "solution.py": "print(1)\n",
-            "diagram.png": "data:image/png;base64,AAAA",
+            "diagram.png": "data:image/png;base64," + png,
+            "review.ipynb": "data:application/octet-stream;base64," + notebook,
             "README.md": "# Title\n",
         }
     }
-    files = _source_files_from_payload(payload)
-    # Sorted by name, base64 binary dropped.
-    assert [f.name for f in files] == ["README.md", "solution.py"]
-    assert any("print(1)" in f.content for f in files)
+    files = {f.name: f.content for f in _source_files_from_payload(payload)}
+    assert "diagram.png" not in files  # genuine binary skipped
+    assert "print(1)" in files["solution.py"]  # plain text passes through
+    assert "x = 1" in files["review.ipynb"]  # notebook decoded + flattened to code
     assert _source_files_from_payload({}) == []
 
 
