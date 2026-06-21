@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { AnalyticsCutoffs } from '@/src/api/analytics';
+import { DEFAULT_ANALYTICS_CUTOFFS, type AnalyticsCutoffs } from '@/src/api/analytics';
 import { isoToLocalInput, localInputToIso } from './format';
 
 /**
- * Submission and grading cutoffs are independent report parameters, not stored
- * filters: changing them re-reads the same snapshot. Empty means "use the
- * snapshot's recorded cutoffs".
+ * Submission and grading cutoffs are independent report parameters. Changing
+ * them re-reads the same snapshot; Reset restores the course default.
  *
  * Inputs initialise from the applied `value`; the parent remounts this via a
  * `key` derived from the applied cutoffs so Apply/Reset re-seed the drafts
@@ -36,10 +35,10 @@ export default function CutoffControls({
     });
   };
 
-  const clear = () => {
-    setSubmission('');
-    setGrading('');
-    onApply({ submissionCutoff: null, gradingCutoff: null });
+  const reset = () => {
+    setSubmission(isoToLocalInput(DEFAULT_ANALYTICS_CUTOFFS.submissionCutoff));
+    setGrading(isoToLocalInput(DEFAULT_ANALYTICS_CUTOFFS.gradingCutoff));
+    onApply(DEFAULT_ANALYTICS_CUTOFFS);
   };
 
   return (
@@ -69,7 +68,7 @@ export default function CutoffControls({
       {(submission || grading) && (
         <button
           type="button"
-          onClick={clear}
+          onClick={reset}
           disabled={disabled}
           className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
         >

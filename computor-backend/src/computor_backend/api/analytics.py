@@ -6,7 +6,10 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.orm import Session
 
-from computor_backend.analytics import AnalyticsCutoffs
+from computor_backend.analytics.config import (
+    AnalyticsCutoffs,
+    default_analytics_cutoffs,
+)
 from computor_backend.analytics.service import AnalyticsService
 from computor_backend.database import get_db
 from computor_backend.exceptions import ForbiddenException, NotFoundException
@@ -270,7 +273,7 @@ def _cutoffs(
     submission_cutoff: datetime | None,
     grading_cutoff: datetime | None,
 ) -> AnalyticsCutoffs:
-    return AnalyticsCutoffs(
+    return default_analytics_cutoffs(
         submission=submission_cutoff,
         grading=grading_cutoff,
-    ).normalized()
+    )

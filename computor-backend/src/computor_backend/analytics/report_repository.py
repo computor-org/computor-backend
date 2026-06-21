@@ -92,11 +92,6 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
             late_params,
         )
         grade_params: list[Any] = []
-        grade_submission_cutoff = self._cutoff_filter(
-            f"sa.{time_column}",
-            self.cutoffs.submission,
-            grade_params,
-        )
         grading_cutoff = self._cutoff_filter(
             "sgd.graded_at",
             self.cutoffs.grading,
@@ -105,12 +100,29 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
 
         return self._rows(
             f"""
-            WITH submittable_contents AS (
-                SELECT cc.id AS content_id
+            WITH submittable_all AS (
+                SELECT
+                    cc.id AS content_id,
+                    cct.slug AS content_type_slug,
+                    cct.title AS content_type_title
                 FROM course_content cc
                 JOIN course_content_type cct ON cct.id = cc.course_content_type_id
                 JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
                 WHERE {submittable_filter}
+            ),
+            standard_marker AS (
+                SELECT COUNT(*) AS standard_count
+                FROM submittable_all
+                WHERE lower(content_type_slug) = 'standard'
+                   OR lower(content_type_title) = 'standard'
+            ),
+            submittable_contents AS (
+                SELECT sa.content_id
+                FROM submittable_all sa
+                CROSS JOIN standard_marker sm
+                WHERE sm.standard_count = 0
+                   OR lower(sa.content_type_slug) = 'standard'
+                   OR lower(sa.content_type_title) = 'standard'
             ),
             all_students AS (
                 SELECT
@@ -168,7 +180,6 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
                     JOIN submission_artifact sa ON sa.submission_group_id = sg.id
                     JOIN submission_grade sgd ON sgd.artifact_id = sa.id
                     WHERE sa.submit = true
-                      {grade_submission_cutoff}
                       {grading_cutoff}
                 ) ranked
                 WHERE rn = 1
@@ -183,9 +194,9 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
                 COUNT(sc.content_id) AS total_max_assignments,
                 COUNT(sub.course_content_id) AS total_submitted_assignments,
                 COUNT(grd.course_content_id) AS total_graded_assignments,
-                COUNT(CASE WHEN grd.grade >= 0.6 THEN grd.course_content_id END)
+                COUNT(CASE WHEN COALESCE(grd.grade, 0) >= 0.6 THEN sc.content_id END)
                     AS standard_passed,
-                AVG(grd.grade) AS average_grading,
+                AVG(COALESCE(grd.grade, 0)) AS average_grading,
                 MAX(sub.latest_submission_at) AS latest_submission_at,
                 COALESCE(MAX(late.late_submission_count), 0) AS late_submission_count
             FROM all_students s
@@ -243,12 +254,28 @@ class AnalyticsDuckDbReportRepository(AnalyticsDuckDbGradingRepository):
         return self._rows(
             f"""
             WITH submittable AS (
-                SELECT cc.id AS content_id, CAST(cc.path AS VARCHAR) AS path,
-                       cc.title, cct.slug AS category
-                FROM course_content cc
-                JOIN course_content_type cct ON cct.id = cc.course_content_type_id
-                JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
-                WHERE {submittable_filter}
+                SELECT *
+                FROM (
+                    SELECT
+                        cc.id AS content_id,
+                        CAST(cc.path AS VARCHAR) AS path,
+                        cc.title,
+                        cct.slug AS category,
+                        cct.title AS category_title,
+                        COUNT(CASE
+                            WHEN lower(cct.slug) = 'standard'
+                              OR lower(cct.title) = 'standard'
+                            THEN 1
+                            ELSE NULL
+                        END) OVER () AS standard_count
+                    FROM course_content cc
+                    JOIN course_content_type cct ON cct.id = cc.course_content_type_id
+                    JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
+                    WHERE {submittable_filter}
+                ) raw
+                WHERE standard_count = 0
+                   OR lower(category) = 'standard'
+                   OR lower(category_title) = 'standard'
             ),
             official AS (
                 SELECT sg.course_content_id, MAX(sa.{time_column}) AS submitted_at

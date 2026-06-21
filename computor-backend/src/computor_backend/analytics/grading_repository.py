@@ -94,11 +94,6 @@ class AnalyticsDuckDbGradingRepository:
             self.cutoffs.submission,
             cutoff_params,
         )
-        grade_submission_cutoff = self._cutoff_filter(
-            f"sa.{self._submission_time_column()}",
-            self.cutoffs.submission,
-            cutoff_params,
-        )
         grading_cutoff = self._cutoff_filter(
             "sgd.graded_at",
             self.cutoffs.grading,
@@ -180,7 +175,6 @@ class AnalyticsDuckDbGradingRepository:
                     JOIN submission_artifact sa ON sa.submission_group_id = sg.id
                     JOIN submission_grade sgd ON sgd.artifact_id = sa.id
                     WHERE sa.submit = true
-                      {grade_submission_cutoff}
                       {grading_cutoff}
                 ) ranked
                 WHERE rn = 1
@@ -481,17 +475,11 @@ class AnalyticsDuckDbGradingRepository:
         course_id: str,
         course_member_id: str | None = None,
     ) -> dict[tuple[str, str], dict[str, Any]]:
-        time_column = self._submission_time_column()
         params: list[Any] = [str(course_id)]
         member_filter = ""
         if course_member_id:
             member_filter = "AND sgm.course_member_id = ?"
             params.append(str(course_member_id))
-        submission_cutoff = self._cutoff_filter(
-            f"sa.{time_column}",
-            self.cutoffs.submission,
-            params,
-        )
         grading_cutoff = self._cutoff_filter("sgd.graded_at", self.cutoffs.grading, params)
 
         rows = self._rows(
@@ -522,7 +510,6 @@ class AnalyticsDuckDbGradingRepository:
                 WHERE sg.course_id = ?
                   AND sa.submit = true
                   {member_filter}
-                  {submission_cutoff}
                   {grading_cutoff}
             ) ranked
             WHERE rn = 1

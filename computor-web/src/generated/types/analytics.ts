@@ -79,6 +79,33 @@ export interface AnalyticsStudentCheckpoint {
   average_grading?: number | null;
   latest_submission_at?: string | null;
   late_submission_count?: number;
+  standard_total?: number;
+  standard_passed?: number;
+  pass_rate?: number;
+  average_score?: number | null;
+}
+
+export interface AnalyticsTutorComment {
+  author_role: string;
+  text: string;
+  created_at?: string | null;
+}
+
+export interface AnalyticsStandardExample {
+  content_id: string;
+  path: string;
+  title: string;
+  category?: string | null;
+  unit?: string | null;
+  score?: number | null;
+  passed?: boolean;
+  test_rounds?: number;
+  submitted_at?: string | null;
+  official?: boolean;
+  late?: boolean;
+  flags?: string[];
+  comments?: AnalyticsTutorComment[];
+  href?: string | null;
 }
 
 export interface AnalyticsTimelineEvent {

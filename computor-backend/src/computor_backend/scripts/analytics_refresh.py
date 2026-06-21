@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import sys
 
+from computor_backend.analytics.config import DEFAULT_ANALYTICS_SUBMISSION_CUTOFF
 from computor_backend.analytics.service import AnalyticsService
 from computor_types.analytics import AnalyticsRefreshRequest
 
@@ -24,7 +25,10 @@ def main() -> int:
     )
     request = AnalyticsRefreshRequest(
         source_name=source_name,
-        submission_cutoff=_datetime_env("ANALYTICS_REFRESH_SUBMISSION_CUTOFF"),
+        submission_cutoff=_datetime_env(
+            "ANALYTICS_REFRESH_SUBMISSION_CUTOFF",
+            DEFAULT_ANALYTICS_SUBMISSION_CUTOFF,
+        ),
         grading_cutoff=_datetime_env("ANALYTICS_REFRESH_GRADING_CUTOFF"),
         run_id=_optional_env("ANALYTICS_REFRESH_RUN_ID"),
         tables=_tables_env("ANALYTICS_REFRESH_TABLES"),
@@ -68,10 +72,10 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _datetime_env(name: str) -> datetime | None:
+def _datetime_env(name: str, default: datetime | None = None) -> datetime | None:
     value = _optional_env(name)
     if value is None:
-        return None
+        return default
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 

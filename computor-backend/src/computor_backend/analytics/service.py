@@ -216,7 +216,7 @@ class AnalyticsService:
         )
         total_graded = sum(student.total_graded_assignments for student in students)
         grade_sum = sum(
-            (student.average_grading or 0) * student.total_graded_assignments
+            (student.average_score or 0) * student.standard_total
             for student in students
         )
         latest_submission_at = None
@@ -235,7 +235,7 @@ class AnalyticsService:
             submitted_percentage=_percentage(total_submitted, total_max),
             total_graded_assignments=total_graded,
             graded_percentage=_percentage(total_graded, total_max),
-            average_grading=_average(grade_sum, total_graded),
+            average_grading=_average(grade_sum, total_max),
             latest_submission_at=latest_submission_at,
             submission_cutoff=cutoffs.submission,
             grading_cutoff=cutoffs.grading,

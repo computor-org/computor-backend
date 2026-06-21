@@ -45,7 +45,7 @@ export default function StudentTimelinePanel({
       try {
         const [t, ex] = await Promise.all([
           getStudentTimeline(courseId, student.course_member_id, cutoffs),
-          getStudentExamples(courseId, student.course_member_id),
+          getStudentExamples(courseId, student.course_member_id, cutoffs),
         ]);
         if (cancelled) return;
         setTimeline(t);

@@ -61,6 +61,13 @@ export interface AnalyticsCutoffs {
   gradingCutoff?: string | null;
 }
 
+export const DEFAULT_ANALYTICS_SUBMISSION_CUTOFF = '2026-06-18T22:01:00.000Z';
+
+export const DEFAULT_ANALYTICS_CUTOFFS: AnalyticsCutoffs = {
+  submissionCutoff: DEFAULT_ANALYTICS_SUBMISSION_CUTOFF,
+  gradingCutoff: null,
+};
+
 /** Carries the HTTP status so callers can distinguish 403 (no access) from 404
  * (no snapshot yet) and render the right empty/error state. */
 export class AnalyticsApiError extends Error {
@@ -165,10 +172,11 @@ export function getExampleSource(
 export function getStudentExamples(
   courseId: string,
   courseMemberId: string,
+  cutoffs?: AnalyticsCutoffs,
 ): Promise<StandardExampleResult[]> {
   if (IS_DEMO) return Promise.resolve(demoStudentDetail(courseMemberId)?.examples ?? []);
   return getJson<StandardExampleResult[]>(
-    `${base(courseId)}/students/${encodeURIComponent(courseMemberId)}/examples`,
+    `${base(courseId)}/students/${encodeURIComponent(courseMemberId)}/examples${cutoffQuery(cutoffs)}`,
   ).catch((e) => {
     if (e instanceof AnalyticsApiError && e.status === 404) return [];
     throw e;

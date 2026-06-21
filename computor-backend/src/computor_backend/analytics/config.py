@@ -5,6 +5,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+DEFAULT_ANALYTICS_SUBMISSION_CUTOFF = datetime(
+    2026,
+    6,
+    18,
+    22,
+    1,
+    tzinfo=timezone.utc,
+)
+
 ANALYTICS_TABLES = (
     "course",
     "course_member",
@@ -19,6 +28,20 @@ ANALYTICS_TABLES = (
     "submission_grade",
     "result",
 )
+
+
+def default_analytics_cutoffs(
+    submission: datetime | None = None,
+    grading: datetime | None = None,
+) -> "AnalyticsCutoffs":
+    return AnalyticsCutoffs(
+        submission=(
+            _as_utc(submission)
+            if submission is not None
+            else DEFAULT_ANALYTICS_SUBMISSION_CUTOFF
+        ),
+        grading=_as_utc(grading),
+    )
 
 
 @dataclass(frozen=True)

@@ -28,6 +28,7 @@ from computor_backend.services.course_member_grading_read import (
 
 
 COURSE_ID = "20000000-0000-4000-8000-000000000001"
+STANDARD_TYPE_ID = "30000000-0000-4000-8000-000000000001"
 ALICE_MEMBER_ID = "50000000-0000-4000-8000-000000000101"
 BOB_MEMBER_ID = "50000000-0000-4000-8000-000000000102"
 
@@ -52,6 +53,87 @@ def test_duckdb_grading_backend_applies_separate_cutoffs():
     assert bob.total_submitted_assignments == 1
     assert bob.overall_progress_percentage == 50.0
     assert bob.overall_average_grading == 0.35
+
+
+def test_report_standard_rows_match_progress_standard_content_type():
+    conn = duckdb.connect(":memory:")
+    _create_schema(conn)
+    _insert_fixture(conn)
+    _mark_assignments_standard_and_add_bonus(conn)
+    cutoffs = AnalyticsCutoffs(
+        submission=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading=None,
+    )
+    report_repo = AnalyticsDuckDbReportRepository(conn, cutoffs=cutoffs)
+    progress_repo = AnalyticsDuckDbGradingRepository(conn, cutoffs=cutoffs)
+
+    unfiltered = build_course_member_grading_list_response(progress_repo, COURSE_ID)
+    assert {row.course_member_id: row for row in unfiltered}[
+        ALICE_MEMBER_ID
+    ].total_max_assignments == 3
+
+    standard_progress = build_course_member_grading_list_response(
+        _StandardOnlyProgressBackend(progress_repo),
+        COURSE_ID,
+    )
+    progress_by_member = {row.course_member_id: row for row in standard_progress}
+    report_by_member = {
+        row["course_member_id"]: row
+        for row in report_repo.get_student_checkpoint_rows(COURSE_ID)
+    }
+
+    alice_report = report_by_member[ALICE_MEMBER_ID]
+    alice_progress = progress_by_member[ALICE_MEMBER_ID]
+    assert alice_report["total_max_assignments"] == alice_progress.total_max_assignments == 2
+    assert (
+        alice_report["total_submitted_assignments"]
+        == alice_progress.total_submitted_assignments
+        == 2
+    )
+    assert alice_report["standard_passed"] == 2
+    assert alice_report["average_grading"] == alice_progress.overall_average_grading == 0.875
+
+    bob_report = report_by_member[BOB_MEMBER_ID]
+    bob_progress = progress_by_member[BOB_MEMBER_ID]
+    assert bob_report["total_max_assignments"] == bob_progress.total_max_assignments == 2
+    assert (
+        bob_report["total_submitted_assignments"]
+        == bob_progress.total_submitted_assignments
+        == 1
+    )
+    assert bob_report["standard_passed"] == 1
+    assert bob_report["average_grading"] == bob_progress.overall_average_grading == 0.35
+
+
+def test_report_points_use_grading_cutoff_not_submission_cutoff():
+    conn = duckdb.connect(":memory:")
+    _create_schema(conn)
+    _insert_fixture(conn)
+    conn.execute(
+        "INSERT INTO submission_grade VALUES "
+        "('80000000-0000-4000-8000-000000000122', "
+        "'70000000-0000-4000-8000-000000000122', "
+        "'50000000-0000-4000-8000-000000000002', "
+        "'2026-06-19 09:00:00+00', 0.95, 1)"
+    )
+    repo = AnalyticsDuckDbReportRepository(
+        conn,
+        cutoffs=AnalyticsCutoffs(
+            submission=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+            grading=datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc),
+        ),
+    )
+
+    bob = {
+        row["course_member_id"]: row
+        for row in repo.get_student_checkpoint_rows(COURSE_ID)
+    }[BOB_MEMBER_ID]
+
+    assert bob["total_submitted_assignments"] == 1
+    assert bob["late_submission_count"] == 1
+    assert bob["total_graded_assignments"] == 2
+    assert bob["standard_passed"] == 2
+    assert bob["average_grading"] == 0.825
 
 
 def test_shared_builder_uses_duckdb_backend_for_member_detail():
@@ -150,14 +232,14 @@ def test_report_repository_tracks_actual_grading_checkpoint_counts():
     assert alice["total_max_assignments"] == 2
     assert alice["total_submitted_assignments"] == 2
     assert alice["total_graded_assignments"] == 1
-    assert alice["average_grading"] == 0.85
+    assert alice["average_grading"] == 0.425
 
     bob = by_member[BOB_MEMBER_ID]
     assert bob["total_max_assignments"] == 2
     assert bob["total_submitted_assignments"] == 1
     assert bob["total_graded_assignments"] == 1
     assert bob["late_submission_count"] == 1
-    assert bob["average_grading"] == 0.70
+    assert bob["average_grading"] == 0.35
 
 
 def test_report_repository_counts_score_pass_at_threshold():
@@ -300,7 +382,7 @@ def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     assert summary.submitted_percentage == 75.0
     assert summary.total_graded_assignments == 2
     assert summary.graded_percentage == 50.0
-    assert summary.average_grading == 0.775
+    assert summary.average_grading == 0.3875
 
     timeline = service.student_timeline(COURSE_ID, BOB_MEMBER_ID, cutoffs)
     event_types = [event.event_type for event in timeline.events]
@@ -514,6 +596,26 @@ class _FakeCoursePermissionQuery:
         return self.result
 
 
+class _StandardOnlyProgressBackend:
+    def __init__(self, repo: AnalyticsDuckDbGradingRepository):
+        self.repo = repo
+
+    def get_course_level_stats_for_all_members(
+        self,
+        course_id,
+        path_prefix=None,
+        course_content_type_id=None,
+    ):
+        return self.repo.get_course_level_stats_for_all_members(
+            course_id,
+            path_prefix=path_prefix,
+            course_content_type_id=STANDARD_TYPE_ID,
+        )
+
+    def get_all_course_members_with_students_role(self, course_id):
+        return self.repo.get_all_course_members_with_students_role(course_id)
+
+
 def _report_repo_with_fixture(
     submission_cutoff: datetime | None,
     grading_cutoff: datetime | None,
@@ -678,3 +780,55 @@ def _insert_fixture(conn):
         ('90000000-0000-4000-8000-000000000922', '{BOB_MEMBER_ID}', '70000000-0000-4000-8000-000000000922', '60000000-0000-4000-8000-000000000122', '40000000-0000-4000-8000-000000000102', '30000000-0000-4000-8000-000000000001', '2026-06-18 21:46:00+00', 0.55, 0, 'bob-a2-test2'),
         ('90000000-0000-4000-8000-000000000923', '{BOB_MEMBER_ID}', '70000000-0000-4000-8000-000000000923', '60000000-0000-4000-8000-000000000122', '40000000-0000-4000-8000-000000000102', '30000000-0000-4000-8000-000000000001', '2026-06-18 21:59:00+00', 0.95, 0, 'bob-a2-test3');
     """)
+
+
+def _mark_assignments_standard_and_add_bonus(conn):
+    conn.execute(
+        "UPDATE course_content_type SET slug = 'standard', title = 'Standard' "
+        "WHERE id = ?",
+        [STANDARD_TYPE_ID],
+    )
+    conn.execute("""
+    INSERT INTO course_content_type VALUES
+        ('30000000-0000-4000-8000-000000000003', 'bonus', 'Bonus', '#9333ea', 'assignment');
+    INSERT INTO course_content VALUES
+        ('40000000-0000-4000-8000-000000000103',
+         '{course_id}',
+         '40000000-0000-4000-8000-000000000001',
+         '30000000-0000-4000-8000-000000000003',
+         'assignment',
+         'Assignment 3',
+         'week1.assignment3',
+         3,
+         true,
+         20,
+         3);
+    INSERT INTO submission_group VALUES
+        ('60000000-0000-4000-8000-000000000113',
+         '{course_id}',
+         '40000000-0000-4000-8000-000000000103',
+         'Alice Bonus',
+         1,
+         20,
+         3),
+        ('60000000-0000-4000-8000-000000000123',
+         '{course_id}',
+         '40000000-0000-4000-8000-000000000103',
+         'Bob Bonus',
+         1,
+         20,
+         3);
+    INSERT INTO submission_group_member VALUES
+        ('61000000-0000-4000-8000-000000000113',
+         '{course_id}',
+         '60000000-0000-4000-8000-000000000113',
+         '{alice_member_id}'),
+        ('61000000-0000-4000-8000-000000000123',
+         '{course_id}',
+         '60000000-0000-4000-8000-000000000123',
+         '{bob_member_id}');
+    """.format(
+        course_id=COURSE_ID,
+        alice_member_id=ALICE_MEMBER_ID,
+        bob_member_id=BOB_MEMBER_ID,
+    ))

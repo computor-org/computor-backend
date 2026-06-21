@@ -12,6 +12,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import type { CourseGet } from 'types/generated';
 import {
   AnalyticsApiError,
+  DEFAULT_ANALYTICS_CUTOFFS,
   analyticsRoleAtLeast,
   getCourseSummary,
   listAnalyticsCourses,
@@ -37,7 +38,7 @@ export default function LecturerAnalyticsPage() {
 
   const [course, setCourse] = useState<CourseGet | null>(null);
   const [analyticsCourse, setAnalyticsCourse] = useState<AnalyticsCourseAccess | null>(null);
-  const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>({});
+  const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>(DEFAULT_ANALYTICS_CUTOFFS);
   const [summary, setSummary] = useState<AnalyticsCourseSummary | null>(null);
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [selected, setSelected] = useState<RosterStudent | null>(null);
