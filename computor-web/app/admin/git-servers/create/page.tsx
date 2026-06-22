@@ -52,6 +52,7 @@ export default function GitServerCreatePage() {
       <FormPanel
         breadcrumbs={[{ label: 'Git Servers', href: '/admin/git-servers' }, { label: 'Register' }]}
         title="Register Git Server"
+        description="A git server is a Git instance (Forgejo or GitLab) that courses bind to for hosting reference and student repositories. Managed instances let Computor provision student repos automatically."
         error={error}
         submitting={saving}
         disabled={!baseUrl.trim()}

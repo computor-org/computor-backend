@@ -65,6 +65,7 @@ function CreateInner() {
       <FormPanel
         breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: 'New' }]}
         title="New Course Family"
+        description="A course family is a lecture — a lecture type such as 'Introduction to Programming'. Each time it runs in a term, you add a course (one instance) under it."
         error={error}
         submitting={saving}
         disabled={!path.trim() || !organizationId}
@@ -72,7 +73,7 @@ function CreateInner() {
         onCancel={() => router.push('/course-families')}
         onSubmit={save}
       >
-        <Field label="Organization" required>
+        <Field label="Organization" required hint="The faculty or institute this lecture belongs to.">
           <select value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} className={inputCls}>
             <option value="">Select an organization…</option>
             {orgs.map((o) => (
@@ -80,11 +81,11 @@ function CreateInner() {
             ))}
           </select>
         </Field>
-        <Field label="Path (slug)" required>
-          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="2026" className={inputCls} />
+        <Field label="Path (slug)" required hint="Lowercase, URL-safe identifier, unique within the organization.">
+          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="intro-programming" className={inputCls} />
         </Field>
-        <Field label="Title">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Winter Semester 2026" className={inputCls} />
+        <Field label="Title" hint="The lecture's name, e.g. 'Introduction to Programming'.">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Introduction to Programming" className={inputCls} />
         </Field>
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />

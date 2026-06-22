@@ -50,6 +50,7 @@ export default function OrganizationCreatePage() {
       <FormPanel
         breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: 'New' }]}
         title="New Organization"
+        description="An organization is a faculty or institute — the top of the hierarchy. It owns the course families (lectures) taught under it."
         error={error}
         submitting={saving}
         disabled={!path.trim()}
@@ -57,18 +58,18 @@ export default function OrganizationCreatePage() {
         onCancel={() => router.push('/organizations')}
         onSubmit={save}
       >
-        <Field label="Path (slug)" required>
+        <Field label="Path (slug)" required hint="Lowercase, URL-safe identifier used in the hierarchy path. Hard to change later.">
           <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="acme" className={inputCls} />
         </Field>
-        <Field label="Type">
+        <Field label="Type" hint="Use 'organization' for a faculty or institute.">
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrganizationType)} className={inputCls}>
             {ORG_TYPES.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
         </Field>
-        <Field label="Title">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Acme University" className={inputCls} />
+        <Field label="Title" hint="Display name shown in lists, e.g. 'Institute of Software Technology'.">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Institute of Software Technology" className={inputCls} />
         </Field>
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />

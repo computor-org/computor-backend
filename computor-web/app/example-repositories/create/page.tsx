@@ -48,6 +48,7 @@ export default function ExampleRepositoryCreatePage() {
       <FormPanel
         breadcrumbs={[{ label: 'Example Repositories', href: '/example-repositories' }, { label: 'New' }]}
         title="New example repository"
+        description="An example repository is a storage backend that holds reusable example content. Courses draw their assignments from these."
         error={error}
         submitting={saving}
         disabled={!name.trim() || !sourceUrl.trim()}
