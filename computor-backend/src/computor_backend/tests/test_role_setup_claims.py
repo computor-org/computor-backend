@@ -45,6 +45,10 @@ class TestOrganizationManagerClaims:
         "course_family",
         "course",
         "example",
+        # ExampleRepository is its own CrudRouter resource; the ``example:*``
+        # claims don't cover it, so managers 403'd on the examples repository
+        # page until it was wired in.
+        "example_repository",
         "extension",
         # The two that were missing — the regression we're guarding against.
         "organization_member",
@@ -74,6 +78,17 @@ class TestOrganizationManagerClaims:
         claims = _claims_by_entity().get(entity, [])
         assert f"{entity}:{action}" in claims, (
             f"{entity}:{action} missing from manager claims"
+        )
+
+    @pytest.mark.parametrize("action", ["create", "get", "list", "update"])
+    def test_example_repository_crud_actions_granted(self, action):
+        # The examples repository page lists (``list``) and opens (``get``)
+        # example_repository rows. ExamplePermissionHandler checks the
+        # per-entity tablename, so these must be present independently of the
+        # ``example:*`` claims.
+        claims = _claims_by_entity().get("example_repository", [])
+        assert f"example_repository:{action}" in claims, (
+            f"example_repository:{action} missing from manager claims"
         )
 
     def test_no_duplicate_member_claims(self):

@@ -20,6 +20,7 @@ from computor_backend.interfaces import (
     StudentProfileInterface,
     ProfileInterface,
     ExampleInterface,
+    ExampleRepositoryInterface,
     ExtensionInterface,
 )
 from computor_backend.model.example import Example
@@ -69,6 +70,14 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     claims.extend(CourseFamilyInterface().claim_values())
     claims.extend(CourseInterface().claim_values())
     claims.extend(ExampleInterface().claim_values())
+    # ExampleRepository is a distinct resource (tablename ``example_repository``)
+    # behind its own CrudRouter. ExamplePermissionHandler keys general
+    # permission checks off the per-entity tablename, so the ``example:*``
+    # claims above do NOT cover the example-repositories endpoints — without
+    # these, managers fall through to the lecturer-in-a-course check and get
+    # 403 "Examples are only accessible to lecturers and above" on the
+    # examples repository page.
+    claims.extend(ExampleRepositoryInterface().claim_values())
     claims.extend(ExtensionInterface().claim_values())
     # Membership tables: managers need to be able to seat / promote /
     # remove users on the orgs and families they manage. Without these
