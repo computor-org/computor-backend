@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { RosterStudent } from '@/src/api/analytics';
 import { formatStudentName } from './format';
 
@@ -14,13 +15,17 @@ import { formatStudentName } from './format';
 export default function RosterList({
   students,
   selectedId,
+  query,
+  onQueryChange,
   onSelect,
 }: {
   students: RosterStudent[];
   selectedId: string | null;
+  query: string;
+  onQueryChange: (query: string) => void;
   onSelect: (student: RosterStudent) => void;
 }) {
-  const [query, setQuery] = useState('');
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const sorted = useMemo(
     () => [...students].sort((a, b) => formatStudentName(a).localeCompare(formatStudentName(b))),
@@ -31,6 +36,35 @@ export default function RosterList({
     if (!q) return sorted;
     return sorted.filter((s) => formatStudentName(s).toLowerCase().includes(q));
   }, [sorted, query]);
+
+  const focusStudent = (index: number) => {
+    buttonRefs.current[index]?.focus();
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'ArrowDown' || filtered.length === 0) return;
+
+    event.preventDefault();
+    focusStudent(0);
+  };
+
+  const handleStudentKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (filtered.length === 0) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusStudent(Math.min(index + 1, filtered.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusStudent(Math.max(index - 1, 0));
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusStudent(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusStudent(filtered.length - 1);
+    }
+  };
 
   if (students.length === 0) {
     return (
@@ -46,20 +80,25 @@ export default function RosterList({
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
           placeholder="Search students"
           aria-label="Search students"
           className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
         />
       </div>
       <ul className="divide-y divide-gray-100">
-        {filtered.map((s) => {
+        {filtered.map((s, index) => {
           const selected = s.course_member_id === selectedId;
           return (
             <li key={s.course_member_id}>
               <button
+                ref={(element) => {
+                  buttonRefs.current[index] = element;
+                }}
                 type="button"
                 onClick={() => onSelect(s)}
+                onKeyDown={(event) => handleStudentKeyDown(event, index)}
                 aria-current={selected ? 'true' : undefined}
                 className={`w-full px-4 py-2 text-left text-sm transition-colors ${
                   selected ? 'bg-blue-50 font-medium text-gray-900' : 'text-gray-800 hover:bg-gray-50'
@@ -71,7 +110,7 @@ export default function RosterList({
           );
         })}
         {filtered.length === 0 && (
-          <li className="px-4 py-3 text-sm text-gray-400">No student matches “{query}”.</li>
+          <li className="px-4 py-3 text-sm text-gray-400">No students match “{query}”.</li>
         )}
       </ul>
     </div>

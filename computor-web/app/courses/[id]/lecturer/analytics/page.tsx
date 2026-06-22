@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams, useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
@@ -15,6 +15,8 @@ import {
   DEFAULT_ANALYTICS_CUTOFFS,
   analyticsRoleAtLeast,
   getCourseSummary,
+  getStudentExamples,
+  listCourseContentsForFind,
   listAnalyticsCourses,
   listStudents,
   type AnalyticsCourseAccess,
@@ -42,7 +44,10 @@ export default function LecturerAnalyticsPage() {
   const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>(DEFAULT_ANALYTICS_CUTOFFS);
   const [summary, setSummary] = useState<AnalyticsCourseSummary | null>(null);
   const [students, setStudents] = useState<RosterStudent[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [exampleFindEntries, setExampleFindEntries] = useState<ExampleFindEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadSequence = useRef(0);
   const [emptyReason, setEmptyReason] = useState<'none' | 'no-snapshot' | 'forbidden' | 'error'>(
     'none',
   );
@@ -59,17 +64,26 @@ export default function LecturerAnalyticsPage() {
   );
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current + 1;
+    loadSequence.current = sequence;
     setLoading(true);
     setErrorText(null);
+    setExampleFindEntries([]);
     try {
       const [s, list] = await Promise.all([
         getCourseSummary(courseId, cutoffs),
         listStudents(courseId, cutoffs),
       ]);
+      const roster = list.students ?? [];
+      if (loadSequence.current !== sequence) return;
       setSummary(s);
-      setStudents(list.students ?? []);
+      setStudents(roster);
       setEmptyReason('none');
+      void buildExampleFindEntries(courseId, roster, cutoffs).then((examples) => {
+        if (loadSequence.current === sequence) setExampleFindEntries(examples);
+      });
     } catch (e) {
+      if (loadSequence.current !== sequence) return;
       setSummary(null);
       setStudents([]);
       if (e instanceof AnalyticsApiError && e.status === 404) {
@@ -81,7 +95,7 @@ export default function LecturerAnalyticsPage() {
         setErrorText(e instanceof Error ? e.message : 'Failed to load analytics.');
       }
     } finally {
-      setLoading(false);
+      if (loadSequence.current === sequence) setLoading(false);
     }
   }, [courseId, cutoffs]);
 
@@ -132,7 +146,7 @@ export default function LecturerAnalyticsPage() {
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
-              href={course ? `/courses/${courseId}/lecturer` : '/lecturer/analytics'}
+              href={`/courses/${courseId}/lecturer/analytics`}
               className="text-sm text-blue-600 hover:underline print:hidden"
             >
               Back to{' '}
@@ -205,12 +219,18 @@ export default function LecturerAnalyticsPage() {
                 <RosterList
                   students={students}
                   selectedId={selected?.course_member_id ?? null}
+                  query={searchQuery}
+                  onQueryChange={setSearchQuery}
                   onSelect={selectStudent}
                 />
               </div>
               <div className="lg:sticky lg:top-4 lg:self-start">
                 {selected ? (
-                  <StudentTimelinePanel courseId={courseId} student={selected} cutoffs={cutoffs} />
+                  <StudentTimelinePanel
+                    courseId={courseId}
+                    student={selected}
+                    cutoffs={cutoffs}
+                  />
                 ) : (
                   <p className="rounded-lg border-2 border-dashed border-gray-200 p-10 text-center text-sm text-gray-400">
                     Select a student to see their evidence.
@@ -218,11 +238,128 @@ export default function LecturerAnalyticsPage() {
                 )}
               </div>
             </div>
+            <BrowserFindText examples={exampleFindEntries} />
           </>
         )}
       </div>
     </AuthenticatedLayout>
   );
+}
+
+interface ExampleFindEntry {
+  key: string;
+  title: string;
+  path: string;
+  contentId: string;
+  unit: string;
+  category: string;
+}
+
+async function buildExampleFindEntries(
+  courseId: string,
+  students: RosterStudent[],
+  cutoffs: AnalyticsCutoffs,
+): Promise<ExampleFindEntry[]> {
+  const examplesByKey = new Map<string, ExampleFindEntry>();
+  const add = (entry: ExampleFindEntry) => {
+    if (!examplesByKey.has(entry.key)) examplesByKey.set(entry.key, entry);
+  };
+  await Promise.all([
+    addCourseContentFindEntries(courseId, add),
+    addStudentExampleFindEntries(courseId, students, cutoffs, add),
+  ]);
+  return [...examplesByKey.values()].sort((a, b) =>
+    `${a.title} ${a.path}`.localeCompare(`${b.title} ${b.path}`),
+  );
+}
+
+async function addCourseContentFindEntries(
+  courseId: string,
+  add: (entry: ExampleFindEntry) => void,
+) {
+  try {
+    const contents = await listCourseContentsForFind(courseId);
+    for (const content of contents) {
+      const deployment = content.deployment;
+      add({
+        key: content.id,
+        title: content.title || content.path || content.id,
+        path: content.path || '',
+        contentId: content.id,
+        unit: content.course_content_type?.slug || '',
+        category: [
+          content.course_content_kind_id,
+          deployment?.example_identifier,
+          deployment?.version_identifier,
+          deployment?.version_tag,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+    }
+  } catch {
+    /* The analytics page must not depend on the auxiliary find index. */
+  }
+}
+
+async function addStudentExampleFindEntries(
+  courseId: string,
+  students: RosterStudent[],
+  cutoffs: AnalyticsCutoffs,
+  add: (entry: ExampleFindEntry) => void,
+) {
+  const batchSize = 8;
+  for (let i = 0; i < students.length; i += batchSize) {
+    const batch = students.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (student) => {
+        try {
+          const examples = await getStudentExamples(courseId, student.course_member_id, cutoffs);
+          for (const ex of examples) {
+            const key = ex.content_id || `${ex.title}|${ex.path}`;
+            add({
+              key,
+              title: ex.title || ex.path || key,
+              path: ex.path || '',
+              contentId: ex.content_id || '',
+              unit: ex.unit || '',
+              category: ex.category || '',
+            });
+          }
+        } catch {
+          /* keep the course page usable if one student's detail endpoint fails */
+        }
+      }),
+    );
+  }
+}
+
+function BrowserFindText({ examples }: { examples: ExampleFindEntry[] }) {
+  if (examples.length === 0) return null;
+
+  return (
+    <div
+      className="print:hidden text-[11px] leading-snug text-gray-400"
+      data-testid="analytics-browser-find-text"
+    >
+      {examples.map((example) => (
+        <span key={example.key} className="mr-3">
+          {findTextParts(example).join(' ')}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function findTextParts(example: ExampleFindEntry): string[] {
+  const raw = [example.title, example.path, example.contentId, example.unit, example.category]
+    .filter(Boolean)
+    .join(' ');
+  const parts = new Set(raw.split(/\s+/).filter(Boolean));
+  for (const token of raw.split(/[^0-9A-Za-zÄÖÜäöüß]+/).filter(Boolean)) {
+    parts.add(token);
+  }
+  return [...parts];
 }
 
 function EmptyState({ title, message }: { title: string; message: string }) {

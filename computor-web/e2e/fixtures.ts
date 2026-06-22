@@ -118,6 +118,65 @@ const EXAMPLES = [
   },
 ];
 
+const OTHER_EXAMPLES = [
+  {
+    ...EXAMPLES[0],
+    content_id: 'cc-3',
+    path: 'week_1.intro',
+    title: 'Week 1 · Intro',
+    flags: [],
+    comments: [],
+  },
+];
+
+const COURSE_CONTENTS = [
+  {
+    id: 'cc-easter',
+    title: 'Easter Formula',
+    path: 'week_1.easter_formula',
+    course_id: COURSE_ID,
+    course_content_type_id: 'type-standard',
+    course_content_kind_id: 'assignment',
+    position: 3,
+    max_group_size: 1,
+    max_test_runs: null,
+    max_submissions: null,
+    testing_service_id: null,
+    is_submittable: true,
+    archived_at: null,
+    has_deployment: true,
+    deployment_status: 'deployed',
+    course_content_type: {
+      id: 'type-standard',
+      title: 'Standard example',
+      slug: 'standard',
+      description: null,
+      color: null,
+      course_id: COURSE_ID,
+      course_content_kind_id: 'assignment',
+      course_content_kind: null,
+    },
+    repository: {
+      provider_url: 'https://git.example.invalid',
+      full_path: 'course/examples',
+      web_url: 'https://git.example.invalid/course/examples',
+    },
+    deployment: {
+      id: 'dep-easter',
+      course_content_id: 'cc-easter',
+      example_version_id: 'ev-easter',
+      example_identifier: 'easter_formula',
+      version_tag: 'v1.0.0',
+      deployment_status: 'deployed',
+      assigned_at: '2026-06-14T10:00:00.000Z',
+      deployed_at: '2026-06-14T10:05:00.000Z',
+      version_identifier: 'easter_formula@v1.0.0',
+      has_newer_version: false,
+      example_version: null,
+    },
+  },
+];
+
 const TIMELINE = {
   course_id: COURSE_ID,
   course_member_id: MEMBER_ID,
@@ -217,7 +276,11 @@ function json(route: Route, body: unknown, status = 200) {
 
 export async function setupAnalytics(
   page: Page,
-  { role = '_lecturer', scenario = 'data' }: { role?: Role; scenario?: Scenario } = {},
+  {
+    role = '_lecturer',
+    scenario = 'data',
+    exampleDelayMs = 0,
+  }: { role?: Role; scenario?: Scenario; exampleDelayMs?: number } = {},
 ): Promise<void> {
   // Seed the cached SSO user so AuthContext treats the session as logged in.
   await page.addInitScript((user) => {
@@ -240,6 +303,7 @@ export async function setupAnalytics(
     const method = route.request().method();
     const studentsBase = `/analytics/courses/${COURSE_ID}/students`;
 
+    if (path === '/lecturers/course-contents') return json(route, COURSE_CONTENTS);
     if (path.endsWith('/user/views')) return json(route, ['lecturer']);
     if (path.endsWith('/user/scopes'))
       return json(route, {
@@ -261,7 +325,13 @@ export async function setupAnalytics(
     }
     if (path.endsWith('/timeline')) return json(route, TIMELINE);
     if (path.endsWith('/source')) return json(route, EXAMPLE_SOURCE);
-    if (path.endsWith('/examples')) return json(route, scenario === 'empty' ? [] : EXAMPLES);
+    if (path.endsWith('/examples') && exampleDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, exampleDelayMs));
+    }
+    if (path === `${studentsBase}/${MEMBER_ID}/examples`) {
+      return json(route, scenario === 'empty' ? [] : EXAMPLES);
+    }
+    if (path.endsWith('/examples')) return json(route, scenario === 'empty' ? [] : OTHER_EXAMPLES);
     if (path === studentsBase) {
       return scenario === 'empty' ? json(route, { detail: 'no snapshot' }, 404) : json(route, STUDENTS);
     }

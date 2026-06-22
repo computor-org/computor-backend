@@ -22,6 +22,7 @@ import type {
   AnalyticsStudentReport,
   AnalyticsStudentTimeline,
 } from '@/src/generated/types/analytics';
+import type { CourseContentLecturerList } from '@/src/generated/types/courses';
 import type {
   ExampleSource,
   StandardExampleResult,
@@ -148,6 +149,16 @@ export function listStudents(
 ): Promise<AnalyticsStudentList> {
   if (IS_DEMO) return Promise.resolve({ students: demoStudents(), gradings: [] });
   return getJson(`${base(courseId)}/students${cutoffQuery(cutoffs)}`);
+}
+
+export function listCourseContentsForFind(courseId: string): Promise<CourseContentLecturerList[]> {
+  if (IS_DEMO) return Promise.resolve([]);
+  return getJson<CourseContentLecturerList[]>(
+    `${API_BASE_URL}/lecturers/course-contents?course_id=${encodeURIComponent(courseId)}&limit=2000`,
+  ).catch((e) => {
+    if (e instanceof AnalyticsApiError) return [];
+    throw e;
+  });
 }
 
 /** Source files of one example, shown in a modal so the lecturer reads the code

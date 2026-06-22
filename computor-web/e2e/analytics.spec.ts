@@ -32,11 +32,37 @@ test.describe('lecturer analytics', () => {
 
     await expect(page.getByText('Select a student to see their evidence.')).toBeVisible();
     await expect(page.getByTestId('analytics-timeline')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Examples' })).toHaveCount(0);
+    const findText = page.getByTestId('analytics-browser-find-text');
+    await expect(findText).toContainText('Week 2 · Loops');
+    await expect(findText).toContainText('week_2.loops');
+    await expect(findText).toContainText('cc-2');
+    await expect(findText).toContainText('week_1.easter_formula');
+    await expect(findText).toContainText('easter_formula@v1.0.0');
+    await expect(findText).toContainText('week 1 easter formula');
+    await expect(findText).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => window.find('week_2.loops', false, false, true)))
+      .toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => window.find('week_1.easter_formula', false, false, true)))
+      .toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => window.find('easter', false, false, true)))
+      .toBe(true);
 
     // Roster row -> per-student timeline (the signature curve).
+    const searchBox = roster.getByRole('searchbox', { name: 'Search students' });
+    await searchBox.fill('loops');
+    await expect(roster.getByText('Ada Lovelace')).toHaveCount(0);
+    await expect(roster.getByText('No students match “loops”.')).toBeVisible();
+    await searchBox.fill('ada');
     const row = roster.getByText('Ada Lovelace');
     await expect(row).toBeVisible();
-    await row.click();
+    await expect(roster.getByText('Grace Hopper')).toHaveCount(0);
+    await page.keyboard.press('ArrowDown');
+    await expect(row).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(page).toHaveURL(new RegExp(`/lecturer/analytics\\?student=${MEMBER_ID}$`));
     const timeline = page.getByTestId('analytics-timeline');
     await expect(timeline).toBeVisible();
@@ -47,9 +73,10 @@ test.describe('lecturer analytics', () => {
     // Detail leads with the score-pass summary, then the per-example evidence
     // table (with a tutor comment), which replaced the old flat event log.
     await expect(timeline.getByText('8/10 standard examples')).toBeVisible();
+    await expect(timeline.getByRole('link', { name: 'Week 1 · Intro' })).toBeVisible();
     await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
 
-    await page.goBack();
+    await page.getByRole('link', { name: 'Back to Test Course' }).click();
     await expect(page).toHaveURL(/\/lecturer\/analytics$/);
     await expect(page.getByText('Select a student to see their evidence.')).toBeVisible();
     await expect(page.getByTestId('analytics-timeline')).toHaveCount(0);
@@ -84,6 +111,18 @@ test.describe('lecturer analytics', () => {
 
     await expect(page.getByTestId('analytics-roster').getByText('Ada Lovelace')).toBeVisible();
     await expect(page.getByTestId('analytics-refresh')).toHaveCount(0);
+  });
+
+  test('does not block the dashboard on the browser-find example text', async ({ page }) => {
+    await setupAnalytics(page, { role: '_lecturer', scenario: 'data', exampleDelayMs: 3_000 });
+    await page.goto(analyticsUrl());
+
+    await expect(page.getByTestId('analytics-summary')).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByTestId('analytics-roster').getByText('Ada Lovelace')).toBeVisible();
+    await expect(page.getByText('Loading analytics…')).toHaveCount(0);
+    await expect(page.getByTestId('analytics-browser-find-text')).toContainText('week_2.loops', {
+      timeout: 5_000,
+    });
   });
 
   test('shows an empty state when no snapshot exists', async ({ page }) => {
