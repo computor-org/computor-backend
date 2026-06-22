@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { analyticsUrl, setupAnalytics } from './fixtures';
+import { MEMBER_ID, analyticsUrl, setupAnalytics } from './fixtures';
 
 test.describe('lecturer analytics', () => {
   test('dashboard shows local and analytics snapshot courses', async ({ page }) => {
@@ -30,10 +30,14 @@ test.describe('lecturer analytics', () => {
     await expect(roster.getByText('01234567')).toHaveCount(0);
     await expect(roster.getByText('Burst')).toHaveCount(0);
 
+    await expect(page.getByText('Select a student to see their evidence.')).toBeVisible();
+    await expect(page.getByTestId('analytics-timeline')).toHaveCount(0);
+
     // Roster row -> per-student timeline (the signature curve).
     const row = roster.getByText('Ada Lovelace');
     await expect(row).toBeVisible();
     await row.click();
+    await expect(page).toHaveURL(new RegExp(`/lecturer/analytics\\?student=${MEMBER_ID}$`));
     const timeline = page.getByTestId('analytics-timeline');
     await expect(timeline).toBeVisible();
     await expect(
@@ -42,19 +46,27 @@ test.describe('lecturer analytics', () => {
 
     // Detail leads with the score-pass summary, then the per-example evidence
     // table (with a tutor comment), which replaced the old flat event log.
-    await expect(timeline.getByText('8/10 standard passed')).toBeVisible();
+    await expect(timeline.getByText('8/10 standard examples')).toBeVisible();
     await expect(timeline.getByText(/asked to explain in lab/)).toBeVisible();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/lecturer\/analytics$/);
+    await expect(page.getByText('Select a student to see their evidence.')).toBeVisible();
+    await expect(page.getByTestId('analytics-timeline')).toHaveCount(0);
+
+    await row.click();
+    await expect(page).toHaveURL(new RegExp(`/lecturer/analytics\\?student=${MEMBER_ID}$`));
 
     // Clicking an example opens its full source page (syntax-highlighted), and
     // "Back" returns to this student's detail.
-    await timeline.getByRole('link', { name: 'Week 2 · Loops' }).click();
+    await page.getByTestId('analytics-timeline').getByRole('link', { name: 'Week 2 · Loops' }).click();
     await expect(page).toHaveURL(/\/lecturer\/analytics\/examples\/cc-2\?student=/);
     await expect(page.getByText('def loops(values):')).toBeVisible();
     await page.getByRole('button', { name: 'test_loops.py' }).click();
     await expect(page.getByText('def test_loops():')).toBeVisible();
     await page.getByRole('link', { name: /Back to student/ }).click();
     await expect(
-      page.getByTestId('analytics-timeline').getByText('8/10 standard passed'),
+      page.getByTestId('analytics-timeline').getByText('8/10 standard examples'),
     ).toBeVisible();
 
     // Update button triggers a job and polls it to completion.

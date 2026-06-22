@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams, useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
@@ -30,7 +30,8 @@ import StudentTimelinePanel from '@/src/components/analytics/StudentTimelinePane
 
 export default function LecturerAnalyticsPage() {
   const courseId = useParams().id as string;
-  const requestedMember = useSearchParams().get('student');
+  const searchParams = useSearchParams();
+  const requestedMember = searchParams.get('student');
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -41,7 +42,6 @@ export default function LecturerAnalyticsPage() {
   const [cutoffs, setCutoffs] = useState<AnalyticsCutoffs>(DEFAULT_ANALYTICS_CUTOFFS);
   const [summary, setSummary] = useState<AnalyticsCourseSummary | null>(null);
   const [students, setStudents] = useState<RosterStudent[]>([]);
-  const [selected, setSelected] = useState<RosterStudent | null>(null);
   const [loading, setLoading] = useState(true);
   const [emptyReason, setEmptyReason] = useState<'none' | 'no-snapshot' | 'forbidden' | 'error'>(
     'none',
@@ -50,6 +50,13 @@ export default function LecturerAnalyticsPage() {
   const canRefresh =
     courseHasAtLeast(courseId, '_lecturer') ||
     analyticsRoleAtLeast(analyticsCourse?.role, '_lecturer');
+  const selected = useMemo(
+    () =>
+      requestedMember
+        ? students.find((s) => s.course_member_id === requestedMember) ?? null
+        : null,
+    [requestedMember, students],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,32 +117,14 @@ export default function LecturerAnalyticsPage() {
     load();
   }, [authLoading, isAuthenticated, load]);
 
-  // Keep a student selected: drop a stale pick, honour the `student` query param
-  // (set when returning from an example's source page), else default to the
-  // first row so the detail pane is never empty when there is data to show.
-  useEffect(() => {
-    if (students.length === 0) {
-      if (selected) setSelected(null);
-      return;
-    }
-    const match = selected
-      ? students.find((s) => s.course_member_id === selected.course_member_id)
-      : null;
-    if (match) return;
-    const requested = requestedMember
-      ? students.find((s) => s.course_member_id === requestedMember)
-      : null;
-    setSelected(requested ?? students[0]);
-  }, [students, selected, requestedMember]);
-
-  // Mirror the selected student into the URL so the browser back button (and the
-  // "Back to student" link from an example page) restore this exact selection.
-  useEffect(() => {
-    if (!selected || requestedMember === selected.course_member_id) return;
-    router.replace(`${pathname}?student=${encodeURIComponent(selected.course_member_id)}`, {
-      scroll: false,
-    });
-  }, [selected, requestedMember, pathname, router]);
+  const selectStudent = useCallback(
+    (student: RosterStudent) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('student', student.course_member_id);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   return (
     <AuthenticatedLayout>
@@ -216,7 +205,7 @@ export default function LecturerAnalyticsPage() {
                 <RosterList
                   students={students}
                   selectedId={selected?.course_member_id ?? null}
-                  onSelect={setSelected}
+                  onSelect={selectStudent}
                 />
               </div>
               <div className="lg:sticky lg:top-4 lg:self-start">
