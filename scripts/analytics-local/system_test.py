@@ -99,7 +99,7 @@ def _assert_course_summary(
     _assert_equal("summary.submitted_percentage", summary.submitted_percentage, 50.0)
     _assert_equal("summary.total_graded_assignments", summary.total_graded_assignments, 2)
     _assert_equal("summary.graded_percentage", summary.graded_percentage, 33.33)
-    _assert_equal("summary.average_grading", summary.average_grading, 0.2583)
+    _assert_equal("summary.average_grading", summary.average_grading, 0.775)
     _assert_equal("summary.latest_job.status", summary.latest_job.status, "succeeded")
 
 

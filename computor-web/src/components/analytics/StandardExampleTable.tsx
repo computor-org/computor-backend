@@ -63,7 +63,7 @@ export default function StandardExampleTable({
   );
 }
 
-/** Per-unit subtotal banner: passed/attempted, average score, flag count. */
+/** Per-unit subtotal banner: admission count, average reviewed score, flag count. */
 function UnitHeader({ unit }: { unit: UnitGroup }) {
   const avg = unit.averageScore === null ? null : Math.round(unit.averageScore * 100);
   return (
@@ -72,7 +72,7 @@ function UnitHeader({ unit }: { unit: UnitGroup }) {
         {unit.label}
       </th>
       <td className="px-3 py-1.5 text-right text-xs text-gray-500">{avg === null ? '' : `${avg}%`}</td>
-      <td className="px-3 py-1.5 text-center text-xs font-medium text-gray-600" title="passed / attempted">
+      <td className="px-3 py-1.5 text-center text-xs font-medium text-gray-600" title="counted / total">
         {unit.passed}/{unit.total}
       </td>
       <td />
@@ -107,6 +107,10 @@ function ExampleRow({ ex, href }: { ex: StandardExampleResult; href: string }) {
         <td className="px-3 py-2 text-center">
           {ex.submitted_at === null ? (
             <span className="text-gray-300">—</span>
+          ) : ex.score === null ? (
+            <span className="text-gray-500" title="Submitted, not reviewed">
+              Review
+            </span>
           ) : ex.passed ? (
             <span className="text-emerald-600" title={`>= ${PASS_THRESHOLD * 100}%`}>
               ✓

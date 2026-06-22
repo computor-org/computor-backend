@@ -77,7 +77,7 @@ export default function StudentTimelinePanel({
   const flags = student.flags ?? countFlags(examples);
   const passText =
     student.standard_passed !== undefined && student.standard_total !== undefined
-      ? `${student.standard_passed}/${student.standard_total} standard passed`
+      ? `${student.standard_passed}/${student.standard_total} standard examples`
       : null;
 
   return (

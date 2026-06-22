@@ -102,7 +102,7 @@ def test_report_standard_rows_match_progress_standard_content_type():
         == 1
     )
     assert bob_report["standard_passed"] == 1
-    assert bob_report["average_grading"] == bob_progress.overall_average_grading == 0.35
+    assert bob_report["average_grading"] == 0.70
 
 
 def test_report_points_use_grading_cutoff_not_submission_cutoff():
@@ -134,6 +134,23 @@ def test_report_points_use_grading_cutoff_not_submission_cutoff():
     assert bob["total_graded_assignments"] == 2
     assert bob["standard_passed"] == 2
     assert bob["average_grading"] == 0.825
+
+
+def test_report_counts_submitted_unreviewed_standard_as_not_failed():
+    repo = _report_repo_with_fixture(
+        submission_cutoff=datetime(2026, 6, 18, 22, 1, tzinfo=timezone.utc),
+        grading_cutoff=datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc),
+    )
+
+    alice = {
+        row["course_member_id"]: row
+        for row in repo.get_student_checkpoint_rows(COURSE_ID)
+    }[ALICE_MEMBER_ID]
+
+    assert alice["total_submitted_assignments"] == 2
+    assert alice["total_graded_assignments"] == 1
+    assert alice["standard_passed"] == 2
+    assert alice["average_grading"] == 0.85
 
 
 def test_shared_builder_uses_duckdb_backend_for_member_detail():
@@ -232,14 +249,16 @@ def test_report_repository_tracks_actual_grading_checkpoint_counts():
     assert alice["total_max_assignments"] == 2
     assert alice["total_submitted_assignments"] == 2
     assert alice["total_graded_assignments"] == 1
-    assert alice["average_grading"] == 0.425
+    assert alice["standard_passed"] == 2
+    assert alice["average_grading"] == 0.85
 
     bob = by_member[BOB_MEMBER_ID]
     assert bob["total_max_assignments"] == 2
     assert bob["total_submitted_assignments"] == 1
     assert bob["total_graded_assignments"] == 1
     assert bob["late_submission_count"] == 1
-    assert bob["average_grading"] == 0.35
+    assert bob["standard_passed"] == 1
+    assert bob["average_grading"] == 0.70
 
 
 def test_report_repository_counts_score_pass_at_threshold():
@@ -382,7 +401,7 @@ def test_analytics_service_reads_summary_and_timeline_from_duckdb(tmp_path):
     assert summary.submitted_percentage == 75.0
     assert summary.total_graded_assignments == 2
     assert summary.graded_percentage == 50.0
-    assert summary.average_grading == 0.3875
+    assert summary.average_grading == 0.775
 
     timeline = service.student_timeline(COURSE_ID, BOB_MEMBER_ID, cutoffs)
     event_types = [event.event_type for event in timeline.events]

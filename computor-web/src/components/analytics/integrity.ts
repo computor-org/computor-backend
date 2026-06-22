@@ -1,18 +1,17 @@
 /**
  * Academic-integrity model for the lecturer analytics dashboard.
  *
- * The dashboard answers two questions per student: did they pass the work
- * (score, not just submission), and is there reason to look closer (rushed
- * bursts, no-iteration success, tutor concern). These types carry that data;
- * the backend fills them from the analytics snapshot, the demo generator
+ * The dashboard answers two questions per student: how many standard examples
+ * count for admission, and is there reason to look closer (rushed bursts,
+ * no-iteration success, tutor concern). These types carry that data; the
+ * backend fills them from the analytics snapshot, the demo generator
  * (`demoData.ts`) fills them with synthetic data for local UI testing.
  *
  * Fields are additive over the existing AnalyticsStudentCheckpoint so the page
  * still renders against the current API before the backend aggregations land.
  */
 
-/** Pass bar over standard examples: score must reach this fraction of the
- * possible points. Submitting and scoring 0 is not a pass. */
+/** Reviewed standard examples must reach this fraction of the possible points. */
 export const PASS_THRESHOLD = 0.6;
 
 /** Default integrity-flag band: highlight the worst 10% of students per signal. */
@@ -158,7 +157,7 @@ export function groupByUnit(examples: StandardExampleResult[]): UnitGroup[] {
       label: unitLabel(key),
       examples: group,
       attempted: official.length,
-      passed: official.filter((e) => e.passed).length,
+      passed: official.filter((e) => e.score === null || e.passed).length,
       total: group.length,
       averageScore: scored.length ? scored.reduce((a, b) => a + b, 0) / scored.length : null,
       flagTotal: group.reduce((a, e) => a + e.flags.length, 0),

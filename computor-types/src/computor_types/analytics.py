@@ -86,8 +86,8 @@ class AnalyticsStudentCheckpoint(BaseModel):
     average_grading: float | None = None
     latest_submission_at: datetime | None = None
     late_submission_count: int = 0
-    # Score-pass over standard (submittable) examples: a pass means the latest
-    # grade reached the pass threshold, not merely that the student submitted.
+    # Admission count over standard examples: a reviewed example must pass the
+    # threshold; a submitted unreviewed example is not failed as zero.
     standard_total: int = 0
     standard_passed: int = 0
     pass_rate: float = 0.0
