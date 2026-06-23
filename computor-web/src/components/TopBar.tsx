@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
+import Avatar from './Avatar';
 
 export default function TopBar() {
   const router = useRouter();
@@ -13,6 +14,28 @@ export default function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [courseTitle, setCourseTitle] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<{ color: number | null; image: string | null }>({ color: null, image: null });
+
+  // Pull the profile's avatar (color / image) once so the badge matches /profile.
+  // Falls back silently to colored initials if it can't be fetched.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/user`);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setAvatar({ color: data?.profile?.avatar_color ?? null, image: data?.profile?.avatar_image ?? null });
+        }
+      } catch {
+        /* keep initials fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Detect a course context — only a real course id (UUID), so static segments
   // like /courses/create don't get fetched as a bogus course (→ backend VAL_001).
@@ -57,13 +80,6 @@ export default function TopBar() {
     router.push('/');
   };
 
-  const getInitials = () => {
-    if (!user) return '?';
-    const first = user.givenName?.charAt(0) || '';
-    const last = user.familyName?.charAt(0) || '';
-    return (first + last).toUpperCase() || user.username.charAt(0).toUpperCase();
-  };
-
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40 print:hidden">
       {/* Logo / Title */}
@@ -96,9 +112,13 @@ export default function TopBar() {
             className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {/* Avatar */}
-            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium text-sm">
-              {getInitials()}
-            </div>
+            <Avatar
+              size="sm"
+              name={`${user?.givenName ?? ''} ${user?.familyName ?? ''}`}
+              fallback={user?.username}
+              avatarColor={avatar.color}
+              avatarImage={avatar.image}
+            />
             {/* User Info */}
             <div className="hidden md:block text-left">
               <p className="text-sm font-medium text-gray-900">
