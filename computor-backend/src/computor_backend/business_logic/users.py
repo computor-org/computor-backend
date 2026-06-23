@@ -136,6 +136,14 @@ def get_course_views_for_user(principal: Principal) -> List[str]:
 def get_course_views_for_user_by_course(user_id: str, course_id: UUID | str, db: Session) -> List[str]:
     """Get available views based on role for a specific course for the user."""
 
+    # A non-UUID course_id (e.g. a client passing a static route segment like
+    # "create" as if it were an id) has no membership. Return [] instead of
+    # letting psycopg2 raise "badly formed hexadecimal UUID string" → 500.
+    try:
+        UUID(str(course_id))
+    except (ValueError, TypeError, AttributeError):
+        return []
+
     # Query course membership for the specific course
     course_member = (
         db.query(CourseMember)

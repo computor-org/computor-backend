@@ -213,9 +213,15 @@ export default function Sidebar() {
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>({});
   const [courseViews, setCourseViews] = useState<string[]>([]);
 
-  // Detect if we're in a course context
+  // Detect if we're in a course context. Only treat the segment as a course id
+  // when it's UUID-shaped — static routes like `/courses/create` must not be
+  // mistaken for a course (otherwise we'd call /user/views/create and 500 on
+  // the UUID cast).
   const courseMatch = pathname.match(/^\/courses\/([^/]+)/);
-  const currentCourseId = courseMatch ? courseMatch[1] : null;
+  const currentCourseId =
+    courseMatch && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseMatch[1])
+      ? courseMatch[1]
+      : null;
 
   // Fetch course-specific views when in course context
   useEffect(() => {
