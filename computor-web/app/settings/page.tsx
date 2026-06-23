@@ -110,9 +110,9 @@ export default function SettingsPage() {
 
         <ErrorBanner>{error}</ErrorBanner>
 
-        {/* Account & Security */}
-        <Section title="Account & Security" description="Password, email, two-factor authentication and active sessions are managed by your login provider.">
-          {accountConsoleUrl ? (
+        {/* Account & Security — only shown when the account console is configured */}
+        {accountConsoleUrl && (
+          <Section title="Account & Security" description="Password, email, two-factor authentication and active sessions are managed by your login provider.">
             <a
               href={accountConsoleUrl}
               target="_blank"
@@ -124,12 +124,8 @@ export default function SettingsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
-          ) : (
-            <p className="text-sm text-gray-500">
-              The account console URL is not configured. Set <code className="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">NEXT_PUBLIC_KEYCLOAK_URL</code> to enable password, email and 2FA management here.
-            </p>
-          )}
-        </Section>
+          </Section>
+        )}
 
         {/* API Tokens */}
         <Section
