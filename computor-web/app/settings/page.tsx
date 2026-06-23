@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { OnboardingClient } from '@/src/clients/OnboardingClient';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -153,6 +154,7 @@ function LinkAccountPanel({ providers, onLinked, onCancel }: {
 
 export default function SettingsPage() {
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAdmin } = usePermissions();
 
   const [tokens, setTokens] = useState<ApiTokenGet[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
@@ -372,6 +374,24 @@ export default function SettingsPage() {
                       <span className="font-mono">{a.provider_account_id}</span> · {a.provider}
                     </div>
                   </div>
+                  {(isAdmin || !a.builtin) && (
+                    <button
+                      onClick={() =>
+                        setConfirm({
+                          title: 'Unlink account',
+                          message: `Unlink ${a.provider} account "${a.provider_account_id}"?`,
+                          confirmWord: a.provider_account_id,
+                          onConfirm: async () => {
+                            await api.del(`/accounts/${a.id}`);
+                            await load();
+                          },
+                        })
+                      }
+                      className="text-sm text-red-600 hover:underline whitespace-nowrap"
+                    >
+                      Unlink
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

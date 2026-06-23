@@ -120,7 +120,19 @@ class AccountPermissionHandler(PermissionHandler):
                 .join(User, User.id == self.entity.user_id)
                 .filter(User.id == principal.user_id)
             )
-        
+
+        # Users may unlink only their OWN, non-built-in accounts. Built-in
+        # identity accounts (SSO / Git server) are excluded, so a delete
+        # attempt resolves to NotFound. Admins (handled above) can delete any.
+        if action == "delete":
+            return (
+                db.query(self.entity)
+                .filter(
+                    self.entity.user_id == principal.user_id,
+                    self.entity.builtin.is_(False),
+                )
+            )
+
         raise ForbiddenException(detail={"entity": self.resource_name})
 
 
