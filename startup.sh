@@ -218,27 +218,55 @@ if [ "$CODER_ENABLED" = "true" ]; then
         done
     fi
 
-    # Auto-detect DOCKER_GID if not set (required for Coder to access Docker socket)
-    if [ -z "$DOCKER_GID" ]; then
-        echo -e "\n${GREEN}Auto-detecting Docker group ID...${NC}"
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS: get GID of docker.sock
-            DOCKER_GID=$(stat -f '%g' /var/run/docker.sock 2>/dev/null || echo "")
-        else
-            # Linux: get docker group ID
-            DOCKER_GID=$(getent group docker | cut -d: -f3 2>/dev/null || stat -c '%g' /var/run/docker.sock 2>/dev/null || echo "")
-        fi
+    # Verify the Coder container will be able to reach the Docker socket.
+    # Coder's provisioner runs as a non-root user (uid 1000) and creates the
+    # workspace's docker volume/image/container through the mounted socket, so
+    # it must belong to the group that owns the socket *inside a container*.
+    echo -e "\n${GREEN}Checking Docker socket access for Coder...${NC}"
 
-        if [ -n "$DOCKER_GID" ]; then
-            export DOCKER_GID
-            echo "  DOCKER_GID=$DOCKER_GID"
+    # Daemon reachable at all?
+    if ! docker info >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: Docker daemon is not reachable.${NC}"
+        echo "  Start Docker/OrbStack and re-run, or set CODER_ENABLED=false in .env."
+        exit 1
+    fi
+
+    # The socket's group as seen INSIDE a container — the value group_add needs.
+    # Host-side stat is wrong on Docker Desktop / OrbStack, where the in-container
+    # socket is root:root (gid 0); probe a throwaway container for the truth.
+    SOCK_GID=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock alpine \
+        stat -c '%g' /var/run/docker.sock 2>/dev/null)
+
+    if [ -z "$DOCKER_GID" ]; then
+        if [ -n "$SOCK_GID" ]; then
+            DOCKER_GID="$SOCK_GID"
+            echo "  Detected DOCKER_GID=$DOCKER_GID"
         else
-            echo -e "${RED}ERROR: Could not detect Docker group ID${NC}"
-            echo "  Please set DOCKER_GID manually in your .env file"
-            echo "  You can find it with: getent group docker | cut -d: -f3"
+            echo -e "${RED}ERROR: Could not detect the Docker socket group.${NC}"
+            echo "  Set DOCKER_GID in .env to the gid of /var/run/docker.sock inside a container."
             exit 1
         fi
+    else
+        echo "  Using DOCKER_GID=$DOCKER_GID (from .env)"
+        if [ -n "$SOCK_GID" ] && [ "$DOCKER_GID" != "$SOCK_GID" ]; then
+            echo -e "  ${YELLOW}Note: socket gid inside a container is $SOCK_GID but DOCKER_GID=$DOCKER_GID.${NC}"
+        fi
     fi
+    export DOCKER_GID
+
+    # End-to-end: a non-root container joined to DOCKER_GID must be able to write
+    # (i.e. connect) to the socket — exactly what Coder's terraform does. This
+    # catches a wrong gid before the first workspace build fails with
+    # "permission denied while trying to connect to the Docker daemon socket".
+    if ! docker run --rm --user 1000:1000 --group-add "$DOCKER_GID" \
+            -v /var/run/docker.sock:/var/run/docker.sock alpine \
+            test -w /var/run/docker.sock >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: a non-root container in group $DOCKER_GID still cannot access /var/run/docker.sock.${NC}"
+        echo "  Coder workspace provisioning would fail with 'permission denied'."
+        echo "  Set DOCKER_GID=${SOCK_GID:-<gid of docker.sock inside a container>} in .env and re-run."
+        exit 1
+    fi
+    echo -e "  ${GREEN}OK — non-root container can reach the Docker socket (gid $DOCKER_GID).${NC}"
 fi
 
 # Copy defaults if source exists
