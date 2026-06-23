@@ -15,6 +15,28 @@ export default function TopBar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [courseTitle, setCourseTitle] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<{ color: number | null; image: string | null }>({ color: null, image: null });
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Unread global announcements drive the bell badge. Re-fetched on navigation,
+  // so the count clears after /notifications opens (which marks them read).
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/messages?scope=global&unread=true&limit=50`);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setUnreadCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch {
+        /* leave the count as-is */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, pathname]);
 
   // Pull the profile's avatar (color / image) once so the badge matches /profile.
   // Falls back silently to colored initials if it can't be fetched.
@@ -96,13 +118,20 @@ export default function TopBar() {
             <div className="h-6 w-px bg-gray-300"></div>
           </>
         )}
-        {/* Notifications Icon (Placeholder) */}
-        <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors relative">
+        {/* Notifications — global announcements */}
+        <button
+          onClick={() => router.push('/notifications')}
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors relative"
+        >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          {/* Notification Badge */}
-          <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center text-[0.65rem] font-semibold text-white bg-red-500 rounded-full">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
         {/* User Menu */}
