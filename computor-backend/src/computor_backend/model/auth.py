@@ -60,6 +60,9 @@ class Account(Base):
     created_by = Column(UUID)
     updated_by = Column(UUID)
     properties = Column(JSONB)
+    # Core-identity accounts (SSO, Git server) created by the auth flow. These
+    # are set in code at creation time and are not unlinkable in the normal UI.
+    builtin = Column(Boolean, nullable=False, server_default=text('false'))
     provider = Column(String(255), nullable=False)
     type = Column(String(63), nullable=False)
     provider_account_id = Column(String(255), nullable=False)

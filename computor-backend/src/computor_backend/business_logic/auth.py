@@ -68,6 +68,7 @@ async def _provision_git_server_account(
             provider_account_id=email,
             user_id=user_id,
             properties={},
+            builtin=True,  # provisioned by the platform — not user-unlinkable
         )
         db.add(account)
         try:
@@ -517,6 +518,7 @@ async def handle_sso_callback(
                         str(auth_result.expires_at) if auth_result.expires_at else None
                     ),
                 },
+                builtin=True,  # the SSO identity account — not user-unlinkable
             )
             db.add(account)
 

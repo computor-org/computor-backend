@@ -35,8 +35,9 @@ class AccountGet(BaseEntityGet):
     type: str = Field(description="Type of authentication account")
     provider_account_id: str = Field(description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
+    builtin: bool = Field(False, description="Built-in identity account (SSO / Git server) that the user cannot unlink")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
-    
+
     @property
     def display_name(self) -> str:
         """Get display name for the account"""
@@ -50,7 +51,8 @@ class AccountList(BaseEntityList):
     type: str = Field(description="Type of authentication account")
     provider_account_id: str = Field(description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
-    
+    builtin: bool = Field(False, description="Built-in identity account (SSO / Git server) that the user cannot unlink")
+
     @property
     def display_name(self) -> str:
         """Get display name for lists"""
