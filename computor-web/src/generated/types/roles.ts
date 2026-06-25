@@ -24,6 +24,8 @@ export interface RoleList {
   id: string;
   /** Role title */
   title?: string | null;
+  /** Role description */
+  description?: string | null;
   /** Whether this is a built-in role */
   builtin: boolean;
 }

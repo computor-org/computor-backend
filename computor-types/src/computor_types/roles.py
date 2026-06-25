@@ -26,6 +26,7 @@ class RoleGet(BaseModel):
 class RoleList(BaseModel):
     id: str = Field(description="Role unique identifier")
     title: Optional[str] = Field(None, description="Role title")
+    description: Optional[str] = Field(None, description="Role description")
     builtin: bool = Field(description="Whether this is a built-in role")
     
     @property

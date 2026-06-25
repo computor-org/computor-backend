@@ -9,11 +9,11 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import Forbidden from '@/src/components/Forbidden';
+import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
 
-const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 const usersClient = new UsersClient();
 const accountsClient = new AccountsClient();
 
@@ -171,14 +171,7 @@ export default function UserDetailPage() {
             {/* Roles */}
             <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
               <h2 className="text-lg font-semibold text-gray-900">System roles</h2>
-              <div className="flex flex-wrap gap-3">
-                {SYSTEM_ROLES.map((r) => (
-                  <label key={r} className="flex items-center gap-1.5 text-sm text-gray-700">
-                    <input type="checkbox" checked={roles.includes(r)} onChange={() => toggleRole(r)} />
-                    {r}
-                  </label>
-                ))}
-              </div>
+              <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} disabled={savingRoles} />
               <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {savingRoles ? 'Saving…' : 'Save roles'}
               </button>

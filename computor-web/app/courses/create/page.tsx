@@ -86,6 +86,7 @@ function CreateInner() {
       <FormPanel
         breadcrumbs={[{ label: 'Courses', href: '/courses' }, { label: 'New' }]}
         title="New Course"
+        description="A course is one run of a lecture in a single term — students enroll here, get their repositories, and submit their work. It belongs to a course family (the lecture)."
         error={error}
         submitting={saving}
         disabled={!path.trim() || !familyId}
@@ -93,7 +94,7 @@ function CreateInner() {
         onCancel={() => router.push('/courses')}
         onSubmit={save}
       >
-        <Field label="Course family" required>
+        <Field label="Course family" required hint="The lecture this course runs. Add it under Course Families first if it's missing.">
           <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className={inputCls}>
             <option value="">Select a course family…</option>
             {families.map((f) => (
@@ -101,11 +102,11 @@ function CreateInner() {
             ))}
           </select>
         </Field>
-        <Field label="Path (slug)" required>
-          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="algorithms" className={inputCls} />
+        <Field label="Path (slug)" required hint="Lowercase, URL-safe identifier, unique within the course family. Hard to change later.">
+          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="algorithms-2026w" className={inputCls} />
         </Field>
-        <Field label="Title">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Algorithms" className={inputCls} />
+        <Field label="Title" hint="Display name for this run, e.g. 'Algorithms — Winter 2026'.">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Algorithms — Winter 2026" className={inputCls} />
         </Field>
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />

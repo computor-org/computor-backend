@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
+import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 
 const invitesClient = new InviteLinkClient();
-
-const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -48,6 +48,9 @@ export default function InvitesPage() {
   const [createModal, setCreateModal] = useState<CreateModal>({
     open: false, email: '', maxUses: 1, expiresInDays: 7, roles: [], note: '', saving: false, error: null,
   });
+
+  const { roles: systemRoles } = useSystemRoles();
+  const roleLabel = (id: string) => systemRoles.find(r => r.id === id)?.title ?? id;
 
   const isAdmin = user?.role === 'admin';
   const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
@@ -177,7 +180,7 @@ export default function InvitesPage() {
                       <div className="flex flex-wrap gap-1">
                         {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
-                              <span key={r} className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">{r}</span>
+                              <span key={r} className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">{roleLabel(r)}</span>
                             ))
                           : <span className="text-xs text-gray-400">None</span>
                         }
@@ -273,21 +276,13 @@ export default function InvitesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">Auto-assign roles on acceptance</label>
-                  <div className="flex flex-wrap gap-2">
-                    {SYSTEM_ROLES.map(r => (
-                      <label key={r} className="flex items-center gap-1 text-xs cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={createModal.roles.includes(r)}
-                          onChange={e => setCreateModal(m => ({
-                            ...m,
-                            roles: e.target.checked ? [...m.roles, r] : m.roles.filter(x => x !== r),
-                          }))}
-                        />
-                        {r}
-                      </label>
-                    ))}
-                  </div>
+                  <SystemRoleCheckboxes
+                    selected={createModal.roles}
+                    onToggle={roleId => setCreateModal(m => ({
+                      ...m,
+                      roles: m.roles.includes(roleId) ? m.roles.filter(x => x !== roleId) : [...m.roles, roleId],
+                    }))}
+                  />
                 </div>
               </div>
             </div>

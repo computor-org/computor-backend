@@ -8,10 +8,10 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { UserCreate } from 'types/generated';
 
-const SYSTEM_ROLES = ['_admin', '_user_manager', '_organization_manager', '_workspace_user', '_workspace_maintainer'];
 const usersClient = new UsersClient();
 
 export default function UserCreatePage() {
@@ -77,15 +77,8 @@ export default function UserCreatePage() {
             <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="Doe" className={inputCls} />
           </Field>
         </div>
-        <Field label="System roles">
-          <div className="flex flex-wrap gap-3">
-            {SYSTEM_ROLES.map((r) => (
-              <label key={r} className="flex items-center gap-1.5 text-sm text-gray-700">
-                <input type="checkbox" checked={roles.includes(r)} onChange={() => toggleRole(r)} />
-                {r}
-              </label>
-            ))}
-          </div>
+        <Field label="System roles" hint="Leave empty for a plain user. Assign roles only as needed.">
+          <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} />
         </Field>
       </FormPanel>
     </AuthenticatedLayout>
