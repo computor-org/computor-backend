@@ -598,7 +598,7 @@ def list_messages_with_read_status(
     ]
 
 
-def get_message_recipient_user_ids(message: Message, db: Session) -> set[str]:
+def get_message_recipient_user_ids(message: Message, db: Session, include_global_admins: bool = True) -> set[str]:
     """Compute the set of user_ids that have read access to ``message``.
 
     Inverse of ``MessagePermissionHandler.build_query`` — given a stored
@@ -622,8 +622,12 @@ def get_message_recipient_user_ids(message: Message, db: Session) -> set[str]:
     if message.author_id:
         user_ids.add(str(message.author_id))
 
-    admin_rows = db.query(UserRole.user_id).filter(UserRole.role_id == "_admin").all()
-    user_ids.update(str(r[0]) for r in admin_rows)
+    # Global admins can READ everything (broadcast fan-out wants them in the
+    # recipient set), but they are not participants of a course scope, so the
+    # @mention audience opts out via include_global_admins=False.
+    if include_global_admins:
+        admin_rows = db.query(UserRole.user_id).filter(UserRole.role_id == "_admin").all()
+        user_ids.update(str(r[0]) for r in admin_rows)
 
     if message.user_id:
         user_ids.add(str(message.user_id))
@@ -798,7 +802,12 @@ def message_audience_user_ids(message_like, db: Session) -> Optional[set[str]]:
     canonical inverse of ``MessagePermissionHandler``."""
     if not any(getattr(message_like, attr, None) for attr in _MENTION_TARGET_ATTRS):
         return None  # global → everyone
-    return get_message_recipient_user_ids(message_like, db)
+    # Mentionability is narrower than read-visibility: a global admin (or any
+    # privilege-bypass viewer) who isn't actually a participant of the scope —
+    # e.g. not a member of the submission group / course — must not be
+    # mentionable. They keep READ access; they're just not offered as a mention
+    # target nor accepted by the gate.
+    return get_message_recipient_user_ids(message_like, db, include_global_admins=False)
 
 
 def validate_message_mentions(message_like, content: Optional[str], db: Session) -> list[str]:
