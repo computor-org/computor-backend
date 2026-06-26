@@ -28,7 +28,7 @@ from computor_types.student_course_contents import (
 from computor_types.tasks import map_int_to_task_status
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.model.course import CourseMember
-from computor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
+from computor_backend.repositories.course_content_queries import CourseMemberCourseContentQueryResult
 from computor_backend.services.result_storage import retrieve_result_json, list_result_artifacts
 
 logger = logging.getLogger(__name__)

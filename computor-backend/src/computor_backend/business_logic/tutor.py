@@ -14,7 +14,7 @@ from computor_backend.repositories.course_member import CourseMemberRepository
 from computor_backend.repositories.submission_group import SubmissionGroupRepository
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from computor_backend.repositories.submission_grade_repo import SubmissionGradeRepository
-from computor_backend.repositories.course_content import (
+from computor_backend.repositories.course_content_queries import (
     course_course_member_list_query,
     course_member_course_content_list_query,
     course_member_course_content_query,

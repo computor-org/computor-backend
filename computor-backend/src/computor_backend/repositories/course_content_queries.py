@@ -1,9 +1,16 @@
 """
-Course content repository for complex query operations.
+Course content query builders (NOT a repository).
 
-This module provides query builder functions for course content, submissions,
-results, and grading data. These functions construct complex SQLAlchemy queries
-with joins, subqueries, and aggregations for efficient data retrieval.
+This module is a collection of free SQLAlchemy query/subquery builder functions
+for course content, submissions, results, messages and grading data -- it has no
+repository class. The actual entity repository is ``CourseContentRepository`` in
+``course_content_repo.py``; this module was historically misnamed
+``course_content.py``, which made it look like that repository.
+
+The functions here construct complex queries with joins, subqueries and
+aggregations for efficient read access by the view repositories. A natural
+follow-up is to split them by concern (results / submissions / messages
+subqueries vs. composite content queries vs. per-member count aggregates).
 """
 
 from typing import Optional
