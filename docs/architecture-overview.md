@@ -330,11 +330,9 @@ Shared Python utility functions used across packages.
 ### Purpose
 - Reusable utilities shared between backend and other Python packages
 - VSIX extension metadata parsing
-- Deployment mapping utilities
 
 ### Key Components
 - **`vsix_utils.py`** - VSIX package metadata parsing for VS Code extensions
-- **`deployment_mapping/`** - `DeploymentMapper`, `DeploymentMappingConfig`, `FieldTransformer`
 
 ### Dependencies
 ```toml

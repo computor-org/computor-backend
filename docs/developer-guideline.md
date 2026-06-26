@@ -213,8 +213,7 @@ computor-fullstack/
 │
 ├── computor-utils/           # 📦 Shared Python utilities
 │   └── src/computor_utils/
-│       ├── vsix_utils.py    # VSIX metadata parsing
-│       └── deployment_mapping/
+│       └── vsix_utils.py    # VSIX metadata parsing
 │
 ├── computor-web/             # 📦 Next.js web frontend
 │   └── src/
