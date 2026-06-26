@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _aggregate_grading_status(statuses: List[str]) -> Optional[str]:
-    from ..services.course_member_grading_stats import aggregate_grading_status
+    from ..utils.grading_status import aggregate_grading_status
 
     return aggregate_grading_status(statuses, default=None)
 
