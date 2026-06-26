@@ -89,6 +89,15 @@ class ExamplesClient:
         response = await self._http.get(f"/examples/versions/{version_id}", params=kwargs)
         return ExampleVersionGet.model_validate(response.json())
 
+    async def delete_versions(
+        self,
+        version_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete a single example version"""
+        await self._http.delete(f"/examples/versions/{version_id}", params=kwargs)
+        return
+
     async def dependencies(
         self,
         example_id: str,

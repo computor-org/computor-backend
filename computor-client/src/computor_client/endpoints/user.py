@@ -19,10 +19,7 @@ from computor_types.user_roles import (
     UserRoleGet,
     UserRoleList,
 )
-from computor_types.users import (
-    UserGet,
-    UserPassword,
-)
+from computor_types.users import UserGet
 
 from computor_client.http import AsyncHTTPClient
 
@@ -89,15 +86,6 @@ class UserClient:
         )
         return UserGet.model_validate(response.json())
 
-    async def password(
-        self,
-        data: Union[UserPassword, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> None:
-        """Set User Password Endpoint"""
-        response = await self._http.post(f"/user/password", json_data=data, params=kwargs)
-        return
-
     async def scopes(
         self,
         **kwargs: Any,
@@ -121,6 +109,42 @@ class UserClient:
     ) -> Dict[str, Any]:
         """Get Course Views For Current User By Course"""
         response = await self._http.get(f"/user/views/{course_id}", params=kwargs)
+        return response.json()
+
+    async def courses_git(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Course Git Descriptor Endpoint"""
+        response = await self._http.get(f"/user/courses/{course_id}/git", params=kwargs)
+        return response.json()
+
+    async def courses_repository(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Student Repository Endpoint"""
+        response = await self._http.get(f"/user/courses/{course_id}/repository", params=kwargs)
+        return response.json()
+
+    async def courses_provision_repository(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Provision Student Repository Endpoint"""
+        response = await self._http.post(f"/user/courses/{course_id}/provision-repository", params=kwargs)
+        return response.json()
+
+    async def courses_register_repository(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Register Student Repository Endpoint"""
+        response = await self._http.post(f"/user/courses/{course_id}/register-repository", params=kwargs)
         return response.json()
 
     async def courses_validate(

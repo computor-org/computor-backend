@@ -6,13 +6,16 @@ Run `bash generate.sh python-client` to regenerate.
 """
 
 from computor_client.endpoints.accounts import AccountsClient
+from computor_client.endpoints.analytics import AnalyticsClient
 from computor_client.endpoints.authentication import AuthenticationClient
+from computor_client.endpoints.coder import CoderClient
 from computor_client.endpoints.course_content_kinds import CourseContentKindsClient
 from computor_client.endpoints.course_content_types import CourseContentTypesClient
 from computor_client.endpoints.course_contents import CourseContentsClient
 from computor_client.endpoints.course_families import CourseFamiliesClient
 from computor_client.endpoints.course_family_members import CourseFamilyMembersClient
 from computor_client.endpoints.course_family_roles import CourseFamilyRolesClient
+from computor_client.endpoints.course_git import CourseGitClient
 from computor_client.endpoints.course_groups import CourseGroupsClient
 from computor_client.endpoints.course_member_comments import CourseMemberCommentsClient
 from computor_client.endpoints.course_member_gradings import CourseMemberGradingsClient
@@ -24,7 +27,10 @@ from computor_client.endpoints.documents import DocumentsClient
 from computor_client.endpoints.example_repositories import ExampleRepositoriesClient
 from computor_client.endpoints.examples import ExamplesClient
 from computor_client.endpoints.extensions import ExtensionsClient
+from computor_client.endpoints.git_server import GitServerClient
+from computor_client.endpoints.git_servers import GitServersClient
 from computor_client.endpoints.groups import GroupsClient
+from computor_client.endpoints.invites import InvitesClient
 from computor_client.endpoints.languages import LanguagesClient
 from computor_client.endpoints.lecturers import LecturersClient
 from computor_client.endpoints.messages import MessagesClient
@@ -55,13 +61,16 @@ from computor_client.endpoints.workspaces import WorkspacesClient
 
 __all__ = [
     "AccountsClient",
+    "AnalyticsClient",
     "AuthenticationClient",
+    "CoderClient",
     "CourseContentKindsClient",
     "CourseContentTypesClient",
     "CourseContentsClient",
     "CourseFamiliesClient",
     "CourseFamilyMembersClient",
     "CourseFamilyRolesClient",
+    "CourseGitClient",
     "CourseGroupsClient",
     "CourseMemberCommentsClient",
     "CourseMemberGradingsClient",
@@ -73,7 +82,10 @@ __all__ = [
     "ExampleRepositoriesClient",
     "ExamplesClient",
     "ExtensionsClient",
+    "GitServerClient",
+    "GitServersClient",
     "GroupsClient",
+    "InvitesClient",
     "LanguagesClient",
     "LecturersClient",
     "MessagesClient",
