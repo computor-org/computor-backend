@@ -4,8 +4,7 @@ Authentication module for the Computor platform.
 Supported authentication methods:
 
 1. **Bearer Token (SSO)** — tokens from Keycloak/OAuth flow (`Authorization: Bearer <token>`)
-2. **GitLab** — `GLP-CREDS` header with base64-encoded JSON
-3. **API Token** — `X-API-Token` header (services and automation)
+2. **API Token** — `X-API-Token` header (services and automation)
 
 All methods create a Principal with user claims and permissions.
 """
@@ -13,18 +12,14 @@ All methods create a Principal with user claims and permissions.
 import datetime
 import json
 import hashlib
-import base64
 import binascii
 from typing import Annotated, Optional, List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from gitlab import Gitlab
 from fastapi import Depends, Request
 from fastapi.security.utils import get_authorization_scheme_param
 
 from computor_backend.database import get_db_session
-from computor_backend.gitlab_utils import gitlab_current_user
-from computor_types.auth import GLPAuthConfig
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.model.service import ApiToken
@@ -63,37 +58,6 @@ class AuthenticationResult:
 class AuthenticationService:
     """Service for handling different authentication methods"""
 
-    @staticmethod
-    def authenticate_gitlab(gitlab_config: GLPAuthConfig, db: Session) -> AuthenticationResult:
-        """Authenticate using GitLab credentials"""
-        
-        gl = Gitlab(url=gitlab_config.url, private_token=gitlab_config.token)
-        
-        try:
-            user_dict = gitlab_current_user(gl)
-        except Exception as e:
-            logger.error(f"GitLab authentication failed: {e}")
-            raise UnauthorizedException("GitLab authentication failed") from e
-        
-        results = (
-            db.query(User.id, UserRole.role_id)
-            .join(Account, Account.user_id == User.id)
-            .outerjoin(UserRole, UserRole.user_id == User.id)
-            .filter(
-                Account.type == "gitlab",
-                Account.provider_account_id == user_dict["username"]
-            )
-            .all()
-        )
-        
-        if not results:
-            raise NotFoundException("User not found")
-        
-        user_id = results[0][0]
-        role_ids = [role_id for _, role_id in results if role_id is not None]
-        
-        return AuthenticationResult(user_id, role_ids, "gitlab")
-    
     @staticmethod
     async def authenticate_sso(token: str, db: Session) -> AuthenticationResult:
         """Authenticate using SSO token with hashed token lookup"""
@@ -329,7 +293,7 @@ class ApiTokenCredentials(BaseModel):
     scheme: str = "ApiToken"
 
 
-def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials]:
+def parse_authorization_header(request: Request) -> Optional[SSOAuthCredentials | ApiTokenCredentials]:
     """Parse authorization header to determine auth type"""
 
     # Check for API Token header (X-API-Token) - highest priority for services
@@ -337,16 +301,6 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | SSO
     if api_token:
         logger.debug("Using API token from X-API-Token header")
         return ApiTokenCredentials(token=api_token)
-
-    # Check for GitLab credentials
-    header_creds = request.headers.get("GLP-CREDS")
-    if header_creds:
-        try:
-            gitlab_creds = json.loads(base64.b64decode(header_creds))
-            return GLPAuthConfig(**gitlab_creds)
-        except Exception as e:
-            logger.error(f"Failed to parse GitLab credentials: {e}")
-            raise UnauthorizedException("Invalid GitLab credentials") from e
 
     # Check for standard Authorization header
     authorization = request.headers.get("Authorization")
@@ -372,14 +326,14 @@ def parse_authorization_header(request: Request) -> Optional[GLPAuthConfig | SSO
 
 async def get_current_principal(
     credentials: Annotated[
-        GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials,
+        SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
     ]
 ) -> Principal:
     """
     Main dependency for getting the current authenticated principal.
 
-    Supports: API Token (X-API-Token), GitLab (GLP-CREDS), SSO Bearer token.
+    Supports: API Token (X-API-Token), SSO Bearer token.
     """
 
     # For cacheable auth methods, check cache FIRST before creating DB connection
@@ -387,10 +341,6 @@ async def get_current_principal(
     if isinstance(credentials, ApiTokenCredentials):
         cache_key = hashlib.sha256(
             f"api_token_permissions:{credentials.token}".encode()
-        ).hexdigest()
-    elif isinstance(credentials, GLPAuthConfig):
-        cache_key = hashlib.sha256(
-            f"{credentials.url}::{credentials.token}".encode()
         ).hexdigest()
     elif isinstance(credentials, SSOAuthCredentials):
         cache_key = hashlib.sha256(
@@ -418,10 +368,6 @@ async def get_current_principal(
             )
             principal = PrincipalBuilder.build(auth_result, db)
 
-        elif isinstance(credentials, GLPAuthConfig):
-            auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
-            principal = PrincipalBuilder.build(auth_result, db)
-
         elif isinstance(credentials, SSOAuthCredentials):
             auth_result = await AuthenticationService.authenticate_sso(
                 credentials.token, db
@@ -443,7 +389,7 @@ async def get_current_principal(
         return principal
 
 
-def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials]:
+def parse_authorization_header_optional(request: Request) -> Optional[SSOAuthCredentials | ApiTokenCredentials]:
     """
     Parse authorization header but return None instead of raising exception.
     Used for endpoints that accept but don't require authentication (like token refresh).
@@ -457,7 +403,7 @@ def parse_authorization_header_optional(request: Request) -> Optional[GLPAuthCon
 async def get_current_principal_optional(
     request: Request,
     credentials: Annotated[
-        Optional[GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials],
+        Optional[SSOAuthCredentials | ApiTokenCredentials],
         Depends(parse_authorization_header_optional)
     ] = None
 ) -> Optional[Principal]:
@@ -470,14 +416,7 @@ async def get_current_principal_optional(
 
     try:
         with get_db_session() as db:
-            if isinstance(credentials, GLPAuthConfig):
-                auth_result = AuthenticationService.authenticate_gitlab(credentials, db)
-                cache_key = hashlib.sha256(
-                    f"{credentials.url}::{credentials.token}".encode()
-                ).hexdigest()
-                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
-
-            elif isinstance(credentials, SSOAuthCredentials):
+            if isinstance(credentials, SSOAuthCredentials):
                 auth_result = await AuthenticationService.authenticate_sso(
                     credentials.token, db
                 )
@@ -502,19 +441,13 @@ class HeaderAuthCredentials(BaseModel):
 
 def get_auth_credentials(
     credentials: Annotated[
-        GLPAuthConfig | SSOAuthCredentials | ApiTokenCredentials,
+        SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
     ]
 ) -> HeaderAuthCredentials:
     """Get information about the authentication method used"""
 
-    if isinstance(credentials, GLPAuthConfig):
-        return HeaderAuthCredentials(
-            type="gitlab",
-            credentials={"url": credentials.url}
-        )
-
-    elif isinstance(credentials, SSOAuthCredentials):
+    if isinstance(credentials, SSOAuthCredentials):
         return HeaderAuthCredentials(
             type="sso",
             credentials={"scheme": credentials.scheme}
