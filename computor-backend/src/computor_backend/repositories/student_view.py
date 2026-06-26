@@ -297,44 +297,27 @@ class StudentViewRepository(ViewRepository):
         Returns:
             Detailed course information
         """
-        user_id = permissions.get_user_id_or_throw()
+        def _build(course):
+            result = CourseStudentGet(
+                id=course.id,
+                title=course.title,
+                course_family_id=course.course_family_id,
+                organization_id=course.organization_id,
+                course_content_types=course.course_content_types,
+                path=course.path,
+            )
+            related_ids = {
+                'course_id': str(course_id),
+                'course_family_id': str(course.course_family_id),
+                'organization_id': str(course.organization_id),
+            }
+            return result, related_ids
 
-        # Try cache
-        cached = self._get_cached_view(
-            user_id=str(user_id),
+        return self._get_cached_course_dto(
+            course_id,
+            permissions,
+            role="_student",
             view_type="course",
-            view_id=str(course_id)
+            dto_cls=CourseStudentGet,
+            builder=_build,
         )
-        if cached is not None:
-            return CourseStudentGet.model_validate(cached, from_attributes=True)
-
-        # Query from DB with permission filtering
-        course = check_course_permissions(permissions, Course, "_student", self.db).filter(
-            Course.id == course_id
-        ).first()
-
-        result = CourseStudentGet(
-            id=course.id,
-            title=course.title,
-            course_family_id=course.course_family_id,
-            organization_id=course.organization_id,
-            course_content_types=course.course_content_types,
-            path=course.path,
-        )
-
-        # Cache result
-        related_ids = {
-            'course_id': str(course_id),
-            'course_family_id': str(course.course_family_id),
-            'organization_id': str(course.organization_id)
-        }
-        self._set_cached_view(
-            user_id=str(user_id),
-            view_type="course",
-            view_id=str(course_id),
-            data=self._serialize_dto(result),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids
-        )
-
-        return result

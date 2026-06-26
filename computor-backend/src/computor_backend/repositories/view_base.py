@@ -383,6 +383,58 @@ class ViewRepository(ABC):
         )
         return response_list
 
+    def _get_cached_course_dto(
+        self,
+        course_id: Any,
+        permissions: Any,
+        *,
+        role: str,
+        view_type: str,
+        dto_cls: type,
+        builder: Callable[[Any], "tuple[Any, dict]"],
+        raise_if_missing: bool = False,
+    ) -> Any:
+        """Shared ``get_course`` skeleton for the DTO-building course views.
+
+        Used by ``StudentViewRepository`` and ``TutorViewRepository``. Cache-first
+        read (deserialize via ``dto_cls``); on miss, permission-filter the
+        ``Course`` query by ``course_id``, then call ``builder(course)`` which
+        returns ``(dto, related_ids)``; cache the serialized dto and return it.
+
+        ``raise_if_missing`` controls the not-found behaviour: the tutor view
+        raises ``NotFoundException`` when the course is absent/forbidden, whereas
+        the student view historically does not (preserved as the default).
+        """
+        from ..permissions.core import check_course_permissions
+        from ..model.course import Course
+
+        user_id = permissions.get_user_id_or_throw()
+
+        cached = self._get_cached_view(
+            user_id=str(user_id), view_type=view_type, view_id=str(course_id)
+        )
+        if cached is not None:
+            return dto_cls.model_validate(cached, from_attributes=True)
+
+        course = check_course_permissions(permissions, Course, role, self.db).filter(
+            Course.id == course_id
+        ).first()
+        if course is None and raise_if_missing:
+            from ..exceptions import NotFoundException
+            raise NotFoundException()
+
+        result, related_ids = builder(course)
+
+        self._set_cached_view(
+            user_id=str(user_id),
+            view_type=view_type,
+            view_id=str(course_id),
+            data=self._serialize_dto(result),
+            ttl=self.get_default_ttl(),
+            related_ids=related_ids,
+        )
+        return result
+
     def _serialize_query_params(self, params: Any, use_hash: bool = True) -> str:
         """
         Serialize query parameters into a stable, deterministic cache key component.

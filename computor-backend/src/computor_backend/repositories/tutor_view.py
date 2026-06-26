@@ -199,53 +199,32 @@ class TutorViewRepository(ViewRepository):
         Returns:
             Course with tutor-specific info
         """
-        user_id = permissions.get_user_id_or_throw()
+        def _build(course):
+            gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
+            gitlab_projects = gitlab_props.get("projects", {})
+            result = CourseTutorGet(
+                id=str(course.id),
+                title=course.title,
+                course_family_id=str(course.course_family_id) if course.course_family_id else None,
+                organization_id=str(course.organization_id) if course.organization_id else None,
+                path=course.path,
+                repository=CourseTutorRepository(
+                    provider_url=gitlab_props.get("url"),
+                    full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
+                    full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
+                ) if gitlab_props else None,
+            )
+            return result, {'course_id': str(course_id)}
 
-        # Try cache
-        cached = self._get_cached_view(
-            user_id=str(user_id),
+        return self._get_cached_course_dto(
+            course_id,
+            permissions,
+            role="_tutor",
             view_type="tutor:course",
-            view_id=str(course_id)
+            dto_cls=CourseTutorGet,
+            builder=_build,
+            raise_if_missing=True,
         )
-        if cached is not None:
-            return CourseTutorGet.model_validate(cached, from_attributes=True)
-
-        # Query from DB
-        course = check_course_permissions(permissions, Course, "_tutor", self.db).filter(
-            Course.id == course_id
-        ).first()
-
-        if course is None:
-            from ..exceptions import NotFoundException
-            raise NotFoundException()
-
-        gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
-        gitlab_projects = gitlab_props.get("projects", {})
-
-        result = CourseTutorGet(
-            id=str(course.id),
-            title=course.title,
-            course_family_id=str(course.course_family_id) if course.course_family_id else None,
-            organization_id=str(course.organization_id) if course.organization_id else None,
-            path=course.path,
-            repository=CourseTutorRepository(
-                provider_url=gitlab_props.get("url"),
-                full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
-                full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
-            ) if gitlab_props else None
-        )
-
-        # Cache result
-        self._set_cached_view(
-            user_id=str(user_id),
-            view_type="tutor:course",
-            view_id=str(course_id),
-            data=self._serialize_dto(result),
-            ttl=self.get_default_ttl(),
-            related_ids={'course_id': str(course_id)}
-        )
-
-        return result
 
     def list_courses(
         self,
