@@ -262,27 +262,10 @@ class TutorViewRepository(ViewRepository):
         Returns:
             List of courses accessible to tutor
         """
-        user_id = permissions.get_user_id_or_throw()
-
-        # Try cache with query-aware key
-        cached = self._get_cached_query_view(
-            user_id=str(user_id),
-            view_type="tutor:courses",
-            params=params
-        )
-        if cached is not None:
-            return [CourseTutorList.model_validate(item, from_attributes=True) for item in cached]
-
-        # Query from DB
-        query = check_course_permissions(permissions, Course, "_tutor", self.db)
-        courses = CourseStudentInterface.search(self.db, query, params).all()
-
-        response_list = []
-        for course in courses:
+        def _build_row(course) -> CourseTutorList:
             gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
             gitlab_projects = gitlab_props.get("projects", {})
-
-            response_list.append(CourseTutorList(
+            return CourseTutorList(
                 id=str(course.id),
                 title=course.title,
                 course_family_id=str(course.course_family_id) if course.course_family_id else None,
@@ -292,16 +275,14 @@ class TutorViewRepository(ViewRepository):
                     provider_url=gitlab_props.get("url"),
                     full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
                     full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
-                ) if gitlab_props else None
-            ))
+                ) if gitlab_props else None,
+            )
 
-        # Cache result with query-aware key
-        self._set_cached_query_view(
-            user_id=str(user_id),
+        return self._list_cached_course_dtos(
+            permissions,
+            params,
+            role="_tutor",
             view_type="tutor:courses",
-            params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl()
+            dto_cls=CourseTutorList,
+            row_builder=_build_row,
         )
-
-        return response_list

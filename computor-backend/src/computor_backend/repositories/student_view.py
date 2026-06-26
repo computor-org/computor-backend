@@ -267,44 +267,20 @@ class StudentViewRepository(ViewRepository):
         Returns:
             List of courses with GitLab repository info
         """
-        user_id = permissions.get_user_id_or_throw()
-
-        # Try cache with query-aware key
-        cached = self._get_cached_query_view(
-            user_id=str(user_id),
+        return self._list_cached_course_dtos(
+            permissions,
+            params,
+            role="_student",
             view_type="courses",
-            params=params
-        )
-        if cached is not None:
-            return [CourseStudentList.model_validate(item, from_attributes=True) for item in cached]
-
-        # Query from DB with permission filtering
-        courses = CourseStudentInterface.search(
-            self.db,
-            check_course_permissions(permissions, Course, "_student", self.db),
-            params
-        ).all()
-
-        response_list: List[CourseStudentList] = []
-        for course in courses:
-            response_list.append(CourseStudentList(
+            dto_cls=CourseStudentList,
+            row_builder=lambda course: CourseStudentList(
                 id=course.id,
                 title=course.title,
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
                 path=course.path,
-            ))
-
-        # Cache result with query-aware key
-        self._set_cached_query_view(
-            user_id=str(user_id),
-            view_type="courses",
-            params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl()
+            ),
         )
-
-        return response_list
 
     def get_course(
         self,

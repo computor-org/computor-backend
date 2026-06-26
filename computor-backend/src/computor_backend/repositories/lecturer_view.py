@@ -101,6 +101,10 @@ class LecturerViewRepository(ViewRepository):
         Returns:
             List of courses
         """
+        # NOTE: unlike the student/tutor views, this does NOT use
+        # ViewRepository._list_cached_course_dtos -- CourseInterface.search
+        # returns a raw ORM query and we serialize Course objects via __dict__
+        # (the model_dump-or-__dict__ fallback below), a different data flow.
         user_id = permissions.get_user_id_or_throw()
 
         # Try cache with query-aware key

@@ -7,7 +7,7 @@ work with query results, DTOs, and complex data structures.
 """
 
 from abc import ABC
-from typing import Any, Optional, Dict, List
+from typing import Any, Callable, Optional, Dict, List
 from sqlalchemy.orm import Session
 import logging
 import json
@@ -332,6 +332,56 @@ class ViewRepository(ABC):
             List of serialized data
         """
         return [self._serialize_dto(dto) for dto in dtos]
+
+    def _list_cached_course_dtos(
+        self,
+        permissions: Any,
+        params: Any,
+        *,
+        role: str,
+        view_type: str,
+        dto_cls: type,
+        row_builder: Callable[[Any], Any],
+    ) -> List[Any]:
+        """Shared ``list_courses`` skeleton for the DTO-building course views.
+
+        Used by ``StudentViewRepository`` and ``TutorViewRepository``, whose
+        ``list_courses`` differ only in role, cache ``view_type``, DTO class and
+        per-row mapping. Both permission-filter the same ``Course`` query, search
+        via ``CourseStudentInterface`` and build pydantic DTOs.
+
+        Flow: cache-first read (deserialize via ``dto_cls``); on miss,
+        permission-filter the query, run the search, map each ORM row through
+        ``row_builder``, cache the serialized DTOs, and return them.
+
+        NOTE: ``LecturerViewRepository.list_courses`` intentionally does NOT use
+        this -- it returns a raw ORM query (``CourseInterface.search``) and
+        serializes ``Course`` objects via ``__dict__``, a different data flow.
+        """
+        from ..permissions.core import check_course_permissions
+        from ..model.course import Course
+        from ..interfaces.student_courses import CourseStudentInterface
+
+        user_id = permissions.get_user_id_or_throw()
+
+        cached = self._get_cached_query_view(
+            user_id=str(user_id), view_type=view_type, params=params
+        )
+        if cached is not None:
+            return [dto_cls.model_validate(item, from_attributes=True) for item in cached]
+
+        query = check_course_permissions(permissions, Course, role, self.db)
+        courses = CourseStudentInterface.search(self.db, query, params).all()
+        response_list = [row_builder(course) for course in courses]
+
+        self._set_cached_query_view(
+            user_id=str(user_id),
+            view_type=view_type,
+            params=params,
+            data=self._serialize_dto_list(response_list),
+            ttl=self.get_default_ttl(),
+        )
+        return response_list
 
     def _serialize_query_params(self, params: Any, use_hash: bool = True) -> str:
         """
