@@ -345,7 +345,8 @@ def _get_gitlab_client(
         return None
 
     try:
-        token = decrypt_api_key(token_encrypted)
+        from computor_types.encryption import decrypt_secret
+        token = decrypt_secret(token_encrypted)
     except Exception as exc:
         logger.warning("Failed to decrypt GitLab token: %s", exc)
         return None

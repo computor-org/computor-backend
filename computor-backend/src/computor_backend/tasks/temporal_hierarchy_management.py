@@ -32,7 +32,7 @@ async def create_organization_activity(
     """
     from ..generator.gitlab_builder import GitLabBuilder
     from ..model.git_provider import GitProvider
-    from computor_types.tokens import encrypt_api_key
+    from computor_types.encryption import encrypt_secret
     from computor_types.gitlab import GitLabConfig
 
     logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
@@ -60,7 +60,7 @@ async def create_organization_activity(
                 raise NotImplementedError(f"Provider type {git_provider_type!r} not yet supported for org creation")
 
             # Create the git_provider row now that we have the org id
-            encrypted = encrypt_api_key(git_provider_token)
+            encrypted = encrypt_secret(git_provider_token)
             provider_row = GitProvider(
                 organization_id=str(org.id),
                 type=git_provider_type,
