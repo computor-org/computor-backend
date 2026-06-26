@@ -282,7 +282,7 @@ kill -9 <PID>
 bash stop.sh
 sudo rm -rf "${SYSTEM_DEPLOYMENT_PATH}/postgres"
 bash startup.sh dev -d
-bash migrations.sh
+bash api.sh   # re-applies migrations automatically on start
 ```
 
 ### Issue: Import Errors

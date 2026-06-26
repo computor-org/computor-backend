@@ -148,17 +148,18 @@ Command-line interface for administrative and development tasks.
 - Code generation (TypeScript, OpenAPI)
 - Admin tasks
 
-### Working Commands (9)
+### Working Commands (10)
 ```bash
-computor login              # Authenticate with API
-computor profiles           # Manage auth profiles
-computor rest               # CRUD operations
-computor admin              # Administrative commands
-computor worker             # Temporal worker management
-computor generate-types     # TypeScript interface generation
-computor generate-clients   # TypeScript client generation
-computor generate-schema    # OpenAPI schema generation
-computor generate-validators # Validator generation
+computor login              # Authenticate
+computor logout             # Clear stored credentials
+computor status             # Show current auth profile
+computor rest               # CRUD operations on entities
+computor deployment         # Apply/manage deployments
+computor token              # Manage API tokens
+computor documents          # Course document sync
+computor service            # Service accounts & service types
+computor delete             # Cascade-delete org/family/course/examples
+computor grading            # Grading queries
 ```
 
 ### Configuration
@@ -188,7 +189,7 @@ FastAPI server providing REST API and business logic.
 
 ### Entry Points
 - **`server.py`**: FastAPI app initialization and startup logic
-- **Shell Scripts**: `api.sh`, `startup.sh`, `migrations.sh`
+- **Shell Scripts**: `startup.sh` (dev/prod services), `api.sh` (dev backend), `web.sh` (dev frontend), `stop.sh`
 
 ### Architecture Layers
 
