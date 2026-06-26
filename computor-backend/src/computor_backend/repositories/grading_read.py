@@ -11,7 +11,7 @@ from computor_types.course_member_gradings import (
     CourseMemberGradingsList,
 )
 
-from .course_member_grading_stats import process_hierarchical_stats
+from ..utils.grading_stats import process_hierarchical_stats
 
 
 class CourseMemberGradingReadBackend(Protocol):

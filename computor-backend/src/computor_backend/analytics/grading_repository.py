@@ -5,7 +5,7 @@ from typing import Any
 
 import duckdb
 
-from computor_backend.services.course_member_grading_stats import (
+from computor_backend.utils.grading_status import (
     aggregate_grading_status,
 )
 

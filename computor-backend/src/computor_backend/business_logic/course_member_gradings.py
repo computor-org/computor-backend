@@ -18,8 +18,10 @@ from computor_backend.cache import Cache
 from computor_backend.repositories.course_member_gradings_view import (
     CourseMemberGradingsViewRepository,
 )
-from computor_backend.services.course_member_grading_stats import (
+from computor_backend.utils.grading_status import (
     aggregate_grading_status as _aggregate_grading_status,  # noqa: F401
+)
+from computor_backend.utils.grading_stats import (
     process_hierarchical_stats as _process_hierarchical_stats,  # noqa: F401
 )
 

@@ -21,7 +21,7 @@ from computor_backend.api.analytics import (
 from computor_backend.exceptions import BadRequestException, ForbiddenException
 from computor_backend.permissions.principal import Principal
 from computor_types.analytics import AnalyticsRefreshRequest
-from computor_backend.services.course_member_grading_read import (
+from computor_backend.repositories.grading_read import (
     build_course_member_grading_list_response,
     build_course_member_grading_response,
 )
