@@ -209,7 +209,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                     )
 
             data_repo = CourseMemberGradingsRepository(self.db)
-            from ..services.course_member_grading_read import (
+            from .grading_read import (
                 build_course_member_grading_response,
             )
             result = build_course_member_grading_response(
@@ -337,7 +337,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             self._check_course_list_permissions(permissions, user_id, course_id)
 
             data_repo = CourseMemberGradingsRepository(self.db)
-            from ..services.course_member_grading_read import (
+            from .grading_read import (
                 build_course_member_grading_list_response,
             )
             results = build_course_member_grading_list_response(data_repo, course_id)

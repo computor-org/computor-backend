@@ -29,6 +29,10 @@ from computor_types.tasks import map_int_to_task_status
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.model.course import CourseMember
 from computor_backend.repositories.course_content_queries import CourseMemberCourseContentQueryResult
+# NOTE: the view_*/mapper modules under repositories/ are a read-model (query)
+# layer, NOT the persistence-repository layer -- they assemble DTOs and may
+# orchestrate reads from services (here: result JSON/artifacts from MinIO). This
+# read-model -> service dependency is deliberate, not an inverted dependency.
 from computor_backend.services.result_storage import retrieve_result_json, list_result_artifacts
 
 logger = logging.getLogger(__name__)

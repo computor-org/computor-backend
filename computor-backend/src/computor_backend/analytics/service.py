@@ -40,7 +40,7 @@ from .job_store import AnalyticsJobStore
 from .report_repository import AnalyticsDuckDbReportRepository
 from .source import PostgresAnalyticsSource
 from .store import AnalyticsDuckDbStore
-from ..services.course_member_grading_read import (
+from ..repositories.grading_read import (
     build_course_member_grading_list_response,
     build_course_member_grading_response,
 )

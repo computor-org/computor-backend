@@ -1,9 +1,9 @@
 """Pure grading-status aggregation, with no DB/service dependencies.
 
 Lives in the util layer (below both repositories and services) so that
-``repositories`` can use it without importing *upward* from ``services`` --
-which was an inverted dependency. ``services.course_member_grading_stats``
-re-exports this for backwards compatibility.
+``repositories`` (and ``utils.grading_stats``) can use it without importing
+*upward* into a higher layer -- the original ``hash``/aggregation helper lived
+in ``services`` and produced an inverted repository -> services dependency.
 """
 from __future__ import annotations
 
