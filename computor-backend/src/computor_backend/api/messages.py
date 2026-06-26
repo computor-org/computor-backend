@@ -37,7 +37,7 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageThread, MessageUpdate
+from computor_types.messages import MentionableQuery, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageThread, MessageUpdate
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -123,18 +123,8 @@ async def create_message(
 @messages_router.get("/mentionable-users", response_model=list[MessageMentionRef])
 async def list_mentionable_users_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    params: MentionableQuery = Depends(),
     db: Session = Depends(get_db),
-    parent_id: Optional[str] = Query(None, description="Inherit scope from this parent/thread message"),
-    organization_id: Optional[str] = Query(None),
-    course_family_id: Optional[str] = Query(None),
-    course_id: Optional[str] = Query(None),
-    course_content_id: Optional[str] = Query(None),
-    course_group_id: Optional[str] = Query(None),
-    submission_group_id: Optional[str] = Query(None),
-    course_member_id: Optional[str] = Query(None),
-    user_id: Optional[str] = Query(None),
-    search: Optional[str] = Query(None, description="Filter candidates by given/family name"),
-    limit: int = Query(50, le=200),
 ):
     """List the users who may be @mentioned in a message of the given scope.
 
@@ -145,22 +135,22 @@ async def list_mentionable_users_endpoint(
     must themselves be in that audience (you cannot enumerate a scope you can't
     see). Global scope (no target) requires a ``search`` term.
     """
-    if parent_id:
-        parent = db.query(Message).filter(Message.id == parent_id).first()
+    if params.parent_id:
+        parent = db.query(Message).filter(Message.id == params.parent_id).first()
         if not parent:
-            raise BadRequestException(detail=f"Parent message {parent_id} not found")
+            raise BadRequestException(detail=f"Parent message {params.parent_id} not found")
         message_like = parent
     else:
         message_like = Message(
             author_id=permissions.user_id,
-            organization_id=organization_id,
-            course_family_id=course_family_id,
-            course_id=course_id,
-            course_content_id=course_content_id,
-            course_group_id=course_group_id,
-            submission_group_id=submission_group_id,
-            course_member_id=course_member_id,
-            user_id=user_id,
+            organization_id=params.organization_id,
+            course_family_id=params.course_family_id,
+            course_id=params.course_id,
+            course_content_id=params.course_content_id,
+            course_group_id=params.course_group_id,
+            submission_group_id=params.submission_group_id,
+            course_member_id=params.course_member_id,
+            user_id=params.user_id,
         )
 
     audience = message_audience_user_ids(message_like, db)
@@ -172,10 +162,10 @@ async def list_mentionable_users_endpoint(
     ):
         raise ForbiddenException(detail="You cannot list mentionable users for this scope")
     # Global scope (no target) would otherwise dump the whole user table.
-    if audience is None and not search:
+    if audience is None and not params.search:
         return []
 
-    users = list_mentionable_users(message_like, db, search=search, limit=limit)
+    users = list_mentionable_users(message_like, db, search=params.search, limit=params.limit)
     return [
         MessageMentionRef(id=str(u.id), given_name=u.given_name, family_name=u.family_name)
         for u in users

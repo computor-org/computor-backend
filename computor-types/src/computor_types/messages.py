@@ -281,6 +281,27 @@ class MessageQuery(ListQuery):
     )
 
 
+class MentionableQuery(BaseModel):
+    """Query for ``GET /messages/mentionable-users``.
+
+    Identifies the message scope whose audience (the users who may be
+    @mentioned) to list. Provide the same target you would post to, or
+    ``parent_id`` to inherit a thread's scope; ``search`` filters candidates by
+    name for large audiences.
+    """
+    parent_id: Optional[str] = Field(None, description="Inherit scope from this parent/thread message")
+    organization_id: Optional[str] = None
+    course_family_id: Optional[str] = None
+    course_id: Optional[str] = None
+    course_content_id: Optional[str] = None
+    course_group_id: Optional[str] = None
+    submission_group_id: Optional[str] = None
+    course_member_id: Optional[str] = None
+    user_id: Optional[str] = None
+    search: Optional[str] = Field(None, description="Filter candidates by given/family name")
+    limit: int = Field(50, le=200, description="Maximum number of candidates to return")
+
+
 class MessageThread(BaseModel):
     """Full conversation thread for a message.
 

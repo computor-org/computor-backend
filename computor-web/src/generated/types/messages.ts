@@ -12,6 +12,22 @@ import type { MessageAuthor, MessageAuthorCourseMember } from './auth';
 
 
 
+/**
+ * A user mentioned in a message.
+ * 
+ * Resolved server-side from the ``@[Given Family](<user_id>)`` tokens in the
+ * message ``content``. The ``id`` (a ``user_id``) is authoritative; the name
+ * is refreshed from here on render so renames never go stale.
+ */
+export interface MessageMentionRef {
+  /** User ID of the mentioned user */
+  id: string;
+  /** Mentioned user's given name */
+  given_name?: string | null;
+  /** Mentioned user's family name */
+  family_name?: string | null;
+}
+
 export interface MessageCreate {
   parent_id?: string | null;
   level?: number;
@@ -58,6 +74,8 @@ export interface MessageGet {
   author?: MessageAuthor | null;
   /** Author's course member context (only for course-scoped messages) */
   author_course_member?: MessageAuthorCourseMember | null;
+  /** Users mentioned in this message */
+  mentions?: MessageMentionRef[];
   is_read?: boolean;
   /** True if the requesting user is the message author */
   is_author?: boolean;
@@ -92,6 +110,8 @@ export interface MessageList {
   author?: MessageAuthor | null;
   /** Author's course member context (only for course-scoped messages) */
   author_course_member?: MessageAuthorCourseMember | null;
+  /** Users mentioned in this message */
+  mentions?: MessageMentionRef[];
   is_read?: boolean;
   /** True if the requesting user is the message author */
   is_author?: boolean;
@@ -165,12 +185,41 @@ export interface MessageQuery {
   created_before?: string | null;
   /** Filter by read status: True = unread only, False = read only, None = all */
   unread?: boolean | null;
+  /** Only messages that mention this user_id */
+  mentioned_user_id?: string | null;
+  /** Only messages that mention the current API user */
+  mentions_me?: boolean | null;
   /** Filter by tags in title (e.g., ['ai', 'ai-help', 'review']). Without # prefix. */
   tags?: string[] | null;
   /** True = must match ALL tags (AND), False = match ANY tag (OR) */
   tags_match_all?: boolean | null;
   /** Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.) */
   tag_scope?: string | null;
+}
+
+/**
+ * Query for ``GET /messages/mentionable-users``.
+ * 
+ * Identifies the message scope whose audience (the users who may be
+ * @mentioned) to list. Provide the same target you would post to, or
+ * ``parent_id`` to inherit a thread's scope; ``search`` filters candidates by
+ * name for large audiences.
+ */
+export interface MentionableQuery {
+  /** Inherit scope from this parent/thread message */
+  parent_id?: string | null;
+  organization_id?: string | null;
+  course_family_id?: string | null;
+  course_id?: string | null;
+  course_content_id?: string | null;
+  course_group_id?: string | null;
+  submission_group_id?: string | null;
+  course_member_id?: string | null;
+  user_id?: string | null;
+  /** Filter candidates by given/family name */
+  search?: string | null;
+  /** Maximum number of candidates to return */
+  limit?: number;
 }
 
 /**
