@@ -110,7 +110,7 @@ def get_course_views_for_user(principal: Principal) -> List[str]:
     #    so they always get the full pipeline (lecturer) view.
     if principal.is_admin or "_organization_manager" in principal.roles:
         views.add("lecturer")
-    if "_user_manager" in principal.roles:
+    if principal.is_admin or "_user_manager" in principal.roles:
         views.add("user_manager")
 
     dependent = principal.claims.dependent if principal.claims else {}
