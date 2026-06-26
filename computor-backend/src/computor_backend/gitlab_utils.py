@@ -23,9 +23,6 @@ def gitlab_fork_project(gitlab: Gitlab, fork_id: str | int, dest_path: str, dest
     print(f"[gitlab_fork_project]{str(e)}")
     raise e
 
-def gitlab_current_user(gitlab: Gitlab):
-    return gitlab.http_get(path=f"/user")
-
 
 def construct_gitlab_http_url(gitlab_base_url: str, full_path: str) -> str:
     """

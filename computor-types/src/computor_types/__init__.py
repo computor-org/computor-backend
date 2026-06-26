@@ -93,10 +93,6 @@ from .users import (
     UserQuery,
 )
 
-# Auth
-from .auth import (
-    GLPAuthConfig,
-)
 
 # Deployments (imported from dependency-free base to avoid circular imports)
 from .deployment_base import BaseDeployment
@@ -213,8 +209,6 @@ __all__ = [
     "UserInterface",
     "UserCreate",
     "UserGet",
-    # Auth
-    "GLPAuthConfig",
     # Deployments / GitLab
     "BaseDeployment",
     "GitLabConfig",

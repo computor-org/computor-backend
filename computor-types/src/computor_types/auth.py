@@ -6,10 +6,6 @@ from computor_types.deployments_refactored import BaseDeployment
 class AuthConfig(ABC, BaseDeployment):
     pass
 
-class GLPAuthConfig(AuthConfig):
-    url: str
-    token: str
-
 class LogoutRequest(BaseModel):
     """Request model for logout."""
     provider: Optional[str] = Field(None, description="Provider name for SSO logout (optional)")
