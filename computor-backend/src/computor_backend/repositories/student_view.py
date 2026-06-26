@@ -219,38 +219,14 @@ class StudentViewRepository(ViewRepository):
         query = user_course_content_list_query(user_id, self.db)
         course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
 
-        response_list: List[CourseContentStudentList] = []
-        for course_contents_result in course_contents_results:
-            # Convert tuple to typed model before mapping
-            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
-
-        # Aggregate status for unit-like course contents (non-submittable)
-        # Units aggregate status from their descendant submittable contents
-        response_list = self._aggregate_unit_statuses(response_list, user_id)
-
-        # Cache result with query-aware key
-        # CRITICAL: Tag with course_id AND individual course_content IDs for proper invalidation
-        related_ids = {}
-        if params.course_id:
-            # Single course filter - tag with that course_id
-            related_ids['student_view'] = str(params.course_id)
-
-        # CRITICAL: Tag each course_content for deployment-related invalidation
-        for result in response_list:
-            if hasattr(result, 'id') and result.id:
-                related_ids[f'course_content:{result.id}'] = None
-
-        self._set_cached_query_view(
-            user_id=str(user_id),
+        return await self._finalize_course_contents_view(
+            course_contents_results,
+            reader_user_id=user_id,
             view_type="course_contents",
             params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids if related_ids else None
+            aggregate_user_id=user_id,
+            base_related_ids={'student_view': str(params.course_id)} if params.course_id else None,
         )
-
-        return response_list
 
     def list_courses(
         self,
@@ -267,44 +243,20 @@ class StudentViewRepository(ViewRepository):
         Returns:
             List of courses with GitLab repository info
         """
-        user_id = permissions.get_user_id_or_throw()
-
-        # Try cache with query-aware key
-        cached = self._get_cached_query_view(
-            user_id=str(user_id),
+        return self._list_cached_course_dtos(
+            permissions,
+            params,
+            role="_student",
             view_type="courses",
-            params=params
-        )
-        if cached is not None:
-            return [CourseStudentList.model_validate(item, from_attributes=True) for item in cached]
-
-        # Query from DB with permission filtering
-        courses = CourseStudentInterface.search(
-            self.db,
-            check_course_permissions(permissions, Course, "_student", self.db),
-            params
-        ).all()
-
-        response_list: List[CourseStudentList] = []
-        for course in courses:
-            response_list.append(CourseStudentList(
+            dto_cls=CourseStudentList,
+            row_builder=lambda course: CourseStudentList(
                 id=course.id,
                 title=course.title,
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
                 path=course.path,
-            ))
-
-        # Cache result with query-aware key
-        self._set_cached_query_view(
-            user_id=str(user_id),
-            view_type="courses",
-            params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl()
+            ),
         )
-
-        return response_list
 
     def get_course(
         self,
@@ -321,44 +273,27 @@ class StudentViewRepository(ViewRepository):
         Returns:
             Detailed course information
         """
-        user_id = permissions.get_user_id_or_throw()
+        def _build(course):
+            result = CourseStudentGet(
+                id=course.id,
+                title=course.title,
+                course_family_id=course.course_family_id,
+                organization_id=course.organization_id,
+                course_content_types=course.course_content_types,
+                path=course.path,
+            )
+            related_ids = {
+                'course_id': str(course_id),
+                'course_family_id': str(course.course_family_id),
+                'organization_id': str(course.organization_id),
+            }
+            return result, related_ids
 
-        # Try cache
-        cached = self._get_cached_view(
-            user_id=str(user_id),
+        return self._get_cached_course_dto(
+            course_id,
+            permissions,
+            role="_student",
             view_type="course",
-            view_id=str(course_id)
+            dto_cls=CourseStudentGet,
+            builder=_build,
         )
-        if cached is not None:
-            return CourseStudentGet.model_validate(cached, from_attributes=True)
-
-        # Query from DB with permission filtering
-        course = check_course_permissions(permissions, Course, "_student", self.db).filter(
-            Course.id == course_id
-        ).first()
-
-        result = CourseStudentGet(
-            id=course.id,
-            title=course.title,
-            course_family_id=course.course_family_id,
-            organization_id=course.organization_id,
-            course_content_types=course.course_content_types,
-            path=course.path,
-        )
-
-        # Cache result
-        related_ids = {
-            'course_id': str(course_id),
-            'course_family_id': str(course.course_family_id),
-            'organization_id': str(course.organization_id)
-        }
-        self._set_cached_view(
-            user_id=str(user_id),
-            view_type="course",
-            view_id=str(course_id),
-            data=self._serialize_dto(result),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids
-        )
-
-        return result

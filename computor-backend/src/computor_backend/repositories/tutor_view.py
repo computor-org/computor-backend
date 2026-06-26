@@ -150,39 +150,17 @@ class TutorViewRepository(ViewRepository):
         query = course_member_course_content_list_query(course_member_id, self.db, reader_user_id=reader_user_id)
         course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
 
-        response_list = []
-        for course_contents_result in course_contents_results:
-            # Convert tuple to typed model before mapping
-            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
-
-        # Aggregate status for unit-like course contents (non-submittable)
-        # Units aggregate status from their descendant submittable contents
-        response_list = self._aggregate_unit_statuses(response_list, str(course_member.user_id))
-
-        # Cache result with query-aware key
-        # CRITICAL: Include course_id for proper invalidation when submissions/results change
-        # CRITICAL: Tag each course_content for deployment-related invalidation
-        related_ids = {
-            'course_member_id': str(course_member_id),
-            'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id for invalidation
-        }
-
-        # Tag each course_content for deployment-related invalidation
-        for result in response_list:
-            if hasattr(result, 'id') and result.id:
-                related_ids[f'course_content:{result.id}'] = None
-
-        self._set_cached_query_view(
-            user_id=str(reader_user_id),
+        return await self._finalize_course_contents_view(
+            course_contents_results,
+            reader_user_id=reader_user_id,
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids
+            aggregate_user_id=str(course_member.user_id),
+            base_related_ids={
+                'course_member_id': str(course_member_id),
+                'tutor_view': str(course_member.course_id),
+            },
         )
-
-        return response_list
 
     def get_course(
         self,
@@ -199,53 +177,32 @@ class TutorViewRepository(ViewRepository):
         Returns:
             Course with tutor-specific info
         """
-        user_id = permissions.get_user_id_or_throw()
+        def _build(course):
+            gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
+            gitlab_projects = gitlab_props.get("projects", {})
+            result = CourseTutorGet(
+                id=str(course.id),
+                title=course.title,
+                course_family_id=str(course.course_family_id) if course.course_family_id else None,
+                organization_id=str(course.organization_id) if course.organization_id else None,
+                path=course.path,
+                repository=CourseTutorRepository(
+                    provider_url=gitlab_props.get("url"),
+                    full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
+                    full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
+                ) if gitlab_props else None,
+            )
+            return result, {'course_id': str(course_id)}
 
-        # Try cache
-        cached = self._get_cached_view(
-            user_id=str(user_id),
+        return self._get_cached_course_dto(
+            course_id,
+            permissions,
+            role="_tutor",
             view_type="tutor:course",
-            view_id=str(course_id)
+            dto_cls=CourseTutorGet,
+            builder=_build,
+            raise_if_missing=True,
         )
-        if cached is not None:
-            return CourseTutorGet.model_validate(cached, from_attributes=True)
-
-        # Query from DB
-        course = check_course_permissions(permissions, Course, "_tutor", self.db).filter(
-            Course.id == course_id
-        ).first()
-
-        if course is None:
-            from ..exceptions import NotFoundException
-            raise NotFoundException()
-
-        gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
-        gitlab_projects = gitlab_props.get("projects", {})
-
-        result = CourseTutorGet(
-            id=str(course.id),
-            title=course.title,
-            course_family_id=str(course.course_family_id) if course.course_family_id else None,
-            organization_id=str(course.organization_id) if course.organization_id else None,
-            path=course.path,
-            repository=CourseTutorRepository(
-                provider_url=gitlab_props.get("url"),
-                full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
-                full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
-            ) if gitlab_props else None
-        )
-
-        # Cache result
-        self._set_cached_view(
-            user_id=str(user_id),
-            view_type="tutor:course",
-            view_id=str(course_id),
-            data=self._serialize_dto(result),
-            ttl=self.get_default_ttl(),
-            related_ids={'course_id': str(course_id)}
-        )
-
-        return result
 
     def list_courses(
         self,
@@ -262,27 +219,10 @@ class TutorViewRepository(ViewRepository):
         Returns:
             List of courses accessible to tutor
         """
-        user_id = permissions.get_user_id_or_throw()
-
-        # Try cache with query-aware key
-        cached = self._get_cached_query_view(
-            user_id=str(user_id),
-            view_type="tutor:courses",
-            params=params
-        )
-        if cached is not None:
-            return [CourseTutorList.model_validate(item, from_attributes=True) for item in cached]
-
-        # Query from DB
-        query = check_course_permissions(permissions, Course, "_tutor", self.db)
-        courses = CourseStudentInterface.search(self.db, query, params).all()
-
-        response_list = []
-        for course in courses:
+        def _build_row(course) -> CourseTutorList:
             gitlab_props = course.properties.get("gitlab", {}) if course.properties else {}
             gitlab_projects = gitlab_props.get("projects", {})
-
-            response_list.append(CourseTutorList(
+            return CourseTutorList(
                 id=str(course.id),
                 title=course.title,
                 course_family_id=str(course.course_family_id) if course.course_family_id else None,
@@ -292,16 +232,14 @@ class TutorViewRepository(ViewRepository):
                     provider_url=gitlab_props.get("url"),
                     full_path_assignments=gitlab_projects.get("assignments", {}).get("full_path"),
                     full_path_student_template=gitlab_projects.get("student_template", {}).get("full_path"),
-                ) if gitlab_props else None
-            ))
+                ) if gitlab_props else None,
+            )
 
-        # Cache result with query-aware key
-        self._set_cached_query_view(
-            user_id=str(user_id),
+        return self._list_cached_course_dtos(
+            permissions,
+            params,
+            role="_tutor",
             view_type="tutor:courses",
-            params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl()
+            dto_cls=CourseTutorList,
+            row_builder=_build_row,
         )
-
-        return response_list

@@ -7,7 +7,7 @@ work with query results, DTOs, and complex data structures.
 """
 
 from abc import ABC
-from typing import Any, Optional, Dict, List
+from typing import Any, Callable, Optional, Dict, List
 from sqlalchemy.orm import Session
 import logging
 import json
@@ -332,6 +332,156 @@ class ViewRepository(ABC):
             List of serialized data
         """
         return [self._serialize_dto(dto) for dto in dtos]
+
+    def _list_cached_course_dtos(
+        self,
+        permissions: Any,
+        params: Any,
+        *,
+        role: str,
+        view_type: str,
+        dto_cls: type,
+        row_builder: Callable[[Any], Any],
+    ) -> List[Any]:
+        """Shared ``list_courses`` skeleton for the DTO-building course views.
+
+        Used by ``StudentViewRepository`` and ``TutorViewRepository``, whose
+        ``list_courses`` differ only in role, cache ``view_type``, DTO class and
+        per-row mapping. Both permission-filter the same ``Course`` query, search
+        via ``CourseStudentInterface`` and build pydantic DTOs.
+
+        Flow: cache-first read (deserialize via ``dto_cls``); on miss,
+        permission-filter the query, run the search, map each ORM row through
+        ``row_builder``, cache the serialized DTOs, and return them.
+
+        NOTE: ``LecturerViewRepository.list_courses`` intentionally does NOT use
+        this -- it returns a raw ORM query (``CourseInterface.search``) and
+        serializes ``Course`` objects via ``__dict__``, a different data flow.
+        """
+        from ..permissions.core import check_course_permissions
+        from ..model.course import Course
+        from ..interfaces.student_courses import CourseStudentInterface
+
+        user_id = permissions.get_user_id_or_throw()
+
+        cached = self._get_cached_query_view(
+            user_id=str(user_id), view_type=view_type, params=params
+        )
+        if cached is not None:
+            return [dto_cls.model_validate(item, from_attributes=True) for item in cached]
+
+        query = check_course_permissions(permissions, Course, role, self.db)
+        courses = CourseStudentInterface.search(self.db, query, params).all()
+        response_list = [row_builder(course) for course in courses]
+
+        self._set_cached_query_view(
+            user_id=str(user_id),
+            view_type=view_type,
+            params=params,
+            data=self._serialize_dto_list(response_list),
+            ttl=self.get_default_ttl(),
+        )
+        return response_list
+
+    def _get_cached_course_dto(
+        self,
+        course_id: Any,
+        permissions: Any,
+        *,
+        role: str,
+        view_type: str,
+        dto_cls: type,
+        builder: Callable[[Any], "tuple[Any, dict]"],
+        raise_if_missing: bool = False,
+    ) -> Any:
+        """Shared ``get_course`` skeleton for the DTO-building course views.
+
+        Used by ``StudentViewRepository`` and ``TutorViewRepository``. Cache-first
+        read (deserialize via ``dto_cls``); on miss, permission-filter the
+        ``Course`` query by ``course_id``, then call ``builder(course)`` which
+        returns ``(dto, related_ids)``; cache the serialized dto and return it.
+
+        ``raise_if_missing`` controls the not-found behaviour: the tutor view
+        raises ``NotFoundException`` when the course is absent/forbidden, whereas
+        the student view historically does not (preserved as the default).
+        """
+        from ..permissions.core import check_course_permissions
+        from ..model.course import Course
+
+        user_id = permissions.get_user_id_or_throw()
+
+        cached = self._get_cached_view(
+            user_id=str(user_id), view_type=view_type, view_id=str(course_id)
+        )
+        if cached is not None:
+            return dto_cls.model_validate(cached, from_attributes=True)
+
+        course = check_course_permissions(permissions, Course, role, self.db).filter(
+            Course.id == course_id
+        ).first()
+        if course is None and raise_if_missing:
+            from ..exceptions import NotFoundException
+            raise NotFoundException()
+
+        result, related_ids = builder(course)
+
+        self._set_cached_view(
+            user_id=str(user_id),
+            view_type=view_type,
+            view_id=str(course_id),
+            data=self._serialize_dto(result),
+            ttl=self.get_default_ttl(),
+            related_ids=related_ids,
+        )
+        return result
+
+    async def _finalize_course_contents_view(
+        self,
+        raw_results: Any,
+        *,
+        reader_user_id: Any,
+        view_type: str,
+        params: Any,
+        aggregate_user_id: str,
+        base_related_ids: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
+        """Shared tail for the student/tutor ``list_course_contents`` views.
+
+        The two methods differ in their *heads* (signature, submission-group
+        provisioning, permission model, query function, cache ``view_type``), but
+        share this tail: map each raw query row via
+        ``course_member_course_content_result_mapper``, aggregate unit statuses,
+        tag each course_content for deployment-related cache invalidation, cache
+        the serialized DTOs, and return the list.
+        """
+        from .view_mappers import course_member_course_content_result_mapper
+        from .course_content import CourseMemberCourseContentQueryResult
+
+        response_list: List[Any] = []
+        for raw in raw_results:
+            typed = CourseMemberCourseContentQueryResult.from_tuple(raw)
+            response_list.append(await course_member_course_content_result_mapper(typed, self.db))
+
+        # Units aggregate status from their descendant submittable contents.
+        response_list = self._aggregate_unit_statuses(response_list, aggregate_user_id)
+
+        # Tag with the view's base ids plus each course_content (deployment
+        # invalidation). ``or None`` preserves the prior behaviour of passing an
+        # empty tag set as None.
+        related_ids = dict(base_related_ids or {})
+        for result in response_list:
+            if hasattr(result, 'id') and result.id:
+                related_ids[f'course_content:{result.id}'] = None
+
+        self._set_cached_query_view(
+            user_id=str(reader_user_id),
+            view_type=view_type,
+            params=params,
+            data=self._serialize_dto_list(response_list),
+            ttl=self.get_default_ttl(),
+            related_ids=related_ids or None,
+        )
+        return response_list
 
     def _serialize_query_params(self, params: Any, use_hash: bool = True) -> str:
         """
