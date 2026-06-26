@@ -6,10 +6,10 @@ import pytest
 from computor_backend.model import (
     User, Account, Profile, StudentProfile, Session,
     Organization, CourseContentKind, CourseRole, CourseFamily,
-    Course, CourseContentType, CourseExecutionBackend, CourseGroup,
+    Course, CourseContentType, CourseGroup,
     CourseContent, CourseMember, SubmissionGroup,
     SubmissionGroupMember, CourseMemberComment,
-    ExecutionBackend, Result, Role, RoleClaim, UserRole,
+    Result, Role, RoleClaim, UserRole,
     Group, GroupClaim, UserGroup, Message, MessageRead
 )
 
@@ -37,7 +37,6 @@ class TestModelImports:
         assert CourseFamily is not None
         assert Course is not None
         assert CourseContentType is not None
-        assert CourseExecutionBackend is not None
         assert CourseGroup is not None
         assert CourseContent is not None
         assert CourseMember is not None
@@ -46,8 +45,11 @@ class TestModelImports:
         assert CourseMemberComment is not None
     
     def test_execution_models(self):
-        """Test execution-related model imports."""
-        assert ExecutionBackend is not None
+        """Test execution-related model imports.
+
+        ExecutionBackend/CourseExecutionBackend were removed (replaced by
+        ServiceType; see migration 1187444942f8); only Result remains here.
+        """
         assert Result is not None
     
     def test_role_models(self):

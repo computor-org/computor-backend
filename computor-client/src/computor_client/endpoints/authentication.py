@@ -10,25 +10,12 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 
 from computor_types.auth import (
-    LocalLoginRequest,
-    LocalLoginResponse,
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
     LogoutResponse,
     ProviderInfo,
     TokenRefreshRequest,
     TokenRefreshResponse,
-    UserRegistrationRequest,
-    UserRegistrationResponse,
-)
-from computor_types.password_management import (
-    AdminResetPasswordRequest,
-    AdminSetPasswordRequest,
-    ChangePasswordRequest,
-    PasswordOperationResponse,
-    PasswordStatusResponse,
-    SetPasswordRequest,
-    UserManagerResetPasswordRequest,
 )
 
 from computor_client.http import AsyncHTTPClient
@@ -42,15 +29,6 @@ class AuthenticationClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def auth_login(
-        self,
-        data: Union[LocalLoginRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> LocalLoginResponse:
-        """Login With Credentials"""
-        response = await self._http.post(f"/auth/login", json_data=data, params=kwargs)
-        return LocalLoginResponse.model_validate(response.json())
-
     async def auth_providers(
         self,
         **kwargs: Any,
@@ -62,7 +40,7 @@ class AuthenticationClient:
             return [ProviderInfo.model_validate(item) for item in data]
         return []
 
-    async def get_auth_login(
+    async def auth_login(
         self,
         provider: str,
         **kwargs: Any,
@@ -89,6 +67,15 @@ class AuthenticationClient:
         return response.json()
 
     async def auth_logout(
+        self,
+        provider: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Sso Logout"""
+        response = await self._http.get(f"/auth/{provider}/logout", params=kwargs)
+        return response.json()
+
+    async def post_auth_logout(
         self,
         **kwargs: Any,
     ) -> LogoutResponse:
@@ -130,15 +117,6 @@ class AuthenticationClient:
         response = await self._http.post(f"/auth/admin/plugins/reload", params=kwargs)
         return response.json()
 
-    async def auth_register(
-        self,
-        data: Union[UserRegistrationRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> UserRegistrationResponse:
-        """Register User"""
-        response = await self._http.post(f"/auth/register", json_data=data, params=kwargs)
-        return UserRegistrationResponse.model_validate(response.json())
-
     async def auth_refresh_local(
         self,
         data: Union[LocalTokenRefreshRequest, Dict[str, Any]],
@@ -165,65 +143,11 @@ class AuthenticationClient:
         response = await self._http.get(f"/auth/verify-coder-access", params=kwargs)
         return response.json()
 
-    async def password_status(
+    async def auth_gitlab_register(
         self,
         **kwargs: Any,
-    ) -> PasswordStatusResponse:
-        """Get Password Status"""
-        response = await self._http.get(f"/password/status", params=kwargs)
-        return PasswordStatusResponse.model_validate(response.json())
-
-    async def password_set(
-        self,
-        data: Union[SetPasswordRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> PasswordOperationResponse:
-        """Set Initial Password"""
-        response = await self._http.post(f"/password/set", json_data=data, params=kwargs)
-        return PasswordOperationResponse.model_validate(response.json())
-
-    async def password_change(
-        self,
-        data: Union[ChangePasswordRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> PasswordOperationResponse:
-        """Change Password"""
-        response = await self._http.post(f"/password/change", json_data=data, params=kwargs)
-        return PasswordOperationResponse.model_validate(response.json())
-
-    async def password_admin_set(
-        self,
-        data: Union[AdminSetPasswordRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> PasswordOperationResponse:
-        """Admin Set Password"""
-        response = await self._http.post(f"/password/admin/set", json_data=data, params=kwargs)
-        return PasswordOperationResponse.model_validate(response.json())
-
-    async def password_admin_reset(
-        self,
-        data: Union[AdminResetPasswordRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> PasswordOperationResponse:
-        """Admin Reset Password"""
-        response = await self._http.post(f"/password/admin/reset", json_data=data, params=kwargs)
-        return PasswordOperationResponse.model_validate(response.json())
-
-    async def password_reset(
-        self,
-        data: Union[UserManagerResetPasswordRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> PasswordOperationResponse:
-        """User Manager Reset Password"""
-        response = await self._http.post(f"/password/reset", json_data=data, params=kwargs)
-        return PasswordOperationResponse.model_validate(response.json())
-
-    async def password_admin_status(
-        self,
-        username: str,
-        **kwargs: Any,
-    ) -> PasswordStatusResponse:
-        """Admin Get User Password Status"""
-        response = await self._http.get(f"/password/admin/status/{username}", params=kwargs)
-        return PasswordStatusResponse.model_validate(response.json())
+    ) -> Dict[str, Any]:
+        """Register Via Gitlab"""
+        response = await self._http.post(f"/auth/gitlab/register", params=kwargs)
+        return response.json()
 

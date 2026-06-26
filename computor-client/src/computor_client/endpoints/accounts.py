@@ -27,6 +27,14 @@ class AccountsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def providers(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """List Account Providers"""
+        response = await self._http.get(f"/accounts/providers", params=kwargs)
+        return response.json()
+
     async def create(
         self,
         data: Union[AccountCreate, Dict[str, Any]],
