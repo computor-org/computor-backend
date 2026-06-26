@@ -45,7 +45,7 @@ from computor_backend.repositories import (
     CourseContentRepository,
     CourseContentDeploymentRepository,
 )
-from aiocache import BaseCache
+import redis.asyncio as aioredis
 
 # Create the router
 course_content_router = CrudRouter(CourseContentInterface)
@@ -165,7 +165,7 @@ async def unassign_example_from_content(
     content_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
-    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+    cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """
     Remove example assignment from course content.
@@ -416,7 +416,7 @@ async def get_course_deployment_summary(
     course_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
-    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+    cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """
     Get deployment summary for a course.
@@ -557,7 +557,7 @@ async def move_course_content(
     move_request: CourseContentMoveRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
-    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+    cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """
     Move a course content to a new path and/or position.
