@@ -19,7 +19,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
-from computor_backend.model.message import Message, MessageRead
+from computor_backend.model.message import Message, MessageRead, MessageMention
 
 
 # Regex pattern for tags: #<non-whitespace> (e.g., #ai, #ai-help, #ai::request)
@@ -320,5 +320,24 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
         # Tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response, etc.)
         if params.tag_scope is not None:
             query = query.filter(Message.title.op('~')(build_tag_prefix_regex(params.tag_scope)))
+
+        # Mention filters — messages that mention a given user, resolved
+        # against the message_mention relation (and still narrowed by the
+        # permission handler like every other filter). ``mentions_me`` is a
+        # convenience that targets the current API user.
+        mention_target = None
+        if params.mentions_me and reader_user_id is not None:
+            mention_target = reader_user_id
+        elif params.mentioned_user_id is not None:
+            mention_target = params.mentioned_user_id
+        if mention_target is not None:
+            query = query.filter(
+                exists().where(
+                    and_(
+                        MessageMention.message_id == Message.id,
+                        MessageMention.mentioned_user_id == mention_target,
+                    )
+                )
+            )
 
         return query

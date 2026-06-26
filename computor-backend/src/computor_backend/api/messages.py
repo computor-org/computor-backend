@@ -37,11 +37,13 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageQuery, MessageThread, MessageUpdate
+from computor_types.messages import MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageThread, MessageUpdate
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories import MessageRepository
+from computor_backend.model.message import Message
+from computor_backend.exceptions import BadRequestException, ForbiddenException
 
 # Import business logic
 from computor_backend.business_logic.messages import (
@@ -49,11 +51,15 @@ from computor_backend.business_logic.messages import (
     get_message_with_read_status,
     get_message_thread,
     invalidate_dashboard_views_for_message,
+    list_mentionable_users,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_author_as_reader,
     mark_message_as_read,
     mark_message_as_unread,
+    message_audience_user_ids,
+    sync_message_mentions,
+    validate_message_mentions,
 )
 from computor_backend.business_logic.message_operations import (
     soft_delete_message,
@@ -85,6 +91,9 @@ async def create_message(
     # immediately so the inbox doesn't show their own posts as unread.
     mark_author_as_reader(message.id, permissions.user_id, db)
 
+    # Persist @mention relations (already gated in create_message_with_author).
+    sync_message_mentions(message.id, payload.content, db)
+
     # Create audit log entry using repository
     message_repo = MessageRepository(db, cache)
     db_message = message_repo.get_by_id_optional(str(message.id))
@@ -110,6 +119,68 @@ async def create_message(
     )
 
     return enriched_message
+
+@messages_router.get("/mentionable-users", response_model=list[MessageMentionRef])
+async def list_mentionable_users_endpoint(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    parent_id: Optional[str] = Query(None, description="Inherit scope from this parent/thread message"),
+    organization_id: Optional[str] = Query(None),
+    course_family_id: Optional[str] = Query(None),
+    course_id: Optional[str] = Query(None),
+    course_content_id: Optional[str] = Query(None),
+    course_group_id: Optional[str] = Query(None),
+    submission_group_id: Optional[str] = Query(None),
+    course_member_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, description="Filter candidates by given/family name"),
+    limit: int = Query(50, le=200),
+):
+    """List the users who may be @mentioned in a message of the given scope.
+
+    Returns the message audience (submission_group members + course staff,
+    course members, etc.) — exactly the set the mention gate enforces — so the
+    compose UI only ever offers valid mentions. Provide the same scope target
+    you would post to, or ``parent_id`` to inherit a thread's scope. The caller
+    must themselves be in that audience (you cannot enumerate a scope you can't
+    see). Global scope (no target) requires a ``search`` term.
+    """
+    if parent_id:
+        parent = db.query(Message).filter(Message.id == parent_id).first()
+        if not parent:
+            raise BadRequestException(detail=f"Parent message {parent_id} not found")
+        message_like = parent
+    else:
+        message_like = Message(
+            author_id=permissions.user_id,
+            organization_id=organization_id,
+            course_family_id=course_family_id,
+            course_id=course_id,
+            course_content_id=course_content_id,
+            course_group_id=course_group_id,
+            submission_group_id=submission_group_id,
+            course_member_id=course_member_id,
+            user_id=user_id,
+        )
+
+    audience = message_audience_user_ids(message_like, db)
+    # Don't let anyone enumerate the membership of a scope they can't see.
+    if (
+        audience is not None
+        and not permissions.is_admin
+        and str(permissions.user_id).lower() not in {a.lower() for a in audience}
+    ):
+        raise ForbiddenException(detail="You cannot list mentionable users for this scope")
+    # Global scope (no target) would otherwise dump the whole user table.
+    if audience is None and not search:
+        return []
+
+    users = list_mentionable_users(message_like, db, search=search, limit=limit)
+    return [
+        MessageMentionRef(id=str(u.id), given_name=u.given_name, family_name=u.family_name)
+        for u in users
+    ]
+
 
 @messages_router.get("/{id}", response_model=MessageGet)
 async def get_message(
@@ -172,7 +243,12 @@ async def update_message(
 ):
     """Update a message with audit logging."""
     # First verify user has access via permissions
-    await get_id_db(permissions, db, id, MessageInterface)
+    existing = await get_id_db(permissions, db, id, MessageInterface)
+
+    # Gate @mentions in the new content against the message's (unchanged)
+    # audience before applying the edit.
+    if payload.content is not None:
+        validate_message_mentions(existing, payload.content, db)
 
     # Update with audit
     message = update_message_with_audit(
@@ -182,6 +258,10 @@ async def update_message(
         new_title=payload.title,
         new_content=payload.content
     )
+
+    # Reconcile mention relations to match the edited content.
+    if payload.content is not None:
+        sync_message_mentions(id, payload.content, db)
 
     # Convert to MessageGet
     message_get = get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)

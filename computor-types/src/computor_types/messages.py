@@ -49,6 +49,21 @@ class MessageAuthorCourseMember(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class MessageMentionRef(BaseModel):
+    """A user mentioned in a message.
+
+    Resolved server-side from the ``@[Given Family](<user_id>)`` tokens in the
+    message ``content``. The ``id`` (a ``user_id``) is authoritative; the name
+    is refreshed from here on render so renames never go stale.
+    """
+    id: str = Field(..., description="User ID of the mentioned user")
+    given_name: Optional[str] = Field(None, max_length=255, description="Mentioned user's given name")
+    family_name: Optional[str] = Field(None, max_length=255, description="Mentioned user's family name")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MessageCreate(BaseModel):
     # author_id is always the current user; set in API
     parent_id: Optional[str] = None
@@ -81,6 +96,9 @@ class MessageGet(BaseEntityGet):
     author: Optional[MessageAuthor] = Field(None, description="Author details (user info)")
     author_course_member: Optional[MessageAuthorCourseMember] = Field(
         None, description="Author's course member context (only for course-scoped messages)"
+    )
+    mentions: List[MessageMentionRef] = Field(
+        default_factory=list, description="Users mentioned in this message"
     )
     is_read: bool = False
     is_author: bool = Field(False, description="True if the requesting user is the message author")
@@ -132,6 +150,9 @@ class MessageList(BaseEntityList):
     author: Optional[MessageAuthor] = Field(None, description="Author details (user info)")
     author_course_member: Optional[MessageAuthorCourseMember] = Field(
         None, description="Author's course member context (only for course-scoped messages)"
+    )
+    mentions: List[MessageMentionRef] = Field(
+        default_factory=list, description="Users mentioned in this message"
     )
     is_read: bool = False
     is_author: bool = Field(False, description="True if the requesting user is the message author")
@@ -237,6 +258,15 @@ class MessageQuery(ListQuery):
     # Unread filter (from current API user's perspective)
     unread: Optional[bool] = Field(
         None, description="Filter by read status: True = unread only, False = read only, None = all"
+    )
+
+    # Mention filters (resolved against the message_mention relation, then
+    # narrowed by MessagePermissionHandler like every other filter)
+    mentioned_user_id: Optional[str] = Field(
+        None, description="Only messages that mention this user_id"
+    )
+    mentions_me: Optional[bool] = Field(
+        None, description="Only messages that mention the current API user"
     )
 
     # Tag filtering (tags in title: #<tag> where tag is any non-whitespace string)

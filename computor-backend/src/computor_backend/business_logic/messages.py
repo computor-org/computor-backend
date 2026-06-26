@@ -1,13 +1,15 @@
 """Business logic for message operations."""
+import re
 from uuid import UUID
 from typing import Optional, Tuple, List, Dict, Any
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from computor_backend.exceptions import BadRequestException, NotImplementedException, ForbiddenException
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.roles import CourseRole, ScopeRole, TUTOR_AND_ABOVE
 from computor_backend.permissions.core import check_permissions
-from computor_backend.model.message import MessageRead, Message
+from computor_backend.model.message import MessageRead, Message, MessageMention
 from computor_backend.model.course import (
     Course,
     CourseContent,
@@ -48,7 +50,7 @@ CONVERSATIONAL_TARGET_FIELDS = frozenset({
 })
 from computor_types.messages import (
     MessageCreate, MessageGet, MessageList, MessageQuery,
-    MessageAuthor, MessageAuthorCourseMember, MessageThread
+    MessageAuthor, MessageAuthorCourseMember, MessageThread, MessageMentionRef
 )
 from computor_backend.cache import Cache
 
@@ -164,6 +166,16 @@ def create_message_with_author(
 
     if 'level' not in model_dump or model_dump['level'] is None:
         model_dump['level'] = 0
+
+    # Gate @mentions against the message's audience before persistence — you
+    # cannot mention a user who could not see the message. The relation rows
+    # are written post-persist via ``sync_message_mentions`` (the message
+    # needs an id first).
+    validate_message_mentions(
+        _transient_message_for_targets(model_dump, permissions.user_id),
+        model_dump.get('content'),
+        db,
+    )
 
     return model_dump
 
@@ -417,10 +429,12 @@ def get_message_with_read_status(
     author = None
     author_course_member = None
 
+    mentions: List[MessageMentionRef] = []
     if db_message:
         author_map, author_course_member_map = _get_author_info([db_message], db)
         author = author_map.get(str(message_id))
         author_course_member = author_course_member_map.get(str(message_id))
+        mentions = _get_mentions_info([db_message], db).get(str(message_id), [])
 
     return message.model_copy(update={
         "is_read": is_read,
@@ -429,6 +443,7 @@ def get_message_with_read_status(
         "deleted_by": deleted_by,
         "author": author,
         "author_course_member": author_course_member,
+        "mentions": mentions,
     })
 
 
@@ -567,6 +582,7 @@ def list_messages_with_read_status(
 
     # Get author info
     author_map, author_course_member_map = _get_author_info(db_messages, db)
+    mentions_map = _get_mentions_info(db_messages, db)
 
     return [
         item.model_copy(update={
@@ -576,6 +592,7 @@ def list_messages_with_read_status(
             "deleted_by": deletion_map.get(item.id, {}).get("deleted_by"),
             "author": author_map.get(item.id),
             "author_course_member": author_course_member_map.get(item.id),
+            "mentions": mentions_map.get(item.id, []),
         })
         for item in items
     ]
@@ -720,6 +737,171 @@ def _elevated_user_ids(db: Session, course_id) -> set[str]:
         .all()
     )
     return {str(r[0]) for r in rows}
+
+
+# ---------------------------------------------------------------------------
+# @mentions
+#
+# A mention is stored inline in ``Message.content`` as ``@[Given Family](<uuid>)``
+# (the uuid is authoritative). On write we extract the uuids, confirm each
+# mentioned user is in the message's audience — reusing
+# ``get_message_recipient_user_ids`` so the gate can never disagree with read
+# visibility — then reconcile the ``message_mention`` rows that power fast
+# "mentions of me" lookups and AI-agent activation.
+# ---------------------------------------------------------------------------
+
+MENTION_PATTERN = re.compile(r'@\[[^\]]*\]\(([0-9a-fA-F-]{36})\)')
+
+_MENTION_TARGET_ATTRS = (
+    'user_id', 'course_member_id', 'submission_group_id', 'course_group_id',
+    'course_content_id', 'course_id', 'course_family_id', 'organization_id',
+)
+
+
+def extract_mention_user_ids(content: Optional[str]) -> list[str]:
+    """Extract mentioned user ids from ``@[name](<uuid>)`` tokens in content.
+
+    The uuid is authoritative; the bracketed display name is ignored. Ids are
+    lower-cased and de-duplicated, preserving first-seen order.
+    """
+    if not content:
+        return []
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for raw in MENTION_PATTERN.findall(content):
+        uid = raw.lower()
+        if uid not in seen:
+            seen.add(uid)
+            ordered.append(uid)
+    return ordered
+
+
+def _transient_message_for_targets(model_dump: dict, author_id) -> Message:
+    """Build an unsaved Message carrying just the target ids + author that the
+    audience query reads, so the create-time gate can run before persistence."""
+    return Message(
+        author_id=author_id,
+        user_id=model_dump.get('user_id'),
+        course_member_id=model_dump.get('course_member_id'),
+        submission_group_id=model_dump.get('submission_group_id'),
+        course_group_id=model_dump.get('course_group_id'),
+        course_content_id=model_dump.get('course_content_id'),
+        course_id=model_dump.get('course_id'),
+        course_family_id=model_dump.get('course_family_id'),
+        organization_id=model_dump.get('organization_id'),
+    )
+
+
+def message_audience_user_ids(message_like, db: Session) -> Optional[set[str]]:
+    """User ids allowed to see ``message_like``, or ``None`` for global
+    (everyone). Thin wrapper over ``get_message_recipient_user_ids`` — the
+    canonical inverse of ``MessagePermissionHandler``."""
+    if not any(getattr(message_like, attr, None) for attr in _MENTION_TARGET_ATTRS):
+        return None  # global → everyone
+    return get_message_recipient_user_ids(message_like, db)
+
+
+def validate_message_mentions(message_like, content: Optional[str], db: Session) -> list[str]:
+    """Confirm every @mention in ``content`` resolves to a real user who is in
+    ``message_like``'s audience; return the validated user ids.
+
+    Raises ``BadRequestException`` (listing the offenders) if a mention is
+    unresolvable or points at someone who could not see the message — you
+    cannot mention a user who has no visibility of the message.
+    """
+    mentioned = extract_mention_user_ids(content)
+    if not mentioned:
+        return []
+
+    existing = {
+        str(r[0]).lower()
+        for r in db.query(User.id).filter(User.id.in_(mentioned)).all()
+    }
+    unresolved = [uid for uid in mentioned if uid not in existing]
+
+    audience = message_audience_user_ids(message_like, db)
+    if audience is None:
+        not_permitted: list[str] = []
+    else:
+        audience_lower = {a.lower() for a in audience}
+        not_permitted = [
+            uid for uid in mentioned
+            if uid in existing and uid not in audience_lower
+        ]
+
+    if unresolved or not_permitted:
+        raise BadRequestException(detail={
+            "message": "Some mentioned users are invalid or cannot see this message.",
+            "unresolved": unresolved,
+            "not_permitted": not_permitted,
+        })
+
+    return mentioned
+
+
+def sync_message_mentions(message_id, content: Optional[str], db: Session) -> None:
+    """Reconcile ``message_mention`` rows for a message to match the mentions
+    currently in its content (add new, drop removed). Commits on change."""
+    desired = set(extract_mention_user_ids(content))
+    existing_rows = db.query(MessageMention).filter(
+        MessageMention.message_id == message_id
+    ).all()
+    existing = {str(r.mentioned_user_id).lower(): r for r in existing_rows}
+
+    changed = False
+    for uid in desired:
+        if uid not in existing:
+            db.add(MessageMention(message_id=message_id, mentioned_user_id=uid))
+            changed = True
+    for uid, row in existing.items():
+        if uid not in desired:
+            db.delete(row)
+            changed = True
+
+    if changed:
+        db.commit()
+
+
+def list_mentionable_users(
+    message_like,
+    db: Session,
+    search: Optional[str] = None,
+    limit: int = 50,
+) -> List[User]:
+    """Users who may be @mentioned in a message with ``message_like``'s scope —
+    i.e. its audience — optionally narrowed by a name search."""
+    audience = message_audience_user_ids(message_like, db)
+    q = db.query(User).filter(User.archived_at.is_(None))
+    if audience is not None:
+        if not audience:
+            return []
+        q = q.filter(User.id.in_(audience))
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(User.given_name.ilike(like), User.family_name.ilike(like)))
+    q = q.order_by(User.family_name, User.given_name)
+    return q.limit(limit).all()
+
+
+def _get_mentions_info(db_messages: List[Message], db: Session) -> Dict[str, List[MessageMentionRef]]:
+    """Batch-load mention refs (id + name) for a set of messages."""
+    if not db_messages:
+        return {}
+    msg_ids = [str(m.id) for m in db_messages]
+    rows = (
+        db.query(
+            MessageMention.message_id, User.id, User.given_name, User.family_name
+        )
+        .join(User, User.id == MessageMention.mentioned_user_id)
+        .filter(MessageMention.message_id.in_(msg_ids))
+        .all()
+    )
+    result: Dict[str, List[MessageMentionRef]] = {mid: [] for mid in msg_ids}
+    for message_id, user_id, given, family in rows:
+        result.setdefault(str(message_id), []).append(
+            MessageMentionRef(id=str(user_id), given_name=given, family_name=family)
+        )
+    return result
 
 
 def invalidate_dashboard_views_for_message(

@@ -70,6 +70,7 @@ class Message(Base):
     user = relationship('User', foreign_keys=[user_id])
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
+    mentions = relationship('MessageMention', back_populates='message', cascade='all, delete-orphan')
 
     @property
     def is_deleted(self) -> bool:
@@ -113,3 +114,29 @@ class MessageRead(Base):
     reader_user = relationship('User', foreign_keys=[reader_user_id])
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
+
+
+class MessageMention(Base):
+    """A user mentioned in a message.
+
+    Created from the ``@[name](user_id)`` tokens in ``Message.content`` once the
+    mentioned user is confirmed to be in the message's audience. Powers fast
+    "messages that mention me" lookups and AI-agent activation. Intentionally
+    lean (no audit columns / trigger): the message author is the implicit
+    creator and rows are derived from content.
+    """
+    __tablename__ = 'message_mention'
+    __table_args__ = (
+        Index('msg_mention_unique_idx', 'message_id', 'mentioned_user_id', unique=True),
+        Index('msg_mention_user_idx', 'mentioned_user_id', 'message_id'),
+    )
+
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    message_id = Column(ForeignKey('message.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    mentioned_user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+
+    # Relationships
+    message = relationship('Message', back_populates='mentions')
+    mentioned_user = relationship('User', foreign_keys=[mentioned_user_id])
