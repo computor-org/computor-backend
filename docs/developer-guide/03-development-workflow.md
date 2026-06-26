@@ -14,17 +14,14 @@ source .venv/bin/activate
 git checkout main
 git pull origin main
 
-# 3. Start Docker services (if not running)
-bash startup.sh
+# 3. Start Docker services (add --build to force a rebuild)
+bash startup.sh dev -d
 
-# 4. Run any new migrations
-bash migrations.sh
-
-# 5. Start backend API
+# 4. Start backend API (runs migrations automatically)
 bash api.sh
 
-# 6. (Optional) Start frontend in another terminal
-bash frontend.sh
+# 5. (Optional) Start frontend in another terminal (dev only)
+bash web.sh
 ```
 
 ### Making Changes

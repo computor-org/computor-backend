@@ -201,15 +201,16 @@ computor-cli/
 ### Key Commands
 
 ```bash
-computor login                  # Authenticate with API
-computor profiles               # Manage auth profiles
+computor login                  # Authenticate
+computor logout                 # Clear stored credentials
+computor status                 # Show current auth profile
 computor rest {entity} {action} # CRUD operations
-computor admin                  # Administrative commands
-computor worker start           # Start Temporal worker
-computor generate-types         # Generate TypeScript types
-computor generate-clients       # Generate TypeScript client
-computor generate-schema        # Generate OpenAPI schema
-computor generate-validators    # Generate validators
+computor deployment apply       # Apply a deployment config
+computor token                  # Manage API tokens
+computor documents              # Course document sync
+computor service                # Service accounts & service types
+computor delete                 # Cascade-delete entities
+computor grading                # Grading queries
 ```
 
 ### Configuration
@@ -468,10 +469,11 @@ class StorageService:
 ## Shell Scripts (Root Directory)
 
 ```bash
-api.sh                      # Start FastAPI backend
-startup.sh                  # Start Docker services
+startup.sh                  # Start Docker services (dev|prod, --build to rebuild)
 stop.sh                     # Stop Docker services
-migrations.sh               # Run Alembic migrations
+api.sh                      # Start FastAPI backend (dev; runs migrations on start)
+web.sh                      # Start Next.js dev server (dev only)
+migrations.sh               # Run Alembic migrations standalone (rarely needed)
 test.sh                     # Run tests
 generate.sh                 # Unified code generation (types, schemas, clients)
 generate.sh types           # Generate TypeScript interfaces
