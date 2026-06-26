@@ -219,38 +219,14 @@ class StudentViewRepository(ViewRepository):
         query = user_course_content_list_query(user_id, self.db)
         course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
 
-        response_list: List[CourseContentStudentList] = []
-        for course_contents_result in course_contents_results:
-            # Convert tuple to typed model before mapping
-            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
-
-        # Aggregate status for unit-like course contents (non-submittable)
-        # Units aggregate status from their descendant submittable contents
-        response_list = self._aggregate_unit_statuses(response_list, user_id)
-
-        # Cache result with query-aware key
-        # CRITICAL: Tag with course_id AND individual course_content IDs for proper invalidation
-        related_ids = {}
-        if params.course_id:
-            # Single course filter - tag with that course_id
-            related_ids['student_view'] = str(params.course_id)
-
-        # CRITICAL: Tag each course_content for deployment-related invalidation
-        for result in response_list:
-            if hasattr(result, 'id') and result.id:
-                related_ids[f'course_content:{result.id}'] = None
-
-        self._set_cached_query_view(
-            user_id=str(user_id),
+        return await self._finalize_course_contents_view(
+            course_contents_results,
+            reader_user_id=user_id,
             view_type="course_contents",
             params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids if related_ids else None
+            aggregate_user_id=user_id,
+            base_related_ids={'student_view': str(params.course_id)} if params.course_id else None,
         )
-
-        return response_list
 
     def list_courses(
         self,

@@ -150,39 +150,17 @@ class TutorViewRepository(ViewRepository):
         query = course_member_course_content_list_query(course_member_id, self.db, reader_user_id=reader_user_id)
         course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
 
-        response_list = []
-        for course_contents_result in course_contents_results:
-            # Convert tuple to typed model before mapping
-            typed_result = CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
-            response_list.append(await course_member_course_content_result_mapper(typed_result, self.db))
-
-        # Aggregate status for unit-like course contents (non-submittable)
-        # Units aggregate status from their descendant submittable contents
-        response_list = self._aggregate_unit_statuses(response_list, str(course_member.user_id))
-
-        # Cache result with query-aware key
-        # CRITICAL: Include course_id for proper invalidation when submissions/results change
-        # CRITICAL: Tag each course_content for deployment-related invalidation
-        related_ids = {
-            'course_member_id': str(course_member_id),
-            'tutor_view': str(course_member.course_id)  # ← CRITICAL: Tag with course_id for invalidation
-        }
-
-        # Tag each course_content for deployment-related invalidation
-        for result in response_list:
-            if hasattr(result, 'id') and result.id:
-                related_ids[f'course_content:{result.id}'] = None
-
-        self._set_cached_query_view(
-            user_id=str(reader_user_id),
+        return await self._finalize_course_contents_view(
+            course_contents_results,
+            reader_user_id=reader_user_id,
             view_type=f"tutor:course_contents:member:{course_member_id}",
             params=params,
-            data=self._serialize_dto_list(response_list),
-            ttl=self.get_default_ttl(),
-            related_ids=related_ids
+            aggregate_user_id=str(course_member.user_id),
+            base_related_ids={
+                'course_member_id': str(course_member_id),
+                'tutor_view': str(course_member.course_id),
+            },
         )
-
-        return response_list
 
     def get_course(
         self,

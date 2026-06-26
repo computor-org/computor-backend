@@ -435,6 +435,54 @@ class ViewRepository(ABC):
         )
         return result
 
+    async def _finalize_course_contents_view(
+        self,
+        raw_results: Any,
+        *,
+        reader_user_id: Any,
+        view_type: str,
+        params: Any,
+        aggregate_user_id: str,
+        base_related_ids: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
+        """Shared tail for the student/tutor ``list_course_contents`` views.
+
+        The two methods differ in their *heads* (signature, submission-group
+        provisioning, permission model, query function, cache ``view_type``), but
+        share this tail: map each raw query row via
+        ``course_member_course_content_result_mapper``, aggregate unit statuses,
+        tag each course_content for deployment-related cache invalidation, cache
+        the serialized DTOs, and return the list.
+        """
+        from .view_mappers import course_member_course_content_result_mapper
+        from .course_content import CourseMemberCourseContentQueryResult
+
+        response_list: List[Any] = []
+        for raw in raw_results:
+            typed = CourseMemberCourseContentQueryResult.from_tuple(raw)
+            response_list.append(await course_member_course_content_result_mapper(typed, self.db))
+
+        # Units aggregate status from their descendant submittable contents.
+        response_list = self._aggregate_unit_statuses(response_list, aggregate_user_id)
+
+        # Tag with the view's base ids plus each course_content (deployment
+        # invalidation). ``or None`` preserves the prior behaviour of passing an
+        # empty tag set as None.
+        related_ids = dict(base_related_ids or {})
+        for result in response_list:
+            if hasattr(result, 'id') and result.id:
+                related_ids[f'course_content:{result.id}'] = None
+
+        self._set_cached_query_view(
+            user_id=str(reader_user_id),
+            view_type=view_type,
+            params=params,
+            data=self._serialize_dto_list(response_list),
+            ttl=self.get_default_ttl(),
+            related_ids=related_ids or None,
+        )
+        return response_list
+
     def _serialize_query_params(self, params: Any, use_hash: bool = True) -> str:
         """
         Serialize query parameters into a stable, deterministic cache key component.
