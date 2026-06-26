@@ -528,7 +528,7 @@ class ViewRepository(ABC):
         Returns:
             Tuple of (aggregated_status, total_unreviewed_count)
         """
-        from computor_backend.repositories.course_content import user_course_content_list_query
+        from computor_backend.repositories.course_content_queries import user_course_content_list_query
         from sqlalchemy import text
 
         unit_path = str(course_content.path)

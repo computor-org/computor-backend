@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .view_base import ViewRepository
 from .view_mappers import course_member_course_content_result_mapper
-from ..repositories.course_content import (
+from ..repositories.course_content_queries import (
     course_member_course_content_query,
     course_member_course_content_list_query,
     CourseMemberCourseContentQueryResult,

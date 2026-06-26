@@ -12,8 +12,8 @@ from .view_base import ViewRepository, _aggregate_grading_status
 
 
 from .view_mappers import course_member_course_content_result_mapper
-from ..repositories.course_content import CourseMemberCourseContentQueryResult
-from ..repositories.course_content import (
+from ..repositories.course_content_queries import CourseMemberCourseContentQueryResult
+from ..repositories.course_content_queries import (
     user_course_content_query,
     user_course_content_list_query
 )
@@ -133,7 +133,7 @@ class StudentViewRepository(ViewRepository):
             return (course_content.status, course_content.unreviewed_count)
 
         # Query descendants from the same course with path starting with this unit's path
-        from computor_backend.repositories.course_content import user_course_content_list_query
+        from computor_backend.repositories.course_content_queries import user_course_content_list_query
         from sqlalchemy import text
 
         unit_path = str(course_content.path)
