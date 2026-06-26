@@ -26,7 +26,6 @@ from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_types.tests import TestCreate, TestJob
-from computor_types.tokens import decrypt_api_key
 from computor_types.courses import CourseProperties
 from computor_types.organizations import OrganizationProperties
 from computor_backend.model.artifact import SubmissionArtifact

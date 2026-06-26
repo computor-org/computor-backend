@@ -5,6 +5,8 @@ This module provides abstract base classes for the repository pattern,
 enabling direct database access with transparent write-through caching.
 """
 
+import hashlib
+import json
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, List, Optional, Dict, Any, Type, Set
 from sqlalchemy.orm import Session
@@ -13,6 +15,19 @@ from sqlalchemy import inspect
 
 # Type variable for generic entity type
 T = TypeVar('T')
+
+
+def stable_params_hash(params: Dict[str, Any]) -> str:
+    """Deterministic hash of query params/criteria for cache keys.
+
+    The builtin ``hash()`` is salted per process (PYTHONHASHSEED), so
+    ``hash(frozenset(params.items()))`` yields different cache keys across
+    workers and restarts -- causing avoidable misses and confusing entries.
+    Serialize canonically (sorted keys, ``str`` fallback for UUID/enum/datetime
+    values) and digest with SHA-256 so the key is identical everywhere.
+    """
+    serialized = json.dumps(params, sort_keys=True, default=str)
+    return hashlib.sha256(serialized.encode()).hexdigest()[:16]
 
 
 class RepositoryError(Exception):
@@ -269,7 +284,7 @@ class BaseRepository(ABC, Generic[T]):
         # Try cache if enabled
         if self._use_cache():
             query_params = {"limit": limit, "offset": offset, **filters}
-            key = self.cache.key(self.entity_type, f"list:{hash(frozenset(query_params.items()))}")
+            key = self.cache.key(self.entity_type, f"list:{stable_params_hash(query_params)}")
             cached = self.cache.get_by_key(key)
             if cached is not None:
                 return [self._deserialize_entity(item) for item in cached]
@@ -293,7 +308,7 @@ class BaseRepository(ABC, Generic[T]):
         # Cache if enabled
         if self._use_cache():
             query_params = {"limit": limit, "offset": offset, **filters}
-            key = self.cache.key(self.entity_type, f"list:{hash(frozenset(query_params.items()))}")
+            key = self.cache.key(self.entity_type, f"list:{stable_params_hash(query_params)}")
             tags = self.get_list_tags(**filters)
             serialized = [self._serialize_entity(e) for e in entities]
             self.cache.set_with_tags(key=key, payload=serialized, tags=tags, ttl=self.get_ttl())
@@ -477,7 +492,7 @@ class BaseRepository(ABC, Generic[T]):
         """
         # Try cache if enabled
         if self._use_cache():
-            key = self.cache.key(self.entity_type, f"find_by:{hash(frozenset(criteria.items()))}")
+            key = self.cache.key(self.entity_type, f"find_by:{stable_params_hash(criteria)}")
             cached = self.cache.get_by_key(key)
             if cached is not None:
                 return [self._deserialize_entity(item) for item in cached]
@@ -493,7 +508,7 @@ class BaseRepository(ABC, Generic[T]):
 
         # Cache if enabled
         if self._use_cache():
-            key = self.cache.key(self.entity_type, f"find_by:{hash(frozenset(criteria.items()))}")
+            key = self.cache.key(self.entity_type, f"find_by:{stable_params_hash(criteria)}")
             tags = self.get_list_tags(**criteria)
             serialized = [self._serialize_entity(e) for e in entities]
             self.cache.set_with_tags(key=key, payload=serialized, tags=tags, ttl=self.get_ttl())
@@ -512,7 +527,7 @@ class BaseRepository(ABC, Generic[T]):
         """
         # Try cache if enabled
         if self._use_cache():
-            key = self.cache.key(self.entity_type, f"find_one_by:{hash(frozenset(criteria.items()))}")
+            key = self.cache.key(self.entity_type, f"find_one_by:{stable_params_hash(criteria)}")
             cached = self.cache.get_by_key(key)
             if cached is not None:
                 return self._deserialize_entity(cached)
@@ -528,7 +543,7 @@ class BaseRepository(ABC, Generic[T]):
 
         # Cache if enabled and entity found
         if entity and self._use_cache():
-            key = self.cache.key(self.entity_type, f"find_one_by:{hash(frozenset(criteria.items()))}")
+            key = self.cache.key(self.entity_type, f"find_one_by:{stable_params_hash(criteria)}")
             tags = self.get_entity_tags(entity)
             self.cache.set_with_tags(
                 key=key,

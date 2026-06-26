@@ -764,11 +764,11 @@ class GitLabBuilder:
     
     def _create_organization_gitlab_config(self, group: Group) -> Dict[str, Any]:
         """Create GitLab configuration for organization WITH encrypted token."""
-        from computor_types.tokens import encrypt_api_key
-        
+        from computor_types.encryption import encrypt_secret
+
         config = {
             "url": self.gitlab_url,
-            "token": encrypt_api_key(self.gitlab_token),  # Only organizations get tokens
+            "token": encrypt_secret(self.gitlab_token),  # Only organizations get tokens
             "group_id": int(group.id) if group.id is not None else None,
             "full_path": group.full_path,
             "parent": int(group.parent_id) if group.parent_id is not None else None,

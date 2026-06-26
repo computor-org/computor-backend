@@ -53,6 +53,14 @@ class MessagesClient:
             return [MessageList.model_validate(item) for item in data]
         return []
 
+    async def mentionable_users(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """List Mentionable Users Endpoint"""
+        response = await self._http.get(f"/messages/mentionable-users", params=kwargs)
+        return response.json()
+
     async def get(
         self,
         id: str,

@@ -20,7 +20,7 @@ from ..database import get_db_session
 from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
-from computor_types.tokens import decrypt_api_key
+from computor_types.encryption import decrypt_secret
 from ..gitlab_utils import gitlab_fork_project, gitlab_unprotect_branches
 
 logger = logging.getLogger(__name__)
@@ -218,8 +218,8 @@ def get_gitlab_client(organization: Organization) -> Gitlab:
     if not gitlab_url or not gitlab_token_encrypted:
         raise ValueError(f"Organization {organization.id} missing GitLab configuration")
     
-    gitlab_token = decrypt_api_key(gitlab_token_encrypted)
-    
+    gitlab_token = decrypt_secret(gitlab_token_encrypted)
+
     # Transform URL for Docker environment if needed
     from ..utils.docker_utils import transform_localhost_url
     api_url = transform_localhost_url(gitlab_url)
@@ -658,7 +658,7 @@ async def create_team_repository(
             raise ValueError(f"Organization {organization.id} missing GitLab configuration")
         
         # Decrypt the GitLab token
-        gitlab_token = decrypt_api_key(gitlab_token_encrypted)
+        gitlab_token = decrypt_secret(gitlab_token_encrypted)
         
         # Transform URL for Docker environment if needed
         from ..utils.docker_utils import transform_localhost_url

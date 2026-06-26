@@ -28,7 +28,7 @@ from computor_types.student_course_contents import (
 from computor_types.tasks import map_int_to_task_status
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.model.course import CourseMember
-from computor_backend.repositories.course_content import CourseMemberCourseContentQueryResult
+from computor_backend.repositories.course_content_queries import CourseMemberCourseContentQueryResult
 # NOTE: the view_*/mapper modules under repositories/ are a read-model (query)
 # layer, NOT the persistence-repository layer -- they assemble DTOs and may
 # orchestrate reads from services (here: result JSON/artifacts from MinIO). This

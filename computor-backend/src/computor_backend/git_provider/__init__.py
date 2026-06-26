@@ -1,5 +1,5 @@
 import logging
-from computor_types.tokens import decrypt_api_key
+from computor_types.encryption import decrypt_secret
 from .base import GitProviderClient
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,6 @@ def get_provider_client_from_db(organization_id: str, db) -> GitProviderClient:
 
 def _decrypt(encrypted_token: str) -> str:
     try:
-        return decrypt_api_key(encrypted_token)
+        return decrypt_secret(encrypted_token)
     except Exception as e:
         raise ValueError(f"Failed to decrypt git provider token: {e}") from e

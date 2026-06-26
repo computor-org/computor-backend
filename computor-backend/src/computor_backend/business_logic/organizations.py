@@ -8,7 +8,7 @@ from computor_backend.exceptions import BadRequestException, NotImplementedExcep
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.organizations import OrganizationProperties
-from computor_types.tokens import encrypt_api_key
+from computor_types.encryption import encrypt_secret
 from computor_backend.model.organization import Organization
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def update_organization_token(
                 )
 
             organization_properties = OrganizationProperties(**organization.properties)
-            organization_properties.gitlab.token = encrypt_api_key(token)
+            organization_properties.gitlab.token = encrypt_secret(token)
             organization.properties = organization_properties.model_dump()
 
             db.commit()
