@@ -892,8 +892,25 @@ def list_mentionable_users(
     return q.limit(limit).all()
 
 
+def _course_id_for_message(msg: Message):
+    """The course a message belongs to (for resolving a participant's role),
+    or None for user-direct / family / org / global scopes."""
+    if msg.course_id:
+        return msg.course_id
+    if msg.course_content_id and msg.course_content:
+        return msg.course_content.course_id
+    if msg.course_group_id and msg.course_group:
+        return msg.course_group.course_id
+    if msg.submission_group_id and msg.submission_group:
+        return msg.submission_group.course_id
+    if msg.course_member_id and msg.course_member:
+        return msg.course_member.course_id
+    return None
+
+
 def _get_mentions_info(db_messages: List[Message], db: Session) -> Dict[str, List[MessageMentionRef]]:
-    """Batch-load mention refs (id + name) for a set of messages."""
+    """Batch-load mention refs (id, name, and the mentioned user's course role
+    within the message's course) for a set of messages."""
     if not db_messages:
         return {}
     msg_ids = [str(m.id) for m in db_messages]
@@ -905,10 +922,29 @@ def _get_mentions_info(db_messages: List[Message], db: Session) -> Dict[str, Lis
         .filter(MessageMention.message_id.in_(msg_ids))
         .all()
     )
+
+    # Resolve each message's course so the mentioned user's role can be attached.
+    course_by_msg = {str(m.id): _course_id_for_message(m) for m in db_messages}
+    user_ids = {str(u) for (_mid, u, _g, _f) in rows}
+    course_ids = {str(c) for c in course_by_msg.values() if c}
+    role_map: Dict[tuple, str] = {}
+    if user_ids and course_ids:
+        for c, u, role_id in (
+            db.query(CourseMember.course_id, CourseMember.user_id, CourseMember.course_role_id)
+            .filter(CourseMember.course_id.in_(course_ids), CourseMember.user_id.in_(user_ids))
+            .all()
+        ):
+            role_map[(str(c), str(u))] = role_id
+
     result: Dict[str, List[MessageMentionRef]] = {mid: [] for mid in msg_ids}
     for message_id, user_id, given, family in rows:
-        result.setdefault(str(message_id), []).append(
-            MessageMentionRef(id=str(user_id), given_name=given, family_name=family)
+        mid = str(message_id)
+        cid = course_by_msg.get(mid)
+        role = role_map.get((str(cid), str(user_id))) if cid else None
+        result.setdefault(mid, []).append(
+            MessageMentionRef(
+                id=str(user_id), given_name=given, family_name=family, course_role_id=role
+            )
         )
     return result
 

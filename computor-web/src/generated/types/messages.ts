@@ -26,6 +26,8 @@ export interface MessageMentionRef {
   given_name?: string | null;
   /** Mentioned user's family name */
   family_name?: string | null;
+  /** Mentioned user's course role within the message's course, if any */
+  course_role_id?: string | null;
 }
 
 export interface MessageCreate {
