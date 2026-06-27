@@ -21,6 +21,11 @@ class GitServerCreate(BaseModel):
     name: Optional[str] = Field(None, description="Human-readable label")
     managed: bool = Field(False, description="True if Computor operates this instance and holds a service token")
     token: Optional[str] = Field(None, description="Service token; stored encrypted, never returned")
+    parent_group_id: Optional[str] = Field(
+        None,
+        description="GitLab parent group id/path the group token is scoped to; "
+        "managed courses are provisioned flat under it (GitLab only)",
+    )
 
 
 class GitServerUpdate(BaseModel):
@@ -28,6 +33,9 @@ class GitServerUpdate(BaseModel):
     managed: Optional[bool] = None
     # Provide a new token to replace it; provide "" to clear it; omit to keep.
     token: Optional[str] = Field(None, description="Replacement service token (\"\" clears, omit keeps)")
+    parent_group_id: Optional[str] = Field(
+        None, description="Replacement GitLab parent group id/path (GitLab only)"
+    )
 
 
 class GitServerGet(BaseModel):
@@ -37,4 +45,7 @@ class GitServerGet(BaseModel):
     name: Optional[str] = None
     managed: bool
     has_token: bool = Field(..., description="Whether a service token is stored (the token itself is never returned)")
+    parent_group_id: Optional[str] = Field(
+        None, description="GitLab parent group id/path for managed provisioning (GitLab only)"
+    )
     created_at: Optional[datetime] = None

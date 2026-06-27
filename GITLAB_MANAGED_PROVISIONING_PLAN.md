@@ -74,10 +74,16 @@ This re-targets the **existing legacy machinery** (`_fetch_gitlab_user_profile`,
       project as the binding template); `provision_student_repository` now dispatches on `server.type`
       (extracted `_provision_forgejo`, added `_provision_gitlab_managed` → fork into students group,
       `mode='gitlab_managed'`). Descriptor already generic. Syntax + import verified.
-- [ ] **Phase 4** — re-target PAT registration / membership grant to the new model:
-      `register_gitlab_managed_access(course_id, glpat, ...)` — `GET /user` with the student PAT
-      (reuse `_fetch_gitlab_user_profile`) → link `Account` → ensure repo provisioned → grant member
-      via group token (`add_member`, Maintainer). Endpoint on `api/user.py`. Optional email-match check.
-- [ ] **Phase 5** — course-create wiring (mode + git server + parent group).
+- [x] **Phase 4** — managed-GitLab student access:
+      `register_gitlab_managed_access` (+ `_link_gitlab_account`) in `course_git.py` — `GET /api/v4/user`
+      with the student PAT (reuses `_fetch_gitlab_user_profile`) → link `Account` (conflict-checked)
+      → ensure repo provisioned → grant Maintainer on the repo + Reporter on the template via the group
+      token (`add_member`). Endpoint `POST /user/courses/{id}/register-gitlab` (reuses
+      `CourseMemberValidationRequest`). Verified imports.
+      **+ registry `parent_group_id`** — added to `GitServerCreate/Update/Get` and persisted under
+      `GitServer.properties.gitlab.parent_group_id` (essential: the binding upsert reads it). The
+      generated Python client already passes it (`**kwargs`); web client is greenfield.
+- [ ] **Phase 5** — course-create wiring (mode + git server + parent group) — convenience; the binding
+      is already settable via `PUT /courses/{id}/git`.
 - [ ] **Phase 6** — extension (student register-GLPAT + managed-GitLab flow).
 - [ ] **Phase 7** — tests.

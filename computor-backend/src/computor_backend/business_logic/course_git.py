@@ -679,3 +679,153 @@ def register_byo_repository(
     db.refresh(rec)
     logger.info("Registered %s repo for course_member %s", data.mode, member.id)
     return _member_repo_to_get(rec)
+
+
+# ---------------------------------------------------------------------------
+# Managed-GitLab student access (register a GLPAT, grant repo membership)
+# ---------------------------------------------------------------------------
+
+# GitLab member access levels (mirror git_provider.gitlab).
+_GITLAB_REPORTER = 20
+_GITLAB_MAINTAINER = 40
+
+
+def _link_gitlab_account(user_id, provider_url, gitlab_username, gitlab_email, db) -> Account:
+    """Create or validate the student's GitLab ``Account`` link
+    (``provider`` = server url, ``type='gitlab'``, ``provider_account_id`` = the
+    GitLab username). Rejects a token whose account is linked to a different user,
+    or that does not match the user's existing link."""
+    provider = (provider_url or "").rstrip("/")
+    existing = (
+        db.query(Account)
+        .filter(Account.user_id == user_id, Account.provider == provider, Account.type == "gitlab")
+        .first()
+    )
+    if existing is not None:
+        if (existing.provider_account_id or "").lower() != gitlab_username.lower():
+            raise BadRequestException(
+                "The GitLab token does not match your linked GitLab account."
+            )
+        return existing
+    conflict = (
+        db.query(Account)
+        .filter(
+            Account.provider == provider,
+            Account.type == "gitlab",
+            Account.provider_account_id == gitlab_username,
+            Account.user_id != user_id,
+        )
+        .first()
+    )
+    if conflict is not None:
+        raise BadRequestException("This GitLab account is already linked to another user.")
+    account = Account(
+        provider=provider,
+        type="gitlab",
+        provider_account_id=gitlab_username,
+        user_id=user_id,
+        properties={"email": gitlab_email} if gitlab_email else None,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    logger.info("Linked GitLab account %s -> user %s", gitlab_username, user_id)
+    return account
+
+
+def register_gitlab_managed_access(
+    course_id: UUID | str,
+    provider_access_token: Optional[str],
+    permissions: Principal,
+    db: Session,
+) -> CourseMemberRepositoryGet:
+    """Link the student's GitLab account from their PAT and grant them access to
+    their managed-GitLab repository.
+
+    ``GET /api/v4/user`` with the student's own PAT proves their GitLab identity
+    (no admin or email-search needed); the backend then uses the registry's group
+    token to add them as a Maintainer on their repo (and Reporter on the course
+    template, so they can pull upstream). Provisions the repo first if needed.
+    Idempotent.
+    """
+    from computor_backend.business_logic.users import _fetch_gitlab_user_profile
+
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if (
+        binding is None
+        or binding.delivery != "git"
+        or "gitlab_managed" not in (binding.student_repo_modes or [])
+    ):
+        raise BadRequestException("This course does not offer managed-GitLab repositories")
+
+    server = binding.git_server
+    if server is None or server.type != "gitlab" or not server.managed or not server.token:
+        raise BadRequestException("No managed GitLab server is bound to this course")
+
+    if not provider_access_token:
+        raise BadRequestException("A GitLab personal access token is required")
+
+    # The student's own PAT proves their GitLab identity (current-user endpoint).
+    profile = _fetch_gitlab_user_profile(server.base_url, provider_access_token)
+    gitlab_user_id = (profile or {}).get("id")
+    gitlab_username = (profile or {}).get("username")
+    gitlab_email = (profile or {}).get("email")
+    if not gitlab_user_id or not gitlab_username:
+        raise BadRequestException("Could not determine the GitLab user from the provided token")
+
+    _link_gitlab_account(member.user_id, server.base_url, gitlab_username, gitlab_email, db)
+
+    # Ensure the student's repo exists (fork), then grant membership.
+    rec = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == member.id)
+        .first()
+    )
+    if rec is None:
+        rec = _provision_gitlab_managed(member, binding, server, user_id, db)
+
+    project_id = ((rec.properties or {}).get("gitlab") or {}).get("project_id")
+    if not project_id:
+        raise BadRequestException(
+            "Your GitLab repository is missing its project id; re-provision and retry."
+        )
+
+    client = get_provider_client_for_server(server)
+    client.add_member(project_id, gitlab_user_id, _GITLAB_MAINTAINER)
+    # Read access on the course template so the student can pull upstream updates.
+    template_project_id = ((binding.properties or {}).get("gitlab") or {}).get("template_project_id")
+    if template_project_id:
+        client.add_member(template_project_id, gitlab_user_id, _GITLAB_REPORTER)
+
+    rec.properties = {
+        **(rec.properties or {}),
+        "gitlab": {
+            **((rec.properties or {}).get("gitlab") or {}),
+            "member_user_id": gitlab_user_id,
+            "access_granted": True,
+        },
+    }
+    rec.updated_by = user_id
+    db.commit()
+    db.refresh(rec)
+    logger.info(
+        "Granted managed-GitLab access for course_member %s (gitlab user %s)",
+        member.id, gitlab_user_id,
+    )
+    return _member_repo_to_get(rec)

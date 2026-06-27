@@ -105,6 +105,7 @@ def _require_registry_admin(principal: Principal) -> None:
 
 
 def _to_get(server: GitServer) -> GitServerGet:
+    parent_group_id = ((server.properties or {}).get("gitlab") or {}).get("parent_group_id")
     return GitServerGet(
         id=str(server.id),
         type=server.type,
@@ -112,6 +113,7 @@ def _to_get(server: GitServer) -> GitServerGet:
         name=server.name,
         managed=bool(server.managed),
         has_token=bool(server.token),
+        parent_group_id=parent_group_id,
         created_at=server.created_at,
     )
 
@@ -126,6 +128,8 @@ def create_git_server(data: GitServerCreate, principal: Principal, db: Session) 
         token=encrypt_secret(data.token) if data.token else None,
         created_by=principal.get_user_id(),
     )
+    if data.parent_group_id:
+        server.properties = {"gitlab": {"parent_group_id": data.parent_group_id}}
     db.add(server)
     db.commit()
     db.refresh(server)
@@ -164,6 +168,14 @@ def update_git_server(
     if data.token is not None:
         # "" clears the token; a non-empty value replaces it (re-encrypted).
         server.token = encrypt_secret(data.token) if data.token else None
+    if data.parent_group_id is not None:
+        # "" clears it; a value sets it. Reassign a fresh dict so the JSONB change
+        # is tracked.
+        props = dict(server.properties or {})
+        gl = dict(props.get("gitlab") or {})
+        gl["parent_group_id"] = data.parent_group_id or None
+        props["gitlab"] = gl
+        server.properties = props
     server.updated_by = principal.get_user_id()
 
     db.commit()

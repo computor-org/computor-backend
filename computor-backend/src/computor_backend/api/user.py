@@ -35,6 +35,7 @@ from computor_backend.business_logic.course_git import (
     get_student_repository,
     provision_student_repository,
     register_byo_repository,
+    register_gitlab_managed_access,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,32 @@ async def register_student_repository_endpoint(
     Upserts the per-membership record; the course must offer the given mode.
     """
     return register_byo_repository(course_id, payload, permissions, db)
+
+
+@user_router.post(
+    "/courses/{course_id}/register-gitlab",
+    response_model=CourseMemberRepositoryGet,
+)
+async def register_gitlab_managed_endpoint(
+    course_id: UUID | str,
+    payload: CourseMemberValidationRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Register the current student's GitLab PAT for a managed-GitLab course and
+    grant them access to their repository.
+
+    ``GET /api/v4/user`` with the student's PAT proves their GitLab identity; the
+    backend links the account and uses the registry's group token to add them as
+    a Maintainer on their repo (Reporter on the template). Provisions the repo
+    first if needed. Idempotent.
+    """
+    return register_gitlab_managed_access(
+        course_id,
+        payload.provider_access_token if payload else None,
+        permissions,
+        db,
+    )
 
 
 @user_router.post(
