@@ -140,7 +140,12 @@ def create_git_server(data: GitServerCreate, principal: Principal, db: Session) 
 
 
 def list_git_servers(principal: Principal, db: Session) -> List[GitServerGet]:
-    _require_registry_admin(principal)
+    # Read-only: the listed fields carry no secrets (the token is never returned —
+    # only ``has_token``), so any authenticated user may read the registry, e.g. a
+    # course creator picking a server when configuring a course's git. Creating /
+    # updating / deleting registry entries stays registry-admin only.
+    if not principal.get_user_id():
+        raise ForbiddenException("Authentication is required to list git servers.")
     servers = db.query(GitServer).order_by(GitServer.created_at).all()
     return [_to_get(s) for s in servers]
 
