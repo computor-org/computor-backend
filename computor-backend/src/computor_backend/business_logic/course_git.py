@@ -829,3 +829,71 @@ def register_gitlab_managed_access(
         member.id, gitlab_user_id,
     )
     return _member_repo_to_get(rec)
+
+
+# ---------------------------------------------------------------------------
+# Template archive (download mode + external-repo seed source)
+# ---------------------------------------------------------------------------
+
+
+def get_template_archive_source(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> tuple[str, dict, str]:
+    """Resolve ``(url, headers, filename)`` for the course template archive on its
+    managed git server.
+
+    The backend fetches it with the registry **service token** and streams it to
+    the student — used by download mode and to seed an external repo — so the
+    student never sees the token. Membership-gated; the template content is
+    something every course member is entitled to.
+    """
+    from urllib.parse import quote
+    from computor_types.encryption import decrypt_secret
+
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if binding is None or not binding.git_server_id or not binding.template_repo:
+        raise BadRequestException("This course has no downloadable template")
+    server = binding.git_server
+    if server is None or not server.token:
+        raise BadRequestException("This course's git server is not available")
+
+    token = decrypt_secret(server.token)
+    branch = binding.default_branch or "main"
+    base = server.base_url.rstrip("/")
+    repo = binding.template_repo
+    if server.type == "forgejo":
+        owner, _, name = repo.partition("/")
+        if not owner or not name:
+            raise BadRequestException("Forgejo template_repo must be 'owner/repo'")
+        url = f"{base}/api/v1/repos/{owner}/{name}/archive/{branch}.zip"
+        headers = {"Authorization": f"token {token}"}
+        slug = name
+    elif server.type == "gitlab":
+        url = (
+            f"{base}/api/v4/projects/{quote(repo, safe='')}"
+            f"/repository/archive.zip?sha={quote(branch, safe='')}"
+        )
+        headers = {"PRIVATE-TOKEN": token}
+        slug = repo.rstrip("/").split("/")[-1]
+    else:
+        raise BadRequestException(f"Unsupported git server type '{server.type}'")
+
+    return url, headers, f"{slug}.zip"

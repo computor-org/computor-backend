@@ -19,7 +19,8 @@ from computor_types.course_git import (
 )
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 # Import business logic
 from computor_backend.business_logic.users import (
@@ -33,6 +34,7 @@ from computor_backend.business_logic.users import (
 from computor_backend.business_logic.course_git import (
     get_course_git_descriptor,
     get_student_repository,
+    get_template_archive_source,
     provision_student_repository,
     register_byo_repository,
     register_gitlab_managed_access,
@@ -207,6 +209,33 @@ async def register_gitlab_managed_endpoint(
         payload.provider_access_token if payload else None,
         permissions,
         db,
+    )
+
+
+@user_router.get("/courses/{course_id}/template/archive")
+async def download_template_archive_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Download the course template as a ZIP (download mode / external-repo seed).
+
+    The backend fetches the template from the bound managed git server with its
+    service token and returns the archive — the student never handles the token.
+    Membership-gated.
+    """
+    url, headers, filename = get_template_archive_source(course_id, permissions, db)
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        upstream = await client.get(url, headers=headers)
+    if upstream.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not fetch the template archive (git server returned {upstream.status_code}).",
+        )
+    return Response(
+        content=upstream.content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
