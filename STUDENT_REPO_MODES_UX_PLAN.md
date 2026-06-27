@@ -52,7 +52,9 @@ user-facing descriptions.
          `StudentRepoMode` + `registerGitlabManaged` API method + picker entry. Type-check clean.
    - [ ] external: provider-agnostic refactor of `GitLabByoProvisioner`/`GitLabTokenManager`; add the
          **seed/link** step (clone template → push to the student's empty repo → set `upstream`).
-   - [ ] download: "Download template ZIP" command → the new endpoint.
+   - [x] download: **"Download Template"** command (`computor.student.downloadTemplate`) → the archive
+         endpoint; offers save-as-ZIP or extract-to-folder (jszip, strips the git-archive wrapper dir).
+         Type-check clean.
    - [ ] Apply the drafted descriptions/prompts.
 3. **Extension — lecturer:** mode selector + git-server picker + template in `createCourse`.
 4. **Web UI (`computor-web`):** course git-config panel + GitServer-registry admin (greenfield;
