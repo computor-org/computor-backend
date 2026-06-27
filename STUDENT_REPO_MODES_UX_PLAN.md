@@ -44,7 +44,8 @@ user-facing descriptions.
          source); membership-gated, student never sees the token. (`get_template_archive_source` +
          endpoint in `api/user.py`.)
    - [ ] Single `student_repo_mode` on the binding (DTO + column/migration) alongside the offered list.
-   - [ ] Relax `GET /git-servers` LIST to course-creators (read-only).
+   - [x] Relax `GET /git-servers` LIST to authenticated users (read-only; no secrets). Mutations stay
+         registry-admin. (`list_git_servers`.)
 2. **Extension — student** (`computor-vsc-extension`):
    - [ ] Drive the flow off the single course mode; drop the "where should your repo live?" picker.
    - [x] managed: Forgejo (existing) + **GitLab** — `provisionAndCloneGitlabManaged` (provision fork →
@@ -56,7 +57,12 @@ user-facing descriptions.
          endpoint; offers save-as-ZIP or extract-to-folder (jszip, strips the git-archive wrapper dir).
          Type-check clean.
    - [ ] Apply the drafted descriptions/prompts.
-3. **Extension — lecturer:** mode selector + git-server picker + template in `createCourse`.
+3. **Extension — lecturer:**
+   - [x] **Configure Course Git** command (`computor.lecturer.configureCourseGit`, on a course tree
+         item) — pick a managed git server + the modes to offer (managed / download / external) →
+         `PUT /courses/{id}/git`. For managed GitLab this provisions the course structure server-side.
+   - [ ] Fold the selector into `createCourse` itself (needs `CourseTaskRequest` + the async course
+         deploy task to set the binding at creation; the dedicated command covers it for now).
 4. **Web UI (`computor-web`):** course git-config panel + GitServer-registry admin (greenfield;
    generate the missing TS types/clients).
 5. **Tests + copy.**
