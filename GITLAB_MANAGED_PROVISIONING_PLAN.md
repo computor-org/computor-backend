@@ -86,4 +86,8 @@ This re-targets the **existing legacy machinery** (`_fetch_gitlab_user_profile`,
 - [ ] **Phase 5** — course-create wiring (mode + git server + parent group) — convenience; the binding
       is already settable via `PUT /courses/{id}/git`.
 - [ ] **Phase 6** — extension (student register-GLPAT + managed-GitLab flow).
-- [ ] **Phase 7** — tests.
+- [~] **Phase 7** — tests. **Unit tests done** (`tests/test_gitlab_managed.py`, 9 tests): mode
+      validation, descriptor for `gitlab_managed`, and `GitLabProviderClient` (ensure_course_structure
+      + idempotency, fork + idempotency, add_member 409 handling) driven against a small in-memory
+      fake of python-gitlab. No regressions (existing course-git suite 23/23 green). **Live-GitLab
+      integration tests deferred** to a follow-up.
