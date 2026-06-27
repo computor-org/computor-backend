@@ -47,7 +47,9 @@ user-facing descriptions.
    - [ ] Relax `GET /git-servers` LIST to course-creators (read-only).
 2. **Extension — student** (`computor-vsc-extension`):
    - [ ] Drive the flow off the single course mode; drop the "where should your repo live?" picker.
-   - [ ] managed: Forgejo (existing) + GitLab (prompt GLPAT → `register-gitlab` → clone).
+   - [x] managed: Forgejo (existing) + **GitLab** — `provisionAndCloneGitlabManaged` (provision fork →
+         prompt GLPAT via `GitLabTokenManager` → `register-gitlab` → clone with the student's token).
+         `StudentRepoMode` + `registerGitlabManaged` API method + picker entry. Type-check clean.
    - [ ] external: provider-agnostic refactor of `GitLabByoProvisioner`/`GitLabTokenManager`; add the
          **seed/link** step (clone template → push to the student's empty repo → set `upstream`).
    - [ ] download: "Download template ZIP" command → the new endpoint.
