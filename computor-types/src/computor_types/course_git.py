@@ -14,7 +14,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-_VALID_STUDENT_REPO_MODES = {"forgejo", "gitlab_byo", "download"}
+_VALID_STUDENT_REPO_MODES = {"forgejo", "gitlab_managed", "gitlab_byo", "download"}
 
 
 class GitTemplateRef(BaseModel):
@@ -40,7 +40,7 @@ class CourseGitDescriptor(BaseModel):
     delivery: Optional[str] = Field(None, description="Assignment delivery: 'git' | 'download'")
     student_repo_modes: List[str] = Field(
         default_factory=list,
-        description="Allowed student-repo backends, e.g. ['forgejo', 'gitlab_byo', 'download']",
+        description="Allowed student-repo backends, e.g. ['forgejo', 'gitlab_managed', 'gitlab_byo', 'download']",
     )
     template: Optional[GitTemplateRef] = Field(
         None, description="Template location (absent for pure download or unconfigured courses)"
@@ -57,7 +57,7 @@ class CourseGitBindingUpsert(BaseModel):
     default_branch: Optional[str] = Field(None, description="Default branch (defaults to 'main')")
     student_repo_modes: List[str] = Field(
         default_factory=list,
-        description="Allowed student-repo backends: subset of ['forgejo', 'gitlab_byo', 'download']",
+        description="Allowed student-repo backends: subset of ['forgejo', 'gitlab_managed', 'gitlab_byo', 'download']",
     )
 
     @field_validator("student_repo_modes")
@@ -98,7 +98,7 @@ class CourseMemberRepositoryGet(BaseModel):
 
     id: str
     course_member_id: str
-    mode: str = Field(..., description="forgejo | gitlab_byo | download")
+    mode: str = Field(..., description="forgejo | gitlab_managed | gitlab_byo | download")
     server_url: Optional[str] = None
     repo_ref: Optional[str] = None
     http_url: Optional[str] = None

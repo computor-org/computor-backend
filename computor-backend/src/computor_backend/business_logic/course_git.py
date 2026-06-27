@@ -263,6 +263,31 @@ def upsert_course_git_binding(
         if not template_url:
             template_url = f"{server.base_url.rstrip('/')}/{template_repo}.git"
 
+    # For a managed GitLab, provision the flat course structure under the
+    # registered parent group (course group + template/reference projects +
+    # students subgroup) and adopt the template project as the binding template.
+    gitlab_structure = None
+    if data.delivery == "git" and server is not None and server.type == "gitlab" and server.managed:
+        gl_server_props = (server.properties or {}).get("gitlab") or {}
+        parent_group_id = gl_server_props.get("parent_group_id")
+        if not parent_group_id:
+            raise BadRequestException(
+                "The bound GitLab server has no parent_group_id configured "
+                "(set it on the git server's properties.gitlab)."
+            )
+        course_slug = str(course.path).replace(".", "-")
+        client = get_provider_client_for_server(server)
+        try:
+            gitlab_structure = client.ensure_course_structure(
+                parent_group_id, course_slug, course.title or course_slug
+            )
+        except Exception as exc:  # materialization is essential — fail loudly
+            raise BadRequestException(
+                f"Could not provision the GitLab course structure: {exc}"
+            )
+        template_repo = gitlab_structure.get("template_path") or template_repo
+        template_url = gitlab_structure.get("template_url") or template_url
+
     if binding is None:
         binding = CourseGitBinding(course_id=course.id, created_by=permissions.get_user_id())
         db.add(binding)
@@ -273,6 +298,8 @@ def upsert_course_git_binding(
     binding.template_url = template_url
     binding.default_branch = data.default_branch or "main"
     binding.student_repo_modes = list(data.student_repo_modes or [])
+    if gitlab_structure is not None:
+        binding.properties = {**(binding.properties or {}), "gitlab": gitlab_structure}
     binding.updated_by = permissions.get_user_id()
 
     db.commit()
@@ -315,9 +342,10 @@ def student_repo_name(template_repo: str, handle: str) -> str:
     return f"{base}-{handle}"
 
 
-def _resolve_forgejo_handle(user_id: str, db: Session) -> Optional[str]:
-    """The student's Forgejo username == their Keycloak handle (preferred_username),
-    stored on the OIDC ``Account.properties['username']`` after SSO login."""
+def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
+    """The student's Keycloak handle (``preferred_username``), stored on the OIDC
+    ``Account.properties['username']`` after SSO login. Used as the Forgejo
+    username and as the managed-GitLab student-repo slug."""
     account = (
         db.query(Account)
         .filter(Account.user_id == user_id, Account.type == "oidc")
@@ -343,7 +371,7 @@ def _maybe_heal_forgejo_collaborator(
     server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
     if server is None:
         return
-    handle = _resolve_forgejo_handle(user_id, db)
+    handle = _resolve_oidc_handle(user_id, db)
     if not handle:
         return
     owner, _, repo = (rec.repo_ref or "").partition("/")
@@ -427,7 +455,7 @@ def _provisioned_response(
     clone_username = None
     if rec.mode == "forgejo" and rec.git_server_id:
         server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
-        handle = _resolve_forgejo_handle(user_id, db)
+        handle = _resolve_oidc_handle(user_id, db)
         creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
         if server is not None and handle and creds:
             client = get_provider_client_for_server(server)
@@ -451,16 +479,100 @@ def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGe
     )
 
 
+def _provision_forgejo(
+    member: CourseMember,
+    binding: CourseGitBinding,
+    server: GitServer,
+    user_id: str,
+    db: Session,
+) -> CourseMemberRepository:
+    """Fork the Forgejo student-template into a repo for the student and record
+    it. The student is added as a write collaborator (best-effort, self-healing)."""
+    if not binding.template_repo:
+        raise BadRequestException("This course has no Forgejo template configured")
+    owner, _, repo = binding.template_repo.partition("/")
+    if not owner or not repo:
+        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+    handle = _resolve_oidc_handle(user_id, db)
+    if not handle:
+        raise BadRequestException(
+            "You have no Forgejo identity yet; sign in once via SSO before provisioning."
+        )
+    new_name = student_repo_name(repo, handle)
+    client = get_provider_client_for_server(server)
+    result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
+    rec = CourseMemberRepository(
+        course_member_id=member.id,
+        mode="forgejo",
+        git_server_id=server.id,
+        server_url=server.base_url,
+        repo_ref=f"{owner}/{new_name}",
+        http_url=result.http_url,
+        ssh_url=result.ssh_url,
+        web_url=result.web_url,
+        properties=result.properties,
+        created_by=user_id,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    logger.info("Provisioned Forgejo repo %s/%s for course_member %s", owner, new_name, member.id)
+    return rec
+
+
+def _provision_gitlab_managed(
+    member: CourseMember,
+    binding: CourseGitBinding,
+    server: GitServer,
+    user_id: str,
+    db: Session,
+) -> CourseMemberRepository:
+    """Fork the managed-GitLab ``template`` project into the course's ``students``
+    subgroup as the student's repo and record it. Access is granted separately,
+    when the student registers their GLPAT — the backend cannot add them until it
+    knows their GitLab user id."""
+    gl_props = (binding.properties or {}).get("gitlab") or {}
+    template_project_id = gl_props.get("template_project_id")
+    students_group_id = gl_props.get("students_group_id")
+    if not template_project_id or not students_group_id:
+        raise BadRequestException(
+            "This course's managed-GitLab structure is not provisioned yet."
+        )
+    handle = _resolve_oidc_handle(user_id, db) or str(member.id)
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", handle).strip("-._") or str(member.id)
+    client = get_provider_client_for_server(server)
+    result = client.provision_student_fork(template_project_id, students_group_id, slug)
+    full_path = (result.properties.get("gitlab") or {}).get("full_path")
+    rec = CourseMemberRepository(
+        course_member_id=member.id,
+        mode="gitlab_managed",
+        git_server_id=server.id,
+        server_url=server.base_url,
+        repo_ref=full_path,
+        http_url=result.http_url,
+        ssh_url=result.ssh_url,
+        web_url=result.web_url,
+        properties=result.properties,
+        created_by=user_id,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    logger.info("Provisioned GitLab repo %s for course_member %s", full_path, member.id)
+    return rec
+
+
 def provision_student_repository(
     course_id: UUID | str,
     permissions: Principal,
     db: Session,
 ) -> StudentRepositoryProvisioned:
-    """Babysat Forgejo provisioning: fork the course's student-template into a
-    repo for the calling student and record it. Idempotent.
+    """Babysat provisioning: fork the course's template into a repo for the
+    calling student and record it. Idempotent.
 
-    Requires the course to be bound (``delivery='git'``) to a *managed* Forgejo
-    server offering the ``forgejo`` student-repo mode, with a template set.
+    Dispatches on the bound *managed* server: Forgejo (``forgejo`` mode) or
+    GitLab (``gitlab_managed`` mode). Requires the course to be bound
+    (``delivery='git'``) with that mode offered and a materialized template.
     """
     user_id = permissions.get_user_id()
     if not user_id:
@@ -493,45 +605,22 @@ def provision_student_repository(
     )
     if binding is None or binding.delivery != "git":
         raise BadRequestException("This course is not configured for git provisioning")
-    if "forgejo" not in (binding.student_repo_modes or []):
-        raise BadRequestException("This course does not offer Forgejo-hosted repositories")
 
     server = binding.git_server
-    if server is None or server.type != "forgejo" or not server.managed or not server.token:
-        raise BadRequestException("No managed Forgejo server is bound to this course")
-    if not binding.template_repo:
-        raise BadRequestException("This course has no Forgejo template configured")
+    if server is None or not server.managed or not server.token:
+        raise BadRequestException("No managed git server is bound to this course")
 
-    owner, _, repo = binding.template_repo.partition("/")
-    if not owner or not repo:
-        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+    if server.type == "forgejo":
+        if "forgejo" not in (binding.student_repo_modes or []):
+            raise BadRequestException("This course does not offer Forgejo-hosted repositories")
+        rec = _provision_forgejo(member, binding, server, user_id, db)
+    elif server.type == "gitlab":
+        if "gitlab_managed" not in (binding.student_repo_modes or []):
+            raise BadRequestException("This course does not offer managed-GitLab repositories")
+        rec = _provision_gitlab_managed(member, binding, server, user_id, db)
+    else:
+        raise BadRequestException(f"Unsupported managed server type '{server.type}'")
 
-    handle = _resolve_forgejo_handle(user_id, db)
-    if not handle:
-        raise BadRequestException(
-            "You have no Forgejo identity yet; sign in once via SSO before provisioning."
-        )
-
-    new_name = student_repo_name(repo, handle)
-    client = get_provider_client_for_server(server)
-    result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
-
-    rec = CourseMemberRepository(
-        course_member_id=member.id,
-        mode="forgejo",
-        git_server_id=server.id,
-        server_url=server.base_url,
-        repo_ref=f"{owner}/{new_name}",
-        http_url=result.http_url,
-        ssh_url=result.ssh_url,
-        web_url=result.web_url,
-        properties=result.properties,
-        created_by=user_id,
-    )
-    db.add(rec)
-    db.commit()
-    db.refresh(rec)
-    logger.info("Provisioned Forgejo repo %s/%s for course_member %s", owner, new_name, member.id)
     return _provisioned_response(rec, user_id, db)
 
 

@@ -119,7 +119,7 @@ class CourseMemberRepository(Base):
     __table_args__ = (
         UniqueConstraint('course_member_id', name='course_member_repository_member_key'),
         CheckConstraint(
-            "mode IN ('forgejo', 'gitlab_byo', 'download')",
+            "mode IN ('forgejo', 'gitlab_managed', 'gitlab_byo', 'download')",
             name='course_member_repository_mode_check',
         ),
     )
@@ -135,7 +135,7 @@ class CourseMemberRepository(Base):
         ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False,
     )
-    mode = Column(String(50), nullable=False)        # 'forgejo' | 'gitlab_byo' | 'download'
+    mode = Column(String(50), nullable=False)        # 'forgejo' | 'gitlab_managed' | 'gitlab_byo' | 'download'
     # Registry server when the repo lives on one we know; null for a BYO repo
     # on an instance not in the registry (then server_url holds the instance).
     git_server_id = Column(ForeignKey('git_server.id', ondelete='SET NULL', onupdate='RESTRICT'))
