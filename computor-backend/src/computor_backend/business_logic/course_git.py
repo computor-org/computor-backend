@@ -363,13 +363,13 @@ def _maybe_heal_forgejo_collaborator(
     provision (the student's Forgejo account didn't exist yet). No-op once the
     collaborator is recorded as added, or for non-Forgejo repos.
     """
-    if rec.mode != "forgejo" or not rec.git_server_id:
+    if rec.mode != "managed" or not rec.git_server_id:
         return
     props = rec.properties or {}
     if (props.get("forgejo") or {}).get("collaborator_added"):
         return
     server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
-    if server is None:
+    if server is None or server.type != "forgejo":
         return
     handle = _resolve_oidc_handle(user_id, db)
     if not handle:
@@ -453,7 +453,10 @@ def _provisioned_response(
     base = _member_repo_to_get(rec).model_dump()
     clone_token = None
     clone_username = None
-    if rec.mode == "forgejo" and rec.git_server_id:
+    # Only a managed *Forgejo* repo mints a clone token; for managed GitLab the
+    # student uses their own credentials, and ``_forgejo_admin_basic_auth_for``
+    # already returns None for a non-Forgejo server (so creds stays None below).
+    if rec.mode == "managed" and rec.git_server_id:
         server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
         handle = _resolve_oidc_handle(user_id, db)
         creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
@@ -503,7 +506,7 @@ def _provision_forgejo(
     result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
     rec = CourseMemberRepository(
         course_member_id=member.id,
-        mode="forgejo",
+        mode="managed",
         git_server_id=server.id,
         server_url=server.base_url,
         repo_ref=f"{owner}/{new_name}",
@@ -545,7 +548,7 @@ def _provision_gitlab_managed(
     full_path = (result.properties.get("gitlab") or {}).get("full_path")
     rec = CourseMemberRepository(
         course_member_id=member.id,
-        mode="gitlab_managed",
+        mode="managed",
         git_server_id=server.id,
         server_url=server.base_url,
         repo_ref=full_path,
@@ -570,9 +573,9 @@ def provision_student_repository(
     """Babysat provisioning: fork the course's template into a repo for the
     calling student and record it. Idempotent.
 
-    Dispatches on the bound *managed* server: Forgejo (``forgejo`` mode) or
-    GitLab (``gitlab_managed`` mode). Requires the course to be bound
-    (``delivery='git'``) with that mode offered and a materialized template.
+    Requires the course to offer the ``managed`` mode (system-hosted) with a
+    materialized template. ``managed`` is provider-agnostic; the bound server's
+    type picks the backend — Forgejo or GitLab.
     """
     user_id = permissions.get_user_id()
     if not user_id:
@@ -610,13 +613,12 @@ def provision_student_repository(
     if server is None or not server.managed or not server.token:
         raise BadRequestException("No managed git server is bound to this course")
 
+    if "managed" not in (binding.student_repo_modes or []):
+        raise BadRequestException("This course does not offer managed (system-hosted) repositories")
+    # 'managed' is provider-agnostic; the bound server's type picks the backend.
     if server.type == "forgejo":
-        if "forgejo" not in (binding.student_repo_modes or []):
-            raise BadRequestException("This course does not offer Forgejo-hosted repositories")
         rec = _provision_forgejo(member, binding, server, user_id, db)
     elif server.type == "gitlab":
-        if "gitlab_managed" not in (binding.student_repo_modes or []):
-            raise BadRequestException("This course does not offer managed-GitLab repositories")
         rec = _provision_gitlab_managed(member, binding, server, user_id, db)
     else:
         raise BadRequestException(f"Unsupported managed server type '{server.type}'")
@@ -770,9 +772,9 @@ def register_gitlab_managed_access(
     if (
         binding is None
         or binding.delivery != "git"
-        or "gitlab_managed" not in (binding.student_repo_modes or [])
+        or "managed" not in (binding.student_repo_modes or [])
     ):
-        raise BadRequestException("This course does not offer managed-GitLab repositories")
+        raise BadRequestException("This course does not offer managed repositories")
 
     server = binding.git_server
     if server is None or server.type != "gitlab" or not server.managed or not server.token:

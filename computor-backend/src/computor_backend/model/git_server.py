@@ -70,7 +70,7 @@ class CourseGitBinding(Base):
     Declares where the course's ``student-template`` lives and which
     student-repo modes the course offers. ``delivery`` selects assignment
     delivery (``git`` fork/clone vs ``download`` archive); ``student_repo_modes``
-    lists the backends a student may pick (e.g. ``["forgejo", "gitlab_byo"]``)
+    lists the hosting modes a student may pick (e.g. ``["managed", "external"]``)
     and is only meaningful when ``delivery = 'git'``.
     """
 
@@ -97,7 +97,7 @@ class CourseGitBinding(Base):
     template_repo = Column(String(2048))      # repo/project ref of the template on the server
     template_url = Column(String(2048))       # clone/web url of the template
     default_branch = Column(String(255), server_default=text("'main'"))
-    # Allowed student-repo modes, e.g. ["forgejo", "gitlab_byo", "download"].
+    # Allowed student-repo hosting modes, e.g. ["managed", "external", "download"].
     student_repo_modes = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     properties = Column(JSONB)
 
@@ -119,7 +119,7 @@ class CourseMemberRepository(Base):
     __table_args__ = (
         UniqueConstraint('course_member_id', name='course_member_repository_member_key'),
         CheckConstraint(
-            "mode IN ('forgejo', 'gitlab_managed', 'gitlab_byo', 'download')",
+            "mode IN ('managed', 'external', 'download')",
             name='course_member_repository_mode_check',
         ),
     )
@@ -135,7 +135,7 @@ class CourseMemberRepository(Base):
         ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False,
     )
-    mode = Column(String(50), nullable=False)        # 'forgejo' | 'gitlab_managed' | 'gitlab_byo' | 'download'
+    mode = Column(String(50), nullable=False)        # 'managed' | 'external' | 'download'
     # Registry server when the repo lives on one we know; null for a BYO repo
     # on an instance not in the registry (then server_url holds the instance).
     git_server_id = Column(ForeignKey('git_server.id', ondelete='SET NULL', onupdate='RESTRICT'))

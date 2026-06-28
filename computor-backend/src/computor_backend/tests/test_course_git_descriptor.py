@@ -11,7 +11,7 @@ from computor_backend.business_logic.course_git import build_course_git_descript
 def _binding(**kw) -> SimpleNamespace:
     base = dict(
         delivery="git",
-        student_repo_modes=["forgejo", "gitlab_byo"],
+        student_repo_modes=["managed", "external"],
         template_repo="fam--course--template",
         template_url="https://forge.local/acme/fam--course--template.git",
         default_branch="main",
@@ -35,7 +35,7 @@ class TestBuildCourseGitDescriptor:
         d = build_course_git_descriptor("c1", _binding(), server)
         assert d.configured is True
         assert d.delivery == "git"
-        assert d.student_repo_modes == ["forgejo", "gitlab_byo"]
+        assert d.student_repo_modes == ["managed", "external"]
         assert d.template is not None
         assert d.template.server_type == "forgejo"
         assert d.template.base_url == "https://forge.local"

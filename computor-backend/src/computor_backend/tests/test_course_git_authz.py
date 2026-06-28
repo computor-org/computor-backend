@@ -79,12 +79,12 @@ class TestCanManageCourseGit:
 
 class TestModesValidator:
     def test_valid_modes_accepted(self):
-        b = CourseGitBindingUpsert(student_repo_modes=["forgejo", "gitlab_byo", "download"])
-        assert b.student_repo_modes == ["forgejo", "gitlab_byo", "download"]
+        b = CourseGitBindingUpsert(student_repo_modes=["managed", "external", "download"])
+        assert b.student_repo_modes == ["managed", "external", "download"]
 
     def test_invalid_mode_rejected(self):
         with pytest.raises(ValueError):
-            CourseGitBindingUpsert(student_repo_modes=["forgejo", "bitbucket"])
+            CourseGitBindingUpsert(student_repo_modes=["managed", "bitbucket"])
 
     def test_empty_default(self):
         assert CourseGitBindingUpsert().student_repo_modes == []

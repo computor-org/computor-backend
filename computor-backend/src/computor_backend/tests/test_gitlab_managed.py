@@ -25,17 +25,17 @@ from computor_types.course_git import CourseGitBindingUpsert
 
 
 class TestStudentRepoModeValidation:
-    def test_gitlab_managed_is_accepted(self):
-        b = CourseGitBindingUpsert(student_repo_modes=["gitlab_managed"])
-        assert b.student_repo_modes == ["gitlab_managed"]
+    def test_managed_is_accepted(self):
+        b = CourseGitBindingUpsert(student_repo_modes=["managed"])
+        assert b.student_repo_modes == ["managed"]
 
     def test_mixed_known_modes_accepted(self):
-        modes = ["forgejo", "gitlab_managed", "gitlab_byo", "download"]
+        modes = ["managed", "external", "download"]
         assert CourseGitBindingUpsert(student_repo_modes=modes).student_repo_modes == modes
 
     def test_unknown_mode_rejected(self):
         with pytest.raises(ValueError):
-            CourseGitBindingUpsert(student_repo_modes=["gitlab_managed", "nonsense"])
+            CourseGitBindingUpsert(student_repo_modes=["managed", "nonsense"])
 
 
 # ---------------------------------------------------------------------------
@@ -44,10 +44,10 @@ class TestStudentRepoModeValidation:
 
 
 class TestDescriptorGitlabManaged:
-    def test_descriptor_carries_gitlab_managed_mode(self):
+    def test_descriptor_carries_managed_mode(self):
         binding = SimpleNamespace(
             delivery="git",
-            student_repo_modes=["gitlab_managed"],
+            student_repo_modes=["managed"],
             template_repo="root/fam--course/template",
             template_url="https://gitlab.example/root/fam--course/template.git",
             default_branch="main",
@@ -56,7 +56,7 @@ class TestDescriptorGitlabManaged:
         server = SimpleNamespace(type="gitlab", base_url="https://gitlab.example")
         d = build_course_git_descriptor("c1", binding, server)
         assert d.configured is True
-        assert d.student_repo_modes == ["gitlab_managed"]
+        assert d.student_repo_modes == ["managed"]
         assert d.template.server_type == "gitlab"
         assert d.template.repo == "root/fam--course/template"
 
