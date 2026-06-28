@@ -1,5 +1,7 @@
-# Never commit local env (carries tokens), caches, or reports.
-.env*
-__pycache__/
+.env.integration
+.env.integration.local
+.env.gitlab-local
 .pytest_cache/
+__pycache__/
+*.egg-info/
 reports/

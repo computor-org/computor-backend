@@ -12,7 +12,7 @@ import pytest
 
 from computor_backend.git_provider.gitlab import GITLAB_MAINTAINER
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.gitlab
 
 COURSE_SLUG = "it-course"
 STUDENT_SLUG = "it-student-alice"
