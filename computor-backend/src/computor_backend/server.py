@@ -90,8 +90,6 @@ from pathlib import Path
 # Coder integration (now part of computor_backend)
 from computor_backend.api.coder import router as coder_api_router
 
-# Git server integration
-from computor_backend.api.git_server import router as git_server_router
 
 async def initialize_plugin_registry_with_config():
     """Initialize plugin registry with configuration from settings."""
@@ -607,10 +605,6 @@ app.include_router(
 # Coder integration API (only registered when CODER_ENABLED=true)
 if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
     app.include_router(coder_api_router)
-
-# Git server API (registered whenever GIT_SERVER is set)
-if os.environ.get("GIT_SERVER", ""):
-    app.include_router(git_server_router)
 
 
 @app.head("/", status_code=204)

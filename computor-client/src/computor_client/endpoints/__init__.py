@@ -27,7 +27,6 @@ from computor_client.endpoints.documents import DocumentsClient
 from computor_client.endpoints.example_repositories import ExampleRepositoriesClient
 from computor_client.endpoints.examples import ExamplesClient
 from computor_client.endpoints.extensions import ExtensionsClient
-from computor_client.endpoints.git_server import GitServerClient
 from computor_client.endpoints.git_servers import GitServersClient
 from computor_client.endpoints.groups import GroupsClient
 from computor_client.endpoints.invites import InvitesClient
@@ -82,7 +81,6 @@ __all__ = [
     "ExampleRepositoriesClient",
     "ExamplesClient",
     "ExtensionsClient",
-    "GitServerClient",
     "GitServersClient",
     "GroupsClient",
     "InvitesClient",
