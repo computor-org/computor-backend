@@ -112,17 +112,20 @@ def _link_testing_service(
     permissions: Principal,
     db: Session
 ) -> None:
-    """Copy ``example_version.testing_service_id`` onto the course content.
+    """Copy ``example_version.testing_service_id`` onto the course content
+    (best-effort).
 
     Resolution from meta.yaml's executionBackend slug to a Service.id is
     best-effort at upload (``api.examples._resolve_testing_service_id``): an
     example may be uploaded before its execution backend is registered, leaving
-    ``testing_service_id = NULL``. **Assignment time is the canonical gate.** If
-    the FK is already set we propagate it (O(1)); if it is NULL we re-resolve the
-    slug from ``execution_backend`` once and write it back so later assignments
-    take the fast path. Truly unresolvable versions raise BadRequestException —
-    the lecturer sees the failure here, when the content actually needs to run
-    tests, instead of being blocked at upload.
+    ``testing_service_id = NULL``. If the FK is already set we propagate it
+    (O(1)); if it is NULL we try to re-resolve the slug from ``execution_backend``
+    once and write it back so later assignments take the fast path.
+
+    Crucially this NEVER blocks the assignment: the testing service is only
+    needed at test-execution time, so an unresolvable backend (none registered
+    yet, or a slug mismatch) is logged and skipped — the content is assigned
+    without a testing service and the link is filled in once the backend exists.
     """
     if example_version.testing_service_id is not None:
         if course_content.testing_service_id != example_version.testing_service_id:
@@ -132,19 +135,20 @@ def _link_testing_service(
         return
 
     # NULL FK: an example uploaded before its backend was registered, or a
-    # legacy/backfilled row. Resolve the slug now and cache it back.
+    # legacy/backfilled row. Resolve the slug now and cache it back if we can —
+    # but DON'T block the assignment when it can't be resolved. The testing
+    # service is only needed at test-execution time; mirroring the upload path
+    # ("don't block upload when the execution backend isn't registered"), the
+    # lecturer assigns now and the link is filled in once the backend exists.
     slug = example_version.get_execution_backend_slug()
     if not slug:
-        raise BadRequestException(
-            error_code="EXAMPLE_VERSION_NO_BACKEND",
-            detail=(
-                f"Example version {example_version.id} has no testing "
-                "service link and its meta.yaml declares no "
-                "executionBackend. Re-upload the example with a valid "
-                "executionBackend slug."
-            ),
-            context={"example_version_id": str(example_version.id)},
+        logger.warning(
+            "Example version %s has no testing service link and declares no "
+            "executionBackend; assigning without one (link it once the backend "
+            "is registered).",
+            example_version.id,
         )
+        return
 
     service = db.query(Service).filter(
         Service.slug == slug,
@@ -153,19 +157,13 @@ def _link_testing_service(
     ).first()
 
     if not service:
-        raise BadRequestException(
-            error_code="EXAMPLE_VERSION_UNKNOWN_BACKEND",
-            detail=(
-                f"Example version {example_version.id} declares "
-                f"executionBackend slug '{slug}', which does not match "
-                "any enabled, non-archived service. Register the service "
-                "or fix the slug in meta.yaml."
-            ),
-            context={
-                "example_version_id": str(example_version.id),
-                "slug": slug,
-            },
+        logger.warning(
+            "Example version %s declares executionBackend '%s', which matches no "
+            "enabled, non-archived service; assigning without a testing service "
+            "(register the service or fix the slug, then re-assign/redeploy).",
+            example_version.id, slug,
         )
+        return
 
     # Self-heal: persist the resolved FK on the example version so we
     # don't have to re-do this lookup on every future assignment.
