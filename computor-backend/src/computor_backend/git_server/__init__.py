@@ -1,21 +1,9 @@
-from .config import get_git_server_settings
-from computor_types.git_server import CreateGitUserRequest, GitUser, GitServerHealthResponse, UpdateGitUserRequest
-from .exceptions import (
-    GitServerError,
-    GitServerDisabledError,
-    GitServerConnectionError,
-    GitServerAuthError,
-    GitUserNotFoundError,
-    GitUserAlreadyExistsError,
-)
+"""Git server environment settings.
 
-
-def get_git_client():
-    """Return the configured git server client, or raise GitServerDisabledError."""
-    settings = get_git_server_settings()
-    if not settings.enabled:
-        raise GitServerDisabledError("No git server configured (GIT_SERVER is not set)")
-    if settings.is_forgejo:
-        from .forgejo import get_forgejo_client
-        return get_forgejo_client()
-    raise GitServerDisabledError(f"Unsupported git server: {settings.git_server!r}")
+Only the env-based settings (``config.get_git_server_settings``) survive here:
+they configure the single managed git server (Forgejo) whose admin credentials
+the *registry* uses to auto-seed its ``GitServer`` row and mint service/clone
+tokens. The legacy single-instance ``/git`` admin proxy (get_git_client and the
+GitServerClient protocol) was removed — git user/repo lifecycle is handled by
+the registry path in ``computor_backend.git_provider``.
+"""
