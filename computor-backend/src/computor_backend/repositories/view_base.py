@@ -455,7 +455,7 @@ class ViewRepository(ABC):
         the serialized DTOs, and return the list.
         """
         from .view_mappers import course_member_course_content_result_mapper
-        from .course_content import CourseMemberCourseContentQueryResult
+        from .course_content_queries import CourseMemberCourseContentQueryResult
 
         response_list: List[Any] = []
         for raw in raw_results:

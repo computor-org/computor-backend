@@ -33,18 +33,18 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
+    <div className="h-screen overflow-hidden bg-gray-50 flex">
+      {/* Sidebar (fixed; scrolls internally via its own nav) */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Bar */}
         <TopBar />
         <MaintenanceBanner />
 
-        {/* Page Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        {/* Page Content — the only vertical scroll container */}
+        <main className="flex-1 p-6 overflow-y-auto min-h-0">
           {children}
         </main>
       </div>
