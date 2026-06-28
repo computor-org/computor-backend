@@ -1,4 +1,5 @@
 """Business logic for submission management."""
+import hashlib
 import io
 import logging
 import mimetypes
@@ -7,7 +8,7 @@ import zipfile
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import List, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, joinedload
@@ -184,6 +185,26 @@ def _should_skip_file(filename: str) -> bool:
     return False
 
 
+def _canonical_zip_hash(file_content: bytes) -> str:
+    """A deterministic content identifier for a submission archive, independent of
+    zip ordering/timestamps: a SHA-256 over every file's (sorted relative path +
+    bytes). Used as the submission ``version_identifier`` when there is no git
+    commit (download mode), so an unchanged re-upload yields the SAME identifier
+    and the existing dedup blocks it — unlike the old random ``manual-{uuid}``,
+    which never deduped."""
+    digest = hashlib.sha256()
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_content), "r") as archive:
+            for name in sorted(n for n in archive.namelist() if not n.endswith("/")):
+                digest.update(name.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(archive.read(name))
+                digest.update(b"\0")
+    except zipfile.BadZipFile:
+        digest = hashlib.sha256(file_content)
+    return f"content-{digest.hexdigest()}"
+
+
 async def upload_submission_artifact(
     submission_group_id: UUID | str,
     file_content: bytes,
@@ -255,7 +276,9 @@ async def upload_submission_artifact(
     if trimmed_version and len(trimmed_version) > 2048:
         raise BadRequestException(detail="version_identifier exceeds maximum length of 2048 characters")
 
-    manual_version_identifier = trimmed_version or f"manual-{uuid4()}"
+    # No client-supplied identifier (download / git-less submit) → content-address
+    # the upload so an unchanged re-submit is detected by the existing dedup.
+    manual_version_identifier = trimmed_version or _canonical_zip_hash(file_content)
 
     # Check submission quota limits (if configured)
     if submission_group.max_submissions is not None:
