@@ -178,7 +178,68 @@ async def create_course_activity(
 
             provider_row = db.query(GitProvider).filter(GitProvider.organization_id == str(org.id)).first()
             if not provider_row:
-                raise ValueError(f"No git provider configured for organization {org.id}")
+                # New course-level git model: no legacy org-scoped GitProvider.
+                # Create the course row, then bind it to a registry git server if
+                # one was chosen at creation. Git is per-course now — not inherited
+                # from the org/family. Authorization happened at the API edge.
+                from ..custom_types import Ltree
+
+                course = (
+                    db.query(Course)
+                    .filter(
+                        Course.course_family_id == family.id,
+                        Course.path == Ltree(config.path),
+                    )
+                    .first()
+                )
+                if course is None:
+                    course = Course(
+                        title=config.name,
+                        description=config.description or "",
+                        path=Ltree(config.path),
+                        course_family_id=family.id,
+                        organization_id=org.id,
+                        properties={},
+                        created_by=user_id,
+                        updated_by=user_id,
+                    )
+                    db.add(course)
+                    db.flush()
+
+                git_binding = None
+                git_cfg = course_config.get("git") or {}
+                if git_cfg.get("git_server_id"):
+                    from computor_types.course_git import CourseGitBindingUpsert
+                    from ..business_logic.course_git import _apply_course_git_binding
+
+                    binding = _apply_course_git_binding(
+                        course,
+                        CourseGitBindingUpsert(
+                            delivery=git_cfg.get("delivery") or "git",
+                            git_server_id=git_cfg.get("git_server_id"),
+                            template_repo=git_cfg.get("template_repo"),
+                            template_url=git_cfg.get("template_url"),
+                            default_branch=git_cfg.get("default_branch"),
+                            student_repo_modes=git_cfg.get("student_repo_modes") or [],
+                        ),
+                        user_id,
+                        db,
+                    )  # commits the course + binding together
+                    git_binding = {
+                        "git_server_id": str(binding.git_server_id) if binding.git_server_id else None,
+                        "template_url": binding.template_url,
+                    }
+                else:
+                    db.commit()
+
+                logger.info(f"Created course (course-level git model): {config.path} (ID: {course.id})")
+                return {
+                    "course_id": str(course.id),
+                    "status": "created",
+                    "name": course_config.get("name"),
+                    "provider_entity_id": None,
+                    "git_binding": git_binding,
+                }
 
             from ..git_provider import _decrypt
             token = _decrypt(provider_row.token)

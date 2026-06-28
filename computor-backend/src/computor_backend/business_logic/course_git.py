@@ -217,7 +217,23 @@ def upsert_course_git_binding(
     """Create or replace a course's git binding (lecturer-cohort only)."""
     course = _load_course_or_404(course_id, db)
     _require_course_git_manage(permissions, course)
+    binding = _apply_course_git_binding(course, data, permissions.get_user_id(), db)
+    return _binding_to_get(binding, db)
 
+
+def _apply_course_git_binding(
+    course: Course,
+    data: CourseGitBindingUpsert,
+    user_id,
+    db: Session,
+) -> CourseGitBinding:
+    """Permission-free core of :func:`upsert_course_git_binding`.
+
+    The caller must already be authorized (the lecturer endpoint checks
+    git-manage; the course-creation flow checks course-create at the API edge).
+    Extracted so a course can be bound to a registry git server during creation,
+    not only via a later lecturer call.
+    """
     binding = (
         db.query(CourseGitBinding)
         .filter(CourseGitBinding.course_id == course.id)
@@ -291,7 +307,7 @@ def upsert_course_git_binding(
         template_url = gitlab_structure.get("template_url") or template_url
 
     if binding is None:
-        binding = CourseGitBinding(course_id=course.id, created_by=permissions.get_user_id())
+        binding = CourseGitBinding(course_id=course.id, created_by=user_id)
         db.add(binding)
 
     binding.delivery = data.delivery
@@ -302,11 +318,11 @@ def upsert_course_git_binding(
     binding.student_repo_modes = list(data.student_repo_modes or [])
     if gitlab_structure is not None:
         binding.properties = {**(binding.properties or {}), "gitlab": gitlab_structure}
-    binding.updated_by = permissions.get_user_id()
+    binding.updated_by = user_id
 
     db.commit()
     db.refresh(binding)
-    return _binding_to_get(binding, db)
+    return binding
 
 
 def get_course_git_binding(

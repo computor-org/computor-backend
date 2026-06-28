@@ -1247,6 +1247,8 @@ export interface CourseFamilyTaskRequest {
 export interface CourseTaskRequest {
   course: Record<string, any>;
   course_family_id: string;
+  /** Course-level git binding applied at creation: the registry git server (git_server_id) hosting the student-template, delivery mode, and allowed student-repo modes. Omit to create the course unbound and configure git later via the course's git binding. Git is per-course — not inherited from the organization or course family. */
+  git?: CourseGitBindingUpsert | null;
 }
 
 export interface GradedByCourseMember {

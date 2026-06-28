@@ -8,6 +8,8 @@ Temporal workflow task requests/responses and template generation.
 from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 
+from computor_types.course_git import CourseGitBindingUpsert
+
 
 class GitLabCredentials(BaseModel):
     """GitLab connection credentials (kept for backwards compatibility)."""
@@ -38,6 +40,16 @@ class CourseTaskRequest(BaseModel):
     """Request to create a course via Temporal workflow."""
     course: Dict
     course_family_id: str
+    git: Optional[CourseGitBindingUpsert] = Field(
+        None,
+        description=(
+            "Course-level git binding applied at creation: the registry git server "
+            "(git_server_id) hosting the student-template, delivery mode, and allowed "
+            "student-repo modes. Omit to create the course unbound and configure git "
+            "later via the course's git binding. Git is per-course — not inherited "
+            "from the organization or course family."
+        ),
+    )
 
 
 class TaskResponse(BaseModel):
