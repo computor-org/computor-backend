@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from computor_backend.git_provider.gitlab import GITLAB_MAINTAINER
+from computor_backend.git_provider.gitlab import GITLAB_MAINTAINER, GITLAB_REPORTER
 
 pytestmark = pytest.mark.gitlab
 
@@ -120,6 +120,20 @@ class TestStudentFork:
         )
         assert r1.provider_project_id == r2.provider_project_id
 
+    def test_two_students_get_distinct_forks(self, gitlab_provider, course_structure):
+        a = gitlab_provider.provision_student_fork(
+            course_structure["template_project_id"],
+            course_structure["students_group_id"],
+            STUDENT_SLUG,
+        )
+        b = gitlab_provider.provision_student_fork(
+            course_structure["template_project_id"],
+            course_structure["students_group_id"],
+            "it-student-bob",
+        )
+        assert a.provider_project_id != b.provider_project_id
+        assert b.properties["gitlab"]["full_path"].endswith(f"/{COURSE_SLUG}/students/it-student-bob")
+
 
 class TestAddMember:
     def test_grant_membership_by_user_id(self, gitlab_provider, course_structure, gitlab_test_user):
@@ -136,3 +150,12 @@ class TestAddMember:
         assert member.access_level == GITLAB_MAINTAINER
         # Idempotent — a repeat add (409) is swallowed as success.
         assert gitlab_provider.add_member(project_id, gitlab_test_user.id, GITLAB_MAINTAINER) is True
+
+    def test_grant_reporter_on_template(self, gitlab_provider, course_structure, gitlab_test_user):
+        # Mirrors register_gitlab_managed_access granting the student read access
+        # on the course template so they can pull upstream updates.
+        template_id = course_structure["template_project_id"]
+        assert gitlab_provider.add_member(template_id, gitlab_test_user.id, GITLAB_REPORTER) is True
+        gl = gitlab_provider._gl()
+        member = gl.projects.get(template_id).members.get(gitlab_test_user.id)
+        assert member.access_level >= GITLAB_REPORTER
