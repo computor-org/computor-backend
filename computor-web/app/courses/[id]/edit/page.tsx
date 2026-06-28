@@ -11,7 +11,12 @@ import Forbidden from '@/src/components/Forbidden';
 import { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseGet, CourseGitBindingGet, GitServerGet } from 'types/generated';
 
-const ALL_MODES = ['forgejo', 'gitlab_byo', 'download'];
+const ALL_MODES = ['managed', 'external', 'download'];
+const MODE_LABELS: Record<string, string> = {
+  managed: 'Managed — we host it',
+  external: 'External — student-hosted (any provider)',
+  download: 'Download — no git',
+};
 
 export default function CourseEditPage() {
   const courseId = useParams().id as string;
@@ -64,9 +69,9 @@ export default function CourseEditPage() {
         setBranch(b.default_branch || 'main');
         setModes(b.student_repo_modes || []);
       } else {
-        // No binding yet — default to the managed Forgejo + forgejo mode.
-        setGitServerId(srv.find((s) => s.type === 'forgejo' && s.managed)?.id ?? srv[0]?.id ?? '');
-        setModes(['forgejo']);
+        // No binding yet — default to a managed server + the managed mode.
+        setGitServerId(srv.find((s) => s.managed)?.id ?? srv[0]?.id ?? '');
+        setModes(['managed']);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An error occurred');
@@ -216,7 +221,7 @@ export default function CourseEditPage() {
                       <option value="download">download</option>
                     </select>
                   </Field>
-                  <Field label="Git server (for the template)" hint="For a managed Forgejo, leave the template fields blank — the template repo is created automatically.">
+                  <Field label="Git server (for the template)" hint="For a managed server (Forgejo or GitLab), leave the template fields blank — the template repo is created automatically.">
                     <select value={gitServerId} onChange={(e) => setGitServerId(e.target.value)} className={inputCls}>
                       <option value="">— none —</option>
                       {servers.map((s) => (
@@ -233,14 +238,14 @@ export default function CourseEditPage() {
                     </Field>
                   </div>
                   <Field label="Template clone URL">
-                    <input value={templateUrl} onChange={(e) => setTemplateUrl(e.target.value)} placeholder="auto for managed Forgejo" className={inputCls} />
+                    <input value={templateUrl} onChange={(e) => setTemplateUrl(e.target.value)} placeholder="auto for managed servers" className={inputCls} />
                   </Field>
                   <Field label="Allowed student-repo modes">
                     <div className="flex flex-wrap gap-3">
                       {ALL_MODES.map((m) => (
                         <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
                           <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
-                          {m}
+                          {MODE_LABELS[m] ?? m}
                         </label>
                       ))}
                     </div>

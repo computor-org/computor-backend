@@ -12,7 +12,12 @@ import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseFamilyList, CourseGet } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
 
-const ALL_MODES = ['forgejo', 'gitlab_byo', 'download'];
+const ALL_MODES = ['managed', 'external', 'download'];
+const MODE_LABELS: Record<string, string> = {
+  managed: 'Managed — we host it',
+  external: 'External — student-hosted (any provider)',
+  download: 'Download — no git',
+};
 
 function CreateInner() {
   const router = useRouter();
@@ -28,7 +33,7 @@ function CreateInner() {
   const [description, setDescription] = useState('');
   const [gitEnabled, setGitEnabled] = useState(true);
   const [serverId, setServerId] = useState('');
-  const [modes, setModes] = useState<string[]>(['forgejo']);
+  const [modes, setModes] = useState<string[]>(['managed']);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +47,7 @@ function CreateInner() {
       if (canConfigureGit) {
         const srv = await api.get<GitServerGet[]>('/git-servers');
         setServers(srv);
-        const def = srv.find((s) => s.type === 'forgejo' && s.managed)?.id ?? srv[0]?.id ?? '';
+        const def = srv.find((s) => s.managed)?.id ?? srv[0]?.id ?? '';
         setServerId(def);
         setGitEnabled(!!def);
       }
@@ -132,12 +137,12 @@ function CreateInner() {
                     {ALL_MODES.map((m) => (
                       <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
                         <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
-                        {m}
+                        {MODE_LABELS[m] ?? m}
                       </label>
                     ))}
                   </div>
                 </Field>
-                <p className="text-xs text-gray-400">For a managed Forgejo the student-template repo is created automatically.</p>
+                <p className="text-xs text-gray-400">For a managed server (Forgejo or GitLab) the course template repo is created automatically.</p>
               </>
             )}
           </div>
