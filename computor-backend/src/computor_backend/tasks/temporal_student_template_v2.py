@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url, make_provider_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -397,23 +397,38 @@ async def generate_student_template_activity_v2(
         # if not organization:
         #     raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
         
-        # Get GitLab token from organization properties
+        # Resolve the push token + provider. Managed courses keep the token on the
+        # bound GitServer (registry); legacy org-level GitLab keeps it in
+        # organization.properties.gitlab.
         gitlab_token = None
+        server_type = "gitlab"
         if organization.properties and 'gitlab' in organization.properties:
             gitlab_config = organization.properties.get('gitlab', {})
             gitlab_token = decrypt_gitlab_token(gitlab_config.get('token'))
             if gitlab_token:
                 logger.info(f"Using decrypted GitLab token from organization {organization.title}")
-        
+
         if not gitlab_token:
-            logger.warning(f"No GitLab token found in organization {organization.title} properties")
+            from computor_backend.model.git_server import CourseGitBinding
+            from computor_types.encryption import decrypt_secret
+            binding = db.query(CourseGitBinding).filter(CourseGitBinding.course_id == course_id).first()
+            if binding is not None and binding.git_server is not None and binding.git_server.token:
+                gitlab_token = decrypt_secret(binding.git_server.token)
+                server_type = (binding.git_server.type or "gitlab").lower()
+                if gitlab_token:
+                    logger.info(
+                        f"Using service token from git server {binding.git_server.base_url} ({server_type})"
+                    )
+
+        if not gitlab_token:
+            logger.warning(f"No git push token found for course {course_id} (org properties or git server)")
         
         # Use temp directory for repository work
         with tempfile.TemporaryDirectory() as temp_dir:
             template_repo_path = os.path.join(temp_dir, "student-template")
             
             # Create authenticated URL if we have a token and it's HTTP
-            auth_url = make_git_auth_url(student_template_url, gitlab_token) if gitlab_token else student_template_url
+            auth_url = make_provider_auth_url(student_template_url, gitlab_token, server_type)
             
             # Try to clone existing repo or create new one
             try:

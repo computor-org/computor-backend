@@ -23,6 +23,7 @@ from computor_types.system import (
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
 from computor_backend.model.course import Course, CourseContent, CourseFamily
+from computor_backend.model.git_server import CourseGitBinding
 from computor_backend.model.organization import Organization
 from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_backend.task_tracker import get_task_tracker
@@ -262,7 +263,19 @@ async def generate_student_template(
     # Get student-template and assignments URLs
     student_template_url = None
     assignments_url = None
-    
+
+    # Managed courses keep the student-template location in the CourseGitBinding
+    # (and the push token on the bound GitServer), not in course/org
+    # properties.gitlab. Resolve from the binding first; the legacy properties
+    # path below remains the fallback for pre-binding (org-level GitLab) courses.
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if binding is not None and binding.template_url:
+        student_template_url = binding.template_url
+
     # First check if course has GitLab properties
     if course.properties and "gitlab" in course.properties:
         course_gitlab = course.properties["gitlab"]

@@ -70,7 +70,7 @@ def decrypt_gitlab_token(encrypted_token: Optional[str]) -> Optional[str]:
 
 
 def make_git_auth_url(url: str, token: str) -> str:
-    """Insert oauth2 token into a git URL for authenticated clone/push."""
+    """Insert oauth2 token into a git URL for authenticated clone/push (GitLab)."""
     parsed = urlparse(url)
     auth_netloc = f"oauth2:{token}@{parsed.hostname}"
     if parsed.port:
@@ -79,6 +79,29 @@ def make_git_auth_url(url: str, token: str) -> str:
         parsed.scheme, auth_netloc, parsed.path,
         parsed.params, parsed.query, parsed.fragment
     ))
+
+
+def make_forgejo_auth_url(url: str, token: str) -> str:
+    """Insert a token for authenticated clone/push on Forgejo/Gitea, which
+    authenticate with the token as the *username* (not ``oauth2:token`` like
+    GitLab)."""
+    parsed = urlparse(url)
+    auth_netloc = f"{token}@{parsed.hostname}"
+    if parsed.port:
+        auth_netloc += f":{parsed.port}"
+    return urlunparse((
+        parsed.scheme, auth_netloc, parsed.path,
+        parsed.params, parsed.query, parsed.fragment
+    ))
+
+
+def make_provider_auth_url(url: str, token: str, server_type: str) -> str:
+    """Build an authenticated git URL for the given provider type."""
+    if not token:
+        return url
+    if (server_type or "").lower() == "forgejo":
+        return make_forgejo_auth_url(url, token)
+    return make_git_auth_url(url, token)
 
 
 def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
