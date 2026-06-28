@@ -108,7 +108,60 @@ async def create_course_family_activity(
 
             provider_row = db.query(GitProvider).filter(GitProvider.organization_id == organization_id).first()
             if not provider_row:
-                raise ValueError(f"No git provider configured for organization {organization_id}")
+                # Course-level model: no legacy org-scoped GitProvider. Create the
+                # family row and enroll the creator as owner. Course families carry
+                # no git config in this model (git is per-course). Authorization
+                # happened at the API edge.
+                from ..custom_types import Ltree
+                from ..model.course import CourseFamilyMember
+
+                family = (
+                    db.query(CourseFamily)
+                    .filter(
+                        CourseFamily.organization_id == org.id,
+                        CourseFamily.path == Ltree(config.path),
+                    )
+                    .first()
+                )
+                if family is None:
+                    family = CourseFamily(
+                        title=config.name,
+                        description=config.description or "",
+                        path=Ltree(config.path),
+                        organization_id=org.id,
+                        properties={},
+                        created_by=user_id,
+                        updated_by=user_id,
+                    )
+                    db.add(family)
+                    db.flush()
+
+                # Enroll the creator as family owner (manage courses under it).
+                # Idempotent on unique (user_id, course_family_id).
+                if user_id and (
+                    db.query(CourseFamilyMember)
+                    .filter(
+                        CourseFamilyMember.course_family_id == family.id,
+                        CourseFamilyMember.user_id == user_id,
+                    )
+                    .first()
+                ) is None:
+                    db.add(CourseFamilyMember(
+                        course_family_id=family.id,
+                        user_id=user_id,
+                        course_family_role_id="_owner",
+                        created_by=user_id,
+                        updated_by=user_id,
+                    ))
+
+                db.commit()
+                logger.info(f"Created course family (course-level model): {config.path} (ID: {family.id})")
+                return {
+                    "course_family_id": str(family.id),
+                    "status": "created",
+                    "name": family_config.get("name"),
+                    "provider_entity_id": None,
+                }
 
             from ..git_provider import _decrypt
             token = _decrypt(provider_row.token)
