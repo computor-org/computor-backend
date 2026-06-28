@@ -426,7 +426,7 @@ export interface CourseTutorGet {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
-  repository: CourseTutorRepository;
+  repository?: CourseTutorRepository | null;
 }
 
 export interface CourseTutorList {
@@ -435,7 +435,7 @@ export interface CourseTutorList {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
-  repository: CourseTutorRepository;
+  repository?: CourseTutorRepository | null;
 }
 
 export interface CourseTutorQuery {
@@ -1030,6 +1030,8 @@ export interface CourseMemberRepositoryGet {
   course_member_id: string;
   /** managed | external | download */
   mode: string;
+  /** Git server type backing this repo: 'forgejo' | 'gitlab' (null for external/unknown) */
+  provider_type?: string | null;
   server_url?: string | null;
   repo_ref?: string | null;
   http_url?: string | null;
@@ -1052,6 +1054,8 @@ export interface StudentRepositoryProvisioned {
   course_member_id: string;
   /** managed | external | download */
   mode: string;
+  /** Git server type backing this repo: 'forgejo' | 'gitlab' (null for external/unknown) */
+  provider_type?: string | null;
   server_url?: string | null;
   repo_ref?: string | null;
   http_url?: string | null;

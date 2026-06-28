@@ -476,6 +476,7 @@ def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGe
         id=str(rec.id),
         course_member_id=str(rec.course_member_id),
         mode=rec.mode,
+        provider_type=(rec.git_server.type if rec.git_server else None),
         server_url=rec.server_url,
         repo_ref=rec.repo_ref,
         http_url=rec.http_url,

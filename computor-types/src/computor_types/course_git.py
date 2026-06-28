@@ -99,6 +99,9 @@ class CourseMemberRepositoryGet(BaseModel):
     id: str
     course_member_id: str
     mode: str = Field(..., description="managed | external | download")
+    provider_type: Optional[str] = Field(
+        None, description="Git server type backing this repo: 'forgejo' | 'gitlab' (null for external/unknown)"
+    )
     server_url: Optional[str] = None
     repo_ref: Optional[str] = None
     http_url: Optional[str] = None
