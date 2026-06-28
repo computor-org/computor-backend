@@ -147,6 +147,25 @@ class UserClient:
         response = await self._http.post(f"/user/courses/{course_id}/register-repository", params=kwargs)
         return response.json()
 
+    async def courses_register_gitlab(
+        self,
+        course_id: str,
+        data: Union[CourseMemberValidationRequest, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Register Gitlab Managed Endpoint"""
+        response = await self._http.post(f"/user/courses/{course_id}/register-gitlab", json_data=data, params=kwargs)
+        return response.json()
+
+    async def courses_template_archive(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Download Template Archive Endpoint"""
+        response = await self._http.get(f"/user/courses/{course_id}/template/archive", params=kwargs)
+        return response.json()
+
     async def courses_validate(
         self,
         course_id: str,

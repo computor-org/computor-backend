@@ -278,7 +278,7 @@ export interface CourseMemberCommentQuery {
 }
 
 export interface CommentCreate {
-  course_member_id: any;
+  course_member_id: string;
   message: string;
 }
 
@@ -980,7 +980,7 @@ export interface CourseGitDescriptor {
   configured: boolean;
   /** Assignment delivery: 'git' | 'download' */
   delivery?: string | null;
-  /** Allowed student-repo backends, e.g. ['forgejo', 'gitlab_byo', 'download'] */
+  /** Allowed student-repo hosting modes, e.g. ['managed', 'external', 'download'] */
   student_repo_modes?: string[];
   /** Template location (absent for pure download or unconfigured courses) */
   template?: GitTemplateRef | null;
@@ -999,7 +999,7 @@ export interface CourseGitBindingUpsert {
   template_url?: string | null;
   /** Default branch (defaults to 'main') */
   default_branch?: string | null;
-  /** Allowed student-repo backends: subset of ['forgejo', 'gitlab_byo', 'download'] */
+  /** Allowed student-repo hosting modes: subset of ['managed', 'external', 'download'] */
   student_repo_modes?: string[];
 }
 
@@ -1028,7 +1028,7 @@ export interface CourseGitBindingGet {
 export interface CourseMemberRepositoryGet {
   id: string;
   course_member_id: string;
-  /** forgejo | gitlab_byo | download */
+  /** managed | external | download */
   mode: string;
   server_url?: string | null;
   repo_ref?: string | null;
@@ -1050,7 +1050,7 @@ export interface CourseMemberRepositoryGet {
 export interface StudentRepositoryProvisioned {
   id: string;
   course_member_id: string;
-  /** forgejo | gitlab_byo | download */
+  /** managed | external | download */
   mode: string;
   server_url?: string | null;
   repo_ref?: string | null;
@@ -1064,13 +1064,14 @@ export interface StudentRepositoryProvisioned {
 }
 
 /**
- * Client-supplied location of a student's BYO repository (e.g. a repo the
- * VSCode extension created on the student's own GitLab with their PAT).
+ * Client-supplied location of a student's external repository (e.g. a repo on
+ * any git provider that the VSCode extension seeded from the course template and
+ * linked back as ``upstream``).
  * 
  * Tracking only — the backend never reads this repo (grading is API upload).
  */
 export interface CourseMemberRepositoryRegister {
-  mode?: "gitlab_byo" | "forgejo" | "download";
+  mode?: "external" | "managed" | "download";
   /** Base URL of the git instance hosting the repo */
   server_url?: string | null;
   /** Provider project/repo reference (e.g. group/path or id) */

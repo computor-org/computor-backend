@@ -18,12 +18,12 @@ import type { Repository } from './common';
 export interface TaskResult {
   task_id: string;
   status: TaskStatus;
-  result?: any | null;
+  result?: unknown | null;
   error?: string | null;
   created_at: string;
   started_at?: string | null;
   finished_at?: string | null;
-  progress?: Record<string, any> | null;
+  progress?: Record<string, unknown> | null;
 }
 
 /**
@@ -31,7 +31,7 @@ export interface TaskResult {
  */
 export interface TaskSubmission {
   task_name: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
   queue?: string;
   workflow_id?: string | null;
   delay?: number | null;
@@ -47,13 +47,13 @@ export interface TaskInfo {
   created_at: string;
   started_at?: string | null;
   finished_at?: string | null;
-  progress?: Record<string, any> | null;
+  progress?: Record<string, unknown> | null;
   error?: string | null;
   worker?: string | null;
   queue?: string | null;
   retries?: number | null;
-  args?: any | null;
-  kwargs?: Record<string, any> | null;
+  args?: unknown | null;
+  kwargs?: Record<string, unknown> | null;
   short_task_id?: string | null;
   status_display?: string | null;
   completed_at?: string | null;

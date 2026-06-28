@@ -220,27 +220,27 @@ export interface FilterBase {
 }
 
 export interface EqualsFilter {
-  eq: any;
+  eq: unknown;
 }
 
 export interface GreaterFilter {
-  gt: any;
+  gt: unknown;
 }
 
 export interface LowerFilter {
-  lt: any;
+  lt: unknown;
 }
 
 export interface NotEqualsFilter {
-  ne: any;
+  ne: unknown;
 }
 
 export interface InFilter {
-  in_: any[];
+  in_: unknown[];
 }
 
 export interface NotInFilter {
-  not_in: any[];
+  not_in: unknown[];
 }
 
 export interface LikeFilter {
@@ -252,7 +252,7 @@ export interface ILikeFilter {
 }
 
 export interface BetweenFilter {
-  between: any[];
+  between: unknown[];
 }
 
 export interface IsNullFilter {
@@ -300,7 +300,7 @@ export interface UserDeployment {
   /** Type of user account (user or token) */
   user_type?: string;
   /** Additional user properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   /** Initial password for the user */
   password?: string | null;
   /** System roles to assign to the user */
@@ -322,7 +322,7 @@ export interface AccountDeployment {
   /** Account ID in the provider system */
   provider_account_id: string;
   /** Provider-specific account properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   /** Access token for API access */
   access_token?: string | null;
   /** Refresh token for token renewal */
@@ -398,7 +398,7 @@ export interface ExecutionBackendConfig {
   /** Type of execution backend (e.g., temporal, prefect) */
   type: string;
   /** Backend-specific properties (e.g., task_queue, namespace, timeout settings) */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -408,7 +408,7 @@ export interface ExecutionBackendReference {
   /** Slug of the execution backend to link */
   slug: string;
   /** Course-specific overrides for this backend (optional) */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -462,7 +462,7 @@ export interface ServiceConfig {
   /** API token configuration */
   api_token: ServiceApiTokenConfig;
   /** Service-specific configuration (task_queue, timeouts, etc.) */
-  config?: Record<string, any> | null;
+  config?: Record<string, unknown> | null;
   /** Service description */
   description?: string | null;
   /** Course memberships for this service's user (e.g., _tutor role for testing services) */
@@ -490,7 +490,7 @@ export interface CourseContentTypeConfig {
   /** Display color (hex, rgb, hsl, or named color) */
   color?: string | null;
   /** Additional properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   /** ID of the course content kind (e.g., 'assignment', 'unit') */
   kind: string;
 }
@@ -522,7 +522,7 @@ export interface OrganizationConfig {
   /** Organization description */
   description?: string | null;
   /** Organization-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
   /** GitLab configuration */
   gitlab?: GitLabConfig | null;
   /** GitHub configuration (future) */
@@ -540,7 +540,7 @@ export interface CourseFamilyConfig {
   /** Course family description */
   description?: string | null;
   /** Course family-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
 }
 
 /**
@@ -572,7 +572,7 @@ export interface CourseContentConfig {
   /** Nested course contents (for units containing assignments) */
   contents?: CourseContentConfig[] | null;
   /** Additional properties for the content */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -596,7 +596,7 @@ export interface CourseConfig {
   /** Course contents hierarchy (assignments, units, etc.) */
   contents?: CourseContentConfig[] | null;
   /** Course-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
 }
 
 /**
@@ -620,7 +620,7 @@ export interface HierarchicalCourseConfig {
   /** Course contents hierarchy (assignments, units, etc.) */
   contents?: CourseContentConfig[] | null;
   /** Course-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
 }
 
 /**
@@ -634,7 +634,7 @@ export interface HierarchicalCourseFamilyConfig {
   /** Course family description */
   description?: string | null;
   /** Course family-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
   /** List of courses in this course family */
   courses?: HierarchicalCourseConfig[];
 }
@@ -650,7 +650,7 @@ export interface HierarchicalOrganizationConfig {
   /** Organization description */
   description?: string | null;
   /** Organization-specific settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
   /** GitLab configuration */
   gitlab?: GitLabConfig | null;
   /** GitHub configuration (future) */
@@ -674,7 +674,7 @@ export interface ComputorDeploymentConfig {
   /** List of users with their accounts and course memberships */
   users?: UserAccountDeployment[];
   /** Global deployment settings */
-  settings?: Record<string, any> | null;
+  settings?: Record<string, unknown> | null;
   /** Optional list of VSIX packages to upload before deployment */
   extensions_upload?: ExtensionUploadConfig[] | null;
   /** If provided, uploads examples before hierarchy deployment */
@@ -1441,7 +1441,7 @@ export interface ComputorTest {
   ignoreClass?: boolean | null;
   verbosity?: number | null;
   name: string;
-  value?: any | null;
+  value?: unknown | null;
   evalString?: string | null;
   pattern?: string | null;
   countRequirement?: number | null;
@@ -1479,7 +1479,7 @@ export interface ComputorTestCollection {
   type?: TypeEnum | null;
   name: string;
   description?: string | null;
-  successDependency?: (string | number | any[]) | null;
+  successDependency?: (string | number | string | number[]) | null;
   setUpCodeDependency?: string | null;
   entryPoint?: string | null;
   inputAnswers?: (string | string[]) | null;
@@ -1568,13 +1568,13 @@ export interface SemanticVersion {
   /** Patch version number */
   patch: number;
   /** Optional prerelease identifier */
-  prerelease?: any;
+  prerelease?: string | null;
 }
 
 export interface GitServerHealthResponse {
   status: string;
   server_type: string;
-  version?: any;
+  version?: string | null;
 }
 
 /**
@@ -1633,7 +1633,7 @@ export interface TutorTestGet {
   created_at?: string | null;
   started_at?: string | null;
   finished_at?: string | null;
-  result_dict?: any | null;
+  result_dict?: unknown | null;
   passed?: number | null;
   failed?: number | null;
   total?: number | null;
@@ -1942,7 +1942,7 @@ export interface ServiceCreate {
   /** Password for service user (optional - use API tokens instead) */
   password?: string | null;
   /** Service-specific configuration */
-  config?: Record<string, any> | null;
+  config?: Record<string, unknown> | null;
   /** Whether the service is enabled */
   enabled?: boolean | null;
 }
@@ -1953,11 +1953,11 @@ export interface ServiceCreate {
 export interface ServiceUpdate {
   name?: string | null;
   description?: string | null;
-  config?: Record<string, any> | null;
+  config?: Record<string, unknown> | null;
   enabled?: boolean | null;
   /** Last heartbeat timestamp */
   last_seen_at?: string | null;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -1980,11 +1980,11 @@ export interface ServiceGet {
   /** ServiceType path (e.g., 'testing.python') */
   service_type_path?: string | null;
   user_id: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   enabled: boolean;
   last_seen_at?: string | null;
   /** Additional properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -2142,8 +2142,8 @@ export interface SubmissionListItem {
   reference_version_identifier?: string | null;
   status: TaskStatus;
   result: number;
-  result_json?: Record<string, any> | null;
-  properties?: Record<string, any> | null;
+  result_json?: Record<string, unknown> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -2503,7 +2503,7 @@ export interface SubmissionArtifactCreate {
  */
 export interface SubmissionArtifactUpdate {
   submit?: boolean | null;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -2527,7 +2527,7 @@ export interface SubmissionArtifactList {
   uploaded_at: string;
   version_identifier?: string | null;
   submit?: boolean;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   latest_result?: ResultList | null;
 }
 
@@ -2549,7 +2549,7 @@ export interface SubmissionArtifactGet {
   uploaded_at: string;
   version_identifier?: string | null;
   submit?: boolean;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
   latest_result?: ResultList | null;
   test_results_count?: number | null;
   grades_count?: number | null;
@@ -2709,7 +2709,7 @@ export interface ResultArtifactCreate {
   file_size: number;
   bucket_name: string;
   object_key: string;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -2725,7 +2725,7 @@ export interface ResultArtifactListItem {
   file_size: number;
   bucket_name: string;
   object_key: string;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -2841,7 +2841,7 @@ export interface CourseContentDeploymentGet {
   last_attempt_at?: string | null;
   deployment_path?: string | null;
   version_identifier?: string | null;
-  deployment_metadata?: Record<string, any> | null;
+  deployment_metadata?: Record<string, unknown> | null;
   workflow_id?: string | null;
   example_version?: any | null;
 }
@@ -3025,7 +3025,7 @@ export interface ErrorResponse {
   /** Human-readable error message */
   message: string;
   /** Additional error details */
-  details?: any | null;
+  details?: unknown | null;
   /** Error severity */
   severity: ErrorSeverity;
   /** Error category */
@@ -3055,7 +3055,7 @@ export interface ErrorDebugInfo {
   /** User ID if authenticated */
   user_id?: string | null;
   /** Additional context */
-  additional_context?: Record<string, any> | null;
+  additional_context?: Record<string, unknown> | null;
 }
 
 /**
@@ -3069,7 +3069,7 @@ export interface ErrorMetadata {
   /** Function raising the error */
   function_name?: string | null;
   /** Additional context */
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   /** User ID if available */
   user_id?: string | null;
   /** Request ID for tracing */
@@ -3077,7 +3077,7 @@ export interface ErrorMetadata {
   /** Override default message */
   override_message?: string | null;
   /** Override default details */
-  override_details?: any | null;
+  override_details?: unknown | null;
 }
 
 export interface ResultCreate {
@@ -3675,7 +3675,7 @@ export interface GradedArtifactInfo {
   /** When the artifact was created (ISO format) */
   created_at?: string | null;
   /** Additional artifact properties (e.g., GitLab info) */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -4213,6 +4213,8 @@ export interface GitServerCreate {
   managed?: boolean;
   /** Service token; stored encrypted, never returned */
   token?: string | null;
+  /** GitLab parent group id/path the group token is scoped to; managed courses are provisioned flat under it (GitLab only) */
+  parent_group_id?: string | null;
 }
 
 export interface GitServerUpdate {
@@ -4220,6 +4222,8 @@ export interface GitServerUpdate {
   managed?: boolean | null;
   /** Replacement service token ("" clears, omit keeps) */
   token?: string | null;
+  /** Replacement GitLab parent group id/path (GitLab only) */
+  parent_group_id?: string | null;
 }
 
 export interface GitServerGet {
@@ -4230,6 +4234,8 @@ export interface GitServerGet {
   managed: boolean;
   /** Whether a service token is stored (the token itself is never returned) */
   has_token: boolean;
+  /** GitLab parent group id/path for managed provisioning (GitLab only) */
+  parent_group_id?: string | null;
   created_at?: string | null;
 }
 

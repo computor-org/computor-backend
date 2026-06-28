@@ -160,7 +160,7 @@ export interface ExampleVersionCreate {
   version_number: number;
   storage_path: string;
   /** Parsed meta.yaml — used to populate promoted columns */
-  meta: Record<string, any>;
+  meta: Record<string, unknown>;
 }
 
 /**
@@ -185,7 +185,7 @@ export interface ExampleVersionGet {
   language?: string | null;
   license?: string | null;
   /** Full meta.yaml properties.executionBackend (slug + version + settings) */
-  execution_backend?: Record<string, any> | null;
+  execution_backend?: Record<string, unknown> | null;
   student_submission_files?: string[];
   additional_files?: string[];
   student_templates?: string[];
@@ -293,7 +293,7 @@ export interface ExampleUploadRequest {
 export interface ExampleBatchUploadRequest {
   repository_id: string;
   /** List of examples with directory and files */
-  examples: Record<string, any>[];
+  examples: Record<string, unknown>[];
 }
 
 /**
@@ -309,9 +309,9 @@ export interface ExampleFileSet {
   /** Map of filename to content (meta.yaml and test.yaml ride inside this dict) */
   files: Record<string, string>;
   /** Parsed meta.yaml (fetched from MinIO with Redis cache) */
-  meta: Record<string, any>;
+  meta: Record<string, unknown>;
   /** Parsed test.yaml (fetched from MinIO with Redis cache); None if absent */
-  test?: Record<string, any> | null;
+  test?: Record<string, unknown> | null;
 }
 
 /**
@@ -328,9 +328,9 @@ export interface ExampleDownloadResponse {
   /** Map of filename to content (includes meta.yaml and test.yaml) */
   files: Record<string, string>;
   /** Parsed meta.yaml (fetched from MinIO with Redis cache) */
-  meta: Record<string, any>;
+  meta: Record<string, unknown>;
   /** Parsed test.yaml (fetched from MinIO with Redis cache); None if absent */
-  test?: Record<string, any> | null;
+  test?: Record<string, unknown> | null;
   /** Dependency examples when with_dependencies=True */
   dependencies?: ExampleFileSet[] | null;
 }

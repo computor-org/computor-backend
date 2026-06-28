@@ -39,11 +39,6 @@ export interface OrganizationUpdateTokenUpdate {
 export interface AuthConfig {
 }
 
-export interface GLPAuthConfig {
-  url: string;
-  token: string;
-}
-
 /**
  * Request model for logout.
  */
@@ -227,7 +222,7 @@ export interface ApiTokenCreate {
   /** Token expiration date (null = never expires) */
   expires_at?: string | null;
   /** Additional properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -250,7 +245,7 @@ export interface ApiTokenAdminCreate {
   /** Token expiration date (null = never expires) */
   expires_at?: string | null;
   /** Additional properties */
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**
@@ -282,7 +277,7 @@ export interface ApiTokenUpdate {
   description?: string | null;
   scopes?: string[] | null;
   expires_at?: string | null;
-  properties?: Record<string, any> | null;
+  properties?: Record<string, unknown> | null;
 }
 
 /**

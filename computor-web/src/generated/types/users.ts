@@ -26,12 +26,12 @@ export interface CreateGitUserRequest {
   username: string;
   email: any;
   display_name: string;
-  password?: any;
+  password?: string | null;
 }
 
 export interface UpdateGitUserRequest {
-  email?: any;
-  display_name?: any;
+  email?: any | null;
+  display_name?: string | null;
 }
 
 export interface GitUser {
@@ -72,6 +72,8 @@ export interface AccountGet {
   provider_account_id: string;
   /** Associated user ID */
   user_id: string;
+  /** Built-in identity account (SSO / Git server) that the user cannot unlink */
+  builtin?: boolean;
   /** Provider-specific properties */
   properties?: any | null;
 }
@@ -91,6 +93,8 @@ export interface AccountList {
   provider_account_id: string;
   /** Associated user ID */
   user_id: string;
+  /** Built-in identity account (SSO / Git server) that the user cannot unlink */
+  builtin?: boolean;
 }
 
 export interface AccountUpdate {
@@ -143,10 +147,10 @@ export interface AccountProvider {
  */
 export interface WorkspaceRoleUser {
   user_id: string;
-  email: any;
-  username: any;
-  given_name: any;
-  family_name: any;
+  email: string | null;
+  username: string | null;
+  given_name: string | null;
+  family_name: string | null;
   roles?: string[];
 }
 

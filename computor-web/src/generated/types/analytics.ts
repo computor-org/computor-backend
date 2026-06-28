@@ -108,6 +108,18 @@ export interface AnalyticsStandardExample {
   href?: string | null;
 }
 
+export interface AnalyticsExampleSourceFile {
+  name: string;
+  content: string;
+}
+
+export interface AnalyticsExampleSource {
+  content_id: string;
+  title: string;
+  files?: AnalyticsExampleSourceFile[];
+  href?: string | null;
+}
+
 export interface AnalyticsTimelineEvent {
   occurred_at: string;
   event_type: string;
