@@ -110,7 +110,24 @@ class GitLabBuilder:
             if existing_org:
                 logger.info(f"Organization already exists: {existing_org.path}")
                 result["organization"] = existing_org
-                
+                # Course-group-only model: never create/validate a GitLab group for
+                # the org. Refresh the recorded connection + hand-made parent, return.
+                # (The legacy group-validation block below is intentionally unreachable.)
+                from computor_types.encryption import encrypt_secret
+                from sqlalchemy.orm.attributes import flag_modified
+                props = existing_org.properties or {}
+                props["gitlab"] = {
+                    **(props.get("gitlab") or {}),
+                    "url": self.gitlab_url,
+                    "token": encrypt_secret(self.gitlab_token),
+                    "parent": org_config.gitlab.parent,
+                }
+                existing_org.properties = props
+                flag_modified(existing_org, "properties")
+                self.db.flush()
+                result["success"] = True
+                return result
+
                 # Validate GitLab group if properties exist
                 if existing_org.properties and existing_org.properties.get("gitlab"):
                     gitlab_config = existing_org.properties["gitlab"]
@@ -187,20 +204,22 @@ class GitLabBuilder:
                 result["success"] = True
                 return result
             
-            # Create new organization
-            # First create GitLab group
-            logger.info(f"Creating new organization GitLab group with parent: {org_config.gitlab.parent}")
-            gitlab_group, _ = self._create_gitlab_group(
-                org_config.name,
-                org_config.path,
-                org_config.gitlab.parent,
-                org_config.description or ""
+            # Create new organization (DB only).
+            # Course-group-only model: we DO NOT create a GitLab group for the
+            # organization — the lecturer builds the org/family group structure by
+            # hand. We only record the connection (url + token) and the hand-made
+            # ``parent`` group under which course groups are created (_create_course).
+            from computor_types.encryption import encrypt_secret
+            logger.info(
+                "Skipping GitLab org group creation (course-group-only model); "
+                "recording hand-made parent group %s", org_config.gitlab.parent,
             )
-            result["gitlab_group"] = gitlab_group
-            result["gitlab_created"] = True
-            
-            # Create organization-specific config with encrypted token
-            gitlab_config = self._create_organization_gitlab_config(gitlab_group)
+            gitlab_config = {
+                "url": self.gitlab_url,
+                "token": encrypt_secret(self.gitlab_token),
+                "parent": org_config.gitlab.parent,
+                "last_synced_at": datetime.now(timezone.utc).isoformat(),
+            }
             
             # Create organization in database
             logger.info(f"Creating organization with gitlab_config: {gitlab_config}")
@@ -267,6 +286,10 @@ class GitLabBuilder:
             if existing_family:
                 logger.info(f"CourseFamily already exists: {existing_family.path}")
                 result["course_family"] = existing_family
+                # Course-group-only model: no GitLab subgroup for the family.
+                # (The legacy group block below is intentionally unreachable.)
+                result["success"] = True
+                return result
                 
                 # Get parent GitLab group
                 parent_gitlab_config = organization.properties.get("gitlab", {})
@@ -359,34 +382,11 @@ class GitLabBuilder:
                 result["success"] = True
                 return result
             
-            # Create new course family
-            # Get parent GitLab group
-            parent_gitlab_config = organization.properties.get("gitlab", {})
-            parent_group_id = parent_gitlab_config.get("group_id")
-            
-            if not parent_group_id:
-                result["error"] = "Parent organization missing GitLab group_id"
-                return result
-            
-            try:
-                parent_group = self.gitlab.groups.get(parent_group_id)
-            except GitlabGetError as e:
-                result["error"] = f"Failed to retrieve parent group {parent_group_id}: {str(e)}"
-                return result
-            
-            # Create GitLab group
-            gitlab_group, _ = self._create_gitlab_group(
-                family_config.name,
-                family_config.path,
-                parent_group_id,
-                family_config.description or "",
-                parent_group
-            )
-            result["gitlab_group"] = gitlab_group
-            result["gitlab_created"] = True
-
-            # Create child-specific config WITHOUT token
-            gitlab_config = self._create_child_gitlab_config(gitlab_group)
+            # Create new course family (DB only).
+            # Course-group-only model: no GitLab subgroup is created for the
+            # course family — the lecturer owns the group structure by hand.
+            logger.info("Skipping GitLab course-family group creation (course-group-only model)")
+            gitlab_config = {"url": self.gitlab_url}
 
             # Create course family in database
             family_data = CourseFamilyCreate(
@@ -456,12 +456,12 @@ class GitLabBuilder:
                 logger.info(f"Course already exists: {existing_course.path}")
                 result["course"] = existing_course
                 
-                # Get parent GitLab group
-                parent_gitlab_config = course_family.properties.get("gitlab", {})
-                parent_group_id = parent_gitlab_config.get("group_id")
-                
+                # Course group lives under the organization's hand-made parent.
+                parent_gitlab_config = organization.properties.get("gitlab", {})
+                parent_group_id = parent_gitlab_config.get("parent")
+
                 if not parent_group_id:
-                    result["error"] = "Parent course family missing GitLab group_id"
+                    result["error"] = "Organization missing GitLab parent group (gitlab.parent)"
                     return result
                 
                 try:
@@ -582,12 +582,14 @@ class GitLabBuilder:
                 return result
             
             # Create new course
-            # Get parent GitLab group
-            parent_gitlab_config = course_family.properties.get("gitlab", {})
-            parent_group_id = parent_gitlab_config.get("group_id")
-            
+            # Course-group-only model: the course group is created directly under
+            # the organization's hand-made *parent* group (we no longer create
+            # org/family groups). The lecturer records it as org.properties.gitlab.parent.
+            parent_gitlab_config = organization.properties.get("gitlab", {})
+            parent_group_id = parent_gitlab_config.get("parent")
+
             if not parent_group_id:
-                result["error"] = "Parent course family missing GitLab group_id"
+                result["error"] = "Organization missing GitLab parent group (gitlab.parent)"
                 return result
             
             try:
