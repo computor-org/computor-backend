@@ -162,7 +162,7 @@ class ForgejoProviderClient:
         team_name = self._team_name(family_slug, course_slug)
 
         template_repo_name = self._repo_name(family_slug, course_slug, "template")
-        assignments_repo_name = self._repo_name(family_slug, course_slug, "assignments")
+        assignments_repo_name = self._repo_name(family_slug, course_slug, "reference")
 
         with self._client() as client:
             team = self._get_or_create_team(client, org_name, team_name, config.description or "")
@@ -172,7 +172,7 @@ class ForgejoProviderClient:
             )
             assignments_repo = self._get_or_create_repo(
                 client, org_name, assignments_repo_name,
-                f"Assignments for {config.name}",
+                f"Reference content for {config.name}",
             )
             self._add_repo_to_team(client, team["id"], org_name, template_repo["name"])
             self._add_repo_to_team(client, team["id"], org_name, assignments_repo["name"])

@@ -861,17 +861,19 @@ class GitLabBuilder:
             "error": None
         }
         
-        # Create both student-template and assignments repositories
+        # Create the template + reference repositories. The names are the current
+        # defaults; existing courses keep whatever names are stored in their
+        # ``properties.gitlab.projects`` (consumers read the stored full_path/url).
         project_configs = [
             {
-                "name": "Student Template",
-                "path": "student-template",
+                "name": "Template",
+                "path": "template",
                 "description": f"Template repository for students in {course.title}",
                 "visibility": "private"
             },
             {
-                "name": "Assignments",
-                "path": "assignments",
+                "name": "Reference",
+                "path": "reference",
                 "description": f"Reference repository with full example content for {course.title}",
                 "visibility": "private"
             }
@@ -921,25 +923,28 @@ class GitLabBuilder:
             if "gitlab" not in course.properties:
                 course.properties["gitlab"] = {}
             
+            # The ``student_template`` / ``assignments`` keys are role slots
+            # (kept for back-compat with existing consumers); the stored path/url
+            # values carry the actual repo names — now ``template`` / ``reference``.
             course.properties["gitlab"]["projects"] = {
                 "student_template": {
-                    "path": "student-template",
-                    "full_path": f"{parent_group.full_path}/student-template",
-                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/student-template",
+                    "path": "template",
+                    "full_path": f"{parent_group.full_path}/template",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/template",
                     "description": "Template repository for students"
                 },
                 "assignments": {
-                    "path": "assignments",
-                    "full_path": f"{parent_group.full_path}/assignments",
-                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/assignments",
+                    "path": "reference",
+                    "full_path": f"{parent_group.full_path}/reference",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/reference",
                     "description": "Reference repository with full example content"
                 },
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
-            
+
             # Store URLs at the top level for easy access
-            course.properties["gitlab"]["student_template_url"] = f"{self.gitlab_url}/{parent_group.full_path}/student-template"
-            course.properties["gitlab"]["assignments_url"] = f"{self.gitlab_url}/{parent_group.full_path}/assignments"
+            course.properties["gitlab"]["student_template_url"] = f"{self.gitlab_url}/{parent_group.full_path}/template"
+            course.properties["gitlab"]["assignments_url"] = f"{self.gitlab_url}/{parent_group.full_path}/reference"
             
             # Tell SQLAlchemy that the properties field has been modified
             flag_modified(course, "properties")
