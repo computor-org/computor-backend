@@ -9,18 +9,14 @@ import SetupLoginMenu from '../src/components/SetupLoginMenu';
 
 export default function Home() {
   const router = useRouter();
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { user, logout } = useAuth();
   const [extensionUrl, setExtensionUrl] = useState<string | null>(null);
   const [extensionLoading, setExtensionLoading] = useState(true);
   const [gettingStartedUrl, setGettingStartedUrl] = useState<string | null>(null);
 
-  // `/` is the public landing page; a signed-in user clicking the Computor logo
-  // wants the app, not the marketing splash. Send them to the dashboard.
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard');
-    }
-  }, [isLoading, isAuthenticated, router]);
+  // `/` is the public landing page and stays viewable when signed in (the header
+  // shows Dashboard + Sign Out for authenticated users) — no auto-redirect, so a
+  // signed-in user can switch back to this view.
 
   useEffect(() => {
     async function fetchExtensionUrl() {
