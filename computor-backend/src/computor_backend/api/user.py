@@ -20,7 +20,9 @@ from computor_types.course_git import (
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Response
+
+from computor_backend.exceptions import ServiceUnavailableException
 
 # Import business logic
 from computor_backend.business_logic.users import (
@@ -228,9 +230,9 @@ async def download_template_archive_endpoint(
     async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
         upstream = await client.get(url, headers=headers)
     if upstream.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not fetch the template archive (git server returned {upstream.status_code}).",
+        raise ServiceUnavailableException(
+            detail="Could not fetch the template archive from the git server.",
+            context={"upstream_status": upstream.status_code},
         )
     return Response(
         content=upstream.content,

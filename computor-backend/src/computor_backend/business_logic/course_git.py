@@ -282,9 +282,11 @@ def upsert_course_git_binding(
                 parent_group_id, course_slug, course.title or course_slug
             )
         except Exception as exc:  # materialization is essential — fail loudly
+            logger.warning("GitLab course-structure provisioning failed: %s", exc)
             raise BadRequestException(
-                f"Could not provision the GitLab course structure: {exc}"
-            )
+                "Could not provision the GitLab course structure on the bound server.",
+                context={"error": str(exc)},
+            ) from exc
         template_repo = gitlab_structure.get("template_path") or template_repo
         template_url = gitlab_structure.get("template_url") or template_url
 
