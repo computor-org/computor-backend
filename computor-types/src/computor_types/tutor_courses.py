@@ -18,7 +18,7 @@ class CourseTutorGet(BaseModel):
     organization_id: Optional[str] = None
     path: str
 
-    repository: CourseTutorRepository
+    repository: Optional[CourseTutorRepository] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,7 +34,7 @@ class CourseTutorList(BaseModel):
     organization_id: Optional[str] = None
     path: str
 
-    repository: CourseTutorRepository
+    repository: Optional[CourseTutorRepository] = None
 
     model_config = ConfigDict(from_attributes=True)
 

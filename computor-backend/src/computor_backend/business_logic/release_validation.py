@@ -185,10 +185,13 @@ def validate_course_for_release(
             logger.error(f"[Validation] ❌ '{assignment.path}': Example was unassigned")
             continue
 
-        # Check 3: Deployment status is valid for release
-        # Valid statuses: 'pending' (will be deployed), 'deployed' (already deployed)
-        # Invalid statuses: 'failed' (deployment failed), 'unassigned' (already handled above)
-        valid_statuses = ['pending', 'deployed']
+        # Check 3: Deployment status is valid for release.
+        # 'pending' (never deployed) and 'failed' (previous attempt failed) are
+        # always retryable; 'deployed' (already deployed) only with force_redeploy.
+        # 'unassigned' is already handled above.
+        valid_statuses = ['pending', 'failed']
+        if force_redeploy:
+            valid_statuses.append('deployed')
 
         if deployment.deployment_status not in valid_statuses:
             error = ValidationError(
