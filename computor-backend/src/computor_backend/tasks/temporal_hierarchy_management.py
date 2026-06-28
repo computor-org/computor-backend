@@ -206,6 +206,24 @@ async def create_course_activity(
                     db.add(course)
                     db.flush()
 
+                # Enroll the creator as course owner so they can manage the course
+                # immediately (assign examples, release, ...). The legacy GitLab
+                # path relied on group-membership sync; the course-level model
+                # records ownership directly. Idempotent on unique (user_id, course_id).
+                from ..model.course import CourseMember
+                if user_id and (
+                    db.query(CourseMember)
+                    .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
+                    .first()
+                ) is None:
+                    db.add(CourseMember(
+                        course_id=course.id,
+                        user_id=user_id,
+                        course_role_id="_owner",
+                        created_by=user_id,
+                        updated_by=user_id,
+                    ))
+
                 git_binding = None
                 git_cfg = course_config.get("git") or {}
                 if git_cfg.get("git_server_id"):
