@@ -18,7 +18,6 @@ from computor_backend.database import get_db
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.cache import Cache
 from computor_backend.repositories import (
-    ServiceRepository,
     ServiceTypeRepository,
     CourseContentDeploymentRepository,
 )
@@ -250,20 +249,23 @@ async def create_test_run(
         CourseContent.id == submission_group.course_content_id
     ).first()
 
-    if not course_content or not course_content.testing_service_id:
+    if not course_content:
         raise BadRequestException(
             error_code="SUBMIT_005",
-            detail="Assignment or testing service not configured"
+            detail="Assignment not configured"
         )
 
-    # Get testing service using repository (e.g., itp-worker-python)
-    service_repo = ServiceRepository(db, repo_cache)
-    service = service_repo.get_by_id_optional(str(course_content.testing_service_id))
+    # Resolve the testing service: cached FK, else by the example's executionBackend
+    # slug (self-healing). Lets a content/example exist before the service is
+    # registered — testing works the moment the matching service appears.
+    from computor_backend.business_logic.testing_service import resolve_testing_service
+
+    service = resolve_testing_service(course_content, db)
 
     if not service:
         raise BadRequestException(
             error_code="SUBMIT_005",
-            detail="Testing service not found"
+            detail="Assignment has no testing service: no enabled service matches the example's executionBackend slug"
         )
 
     # Get the service type using repository
