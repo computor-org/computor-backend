@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import yaml
 
@@ -40,18 +41,29 @@ logger = logging.getLogger(__name__)
 def _deployments_dir() -> str:
     """Directory of bootstrap deployment YAMLs.
 
-    Set ``DEPLOYMENTS_DIR`` explicitly (the prod container mounts the staged dir
-    there); on the dev host the API runs from the repo root, so the default
-    ``data/deployments`` resolves to the repo's directory.
+    Prod sets ``DEPLOYMENTS_DIR`` (the container mounts the staged dir there). In
+    dev the API runs from ``computor-backend/src`` (api.sh), NOT the repo root, so
+    a cwd-relative path won't find ``data/deployments`` — resolve it relative to
+    the repo root instead (this file is at
+    ``<repo>/computor-backend/src/computor_backend/business_logic/bootstrap.py``).
     """
-    return os.environ.get("DEPLOYMENTS_DIR") or os.path.join("data", "deployments")
+    env = os.environ.get("DEPLOYMENTS_DIR")
+    if env:
+        return env
+    repo_root = Path(__file__).resolve().parents[4]
+    return str(repo_root / "data" / "deployments")
 
 
 def ensure_bootstrap_services() -> None:
-    """Apply the ``services:`` of every ``data/deployments/*.yaml`` idempotently."""
+    """Apply the ``services:`` of every ``data/deployments/*.yaml`` idempotently.
+
+    Prints ``[STARTUP] Bootstrap services: ...`` lines (visible in the API log,
+    like the other startup steps) so an empty/missing dir or a per-service result
+    is observable.
+    """
     deployments_dir = _deployments_dir()
     if not os.path.isdir(deployments_dir):
-        logger.info("[bootstrap] no deployments dir at %s — skipping", deployments_dir)
+        print(f"[STARTUP] Bootstrap services: no deployments dir at {deployments_dir} — skipping")
         return
 
     files = sorted(
@@ -60,8 +72,10 @@ def ensure_bootstrap_services() -> None:
         if f.endswith((".yaml", ".yml")) and not f.endswith((".example.yaml", ".example.yml"))
     )
     if not files:
+        print(f"[STARTUP] Bootstrap services: no deployment files in {deployments_dir} (only examples?)")
         return
 
+    print(f"[STARTUP] Bootstrap services: applying {len(files)} file(s) from {deployments_dir}")
     system = Principal(is_admin=True)  # trusted boot context; created_by stays NULL
     with get_db_session() as db:
         for fname in files:
@@ -71,20 +85,19 @@ def ensure_bootstrap_services() -> None:
                     data = yaml.safe_load(fh) or {}
                 config = ComputorDeploymentConfig(**data)
             except Exception as exc:  # noqa: BLE001 - one bad file shouldn't block the rest
-                logger.warning("[bootstrap] %s: invalid deployment YAML, skipping: %s", fname, exc)
+                print(f"[STARTUP] Bootstrap services: {fname} is invalid, skipping: {exc}")
                 continue
 
             for svc in (config.services or []):
                 try:
-                    _ensure_service(svc, system, db)
+                    status = _ensure_service(svc, system, db)
+                    print(f"[STARTUP] Bootstrap service '{svc.slug}': {status}")
                 except Exception as exc:  # noqa: BLE001 - best-effort per service
-                    logger.warning(
-                        "[bootstrap] service '%s' (%s) failed: %s",
-                        getattr(svc, "slug", "?"), fname, exc,
-                    )
+                    print(f"[STARTUP] Bootstrap service '{getattr(svc, 'slug', '?')}' failed: {exc}")
 
 
-def _ensure_service(svc: ServiceConfig, system: Principal, db) -> None:
+def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
+    """Ensure one service + its token exist. Returns a short human status."""
     existing = db.query(Service).filter(Service.slug == svc.slug).first()
     if existing is None:
         created = create_service_account(
@@ -104,9 +117,10 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> None:
             db,
         )
         user_id = str(created.user_id)
-        logger.info("[bootstrap] created service %s", svc.slug)
+        created_now = True
     else:
         user_id = str(existing.user_id)
+        created_now = False
 
     # Token is idempotent: leave any existing active token untouched (a changed
     # ${TESTING_WORKER_TOKEN} is intentionally NOT auto-rotated here — that would
@@ -117,24 +131,18 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> None:
         .first()
     )
     if has_token is not None:
-        return
+        return "created (token already present)" if created_now else "already present"
 
     raw = svc.api_token.token if svc.api_token else None
     if not raw:
-        logger.warning(
-            "[bootstrap] service %s has no predefined api_token.token — left without a token",
-            svc.slug,
-        )
-        return
+        return f"{'created' if created_now else 'present'} WITHOUT a token (no api_token.token in YAML)"
 
     token = os.path.expandvars(raw)
     if not token or token.startswith("${") or not token.startswith("ctp_") or len(token) < 32:
-        logger.warning(
-            "[bootstrap] service %s: api_token did not resolve to a valid 'ctp_' token "
-            "(is the env var set/exported?) — left without a token",
-            svc.slug,
+        return (
+            f"{'created' if created_now else 'present'} WITHOUT a token — api_token did not resolve "
+            f"to a valid 'ctp_' token (is TESTING_WORKER_TOKEN set & exported in the API's env?)"
         )
-        return
 
     expires_at = None
     if svc.api_token.expires_days:
@@ -152,4 +160,4 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> None:
         system,
         db,
     )
-    logger.info("[bootstrap] set predefined token for service %s", svc.slug)
+    return f"{'created' if created_now else 'present'} + token set"
