@@ -112,21 +112,47 @@ def deploy_course_from_config(
     errors: List[str] = []
     warnings: List[CourseDeployWarning] = []
 
-    # --- content types: validate kinds + build slug -> config / submittable maps
+    # --- content types: validate kinds. The unique key is (slug, kind), NOT slug
+    # alone: the same slug may be defined twice with different kinds (e.g. a
+    # 'training' unit and a 'training' assignment). A content node's reference is
+    # disambiguated by tree structure — a node with children resolves to a
+    # non-submittable (unit) type, a leaf to a submittable (assignment) type.
     kinds: Dict[str, CourseContentKind] = {k.id: k for k in db.query(CourseContentKind).all()}
-    ct_by_slug: Dict[str, object] = {}
-    submittable_by_slug: Dict[str, bool] = {}
-    for ct in (config.content_types or []):
-        if ct.slug in ct_by_slug:
-            errors.append(f"Duplicate content type slug '{ct.slug}'")
-            continue
+    ct_configs = list(config.content_types or [])
+    cts_by_slug: Dict[str, list] = {}
+    seen_slug_kind: set = set()
+    for ct in ct_configs:
         if ct.kind not in kinds:
             errors.append(
                 f"Content type '{ct.slug}' has unknown kind '{ct.kind}' "
                 f"(expected one of: {', '.join(sorted(kinds)) or 'none'})"
             )
-        ct_by_slug[ct.slug] = ct
-        submittable_by_slug[ct.slug] = bool(kinds.get(ct.kind) and kinds[ct.kind].submittable)
+        key = (ct.slug, ct.kind)
+        if key in seen_slug_kind:
+            errors.append(f"Duplicate content type '{ct.slug}' (kind '{ct.kind}')")
+            continue
+        seen_slug_kind.add(key)
+        cts_by_slug.setdefault(ct.slug, []).append(ct)
+
+    def _is_submittable(ct) -> bool:
+        return bool(kinds.get(ct.kind) and kinds[ct.kind].submittable)
+
+    def _resolve_ct(slug: str, has_children: bool):
+        """Pick the content-type config for a reference, disambiguating a shared
+        slug by structure. Returns (config | None, mismatch_warning | None)."""
+        candidates = cts_by_slug.get(slug)
+        if not candidates:
+            return None, None
+        if len(candidates) == 1:
+            ct = candidates[0]
+            if has_children and _is_submittable(ct):
+                return ct, "is an assignment (submittable) but has nested contents"
+            return ct, None
+        want_submittable = not has_children
+        for ct in candidates:
+            if _is_submittable(ct) == want_submittable:
+                return ct, None
+        return candidates[0], None
 
     # --- course path must be free within the family
     if not config.path:
@@ -155,7 +181,7 @@ def deploy_course_from_config(
     default_service_id: Optional[str] = next(iter(service_ids.values()), None)
 
     version_repo = ExampleVersionRepository(db, get_cache())
-    summary = CourseDeploySummary(content_types=len(ct_by_slug))
+    summary = CourseDeploySummary(content_types=len(seen_slug_kind))
 
     def _resolve_version_tag(example: Example, requested: Optional[str]) -> Optional[str]:
         """Resolve the concrete semantic version tag to assign (None if none available)."""
@@ -165,7 +191,7 @@ def deploy_course_from_config(
         latest = version_repo.find_latest_version(str(example.id))
         return latest.version_tag if latest else None
 
-    def _walk(items, parent_path: Optional[str], ct_rows: Optional[Dict[str, CourseContentType]], counter: List[float], seen: Optional[set]):
+    def _walk(items, parent_path: Optional[str], ct_rows: Optional[Dict[tuple, CourseContentType]], counter: List[float], seen: Optional[set]):
         """Validate (ct_rows is None) or apply (ct_rows given) the content tree."""
         apply = ct_rows is not None
         for c in items:
@@ -182,10 +208,16 @@ def deploy_course_from_config(
                     errors.append(f"Duplicate content path '{full}'")
                 seen.add(full)
 
-            known_type = c.content_type in ct_by_slug
-            if not known_type:
+            ct_cfg, ct_warn = _resolve_ct(c.content_type, bool(c.contents))
+            if ct_cfg is None:
                 errors.append(f"Content '{full}' references undefined content_type '{c.content_type}'")
-            submittable = submittable_by_slug.get(c.content_type, False)
+                _walk(c.contents or [], full, ct_rows, counter, seen)
+                continue
+            if ct_warn:
+                warnings.append(
+                    CourseDeployWarning(path=full, reason=f"Content type '{c.content_type}' {ct_warn}")
+                )
+            submittable = _is_submittable(ct_cfg)
 
             if submittable:
                 summary.assignments += 1
@@ -230,8 +262,8 @@ def deploy_course_from_config(
                     elif not apply:
                         summary.examples_assigned += 1
 
-            if apply and known_type:
-                ct_row = ct_rows[c.content_type]
+            if apply:
+                ct_row = ct_rows[(ct_cfg.slug, ct_cfg.kind)]
                 position = c.position if c.position is not None else counter[0]
                 counter[0] += 1.0
                 content = CourseContent(
@@ -323,10 +355,13 @@ def deploy_course_from_config(
         )
     )
 
-    ct_rows: Dict[str, CourseContentType] = {}
-    for slug, ct in ct_by_slug.items():
+    ct_rows: Dict[tuple, CourseContentType] = {}
+    for ct in ct_configs:
+        key = (ct.slug, ct.kind)
+        if key in ct_rows:
+            continue
         row = CourseContentType(
-            slug=slug,
+            slug=ct.slug,
             title=ct.title,
             description=ct.description,
             color=ct.color or "green",
@@ -337,7 +372,7 @@ def deploy_course_from_config(
             updated_by=permissions.user_id,
         )
         db.add(row)
-        ct_rows[slug] = row
+        ct_rows[key] = row
     db.flush()
     # Commit the course + owner membership + content types before assigning
     # examples (assign_example_to_content authorizes against the live membership).
