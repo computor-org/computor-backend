@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Start from home directory
-cd /home/uvicorn
+cd /home/worker
 
 # Run Alembic migrations
 echo "Applying Alembic migrations..."
-cd computor-backend/src/computor_backend && alembic upgrade head && cd /home/uvicorn
+cd computor-backend/src/computor_backend && alembic upgrade head && cd /home/worker
 
-# Start the server from the correct directory (stay in /home/uvicorn)
-cd /home/uvicorn/computor-backend/src && python server.py
+# Start the server from the correct directory (stay in /home/worker)
+cd /home/worker/computor-backend/src && python server.py

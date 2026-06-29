@@ -325,6 +325,22 @@ if [ -f "docker/postgres-init/01-create-multiple-databases.sh" ]; then
     chmod +x docker/postgres-init/01-create-multiple-databases.sh 2>/dev/null || true
 fi
 
+# The Python service images (api + temporal workers) inherit from a shared base
+# image (docker/base/Dockerfile); the matlab worker COPYs from it. Build it first
+# so their `FROM computor-base:latest` resolves. Rebuild when --build is requested
+# or when the image is missing (cached/fast otherwise).
+if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
+    echo -e "\n${GREEN}Building shared base image (computor-base)...${NC}"
+    docker build -f docker/base/Dockerfile -t computor-base:latest .
+fi
+# The testing worker also layers on a heavy, slow-changing language-runtimes
+# image (Octave/R/Python 3.13/Julia) built independently of the project source.
+# Cached after the first build (no project files in its context).
+if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-testing-runtimes:latest >/dev/null 2>&1; then
+    echo -e "\n${GREEN}Building testing runtimes image (computor-testing-runtimes)...${NC}"
+    docker build -f docker/testing-runtimes/Dockerfile -t computor-testing-runtimes:latest .
+fi
+
 # Start services
 echo -e "\n${GREEN}Starting Computor services...${NC}"
 echo "Command: docker compose $COMPOSE_FILES up $DOCKER_ARGS"

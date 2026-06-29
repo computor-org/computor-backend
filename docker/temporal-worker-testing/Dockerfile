@@ -1,107 +1,44 @@
-FROM python:3.10-slim
+# Testing temporal worker = heavy language runtimes (computor-testing-runtimes)
+# + the computor python project env (copied from computor-base) + computor-testing.
+#
+# The runtimes (Octave/R/C/Fortran/Python 3.13/Julia) live in their own image so
+# editing project source no longer recompiles them. We build FROM the runtimes
+# and COPY the (small, fast-changing) computor env on top — both are python:3.10-slim
+# based, so the CPython-3.10 env is ABI-compatible.
+# See docker/testing-runtimes/Dockerfile and docker/base/Dockerfile.
+FROM computor-base:latest AS pybase
 
-# Install system dependencies and language runtimes for unified testing
-RUN apt-get update && apt-get install -y \
-    # Basic tools
-    git \
-    tzdata \
-    build-essential \
-    wget \
-    curl \
-    # Python build dependencies
-    libssl-dev \
-    zlib1g-dev \
-    libncurses5-dev \
-    libncursesw5-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libgdbm-dev \
-    libdb5.3-dev \
-    libbz2-dev \
-    libexpat1-dev \
-    liblzma-dev \
-    libffi-dev \
-    uuid-dev \
-    # Language runtimes for computor-testing
-    octave \
-    r-base \
-    gcc \
-    g++ \
-    gfortran \
-    && rm -rf /var/lib/apt/lists/*
+FROM computor-testing-runtimes:latest
 
-# Install Python 3.13 for test execution (alongside 3.10 for worker)
-RUN wget -q https://www.python.org/ftp/python/3.13.1/Python-3.13.1.tgz && \
-    tar -xzf Python-3.13.1.tgz && \
-    cd Python-3.13.1 && \
-    ./configure --enable-optimizations --prefix=/usr/local/python3.13 && \
-    make -j$(nproc) && \
-    make altinstall && \
-    cd .. && \
-    rm -rf Python-3.13.1 Python-3.13.1.tgz && \
-    ln -s /usr/local/python3.13/bin/python3.13 /usr/local/bin/python3.13 && \
-    ln -s /usr/local/python3.13/bin/pip3.13 /usr/local/bin/pip3.13
+# Bring in the computor python project env from the shared base. Same /home/worker
+# path + CPython 3.10, so the editable installs + their deps resolve.
+COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
+COPY --from=pybase --chown=worker:worker /home/worker/computor-types    /home/worker/computor-types
+COPY --from=pybase --chown=worker:worker /home/worker/computor-utils    /home/worker/computor-utils
+COPY --from=pybase --chown=worker:worker /home/worker/computor-client   /home/worker/computor-client
+COPY --from=pybase --chown=worker:worker /home/worker/computor-backend  /home/worker/computor-backend
 
-# Install Julia from official source (not available in Debian repos)
-# Julia is optional - worker will still function for other languages if installation fails
-RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-linux-x86_64.tar.gz -O /tmp/julia.tar.gz && \
-    tar -xzf /tmp/julia.tar.gz -C /opt/ && \
-    rm /tmp/julia.tar.gz && \
-    ln -s /opt/julia-1.10.0/bin/julia /usr/local/bin/julia || echo "Julia installation failed, skipping"
-
-# Set timezone to UTC
-ENV TZ=UTC
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Create worker user
-RUN useradd -ms /bin/bash worker
-WORKDIR /home/worker
-
-# Copy computor packages as root
-ADD computor-types /home/worker/computor-types
-ADD computor-utils /home/worker/computor-utils
-ADD computor-client /home/worker/computor-client
-ADD computor-backend /home/worker/computor-backend
-ADD computor-testing /home/worker/computor-testing
-
-# Change ownership
-RUN chown -R worker:worker /home/worker
-
-# Switch to worker user
 USER worker
-
-# Install local packages first (needed by computor-backend)
-RUN pip install --user /home/worker/computor-types
-RUN pip install --user /home/worker/computor-utils
-RUN pip install --user /home/worker/computor-client
-
-# Install computor-backend with all dependencies
-RUN pip install --user /home/worker/computor-backend
-
-# Install computor-testing framework
-RUN pip install --user /home/worker/computor-testing
-
-# Add src to PYTHONPATH so imports work
-ENV PYTHONPATH=/home/worker/computor-backend/src:$PYTHONPATH
-
-# Add user local bin to PATH (for computor-test CLI after installation)
+WORKDIR /home/worker
+# Re-declare the env the base set (we FROM the runtimes image, not computor-base).
 ENV PATH=/home/worker/.local/bin:$PATH
+ENV PYTHONPATH=/home/worker/computor-backend/src
 
-# Set up R library path for user packages
+# computor-testing framework (not part of the shared base)
+ADD --chown=worker:worker computor-testing /home/worker/computor-testing
+RUN pip install --user --no-warn-script-location /home/worker/computor-testing
+
+# R user library
 ENV R_LIBS_USER=/home/worker/.local/lib/R/library
 RUN mkdir -p /home/worker/.local/lib/R/library
 
-# Pre-build Python 3.13 test venv with base testing dependencies at build time
-# This avoids slow installs at container startup
+# Pre-build the Python 3.13 test venv with base testing deps at build time
+# (avoids slow installs at container startup).
 RUN python3.13 -m venv /home/worker/test-venv && \
     /home/worker/test-venv/bin/pip install --upgrade pip && \
     /home/worker/test-venv/bin/pip install -r /home/worker/computor-testing/requirements.txt
 ENV PYTHON_TEST_EXECUTABLE=/home/worker/test-venv/bin/python
 
-# Copy the testing worker startup script
+# Testing worker startup script: sets up language envs, then starts the worker.
 COPY docker/temporal-worker-testing/testing-worker.py /home/worker/testing-worker.py
-
-# Entry point runs the startup script which:
-# 1. Sets up language-specific environments
-# 2. Starts the temporal worker
 ENTRYPOINT ["python", "/home/worker/testing-worker.py"]

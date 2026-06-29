@@ -178,7 +178,7 @@ services:
   temporal-worker:
     build:
       context: ../../
-      dockerfile: ./docker/temporal-worker-dev/Dockerfile
+      dockerfile: ./docker/temporal-worker/Dockerfile
     networks:
       - computor-network
     restart: unless-stopped
