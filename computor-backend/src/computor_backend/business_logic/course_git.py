@@ -259,8 +259,10 @@ def _apply_course_git_binding(
     template_url = (data.template_url or "").strip() or None
 
     # For a managed Forgejo, make the binding immediately usable: default the
-    # template repo from the course's org + path, ensure it actually exists in
-    # Forgejo, and default its clone URL — so a course is never bound-but-broken.
+    # template repo from the course's org + path, ensure it (and the staff-only
+    # reference repo) actually exist in Forgejo, and default its clone URL — so a
+    # course is never bound-but-broken.
+    forgejo_reference_repo = None
     if data.delivery == "git" and server is not None and server.type == "forgejo" and server.managed:
         if not template_repo:
             from computor_backend.model.organization import Organization
@@ -270,12 +272,17 @@ def _apply_course_git_binding(
             template_repo = f"{owner}/{str(course.path).replace('.', '-')}--template"
         owner, _, repo = template_repo.partition("/")
         if owner and repo:
+            base = re.sub(r"[-_]*template$", "", repo, flags=re.IGNORECASE).rstrip("-_.") or repo
+            forgejo_reference_repo = f"{owner}/{base}--reference"
             try:
                 client = get_provider_client_for_server(server)
                 if hasattr(client, "ensure_template_repo"):
                     client.ensure_template_repo(owner, repo)
+                # The reference (solution) repo is staff-only; students never see it.
+                if hasattr(client, "ensure_reference_repo"):
+                    client.ensure_reference_repo(owner, f"{base}--reference")
             except Exception as exc:  # best-effort — don't block binding on a Forgejo hiccup
-                logger.warning("Could not ensure Forgejo template repo %s: %s", template_repo, exc)
+                logger.warning("Could not ensure Forgejo repos for %s: %s", template_repo, exc)
         if not template_url:
             template_url = f"{server.base_url.rstrip('/')}/{template_repo}.git"
 
@@ -318,6 +325,11 @@ def _apply_course_git_binding(
     binding.student_repo_modes = list(data.student_repo_modes or [])
     if gitlab_structure is not None:
         binding.properties = {**(binding.properties or {}), "gitlab": gitlab_structure}
+    if forgejo_reference_repo is not None:
+        binding.properties = {
+            **(binding.properties or {}),
+            "forgejo": {**((binding.properties or {}).get("forgejo") or {}), "reference_repo": forgejo_reference_repo},
+        }
     binding.updated_by = user_id
 
     db.commit()
@@ -457,6 +469,104 @@ def _forgejo_admin_basic_auth_for(server: GitServer):
     if (server.base_url or "").rstrip("/") != (settings.git_server_url or "").rstrip("/"):
         return None
     return (settings.git_server_admin_username, settings.git_server_admin_password)
+
+
+def _ensure_forgejo_account(user_id: str, server: GitServer, db: Session) -> Optional[str]:
+    """Make sure the user has a Forgejo account, creating it via the admin API if
+    needed, so collaborator/fork grants don't have to wait for a manual Forgejo
+    login. Returns the Forgejo handle (preferred_username) or None if unknown.
+
+    Best-effort: needs the user's OIDC handle (set at computor SSO login) and our
+    managed-server admin credentials; if either is missing we just return the
+    handle (or None) and let the downstream grant self-heal."""
+    handle = _resolve_oidc_handle(user_id, db)
+    if not handle:
+        return None
+    creds = _forgejo_admin_basic_auth_for(server)
+    if not creds:
+        return handle
+    from computor_backend.model.auth import User
+
+    user = db.query(User).filter(User.id == user_id).first()
+    email = (user.email if user else None) or f"{handle}@users.noreply.local"
+    full_name = (
+        " ".join(filter(None, [getattr(user, "given_name", None), getattr(user, "family_name", None)]))
+        if user
+        else handle
+    ) or handle
+    client = get_provider_client_for_server(server)
+    if hasattr(client, "ensure_user"):
+        try:
+            client.ensure_user(handle, email, full_name, creds[0], creds[1])
+        except Exception as exc:  # best-effort — don't block provisioning
+            logger.warning("Could not ensure Forgejo account for %s: %s", handle, exc)
+    return handle
+
+
+def _reference_repo_ref(binding: CourseGitBinding) -> Optional[str]:
+    """The course's reference (solution) repo ref, by convention from the template:
+    ``{owner}/{base}--template`` -> ``{owner}/{base}--reference``. Honours an
+    explicit ``binding.properties.forgejo.reference_repo`` if present."""
+    props = (binding.properties or {}).get("forgejo") or {}
+    if props.get("reference_repo"):
+        return props["reference_repo"]
+    template = (binding.template_repo or "").strip()
+    owner, _, repo = template.partition("/")
+    if not owner or not repo:
+        return None
+    base = re.sub(r"[-_]*template$", "", repo, flags=re.IGNORECASE).rstrip("-_.") or repo
+    return f"{owner}/{base}--reference"
+
+
+def _maybe_grant_forgejo_staff_access(
+    member: CourseMember,
+    binding: CourseGitBinding,
+    server: Optional[GitServer],
+    user_id: str,
+    db: Session,
+) -> None:
+    """For ``_lecturer`` and above on a managed-Forgejo course, grant admin
+    collaborator on the canonical template AND reference repos (creating the
+    reference repo if missing). Students/tutors get NOTHING here — only their own
+    fork; they never get access to the template directly or to the reference repo.
+    Idempotent; the Forgejo account is ensured first so the grant succeeds without
+    a manual login."""
+    from computor_backend.permissions.principal import course_role_hierarchy
+
+    if server is None or server.type != "forgejo" or not server.managed:
+        return
+    if member.course_role_id not in course_role_hierarchy.get_allowed_roles("_lecturer"):
+        return
+    template = (binding.template_repo or "").strip()
+    owner, _, t_repo = template.partition("/")
+    if not owner or not t_repo:
+        return
+
+    handle = _ensure_forgejo_account(user_id, server, db)
+    if not handle:
+        return
+
+    client = get_provider_client_for_server(server)
+    if not hasattr(client, "ensure_collaborator"):
+        return
+
+    reference = _reference_repo_ref(binding)
+    if reference and hasattr(client, "ensure_reference_repo"):
+        r_owner, _, r_repo = reference.partition("/")
+        try:
+            client.ensure_reference_repo(r_owner, r_repo)
+        except Exception as exc:  # best-effort
+            logger.warning("Could not ensure Forgejo reference repo %s: %s", reference, exc)
+
+    granted_template = client.ensure_collaborator(owner, t_repo, handle, permission="admin")
+    granted_reference = False
+    if reference:
+        r_owner, _, r_repo = reference.partition("/")
+        granted_reference = client.ensure_collaborator(r_owner, r_repo, handle, permission="admin")
+    logger.info(
+        "Forgejo staff access for %s (role %s): template=%s reference=%s",
+        handle, member.course_role_id, granted_template, granted_reference,
+    )
 
 
 def _provisioned_response(
@@ -608,18 +718,6 @@ def provision_student_repository(
     if member is None:
         raise NotFoundException("You are not a member of this course")
 
-    # Idempotent: one working repo per course membership. On re-provision,
-    # self-heal a Forgejo write-collaborator that couldn't be granted the first
-    # time (student hadn't logged into Forgejo yet).
-    existing = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == member.id)
-        .first()
-    )
-    if existing is not None:
-        _maybe_heal_forgejo_collaborator(existing, user_id, db)
-        return _provisioned_response(existing, user_id, db)
-
     binding = (
         db.query(CourseGitBinding)
         .filter(CourseGitBinding.course_id == course_id)
@@ -632,16 +730,37 @@ def provision_student_repository(
     if server is None or not server.managed or not server.token:
         raise BadRequestException("No managed git server is bound to this course")
 
+    # Idempotent: one working repo per course membership. On re-provision,
+    # self-heal a Forgejo write-collaborator that couldn't be granted the first
+    # time (member hadn't logged into Forgejo yet) and (re)grant staff access for
+    # _lecturer+ on the canonical template/reference repos.
+    existing = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == member.id)
+        .first()
+    )
+    if existing is not None:
+        _maybe_heal_forgejo_collaborator(existing, user_id, db)
+        _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
+        return _provisioned_response(existing, user_id, db)
+
     if "managed" not in (binding.student_repo_modes or []):
         raise BadRequestException("This course does not offer managed (system-hosted) repositories")
     # 'managed' is provider-agnostic; the bound server's type picks the backend.
     if server.type == "forgejo":
+        # Make sure the member's Forgejo account exists first, so the fork's
+        # collaborator grant (and staff access below) succeed without a manual
+        # Forgejo login.
+        _ensure_forgejo_account(user_id, server, db)
         rec = _provision_forgejo(member, binding, server, user_id, db)
     elif server.type == "gitlab":
         rec = _provision_gitlab_managed(member, binding, server, user_id, db)
     else:
         raise BadRequestException(f"Unsupported managed server type '{server.type}'")
 
+    # Every member gets their own fork (above); _lecturer+ additionally get admin
+    # access to the canonical template + reference repos.
+    _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
     return _provisioned_response(rec, user_id, db)
 
 
