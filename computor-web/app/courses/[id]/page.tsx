@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/src/utils/api';
@@ -22,6 +23,28 @@ export default function CoursePage() {
   );
   const course = data?.course ?? null;
   const courseViews = data?.courseViews ?? [];
+
+  const [ensuring, setEnsuring] = useState(false);
+  const [ensureMsg, setEnsureMsg] = useState<string | null>(null);
+  const [ensureErr, setEnsureErr] = useState(false);
+
+  async function ensureGitAccess() {
+    setEnsuring(true);
+    setEnsureMsg(null);
+    setEnsureErr(false);
+    try {
+      const r = await api.post<{ web_url?: string | null }>(
+        `/user/courses/${courseId}/provision-repository`,
+        {},
+      );
+      setEnsureMsg(r?.web_url ? `Repository ready: ${r.web_url}` : 'Git access ensured.');
+    } catch (e) {
+      setEnsureErr(true);
+      setEnsureMsg(e instanceof Error ? e.message : 'Failed to ensure git access');
+    } finally {
+      setEnsuring(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -132,6 +155,27 @@ export default function CoursePage() {
               </div>
             )}
           </dl>
+        </div>
+
+        {/* Git repository — create/repair the caller's repo for this course.
+            Students get their own fork; staff (_lecturer+) also get access to
+            the template + reference repos. Backend ensures the Forgejo account. */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Git repository</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Create or repair your repository for this course. No need to log into the git server first
+            {canManage ? ' — as staff this also grants you access to the template and reference repositories.' : '.'}
+          </p>
+          <button
+            onClick={ensureGitAccess}
+            disabled={ensuring}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {ensuring ? 'Working…' : 'Ensure git access'}
+          </button>
+          {ensureMsg && (
+            <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
+          )}
         </div>
 
         {/* Quick Actions - Based on available views */}

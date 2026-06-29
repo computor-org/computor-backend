@@ -1,4 +1,5 @@
 import logging
+import secrets
 import httpx
 from computor_types.git_provider import (
     OrgProviderResult,
@@ -380,6 +381,57 @@ class ForgejoProviderClient:
         with self._client() as client:
             self._get_or_create_org(client, owner, "Computor courses")
             return self._get_or_create_repo(client, owner, repo, "Student template")
+
+    def ensure_reference_repo(self, owner: str, repo: str) -> dict:
+        """Ensure the course's reference (solution) repo exists. Created lazily
+        and only ever shared with staff (_lecturer+); students never get access.
+        Returns the repo dict."""
+        with self._client() as client:
+            self._get_or_create_org(client, owner, "Computor courses")
+            return self._get_or_create_repo(client, owner, repo, "Reference solution")
+
+    def ensure_user(
+        self,
+        username: str,
+        email: str,
+        full_name: str,
+        admin_username: str,
+        admin_password: str,
+    ) -> bool:
+        """Idempotently create a local Forgejo account via the admin API so the
+        backend can grant repo access (fork collaborator / staff) without waiting
+        for the person to log into Forgejo by hand.
+
+        Uses **basic auth** (admin user). The account links to its Keycloak OIDC
+        identity on first SSO login — Forgejo is configured with
+        ``ACCOUNT_LINKING=auto`` and ``USERNAME=preferred_username`` — so matching
+        by ``username`` + ``email`` is the intended, conflict-free flow. A random
+        password is set and never used (auth is via SSO). Returns True if the
+        account exists (created or already present)."""
+        payload = {
+            "source_id": 0,
+            "login_name": username,
+            "username": username,
+            "email": email,
+            "full_name": full_name or username,
+            "password": secrets.token_urlsafe(24),
+            "must_change_password": False,
+            "send_notify": False,
+            "visibility": "private",
+        }
+        auth = (admin_username, admin_password)
+        with httpx.Client(base_url=self._url, auth=auth, timeout=30.0) as client:
+            r = client.post(f"{_BASE}/admin/users", json=payload)
+        if r.status_code in (200, 201):
+            logger.info("Forgejo: created account %s", username)
+            return True
+        if r.status_code == 422:
+            # Already exists (duplicate username/email) — the desired end state.
+            return True
+        logger.warning(
+            "Forgejo: could not ensure account %s (status %s)", username, r.status_code
+        )
+        return False
 
     def sync_member_permissions(
         self,
