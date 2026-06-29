@@ -25,8 +25,6 @@ from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_types.tests import TestCreate, TestJob
-from computor_types.courses import CourseProperties
-from computor_types.organizations import OrganizationProperties
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_backend.model.course import (
@@ -277,14 +275,6 @@ async def create_test_run(
             error_code="SUBMIT_005",
             detail="Service type not found for service"
         )
-
-    # Get course and organization for GitLab configuration
-    course = db.query(Course).filter(Course.id == submission_group.course_id).first()
-    course_family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
-    organization = db.query(Organization).filter(Organization.id == course_family.organization_id).first()
-
-    organization_properties = OrganizationProperties(**organization.properties)
-    course_properties = CourseProperties(**course.properties)
 
     # Get deployment info for reference example using repository
     deployment_repo = CourseContentDeploymentRepository(db, repo_cache)
