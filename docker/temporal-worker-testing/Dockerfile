@@ -1,56 +1,28 @@
-# Unified testing temporal worker — runs the testing queue. Adds the language
-# runtimes (Octave, R, C/C++/Fortran, Python 3.13, Julia) and the
-# computor-testing framework on top of the shared base. See docker/base/Dockerfile.
-FROM computor-base:latest
+# Testing temporal worker = heavy language runtimes (computor-testing-runtimes)
+# + the computor python project env (copied from computor-base) + computor-testing.
+#
+# The runtimes (Octave/R/C/Fortran/Python 3.13/Julia) live in their own image so
+# editing project source no longer recompiles them. We build FROM the runtimes
+# and COPY the (small, fast-changing) computor env on top — both are python:3.10-slim
+# based, so the CPython-3.10 env is ABI-compatible.
+# See docker/testing-runtimes/Dockerfile and docker/base/Dockerfile.
+FROM computor-base:latest AS pybase
 
-USER root
+FROM computor-testing-runtimes:latest
 
-# Language runtimes + Python build deps (for the 3.13 build below)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        wget \
-        curl \
-        # Python build dependencies
-        libssl-dev \
-        zlib1g-dev \
-        libncurses5-dev \
-        libncursesw5-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libgdbm-dev \
-        libdb5.3-dev \
-        libbz2-dev \
-        libexpat1-dev \
-        liblzma-dev \
-        libffi-dev \
-        uuid-dev \
-        # Language runtimes for computor-testing
-        octave \
-        r-base \
-        gcc \
-        g++ \
-        gfortran \
-    && rm -rf /var/lib/apt/lists/*
-
-# Python 3.13 for test execution (alongside 3.10 for the worker)
-RUN wget -q https://www.python.org/ftp/python/3.13.1/Python-3.13.1.tgz && \
-    tar -xzf Python-3.13.1.tgz && \
-    cd Python-3.13.1 && \
-    ./configure --enable-optimizations --prefix=/usr/local/python3.13 && \
-    make -j$(nproc) && \
-    make altinstall && \
-    cd .. && \
-    rm -rf Python-3.13.1 Python-3.13.1.tgz && \
-    ln -s /usr/local/python3.13/bin/python3.13 /usr/local/bin/python3.13 && \
-    ln -s /usr/local/python3.13/bin/pip3.13 /usr/local/bin/pip3.13
-
-# Julia (not in Debian repos). Optional — worker still functions if this fails.
-RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-linux-x86_64.tar.gz -O /tmp/julia.tar.gz && \
-    tar -xzf /tmp/julia.tar.gz -C /opt/ && \
-    rm /tmp/julia.tar.gz && \
-    ln -s /opt/julia-1.10.0/bin/julia /usr/local/bin/julia || echo "Julia installation failed, skipping"
+# Bring in the computor python project env from the shared base. Same /home/worker
+# path + CPython 3.10, so the editable installs + their deps resolve.
+COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
+COPY --from=pybase --chown=worker:worker /home/worker/computor-types    /home/worker/computor-types
+COPY --from=pybase --chown=worker:worker /home/worker/computor-utils    /home/worker/computor-utils
+COPY --from=pybase --chown=worker:worker /home/worker/computor-client   /home/worker/computor-client
+COPY --from=pybase --chown=worker:worker /home/worker/computor-backend  /home/worker/computor-backend
 
 USER worker
+WORKDIR /home/worker
+# Re-declare the env the base set (we FROM the runtimes image, not computor-base).
+ENV PATH=/home/worker/.local/bin:$PATH
+ENV PYTHONPATH=/home/worker/computor-backend/src
 
 # computor-testing framework (not part of the shared base)
 ADD --chown=worker:worker computor-testing /home/worker/computor-testing

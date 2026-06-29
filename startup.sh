@@ -333,6 +333,13 @@ if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-base:l
     echo -e "\n${GREEN}Building shared base image (computor-base)...${NC}"
     docker build -f docker/base/Dockerfile -t computor-base:latest .
 fi
+# The testing worker also layers on a heavy, slow-changing language-runtimes
+# image (Octave/R/Python 3.13/Julia) built independently of the project source.
+# Cached after the first build (no project files in its context).
+if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-testing-runtimes:latest >/dev/null 2>&1; then
+    echo -e "\n${GREEN}Building testing runtimes image (computor-testing-runtimes)...${NC}"
+    docker build -f docker/testing-runtimes/Dockerfile -t computor-testing-runtimes:latest .
+fi
 
 # Start services
 echo -e "\n${GREEN}Starting Computor services...${NC}"
