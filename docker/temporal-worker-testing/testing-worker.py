@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from computor_types.services import ServiceGet
 from computor_client.http import AsyncHTTPClient
+from computor_client.exceptions import AuthenticationError, AuthorizationError
 
 
 # =============================================================================
@@ -64,7 +65,15 @@ async def fetch_service_config(
                 data = response.json()
                 print(f"  Response data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
                 return ServiceGet.model_validate(data)
+        except (AuthenticationError, AuthorizationError) as e:
+            # An auth failure (missing/placeholder/invalid API_TOKEN) will never
+            # succeed by retrying, and the worker runs fine on environment config.
+            # Warn once and continue — no 60x retry loop, no scary traceback.
+            print(f"  ⚠ API token not accepted ({e}); continuing with environment config")
+            return None
         except Exception as e:
+            # Connection/timeout (NetworkError) etc. — the backend may still be
+            # starting, so retry.
             if attempt < max_retries:
                 print(f"  ⚠ Attempt {attempt}/{max_retries} failed: {e}")
                 print(f"  Retrying in {retry_interval} seconds...")
