@@ -175,7 +175,8 @@ def deploy_course_from_config(
         else:
             warnings.append(
                 CourseDeployWarning(
-                    reason=f"Service '{svc.slug}' not found; assignments won't be linked to it"
+                    reason=f"Testing service '{svc.slug}' is not registered; assignments will have "
+                    f"no testing service, so students can't run tests or submit until one is linked"
                 )
             )
     default_service_id: Optional[str] = next(iter(service_ids.values()), None)

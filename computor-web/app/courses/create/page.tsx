@@ -56,6 +56,7 @@ function CreateInner() {
   const [fileText, setFileText] = useState('');
   const [validating, setValidating] = useState(false);
   const [check, setCheck] = useState<DeployResult | null>(null);
+  const [createdCourseId, setCreatedCourseId] = useState<string | null>(null);
   const hasFile = !!fileText;
 
   useEffect(() => {
@@ -80,6 +81,7 @@ function CreateInner() {
 
   async function onPickFile(file: File | undefined) {
     setCheck(null);
+    setCreatedCourseId(null);
     setError(null);
     if (!file) {
       setFileName('');
@@ -99,6 +101,7 @@ function CreateInner() {
     if (!familyId || !fileText) return;
     setValidating(true);
     setError(null);
+    setCreatedCourseId(null);
     try {
       const res = await api.post<DeployResult>(`/course-families/${familyId}/deploy-course`, {
         yaml: fileText,
@@ -133,6 +136,15 @@ function CreateInner() {
         });
         if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
         await configureGit(res.course_id);
+        if (res.warnings?.length) {
+          // The course was created, but something is off (e.g. a service slug
+          // didn't resolve, so assignments have no testing service). Surface the
+          // warnings instead of silently navigating away; the user can proceed.
+          setCheck(res);
+          setCreatedCourseId(res.course_id);
+          setSaving(false);
+          return;
+        }
         router.push(`/courses/${res.course_id}`);
         return;
       }
@@ -232,8 +244,20 @@ function CreateInner() {
                       ))}
                     </ul>
                   )}
-                  {check.errors.length === 0 && (
+                  {check.errors.length === 0 && !createdCourseId && (
                     <div className="text-green-600">Looks good — ready to create.</div>
+                  )}
+                  {createdCourseId && (
+                    <div className="flex items-center gap-2 pt-1 text-green-700">
+                      <span>Course created{check.warnings.length > 0 ? ' with warnings (above)' : ''}.</span>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/courses/${createdCourseId}`)}
+                        className="text-blue-600 underline"
+                      >
+                        Open course
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
