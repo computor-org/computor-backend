@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
 from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager
@@ -239,6 +240,15 @@ async def startup_logic():
             await asyncio.to_thread(ensure_managed_forgejo_registered)
         except Exception as e:
             print(f"[STARTUP] Managed Forgejo registry seeding failed (non-fatal): {e}")
+
+    # Apply bootstrap deployments (data/deployments/*): seed the default testing
+    # worker Service + its predefined token idempotently, so courses can run tests
+    # out of the box. Best-effort + off-thread (sync DB work).
+    from computor_backend.business_logic.bootstrap import ensure_bootstrap_services
+    try:
+        await asyncio.to_thread(ensure_bootstrap_services)
+    except Exception as e:
+        print(f"[STARTUP] Bootstrap services seeding failed (non-fatal): {e}")
 
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):

@@ -90,11 +90,14 @@ services:
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
       - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
+      # Bootstrap deployments staged by startup.sh; applied idempotently at boot.
+      - ${SYSTEM_DEPLOYMENT_PATH}/deployments:/deployments:ro
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: true
+      DEPLOYMENTS_DIR: /deployments
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}

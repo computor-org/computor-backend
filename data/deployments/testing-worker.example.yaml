@@ -1,0 +1,36 @@
+# Bootstrap deployment — applied idempotently at API startup (see
+# computor_backend.business_logic.bootstrap.ensure_bootstrap_services). Every
+# *.yaml under data/deployments/ has its `services:` section applied on each
+# start: created once, then a no-op.
+#
+# This example defines the default testing worker Service so courses can run
+# tests / accept submissions out of the box. To use it, drop a real file in this
+# directory (e.g. testing-worker.yaml — gitignored, like .env); startup.sh also
+# seeds one from this example on first run.
+#
+# Single source of truth for the token: `api_token.token` is read from the
+# environment (${TESTING_WORKER_TOKEN}) — the SAME value the
+# temporal-worker-testing container uses as API_TOKEN — so they can't drift. Set
+# TESTING_WORKER_TOKEN in .env to a `ctp_...` token (>= 32 chars).
+#
+# Only the `services:` section is applied at boot (no organizations/users/contents).
+
+services:
+  - slug: testing.default               # adjust to match the executionBackend slug
+                                         # your examples/courses reference (e.g.
+                                         # itpcp.exec.py) so contents link to it.
+    service_type_path: testing.temporal  # resolves to the ServiceType seeded by migration
+    language: python                     # the testing worker also handles octave/R/julia/...
+    description: Default testing worker
+    user:
+      username: testing-worker
+      email: testing-worker@computor.local
+      given_name: Testing
+      family_name: Worker
+    api_token:
+      token: ${TESTING_WORKER_TOKEN}     # expanded from the environment at apply time
+      name: Testing Worker Token
+      expires_days: 365
+    config:
+      temporal:
+        task_queue: testing              # MUST equal the worker's --queues=testing
