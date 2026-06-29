@@ -292,7 +292,6 @@ async def generate_student_template_activity_v2(
     from datetime import datetime, timezone
     from sqlalchemy.orm import joinedload
     from sqlalchemy import and_
-    from ..utils.docker_utils import transform_localhost_url
     from ..database import get_db_session
     from ..model.course import Course, CourseContent
     from ..model.example import Example, ExampleVersion, ExampleRepository
@@ -380,10 +379,6 @@ async def generate_student_template_activity_v2(
             )
 
         logger.info(f"Updated {len(deployments_to_process)} deployments to 'deploying' status")
-        
-        # Transform localhost URLs for Docker environments
-        student_template_url = transform_localhost_url(student_template_url)
-        logger.info(f"Using student template URL: {student_template_url}")
 
         # Get course details
         course = db.query(Course).filter(Course.id == course_id).first()
@@ -411,18 +406,30 @@ async def generate_student_template_activity_v2(
         if not gitlab_token:
             from computor_backend.model.git_server import CourseGitBinding
             from computor_types.encryption import decrypt_secret
+            from computor_backend.git_provider import backend_reachable_base_url
             binding = db.query(CourseGitBinding).filter(CourseGitBinding.course_id == course_id).first()
-            if binding is not None and binding.git_server is not None and binding.git_server.token:
-                gitlab_token = decrypt_secret(binding.git_server.token)
-                server_type = (binding.git_server.type or "gitlab").lower()
-                if gitlab_token:
-                    logger.info(
-                        f"Using service token from git server {binding.git_server.base_url} ({server_type})"
-                    )
+            if binding is not None and binding.git_server is not None:
+                if binding.git_server.token:
+                    gitlab_token = decrypt_secret(binding.git_server.token)
+                    server_type = (binding.git_server.type or "gitlab").lower()
+                    if gitlab_token:
+                        logger.info(
+                            f"Using service token from git server {binding.git_server.base_url} ({server_type})"
+                        )
+                # The stored template_url uses the public base_url (student-facing).
+                # A backend component must clone/push via the address it can reach
+                # (service-DNS in docker, localhost on host) — swap only the origin,
+                # keeping the repo path. No-op when they're the same (host API / prod).
+                public_base = (binding.git_server.base_url or "").rstrip("/")
+                reachable_base = backend_reachable_base_url(binding.git_server)
+                if public_base and reachable_base != public_base and student_template_url.startswith(public_base):
+                    student_template_url = reachable_base + student_template_url[len(public_base):]
 
         if not gitlab_token:
             logger.warning(f"No git push token found for course {course_id} (org properties or git server)")
-        
+
+        logger.info(f"Using student template URL: {student_template_url}")
+
         # Use temp directory for repository work
         with tempfile.TemporaryDirectory() as temp_dir:
             template_repo_path = os.path.join(temp_dir, "student-template")

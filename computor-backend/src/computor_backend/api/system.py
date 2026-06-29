@@ -108,8 +108,9 @@ async def create_course_family_async(
             context={"organization_id": request.organization_id}
         )
 
-    # Check if organization has GitLab integration
-    parent_gitlab_config = organization.properties.get("gitlab", {})
+    # Check if organization has GitLab integration (legacy org-scoped model;
+    # orgs may carry no properties in the course-level model, so guard the None).
+    parent_gitlab_config = (organization.properties or {}).get("gitlab", {})
     has_gitlab = bool(parent_gitlab_config.get("group_id"))
 
     # Convert to course family config format
@@ -176,17 +177,23 @@ async def create_course_async(
             context={"course_family_id": request.course_family_id}
         )
 
-    # Check if course family has GitLab integration
-    parent_gitlab_config = course_family.properties.get("gitlab", {})
+    # Check if course family has GitLab integration (legacy org-scoped model;
+    # families carry no git config in the course-level model, so guard the None).
+    parent_gitlab_config = (course_family.properties or {}).get("gitlab", {})
     has_gitlab = bool(parent_gitlab_config.get("group_id"))
 
-    # Convert to course config format
+    # Convert to course config format. In the course-level git model the caller
+    # picks a registry git server (GET /git-servers, or registers a new one) and
+    # passes it as the typed `git` binding; the course is bound to it at creation.
+    # Optional — a course may be created unbound and configured later via its git
+    # binding. Serialized to a plain dict for the Temporal activity.
     course_config = {
         "name": request.course.get("title", ""),
         "path": request.course.get("path", ""),
         "description": request.course.get("description", ""),
         "course_family_id": request.course_family_id,
-        "has_gitlab": has_gitlab
+        "has_gitlab": has_gitlab,
+        "git": request.git.model_dump() if (request.git and request.git.git_server_id) else None,
     }
 
     # Submit task using Temporal and track for permission-aware polling
