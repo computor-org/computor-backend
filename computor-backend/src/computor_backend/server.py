@@ -72,6 +72,7 @@ from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.git_servers import git_servers_router
 from computor_backend.api.course_git import course_git_router
+from computor_backend.api.course_deployment import course_deployment_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.analytics import analytics_router
@@ -497,6 +498,8 @@ app.include_router(
 # lecturer-facing per-course binding. Auth is enforced per-endpoint.
 app.include_router(git_servers_router, tags=["git-servers"])
 app.include_router(course_git_router, tags=["course-git"])
+# Single-course deploy from an uploaded course_deployment.yaml (web create page).
+app.include_router(course_deployment_router, tags=["course-deployment"])
 
 # app.include_router(
 #     info_router,
