@@ -390,6 +390,73 @@ class ForgejoProviderClient:
             self._get_or_create_org(client, owner, "Computor courses")
             return self._get_or_create_repo(client, owner, repo, "Reference solution")
 
+    def create_course_org(self, name: str) -> str:
+        """Try to create a per-course Forgejo org, reporting whether it was new.
+
+        Returns ``"created"`` (HTTP 201) or ``"exists"`` (409/422 — the name is
+        already taken). Used to allocate a collision-free org name: the caller
+        walks candidate names and takes the first ``"created"``. Forgejo's own
+        org-name uniqueness (it rejects a duplicate) serialises concurrent
+        allocations, so two different courses can never share an org.
+        """
+        with self._client() as client:
+            r = client.post(
+                f"{_BASE}/orgs",
+                json={"username": name, "visibility": "private", "description": "Computor course"},
+            )
+        if r.status_code in (200, 201):
+            return "created"
+        if r.status_code in (409, 422):
+            return "exists"
+        r.raise_for_status()
+        return "exists"
+
+    # Read-all team that gives _lecturer+ the GitLab "Reporter" equivalent on
+    # every repo in a course org (student forks included, now and in future).
+    _GRADERS_TEAM = "graders"
+
+    def _ensure_reader_team(self, client: httpx.Client, org_name: str) -> int:
+        r = client.get(f"{_BASE}/orgs/{org_name}/teams")
+        r.raise_for_status()
+        for team in r.json():
+            if team["name"] == self._GRADERS_TEAM:
+                return team["id"]
+        r = client.post(
+            f"{_BASE}/orgs/{org_name}/teams",
+            json={
+                "name": self._GRADERS_TEAM,
+                "description": "Lecturers and staff — read access to all course repositories",
+                "permission": "read",
+                "includes_all_repositories": True,
+                "units": ["repo.code", "repo.issues", "repo.pulls"],
+            },
+        )
+        r.raise_for_status()
+        return r.json()["id"]
+
+    def grant_org_reader(self, org_name: str, username: str) -> bool:
+        """Add ``username`` to the course org's read-all ``graders`` team.
+
+        GitLab "Reporter" equivalent: read on every repo in the org, including
+        student forks created *after* the grant (``includes_all_repositories``),
+        so a lecturer is added once rather than per-fork. Idempotent; best-effort
+        — returns False (logged) if the user has no Forgejo account yet, so a
+        later provision self-heals."""
+        try:
+            with self._client() as client:
+                team_id = self._ensure_reader_team(client, org_name)
+                r = client.put(f"{_BASE}/teams/{team_id}/members/{username}")
+        except httpx.HTTPError as exc:
+            logger.warning("Forgejo: could not ensure graders team for %s: %s", org_name, exc)
+            return False
+        if r.status_code in (200, 204):
+            return True
+        logger.warning(
+            "Forgejo: could not add %s to graders team of %s (status %s)",
+            username, org_name, r.status_code,
+        )
+        return False
+
     def ensure_user(
         self,
         username: str,

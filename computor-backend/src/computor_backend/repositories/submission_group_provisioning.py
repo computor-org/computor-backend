@@ -22,6 +22,78 @@ from computor_backend.exceptions import NotImplementedException
 logger = logging.getLogger(__name__)
 
 
+def _assignment_directory(course_content) -> str | None:
+    """The assignment's subfolder within the student repo (per submission group).
+
+    Prefers the deployed example's directory, else the course-content path."""
+    if course_content.deployment and course_content.deployment.example_version:
+        example = course_content.deployment.example_version.example
+        if example and example.directory:
+            return example.directory
+    if course_content.path:
+        return str(course_content.path)
+    return None
+
+
+def member_course_repo_git_block(course_member, db, directory: str | None = None) -> dict | None:
+    """Provider-agnostic git location for a member's *course-level* repo, or None.
+
+    Reads the new ``CourseMemberRepository`` (the course-level git model — Forgejo
+    or managed GitLab). Returns None for legacy GitLab courses, which instead
+    carry repo info in ``course_member.properties['gitlab']`` (handled separately).
+    ``directory`` is the assignment's subfolder within the repo, stamped per
+    submission group so the same course repo can back many assignments.
+    """
+    from computor_backend.model.git_server import CourseMemberRepository
+
+    rec = (
+        db.query(CourseMemberRepository)
+        .filter(CourseMemberRepository.course_member_id == course_member.id)
+        .first()
+    )
+    if rec is None or not rec.repo_ref:
+        return None
+    block = {
+        "provider": rec.git_server.type if rec.git_server else None,
+        "server_url": rec.server_url,
+        "repo_ref": rec.repo_ref,
+        "http_url": rec.http_url,
+        "ssh_url": rec.ssh_url,
+        "web_url": rec.web_url,
+        "source": f"course_member_repository:{rec.id}",
+    }
+    if directory:
+        block["directory"] = directory
+    return block
+
+
+def stamp_member_repo_on_submission_groups(course_member, db) -> int:
+    """Back-fill ``properties['git']`` on a member's existing individual submission
+    groups from their ``CourseMemberRepository``. Idempotent; returns how many were
+    updated. (Team groups — ``max_group_size > 1`` — are left for the team repo.)"""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    groups = (
+        db.query(SubmissionGroup)
+        .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+        .filter(
+            SubmissionGroupMember.course_member_id == course_member.id,
+            SubmissionGroup.max_group_size == 1,
+        )
+        .all()
+    )
+    updated = 0
+    for sg in groups:
+        block = member_course_repo_git_block(course_member, db, _assignment_directory(sg.course_content))
+        if not block or (sg.properties or {}).get("git") == block:
+            continue
+        sg.properties = {**(sg.properties or {}), "git": block}
+        flag_modified(sg, "properties")
+        db.add(sg)
+        updated += 1
+    return updated
+
+
 def _create_submission_group_for_member(
     course_member: CourseMember,
     course_content: CourseContent,
@@ -139,6 +211,16 @@ def _create_submission_group_for_member(
             f"Preparing GitLab repository info from course_member {course_member.id} "
             f"for new submission group, content {course_content.id}"
         )
+
+    # New course-level git model (Forgejo / managed GitLab): record the member's
+    # repo provider-agnostically under properties['git']. Mutually exclusive in
+    # practice with the legacy 'gitlab' block above (a course uses one model).
+    if max_group_size == 1:
+        git_block = member_course_repo_git_block(
+            course_member, db, _assignment_directory(course_content)
+        )
+        if git_block:
+            properties['git'] = git_block
     # For team assignments (max_group_size > 1), properties remain empty {}
     # Team repositories will be created separately through team formation workflow
 

@@ -22,11 +22,15 @@ from computor_backend.exceptions import (
 )
 from computor_backend.git_provider import get_provider_client_for_server
 from computor_backend.model.auth import Account
-from computor_backend.model.course import Course, CourseMember
+from computor_backend.model.course import Course, CourseFamily, CourseMember
 from computor_backend.model.git_server import (
     CourseGitBinding,
     CourseMemberRepository,
     GitServer,
+)
+from computor_backend.utils.forgejo_naming import (
+    allocate_course_org_name,
+    student_repo_name_in_org,
 )
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
@@ -263,24 +267,54 @@ def _apply_course_git_binding(
     # reference repo) actually exist in Forgejo, and default its clone URL — so a
     # course is never bound-but-broken.
     forgejo_reference_repo = None
+    forgejo_layout = None
     if data.delivery == "git" and server is not None and server.type == "forgejo" and server.managed:
+        client = get_provider_client_for_server(server)
         if not template_repo:
+            # New "course_org" layout: one Forgejo org per course, named from the
+            # course's place in the hierarchy. The org is allocated collision-free
+            # (short -> family-qualified -> numeric suffix; always <=40 chars), so
+            # two families that reuse a course slug never share an org. Student
+            # forks are then just the realm-unique handle inside that org.
             from computor_backend.model.organization import Organization
 
             org = db.query(Organization).filter(Organization.id == course.organization_id).first()
-            owner = str(org.path).replace(".", "-") if org and org.path is not None else "courses"
-            template_repo = f"{owner}/{str(course.path).replace('.', '-')}--template"
+            family = (
+                db.query(CourseFamily)
+                .filter(CourseFamily.id == course.course_family_id)
+                .first()
+            )
+            org_path = str(org.path) if org and org.path is not None else "courses"
+            family_path = str(family.path) if family and family.path is not None else ""
+            try:
+                owner = allocate_course_org_name(
+                    org_path, family_path, str(course.path), str(course.id),
+                    # The predicate *claims* the name by creating the org; Forgejo's
+                    # 422-on-duplicate makes concurrent allocation race-safe.
+                    is_free=lambda name: client.create_course_org(name) == "created",
+                )
+            except Exception as exc:  # allocating the org is essential — fail loudly
+                logger.warning("Forgejo course-org allocation failed: %s", exc)
+                raise BadRequestException(
+                    "Could not provision the Forgejo organization for this course.",
+                    context={"error": str(exc)},
+                ) from exc
+            template_repo = f"{owner}/template"
+            forgejo_reference_repo = f"{owner}/reference"
+            forgejo_layout = "course_org"
         owner, _, repo = template_repo.partition("/")
         if owner and repo:
-            base = re.sub(r"[-_]*template$", "", repo, flags=re.IGNORECASE).rstrip("-_.") or repo
-            forgejo_reference_repo = f"{owner}/{base}--reference"
+            if forgejo_reference_repo is None:
+                # Legacy/explicit layout: reference name derived from the template.
+                base = re.sub(r"[-_]*template$", "", repo, flags=re.IGNORECASE).rstrip("-_.") or repo
+                forgejo_reference_repo = f"{owner}/{base}--reference"
+            reference_repo_name = forgejo_reference_repo.partition("/")[2]
             try:
-                client = get_provider_client_for_server(server)
                 if hasattr(client, "ensure_template_repo"):
                     client.ensure_template_repo(owner, repo)
                 # The reference (solution) repo is staff-only; students never see it.
                 if hasattr(client, "ensure_reference_repo"):
-                    client.ensure_reference_repo(owner, f"{base}--reference")
+                    client.ensure_reference_repo(owner, reference_repo_name)
             except Exception as exc:  # best-effort — don't block binding on a Forgejo hiccup
                 logger.warning("Could not ensure Forgejo repos for %s: %s", template_repo, exc)
         if not template_url:
@@ -325,11 +359,13 @@ def _apply_course_git_binding(
     binding.student_repo_modes = list(data.student_repo_modes or [])
     if gitlab_structure is not None:
         binding.properties = {**(binding.properties or {}), "gitlab": gitlab_structure}
-    if forgejo_reference_repo is not None:
-        binding.properties = {
-            **(binding.properties or {}),
-            "forgejo": {**((binding.properties or {}).get("forgejo") or {}), "reference_repo": forgejo_reference_repo},
-        }
+    if forgejo_reference_repo is not None or forgejo_layout is not None:
+        forgejo_props = {**((binding.properties or {}).get("forgejo") or {})}
+        if forgejo_reference_repo is not None:
+            forgejo_props["reference_repo"] = forgejo_reference_repo
+        if forgejo_layout is not None:
+            forgejo_props["layout"] = forgejo_layout
+        binding.properties = {**(binding.properties or {}), "forgejo": forgejo_props}
     binding.updated_by = user_id
 
     db.commit()
@@ -563,9 +599,18 @@ def _maybe_grant_forgejo_staff_access(
     if reference:
         r_owner, _, r_repo = reference.partition("/")
         granted_reference = client.ensure_collaborator(r_owner, r_repo, handle, permission="admin")
+
+    # In the course_org layout, also give _lecturer+ the GitLab "Reporter"
+    # equivalent on every student fork via the org's read-all `graders` team
+    # (covers forks created later too — one grant per lecturer, not per fork).
+    granted_reader = False
+    layout = (binding.properties or {}).get("forgejo", {}).get("layout")
+    if layout == "course_org" and hasattr(client, "grant_org_reader"):
+        granted_reader = client.grant_org_reader(owner, handle)
+
     logger.info(
-        "Forgejo staff access for %s (role %s): template=%s reference=%s",
-        handle, member.course_role_id, granted_template, granted_reference,
+        "Forgejo staff access for %s (role %s): template=%s reference=%s reader=%s",
+        handle, member.course_role_id, granted_template, granted_reference, granted_reader,
     )
 
 
@@ -630,7 +675,30 @@ def _provision_forgejo(
         raise BadRequestException(
             "You have no Forgejo identity yet; sign in once via SSO before provisioning."
         )
-    new_name = student_repo_name(repo, handle)
+    # In the course_org layout the org already encodes the course, so the fork is
+    # just the realm-unique handle; legacy bindings keep the {base}-{handle} form.
+    layout = (binding.properties or {}).get("forgejo", {}).get("layout")
+    if layout == "course_org":
+        new_name = student_repo_name_in_org(handle)
+    else:
+        new_name = student_repo_name(repo, handle)
+    repo_ref = f"{owner}/{new_name}"
+    # Identity guard (defends the legacy flat namespace): never adopt a repo that
+    # already belongs to a *different* course member. Collisions are impossible in
+    # the course_org layout, but this + the DB unique index make any residual
+    # clash a loud error instead of silent repo-sharing.
+    clash = (
+        db.query(CourseMemberRepository)
+        .filter(
+            CourseMemberRepository.repo_ref == repo_ref,
+            CourseMemberRepository.course_member_id != member.id,
+        )
+        .first()
+    )
+    if clash is not None:
+        raise ConflictException(
+            f"Forgejo repository '{repo_ref}' is already in use by another course member"
+        )
     client = get_provider_client_for_server(server)
     result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
     rec = CourseMemberRepository(
@@ -638,7 +706,7 @@ def _provision_forgejo(
         mode="managed",
         git_server_id=server.id,
         server_url=server.base_url,
-        repo_ref=f"{owner}/{new_name}",
+        repo_ref=repo_ref,
         http_url=result.http_url,
         ssh_url=result.ssh_url,
         web_url=result.web_url,
@@ -694,6 +762,22 @@ def _provision_gitlab_managed(
     return rec
 
 
+def _stamp_repo_on_submission_groups(member: CourseMember, db: Session) -> None:
+    """Propagate the member's course repo onto their individual submission groups
+    as provider-agnostic ``properties['git']``, so the per-assignment record points
+    at the repo even when the repo is provisioned after the groups already exist.
+    Best-effort — never blocks provisioning (the repo is already committed)."""
+    from computor_backend.repositories.submission_group_provisioning import (
+        stamp_member_repo_on_submission_groups,
+    )
+    try:
+        if stamp_member_repo_on_submission_groups(member, db):
+            db.commit()
+    except Exception as exc:  # auxiliary bookkeeping — don't fail the provision
+        logger.warning("Could not stamp repo onto submission groups for %s: %s", member.id, exc)
+        db.rollback()
+
+
 def provision_student_repository(
     course_id: UUID | str,
     permissions: Principal,
@@ -742,6 +826,7 @@ def provision_student_repository(
     if existing is not None:
         _maybe_heal_forgejo_collaborator(existing, user_id, db)
         _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
+        _stamp_repo_on_submission_groups(member, db)
         return _provisioned_response(existing, user_id, db)
 
     if "managed" not in (binding.student_repo_modes or []):
@@ -761,6 +846,7 @@ def provision_student_repository(
     # Every member gets their own fork (above); _lecturer+ additionally get admin
     # access to the canonical template + reference repos.
     _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
+    _stamp_repo_on_submission_groups(member, db)
     return _provisioned_response(rec, user_id, db)
 
 

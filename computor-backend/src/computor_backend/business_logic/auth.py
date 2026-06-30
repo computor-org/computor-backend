@@ -752,17 +752,27 @@ async def provision_keycloak_login(
 
     # Username is a generated, Forgejo-safe handle (never the email) so that
     # Forgejo's OIDC preferred_username maps to a valid Forgejo account name.
-    handle = await kc.generate_unique_username(given_name, family_name, email)
-    kc_user_id = await kc.create_user(KeycloakUser(
-        username=handle,
-        email=email,
-        firstName=given_name or "",
-        lastName=family_name or "",
-        enabled=True,
-        emailVerified=True,
-        credentials=[{"type": "password", "value": password, "temporary": False}],
-    ))
-    return kc_user_id, True
+    # Retry on a lost uniqueness race: if the handle is taken between the
+    # existence check and the create (409 -> ValueError), regenerate — the next
+    # generate_unique_username sees it taken and advances to the next candidate
+    # or a numeric suffix. Keycloak's realm uniqueness is the hard backstop.
+    last_exc = None
+    for _ in range(5):
+        handle = await kc.generate_unique_username(given_name, family_name, email)
+        try:
+            kc_user_id = await kc.create_user(KeycloakUser(
+                username=handle,
+                email=email,
+                firstName=given_name or "",
+                lastName=family_name or "",
+                enabled=True,
+                emailVerified=True,
+                credentials=[{"type": "password", "value": password, "temporary": False}],
+            ))
+            return kc_user_id, True
+        except ValueError as exc:
+            last_exc = exc
+    raise last_exc
 
 
 async def ensure_keycloak_admin(email: str, password: str) -> None:

@@ -18,6 +18,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     func,
@@ -121,6 +122,16 @@ class CourseMemberRepository(Base):
         CheckConstraint(
             "mode IN ('managed', 'external', 'download')",
             name='course_member_repository_mode_check',
+        ),
+        # No two managed repos may share a (server, repo_ref): a name collision
+        # surfaces as a loud error instead of silently sharing one repo across
+        # students. Partial so BYO/download rows and many NULL repo_refs are
+        # exempt (Postgres counts NULLs as distinct anyway).
+        Index(
+            'course_member_repository_managed_ref_key',
+            'git_server_id', 'repo_ref',
+            unique=True,
+            postgresql_where=text("mode = 'managed' AND repo_ref IS NOT NULL"),
         ),
     )
 

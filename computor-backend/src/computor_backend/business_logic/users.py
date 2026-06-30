@@ -730,16 +730,27 @@ def _sync_gitlab_memberships(
             .filter(SubmissionGroupMember.course_member_id == course_member.id)\
             .all()
 
-        # Collect unique repository paths from all submission groups
+        # Collect unique repository paths from all submission groups. This grants
+        # GitLab project access, so only GitLab-hosted repos are relevant: read the
+        # provider-agnostic 'git' block when its provider is gitlab, else fall back
+        # to the legacy GitLab-shaped 'gitlab' block.
         unique_repositories = set()
         for membership in submission_group_memberships:
             submission_group = membership.group
             if submission_group.properties and isinstance(submission_group.properties, dict):
-                gitlab_props = submission_group.properties.get('gitlab')
-                if gitlab_props and isinstance(gitlab_props, dict):
-                    full_path = gitlab_props.get('full_path')
-                    if full_path:
-                        unique_repositories.add(full_path)
+                full_path = None
+                git_props = submission_group.properties.get('git')
+                if (
+                    git_props and isinstance(git_props, dict)
+                    and git_props.get('provider') == 'gitlab'
+                ):
+                    full_path = git_props.get('repo_ref')
+                if not full_path:
+                    gitlab_props = submission_group.properties.get('gitlab')
+                    if gitlab_props and isinstance(gitlab_props, dict):
+                        full_path = gitlab_props.get('full_path')
+                if full_path:
+                    unique_repositories.add(full_path)
 
         # Grant access to all unique repositories
         for repository_path in unique_repositories:

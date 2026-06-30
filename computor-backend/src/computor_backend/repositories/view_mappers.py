@@ -57,6 +57,22 @@ def _build_repository(submission_group) -> Optional[SubmissionGroupRepository]:
     """
     if submission_group is None or submission_group.properties is None:
         return None
+    # Prefer the provider-agnostic 'git' block (new course-level model); fall back
+    # to the legacy GitLab-shaped 'gitlab' block.
+    git = submission_group.properties.get('git')
+    if git:
+        base_url = (git.get('server_url') or '').rstrip('/')
+        full_path = git.get('repo_ref') or ''
+        clone_url = git.get('http_url') or (
+            f"{base_url}/{full_path}.git" if base_url and full_path else ''
+        )
+        return SubmissionGroupRepository(
+            provider=git.get('provider') or 'git',
+            url=git.get('server_url') or '',
+            full_path=full_path,
+            clone_url=clone_url,
+            web_url=git.get('web_url'),
+        )
     gitlab_info = submission_group.properties.get('gitlab', {})
     base_url = gitlab_info.get('url', '').rstrip('/')
     full_path = gitlab_info.get('full_path', '')
