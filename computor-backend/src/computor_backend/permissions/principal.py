@@ -341,6 +341,18 @@ class Principal(BaseModel):
 
         return highest_role
 
+    def get_course_assignment_ceiling(self, course_id: str) -> Optional[str]:
+        """The highest course role this principal may assign to a member.
+
+        Admins and organization managers may assign any course role (treated as
+        ``_owner``); everyone else is capped at their own highest role in the
+        course. Used by the course-member assignment guards together with
+        :func:`CourseRoleHierarchy.can_assign_role`.
+        """
+        if self.is_admin or "_organization_manager" in self.roles:
+            return "_owner"
+        return self.get_highest_course_role(course_id)
+
     def has_any_course_role(self, required_role: str) -> bool:
         """Check if user has the required role in any course."""
         if self.is_admin:

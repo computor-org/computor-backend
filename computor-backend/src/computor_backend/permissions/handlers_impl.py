@@ -622,6 +622,19 @@ class CourseMemberPermissionHandler(PermissionHandler):
             if course_id:
                 if not principal.permitted("course", action, course_id, course_role=self.ACTION_ROLE_MAP.get(action)):
                     return False
+                # Enforce the role-assignment ceiling: you cannot enrol a member
+                # with a role above your own (admins/org-managers are uncapped).
+                # Mirrors the guard on update and the email-import path.
+                target_role = (context or {}).get("course_role_id")
+                if target_role:
+                    ceiling = principal.get_course_assignment_ceiling(course_id)
+                    if not ceiling or not course_role_hierarchy.can_assign_role(ceiling, target_role):
+                        raise ForbiddenException(
+                            error_code="AUTHZ_005",
+                            detail=f"You cannot assign the role '{target_role}'. "
+                                   f"Your role can only assign roles at or below your privilege level.",
+                            context={"target_role": target_role, "course_id": course_id},
+                        )
                 # Enforce additional parent context constraints (ignore course_id)
                 return self.check_additional_context_permissions(
                     principal, context, exclude_keys=["course_id"]

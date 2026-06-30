@@ -103,8 +103,10 @@ def custom_permissions_course_member(
 
     course_id = str(course_member.course_id)
 
-    # Check user has at least _lecturer role in this course
-    user_role = permissions.get_highest_course_role(course_id)
+    # Check user has at least _lecturer role in this course. Org-managers are
+    # treated as _owner here (their assignment ceiling), so they can manage any
+    # course's roster without being enrolled.
+    user_role = permissions.get_course_assignment_ceiling(course_id)
     if not user_role or course_role_hierarchy.get_role_level(user_role) < course_role_hierarchy.get_role_level("_lecturer"):
         raise ForbiddenException(
             "You don't have permission to update course members. "
