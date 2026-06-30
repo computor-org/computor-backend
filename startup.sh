@@ -164,12 +164,66 @@ create_dir_if_needed() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
         echo "  Creating: $dir_path"
-        mkdir -p "$dir_path"
+        mkdir -p "$dir_path" || { echo -e "  ${RED}Failed to create $dir_path${NC}"; exit 1; }
     fi
+}
+
+# Ensure SYSTEM_DEPLOYMENT_PATH exists and is writable by the current user.
+# We do NOT run the whole script as root, and we NEVER touch a pre-existing,
+# writable base — whatever permissions/ownership you gave it are left exactly
+# as-is. We only escalate (after asking) when the base has to be created under a
+# root-owned path like /srv, or exists but isn't writable at all. A base we
+# create ourselves is chown'd to you rather than chmod 777'd.
+ensure_deployment_base() {
+    local base="$SYSTEM_DEPLOYMENT_PATH"
+
+    if [ -e "$base" ] && [ ! -d "$base" ]; then
+        echo -e "  ${RED}'$base' exists but is not a directory.${NC}"; exit 1
+    fi
+
+    # Pre-existing and writable -> use it untouched (your permissions stay).
+    if [ -d "$base" ] && [ -w "$base" ]; then
+        return 0
+    fi
+    # Missing -> create unprivileged if the parent allows it.
+    if [ ! -d "$base" ] && mkdir -p "$base" 2>/dev/null; then
+        return 0
+    fi
+
+    # Either missing under a root-owned parent, or exists but not writable by us.
+    if [ -d "$base" ]; then
+        echo -e "  ${YELLOW}'$base' exists but is not writable by $(id -un).${NC}"
+    else
+        echo -e "  ${YELLOW}'$base' is under a root-owned path and must be created.${NC}"
+    fi
+    if ! command -v sudo >/dev/null 2>&1; then
+        echo -e "  ${RED}sudo is not available.${NC} Prepare it manually, then re-start:"
+        echo "    sudo mkdir -p '$base' && sudo chown -R $(id -u):$(id -g) '$base'"
+        exit 1
+    fi
+
+    local reply
+    read -rp "  Create/own '$base' with sudo now? [y/N] " reply
+    case "$reply" in
+        [yY]|[yY][eE][sS])
+            sudo mkdir -p "$base" \
+                && sudo chown -R "$(id -u):$(id -g)" "$base" \
+                || { echo -e "  ${RED}Failed to prepare $base.${NC}"; exit 1; }
+            echo -e "  ${GREEN}Prepared $base.${NC}"
+            ;;
+        *)
+            echo -e "  ${RED}Aborted.${NC} Prepare it manually, then re-start:"
+            echo "    sudo mkdir -p '$base' && sudo chown -R $(id -u):$(id -g) '$base'"
+            exit 1
+            ;;
+    esac
 }
 
 # Pre-create directories
 echo -e "\n${GREEN}Creating necessary directories...${NC}"
+
+: "${SYSTEM_DEPLOYMENT_PATH:?SYSTEM_DEPLOYMENT_PATH must be set in .env}"
+ensure_deployment_base
 
 # Database directories
 create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/postgres"
