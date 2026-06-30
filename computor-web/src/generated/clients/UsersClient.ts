@@ -15,7 +15,7 @@ export class UsersClient extends BaseEndpointClient {
   /**
    * List Users
    */
-  async listUsersUsersGet({ archived, email, familyName, givenName, id, isService, limit, skip, userId, username }: { archived?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; skip?: number | null; userId?: string | null; username?: string | null }): Promise<UserList[]> {
+  async listUsersUsersGet({ archived, email, familyName, givenName, id, isService, limit, search, skip, userId, username }: { archived?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; search?: string | null; skip?: number | null; userId?: string | null; username?: string | null }): Promise<UserList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
       email,
@@ -24,6 +24,7 @@ export class UsersClient extends BaseEndpointClient {
       id,
       is_service: isService,
       limit,
+      search,
       skip,
       user_id: userId,
       username,
