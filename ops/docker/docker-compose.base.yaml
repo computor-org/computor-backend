@@ -108,7 +108,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: temporal-postgres
+    container_name: computor-temporal-postgres
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_POSTGRES_PORT:-5433}:5433"
@@ -138,7 +138,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: temporal
+    container_name: computor-temporal
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
