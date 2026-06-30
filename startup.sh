@@ -411,6 +411,13 @@ if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-testin
     echo -e "\n${GREEN}Building testing runtimes image (computor-testing-runtimes)...${NC}"
     docker build -f docker/testing-runtimes/Dockerfile -t computor-testing-runtimes:latest .
 fi
+# The coder worker likewise layers its system packages (Docker CLI + coder CLI)
+# in an independent image so a project source change no longer re-runs that
+# apt/curl install. Built once and cached; only needed when Coder is enabled.
+if [ "$CODER_ENABLED" = "true" ] && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-coder-runtime:latest >/dev/null 2>&1; }; then
+    echo -e "\n${GREEN}Building coder runtime image (computor-coder-runtime)...${NC}"
+    docker build -f docker/coder-runtime/Dockerfile -t computor-coder-runtime:latest .
+fi
 
 # Start services
 echo -e "\n${GREEN}Starting Computor services...${NC}"
