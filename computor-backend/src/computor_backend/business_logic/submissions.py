@@ -241,8 +241,19 @@ async def upload_submission_artifact(
     if not course_content.is_submittable:
         raise BadRequestException(detail="This course content does not accept submissions")
 
-    if not course_content.testing_service_id:
-        raise BadRequestException(detail="Course content is missing a testing service to link submissions")
+    # Resolve the testing service by the example's executionBackend slug (the FK is
+    # only a cache and is often NULL when the service was registered after the
+    # example was assigned). Self-heals the FK when it resolves.
+    from computor_backend.business_logic.testing_service import resolve_testing_service
+
+    if resolve_testing_service(course_content, db) is None:
+        raise BadRequestException(
+            detail=(
+                "Course content has no testing service: its example's executionBackend "
+                "matches no registered, enabled service yet. Register that service "
+                "(matching the example's executionBackend slug) and try again."
+            )
+        )
 
     # Determine submitting course member
     submitting_member: Optional[CourseMember] = None
