@@ -110,6 +110,13 @@ if [ "$KEYCLOAK_ENABLED" = "true" ] && [ "$GIT_SERVER" = "forgejo" ] && [ -z "${
     echo -e "  ${GREEN}✓${NC} Generated and persisted FORGEJO_KEYCLOAK_CLIENT_SECRET to .env"
 fi
 
+# Pin the Compose project name. The base compose file also declares `name: computor`
+# (the canonical source); exporting it here keeps the name stable even for ad-hoc
+# `docker compose` calls and is honoured over the file. An explicit value in .env
+# still wins. Without this, Compose defaults to the compose-file dir basename
+# (`docker`) → `docker-<service>-<n>` container names.
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-computor}"
+
 # Build docker-compose command
 COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml"
 

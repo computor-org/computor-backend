@@ -192,6 +192,10 @@ echo -e "Coder: ${YELLOW}$([ "$INCLUDE_CODER" = true ] && echo "enabled" || echo
 echo -e "Keycloak: ${YELLOW}$([ "$INCLUDE_KEYCLOAK" = true ] && echo "enabled" || echo "disabled")${NC}"
 echo -e "Forgejo: ${YELLOW}$([ "$INCLUDE_FORGEJO" = true ] && echo "enabled" || echo "disabled")${NC}"
 
+# Pin the Compose project name (must match startup.sh) so `down` targets the same
+# project that `up` created. The base compose file also declares `name: computor`.
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-computor}"
+
 # Build docker-compose command (must match startup.sh)
 COMPOSE_FILES="-f ${OPS_DIR}/docker/docker-compose.base.yaml -f ${OPS_DIR}/docker/docker-compose.$ENVIRONMENT.yaml"
 if [ "$ENVIRONMENT" = "prod" ]; then
