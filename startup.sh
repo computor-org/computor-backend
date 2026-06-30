@@ -319,6 +319,23 @@ if [ "${KEYCLOAK_ENABLED}" = "true" ]; then
     fi
 fi
 
+# Bootstrap deployments (data/deployments/*.yaml). Applied idempotently by the API
+# at startup to seed system services (the default testing worker). Real files are
+# local-only (gitignored), like .env: seed the default from its committed example
+# on first run, then stage real (non-example) files to the deploy path where the
+# prod uvicorn container reads them (DEPLOYMENTS_DIR). In dev the host API reads
+# ./data/deployments directly. Tokens come from .env via ${VAR}, never these files.
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/deployments"
+if [ ! -f "data/deployments/testing-worker.yaml" ] && [ -f "data/deployments/testing-worker.example.yaml" ]; then
+    echo "  Seeding data/deployments/testing-worker.yaml from example..."
+    cp "data/deployments/testing-worker.example.yaml" "data/deployments/testing-worker.yaml"
+fi
+for f in data/deployments/*.yaml data/deployments/*.yml; do
+    [ -f "$f" ] || continue
+    case "$f" in *.example.yaml | *.example.yml) continue ;; esac
+    cp "$f" "${SYSTEM_DEPLOYMENT_PATH}/deployments/"
+done
+
 # Make postgres init script executable. Tolerate a deploy user who is not the
 # file owner (the file ships executable from git, so this is only a touch-up).
 if [ -f "docker/postgres-init/01-create-multiple-databases.sh" ]; then
