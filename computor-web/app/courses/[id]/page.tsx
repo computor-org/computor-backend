@@ -11,8 +11,9 @@ import Breadcrumbs from '@/src/components/Breadcrumbs';
 import type { CourseGet } from 'types/generated';
 
 export default function CoursePage() {
-  const { canManageHierarchy: canManage } = usePermissions();
   const courseId = useParams().id as string;
+  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const { data, loading, error } = useResource(
     async () => ({
@@ -177,6 +178,26 @@ export default function CoursePage() {
             <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
           )}
         </div>
+
+        {/* Members — staff (_lecturer+) and managers can manage the roster. */}
+        {canManageMembers && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Members</h2>
+                <p className="text-sm text-gray-600">
+                  View the course roster, change member roles, and add users to the course.
+                </p>
+              </div>
+              <Link
+                href={`/courses/${courseId}/members`}
+                className="shrink-0 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Manage members
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions - Based on available views */}
         {courseViews.length > 0 && (
