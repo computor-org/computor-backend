@@ -8,8 +8,8 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
-import Notification from '@/src/components/workspaces/Notification';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import type {
   WorkspaceRoleUser,
   CoderWorkspace,
@@ -22,12 +22,12 @@ const rolesClient = new WorkspaceRolesClient();
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const notify = useNotify();
 
   const [user, setUser] = useState<WorkspaceRoleUser | null>(null);
   const [workspaces, setWorkspaces] = useState<CoderWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
   const [provisioning, setProvisioning] = useState(false);
 
@@ -75,10 +75,10 @@ export default function UserDetailPage() {
       await coderClient.provisionWorkspace({
         body: { email: user.email, template: 'python-workspace' as WorkspaceTemplate },
       });
-      setNotification({ message: 'Workspace provisioned', type: 'success' });
+      notify('Workspace provisioned', 'success');
       await fetchUserAndWorkspaces();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Provisioning failed', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
     } finally {
       setProvisioning(false);
     }
@@ -87,20 +87,20 @@ export default function UserDetailPage() {
   const handleStart = async (owner: string, name: string) => {
     try {
       await coderClient.startWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace starting...', type: 'success' });
+      notify('Workspace starting...', 'success');
       setTimeout(fetchUserAndWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to start', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to start', 'error');
     }
   };
 
   const handleStop = async (owner: string, name: string) => {
     try {
       await coderClient.stopWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace stopping...', type: 'success' });
+      notify('Workspace stopping...', 'success');
       setTimeout(fetchUserAndWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to stop', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to stop', 'error');
     }
   };
 
@@ -108,11 +108,11 @@ export default function UserDetailPage() {
     if (!deleteTarget) return;
     try {
       await coderClient.deleteWorkspace({ username: deleteTarget.owner, workspaceName: deleteTarget.name });
-      setNotification({ message: 'Workspace deleted', type: 'success' });
+      notify('Workspace deleted', 'success');
       setDeleteTarget(null);
       await fetchUserAndWorkspaces();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to delete', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to delete', 'error');
       setDeleteTarget(null);
     }
   };
@@ -123,20 +123,16 @@ export default function UserDetailPage() {
       if (data.code_server_url || data.access_url) {
         window.open((data.code_server_url || data.access_url)!, '_blank');
       } else {
-        setNotification({ message: 'No access URL available', type: 'error' });
+        notify('No access URL available', 'error');
       }
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to open', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to open', 'error');
     }
   };
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6 max-w-4xl">
-        {notification && (
-          <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
-        )}
-
         {/* Header */}
         <div>
           <Link href="/workspaces/admin" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">

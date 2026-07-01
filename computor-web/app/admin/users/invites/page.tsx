@@ -3,9 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import Forbidden from '@/src/components/Forbidden';
+import Modal from '@/src/components/Modal';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
@@ -42,7 +46,6 @@ export default function InvitesPage() {
   const [invites, setInvites] = useState<InviteLinkList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
 
@@ -57,10 +60,7 @@ export default function InvitesPage() {
   // session's role string, which can go stale between logins.
   const { isUserManager } = usePermissions();
 
-  const notify = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+  const notify = useNotify();
 
   const fetchInvites = useCallback(async () => {
     setLoading(true);
@@ -82,11 +82,7 @@ export default function InvitesPage() {
 
   if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-8 text-red-600 font-medium">Access denied. Requires admin or _user_manager role.</div>
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
 
   const inviteUrl = (token: string) => `${BASE_URL}/invite/${token}`;
@@ -145,12 +141,6 @@ export default function InvitesPage() {
             + New Invite
           </button>
         </div>
-
-        {notification && (
-          <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-            {notification.message}
-          </div>
-        )}
 
         {loading ? (
           <div className="text-gray-500 py-8 text-center">Loading…</div>
@@ -222,10 +212,8 @@ export default function InvitesPage() {
 
       {/* Create Modal */}
       {createModal.open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">New Invite Link</h2>
+        <Modal title="New Invite Link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
+            <div className="p-6 pt-4">
               {createModal.error && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{createModal.error}</div>
               )}
@@ -288,7 +276,7 @@ export default function InvitesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-2">
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-2">
               <button
                 onClick={() => setCreateModal(m => ({ ...m, open: false, error: null }))}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
@@ -303,23 +291,18 @@ export default function InvitesPage() {
                 {createModal.saving ? 'Creating…' : 'Create Invite'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Revoke Confirm */}
-      {revokeConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Revoke Invite?</h2>
-            <p className="text-sm text-gray-600 mb-4">This link will immediately stop working.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setRevokeConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={() => handleRevoke(revokeConfirm)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Revoke</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={revokeConfirm !== null}
+        title="Revoke Invite?"
+        message="This link will immediately stop working."
+        confirmLabel="Revoke"
+        variant="danger"
+        onConfirm={() => revokeConfirm && handleRevoke(revokeConfirm)}
+        onCancel={() => setRevokeConfirm(null)}
+      />
     </AuthenticatedLayout>
   );
 }

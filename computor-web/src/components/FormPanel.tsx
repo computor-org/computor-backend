@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { cloneElement, isValidElement, useId, type ReactNode } from 'react';
 import Breadcrumbs, { type Crumb } from './Breadcrumbs';
 
 export const inputCls =
@@ -17,13 +17,24 @@ export function Field({
   hint?: string;
   children: ReactNode;
 }) {
+  // Associate the label with its control so clicking it focuses the input and
+  // screen readers announce it. A single element child without an id gets the
+  // generated one; multi-element children keep their own ids.
+  const generatedId = useId();
+  let control = children;
+  let htmlFor: string | undefined;
+  if (isValidElement<{ id?: string }>(children)) {
+    htmlFor = children.props.id ?? generatedId;
+    control = children.props.id ? children : cloneElement(children, { id: generatedId });
+  }
+
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">
+      <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500"> *</span>}
       </label>
-      {children}
+      {control}
       {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
   );

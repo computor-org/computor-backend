@@ -6,8 +6,9 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import WorkspaceCard from '@/src/components/workspaces/WorkspaceCard';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
-import Notification from '@/src/components/workspaces/Notification';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import Modal from '@/src/components/Modal';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
 import type {
   CoderWorkspace,
@@ -19,12 +20,12 @@ const coderClient = new CoderClient();
 
 export default function WorkspacesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const notify = useNotify();
   const [workspaces, setWorkspaces] = useState<CoderWorkspace[]>([]);
   const [health, setHealth] = useState<CoderHealthResponse | null>(null);
   const [templateCount, setTemplateCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
@@ -109,20 +110,20 @@ export default function WorkspacesPage() {
   const handleStart = async (owner: string, name: string) => {
     try {
       await coderClient.startWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace starting...', type: 'success' });
+      notify('Workspace starting...', 'success');
       setTimeout(fetchWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to start', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to start', 'error');
     }
   };
 
   const handleStop = async (owner: string, name: string) => {
     try {
       await coderClient.stopWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace stopping...', type: 'success' });
+      notify('Workspace stopping...', 'success');
       setTimeout(fetchWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to stop', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to stop', 'error');
     }
   };
 
@@ -130,11 +131,11 @@ export default function WorkspacesPage() {
     if (!deleteTarget) return;
     try {
       await coderClient.deleteWorkspace({ username: deleteTarget.owner, workspaceName: deleteTarget.name });
-      setNotification({ message: 'Workspace deleted', type: 'success' });
+      notify('Workspace deleted', 'success');
       setDeleteTarget(null);
       fetchWorkspaces();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to delete', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to delete', 'error');
       setDeleteTarget(null);
     }
   };
@@ -153,22 +154,13 @@ export default function WorkspacesPage() {
       setDetailsData(data);
       setDetailsOpen(true);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to fetch details', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to fetch details', 'error');
     }
   };
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        {/* Notification */}
-        {notification && (
-          <Notification
-            message={notification.message}
-            type={notification.type}
-            onClose={() => setNotification(null)}
-          />
-        )}
-
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -311,17 +303,8 @@ export default function WorkspacesPage() {
 
         {/* Details Modal */}
         {detailsOpen && detailsData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setDetailsOpen(false)} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Workspace Details</h3>
-                <button onClick={() => setDetailsOpen(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+          <Modal title="Workspace Details" onClose={() => setDetailsOpen(false)} maxWidth="max-w-lg">
+            <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto">
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-gray-100">
                   <tr><td className="py-2 font-medium text-gray-600 pr-4">Name</td><td className="py-2 text-gray-900">{detailsData.workspace.name}</td></tr>
@@ -341,7 +324,7 @@ export default function WorkspacesPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
     </AuthenticatedLayout>

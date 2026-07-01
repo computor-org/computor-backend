@@ -8,8 +8,10 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
@@ -29,8 +31,12 @@ export default function UserDetailPage() {
   const [providers, setProviders] = useState<AccountProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
   const [savingRoles, setSavingRoles] = useState(false);
+  const notify = useNotify();
+
+  // Confirmation dialogs (styled, instead of window.confirm)
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [removeAccountId, setRemoveAccountId] = useState<string | null>(null);
 
   // Add-account form
   const [addProvider, setAddProvider] = useState<string | null>(null);
@@ -68,7 +74,6 @@ export default function UserDetailPage() {
   async function saveRoles() {
     if (!user) return;
     setSavingRoles(true);
-    setMsg(null);
     const current = (user.user_roles ?? []).map((r) => r.role_id);
     const toAdd = roles.filter((r) => !current.includes(r));
     const toRemove = current.filter((r) => !roles.includes(r));
@@ -79,10 +84,10 @@ export default function UserDetailPage() {
       for (const roleId of toRemove) {
         await api.del(`/user-roles/users/${userId}/roles/${roleId}`);
       }
-      setMsg('Roles updated.');
+      notify('Roles updated.', 'success');
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Failed to update roles');
+      notify(e instanceof Error ? e.message : 'Failed to update roles', 'error');
     } finally {
       setSavingRoles(false);
     }
@@ -90,14 +95,15 @@ export default function UserDetailPage() {
 
   async function toggleArchive() {
     if (!user) return;
+    setShowArchiveConfirm(false);
     const archiving = !user.archived_at;
-    if (!confirm(archiving ? `Archive ${user.email}? They will not be able to log in.` : `Unarchive ${user.email}?`)) return;
     try {
       if (archiving) await usersClient.routeUsersUsersIdArchivePatch({ id: userId });
       else await usersClient.unarchiveUsersUsersIdUnarchivePatch({ id: userId });
+      notify(archiving ? 'User archived.' : 'User unarchived.', 'success');
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Operation failed');
+      notify(e instanceof Error ? e.message : 'Operation failed', 'error');
     }
   }
 
@@ -105,7 +111,6 @@ export default function UserDetailPage() {
     const prov = providers.find((p) => p.id === addProvider);
     if (!prov || !providerUrl.trim() || !accountId.trim()) return;
     setSavingAccount(true);
-    setMsg(null);
     try {
       await accountsClient.createAccountsAccountsPost({
         body: { provider: providerUrl.trim(), type: prov.type, provider_account_id: accountId.trim(), user_id: userId },
@@ -114,20 +119,22 @@ export default function UserDetailPage() {
       setProviderUrl('');
       setAccountId('');
       setAccounts(await accountsClient.listAccountsAccountsGet({ userId, limit: 100 }));
+      notify('Account linked.', 'success');
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Failed to add account');
+      notify(e instanceof Error ? e.message : 'Failed to add account', 'error');
     } finally {
       setSavingAccount(false);
     }
   }
 
   async function removeAccount(id: string) {
-    if (!confirm('Remove this linked account?')) return;
+    setRemoveAccountId(null);
     try {
       await accountsClient.deleteAccountsAccountsIdDelete({ id });
       setAccounts((a) => a.filter((x) => x.id !== id));
+      notify('Linked account removed.', 'success');
     } catch {
-      setMsg('Failed to remove account');
+      notify('Failed to remove account', 'error');
     }
   }
 
@@ -155,13 +162,11 @@ export default function UserDetailPage() {
                 <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
                   Edit
                 </Link>
-                <button onClick={toggleArchive} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
                   {user.archived_at ? 'Unarchive' : 'Archive'}
                 </button>
               </div>
             </div>
-
-            {msg && <div className="p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">{msg}</div>}
 
             <section className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div><dt className="text-gray-500">Status</dt><dd className="text-gray-900">{user.archived_at ? 'Archived' : 'Active'}</dd></div>
@@ -193,7 +198,7 @@ export default function UserDetailPage() {
                           <span className="mx-2 text-gray-300">·</span>
                           <span className="text-gray-600">{acc.provider_account_id}</span>
                         </div>
-                        <button onClick={() => removeAccount(acc.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                       </div>
                     );
                   })}
@@ -224,7 +229,7 @@ export default function UserDetailPage() {
                         <div className="flex justify-end gap-2">
                           <button onClick={() => setAddProvider(null)} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
                           <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                            {savingAccount ? '…' : 'Link account'}
+                            {savingAccount ? 'Linking…' : 'Link account'}
                           </button>
                         </div>
                       </div>
@@ -235,6 +240,29 @@ export default function UserDetailPage() {
             </section>
           </>
         ) : null}
+
+        <ConfirmDialog
+          open={showArchiveConfirm}
+          title={user?.archived_at ? 'Unarchive user' : 'Archive user'}
+          message={
+            user?.archived_at
+              ? `Unarchive ${user?.email}? They will be able to log in again.`
+              : `Archive ${user?.email}? They will not be able to log in.`
+          }
+          confirmLabel={user?.archived_at ? 'Unarchive' : 'Archive'}
+          variant={user?.archived_at ? 'default' : 'danger'}
+          onConfirm={toggleArchive}
+          onCancel={() => setShowArchiveConfirm(false)}
+        />
+        <ConfirmDialog
+          open={removeAccountId !== null}
+          title="Remove linked account"
+          message="Remove this linked account? The user can no longer sign in or be matched through it."
+          confirmLabel="Remove"
+          variant="danger"
+          onConfirm={() => removeAccountId && removeAccount(removeAccountId)}
+          onCancel={() => setRemoveAccountId(null)}
+        />
       </div>
     </AuthenticatedLayout>
   );

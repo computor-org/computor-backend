@@ -138,6 +138,9 @@ export default function TopBar() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="User menu"
             className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {/* Avatar */}

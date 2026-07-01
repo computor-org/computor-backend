@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import Forbidden from '@/src/components/Forbidden';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
@@ -76,12 +79,7 @@ export default function RolesPage() {
   const [addingMember, setAddingMember] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<{ userId: string; email: string } | null>(null);
 
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  const notify = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+  const notify = useNotify();
 
   // Load roles and all users on mount
   useEffect(() => {
@@ -190,11 +188,7 @@ export default function RolesPage() {
   // Guard
   if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-8 text-red-600 font-medium">Access denied. Requires admin or _user_manager role.</div>
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
 
   return (
@@ -251,13 +245,6 @@ export default function RolesPage() {
             <div className="p-8 text-red-500 text-sm">{detailError}</div>
           ) : roleDetail ? (
             <div className="p-6 space-y-8 max-w-3xl">
-
-              {/* Notification */}
-              {notification && (
-                <div className={`px-4 py-3 rounded-lg text-sm ${notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                  {notification.message}
-                </div>
-              )}
 
               {/* Role header */}
               <div>
@@ -383,26 +370,15 @@ export default function RolesPage() {
         </div>
       </div>
 
-      {/* Remove member confirm */}
-      {removeConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Remove from role?</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Remove <strong>{removeConfirm.email}</strong> from <strong>{selectedRoleId}</strong>?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setRemoveConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button
-                onClick={() => handleRemoveMember(removeConfirm.userId)}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={removeConfirm !== null}
+        title="Remove from role?"
+        message={`Remove ${removeConfirm?.email ?? ''} from ${selectedRoleId ?? ''}?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={() => removeConfirm && handleRemoveMember(removeConfirm.userId)}
+        onCancel={() => setRemoveConfirm(null)}
+      />
     </AuthenticatedLayout>
   );
 }

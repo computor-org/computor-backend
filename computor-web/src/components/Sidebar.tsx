@@ -320,9 +320,11 @@ export default function Sidebar() {
             {!collapsed && hasSubItems && !sectionActive && (
               <button
                 onClick={() => toggleView(navItem.id)}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${navItem.label} section`}
+                aria-expanded={isExpanded}
                 className="p-2 hover:bg-gray-100 rounded transition-colors"
               >
-                <span className={`transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>
+                <span aria-hidden="true" className={`transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>
                   {icons.chevronDown}
                 </span>
               </button>
@@ -383,6 +385,7 @@ export default function Sidebar() {
             onClick={() => setCollapsed(!collapsed)}
             className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <svg
               className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}
@@ -469,6 +472,7 @@ export default function Sidebar() {
           onClick={() => setCollapsed(!collapsed)}
           className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <svg
             className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}

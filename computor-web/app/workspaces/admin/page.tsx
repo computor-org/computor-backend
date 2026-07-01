@@ -6,8 +6,8 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
-import Notification from '@/src/components/workspaces/Notification';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
+import { useNotify } from '@/src/contexts/NotificationContext';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
 import type { WorkspaceRoleUser, WorkspaceTemplate } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
@@ -16,10 +16,10 @@ const WORKSPACE_ROLES = ['_workspace_user', '_workspace_maintainer'] as const;
 
 export default function WorkspaceAdminPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const notify = useNotify();
   const [users, setUsers] = useState<WorkspaceRoleUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Assign role form
@@ -87,12 +87,12 @@ export default function WorkspaceAdminPage() {
           await coderClient.provisionWorkspace({
             body: { email: assignEmail, template: 'python-workspace' as WorkspaceTemplate },
           });
-          setNotification({ message: 'Role assigned and workspace provisioned', type: 'success' });
+          notify('Role assigned and workspace provisioned', 'success');
         } catch {
-          setNotification({ message: 'Role assigned but workspace provisioning failed', type: 'error' });
+          notify('Role assigned but workspace provisioning failed', 'error');
         }
       } else {
-        setNotification({ message: 'Role assigned successfully', type: 'success' });
+        notify('Role assigned successfully', 'success');
       }
 
       setAssignEmail('');
@@ -101,7 +101,7 @@ export default function WorkspaceAdminPage() {
       setWorkspaceStatus({});
       await fetchUsers();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to assign role', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to assign role', 'error');
     } finally {
       setAssigning(false);
     }
@@ -111,11 +111,11 @@ export default function WorkspaceAdminPage() {
     if (!removeTarget) return;
     try {
       await rolesClient.removeRole({ userId: removeTarget.userId, roleId: removeTarget.roleId });
-      setNotification({ message: 'Role removed', type: 'success' });
+      notify('Role removed', 'success');
       setRemoveTarget(null);
       await fetchUsers();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to remove role', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to remove role', 'error');
       setRemoveTarget(null);
     }
   };
@@ -125,10 +125,10 @@ export default function WorkspaceAdminPage() {
     if (!u?.email) return;
     try {
       await rolesClient.assignRole({ body: { email: u.email, role_id: roleId } });
-      setNotification({ message: 'Role added', type: 'success' });
+      notify('Role added', 'success');
       await fetchUsers();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to add role', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to add role', 'error');
     }
   };
 
@@ -137,10 +137,10 @@ export default function WorkspaceAdminPage() {
       await coderClient.provisionWorkspace({
         body: { email, template: 'python-workspace' as WorkspaceTemplate },
       });
-      setNotification({ message: 'Workspace provisioned', type: 'success' });
+      notify('Workspace provisioned', 'success');
       setWorkspaceStatus({});
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Provisioning failed', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
     }
   };
 
@@ -159,10 +159,6 @@ export default function WorkspaceAdminPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        {notification && (
-          <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
-        )}
-
         {/* Header */}
         <div>
           <Link href="/workspaces" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">

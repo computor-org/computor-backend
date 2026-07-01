@@ -6,18 +6,18 @@ import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
-import Notification from '@/src/components/workspaces/Notification';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
+import { useNotify } from '@/src/contexts/NotificationContext';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
 
 const maintenanceClient = new MaintenanceClient();
 
 export default function MaintenancePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
+  const notify = useNotify();
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Activate form
   const [activateMessage, setActivateMessage] = useState('The system is undergoing scheduled maintenance.');
@@ -62,10 +62,10 @@ export default function MaintenancePage() {
     setActivating(true);
     try {
       await maintenanceClient.activate(activateMessage);
-      setNotification({ message: 'Maintenance mode activated', type: 'success' });
+      notify('Maintenance mode activated', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to activate', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to activate', 'error');
     } finally {
       setActivating(false);
     }
@@ -76,10 +76,10 @@ export default function MaintenancePage() {
     setDeactivating(true);
     try {
       await maintenanceClient.deactivate();
-      setNotification({ message: 'Maintenance mode deactivated', type: 'success' });
+      notify('Maintenance mode deactivated', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to deactivate', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to deactivate', 'error');
     } finally {
       setDeactivating(false);
     }
@@ -93,11 +93,11 @@ export default function MaintenancePage() {
     try {
       const isoDate = new Date(scheduleDate).toISOString();
       await maintenanceClient.schedule(isoDate, scheduleMessage);
-      setNotification({ message: 'Maintenance scheduled', type: 'success' });
+      notify('Maintenance scheduled', 'success');
       setScheduleDate('');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to schedule', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to schedule', 'error');
     } finally {
       setScheduling(false);
     }
@@ -108,10 +108,10 @@ export default function MaintenancePage() {
     setCancelling(true);
     try {
       await maintenanceClient.cancelSchedule();
-      setNotification({ message: 'Scheduled maintenance cancelled', type: 'success' });
+      notify('Scheduled maintenance cancelled', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to cancel schedule', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to cancel schedule', 'error');
     } finally {
       setCancelling(false);
     }
@@ -135,9 +135,6 @@ export default function MaintenancePage() {
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
         <Breadcrumbs items={[{ label: 'Maintenance' }]} />
-        {notification && (
-          <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
-        )}
 
         {/* Header */}
         <div>
