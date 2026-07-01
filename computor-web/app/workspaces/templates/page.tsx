@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
-import type { CoderTemplate } from '@/src/types/workspaces';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 
 const coderClient = new CoderClient();
 
@@ -39,49 +39,28 @@ function TemplateIcon({ name }: { name: string }) {
 }
 
 export default function TemplatesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [templates, setTemplates] = useState<CoderTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-
-    async function fetchTemplates() {
-      try {
-        const data = await coderClient.listTemplates();
-        setTemplates(data.templates);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchTemplates();
-  }, [authLoading, isAuthenticated]);
+  const { data, loading, error } = useResource(
+    async () => (await coderClient.listTemplates()).templates,
+    [],
+  );
+  const templates = data ?? [];
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Link href="/workspaces" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Workspaces
-            </Link>
-            <h1 className="text-3xl font-bold text-gray-900">Templates</h1>
-            <p className="mt-2 text-gray-600">Browse available workspace templates</p>
-          </div>
-          {!loading && (
-            <div className="text-sm text-gray-500">
-              {templates.length} {templates.length === 1 ? 'template' : 'templates'}
-            </div>
-          )}
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Templates' }]}
+          title="Templates"
+          subtitle="Browse available workspace templates"
+          actions={
+            !loading ? (
+              <div className="text-sm text-gray-500">
+                {templates.length} {templates.length === 1 ? 'template' : 'templates'}
+              </div>
+            ) : null
+          }
+        />
 
         {/* Loading */}
         {loading && (
@@ -97,16 +76,7 @@ export default function TemplatesPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Empty */}
         {!loading && !error && templates.length === 0 && (

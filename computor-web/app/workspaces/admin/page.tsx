@@ -1,26 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
-import type { WorkspaceRoleUser, WorkspaceTemplate } from '@/src/types/workspaces';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import { inputCls } from '@/src/components/FormPanel';
+import type { WorkspaceTemplate } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 const rolesClient = new WorkspaceRolesClient();
 const WORKSPACE_ROLES = ['_workspace_user', '_workspace_maintainer'] as const;
 
 export default function WorkspaceAdminPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const notify = useNotify();
-  const [users, setUsers] = useState<WorkspaceRoleUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const {
+    data,
+    loading,
+    error,
+    reload: fetchUsers,
+  } = useResource(() => rolesClient.listUsers(), []);
+  const users = useMemo(() => data ?? [], [data]);
 
   // Assign role form
   const [assignEmail, setAssignEmail] = useState('');
@@ -33,23 +40,6 @@ export default function WorkspaceAdminPage() {
 
   // Role removal confirmation
   const [removeTarget, setRemoveTarget] = useState<{ userId: string; roleId: string; email: string } | null>(null);
-
-  const fetchUsers = async () => {
-    try {
-      const data = await rolesClient.listUsers();
-      setUsers(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    fetchUsers();
-  }, [authLoading, isAuthenticated]);
 
   // Check workspace status for each user with a workspace role
   useEffect(() => {
@@ -160,16 +150,11 @@ export default function WorkspaceAdminPage() {
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div>
-          <Link href="/workspaces" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Workspaces
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Workspace Administration</h1>
-          <p className="mt-2 text-gray-600">Manage workspace roles and user access</p>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
+          title="Workspace Administration"
+          subtitle="Manage workspace roles and user access"
+        />
 
         {/* Assign Role Form */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -182,7 +167,7 @@ export default function WorkspaceAdminPage() {
                 type="email"
                 value={assignEmail}
                 onChange={(e) => setAssignEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className={inputCls}
                 placeholder="user@example.com"
                 required
               />
@@ -193,7 +178,7 @@ export default function WorkspaceAdminPage() {
                 id="assign-role"
                 value={assignRole}
                 onChange={(e) => setAssignRole(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className={inputCls}
               >
                 {WORKSPACE_ROLES.map((role) => (
                   <option key={role} value={role}>{role}</option>
@@ -225,13 +210,13 @@ export default function WorkspaceAdminPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            className={`${inputCls} max-w-md`}
             placeholder="Search by name, email, or username..."
           />
         </div>
 
         {/* Loading */}
-        {loading && (
+        {loading && !data && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
             <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
             <div className="space-y-3">
@@ -243,30 +228,21 @@ export default function WorkspaceAdminPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Users Table */}
-        {!loading && !error && (
+        {data && !error && (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Username</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Roles</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Workspace</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
+              <table className="w-full text-sm divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workspace</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

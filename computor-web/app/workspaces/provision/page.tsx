@@ -1,11 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import { inputCls } from '@/src/components/FormPanel';
 import type {
   CoderTemplate,
   ProvisionResult,
@@ -29,34 +32,27 @@ export default function ProvisionPage() {
 }
 
 function ProvisionPageContent() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const preselectedTemplate = searchParams.get('template');
 
-  const [templates, setTemplates] = useState<CoderTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ProvisionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
 
-  // Load templates
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-
-    async function fetchTemplates() {
+  // Load templates (falls back to the static list if the API fails)
+  const { data: templatesData, loading: loadingTemplates } = useResource<CoderTemplate[]>(
+    async () => {
       try {
         const data = await coderClient.listTemplates();
-        setTemplates(data.templates.length > 0 ? data.templates : FALLBACK_TEMPLATES);
+        return data.templates.length > 0 ? data.templates : FALLBACK_TEMPLATES;
       } catch {
-        setTemplates(FALLBACK_TEMPLATES);
-      } finally {
-        setLoadingTemplates(false);
+        return FALLBACK_TEMPLATES;
       }
-    }
-
-    fetchTemplates();
-  }, [authLoading, isAuthenticated]);
+    },
+    [],
+  );
+  const templates = useMemo(() => templatesData ?? [], [templatesData]);
 
   // Set preselected template once templates are loaded
   useEffect(() => {
@@ -100,16 +96,11 @@ function ProvisionPageContent() {
     <AuthenticatedLayout>
       <div className="p-6 space-y-6 max-w-2xl">
         {/* Header */}
-        <div>
-          <Link href="/workspaces" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Workspaces
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Provision Workspace</h1>
-          <p className="mt-2 text-gray-600">Create a new development workspace</p>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Provision' }]}
+          title="Provision Workspace"
+          subtitle="Create a new development workspace"
+        />
 
         {/* Form */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -126,7 +117,7 @@ function ProvisionPageContent() {
                   id="template"
                   value={selectedTemplate}
                   onChange={(e) => setSelectedTemplate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={inputCls}
                   required
                 >
                   <option value="" disabled>Select a template...</option>
@@ -156,16 +147,7 @@ function ProvisionPageContent() {
         </div>
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Success */}
         {result && (
@@ -176,28 +158,30 @@ function ProvisionPageContent() {
               </svg>
               <h3 className="text-lg font-semibold text-green-900">Workspace Provisioned</h3>
             </div>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-green-100">
-                <tr>
-                  <td className="py-2 font-medium text-green-800 pr-4">User</td>
-                  <td className="py-2 text-green-900">{result.user.email}</td>
-                </tr>
-                {result.workspace && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-green-100">
                   <tr>
-                    <td className="py-2 font-medium text-green-800 pr-4">Workspace</td>
-                    <td className="py-2 text-green-900">{result.workspace.name}</td>
+                    <td className="py-2 font-medium text-green-800 pr-4">User</td>
+                    <td className="py-2 text-green-900">{result.user.email}</td>
                   </tr>
-                )}
-                <tr>
-                  <td className="py-2 font-medium text-green-800 pr-4">Created User</td>
-                  <td className="py-2 text-green-900">{result.created_user ? 'Yes' : 'No (existing)'}</td>
-                </tr>
-                <tr>
-                  <td className="py-2 font-medium text-green-800 pr-4">Created Workspace</td>
-                  <td className="py-2 text-green-900">{result.created_workspace ? 'Yes' : 'No (existing)'}</td>
-                </tr>
-              </tbody>
-            </table>
+                  {result.workspace && (
+                    <tr>
+                      <td className="py-2 font-medium text-green-800 pr-4">Workspace</td>
+                      <td className="py-2 text-green-900">{result.workspace.name}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className="py-2 font-medium text-green-800 pr-4">Created User</td>
+                    <td className="py-2 text-green-900">{result.created_user ? 'Yes' : 'No (existing)'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 font-medium text-green-800 pr-4">Created Workspace</td>
+                    <td className="py-2 text-green-900">{result.created_workspace ? 'Yes' : 'No (existing)'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div className="mt-4">
               <Link
                 href="/workspaces"

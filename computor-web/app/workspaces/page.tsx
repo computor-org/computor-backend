@@ -4,28 +4,38 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import WorkspaceCard from '@/src/components/workspaces/WorkspaceCard';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Modal from '@/src/components/Modal';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
-import type {
-  CoderWorkspace,
-  CoderHealthResponse,
-  WorkspaceDetails,
-} from '@/src/types/workspaces';
+import type { CoderHealthResponse, WorkspaceDetails } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
 export default function WorkspacesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const notify = useNotify();
-  const [workspaces, setWorkspaces] = useState<CoderWorkspace[]>([]);
   const [health, setHealth] = useState<CoderHealthResponse | null>(null);
   const [templateCount, setTemplateCount] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Main load: workspaces (health and template count are non-blocking side loads)
+  const { data, loading, error, reload, setData } = useResource(async () => {
+    coderClient.getHealth()
+      .then((d) => setHealth(d))
+      .catch(() => setHealth({ healthy: false, message: 'Unable to connect' }));
+
+    coderClient.listTemplates()
+      .then((d) => setTemplateCount(d.count))
+      .catch(() => {});
+
+    return (await coderClient.listWorkspaces()).workspaces;
+  }, []);
+  const workspaces = data ?? [];
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
@@ -37,41 +47,22 @@ export default function WorkspacesPage() {
   // Polling ref
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Targeted workspace refresh for polling/actions: updates data without
+  // toggling the loading state; transient failures are ignored. If the
+  // initial load had failed, a successful poll triggers a full reload so
+  // the error state recovers (matching the previous behavior).
   const fetchWorkspaces = useCallback(async () => {
     try {
-      const data = await coderClient.listWorkspaces();
-      setWorkspaces(data.workspaces);
-      if (loading) setLoading(false);
-      setError(null);
-    } catch (err) {
-      if (loading) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        setLoading(false);
+      const fresh = (await coderClient.listWorkspaces()).workspaces;
+      if (error) {
+        reload();
+      } else {
+        setData(fresh);
       }
+    } catch {
+      // ignore transient polling failures
     }
-  }, [loading]);
-
-  // Initial load: health, templates, workspaces
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-
-    async function loadDashboard() {
-      // Health check (non-blocking)
-      coderClient.getHealth()
-        .then((data) => setHealth(data))
-        .catch(() => setHealth({ healthy: false, message: 'Unable to connect' }));
-
-      // Template count (non-blocking)
-      coderClient.listTemplates()
-        .then((data) => setTemplateCount(data.count))
-        .catch(() => {});
-
-      // Workspaces (main load)
-      await fetchWorkspaces();
-    }
-
-    loadDashboard();
-  }, [authLoading, isAuthenticated, fetchWorkspaces]);
+  }, [error, reload, setData]);
 
   // Polling: every 3 seconds with visibility API pause
   useEffect(() => {
@@ -162,18 +153,19 @@ export default function WorkspacesPage() {
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Workspaces</h1>
-            <p className="mt-2 text-gray-600">Manage your development workspaces</p>
-          </div>
-          <Link
-            href="/workspaces/provision"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            New Workspace
-          </Link>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Workspaces' }]}
+          title="Workspaces"
+          subtitle="Manage your development workspaces"
+          actions={
+            <Link
+              href="/workspaces/provision"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              New Workspace
+            </Link>
+          }
+        />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -246,16 +238,7 @@ export default function WorkspacesPage() {
         )}
 
         {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Empty State */}
         {!loading && !error && workspaces.length === 0 && (
@@ -305,24 +288,26 @@ export default function WorkspacesPage() {
         {detailsOpen && detailsData && (
           <Modal title="Workspace Details" onClose={() => setDetailsOpen(false)} maxWidth="max-w-lg">
             <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-gray-100">
-                  <tr><td className="py-2 font-medium text-gray-600 pr-4">Name</td><td className="py-2 text-gray-900">{detailsData.workspace.name}</td></tr>
-                  <tr><td className="py-2 font-medium text-gray-600 pr-4">Status</td><td className="py-2"><WorkspaceStatusBadge status={detailsData.status} size="sm" /></td></tr>
-                  <tr><td className="py-2 font-medium text-gray-600 pr-4">Template</td><td className="py-2 text-gray-900">{detailsData.workspace.template_name}</td></tr>
-                  <tr><td className="py-2 font-medium text-gray-600 pr-4">Owner</td><td className="py-2 text-gray-900">{detailsData.workspace.owner_name}</td></tr>
-                  <tr><td className="py-2 font-medium text-gray-600 pr-4">ID</td><td className="py-2 text-gray-500 font-mono text-xs">{detailsData.workspace.id}</td></tr>
-                  {detailsData.access_url && (
-                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Access URL</td><td className="py-2"><a href={detailsData.access_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">{detailsData.access_url}</a></td></tr>
-                  )}
-                  {detailsData.code_server_url && (
-                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Code Server</td><td className="py-2"><a href={detailsData.code_server_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">{detailsData.code_server_url}</a></td></tr>
-                  )}
-                  {detailsData.workspace.created_at && (
-                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Created</td><td className="py-2 text-gray-900">{new Date(detailsData.workspace.created_at).toLocaleString()}</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-gray-100">
+                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Name</td><td className="py-2 text-gray-900">{detailsData.workspace.name}</td></tr>
+                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Status</td><td className="py-2"><WorkspaceStatusBadge status={detailsData.status} size="sm" /></td></tr>
+                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Template</td><td className="py-2 text-gray-900">{detailsData.workspace.template_name}</td></tr>
+                    <tr><td className="py-2 font-medium text-gray-600 pr-4">Owner</td><td className="py-2 text-gray-900">{detailsData.workspace.owner_name}</td></tr>
+                    <tr><td className="py-2 font-medium text-gray-600 pr-4">ID</td><td className="py-2 text-gray-500 font-mono text-xs">{detailsData.workspace.id}</td></tr>
+                    {detailsData.access_url && (
+                      <tr><td className="py-2 font-medium text-gray-600 pr-4">Access URL</td><td className="py-2"><a href={detailsData.access_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">{detailsData.access_url}</a></td></tr>
+                    )}
+                    {detailsData.code_server_url && (
+                      <tr><td className="py-2 font-medium text-gray-600 pr-4">Code Server</td><td className="py-2"><a href={detailsData.code_server_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">{detailsData.code_server_url}</a></td></tr>
+                    )}
+                    {detailsData.workspace.created_at && (
+                      <tr><td className="py-2 font-medium text-gray-600 pr-4">Created</td><td className="py-2 text-gray-900">{new Date(detailsData.workspace.created_at).toLocaleString()}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </Modal>
         )}
