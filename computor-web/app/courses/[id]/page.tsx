@@ -8,7 +8,7 @@ import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
-import type { CourseGet } from 'types/generated';
+import type { CourseGet, CourseFamilyGet, CourseGitBindingGet, OrganizationGet } from 'types/generated';
 
 interface ViewCard {
   view: string;
@@ -24,14 +24,26 @@ export default function CoursePage() {
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const { data, loading, error } = useResource(
-    async () => ({
-      course: await api.get<CourseGet>(`/courses/${courseId}`),
-      courseViews: await api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
-    }),
-    [courseId],
+    async () => {
+      const course = await api.get<CourseGet>(`/courses/${courseId}`);
+      const [courseViews, organization, courseFamily, gitBinding] = await Promise.all([
+        api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
+        api.get<OrganizationGet>(`/organizations/${course.organization_id}`).catch(() => null),
+        api.get<CourseFamilyGet>(`/course-families/${course.course_family_id}`).catch(() => null),
+        // Git binding is lecturer-cohort only; fetch it only for managers.
+        canManageMembers
+          ? api.get<CourseGitBindingGet>(`/courses/${courseId}/git`).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      return { course, courseViews, organization, courseFamily, gitBinding };
+    },
+    [courseId, canManageMembers],
   );
   const course = data?.course ?? null;
   const courseViews = data?.courseViews ?? [];
+  const organization = data?.organization ?? null;
+  const courseFamily = data?.courseFamily ?? null;
+  const gitBinding = data?.gitBinding ?? null;
 
   const [ensuring, setEnsuring] = useState(false);
   const [ensureMsg, setEnsureMsg] = useState<string | null>(null);
@@ -127,10 +139,20 @@ export default function CoursePage() {
   const quickCols =
     viewCards.length >= 3 ? 'md:grid-cols-3' : viewCards.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
+  // Hierarchy breadcrumb: Organization › Course family › Course, falling back to
+  // the flat Courses list when those aren't readable (e.g. for students).
+  const crumbs: { label: string; href?: string }[] = [];
+  if (organization)
+    crumbs.push({ label: organization.title || organization.path, href: `/organizations/${organization.id}` });
+  if (courseFamily)
+    crumbs.push({ label: courseFamily.title || courseFamily.path, href: `/course-families/${courseFamily.id}` });
+  if (crumbs.length === 0) crumbs.push({ label: 'Courses', href: '/courses' });
+  crumbs.push({ label: course.title || course.path });
+
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-8">
-        <Breadcrumbs items={[{ label: 'Courses', href: '/courses' }, { label: course.title || course.path }]} />
+        <Breadcrumbs items={crumbs} />
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -212,11 +234,88 @@ export default function CoursePage() {
           </div>
         </div>
 
+        {/* Git configuration — the course's binding (read-only; managers only). */}
+        {canManageMembers && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Git configuration</h2>
+            {gitBinding ? (
+              <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <dt className="text-gray-500">Delivery</dt>
+                  <dd className="mt-1 text-gray-900">{gitBinding.delivery}</dd>
+                </div>
+                {gitBinding.default_branch && (
+                  <div>
+                    <dt className="text-gray-500">Default branch</dt>
+                    <dd className="mt-1 text-gray-900 font-mono">{gitBinding.default_branch}</dd>
+                  </div>
+                )}
+                {gitBinding.student_repo_modes && gitBinding.student_repo_modes.length > 0 && (
+                  <div>
+                    <dt className="text-gray-500">Student repos</dt>
+                    <dd className="mt-1 text-gray-900">{gitBinding.student_repo_modes.join(', ')}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-gray-500">Status</dt>
+                  <dd className="mt-1">
+                    {gitBinding.locked ? (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                        title={gitBinding.lock_reason ?? undefined}
+                      >
+                        Locked
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        Editable
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                {(gitBinding.template_url || gitBinding.template_repo) && (
+                  <div className="col-span-2 sm:col-span-4">
+                    <dt className="text-gray-500">Template</dt>
+                    <dd className="mt-1 text-gray-900 break-all">
+                      {gitBinding.template_url ? (
+                        <a
+                          href={gitBinding.template_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {gitBinding.template_url}
+                        </a>
+                      ) : (
+                        gitBinding.template_repo
+                      )}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p className="text-sm text-gray-500">No git binding configured for this course.</p>
+            )}
+          </div>
+        )}
+
         {/* About — description + the few facts worth showing (no identifiers). */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>
           {course.description && <p className="text-gray-700 mb-6">{course.description}</p>}
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            {organization && (
+              <div>
+                <dt className="text-gray-500">Organization</dt>
+                <dd className="mt-1 text-gray-900">{organization.title || organization.path}</dd>
+              </div>
+            )}
+            {courseFamily && (
+              <div>
+                <dt className="text-gray-500">Course family</dt>
+                <dd className="mt-1 text-gray-900">{courseFamily.title || courseFamily.path}</dd>
+              </div>
+            )}
             {course.language_code && (
               <div>
                 <dt className="text-gray-500">Language</dt>
