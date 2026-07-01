@@ -178,6 +178,11 @@ const icons: Record<string, React.ReactElement> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
     </svg>
   ),
+  overview: (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
   workspaces: (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -388,6 +393,24 @@ export default function Sidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             {!collapsed && <span className="text-sm">Back to Courses</span>}
+          </Link>
+
+          {/* Course overview (this course's landing page) — always reachable,
+              even after switching into a role view. Active only on the exact
+              path so it doesn't stay highlighted inside the role sub-routes. */}
+          <Link
+            href={`/courses/${currentCourseId}`}
+            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 ${
+              pathname === `/courses/${currentCourseId}`
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+            title={collapsed ? 'Overview' : undefined}
+          >
+            <span className={pathname === `/courses/${currentCourseId}` ? 'text-blue-600' : 'text-gray-500'}>
+              {icons.overview}
+            </span>
+            {!collapsed && <span className="text-sm font-medium">Overview</span>}
           </Link>
 
           {renderNavItems(availableViews)}
