@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
@@ -147,7 +148,7 @@ export default function UserDetailPage() {
       <div className="p-6 space-y-6 max-w-3xl">
         <Breadcrumbs items={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]} />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>

@@ -76,6 +76,10 @@ export default function RolesPage() {
   const [allUsers, setAllUsers] = useState<UserList[]>([]);
   const [addSearch, setAddSearch] = useState('');
   const [addUserId, setAddUserId] = useState('');
+  const [pickerResults, setPickerResults] = useState<UserList[]>([]);
+  // The query the current pickerResults answer — guards the "no matches"
+  // message against flashing while a debounced search is still in flight.
+  const [pickerQuery, setPickerQuery] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<{ userId: string; email: string } | null>(null);
 
@@ -89,16 +93,35 @@ export default function RolesPage() {
       .then(data => { setRoles(data); setRolesLoading(false); })
       .catch(e => { setRolesError(e instanceof Error ? e.message : 'Failed to load roles'); setRolesLoading(false); });
 
+    // Kept only for the member-list email display: UserRoleList carries just
+    // user_id, and /users has no bulk id filter. The add-member picker below
+    // searches server-side on demand instead of relying on this preload.
     usersClient.listUsersUsersGet({ limit: 500 })
       .then(setAllUsers)
       .catch(() => {});
   }, [authLoading, isAuthenticated, isUserManager]);
 
+  // Debounced server-side search for the add-member picker (limit 20), so
+  // users beyond the display preload above are still findable.
+  useEffect(() => {
+    const q = addSearch.trim();
+    if (!q || addUserId) return;
+    const t = setTimeout(() => {
+      usersClient.listUsersUsersGet({ search: q, limit: 20 })
+        .then(res => { setPickerResults(res); setPickerQuery(q); })
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [addSearch, addUserId]);
+
   const userMap = useMemo(() => {
     const m = new Map<string, UserList>();
     allUsers.forEach(u => m.set(u.id, u));
+    // Picker results too, so a freshly added member outside the preload
+    // still shows an email in the member list.
+    pickerResults.forEach(u => m.set(u.id, u));
     return m;
-  }, [allUsers]);
+  }, [allUsers, pickerResults]);
 
   const loadRoleDetail = useCallback(async (roleId: string) => {
     setDetailLoading(true);
@@ -175,15 +198,10 @@ export default function RolesPage() {
 
   const memberUserIds = useMemo(() => new Set(members.map(m => m.user_id)), [members]);
 
-  const addCandidates = useMemo(() => {
-    const q = addSearch.toLowerCase();
-    return allUsers.filter(u =>
-      !memberUserIds.has(u.id) &&
-      !u.archived_at &&
-      ((u.email?.toLowerCase().includes(q) ?? false)
-        || `${u.given_name ?? ''} ${u.family_name ?? ''}`.toLowerCase().includes(q))
-    ).slice(0, 8);
-  }, [allUsers, memberUserIds, addSearch]);
+  const addCandidates = useMemo(
+    () => pickerResults.filter(u => !memberUserIds.has(u.id) && !u.archived_at).slice(0, 8),
+    [pickerResults, memberUserIds],
+  );
 
   // Guard
   if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
@@ -355,7 +373,7 @@ export default function RolesPage() {
                         {addingMember ? 'Adding…' : 'Add'}
                       </button>
                     )}
-                    {addSearch && addCandidates.length === 0 && !addUserId && (
+                    {addSearch && addCandidates.length === 0 && !addUserId && pickerQuery === addSearch.trim() && (
                       <p className="mt-1 text-xs text-gray-400">No matching users found.</p>
                     )}
                   </div>

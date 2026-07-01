@@ -32,18 +32,25 @@ export default function MaintenanceBanner() {
   const [scheduleDismissed, setScheduleDismissed] = useState(false);
   const [minutesRemaining, setMinutesRemaining] = useState<number | null>(null);
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      const data = await maintenanceClient.getStatus();
-      setStatus(data);
-      // Reset dismiss when schedule changes
-      if (!data.scheduled_at) {
-        setScheduleDismissed(false);
-        setMinutesRemaining(null);
-      }
-    } catch {
-      // Silently ignore — don't block UI if maintenance endpoint is unavailable
-    }
+  // Promise-based (not async/await) so all setState happens inside the
+  // .then callback — the effects below never call setState synchronously.
+  const fetchStatus = useCallback(() => {
+    maintenanceClient
+      .getStatus()
+      .then((data) => {
+        setStatus(data);
+        if (data.scheduled_at) {
+          // Seed the countdown right away; the interval below only refreshes it.
+          setMinutesRemaining(Math.max(0, (new Date(data.scheduled_at).getTime() - Date.now()) / 60000));
+        } else {
+          // Reset dismiss when schedule changes
+          setScheduleDismissed(false);
+          setMinutesRemaining(null);
+        }
+      })
+      .catch(() => {
+        // Silently ignore — don't block UI if maintenance endpoint is unavailable
+      });
   }, []);
 
   // Poll maintenance status every 30s
@@ -55,20 +62,15 @@ export default function MaintenanceBanner() {
     return () => clearInterval(interval);
   }, [isAuthenticated, fetchStatus]);
 
-  // Update countdown every 10 seconds for smooth display
+  // Update countdown every 10 seconds for smooth display (the initial value
+  // is set in the fetch callback above, not synchronously in this effect)
   useEffect(() => {
-    if (!status?.scheduled_at) {
-      setMinutesRemaining(null);
-      return;
-    }
+    if (!status?.scheduled_at) return;
 
-    const updateCountdown = () => {
-      const remaining = (new Date(status.scheduled_at!).getTime() - Date.now()) / 60000;
-      setMinutesRemaining(remaining > 0 ? remaining : 0);
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 10000);
+    const scheduledAt = new Date(status.scheduled_at).getTime();
+    const interval = setInterval(() => {
+      setMinutesRemaining(Math.max(0, (scheduledAt - Date.now()) / 60000));
+    }, 10000);
     return () => clearInterval(interval);
   }, [status?.scheduled_at]);
 

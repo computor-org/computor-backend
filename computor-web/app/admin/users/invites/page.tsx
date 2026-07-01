@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
 import Modal from '@/src/components/Modal';
@@ -24,10 +26,10 @@ function StatusBadge({ invite }: { invite: InviteLinkList }) {
   const revoked = !!invite.revoked_at;
   const exhausted = invite.use_count >= invite.max_uses;
 
-  if (revoked) return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Revoked</span>;
-  if (expired) return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Expired</span>;
-  if (exhausted) return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Used</span>;
-  return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Active</span>;
+  if (revoked) return <Badge color="red">Revoked</Badge>;
+  if (expired) return <Badge color="gray">Expired</Badge>;
+  if (exhausted) return <Badge color="gray">Used</Badge>;
+  return <Badge color="green">Active</Badge>;
 }
 
 interface CreateModal {
@@ -126,26 +128,25 @@ export default function InvitesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6">
-        <Breadcrumbs items={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]} />
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Invite Links</h1>
-            <p className="text-sm text-gray-500 mt-1">Create one-time links to onboard new users without GitLab PAT</p>
-          </div>
-          <button
-            onClick={() => setCreateModal(m => ({ ...m, open: true }))}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            + New Invite
-          </button>
-        </div>
+      <div className="p-6 space-y-6">
+        <PageHeader
+          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]}
+          title="Invite Links"
+          subtitle="Create one-time links to onboard new users without GitLab PAT"
+          actions={
+            <button
+              onClick={() => setCreateModal(m => ({ ...m, open: true }))}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              + New Invite
+            </button>
+          }
+        />
 
         {loading ? (
           <div className="text-gray-500 py-8 text-center">Loading…</div>
         ) : error ? (
-          <div className="text-red-600 py-8 text-center">{error}</div>
+          <ErrorBanner>{error}</ErrorBanner>
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -172,7 +173,7 @@ export default function InvitesPage() {
                       <div className="flex flex-wrap gap-1">
                         {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
-                              <span key={r} className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">{roleLabel(r)}</span>
+                              <Badge key={r} color="blue">{roleLabel(r)}</Badge>
                             ))
                           : <span className="text-xs text-gray-400">None</span>
                         }
@@ -215,7 +216,7 @@ export default function InvitesPage() {
         <Modal title="New Invite Link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
             <div className="p-6 pt-4">
               {createModal.error && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{createModal.error}</div>
+                <div className="mb-3"><ErrorBanner>{createModal.error}</ErrorBanner></div>
               )}
               <div className="space-y-4">
                 <div>

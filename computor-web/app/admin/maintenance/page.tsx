@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
@@ -134,13 +136,11 @@ export default function MaintenancePage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Maintenance' }]} />
-
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Maintenance Mode</h1>
-          <p className="mt-2 text-gray-600">Manage system maintenance state and schedule future maintenance windows.</p>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Maintenance' }]}
+          title="Maintenance Mode"
+          subtitle="Manage system maintenance state and schedule future maintenance windows."
+        />
 
         {/* Loading */}
         {loading && (
@@ -151,16 +151,7 @@ export default function MaintenancePage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Status Card */}
         {!loading && status && (
@@ -170,13 +161,9 @@ export default function MaintenancePage() {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-600">Status:</span>
                 {status.active ? (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                    Active
-                  </span>
+                  <Badge color="yellow" pill>Active</Badge>
                 ) : (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Inactive
-                  </span>
+                  <Badge color="green" pill>Inactive</Badge>
                 )}
               </div>
 
