@@ -8,7 +8,14 @@ import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
-import type { CourseGet, CourseFamilyGet, CourseGitBindingGet, OrganizationGet } from 'types/generated';
+import type {
+  CourseGet,
+  CourseFamilyGet,
+  CourseGitBindingGet,
+  CourseMemberRepositoryGet,
+  OrganizationGet,
+  StudentRepositoryProvisioned,
+} from 'types/generated';
 
 interface ViewCard {
   view: string;
@@ -23,10 +30,10 @@ export default function CoursePage() {
   const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
-  const { data, loading, error } = useResource(
+  const { data, loading, error, reload } = useResource(
     async () => {
       const course = await api.get<CourseGet>(`/courses/${courseId}`);
-      const [courseViews, organization, courseFamily, gitBinding] = await Promise.all([
+      const [courseViews, organization, courseFamily, gitBinding, myRepo] = await Promise.all([
         api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
         api.get<OrganizationGet>(`/organizations/${course.organization_id}`).catch(() => null),
         api.get<CourseFamilyGet>(`/course-families/${course.course_family_id}`).catch(() => null),
@@ -34,8 +41,10 @@ export default function CoursePage() {
         canManageMembers
           ? api.get<CourseGitBindingGet>(`/courses/${courseId}/git`).catch(() => null)
           : Promise.resolve(null),
+        // The caller's own repository. 404s (→ null) when they aren't a member.
+        api.get<CourseMemberRepositoryGet>(`/user/courses/${courseId}/repository`).catch(() => null),
       ]);
-      return { course, courseViews, organization, courseFamily, gitBinding };
+      return { course, courseViews, organization, courseFamily, gitBinding, myRepo };
     },
     [courseId, canManageMembers],
   );
@@ -44,21 +53,26 @@ export default function CoursePage() {
   const organization = data?.organization ?? null;
   const courseFamily = data?.courseFamily ?? null;
   const gitBinding = data?.gitBinding ?? null;
+  const myRepo = data?.myRepo ?? null;
 
   const [ensuring, setEnsuring] = useState(false);
   const [ensureMsg, setEnsureMsg] = useState<string | null>(null);
   const [ensureErr, setEnsureErr] = useState(false);
+  const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
 
   async function ensureGitAccess() {
     setEnsuring(true);
     setEnsureMsg(null);
     setEnsureErr(false);
+    setProvisioned(null);
     try {
-      const r = await api.post<{ web_url?: string | null }>(
+      const r = await api.post<StudentRepositoryProvisioned>(
         `/user/courses/${courseId}/provision-repository`,
         {},
       );
-      setEnsureMsg(r?.web_url ? `Repository ready: ${r.web_url}` : 'Git access ensured.');
+      setProvisioned(r);
+      setEnsureMsg('Git access ensured.');
+      await reload(); // refresh the persisted repository details below
     } catch (e) {
       setEnsureErr(true);
       setEnsureMsg(e instanceof Error ? e.message : 'Failed to ensure git access');
@@ -148,6 +162,13 @@ export default function CoursePage() {
     crumbs.push({ label: courseFamily.title || courseFamily.path, href: `/course-families/${courseFamily.id}` });
   if (crumbs.length === 0) crumbs.push({ label: 'Courses', href: '/courses' });
   crumbs.push({ label: course.title || course.path });
+
+  const repoRow = (label: string, value: ReactNode) => (
+    <div className="flex gap-3">
+      <dt className="text-gray-500 w-28 shrink-0">{label}</dt>
+      <dd className="text-gray-900 min-w-0 break-all">{value}</dd>
+    </div>
+  );
 
   return (
     <AuthenticatedLayout>
@@ -242,106 +263,147 @@ export default function CoursePage() {
           </dl>
         </div>
 
-        {/* Git configuration — the course's binding (read-only; managers only). */}
-        {canManageMembers && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Git configuration</h2>
-            {gitBinding ? (
-              <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <dt className="text-gray-500">Delivery</dt>
-                  <dd className="mt-1 text-gray-900">{gitBinding.delivery}</dd>
-                </div>
-                {gitBinding.default_branch && (
-                  <div>
-                    <dt className="text-gray-500">Default branch</dt>
-                    <dd className="mt-1 text-gray-900 font-mono">{gitBinding.default_branch}</dd>
-                  </div>
-                )}
-                {gitBinding.student_repo_modes && gitBinding.student_repo_modes.length > 0 && (
-                  <div>
-                    <dt className="text-gray-500">Student repos</dt>
-                    <dd className="mt-1 text-gray-900">{gitBinding.student_repo_modes.join(', ')}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="text-gray-500">Status</dt>
-                  <dd className="mt-1">
-                    {gitBinding.locked ? (
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
-                        title={gitBinding.lock_reason ?? undefined}
-                      >
-                        Locked
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Editable
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                {(gitBinding.template_url || gitBinding.template_repo) && (
-                  <div className="col-span-2 sm:col-span-4">
-                    <dt className="text-gray-500">Template</dt>
-                    <dd className="mt-1 text-gray-900 break-all">
-                      {gitBinding.template_url ? (
-                        <a
-                          href={gitBinding.template_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {gitBinding.template_url}
-                        </a>
-                      ) : (
-                        gitBinding.template_repo
-                      )}
-                    </dd>
-                  </div>
-                )}
+        {/* Git — the caller's own repository (+ ensure access), then the course
+            binding for managers. */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-gray-900">Git</h2>
+
+          {/* Your repository (everyone) */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Your repository</h3>
+            {myRepo ? (
+              <dl className="space-y-2 text-sm">
+                {repoRow('Mode', myRepo.mode)}
+                {myRepo.provider_type && repoRow('Provider', myRepo.provider_type)}
+                {myRepo.repo_ref && repoRow('Repository', <span className="font-mono">{myRepo.repo_ref}</span>)}
+                {myRepo.web_url &&
+                  repoRow(
+                    'Web',
+                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                      {myRepo.web_url}
+                    </a>,
+                  )}
+                {myRepo.http_url && repoRow('Clone (HTTPS)', <span className="font-mono">{myRepo.http_url}</span>)}
+                {myRepo.ssh_url && repoRow('Clone (SSH)', <span className="font-mono">{myRepo.ssh_url}</span>)}
               </dl>
             ) : (
-              <p className="text-sm text-gray-500">No git binding configured for this course.</p>
-            )}
-          </div>
-        )}
-
-        {/* Actions — members management and per-user git repository. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {canManageMembers && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Members</h2>
-              <p className="text-sm text-gray-600 flex-1">
-                View the roster, change member roles, and add users to the course.
+              <p className="text-sm text-gray-600">
+                You don&apos;t have a repository for this course yet.
               </p>
-              <Link
-                href={`/courses/${courseId}/members`}
-                className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Manage members
-              </Link>
-            </div>
-          )}
+            )}
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Git repository</h2>
-            <p className="text-sm text-gray-600 flex-1">
-              Create or repair your repository for this course
-              {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
-            </p>
             <button
               onClick={ensureGitAccess}
               disabled={ensuring}
-              className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="mt-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {ensuring ? 'Working…' : 'Ensure git access'}
+              {ensuring ? 'Working…' : myRepo ? 'Repair git access' : 'Ensure git access'}
             </button>
+            <p className="mt-2 text-xs text-gray-500">
+              Creates or repairs your repository for this course
+              {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
+            </p>
             {ensureMsg && (
               <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
             )}
+            {provisioned?.clone_token && (
+              <div className="mt-3 p-3 rounded border border-amber-200 bg-amber-50 text-sm text-amber-900">
+                <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
+                <p className="mt-1">
+                  <span className="text-amber-700">Username:</span>{' '}
+                  <span className="font-mono">{provisioned.clone_username}</span>
+                </p>
+                <p>
+                  <span className="text-amber-700">Token:</span>{' '}
+                  <span className="font-mono break-all">{provisioned.clone_token}</span>
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* Course configuration (managers only) */}
+          {canManageMembers && (
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Course configuration</h3>
+              {gitBinding ? (
+                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <dt className="text-gray-500">Delivery</dt>
+                    <dd className="mt-1 text-gray-900">{gitBinding.delivery}</dd>
+                  </div>
+                  {gitBinding.default_branch && (
+                    <div>
+                      <dt className="text-gray-500">Default branch</dt>
+                      <dd className="mt-1 text-gray-900 font-mono">{gitBinding.default_branch}</dd>
+                    </div>
+                  )}
+                  {gitBinding.student_repo_modes && gitBinding.student_repo_modes.length > 0 && (
+                    <div>
+                      <dt className="text-gray-500">Student repos</dt>
+                      <dd className="mt-1 text-gray-900">{gitBinding.student_repo_modes.join(', ')}</dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="text-gray-500">Status</dt>
+                    <dd className="mt-1">
+                      {gitBinding.locked ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                          title={gitBinding.lock_reason ?? undefined}
+                        >
+                          Locked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          Editable
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  {(gitBinding.template_url || gitBinding.template_repo) && (
+                    <div className="col-span-2 sm:col-span-4">
+                      <dt className="text-gray-500">Template</dt>
+                      <dd className="mt-1 text-gray-900 break-all">
+                        {gitBinding.template_url ? (
+                          <a
+                            href={gitBinding.template_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {gitBinding.template_url}
+                          </a>
+                        ) : (
+                          gitBinding.template_repo
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <p className="text-sm text-gray-500">No git binding configured for this course.</p>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Members — managers only; hidden entirely from everyone else. */}
+        {canManageMembers && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Members</h2>
+              <p className="text-sm text-gray-600">
+                View the roster, change member roles, and add users to the course.
+              </p>
+            </div>
+            <Link
+              href={`/courses/${courseId}/members`}
+              className="shrink-0 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Manage members
+            </Link>
+          </div>
+        )}
       </div>
     </AuthenticatedLayout>
   );
