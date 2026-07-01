@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -75,6 +75,22 @@ export default function AddCourseMembersPage() {
   );
   const users = usersData ?? [];
   const hasNext = users.length === PAGE_SIZE;
+
+  // Current members are shown on the roster page, so hide them from the picker.
+  // Fetched once from the course-member API (this is the members feature — no
+  // need to leak course concerns into the generic /users endpoint).
+  const { data: memberData } = useResource(
+    () => membersClient.listCourseMembersCourseMembersGet({ courseId, limit: 2000 }),
+    [courseId],
+    { enabled: canManage },
+  );
+  const memberIds = useMemo(
+    () => new Set((memberData ?? []).map((m) => m.user_id)),
+    [memberData],
+  );
+  // Keep users added in this session visible (with "Added ✓") — memberData
+  // isn't refetched after an add.
+  const visibleUsers = users.filter((u) => added.has(u.id) || !memberIds.has(u.id));
 
   async function addUser(u: UserList) {
     const role = rowRole[u.id] ?? defaultRole;
@@ -195,7 +211,7 @@ export default function AddCourseMembersPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {users.map((u) => {
+                    {visibleUsers.map((u) => {
                       const isAdded = added.has(u.id);
                       return (
                         <tr key={u.id} className="hover:bg-gray-50">
@@ -236,10 +252,10 @@ export default function AddCourseMembersPage() {
                         </tr>
                       );
                     })}
-                    {users.length === 0 && (
+                    {visibleUsers.length === 0 && (
                       <tr>
                         <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
-                          No users found.
+                          No users to add.
                         </td>
                       </tr>
                     )}
