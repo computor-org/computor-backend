@@ -43,8 +43,6 @@ class UserInterface(UserInterfaceBase, BackendEntityInterface):
             query = query.filter(User.family_name == params.family_name)
         if params.email is not None:
             query = query.filter(User.email == params.email)
-        if params.username is not None:
-            query = query.filter(User.username == params.username)
         if params.is_service is not None:
             query = query.filter(User.is_service == params.is_service)
         if params.search:
