@@ -62,10 +62,10 @@ export interface AnalyticsCutoffs {
   gradingCutoff?: string | null;
 }
 
-export const DEFAULT_ANALYTICS_SUBMISSION_CUTOFF = '2026-06-18T22:01:00.000Z';
-
+/** No cutoffs by default — a preset date would silently hide submissions
+ * made after it. Cutoffs are course-specific and set in the UI. */
 export const DEFAULT_ANALYTICS_CUTOFFS: AnalyticsCutoffs = {
-  submissionCutoff: DEFAULT_ANALYTICS_SUBMISSION_CUTOFF,
+  submissionCutoff: null,
   gradingCutoff: null,
 };
 
