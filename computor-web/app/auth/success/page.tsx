@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SSOAuthService } from '@/src/services/ssoAuthService';
+import { ssoAuthService } from '@/src/services/authInstances';
 
 export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null);
@@ -12,13 +12,18 @@ export default function AuthSuccessPage() {
         // Backend has already set ct_access_token / ct_refresh_token cookies on
         // the redirect response. Fetch /user (with credentials) to populate the
         // user record, then full-reload so AuthContext re-initializes.
-        const sso = new SSOAuthService();
-        const result = await sso.handleSSOCallback();
+        const result = await ssoAuthService.handleSSOCallback();
         if (!result.success) {
           throw new Error(result.error || 'Sign-in failed');
         }
         let redirect = sessionStorage.getItem('auth_redirect') || '/dashboard';
         sessionStorage.removeItem('auth_redirect');
+        // Only accept same-origin absolute paths: anything not starting with a
+        // single "/" (e.g. a protocol-relative "//host" planted in storage)
+        // would send the user off-site.
+        if (!redirect.startsWith('/') || redirect.startsWith('//')) {
+          redirect = '/dashboard';
+        }
         // Don't bounce back to single-use or pre-auth pages: an invite link is
         // consumed during this very sign-in (re-loading it 400s with "already
         // used"), and login/register/auth pages are meaningless once logged in.
