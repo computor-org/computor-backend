@@ -159,7 +159,10 @@ export default function CoursePage() {
         </svg>
       ),
     },
-  ].filter((c) => courseViews.includes(c.view));
+    // Management is a permission (not a course role): show it to the manager
+    // cohort directly, so it appears even before the backend's `management`
+    // view is loaded. Student/tutor/lecturer stay driven by the course views.
+  ].filter((c) => courseViews.includes(c.view) || (c.view === 'management' && canManageMembers));
 
   // Literal class strings so Tailwind's JIT actually emits them.
   const quickCols =
