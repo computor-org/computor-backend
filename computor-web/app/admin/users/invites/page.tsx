@@ -6,6 +6,7 @@ import Breadcrumbs from '@/src/components/Breadcrumbs';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 
@@ -37,7 +38,7 @@ interface CreateModal {
 }
 
 export default function InvitesPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [invites, setInvites] = useState<InviteLinkList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +53,9 @@ export default function InvitesPage() {
   const { roles: systemRoles } = useSystemRoles();
   const roleLabel = (id: string) => systemRoles.find(r => r.id === id)?.title ?? id;
 
-  const isAdmin = user?.role === 'admin';
-  const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
+  // Backend-refreshed scopes (via usePermissions) instead of the cached
+  // session's role string, which can go stale between logins.
+  const { isUserManager } = usePermissions();
 
   const notify = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type });

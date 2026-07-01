@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
@@ -52,10 +53,11 @@ function RoleBadge({ role }: { role: RoleList | RoleGet }) {
 }
 
 export default function RolesPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const isAdmin = user?.role === 'admin';
-  const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
+  // Backend-refreshed scopes (via usePermissions) instead of the cached
+  // session's role string, which can go stale between logins.
+  const { isAdmin, isUserManager } = usePermissions();
 
   const [roles, setRoles] = useState<RoleList[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);

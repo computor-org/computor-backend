@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Breadcrumbs from '@/src/components/Breadcrumbs';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
 import Notification from '@/src/components/workspaces/Notification';
 import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
@@ -11,7 +12,8 @@ import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
 const maintenanceClient = new MaintenanceClient();
 
 export default function MaintenancePage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAdmin } = usePermissions();
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export default function MaintenancePage() {
   };
 
   // Access control
-  if (!authLoading && user?.role !== 'admin') {
+  if (!authLoading && !isAdmin) {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
