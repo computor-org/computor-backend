@@ -112,7 +112,7 @@ export default function CourseMembersPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-6 flex flex-col h-full min-h-0 gap-6">
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
@@ -134,11 +134,11 @@ export default function CourseMembersPage() {
         <ErrorBanner>{error || actionError}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500 py-8 text-center">Loading members…</div>
+          <div className="flex-1 min-h-0 flex items-center justify-center text-gray-500">Loading members…</div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-lg overflow-y-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
@@ -212,9 +212,9 @@ export default function CourseMembersPage() {
           </div>
         )}
 
-        {/* Pager — total count isn't exposed via the client, so Next is enabled
-            whenever a full page came back. */}
-        <div className="flex items-center justify-between">
+        {/* Pager — pinned below the scrolling list. Total count isn't exposed
+            via the client, so Next is enabled whenever a full page came back. */}
+        <div className="shrink-0 flex items-center justify-between">
           <span className="text-sm text-gray-500">Page {page + 1}</span>
           <div className="flex gap-2">
             <button
