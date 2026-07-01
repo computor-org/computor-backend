@@ -307,6 +307,7 @@ export interface UserQuery {
   archived?: boolean | null;
   username?: string | null;
   is_service?: boolean | null;
+  search?: string | null;
 }
 
 /**

@@ -45,6 +45,7 @@ class CrudRouter:
         self.on_deleted = []
         self.on_archived = []
         self.pre_archive = []  # sync guards: (entity, permissions, db) -> None, raise to block
+        self.pre_delete = []  # sync guards: (entity, permissions, db) -> None, raise to block
 
     def create(self):
         async def route(
@@ -111,6 +112,9 @@ class CrudRouter:
             # Fetch the row before deletion so post_delete callbacks and cache
             # invalidation can see its fields. Cheaper than racing the delete.
             entity_deleted = await get_id_db(permissions, db, id, self.dto)
+
+            for guard in self.pre_delete:
+                guard(entity_deleted, permissions, db)
 
             self._invalidate_caches_for(entity_deleted)
 

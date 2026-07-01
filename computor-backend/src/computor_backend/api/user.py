@@ -104,12 +104,25 @@ async def get_course_views_for_current_user_by_course(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Get available views based on role for a specific course for the current user."""
+    """Get available views based on role for a specific course for the current user.
+
+    student/tutor/lecturer are course-role perspectives (membership-based). The
+    ``management`` view is course administration (member management, …) and is
+    granted to the lecturer cohort — admins, organization managers, and course
+    lecturers or higher — even when they hold no student/tutor/lecturer role.
+    """
     user_id = permissions.get_user_id()
     if not user_id:
         return []
 
-    return get_course_views_for_user_by_course(user_id, course_id, db)
+    views = get_course_views_for_user_by_course(user_id, course_id, db)
+    if (
+        permissions.is_admin
+        or "_organization_manager" in permissions.roles
+        or "lecturer" in views
+    ):
+        views = sorted(set(views) | {"management"})
+    return views
 
 @user_router.get(
     "/courses/{course_id}/git",

@@ -158,7 +158,7 @@ def sync(course_family_identifier: str, force: bool, auth: CLIAuthConfig):
 
             click.echo(f"\n💡 Monitor workflow progress:")
             click.echo(f"   - Temporal UI: http://localhost:8088 (search for workflow ID)")
-            click.echo(f"   - Check logs: docker logs -f temporal-worker-1")
+            click.echo(f"   - Check logs: docker logs -f computor-temporal-worker-1")
 
         except Exception as e:
             click.secho(f"\n❌ Failed to start sync workflow: {e}", fg="red", err=True)

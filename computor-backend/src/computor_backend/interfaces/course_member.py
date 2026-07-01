@@ -64,6 +64,31 @@ async def post_update_course_member(
     invalidate_course_dashboards(course_member.course_id, get_cache())
 
 
+def guard_course_member_delete(entity, permissions: Principal, db: Session) -> None:
+    """Block removing a member you could not also (re-)assign.
+
+    Mirrors the assignment ceiling on create/update: admins are uncapped;
+    everyone else may only remove members whose role is strictly below their
+    assignment ceiling, and never themselves. Wired as a ``pre_delete`` guard
+    on the CourseMember CrudRouter.
+    """
+    if permissions.is_admin:
+        return
+
+    if str(entity.user_id) == permissions.user_id:
+        raise ForbiddenException(
+            "You cannot remove your own course membership. Please contact an administrator."
+        )
+
+    ceiling = permissions.get_course_assignment_ceiling(str(entity.course_id))
+    target_level = course_role_hierarchy.get_role_level(entity.course_role_id)
+    if not ceiling or target_level >= course_role_hierarchy.get_role_level(ceiling):
+        raise ForbiddenException(
+            f"You cannot remove a course member with role '{entity.course_role_id}'. "
+            f"You can only remove members with lower privilege levels."
+        )
+
+
 def custom_permissions_course_member(
     permissions: Principal,
     db: Session,
@@ -103,8 +128,10 @@ def custom_permissions_course_member(
 
     course_id = str(course_member.course_id)
 
-    # Check user has at least _lecturer role in this course
-    user_role = permissions.get_highest_course_role(course_id)
+    # Check user has at least _lecturer role in this course. Org-managers are
+    # treated as _owner here (their assignment ceiling), so they can manage any
+    # course's roster without being enrolled.
+    user_role = permissions.get_course_assignment_ceiling(course_id)
     if not user_role or course_role_hierarchy.get_role_level(user_role) < course_role_hierarchy.get_role_level("_lecturer"):
         raise ForbiddenException(
             "You don't have permission to update course members. "

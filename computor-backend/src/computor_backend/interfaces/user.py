@@ -1,6 +1,7 @@
 """Backend User interface with SQLAlchemy model."""
 
 from typing import Optional
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from computor_types.users import (
@@ -44,6 +45,18 @@ class UserInterface(UserInterfaceBase, BackendEntityInterface):
             query = query.filter(User.email == params.email)
         if params.is_service is not None:
             query = query.filter(User.is_service == params.is_service)
+        if params.search:
+            # Free-text substring match across name + email, mirroring the
+            # ``search`` convention in ``list_mentionable_users``. Runs on top
+            # of the permission-scoped query, so it only narrows visibility.
+            like = f"%{params.search.strip()}%"
+            query = query.filter(
+                or_(
+                    User.given_name.ilike(like),
+                    User.family_name.ilike(like),
+                    User.email.ilike(like),
+                )
+            )
 
         if params.archived is not None and params.archived:
             query = query.filter(User.archived_at.isnot(None))

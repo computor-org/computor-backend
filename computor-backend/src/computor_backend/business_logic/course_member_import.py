@@ -57,10 +57,15 @@ async def import_course_member(
     Raises:
         ForbiddenException: If user lacks permissions
     """
-    # Validate course exists and user has permissions (lecturer role or higher)
-    course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
-        Course.id == course_id
-    ).first()
+    # Validate course exists and user has permissions (lecturer role or higher).
+    # Admins and organization managers are not course members but may manage any
+    # course's roster, so they bypass the membership-based filter.
+    if permissions.is_admin or "_organization_manager" in permissions.roles:
+        course = db.query(Course).filter(Course.id == course_id).first()
+    else:
+        course = check_course_permissions(permissions, Course, "_lecturer", db).filter(
+            Course.id == course_id
+        ).first()
 
     if not course:
         raise ForbiddenException(
@@ -68,8 +73,9 @@ async def import_course_member(
             "Lecturer role or higher is required."
         )
 
-    # Validate role assignment - user can only assign roles at or below their own level
-    user_role = permissions.get_highest_course_role(str(course_id))
+    # Validate role assignment - user can only assign roles at or below their own
+    # level (admins/org-managers are uncapped, treated as _owner).
+    user_role = permissions.get_course_assignment_ceiling(str(course_id))
     target_role = member_request.course_role_id
 
     if not user_role:

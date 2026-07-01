@@ -33,7 +33,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: temporal-ui
+    container_name: computor-temporal-ui
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8088}:8080"

@@ -3,13 +3,28 @@
  * Endpoint: /course-member-import
  */
 
-import type { CourseMemberImportRequest, CourseMemberImportResponse } from 'types/generated';
+import type { CourseMemberImportFileParseRequest, CourseMemberImportParseResponse, CourseMemberImportRequest, CourseMemberImportResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
 export class CourseMemberImportClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
     super(client, '/course-member-import');
+  }
+
+  /**
+   * Parse Member File
+   * Parse an uploaded member file (CSV/JSON/XLSX/Excel-XML) into preview rows.
+   * Read-only: it never touches the database. The client shows the rows for
+   * review/edit and then imports selected ones via ``POST /course-member-import/{id}``.
+   * **Required Permissions**: Lecturer role or higher (admins and organization
+   * managers may parse for any course).
+   */
+  async parseMemberFileCourseMemberImportParseCourseIdPost({ courseId, userId, body }: { courseId: string; userId?: string | null; body: CourseMemberImportFileParseRequest }): Promise<CourseMemberImportParseResponse> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<CourseMemberImportParseResponse>(this.buildPath('parse', courseId), body, { params: queryParams });
   }
 
   /**

@@ -175,6 +175,13 @@ class UserQuery(ListQuery):
     archived: Optional[bool] = None
     username: Optional[str] = None
     is_service: Optional[bool] = None
+    search: Optional[str] = None
+    """Free-text substring match over given name, family name and email.
+
+    Applied on top of the permission-scoped query, so it never widens which
+    users a caller can see — it only narrows the visible set. Mirrors the
+    ``search`` convention used by the mentionable-users endpoint.
+    """
 
 
 # Additional user-related DTOs
