@@ -284,7 +284,6 @@ export default function CoursePage() {
                     </a>,
                   )}
                 {myRepo.http_url && repoRow('Clone (HTTPS)', <span className="font-mono">{myRepo.http_url}</span>)}
-                {myRepo.ssh_url && repoRow('Clone (SSH)', <span className="font-mono">{myRepo.ssh_url}</span>)}
               </dl>
             ) : (
               <p className="text-sm text-gray-600">
