@@ -198,40 +198,48 @@ export default function CoursePage() {
           </div>
         )}
 
-        {/* Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {canManageMembers && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Members</h2>
-              <p className="text-sm text-gray-600 flex-1">
-                View the roster, change member roles, and add users to the course.
-              </p>
-              <Link
-                href={`/courses/${courseId}/members`}
-                className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Manage members
-              </Link>
-            </div>
-          )}
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Git repository</h2>
-            <p className="text-sm text-gray-600 flex-1">
-              Create or repair your repository for this course
-              {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
-            </p>
-            <button
-              onClick={ensureGitAccess}
-              disabled={ensuring}
-              className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {ensuring ? 'Working…' : 'Ensure git access'}
-            </button>
-            {ensureMsg && (
-              <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
+        {/* About — description + the few facts worth showing (no identifiers). */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>
+          {course.description && <p className="text-gray-700 mb-6">{course.description}</p>}
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            {organization && (
+              <div>
+                <dt className="text-gray-500">Organization</dt>
+                <dd className="mt-1 text-gray-900">{organization.title || organization.path}</dd>
+              </div>
             )}
-          </div>
+            {courseFamily && (
+              <div>
+                <dt className="text-gray-500">Course family</dt>
+                <dd className="mt-1 text-gray-900">{courseFamily.title || courseFamily.path}</dd>
+              </div>
+            )}
+            {course.language_code && (
+              <div>
+                <dt className="text-gray-500">Language</dt>
+                <dd className="mt-1 text-gray-900 uppercase">{course.language_code}</dd>
+              </div>
+            )}
+            {course.team_mode && (
+              <div>
+                <dt className="text-gray-500">Team mode</dt>
+                <dd className="mt-1 text-gray-900">{course.team_mode}</dd>
+              </div>
+            )}
+            {course.created_at && (
+              <div>
+                <dt className="text-gray-500">Created</dt>
+                <dd className="mt-1 text-gray-900">{new Date(course.created_at).toLocaleDateString()}</dd>
+              </div>
+            )}
+            {course.updated_at && (
+              <div>
+                <dt className="text-gray-500">Last updated</dt>
+                <dd className="mt-1 text-gray-900">{new Date(course.updated_at).toLocaleDateString()}</dd>
+              </div>
+            )}
+          </dl>
         </div>
 
         {/* Git configuration — the course's binding (read-only; managers only). */}
@@ -299,48 +307,40 @@ export default function CoursePage() {
           </div>
         )}
 
-        {/* About — description + the few facts worth showing (no identifiers). */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>
-          {course.description && <p className="text-gray-700 mb-6">{course.description}</p>}
-          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            {organization && (
-              <div>
-                <dt className="text-gray-500">Organization</dt>
-                <dd className="mt-1 text-gray-900">{organization.title || organization.path}</dd>
-              </div>
+        {/* Actions — members management and per-user git repository. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {canManageMembers && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Members</h2>
+              <p className="text-sm text-gray-600 flex-1">
+                View the roster, change member roles, and add users to the course.
+              </p>
+              <Link
+                href={`/courses/${courseId}/members`}
+                className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Manage members
+              </Link>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Git repository</h2>
+            <p className="text-sm text-gray-600 flex-1">
+              Create or repair your repository for this course
+              {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
+            </p>
+            <button
+              onClick={ensureGitAccess}
+              disabled={ensuring}
+              className="mt-4 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {ensuring ? 'Working…' : 'Ensure git access'}
+            </button>
+            {ensureMsg && (
+              <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
             )}
-            {courseFamily && (
-              <div>
-                <dt className="text-gray-500">Course family</dt>
-                <dd className="mt-1 text-gray-900">{courseFamily.title || courseFamily.path}</dd>
-              </div>
-            )}
-            {course.language_code && (
-              <div>
-                <dt className="text-gray-500">Language</dt>
-                <dd className="mt-1 text-gray-900 uppercase">{course.language_code}</dd>
-              </div>
-            )}
-            {course.team_mode && (
-              <div>
-                <dt className="text-gray-500">Team mode</dt>
-                <dd className="mt-1 text-gray-900">{course.team_mode}</dd>
-              </div>
-            )}
-            {course.created_at && (
-              <div>
-                <dt className="text-gray-500">Created</dt>
-                <dd className="mt-1 text-gray-900">{new Date(course.created_at).toLocaleDateString()}</dd>
-              </div>
-            )}
-            {course.updated_at && (
-              <div>
-                <dt className="text-gray-500">Last updated</dt>
-                <dd className="mt-1 text-gray-900">{new Date(course.updated_at).toLocaleDateString()}</dd>
-              </div>
-            )}
-          </dl>
+          </div>
         </div>
       </div>
     </AuthenticatedLayout>
