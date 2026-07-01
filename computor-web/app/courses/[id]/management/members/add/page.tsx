@@ -481,7 +481,7 @@ export default function AddCourseMembersPage() {
                 if (f) handleFile(f);
                 e.target.value = '';
               }}
-              className="block text-sm"
+              className="block text-sm text-gray-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
             />
 
             {fileError && (
