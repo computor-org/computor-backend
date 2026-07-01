@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { InvitesClient } from '@/src/generated/clients/InvitesClient';
@@ -117,11 +118,11 @@ export default function InvitePage() {
         {/* Header */}
         <div className="p-8 pb-0">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />
+            <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
             <span className="text-lg font-semibold text-gray-900">Computor</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
-          <p className="text-sm text-gray-500 mb-2">You've been invited to join Computor.</p>
+          <p className="text-sm text-gray-500 mb-2">You&apos;ve been invited to join Computor.</p>
 
           {/* Invite metadata */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-xs text-blue-800 space-y-1">

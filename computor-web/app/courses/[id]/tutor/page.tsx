@@ -2,15 +2,26 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import StatCards from '@/src/components/progress/StatCards';
-import ProgressDistributionChart from '@/src/components/progress/ProgressDistributionChart';
-import ContentTypeChart from '@/src/components/progress/ContentTypeChart';
 import ProgressBar from '@/src/components/progress/ProgressBar';
 import type { CourseMemberGradingsList } from 'types/generated';
+
+// Charts pull in recharts (~large) — load them only when this page renders
+// instead of shipping the library in the shared bundle.
+const chartLoading = () => <div className="h-64 bg-gray-100 rounded animate-pulse" />;
+const ProgressDistributionChart = dynamic(
+  () => import('@/src/components/progress/ProgressDistributionChart'),
+  { ssr: false, loading: chartLoading },
+);
+const ContentTypeChart = dynamic(
+  () => import('@/src/components/progress/ContentTypeChart'),
+  { ssr: false, loading: chartLoading },
+);
 
 const gradingsClient = new CourseMemberGradingsClient();
 

@@ -3,14 +3,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import ProgressBar from '@/src/components/progress/ProgressBar';
-import SubmissionDonutChart from '@/src/components/progress/SubmissionDonutChart';
 import ContentTree from '@/src/components/progress/ContentTree';
 import type { CourseMemberGradingsGet } from 'types/generated';
+
+// Pulls in recharts — load only when this page renders (keeps the shared
+// bundle free of the charting library).
+const SubmissionDonutChart = dynamic(
+  () => import('@/src/components/progress/SubmissionDonutChart'),
+  { ssr: false, loading: () => <div className="h-48 bg-gray-100 rounded animate-pulse" /> },
+);
 
 const gradingsClient = new CourseMemberGradingsClient();
 
