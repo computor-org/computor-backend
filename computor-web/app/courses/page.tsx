@@ -118,13 +118,6 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
               <span className="uppercase">{course.language_code}</span>
             </div>
           )}
-          {course.team_mode && (
-            <div className="flex items-center">
-              <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                Team Mode: {course.team_mode}
-              </span>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">

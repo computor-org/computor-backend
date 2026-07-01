@@ -32,16 +32,6 @@ class CourseCreate(BaseModel):
     language_code: Optional[str] = None
     properties: Optional[CourseProperties] = None
 
-    # Team formation defaults (apply to all assignments)
-    team_mode: Optional[str] = None
-    team_min_group_size: Optional[int] = None
-    team_allow_student_creation: Optional[bool] = None
-    team_allow_join: Optional[bool] = None
-    team_allow_leave: Optional[bool] = None
-    team_auto_assign_unmatched: Optional[bool] = None
-    team_lock_at_deadline: Optional[bool] = None
-    team_require_approval: Optional[bool] = None
-
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
     title: Optional[str] = None
@@ -51,16 +41,6 @@ class CourseGet(BaseEntityGet,CourseCreate):
     organization_id: str
     language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
-
-    # Team formation defaults
-    team_mode: Optional[str] = None
-    team_min_group_size: Optional[int] = None
-    team_allow_student_creation: Optional[bool] = None
-    team_allow_join: Optional[bool] = None
-    team_allow_leave: Optional[bool] = None
-    team_auto_assign_unmatched: Optional[bool] = None
-    team_lock_at_deadline: Optional[bool] = None
-    team_require_approval: Optional[bool] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -80,10 +60,6 @@ class CourseList(BaseModel):
     language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
 
-    # Team formation defaults
-    team_mode: Optional[str] = None
-    team_allow_student_creation: Optional[bool] = None
-
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
@@ -95,16 +71,6 @@ class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None
-
-    # Team formation defaults
-    team_mode: Optional[str] = None
-    team_min_group_size: Optional[int] = None
-    team_allow_student_creation: Optional[bool] = None
-    team_allow_join: Optional[bool] = None
-    team_allow_leave: Optional[bool] = None
-    team_auto_assign_unmatched: Optional[bool] = None
-    team_lock_at_deadline: Optional[bool] = None
-    team_require_approval: Optional[bool] = None
 
 class CourseQuery(ListQuery):
     id: Optional[str] = None

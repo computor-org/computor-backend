@@ -3,7 +3,7 @@
  * Endpoint: /submission-groups
  */
 
-import type { JoinTeamRequest, JoinTeamResponse, SubmissionGroupCreate, SubmissionGroupGet, SubmissionGroupList, SubmissionGroupProperties, SubmissionGroupUpdate } from 'types/generated';
+import type { SubmissionGroupCreate, SubmissionGroupGet, SubmissionGroupList, SubmissionGroupProperties, SubmissionGroupUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -69,18 +69,5 @@ export class SubmissionGroupsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.patch<SubmissionGroupGet>(this.buildPath(id), body, { params: queryParams });
-  }
-
-  /**
-   * Join Team
-   * Join an existing team.
-   * If require_approval is true, the join request will be pending until approved.
-   * Otherwise, the user is immediately added to the team.
-   */
-  async joinTeamSubmissionGroupsSubmissionGroupIdJoinPost({ submissionGroupId, userId, body }: { submissionGroupId: string; userId?: string | null; body: JoinTeamRequest }): Promise<JoinTeamResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<JoinTeamResponse>(this.buildPath(submissionGroupId, 'join'), body, { params: queryParams });
   }
 }

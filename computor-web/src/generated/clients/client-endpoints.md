@@ -89,10 +89,6 @@
 | `getContentDeploymentCourseContentsContentIdDeploymentGet` | GET | `/course-contents/{content_id}/deployment` | — | `DeploymentWithHistory | null` |
 | `unassignExampleFromContentCourseContentsContentIdExampleDelete` | DELETE | `/course-contents/{content_id}/example` | — | `Record<string, unknown> & Record<string, string>` |
 | `moveCourseContentCourseContentsContentIdMovePatch` | PATCH | `/course-contents/{content_id}/move` | `CourseContentMoveRequest` | `CourseContentGet` |
-| `getAvailableTeamsCourseContentsCourseContentIdSubmissionGroupsAvailableGet` | GET | `/course-contents/{course_content_id}/submission-groups/available` | — | `AvailableTeam[]` |
-| `leaveMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamDelete` | DELETE | `/course-contents/{course_content_id}/submission-groups/my-team` | — | `LeaveTeamResponse` |
-| `getMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamGet` | GET | `/course-contents/{course_content_id}/submission-groups/my-team` | — | `TeamResponse` |
-| `createMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamPost` | POST | `/course-contents/{course_content_id}/submission-groups/my-team` | `TeamCreate` | `TeamResponse` |
 | `deleteCourseContentsCourseContentsIdDelete` | DELETE | `/course-contents/{id}` | — | `void` |
 | `getCourseContentsCourseContentsIdGet` | GET | `/course-contents/{id}` | — | `CourseContentGet` |
 | `updateCourseContentsCourseContentsIdPatch` | PATCH | `/course-contents/{id}` | `CourseContentUpdate` | `CourseContentGet` |
@@ -553,7 +549,6 @@
 | `deleteSubmissionGroupsSubmissionGroupsIdDelete` | DELETE | `/submission-groups/{id}` | — | `void` |
 | `getSubmissionGroupsSubmissionGroupsIdGet` | GET | `/submission-groups/{id}` | — | `SubmissionGroupGet` |
 | `updateSubmissionGroupsSubmissionGroupsIdPatch` | PATCH | `/submission-groups/{id}` | `SubmissionGroupUpdate` | `SubmissionGroupGet` |
-| `joinTeamSubmissionGroupsSubmissionGroupIdJoinPost` | POST | `/submission-groups/{submission_group_id}/join` | `JoinTeamRequest` | `JoinTeamResponse` |
 
 ## SubmissionsClient
 - Base path: `/submissions`

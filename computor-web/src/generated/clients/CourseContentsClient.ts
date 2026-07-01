@@ -3,7 +3,7 @@
  * Endpoint: /course-contents
  */
 
-import type { AvailableTeam, CourseContentCreate, CourseContentGet, CourseContentList, CourseContentMoveRequest, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory, LeaveTeamResponse, TeamCreate, TeamResponse } from 'types/generated';
+import type { CourseContentCreate, CourseContentGet, CourseContentList, CourseContentMoveRequest, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -108,57 +108,6 @@ export class CourseContentsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.patch<CourseContentGet>(this.buildPath(contentId, 'move'), body, { params: queryParams });
-  }
-
-  /**
-   * Get Available Teams
-   * Browse available teams that the current user can join.
-   * Only shows teams that:
-   * - Are in 'forming' status
-   * - Have space for more members
-   * - Are for the specified course content
-   */
-  async getAvailableTeamsCourseContentsCourseContentIdSubmissionGroupsAvailableGet({ courseContentId, userId }: { courseContentId: string; userId?: string | null }): Promise<AvailableTeam[]> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.get<AvailableTeam[]>(this.buildPath(courseContentId, 'submission-groups', 'available'), { params: queryParams });
-  }
-
-  /**
-   * Leave My Team
-   * Leave the current user's team for a course content.
-   * If the user is the last member, the team is deleted.
-   */
-  async leaveMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamDelete({ courseContentId, userId }: { courseContentId: string; userId?: string | null }): Promise<LeaveTeamResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.delete<LeaveTeamResponse>(this.buildPath(courseContentId, 'submission-groups', 'my-team'), { params: queryParams });
-  }
-
-  /**
-   * Get My Team
-   * Get the current user's team for a course content.
-   * Returns 404 if user doesn't have a team yet.
-   */
-  async getMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamGet({ courseContentId, userId }: { courseContentId: string; userId?: string | null }): Promise<TeamResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.get<TeamResponse>(this.buildPath(courseContentId, 'submission-groups', 'my-team'), { params: queryParams });
-  }
-
-  /**
-   * Create My Team
-   * Create a new team for the current user for a course content.
-   * Student endpoint - creates a team and adds the current user as the first member.
-   */
-  async createMyTeamCourseContentsCourseContentIdSubmissionGroupsMyTeamPost({ courseContentId, userId, body }: { courseContentId: string; userId?: string | null; body: TeamCreate }): Promise<TeamResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<TeamResponse>(this.buildPath(courseContentId, 'submission-groups', 'my-team'), body, { params: queryParams });
   }
 
   /**

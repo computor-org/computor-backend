@@ -50,7 +50,6 @@ from computor_client.endpoints.submission_groups import SubmissionGroupsClient
 from computor_client.endpoints.submissions import SubmissionsClient
 from computor_client.endpoints.system import SystemClient
 from computor_client.endpoints.tasks import TasksClient
-from computor_client.endpoints.team_management import TeamManagementClient
 from computor_client.endpoints.tests import TestsClient
 from computor_client.endpoints.tokens import TokensClient
 from computor_client.endpoints.tutors import TutorsClient
@@ -104,7 +103,6 @@ __all__ = [
     "SubmissionsClient",
     "SystemClient",
     "TasksClient",
-    "TeamManagementClient",
     "TestsClient",
     "TokensClient",
     "TutorsClient",

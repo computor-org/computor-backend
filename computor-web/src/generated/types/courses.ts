@@ -1210,14 +1210,6 @@ export interface CourseCreate {
   course_family_id: string;
   language_code?: string | null;
   properties?: CourseProperties | null;
-  team_mode?: string | null;
-  team_min_group_size?: number | null;
-  team_allow_student_creation?: boolean | null;
-  team_allow_join?: boolean | null;
-  team_allow_leave?: boolean | null;
-  team_auto_assign_unmatched?: boolean | null;
-  team_lock_at_deadline?: boolean | null;
-  team_require_approval?: boolean | null;
 }
 
 export interface CourseGet {
@@ -1228,14 +1220,6 @@ export interface CourseGet {
   course_family_id: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
-  team_mode?: string | null;
-  team_min_group_size?: number | null;
-  team_allow_student_creation?: boolean | null;
-  team_allow_join?: boolean | null;
-  team_allow_leave?: boolean | null;
-  team_auto_assign_unmatched?: boolean | null;
-  team_lock_at_deadline?: boolean | null;
-  team_require_approval?: boolean | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1254,22 +1238,12 @@ export interface CourseList {
   path: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
-  team_mode?: string | null;
-  team_allow_student_creation?: boolean | null;
 }
 
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
   language_code?: string | null;
-  team_mode?: string | null;
-  team_min_group_size?: number | null;
-  team_allow_student_creation?: boolean | null;
-  team_allow_join?: boolean | null;
-  team_allow_leave?: boolean | null;
-  team_auto_assign_unmatched?: boolean | null;
-  team_lock_at_deadline?: boolean | null;
-  team_require_approval?: boolean | null;
 }
 
 export interface CourseQuery {

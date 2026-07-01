@@ -257,12 +257,6 @@ export default function CoursePage() {
                 <dd className="mt-1 text-gray-900 uppercase">{course.language_code}</dd>
               </div>
             )}
-            {course.team_mode && (
-              <div>
-                <dt className="text-gray-500">Team mode</dt>
-                <dd className="mt-1 text-gray-900">{course.team_mode}</dd>
-              </div>
-            )}
             {course.created_at && (
               <div>
                 <dt className="text-gray-500">Created</dt>

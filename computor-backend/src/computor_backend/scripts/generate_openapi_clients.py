@@ -885,11 +885,6 @@ except Exception as e:
     'TaskSubmission': 'tasks',
     'TaskInfo': 'tasks',
     'TestCreate': 'tests',
-    # Team Management
-    'AvailableTeam': 'team_management',
-    'LeaveTeamResponse': 'team_management',
-    'TeamCreate': 'team_management',
-    'TeamResponse': 'team_management',
     # Tutor
     'TutorCourseMemberCourseContent': 'tutor_course_members',
     'TutorCourseMemberGet': 'tutor_course_members',
