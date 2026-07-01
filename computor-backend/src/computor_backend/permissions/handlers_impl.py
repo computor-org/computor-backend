@@ -605,12 +605,15 @@ class CourseMemberPermissionHandler(PermissionHandler):
     }
     
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
-        if self.check_admin(principal):
+        # Admins and organization managers manage course rosters everywhere
+        # (consistent with the uncapped assignment ceiling): full read/write on
+        # course members in any course.
+        if self.check_admin(principal) or "_organization_manager" in principal.roles:
             return True
-        
+
         if self.check_general_permission(principal, action):
             return True
-        
+
         # Students can view their own membership
         if action in ["get", "list"] and resource_id == principal.user_id:
             return True
@@ -645,7 +648,8 @@ class CourseMemberPermissionHandler(PermissionHandler):
         return False
     
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        if self.check_admin(principal):
+        # Admins and organization managers see/manage every course's roster.
+        if self.check_admin(principal) or "_organization_manager" in principal.roles:
             return db.query(self.entity)
 
         if self.check_general_permission(principal, action):
