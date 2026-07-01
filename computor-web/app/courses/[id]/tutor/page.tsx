@@ -115,7 +115,7 @@ export default function TutorCourseProgressPage() {
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span className="text-gray-300 ml-1">&#8597;</span>;
-    return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '&#8593;' : '&#8595;'}</span>;
+    return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
   return (

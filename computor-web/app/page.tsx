@@ -241,7 +241,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-16 sticky bottom-0 z-40">
+      <footer className="border-t bg-white mt-16">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-gray-600">
             <p>&copy; 2025 Computor. Educational Platform for Programming.</p>

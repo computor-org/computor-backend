@@ -57,7 +57,7 @@ export default function DashboardPage() {
     { label: 'Course Families', href: '/course-families', show: showManagement },
     { label: 'Workspaces', href: '/workspaces', show: isWorkspaceUser },
     { label: 'User Management', href: '/admin/users', show: isUserManager },
-    { label: 'System', href: '/admin', show: isAdmin },
+    { label: 'System', href: '/admin/maintenance', show: isAdmin },
     { label: 'Settings', href: '/settings', show: true },
   ].filter((a) => a.show);
 
