@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { CoderWorkspace, WorkspaceDetails } from '@/src/types/workspaces';
+import type { CoderWorkspace } from '@/src/types/workspaces';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 
 interface WorkspaceCardProps {
