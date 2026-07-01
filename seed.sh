@@ -1,17 +1,17 @@
 #!/bin/bash
-# Development database seeder.
+# Development seeder — enrols fake users into EXISTING courses.
 #
-# Creates fake users and enrols them into EXISTING courses with a role mix so
-# you have realistic rosters in the web UI and the VS Code extension. Direct-DB
-# only (no Keycloak/Forgejo) — seeded users appear in rosters but cannot log in.
-# Every seeded row is tagged properties.dev_seed for a clean --cleanup.
+# Runs the backend's own import logic in-process as an admin, so every real
+# mechanic applies (user find-or-create, student profiles, submission groups).
+# Seeded users (dev.userNNN@seed.local) are not loginable. Needs Postgres up
+# (startup.sh); does NOT need the API (api.sh) or Keycloak.
 #
 # Usage:
 #   bash seed.sh                          # 20 users into every course
 #   bash seed.sh --users 50               # 50 users per course
-#   bash seed.sh --course-path py-2025    # only that course
-#   bash seed.sh --cleanup                # remove seeded rows, then reseed
-#   bash seed.sh --cleanup-only           # just remove seeded rows
+#   bash seed.sh --course-id <uuid>       # only that course (or --course-path)
+#   bash seed.sh --cleanup                # remove seeded users, then reseed
+#   bash seed.sh --cleanup-only           # just remove seeded users
 #   bash seed.sh --help                   # full option list
 
 set -euo pipefail
