@@ -183,6 +183,59 @@ export interface CourseMemberImportResponse {
   workflow_id?: string | null;
 }
 
+/**
+ * A single member parsed from an uploaded file (preview before import).
+ */
+export interface CourseMemberImportRow {
+  /** Email address */
+  email: string;
+  /** First name */
+  given_name?: string | null;
+  /** Last name */
+  family_name?: string | null;
+  /** Matriculation / student number */
+  student_id?: string | null;
+  /** Course group name */
+  course_group_title?: string | null;
+  /** Course role ID (e.g., _student) */
+  course_role_id?: string | null;
+  /** Incoming/exchange marker */
+  incoming?: string | null;
+  /** Study programme id */
+  study_id?: string | null;
+  /** Study programme name */
+  study_name?: string | null;
+  /** Semester in study */
+  semester?: number | null;
+  /** Registration date */
+  registration_date?: string | null;
+  /** Free-text notes */
+  notes?: string | null;
+}
+
+/**
+ * Upload payload for the file parser: the file as base64 (handles binary
+ * xlsx as well as text csv/json/xml over plain JSON).
+ */
+export interface CourseMemberImportFileParseRequest {
+  /** Original filename — used to detect the format */
+  filename: string;
+  /** Base64-encoded file bytes */
+  content_base64: string;
+}
+
+/**
+ * Rows parsed from an uploaded member file. No database writes occur.
+ */
+export interface CourseMemberImportParseResponse {
+  /** Parsed members (rows without an email are dropped) */
+  rows?: CourseMemberImportRow[];
+  /** csv | json | xlsx | xml */
+  detected_format?: string | null;
+  /** Non-fatal parse warnings */
+  warnings?: string[];
+}
+
 export interface CourseContentKindCreate {
   title?: string | null;
   description?: string | null;
