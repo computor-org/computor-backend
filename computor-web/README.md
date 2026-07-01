@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# computor-web
 
-## Getting Started
+Web frontend for [Computor](https://github.com/computor-org/computor-backend), the educational platform for programming courses. Next.js 16 (App Router, client-side rendering), React 19, Tailwind CSS 4, TypeScript.
 
-First, run the development server:
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+yarn install
+yarn dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app talks to the Computor FastAPI backend. Configuration:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Env var | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL. Baked in at build time (`NEXT_PUBLIC_*`), so set it when building the Docker image for production. |
+| `NEXT_PUBLIC_ANALYTICS_DEMO` | unset | `1` renders the lecturer analytics against synthetic data with no backend/auth — local UI development only, never set in production. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See `docker/ENV_VARIABLES.md` for the Docker build details.
 
-## Learn More
+## Authentication
 
-To learn more about Next.js, take a look at the following resources:
+Sign-in is Keycloak SSO (brokered by the backend). Tokens live in HttpOnly cookies set by the backend; the frontend stores only non-sensitive user data in `sessionStorage` (see `src/services/authStorage.ts`). All HTTP layers refresh the access token on 401 through a single-flight guard (`src/utils/tokenRefresh.ts`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Role gating in the UI goes through `usePermissions()` (`src/hooks/usePermissions.ts`), which derives from the backend's `/user/scopes` and `/user/views`. The backend enforces every action regardless.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
+```
+app/                    Routes (App Router; all pages are client components)
+src/components/         Shared UI (PageHeader, FormPanel, Modal, ConfirmDialog,
+                        Button, Badge, Spinner, EmptyState, ErrorBanner, …)
+src/contexts/           AuthContext, NotificationContext (useNotify toasts)
+src/hooks/              useResource (data fetching), usePermissions, …
+src/api/client.ts       APIClient used by all generated clients
+src/generated/          API clients + types generated from the backend
+                        (do not edit by hand; regenerate via ../generate.sh)
+src/services/           Auth services (SSO + basic fallback)
+e2e/                    Playwright tests (network-mocked, no backend needed)
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Conventions:
+- Data fetching on pages goes through `useResource`; mutations report via `useNotify()` toasts.
+- Dialogs render through `Modal` (focus trap + dialog semantics). Destructive deletes use `ConfirmDeleteDialog` (type-to-confirm); simple confirmations use `ConfirmDialog`.
+- Page headers use `PageHeader`; inline errors use `ErrorBanner`; status chips use `Badge`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Testing
+
+```bash
+yarn test:e2e       # Playwright; starts its own next dev server on :3100
+```
+
+The e2e tests mock the backend at the network layer (`e2e/fixtures.ts`), so they need no running API or database. First run: `npx playwright install chromium`.
+
+## Lint / build
+
+```bash
+yarn lint
+yarn build
+```
