@@ -23,6 +23,8 @@ const importClient = new CourseMemberImportClient();
 const usersClient = new UsersClient();
 const coursesClient = new CoursesClient();
 
+type AddTab = 'list' | 'email';
+
 function userName(u: UserList): string {
   const name = `${u.given_name ?? ''} ${u.family_name ?? ''}`.trim();
   return name || u.email || u.id;
@@ -37,6 +39,8 @@ export default function AddCourseMembersPage() {
   const ceiling = isAdmin || isOrganizationManager ? '_owner' : highestCourseRole(courseRoles[courseId]);
   const roleOptions = assignableRoles(ceiling);
   const defaultRole = roleOptions[0] ?? '_student';
+
+  const [tab, setTab] = useState<AddTab>('list');
 
   // ---- users table (pick an existing user) -------------------------------
   const [searchInput, setSearchInput] = useState('');
@@ -167,6 +171,11 @@ export default function AddCourseMembersPage() {
     );
   }
 
+  const tabClass = (active: boolean) =>
+    `py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+      active ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`;
+
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
@@ -178,15 +187,26 @@ export default function AddCourseMembersPage() {
             { label: 'Add' },
           ]}
           title="Add members"
-          subtitle="Pick existing users from the table, or invite someone by email."
+          subtitle="Add existing users from the list, or invite someone new by email."
         />
 
-        <div className="flex flex-col xl:flex-row gap-6">
-          {/* Users table */}
-          <div className="flex-1 min-w-0 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">From the user list</h2>
+        {/* Tabs: the two add flows are mutually exclusive, so show one at a time. */}
+        <div className="border-b border-gray-200">
+          <nav className="flex gap-6">
+            <button type="button" onClick={() => setTab('list')} className={tabClass(tab === 'list')}>
+              From user list
+            </button>
+            <button type="button" onClick={() => setTab('email')} className={tabClass(tab === 'email')}>
+              By email
+            </button>
+          </nav>
+        </div>
+
+        {tab === 'list' ? (
+          <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              You can only see users your permissions allow. Pick a role and add them to the course.
+              You can only see users your permissions allow. Users already in the course are hidden — pick a
+              role and add them.
             </p>
             <input
               type="text"
@@ -284,45 +304,44 @@ export default function AddCourseMembersPage() {
               </div>
             </div>
           </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              importByEmail();
+            }}
+            className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 max-w-lg"
+          >
+            <p className="text-sm text-gray-500">
+              Adds the user with this email, creating the account if it does not exist yet. Use this for people
+              not yet in the system.
+            </p>
 
-          {/* Add by email */}
-          <div className="xl:w-80 shrink-0">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                importByEmail();
-              }}
-              className="bg-white border border-gray-200 rounded-lg p-5 space-y-4"
-            >
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">By email</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Adds the user with this email, creating the account if it does not exist yet.
-                </p>
-              </div>
+            {importError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{importError}</div>
+            )}
+            {importMsg && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
+            )}
 
-              {importError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{importError}</div>
-              )}
-              {importMsg && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
-              )}
-
-              <Field label="Email" required>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={inputCls}
-                  placeholder="person@example.org"
-                />
-              </Field>
+            <Field label="Email" required>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputCls}
+                placeholder="person@example.org"
+              />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Given name">
                 <input value={givenName} onChange={(e) => setGivenName(e.target.value)} className={inputCls} />
               </Field>
               <Field label="Family name">
                 <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} className={inputCls} />
               </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Role" required>
                 <select value={emailRole} onChange={(e) => setEmailRole(e.target.value)} className={inputCls}>
                   {roleOptions.map((r) => (
@@ -335,17 +354,17 @@ export default function AddCourseMembersPage() {
               <Field label="Group" hint="Optional. Created if it does not exist yet.">
                 <input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} className={inputCls} />
               </Field>
+            </div>
 
-              <button
-                type="submit"
-                disabled={importing || !email.trim()}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {importing ? 'Adding…' : 'Add by email'}
-              </button>
-            </form>
-          </div>
-        </div>
+            <button
+              type="submit"
+              disabled={importing || !email.trim()}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {importing ? 'Adding…' : 'Add by email'}
+            </button>
+          </form>
+        )}
       </div>
     </AuthenticatedLayout>
   );
