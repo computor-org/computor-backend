@@ -1,21 +1,22 @@
 'use client';
 
-import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import NotFound from '@/src/components/NotFound';
-import { useParams } from 'next/navigation';
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
-export default function StudentViewPage() {
+/**
+ * Redirect /courses/[id]/student → /courses/[id]/student/course-contents
+ *
+ * The student view has no overview page yet; course contents is the only
+ * destination, so land there instead of on a placeholder.
+ */
+export default function StudentViewRedirect() {
   const params = useParams();
+  const router = useRouter();
   const courseId = params.id as string;
 
-  return (
-    <AuthenticatedLayout>
-      <NotFound
-        title="Student View"
-        message="This is a placeholder for the student overview page. Navigate to Course Contents to view assignments."
-        backLink={`/courses/${courseId}`}
-        backText="Back to Course"
-      />
-    </AuthenticatedLayout>
-  );
+  useEffect(() => {
+    router.replace(`/courses/${courseId}/student/course-contents`);
+  }, [router, courseId]);
+
+  return null;
 }
