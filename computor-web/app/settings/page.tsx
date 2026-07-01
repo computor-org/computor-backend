@@ -93,7 +93,7 @@ function LinkAccountPanel({ providers, onLinked, onCancel }: {
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-      {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+      <ErrorBanner>{error}</ErrorBanner>
 
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Account type</label>

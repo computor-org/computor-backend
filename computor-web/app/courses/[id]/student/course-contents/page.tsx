@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import EmptyState from '@/src/components/EmptyState';
 import type { CourseContentStudentList } from 'types/generated';
 
 interface TreeNode {
@@ -279,9 +281,7 @@ export default function StudentCourseContentsPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
+          <ErrorBanner>{error}</ErrorBanner>
         </div>
       </AuthenticatedLayout>
     );
@@ -307,15 +307,15 @@ export default function StudentCourseContentsPage() {
             {renderTree(tree)}
           </div>
         ) : (
-          <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No assignments yet</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Assignments will appear here once they are published by your instructor.
-            </p>
-          </div>
+          <EmptyState
+            icon={
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+            title="No assignments yet"
+            description="Assignments will appear here once they are published by your instructor."
+          />
         )}
       </div>
     </AuthenticatedLayout>

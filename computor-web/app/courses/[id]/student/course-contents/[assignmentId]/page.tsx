@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import type { CourseContentStudentGet } from 'types/generated';
 
 export default function AssignmentDetailPage() {
@@ -64,9 +65,7 @@ export default function AssignmentDetailPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error || 'Assignment not found'}</p>
-          </div>
+          <ErrorBanner>{error || 'Assignment not found'}</ErrorBanner>
         </div>
       </AuthenticatedLayout>
     );

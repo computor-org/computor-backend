@@ -6,7 +6,8 @@ import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseGet, CourseGitBindingGet, GitServerGet } from 'types/generated';
@@ -140,19 +141,17 @@ export default function CourseEditPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6 max-w-3xl">
-        <div>
-          <Breadcrumbs
-            items={[
-              { label: 'Courses', href: '/courses' },
-              { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
-              { label: 'Edit' },
-            ]}
-          />
-          <h1 className="text-3xl font-bold text-gray-900">Edit course</h1>
-          {course && <p className="mt-1 text-sm text-gray-500 font-mono">{course.path}</p>}
-        </div>
+        <PageHeader
+          breadcrumbs={[
+            { label: 'Courses', href: '/courses' },
+            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: 'Edit' },
+          ]}
+          title="Edit course"
+          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
+        />
 
-        {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>

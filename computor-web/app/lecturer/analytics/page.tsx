@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import EmptyState from '@/src/components/EmptyState';
 import { useAuth } from '@/src/contexts/AuthContext';
 import {
   analyticsRoleLabel,
@@ -40,31 +43,24 @@ export default function LecturerAnalyticsIndexPage() {
   return (
     <AuthenticatedLayout>
       <div className="space-y-6 p-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Analytics Snapshots</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Courses imported from authenticated analytics sources.
-            </p>
-          </div>
-          <Link href="/dashboard" className="text-sm font-medium text-blue-600 hover:underline">
-            Dashboard
-          </Link>
-        </header>
+        <PageHeader
+          breadcrumbs={[{ label: 'Analytics Snapshots' }]}
+          title="Analytics Snapshots"
+          subtitle={<span className="text-sm">Courses imported from authenticated analytics sources.</span>}
+          actions={
+            <Link href="/dashboard" className="text-sm font-medium text-blue-600 hover:underline">
+              Dashboard
+            </Link>
+          }
+        />
 
         {loading && <p className="text-sm text-gray-500">Loading analytics courses...</p>}
-        {!loading && error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {!loading && <ErrorBanner>{error}</ErrorBanner>}
         {!loading && !error && courses.length === 0 && (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-            <h2 className="text-lg font-medium text-gray-900">No analytics snapshots</h2>
-            <p className="mt-2 text-sm text-gray-500">
-              No imported courses are available for your account.
-            </p>
-          </div>
+          <EmptyState
+            title="No analytics snapshots"
+            description="No imported courses are available for your account."
+          />
         )}
         {!loading && !error && courses.length > 0 && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

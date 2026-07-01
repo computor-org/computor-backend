@@ -8,7 +8,8 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { discoverExamplesInZip, type DiscoveredExample } from '@/src/utils/exampleZip';
 import type { ExampleRepositoryList } from 'types/generated';
@@ -103,15 +104,19 @@ function UploadInner() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 max-w-2xl">
-        <Breadcrumbs items={[{ label: 'Examples', href: '/examples' }, { label: 'Upload' }]} />
-        <h1 className="text-2xl font-bold text-gray-900">Upload examples</h1>
-        <p className="mt-1 text-gray-600">
-          Choose a repository and a .zip of one example (a root <code className="font-mono">meta.yaml</code>) or several
-          (each in its own folder with a <code className="font-mono">meta.yaml</code>).
-        </p>
+        <PageHeader
+          breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: 'Upload' }]}
+          title="Upload examples"
+          subtitle={
+            <>
+              Choose a repository and a .zip of one example (a root <code className="font-mono">meta.yaml</code>) or several
+              (each in its own folder with a <code className="font-mono">meta.yaml</code>).
+            </>
+          }
+        />
 
         <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-          {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
+          <ErrorBanner>{error}</ErrorBanner>
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Repository</label>
@@ -145,7 +150,7 @@ function UploadInner() {
           </div>
 
           {parsing && <div className="text-sm text-gray-500">Reading zip…</div>}
-          {parseError && <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{parseError}</div>}
+          <ErrorBanner>{parseError}</ErrorBanner>
 
           {rows.length > 0 && (
             <div className="space-y-2">

@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import PageHeader from '@/src/components/PageHeader';
 import type { CourseGet } from 'types/generated';
 
 const SECTIONS = [
@@ -59,13 +60,15 @@ export default function LecturerViewPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <Link href={`/courses/${courseId}`} className="text-sm text-blue-600 hover:underline">
-            ← {course?.title || course?.path || 'Course'}
-          </Link>
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">Lecturer View</h1>
-          {course && <p className="mt-1 text-sm text-gray-500 font-mono">{course.path}</p>}
-        </div>
+        <PageHeader
+          breadcrumbs={[
+            { label: 'Courses', href: '/courses' },
+            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: 'Lecturer View' },
+          ]}
+          title="Lecturer View"
+          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {SECTIONS.map((s) => (

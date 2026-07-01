@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import ProgressBar from '@/src/components/progress/ProgressBar';
@@ -119,11 +120,7 @@ export default function StudentProgressPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Content */}
         {!loading && !error && data && (
