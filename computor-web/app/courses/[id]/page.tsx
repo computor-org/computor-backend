@@ -140,10 +140,22 @@ export default function CoursePage() {
       view: 'lecturer',
       href: `/courses/${courseId}/lecturer`,
       title: 'Lecturer view',
-      desc: 'Management & analytics',
+      desc: 'Contents, grading & analytics',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      ),
+    },
+    {
+      view: 'management',
+      href: `/courses/${courseId}/management/members`,
+      title: 'Management',
+      desc: 'Members & course administration',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
     },
@@ -386,23 +398,6 @@ export default function CoursePage() {
           )}
         </div>
 
-        {/* Members — managers only; hidden entirely from everyone else. */}
-        {canManageMembers && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Members</h2>
-              <p className="text-sm text-gray-600">
-                View the roster, change member roles, and add users to the course.
-              </p>
-            </div>
-            <Link
-              href={`/courses/${courseId}/members`}
-              className="shrink-0 self-start px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Manage members
-            </Link>
-          </div>
-        )}
       </div>
     </AuthenticatedLayout>
   );

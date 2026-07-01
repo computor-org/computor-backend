@@ -144,6 +144,16 @@ const getViewNavigation = (courseId: string): NavItem[] => [
       { id: 'lecturer-analytics', label: 'Analytics', path: `/courses/${courseId}/lecturer/analytics` },
     ],
   },
+  {
+    id: 'management-view',
+    view: 'management',
+    label: 'Management',
+    path: `/courses/${courseId}/management`,
+    icon: 'admin',
+    subItems: [
+      { id: 'management-members', label: 'Course Members', path: `/courses/${courseId}/management/members` },
+    ],
+  },
 ];
 
 /**
@@ -208,7 +218,7 @@ const icons: Record<string, React.ReactElement> = {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, views } = useAuth();
+  const { user } = useAuth();
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -247,13 +257,15 @@ export default function Sidebar() {
           }
         } catch (error) {
           console.error('Failed to fetch course views:', error);
-          // Fallback to global views if course-specific fetch fails
-          setCourseViews(views);
+          // Leave course views empty on failure — do NOT fall back to global
+          // views, or a non-member (e.g. an org-manager) would be shown course
+          // role views (student/tutor/lecturer) they don't hold for this course.
+          setCourseViews([]);
         }
       }
       fetchCourseViews();
     }
-  }, [currentCourseId, views, user]);
+  }, [currentCourseId, user]);
 
   const toggleView = (viewId: string) => {
     setExpandedViews(prev => ({
@@ -345,8 +357,9 @@ export default function Sidebar() {
   // If we're in a course context, show view-based navigation
   if (currentCourseId) {
     const viewNavigation = getViewNavigation(currentCourseId);
-    // Use course-specific views if available, otherwise fall back to global views
-    const activeViews = courseViews.length > 0 ? courseViews : views;
+    // Only the course's actual views — never fall back to global views, which
+    // would surface role views the user doesn't hold for this course.
+    const activeViews = courseViews;
     const availableViews = viewNavigation.filter((item) =>
       activeViews.includes(item.view!)
     );

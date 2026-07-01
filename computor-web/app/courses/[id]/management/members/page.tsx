@@ -117,13 +117,13 @@ export default function CourseMembersPage() {
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
             { label: courseLabel, href: `/courses/${courseId}` },
-            { label: 'Members' },
+            { label: 'Course Members' },
           ]}
-          title="Members"
+          title="Course Members"
           subtitle="Manage who belongs to this course and their roles."
           actions={
             <Link
-              href={`/courses/${courseId}/members/add`}
+              href={`/courses/${courseId}/management/members/add`}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
               Add members
