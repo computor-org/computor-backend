@@ -4,9 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { AuthUser, AuthResponse } from '../types/auth';
 import { UserScopes } from '../generated/types/users';
 import { ssoAuthService, authService } from '../services/authInstances';
-import { apiFetch } from '../utils/apiClient';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
 // and clears the cached session on failure instead of bailing out blindly.

@@ -1,15 +1,13 @@
 import { AuthResponse, AuthUser } from '../types/auth';
 import { ISSOAuthProvider } from '../interfaces/IAuthProvider';
 import { UserGet } from '../generated/types/users';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import {
   clearStoredSession,
   determineRole,
   loadStoredSession,
   saveStoredSession,
 } from './authStorage';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
  * SSO Authentication Service

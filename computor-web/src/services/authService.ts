@@ -8,8 +8,7 @@ import {
   loadStoredSession,
   saveStoredSession,
 } from './authStorage';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../utils/apiClient';
 
 /**
  * Authentication Service using FastAPI Backend
