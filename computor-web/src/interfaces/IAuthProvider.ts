@@ -8,23 +8,11 @@
  * Tokens are NOT accessible to JavaScript, preventing XSS attacks.
  */
 
-export interface AuthUser {
-  id: string;
-  username: string;
-  email: string;
-  givenName?: string;
-  familyName?: string;
-  role: 'admin' | 'lecturer' | 'student';
-  systemRoles: string[];
-  permissions: string[];
-  courses: string[];
-}
+// Canonical definitions live in src/types/auth.ts — re-exported here so
+// existing imports keep working without a second, drift-prone copy.
+import type { AuthUser, AuthResponse } from '../types/auth';
 
-export interface AuthResponse {
-  success: boolean;
-  user?: AuthUser;
-  error?: string;
-}
+export type { AuthUser, AuthResponse };
 
 /**
  * Core authentication provider interface

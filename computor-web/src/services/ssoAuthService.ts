@@ -1,6 +1,13 @@
-import { LoginCredentials, AuthResponse, AuthUser } from '../types/auth';
+import { AuthResponse, AuthUser } from '../types/auth';
 import { ISSOAuthProvider } from '../interfaces/IAuthProvider';
+import { UserGet } from '../generated/types/users';
 import { apiFetch } from '../utils/apiClient';
+import {
+  clearStoredSession,
+  determineRole,
+  loadStoredSession,
+  saveStoredSession,
+} from './authStorage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -14,52 +21,21 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  * - Tokens are automatically sent with all requests via cookies
  */
 export class SSOAuthService implements ISSOAuthProvider {
-  private readonly USER_KEY = 'auth_user';
   private currentUser: AuthUser | null = null;
+  private currentViews: string[] = [];
 
   constructor() {
-    // Load user from sessionStorage on initialization
-    this.loadUserFromStorage();
-  }
-
-  /**
-   * Load user data from sessionStorage
-   * Only runs on client-side (browser)
-   */
-  private loadUserFromStorage(): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      const storedUser = sessionStorage.getItem(this.USER_KEY);
-      if (storedUser) {
-        this.currentUser = JSON.parse(storedUser);
-      }
-    } catch (error) {
-      console.error('Failed to load user from storage:', error);
-      this.currentUser = null;
+    const session = loadStoredSession('sso');
+    if (session) {
+      this.currentUser = session.user;
+      this.currentViews = session.views;
     }
   }
 
-  /**
-   * Save user data to sessionStorage (NOT tokens!)
-   * Only runs on client-side (browser)
-   */
-  private saveUserToStorage(user: AuthUser): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window === 'undefined') {
-      this.currentUser = user;
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(this.USER_KEY, JSON.stringify(user));
-      this.currentUser = user;
-    } catch (error) {
-      console.error('Failed to save user to storage:', error);
-    }
+  private saveSession(user: AuthUser, views: string[]): void {
+    saveStoredSession('sso', user, views);
+    this.currentUser = user;
+    this.currentViews = views;
   }
 
   /**
@@ -74,6 +50,13 @@ export class SSOAuthService implements ISSOAuthProvider {
    */
   getCurrentUser(): AuthUser | null {
     return this.currentUser;
+  }
+
+  /**
+   * Get current user's available views
+   */
+  getCurrentViews(): string[] {
+    return this.currentViews;
   }
 
   /**
@@ -101,21 +84,21 @@ export class SSOAuthService implements ISSOAuthProvider {
    */
   async handleSSOCallback(): Promise<AuthResponse> {
     try {
-      // Fetch user info - cookies are sent automatically
-      // No need to pass tokens manually!
-      const response = await fetch(`${API_BASE_URL}/user`, {
-        credentials: 'include', // Send cookies
-      });
+      // Fetch user info and views — cookies are sent automatically.
+      const [response, views] = await Promise.all([
+        fetch(`${API_BASE_URL}/user`, { credentials: 'include' }),
+        this.fetchUserViews(),
+      ]);
 
       if (!response.ok) {
         throw new Error('Failed to fetch user info');
       }
 
-      const userInfo = await response.json();
-      const user = this.mapUserResponse(userInfo);
+      const userInfo: UserGet = await response.json();
+      const user = this.mapUserResponse(userInfo, views ?? []);
 
       // Store ONLY user data (not tokens!)
-      this.saveUserToStorage(user);
+      this.saveSession(user, views ?? []);
 
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -134,23 +117,36 @@ export class SSOAuthService implements ISSOAuthProvider {
   }
 
   /**
+   * Fetch the user's course views (student/tutor/lecturer/user_manager).
+   * Returns null on failure so callers can keep the views they already have.
+   */
+  private async fetchUserViews(): Promise<string[] | null> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/user/views`);
+      if (!response.ok) return null;
+      const views = await response.json();
+      return Array.isArray(views) ? views : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Build an AuthUser from a backend `GET /user` payload.
    *
    * GET /user returns the User object directly (not wrapped in { user: ... }).
    * user_roles is an array of { role_id: string, ... } — extract role_id strings.
    */
-  private mapUserResponse(userInfo: any): AuthUser {
-    const roleIds: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
+  private mapUserResponse(userInfo: UserGet, views: string[]): AuthUser {
+    const roleIds: string[] = (userInfo.user_roles || []).map((r) => r.role_id);
     return {
       id: userInfo.id,
-      username: userInfo.username || userInfo.email,
-      email: userInfo.email,
-      givenName: userInfo.given_name,
-      familyName: userInfo.family_name,
-      role: this.mapRolesToFrontend(roleIds),
+      username: userInfo.username || userInfo.email || '',
+      email: userInfo.email || '',
+      givenName: userInfo.given_name || undefined,
+      familyName: userInfo.family_name || undefined,
+      role: determineRole(roleIds, views),
       systemRoles: roleIds,
-      permissions: this.mapPermissions(roleIds),
-      courses: [],
     };
   }
 
@@ -186,8 +182,9 @@ export class SSOAuthService implements ISSOAuthProvider {
 
     if (response.ok) {
       try {
-        const userInfo = await response.json();
-        this.saveUserToStorage(this.mapUserResponse(userInfo));
+        const userInfo: UserGet = await response.json();
+        const views = (await this.fetchUserViews()) ?? this.currentViews;
+        this.saveSession(this.mapUserResponse(userInfo, views), views);
       } catch {
         // A body-parse hiccup must not drop an otherwise-valid session.
       }
@@ -201,47 +198,6 @@ export class SSOAuthService implements ISSOAuthProvider {
 
     // Server-side error (5xx) etc. — don't punish the user for it; keep session.
     return 'unreachable';
-  }
-
-  /**
-   * Direct login (for testing or basic auth fallback)
-   * Backend sets HttpOnly cookies on successful login
-   */
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Receive cookies
-        body: JSON.stringify(credentials),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        return {
-          success: false,
-          error: error || 'Login failed',
-        };
-      }
-
-      const data = await response.json();
-
-      // Store user data (cookies are already set by backend)
-      const user: AuthUser = data.user;
-      this.saveUserToStorage(user);
-
-      return {
-        success: true,
-        user,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Network error',
-      };
-    }
   }
 
   /**
@@ -314,9 +270,10 @@ export class SSOAuthService implements ISSOAuthProvider {
     }
 
     try {
-      const userInfo = await userResponse.json();
-      const user = this.mapUserResponse(userInfo);
-      this.saveUserToStorage(user);
+      const userInfo: UserGet = await userResponse.json();
+      const views = (await this.fetchUserViews()) ?? this.currentViews;
+      const user = this.mapUserResponse(userInfo, views);
+      this.saveSession(user, views);
       return { success: true, user };
     } catch (error) {
       console.warn('User payload parse failed after refresh:', error);
@@ -327,14 +284,11 @@ export class SSOAuthService implements ISSOAuthProvider {
   /**
    * Clear local session data
    * Does NOT clear HttpOnly cookies (only backend can do that)
-   * Only runs on client-side (browser)
    */
   clearSession(): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem(this.USER_KEY);
-    }
+    clearStoredSession();
     this.currentUser = null;
+    this.currentViews = [];
   }
 
   /**
@@ -367,7 +321,7 @@ export class SSOAuthService implements ISSOAuthProvider {
       const providers = await response.json();
 
       // Map ProviderInfo to simplified format
-      return providers.map((p: any) => ({
+      return providers.map((p: { name: string; display_name: string; type: string; enabled: boolean }) => ({
         name: p.name,
         display_name: p.display_name,
         type: p.type,
@@ -377,54 +331,5 @@ export class SSOAuthService implements ISSOAuthProvider {
       console.error('Failed to fetch SSO providers:', error);
       return [];
     }
-  }
-
-  /**
-   * Map backend roles to frontend role
-   */
-  private mapRolesToFrontend(roles: string[]): 'admin' | 'lecturer' | 'student' {
-    if (roles.includes('_admin')) return 'admin';
-    if (roles.includes('_lecturer')) return 'lecturer';
-    return 'student';
-  }
-
-  /**
-   * Map roles to permissions
-   */
-  private mapPermissions(roles: string[]): string[] {
-    const permissions: string[] = [];
-
-    if (roles.includes('_admin')) {
-      permissions.push(
-        'view_students',
-        'view_course_students',
-        'create_assignments',
-        'view_grades',
-        'manage_course',
-        'admin_access',
-        'manage_users',
-        'system_settings',
-        'view_audit'
-      );
-    }
-
-    if (roles.includes('_lecturer')) {
-      permissions.push(
-        'view_students',
-        'view_course_students',
-        'create_assignments',
-        'view_grades',
-        'manage_course'
-      );
-    }
-
-    if (roles.includes('_student')) {
-      permissions.push(
-        'view_assignments',
-        'submit_assignments'
-      );
-    }
-
-    return permissions;
   }
 }

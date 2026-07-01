@@ -1,10 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AuthUser, AuthResponse } from '../types/auth';
 import { UserScopes } from '../generated/types/users';
-import { SSOAuthService } from '../services/ssoAuthService';
-import { AuthService } from '../services/authService';
+import { ssoAuthService, authService } from '../services/authInstances';
 import { apiFetch } from '../utils/apiClient';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -36,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch the authoritative per-scope role maps + view list from the backend.
   // `/user/scopes` (is_admin + organization/course_family/course role maps) and
   // `/user/views` (lecturer/student/tutor/user_manager) drive all role-gated UI.
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
       const [viewsRes, scopesRes] = await Promise.all([
         apiFetch(`${API_BASE_URL}/user/views`),
@@ -47,11 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Transient failure — keep whatever we already have rather than wiping gating.
     }
-  };
-
-  // Initialize auth services
-  const ssoAuthService = new SSOAuthService();
-  const authService = new AuthService();
+  }, []);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -70,8 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           familyName: 'Lecturer',
           role: 'lecturer',
           systemRoles: [],
-          permissions: [],
-          courses: [],
         });
         setIsLoading(false);
         return;
@@ -86,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // restores sessionStorage after a restart), so trusting it blindly
         // leaves a stale "Sign Out" button for a dead session.
         setUser(ssoUser);
-        setViews(authService.getCurrentViews());
+        setViews(ssoAuthService.getCurrentViews());
 
         const status = await ssoAuthService.validateSession();
         if (status === 'invalid') {
@@ -117,34 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initAuth();
-  }, []);
+  }, [loadPermissions]);
 
-  // Proactive token refresh. This MUST fire well within Keycloak's SSO Session
-  // Idle (30 min on the computor realm): only /auth/refresh resets that idle timer
-  // — ordinary API calls hit the backend's own session, not Keycloak — so if we
-  // wait longer than the idle window the Keycloak session expires and the refresh
-  // (and thus the user's session) dies. 15 min gives two attempts per idle window.
-  useEffect(() => {
-    if (!user) return;
-
-    // Refresh interval: 15 minutes — comfortably under the 30-min Keycloak SSO idle.
-    const REFRESH_INTERVAL = 15 * 60 * 1000;
-
-    // Set up interval to refresh token periodically
-    const refreshInterval = setInterval(async () => {
-      console.log('Proactively refreshing token...');
-      const result = await refreshSession();
-      if (!result.success) {
-        console.error('Proactive token refresh failed');
-      }
-    }, REFRESH_INTERVAL);
-
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [user]);
-
-  const login = async (username: string, password: string): Promise<AuthResponse> => {
+  const login = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
       const response = await authService.login({ username, password });
@@ -159,13 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadPermissions]);
 
-  const loginWithSSO = (provider: string = 'keycloak') => {
+  const loginWithSSO = useCallback((provider: string = 'keycloak') => {
     ssoAuthService.initiateSSO(provider);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setIsLoading(true);
     try {
       // Try SSO logout first
@@ -181,14 +149,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const refreshSession = async (): Promise<AuthResponse> => {
+  const refreshSession = useCallback(async (): Promise<AuthResponse> => {
     try {
       let response: AuthResponse | null = null;
 
       if (ssoAuthService.isAuthenticated()) {
         response = await ssoAuthService.refreshSession();
+        if (response?.success) {
+          setViews(ssoAuthService.getCurrentViews());
+        }
       } else if (authService.isAuthenticated()) {
         response = await authService.refreshSession();
         if (response?.success) {
@@ -223,7 +194,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  };
+  }, []);
+
+  // Proactive token refresh. This MUST fire well within Keycloak's SSO Session
+  // Idle (30 min on the computor realm): only /auth/refresh resets that idle timer
+  // — ordinary API calls hit the backend's own session, not Keycloak — so if we
+  // wait longer than the idle window the Keycloak session expires and the refresh
+  // (and thus the user's session) dies. 15 min gives two attempts per idle window.
+  useEffect(() => {
+    if (!user) return;
+
+    // Refresh interval: 15 minutes — comfortably under the 30-min Keycloak SSO idle.
+    const REFRESH_INTERVAL = 15 * 60 * 1000;
+
+    const refreshInterval = setInterval(async () => {
+      const result = await refreshSession();
+      if (!result.success) {
+        console.error('Proactive token refresh failed');
+      }
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [user, refreshSession]);
 
   const value: AuthContextType = {
     user,
