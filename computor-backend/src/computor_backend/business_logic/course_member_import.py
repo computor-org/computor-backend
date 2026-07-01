@@ -73,22 +73,25 @@ async def import_course_member(
             "Lecturer role or higher is required."
         )
 
-    # Validate role assignment - user can only assign roles at or below their own
-    # level (admins/org-managers are uncapped, treated as _owner).
-    user_role = permissions.get_course_assignment_ceiling(str(course_id))
+    # Validate role assignment. Management authority (which existing members you
+    # may touch) uses the uncapped authority ceiling; the role you may *grant*
+    # uses the assignment ceiling — lecturers are capped at _student, and only
+    # maintainers/owners/org-managers may grant a role above _student.
+    authority = permissions.get_course_authority_ceiling(str(course_id))
+    assign_ceiling = permissions.get_course_assignment_ceiling(str(course_id))
     target_role = member_request.course_role_id
 
-    if not user_role:
+    if not authority:
         raise ForbiddenException(
             "You don't have a role in this course"
         )
 
-    if not course_role_hierarchy.can_assign_role(user_role, target_role):
+    if not assign_ceiling or not course_role_hierarchy.can_assign_role(assign_ceiling, target_role):
         raise ForbiddenException(
             error_code="AUTHZ_005",
             detail=f"You cannot assign the role '{target_role}'. "
-                   f"Your role '{user_role}' can only assign roles at or below your privilege level.",
-            context={"target_role": target_role, "user_role": user_role, "course_id": str(course_id)},
+                   f"Your role can only assign roles up to '{assign_ceiling or '—'}'.",
+            context={"target_role": target_role, "assign_ceiling": assign_ceiling, "course_id": str(course_id)},
         )
 
     # Initialize tracking variables
@@ -159,11 +162,11 @@ async def import_course_member(
             target_current_role = existing_member.course_role_id
             if target_current_role and not permissions.is_admin:
                 target_current_level = course_role_hierarchy.get_role_level(target_current_role)
-                user_level = course_role_hierarchy.get_role_level(user_role)
-                if target_current_level >= user_level:
+                authority_level = course_role_hierarchy.get_role_level(authority)
+                if target_current_level >= authority_level:
                     raise ForbiddenException(
                         f"You cannot modify a course member with role '{target_current_role}'. "
-                        f"Your role '{user_role}' can only modify members with lower privilege levels."
+                        f"Your role '{authority}' can only modify members with lower privilege levels."
                     )
 
             # Update existing member

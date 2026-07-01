@@ -80,7 +80,7 @@ def guard_course_member_delete(entity, permissions: Principal, db: Session) -> N
             "You cannot remove your own course membership. Please contact an administrator."
         )
 
-    ceiling = permissions.get_course_assignment_ceiling(str(entity.course_id))
+    ceiling = permissions.get_course_authority_ceiling(str(entity.course_id))
     target_level = course_role_hierarchy.get_role_level(entity.course_role_id)
     if not ceiling or target_level >= course_role_hierarchy.get_role_level(ceiling):
         raise ForbiddenException(
@@ -101,8 +101,11 @@ def custom_permissions_course_member(
 
     Validates:
     1. User has at least _lecturer role in the course
-    2. User can only assign roles <= their own level
+    2. User can only assign roles up to their assignment ceiling
+       (lecturers are capped at _student; only maintainers/owners/org-managers
+       may grant a role above _student)
     3. User cannot modify their own role (unless admin)
+    4. User cannot modify members at or above their own authority level
 
     Args:
         permissions: Current user's permission context
@@ -129,10 +132,10 @@ def custom_permissions_course_member(
     course_id = str(course_member.course_id)
 
     # Check user has at least _lecturer role in this course. Org-managers are
-    # treated as _owner here (their assignment ceiling), so they can manage any
+    # treated as _owner here (their authority ceiling), so they can manage any
     # course's roster without being enrolled.
-    user_role = permissions.get_course_assignment_ceiling(course_id)
-    if not user_role or course_role_hierarchy.get_role_level(user_role) < course_role_hierarchy.get_role_level("_lecturer"):
+    authority = permissions.get_course_authority_ceiling(course_id)
+    if not authority or course_role_hierarchy.get_role_level(authority) < course_role_hierarchy.get_role_level("_lecturer"):
         raise ForbiddenException(
             "You don't have permission to update course members. "
             "Lecturer role or higher is required."
@@ -148,22 +151,25 @@ def custom_permissions_course_member(
     target_current_role = course_member.course_role_id
     if target_current_role:
         target_current_level = course_role_hierarchy.get_role_level(target_current_role)
-        user_level = course_role_hierarchy.get_role_level(user_role)
-        if target_current_level >= user_level:
+        authority_level = course_role_hierarchy.get_role_level(authority)
+        if target_current_level >= authority_level:
             raise ForbiddenException(
                 f"You cannot modify a course member with role '{target_current_role}'. "
-                f"Your role '{user_role}' can only modify members with lower privilege levels."
+                f"Your role '{authority}' can only modify members with lower privilege levels."
             )
 
-    # If updating course_role_id, validate role escalation
+    # If updating course_role_id, validate role escalation against the assignment
+    # ceiling. Lecturers (and below) are capped at _student; only maintainers,
+    # owners and organization managers may grant a role above _student.
     if hasattr(entity, 'course_role_id') and entity.course_role_id is not None:
         target_role = entity.course_role_id
-        if not course_role_hierarchy.can_assign_role(user_role, target_role):
+        assign_ceiling = permissions.get_course_assignment_ceiling(course_id)
+        if not assign_ceiling or not course_role_hierarchy.can_assign_role(assign_ceiling, target_role):
             raise ForbiddenException(
                 error_code="AUTHZ_005",
                 detail=f"You cannot assign the role '{target_role}'. "
-                       f"Your role '{user_role}' can only assign roles at or below your privilege level.",
-                context={"target_role": target_role, "user_role": user_role, "course_id": course_id},
+                       f"Your role can only assign roles up to '{assign_ceiling or '—'}'.",
+                context={"target_role": target_role, "assign_ceiling": assign_ceiling, "course_id": course_id},
             )
 
     # Return query for the specific course member

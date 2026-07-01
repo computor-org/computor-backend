@@ -20,6 +20,7 @@ import {
   canManageMemberRole,
   courseRoleLabel,
   highestCourseRole,
+  maxAssignableRole,
 } from '@/src/utils/courseRoles';
 
 const PAGE_SIZE = 25;
@@ -39,7 +40,9 @@ export default function CourseMembersPage() {
 
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
   const ceiling = isAdmin || isOrganizationManager ? '_owner' : highestCourseRole(courseRoles[courseId]);
-  const roleOptions = assignableRoles(ceiling);
+  // Roles this user may grant (lecturers capped at _student); `ceiling` itself
+  // still governs which existing members they may edit/remove below.
+  const roleOptions = assignableRoles(maxAssignableRole(ceiling));
 
   const [page, setPage] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);

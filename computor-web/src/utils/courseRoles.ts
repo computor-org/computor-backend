@@ -51,9 +51,23 @@ export function highestCourseRole(roleIds: string[] | undefined | null): string 
 }
 
 /**
+ * The highest role a principal with authority `ceiling` may *grant*. Lecturers
+ * (and below) are capped at `_student`; only `_maintainer` and above — including
+ * admins / organization managers, who are passed in as `_owner` — may grant a
+ * role above `_student`. Mirrors the backend
+ * `Principal.get_course_assignment_ceiling`.
+ */
+export function maxAssignableRole(ceiling?: string | null): CourseRoleId | null {
+  if (!ceiling) return null;
+  if (roleRank(ceiling) >= roleRank('_maintainer')) return ceiling as CourseRoleId;
+  return '_student';
+}
+
+/**
  * Roles a principal whose assignment ceiling is `ceiling` may grant — every
  * role at or below the ceiling's rank (low → high). Mirrors the backend's
  * `CourseRoleHierarchy.can_assign_role` (level(assigner) >= level(target)).
+ * Pass a value from {@link maxAssignableRole} to apply the lecturer cap.
  */
 export function assignableRoles(ceiling?: string | null): CourseRoleId[] {
   const max = roleRank(ceiling);

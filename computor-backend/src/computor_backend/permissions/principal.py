@@ -342,12 +342,39 @@ class Principal(BaseModel):
         return highest_role
 
     def get_course_assignment_ceiling(self, course_id: str) -> Optional[str]:
-        """The highest course role this principal may assign to a member.
+        """The highest course role this principal may **assign** to a member.
 
-        Admins and organization managers may assign any course role (treated as
-        ``_owner``); everyone else is capped at their own highest role in the
-        course. Used by the course-member assignment guards together with
-        :func:`CourseRoleHierarchy.can_assign_role`.
+        Admins and organization managers are uncapped (treated as ``_owner``).
+        Course ``_owner`` and ``_maintainer`` may assign roles up to their own
+        highest role. Everyone below ``_maintainer`` — i.e. ``_lecturer`` and
+        down — is capped at ``_student``: only maintainers, owners, organization
+        managers and admins may grant a course role above ``_student``. Pairs
+        with :func:`CourseRoleHierarchy.can_assign_role` in the
+        create/update/import guards.
+
+        This is deliberately distinct from
+        :func:`get_course_authority_ceiling`, which governs which *existing*
+        members a principal may manage (modify/remove) and is not capped.
+        """
+        if self.is_admin or "_organization_manager" in self.roles:
+            return "_owner"
+        highest = self.get_highest_course_role(course_id)
+        if highest is None:
+            return None
+        # Only _maintainer and above may grant a role above _student; lecturers
+        # (and below) are capped at _student.
+        if course_role_hierarchy.get_role_level(highest) >= course_role_hierarchy.get_role_level("_maintainer"):
+            return highest
+        return "_student"
+
+    def get_course_authority_ceiling(self, course_id: str) -> Optional[str]:
+        """The principal's effective authority level in a course.
+
+        Admins and organization managers are treated as ``_owner``; everyone
+        else gets their own highest course role. Used to decide which *existing*
+        members a principal may manage — the lecturer-or-above gate and the
+        peer/superior and delete guards — NOT the maximum role they may grant
+        (see :func:`get_course_assignment_ceiling`).
         """
         if self.is_admin or "_organization_manager" in self.roles:
             return "_owner"

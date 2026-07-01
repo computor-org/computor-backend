@@ -15,7 +15,7 @@ import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberIm
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { CourseMemberImportRow, UserList } from 'types/generated';
-import { assignableRoles, courseRoleLabel, highestCourseRole } from '@/src/utils/courseRoles';
+import { assignableRoles, courseRoleLabel, highestCourseRole, maxAssignableRole } from '@/src/utils/courseRoles';
 
 const PAGE_SIZE = 10;
 const membersClient = new CourseMembersClient();
@@ -37,7 +37,10 @@ export default function AddCourseMembersPage() {
 
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
   const ceiling = isAdmin || isOrganizationManager ? '_owner' : highestCourseRole(courseRoles[courseId]);
-  const roleOptions = assignableRoles(ceiling);
+  // Roles this user may grant when adding/importing members. Lecturers (and
+  // below) are capped at _student; only maintainers/owners/org-managers may
+  // grant a higher role. Mirrors the backend assignment ceiling.
+  const roleOptions = assignableRoles(maxAssignableRole(ceiling));
   const defaultRole = roleOptions[0] ?? '_student';
 
   const [tab, setTab] = useState<AddTab>('list');
