@@ -19,3 +19,42 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Print support. Pages that want a clean printout wrap their report body in
+ * `#printable-report`; on print we hide the app chrome (sidebar, top bar, the
+ * fixed-height scroll shells) and let only that region flow onto paper. Mark
+ * in-report controls (buttons, inputs) with Tailwind's `print:hidden`.
+ */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #printable-report,
+  #printable-report * {
+    visibility: visible !important;
+  }
+
+  #printable-report {
+    display: block !important;
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Neutralize the on-screen scroll shells so the whole report prints. */
+  #printable-report * {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+}

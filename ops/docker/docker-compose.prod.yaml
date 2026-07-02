@@ -2,29 +2,6 @@
 # Extends docker-compose.base.yaml with production services and configuration
 
 services:
-  analytics-permissions:
-    image: alpine:3.20
-    security_opt:
-      - "no-new-privileges:true"
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    command:
-      - sh
-      - -c
-      - |
-        set -eu
-        mkdir -p /analytics/raw /analytics/duckdb /analytics/jobs
-        chown -R "${ANALYTICS_CONTAINER_UID:-1000}:${ANALYTICS_CONTAINER_GID:-1000}" /analytics
-        chmod -R u+rwX,go-rwx /analytics
-    volumes:
-      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:/analytics
-    restart: "no"
-    labels:
-      - "traefik.enable=false"
-
   # Restricted Docker API proxy. Traefik talks to this instead of the raw
   # socket, so a compromised Traefik can't drive arbitrary Docker actions.
   socket-proxy:
@@ -85,7 +62,6 @@ services:
     command: ["sh", "startup.bash"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
-      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:${ANALYTICS_ROOT:-/srv/computor/analytics}
       # Documents tree shared with static-server (which mounts the same host
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
@@ -102,19 +78,6 @@ services:
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
       DOCUMENTS_ROOT: ${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       DOCUMENTS_MAX_FILE_SIZE: ${DOCUMENTS_MAX_FILE_SIZE:-10485760}
-      ANALYTICS_ROOT: ${ANALYTICS_ROOT:-/srv/computor/analytics}
-      ANALYTICS_SOURCE_NAME: ${ANALYTICS_SOURCE_NAME:-green}
-      ANALYTICS_SOURCE_DATABASE_URL: ${ANALYTICS_SOURCE_DATABASE_URL:-}
-      ANALYTICS_SOURCE_API_URL: ${ANALYTICS_SOURCE_API_URL:-}
-      ANALYTICS_SOURCE_API_TOKEN: ${ANALYTICS_SOURCE_API_TOKEN:-}
-      ANALYTICS_EXPORT_CHUNK_SIZE: ${ANALYTICS_EXPORT_CHUNK_SIZE:-100000}
-      ANALYTICS_REFRESH_COURSE_ID: ${ANALYTICS_REFRESH_COURSE_ID:-}
-      ANALYTICS_REFRESH_SOURCE_NAME: ${ANALYTICS_REFRESH_SOURCE_NAME:-green}
-      ANALYTICS_REFRESH_REQUESTED_BY_USER_ID: ${ANALYTICS_REFRESH_REQUESTED_BY_USER_ID:-ops}
-      ANALYTICS_REFRESH_RUN_ID: ${ANALYTICS_REFRESH_RUN_ID:-}
-      ANALYTICS_REFRESH_SUBMISSION_CUTOFF: ${ANALYTICS_REFRESH_SUBMISSION_CUTOFF:-}
-      ANALYTICS_REFRESH_GRADING_CUTOFF: ${ANALYTICS_REFRESH_GRADING_CUTOFF:-}
-      ANALYTICS_REFRESH_TABLES: ${ANALYTICS_REFRESH_TABLES:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5437
       POSTGRES_USER: ${POSTGRES_USER}
@@ -154,8 +117,6 @@ services:
       # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
       FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
     depends_on:
-      analytics-permissions:
-        condition: service_completed_successfully
       postgres:
         condition: service_started
       minio:

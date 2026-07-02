@@ -393,7 +393,7 @@ class TypeScriptGenerator:
 
         When `only_categories` is given, only those category files are written
         and the index merges (rather than replaces) their exports. This lets a
-        single category (e.g. analytics) be regenerated without a full backend
+        single category (e.g. messages) be regenerated without a full backend
         import environment, which would otherwise empty the other category files
         whose models failed to import.
         """
@@ -414,7 +414,6 @@ class TypeScriptGenerator:
             'tasks': [],
             'examples': [],
             'messages': [],
-            'analytics': [],
             'websocket': [],
             'common': [],
         }
@@ -443,13 +442,9 @@ class TypeScriptGenerator:
             # Determine category
             category = 'common'  # default
 
-            # Analytics models take priority: their names carry 'course'/'job'
-            # substrings that would otherwise scatter them into courses/tasks.
-            if 'analytics' in module_name or model_name.startswith('analytics'):
-                category = 'analytics'
             # WebSocket models take priority (module-level check prevents
             # WSDeployment* being categorized as 'common' by the deployment rule)
-            elif 'websocket' in module_name or model_name.startswith('ws'):
+            if 'websocket' in module_name or model_name.startswith('ws'):
                 category = 'websocket'
             # Special handling for GitLab and deployment configs
             elif 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
@@ -481,9 +476,7 @@ class TypeScriptGenerator:
             module_name = enum.__module__.lower() if hasattr(enum, '__module__') else ''
 
             category = 'common'
-            if 'analytics' in module_name or enum_name.startswith('analytics'):
-                category = 'analytics'
-            elif 'websocket' in module_name or enum_name.startswith('ws'):
+            if 'websocket' in module_name or enum_name.startswith('ws'):
                 category = 'websocket'
             elif 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
                 category = 'common'
@@ -652,7 +645,7 @@ def main():
         "--categories",
         help=(
             "Comma-separated category names to (re)generate in isolation, e.g. "
-            "'analytics'. Other category files and their index exports are left "
+            "'messages'. Other category files and their index exports are left "
             "untouched. Omit to regenerate everything."
         ),
     )

@@ -97,9 +97,8 @@ export function usePermissions() {
       : Object.keys(familyRoles).length > 0);
 
   // True when the user holds at least `minRole` on the course (admins bypass).
-  // Mirrors the backend course-role hierarchy so refresh/read surfaces gate the
-  // same way the API enforces them (e.g. analytics: read `_tutor`, refresh
-  // `_lecturer`).
+  // Mirrors the backend course-role hierarchy so course surfaces gate the same
+  // way the API enforces them.
   const courseHasAtLeast = (courseId: string, minRole: string): boolean => {
     if (isAdmin) return true;
     const want = COURSE_ROLE_RANK[minRole] ?? COURSE_ROLE_RANK._owner;

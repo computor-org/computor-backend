@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 
 /**
  * Admin → Users list: server-side search + paging against a mocked backend.
- * Self-contained network mocks (same approach as fixtures.ts / analytics.spec).
+ * Self-contained network mocks.
  */
 
 const API_ORIGIN = 'http://localhost:8000';
