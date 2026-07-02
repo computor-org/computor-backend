@@ -10,9 +10,7 @@ ops/
 │   ├── docker-compose.base.yaml      # Core shared services
 │   ├── docker-compose.dev.yaml       # Development-specific
 │   ├── docker-compose.prod.yaml      # Production-specific
-│   ├── docker-compose.coder.yaml     # Optional Coder addon
-│   ├── docker-compose-dev.yaml.old   # Legacy dev config (deprecated)
-│   └── docker-compose-prod.yaml.old  # Legacy prod config (deprecated)
+│   └── docker-compose.coder.yaml     # Optional Coder addon
 │
 ├── environments/              # Environment configuration templates
 │   ├── .env.common.template   # Shared configuration
