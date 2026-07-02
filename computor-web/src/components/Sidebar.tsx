@@ -125,11 +125,8 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     path: `/courses/${courseId}/tutor`,
     icon: 'tutor',
     ownPage: true,
-    subItems: [
-      { id: 'tutor-students', label: 'Students', path: `/courses/${courseId}/tutor/students` },
-      // Submissions and Grading are not implemented yet — re-add the links
-      // once /courses/[id]/tutor/{submissions,grading} have real pages.
-    ],
+    // The Tutor landing IS the student progress overview; no sub-pages yet
+    // (submissions/grading are still stubs).
   },
   {
     id: 'lecturer-view',
@@ -140,8 +137,9 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     ownPage: true,
     subItems: [
       { id: 'lecturer-content', label: 'Course Contents', path: `/courses/${courseId}/lecturer/content` },
-      // Students and Grading Overview are not implemented yet — re-add the
-      // links once /courses/[id]/lecturer/{students,grading} have real pages.
+      { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
+      // Grading Overview isn't implemented yet — re-add the link once
+      // /courses/[id]/lecturer/grading has a real page.
       { id: 'lecturer-analytics', label: 'Analytics', path: `/courses/${courseId}/lecturer/analytics` },
     ],
   },
