@@ -115,6 +115,21 @@ export default function ProfilePage() {
           breadcrumbs={[{ label: 'My Profile' }]}
           title="My Profile"
           subtitle="Your identity and public profile across Computor."
+          actions={
+            user ? (
+              <div className="flex items-center gap-3">
+                {saved && <span className="text-sm text-green-600">Saved</span>}
+                <button
+                  type="submit"
+                  form="profile-form"
+                  disabled={saving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            ) : undefined
+          }
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -146,6 +161,7 @@ export default function ProfilePage() {
 
             {/* Edit form */}
             <form
+              id="profile-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 save();
@@ -191,16 +207,6 @@ export default function ProfilePage() {
                     />
                   </Field>
                 </div>
-              </div>
-              <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex items-center justify-end gap-3 border-t border-gray-100">
-                {saved && <span className="text-sm text-green-600">Saved</span>}
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
               </div>
             </form>
           </>
