@@ -12,6 +12,7 @@ import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMember
 import ProgressBar from '@/src/components/progress/ProgressBar';
 import ContentTree from '@/src/components/progress/ContentTree';
 import SubmissionCurve from '@/src/components/progress/SubmissionCurve';
+import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
 import type { CourseMemberGradingsGet } from 'types/generated';
 
 // Pulls in recharts — load only when this page renders (keeps the shared
@@ -42,11 +43,6 @@ function isoToLocalInput(iso: string | null): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function localInputToIso(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
 
 export default function StudentProgressPage() {
   const params = useParams();
@@ -57,34 +53,12 @@ export default function StudentProgressPage() {
   const [data, setData] = useState<CourseMemberGradingsGet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Configurable start/due dates: the start date windows the curve, the due
-  // date is drawn as a guide and flags late work. Persisted per course so they
-  // carry across students.
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!courseId) return;
-    try {
-      setStartDate(localStorage.getItem(`grading-start-date:${courseId}`) || null);
-      setDueDate(localStorage.getItem(`grading-due-date:${courseId}`) || null);
-    } catch {
-      /* storage unavailable */
-    }
-  }, [courseId]);
-
-  const makeDateHandler = (key: string, set: (v: string | null) => void) => (value: string) => {
-    const iso = localInputToIso(value);
-    set(iso);
-    try {
-      if (iso) localStorage.setItem(`${key}:${courseId}`, iso);
-      else localStorage.removeItem(`${key}:${courseId}`);
-    } catch {
-      /* storage unavailable */
-    }
-  };
-  const onStartDateChange = makeDateHandler('grading-start-date', setStartDate);
-  const onDueDateChange = makeDateHandler('grading-due-date', setDueDate);
+  // Start/due dates persist in localStorage — scoped per course, with a global
+  // "last-used" fallback so a not-yet-configured course pre-fills with the last
+  // dates set anywhere. The start date windows the curve; the due date is drawn
+  // as a guide and flags late work.
+  const [startDate, onStartDateChange] = usePersistedCourseDate(courseId, 'start-date');
+  const [dueDate, onDueDateChange] = usePersistedCourseDate(courseId, 'due-date');
 
   const fetchData = useCallback(async () => {
     try {
