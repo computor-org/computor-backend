@@ -3,7 +3,7 @@
  * Endpoint: /users
  */
 
-import type { UserCreate, UserGet, UserList, UserUpdate } from 'types/generated';
+import type { UserBanRequest, UserCreate, UserGet, UserList, UserUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -15,9 +15,10 @@ export class UsersClient extends BaseEndpointClient {
   /**
    * List Users
    */
-  async listUsersUsersGet({ archived, email, familyName, givenName, id, isService, limit, search, skip, userId, username }: { archived?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; search?: string | null; skip?: number | null; userId?: string | null; username?: string | null }): Promise<UserList[]> {
+  async listUsersUsersGet({ archived, banned, email, familyName, givenName, id, isService, limit, search, skip, userId, username }: { archived?: boolean | null; banned?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; search?: string | null; skip?: number | null; userId?: string | null; username?: string | null }): Promise<UserList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
+      banned,
       email,
       family_name: familyName,
       given_name: givenName,
@@ -90,5 +91,24 @@ export class UsersClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.patch<void>(this.buildPath(id, 'unarchive'), { params: queryParams });
+  }
+
+  /**
+   * Ban User
+   * Ban a user, blocking them from authenticating (admin or _user_manager).
+   * Stamps ``banned_at`` (source of truth) plus an optional ``ban_reason`` and
+   * sets the Redis kill-switch so any warm auth cache is invalidated at once.
+   * Rejects self-bans and bans against ``_admin`` users.
+   */
+  async banUserUsersUserIdBanPatch({ userId, body }: { userId: string; body?: UserBanRequest | null }): Promise<UserGet> {
+    return this.client.patch<UserGet>(this.buildPath(userId, 'ban'), body);
+  }
+
+  /**
+   * Unban User
+   * Lift a user's ban (admin or _user_manager).
+   */
+  async unbanUserUsersUserIdUnbanPatch({ userId }: { userId: string }): Promise<UserGet> {
+    return this.client.patch<UserGet>(this.buildPath(userId, 'unban'));
   }
 }

@@ -38,6 +38,9 @@ export default function UserDetailPage() {
 
   // Confirmation dialogs (styled, instead of window.confirm)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showBanConfirm, setShowBanConfirm] = useState(false);
+  const [showUnbanConfirm, setShowUnbanConfirm] = useState(false);
+  const [banReason, setBanReason] = useState('');
   const [removeAccountId, setRemoveAccountId] = useState<string | null>(null);
 
   // Add-account form
@@ -109,6 +112,31 @@ export default function UserDetailPage() {
     }
   }
 
+  async function banUser() {
+    if (!user) return;
+    setShowBanConfirm(false);
+    try {
+      await usersClient.banUserUsersUserIdBanPatch({ userId, body: { reason: banReason.trim() || null } });
+      notify('User banned. They can no longer sign in.', 'success');
+      setBanReason('');
+      await load();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to ban user', 'error');
+    }
+  }
+
+  async function unbanUser() {
+    if (!user) return;
+    setShowUnbanConfirm(false);
+    try {
+      await usersClient.unbanUserUsersUserIdUnbanPatch({ userId });
+      notify('User unbanned. They can sign in again.', 'success');
+      await load();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to unban user', 'error');
+    }
+  }
+
   async function addAccount() {
     const prov = providers.find((p) => p.id === addProvider);
     if (!prov || !providerUrl.trim() || !accountId.trim()) return;
@@ -170,8 +198,43 @@ export default function UserDetailPage() {
         ) : user ? (
           <ScrollArea className="space-y-6 max-w-3xl">
             <section className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <div><dt className="text-gray-500">Status</dt><dd className="text-gray-900">{user.archived_at ? 'Archived' : 'Active'}</dd></div>
+              <div>
+                <dt className="text-gray-500">Status</dt>
+                <dd className="text-gray-900">
+                  {user.banned_at ? <span className="text-red-700 font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
+                </dd>
+              </div>
               <div><dt className="text-gray-500">Created</dt><dd className="text-gray-900">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
+            </section>
+
+            {/* Access control (ban / unban) */}
+            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
+              <h2 className="text-lg font-semibold text-gray-900">Access control</h2>
+              {user.banned_at ? (
+                <div className="space-y-2 text-sm">
+                  <p className="text-red-700 font-medium">
+                    Banned on {new Date(user.banned_at).toLocaleString()}. This user cannot authenticate.
+                  </p>
+                  {user.ban_reason ? <p className="text-gray-600">Reason: {user.ban_reason}</p> : null}
+                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                    Unban user
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Banning immediately blocks this user from signing in and revokes their active sessions.</p>
+                  <input
+                    value={banReason}
+                    onChange={(e) => setBanReason(e.target.value)}
+                    placeholder="Reason (optional)"
+                    maxLength={1024}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                    Ban user
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* Roles */}
@@ -254,6 +317,23 @@ export default function UserDetailPage() {
           variant={user?.archived_at ? 'default' : 'danger'}
           onConfirm={toggleArchive}
           onCancel={() => setShowArchiveConfirm(false)}
+        />
+        <ConfirmDialog
+          open={showBanConfirm}
+          title="Ban user"
+          message={`Ban ${user?.email}? They will be signed out and blocked from authenticating until unbanned.`}
+          confirmLabel="Ban"
+          variant="danger"
+          onConfirm={banUser}
+          onCancel={() => setShowBanConfirm(false)}
+        />
+        <ConfirmDialog
+          open={showUnbanConfirm}
+          title="Unban user"
+          message={`Unban ${user?.email}? They will be able to sign in again.`}
+          confirmLabel="Unban"
+          onConfirm={unbanUser}
+          onCancel={() => setShowUnbanConfirm(false)}
         />
         <ConfirmDialog
           open={removeAccountId !== null}
