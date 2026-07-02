@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 
 // Deployment status → badge styling. The lecturer list always carries the
@@ -91,17 +92,18 @@ export default function LecturerContentPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <Link href={`/courses/${courseId}`} className="text-sm text-blue-600 hover:underline">
-            ← {course?.title || course?.path || 'Course'}
-          </Link>
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">Course Contents</h1>
-          {course && <p className="mt-1 text-sm text-gray-500 font-mono">{course.path}</p>}
-        </div>
+        <PageHeader
+          breadcrumbs={[
+            { label: 'Courses', href: '/courses' },
+            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
+            { label: 'Course Contents' },
+          ]}
+          title="Course Contents"
+          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
+        />
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
           <div className="text-gray-500">Loading…</div>

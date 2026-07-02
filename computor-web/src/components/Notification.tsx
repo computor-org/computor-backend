@@ -41,6 +41,11 @@ const typeIcons: Record<NotificationType, React.ReactElement> = {
   ),
 };
 
+/**
+ * A single toast card. Position-agnostic — rendering and stacking is owned by
+ * NotificationProvider; page code should call useNotify() rather than
+ * rendering this directly.
+ */
 export default function Notification({ message, type, onClose, duration = 5000 }: NotificationProps) {
   useEffect(() => {
     const timer = setTimeout(onClose, duration);
@@ -50,12 +55,12 @@ export default function Notification({ message, type, onClose, duration = 5000 }
   const styles = typeStyles[type];
 
   return (
-    <div className={`fixed top-4 right-4 z-50 max-w-sm border rounded-lg p-4 shadow-lg ${styles.bg}`}>
+    <div className={`max-w-sm border rounded-lg p-4 shadow-lg ${styles.bg}`}>
       <div className="flex items-start gap-3">
         <span className={styles.icon}>{typeIcons[type]}</span>
         <p className={`text-sm font-medium flex-1 ${styles.text}`}>{message}</p>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button onClick={onClose} aria-label="Dismiss notification" className="text-gray-400 hover:text-gray-600">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

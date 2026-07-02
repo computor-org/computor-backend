@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import Forbidden from '@/src/components/Forbidden';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useNotify } from '@/src/contexts/NotificationContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
@@ -52,10 +56,11 @@ function RoleBadge({ role }: { role: RoleList | RoleGet }) {
 }
 
 export default function RolesPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const isAdmin = user?.role === 'admin';
-  const isUserManager = isAdmin || (user?.systemRoles?.includes('_user_manager') ?? false);
+  // Backend-refreshed scopes (via usePermissions) instead of the cached
+  // session's role string, which can go stale between logins.
+  const { isAdmin, isUserManager } = usePermissions();
 
   const [roles, setRoles] = useState<RoleList[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
@@ -71,15 +76,14 @@ export default function RolesPage() {
   const [allUsers, setAllUsers] = useState<UserList[]>([]);
   const [addSearch, setAddSearch] = useState('');
   const [addUserId, setAddUserId] = useState('');
+  const [pickerResults, setPickerResults] = useState<UserList[]>([]);
+  // The query the current pickerResults answer — guards the "no matches"
+  // message against flashing while a debounced search is still in flight.
+  const [pickerQuery, setPickerQuery] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<{ userId: string; email: string } | null>(null);
 
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  const notify = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+  const notify = useNotify();
 
   // Load roles and all users on mount
   useEffect(() => {
@@ -89,16 +93,35 @@ export default function RolesPage() {
       .then(data => { setRoles(data); setRolesLoading(false); })
       .catch(e => { setRolesError(e instanceof Error ? e.message : 'Failed to load roles'); setRolesLoading(false); });
 
+    // Kept only for the member-list email display: UserRoleList carries just
+    // user_id, and /users has no bulk id filter. The add-member picker below
+    // searches server-side on demand instead of relying on this preload.
     usersClient.listUsersUsersGet({ limit: 500 })
       .then(setAllUsers)
       .catch(() => {});
   }, [authLoading, isAuthenticated, isUserManager]);
 
+  // Debounced server-side search for the add-member picker (limit 20), so
+  // users beyond the display preload above are still findable.
+  useEffect(() => {
+    const q = addSearch.trim();
+    if (!q || addUserId) return;
+    const t = setTimeout(() => {
+      usersClient.listUsersUsersGet({ search: q, limit: 20 })
+        .then(res => { setPickerResults(res); setPickerQuery(q); })
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [addSearch, addUserId]);
+
   const userMap = useMemo(() => {
     const m = new Map<string, UserList>();
     allUsers.forEach(u => m.set(u.id, u));
+    // Picker results too, so a freshly added member outside the preload
+    // still shows an email in the member list.
+    pickerResults.forEach(u => m.set(u.id, u));
     return m;
-  }, [allUsers]);
+  }, [allUsers, pickerResults]);
 
   const loadRoleDetail = useCallback(async (roleId: string) => {
     setDetailLoading(true);
@@ -175,24 +198,15 @@ export default function RolesPage() {
 
   const memberUserIds = useMemo(() => new Set(members.map(m => m.user_id)), [members]);
 
-  const addCandidates = useMemo(() => {
-    const q = addSearch.toLowerCase();
-    return allUsers.filter(u =>
-      !memberUserIds.has(u.id) &&
-      !u.archived_at &&
-      ((u.email?.toLowerCase().includes(q) ?? false)
-        || `${u.given_name ?? ''} ${u.family_name ?? ''}`.toLowerCase().includes(q))
-    ).slice(0, 8);
-  }, [allUsers, memberUserIds, addSearch]);
+  const addCandidates = useMemo(
+    () => pickerResults.filter(u => !memberUserIds.has(u.id) && !u.archived_at).slice(0, 8),
+    [pickerResults, memberUserIds],
+  );
 
   // Guard
   if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-8 text-red-600 font-medium">Access denied. Requires admin or _user_manager role.</div>
-      </AuthenticatedLayout>
-    );
+    return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
 
   return (
@@ -249,13 +263,6 @@ export default function RolesPage() {
             <div className="p-8 text-red-500 text-sm">{detailError}</div>
           ) : roleDetail ? (
             <div className="p-6 space-y-8 max-w-3xl">
-
-              {/* Notification */}
-              {notification && (
-                <div className={`px-4 py-3 rounded-lg text-sm ${notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                  {notification.message}
-                </div>
-              )}
 
               {/* Role header */}
               <div>
@@ -366,7 +373,7 @@ export default function RolesPage() {
                         {addingMember ? 'Adding…' : 'Add'}
                       </button>
                     )}
-                    {addSearch && addCandidates.length === 0 && !addUserId && (
+                    {addSearch && addCandidates.length === 0 && !addUserId && pickerQuery === addSearch.trim() && (
                       <p className="mt-1 text-xs text-gray-400">No matching users found.</p>
                     )}
                   </div>
@@ -381,26 +388,15 @@ export default function RolesPage() {
         </div>
       </div>
 
-      {/* Remove member confirm */}
-      {removeConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Remove from role?</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Remove <strong>{removeConfirm.email}</strong> from <strong>{selectedRoleId}</strong>?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setRemoveConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button
-                onClick={() => handleRemoveMember(removeConfirm.userId)}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={removeConfirm !== null}
+        title="Remove from role?"
+        message={`Remove ${removeConfirm?.email ?? ''} from ${selectedRoleId ?? ''}?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={() => removeConfirm && handleRemoveMember(removeConfirm.userId)}
+        onCancel={() => setRemoveConfirm(null)}
+      />
     </AuthenticatedLayout>
   );
 }

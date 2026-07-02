@@ -1,72 +1,53 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
-import Notification from '@/src/components/workspaces/Notification';
-import type {
-  WorkspaceRoleUser,
-  CoderWorkspace,
-  WorkspaceTemplate,
-} from '@/src/types/workspaces';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import { useNotify } from '@/src/contexts/NotificationContext';
+import type { CoderWorkspace, WorkspaceTemplate } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 const rolesClient = new WorkspaceRolesClient();
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const notify = useNotify();
 
-  const [user, setUser] = useState<WorkspaceRoleUser | null>(null);
-  const [workspaces, setWorkspaces] = useState<CoderWorkspace[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
   const [provisioning, setProvisioning] = useState(false);
 
-  const fetchUserAndWorkspaces = useCallback(async () => {
-    try {
-      // Fetch user info from the role users list
-      const allUsers = await rolesClient.listUsers();
-      const foundUser = allUsers.find((u) => u.user_id === userId);
+  const {
+    data,
+    loading,
+    error,
+    reload: fetchUserAndWorkspaces,
+  } = useResource(async () => {
+    // Fetch user info from the role users list
+    const allUsers = await rolesClient.listUsers();
+    const foundUser = allUsers.find((u) => u.user_id === userId);
+    if (!foundUser) throw new Error('User not found');
 
-      if (!foundUser) {
-        setError('User not found');
-        setLoading(false);
-        return;
+    // Fetch workspaces for this user
+    let workspaces: CoderWorkspace[] = [];
+    if (foundUser.email) {
+      try {
+        workspaces = (await coderClient.listWorkspaces({ email: foundUser.email })).workspaces;
+      } catch {
+        // Non-critical: user may not have workspaces
       }
-
-      setUser(foundUser);
-
-      // Fetch workspaces for this user
-      if (foundUser.email) {
-        try {
-          const data = await coderClient.listWorkspaces({ email: foundUser.email });
-          setWorkspaces(data.workspaces);
-        } catch {
-          // Non-critical: user may not have workspaces
-        }
-      }
-
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
     }
-  }, [userId]);
 
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    fetchUserAndWorkspaces();
-  }, [authLoading, isAuthenticated, fetchUserAndWorkspaces]);
+    return { user: foundUser, workspaces };
+  }, [userId]);
+  const user = data?.user ?? null;
+  const workspaces = data?.workspaces ?? [];
 
   const handleProvision = async () => {
     if (!user?.email) return;
@@ -75,10 +56,10 @@ export default function UserDetailPage() {
       await coderClient.provisionWorkspace({
         body: { email: user.email, template: 'python-workspace' as WorkspaceTemplate },
       });
-      setNotification({ message: 'Workspace provisioned', type: 'success' });
+      notify('Workspace provisioned', 'success');
       await fetchUserAndWorkspaces();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Provisioning failed', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
     } finally {
       setProvisioning(false);
     }
@@ -87,20 +68,20 @@ export default function UserDetailPage() {
   const handleStart = async (owner: string, name: string) => {
     try {
       await coderClient.startWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace starting...', type: 'success' });
+      notify('Workspace starting...', 'success');
       setTimeout(fetchUserAndWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to start', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to start', 'error');
     }
   };
 
   const handleStop = async (owner: string, name: string) => {
     try {
       await coderClient.stopWorkspace({ username: owner, workspaceName: name });
-      setNotification({ message: 'Workspace stopping...', type: 'success' });
+      notify('Workspace stopping...', 'success');
       setTimeout(fetchUserAndWorkspaces, 2000);
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to stop', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to stop', 'error');
     }
   };
 
@@ -108,11 +89,11 @@ export default function UserDetailPage() {
     if (!deleteTarget) return;
     try {
       await coderClient.deleteWorkspace({ username: deleteTarget.owner, workspaceName: deleteTarget.name });
-      setNotification({ message: 'Workspace deleted', type: 'success' });
+      notify('Workspace deleted', 'success');
       setDeleteTarget(null);
       await fetchUserAndWorkspaces();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to delete', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to delete', 'error');
       setDeleteTarget(null);
     }
   };
@@ -123,33 +104,28 @@ export default function UserDetailPage() {
       if (data.code_server_url || data.access_url) {
         window.open((data.code_server_url || data.access_url)!, '_blank');
       } else {
-        setNotification({ message: 'No access URL available', type: 'error' });
+        notify('No access URL available', 'error');
       }
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to open', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to open', 'error');
     }
   };
 
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6 max-w-4xl">
-        {notification && (
-          <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
-        )}
-
         {/* Header */}
-        <div>
-          <Link href="/workspaces/admin" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Administration
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">User Detail</h1>
-        </div>
+        <PageHeader
+          breadcrumbs={[
+            { label: 'Workspaces', href: '/workspaces' },
+            { label: 'Administration', href: '/workspaces/admin' },
+            { label: 'User Detail' },
+          ]}
+          title="User Detail"
+        />
 
         {/* Loading */}
-        {loading && (
+        {loading && !data && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
             <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
             <div className="space-y-2">
@@ -160,16 +136,7 @@ export default function UserDetailPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* User Info Card */}
         {user && (
@@ -233,14 +200,14 @@ export default function UserDetailPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Template</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
+              <table className="w-full text-sm divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Template</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

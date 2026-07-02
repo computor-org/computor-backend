@@ -9,6 +9,7 @@ import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
@@ -182,9 +183,7 @@ export default function CourseMembersPage() {
                             ))}
                           </select>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                            {courseRoleLabel(m.course_role_id)}
-                          </span>
+                          <Badge color="gray">{courseRoleLabel(m.course_role_id)}</Badge>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">

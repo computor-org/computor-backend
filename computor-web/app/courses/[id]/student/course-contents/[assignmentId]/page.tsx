@@ -8,7 +8,37 @@ import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import type { CourseContentStudentGet } from 'types/generated';
+
+/** Shape of the tester's result_json payload (not covered by generated types). */
+interface TestSummary {
+  passed: number;
+  failed: number;
+  skipped: number;
+  total: number;
+}
+
+interface SubtestResult {
+  name?: string;
+  result?: string;
+  resultMessage?: string;
+}
+
+interface TestResult {
+  name?: string;
+  type?: string;
+  result?: string;
+  summary: TestSummary;
+  tests?: SubtestResult[];
+}
+
+interface TestRunResult {
+  result?: string;
+  result_value?: number;
+  summary: TestSummary;
+  tests?: TestResult[];
+}
 
 export default function AssignmentDetailPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -64,15 +94,13 @@ export default function AssignmentDetailPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error || 'Assignment not found'}</p>
-          </div>
+          <ErrorBanner>{error || 'Assignment not found'}</ErrorBanner>
         </div>
       </AuthenticatedLayout>
     );
   }
 
-  const resultData = assignment.result?.result_json as any;
+  const resultData = assignment.result?.result_json as TestRunResult | undefined;
 
   return (
     <AuthenticatedLayout>
@@ -187,7 +215,7 @@ export default function AssignmentDetailPage() {
                   {resultData.result === 'PASSED' ? '✓' : '✗'} {resultData.result}
                 </span>
                 <span className="text-3xl font-bold" style={{
-                  color: resultData.result_value >= 50 ? '#10B981' : '#EF4444'
+                  color: (resultData.result_value ?? 0) >= 50 ? '#10B981' : '#EF4444'
                 }}>
                   {(resultData.result_value || 0).toFixed(1)}%
                 </span>
@@ -204,7 +232,7 @@ export default function AssignmentDetailPage() {
 
             {/* Test Details */}
             <div className="space-y-4">
-              {resultData.tests?.map((test: any, idx: number) => (
+              {resultData.tests?.map((test, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-lg">
                   <div className="p-4 bg-gray-50 border-b border-gray-200">
                     <div className="flex items-center justify-between">
@@ -233,7 +261,7 @@ export default function AssignmentDetailPage() {
                   {/* Sub-tests */}
                   {test.tests && test.tests.length > 0 && (
                     <div className="p-4 space-y-2">
-                      {test.tests.map((subtest: any, subIdx: number) => (
+                      {test.tests.map((subtest, subIdx) => (
                         <div
                           key={subIdx}
                           className="flex items-start justify-between py-2 border-b last:border-b-0 border-gray-100"

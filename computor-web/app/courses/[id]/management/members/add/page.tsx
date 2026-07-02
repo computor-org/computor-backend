@@ -421,9 +421,7 @@ export default function AddCourseMembersPage() {
               not yet in the system.
             </p>
 
-            {importError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{importError}</div>
-            )}
+            <ErrorBanner>{importError}</ErrorBanner>
             {importMsg && (
               <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
             )}
@@ -487,9 +485,7 @@ export default function AddCourseMembersPage() {
               className="block text-sm text-gray-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
             />
 
-            {fileError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{fileError}</div>
-            )}
+            <ErrorBanner>{fileError}</ErrorBanner>
 
             {fileParsing ? (
               <div className="text-gray-500 py-8 text-center">Parsing file…</div>

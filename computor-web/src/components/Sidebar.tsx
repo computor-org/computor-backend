@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -126,8 +127,8 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     ownPage: true,
     subItems: [
       { id: 'tutor-students', label: 'Students', path: `/courses/${courseId}/tutor/students` },
-      { id: 'tutor-submissions', label: 'Submissions', path: `/courses/${courseId}/tutor/submissions` },
-      { id: 'tutor-grading', label: 'Grading', path: `/courses/${courseId}/tutor/grading` },
+      // Submissions and Grading are not implemented yet — re-add the links
+      // once /courses/[id]/tutor/{submissions,grading} have real pages.
     ],
   },
   {
@@ -139,8 +140,8 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     ownPage: true,
     subItems: [
       { id: 'lecturer-content', label: 'Course Contents', path: `/courses/${courseId}/lecturer/content` },
-      { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
-      { id: 'lecturer-grading', label: 'Grading Overview', path: `/courses/${courseId}/lecturer/grading` },
+      // Students and Grading Overview are not implemented yet — re-add the
+      // links once /courses/[id]/lecturer/{students,grading} have real pages.
       { id: 'lecturer-analytics', label: 'Analytics', path: `/courses/${courseId}/lecturer/analytics` },
     ],
   },
@@ -320,9 +321,11 @@ export default function Sidebar() {
             {!collapsed && hasSubItems && !sectionActive && (
               <button
                 onClick={() => toggleView(navItem.id)}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${navItem.label} section`}
+                aria-expanded={isExpanded}
                 className="p-2 hover:bg-gray-100 rounded transition-colors"
               >
-                <span className={`transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>
+                <span aria-hidden="true" className={`transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>
                   {icons.chevronDown}
                 </span>
               </button>
@@ -383,6 +386,7 @@ export default function Sidebar() {
             onClick={() => setCollapsed(!collapsed)}
             className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <svg
               className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}
@@ -434,14 +438,14 @@ export default function Sidebar() {
           {!collapsed ? (
             <div className="space-y-2">
               <div className="flex items-center justify-center space-x-2">
-                <img src="/computor_logo.png" alt="Computor" className="h-6 w-6" />
+                <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
                 <span className="text-sm font-semibold text-gray-700">Computor</span>
               </div>
               <p className="text-xs text-gray-500 text-center">v1.0.0</p>
             </div>
           ) : (
             <div className="flex justify-center">
-              <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />
+              <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
             </div>
           )}
         </div>
@@ -469,6 +473,7 @@ export default function Sidebar() {
           onClick={() => setCollapsed(!collapsed)}
           className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <svg
             className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}
@@ -503,14 +508,14 @@ export default function Sidebar() {
         {!collapsed ? (
           <div className="space-y-2">
             <div className="flex items-center justify-center space-x-2">
-              <img src="/computor_logo.png" alt="Computor" className="h-6 w-6" />
+              <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
               <span className="text-sm font-semibold text-gray-700">Computor</span>
             </div>
             <p className="text-xs text-gray-500 text-center">v1.0.0</p>
           </div>
         ) : (
           <div className="flex justify-center">
-            <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />
+            <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
           </div>
         )}
       </div>

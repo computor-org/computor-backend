@@ -7,7 +7,8 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import type {
   CourseGet,
   CourseFamilyGet,
@@ -99,14 +100,7 @@ export default function CoursePage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error || 'Course not found'}</p>
-            </div>
-          </div>
+          <ErrorBanner>{error || 'Course not found'}</ErrorBanner>
         </div>
       </AuthenticatedLayout>
     );
@@ -188,30 +182,30 @@ export default function CoursePage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-8">
-        <Breadcrumbs items={crumbs} />
-
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-gray-900">{course.title || 'Untitled Course'}</h1>
-            <p className="mt-2 flex items-center gap-3 text-gray-600">
+        <PageHeader
+          breadcrumbs={crumbs}
+          title={course.title || 'Untitled Course'}
+          subtitle={
+            <span className="flex items-center gap-3">
               <span className="font-mono text-sm truncate">{course.path}</span>
               {course.language_code && (
                 <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
                   {course.language_code}
                 </span>
               )}
-            </p>
-          </div>
-          {canManage && (
-            <Link
-              href={`/courses/${courseId}/edit`}
-              className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Edit
-            </Link>
-          )}
-        </div>
+            </span>
+          }
+          actions={
+            canManage && (
+              <Link
+                href={`/courses/${courseId}/edit`}
+                className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Edit
+              </Link>
+            )
+          }
+        />
 
         {/* Quick Access — the primary way into the course, so it leads. */}
         {viewCards.length > 0 && (

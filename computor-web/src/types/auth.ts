@@ -31,10 +31,10 @@ export interface AuthUser {
   email: string;
   givenName?: string;
   familyName?: string;
+  /** Display-level role; real gating uses usePermissions (scopes/views). */
   role: 'admin' | 'lecturer' | 'student';
+  /** Global role ids from the backend (e.g. _admin, _user_manager). */
   systemRoles: string[];
-  permissions: string[];
-  courses: string[];
 }
 
 /**

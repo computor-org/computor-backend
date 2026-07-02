@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -106,7 +107,7 @@ export default function TopBar() {
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40 print:hidden">
       {/* Logo / Title */}
       <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
-        <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />
+        <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
         <h1 className="text-xl font-bold text-gray-900">Computor</h1>
       </Link>
 
@@ -138,6 +139,9 @@ export default function TopBar() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="User menu"
             className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {/* Avatar */}

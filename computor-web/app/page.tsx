@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -78,7 +79,7 @@ export default function Home() {
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <img src="/computor_logo.png" alt="Computor" className="h-10 w-10" />
+            <Image src="/computor_logo.png" alt="Computor" width={40} height={40} className="h-10 w-10" />
             <h1 className="text-2xl font-bold text-gray-900">Computor</h1>
           </div>
           {user ? (
@@ -241,7 +242,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-16 sticky bottom-0 z-40">
+      <footer className="border-t bg-white mt-16">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-gray-600">
             <p>&copy; 2025 Computor. Educational Platform for Programming.</p>

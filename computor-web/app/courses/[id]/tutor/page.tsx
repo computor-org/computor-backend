@@ -2,15 +2,26 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ErrorBanner from '@/src/components/ErrorBanner';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import StatCards from '@/src/components/progress/StatCards';
-import ProgressDistributionChart from '@/src/components/progress/ProgressDistributionChart';
-import ContentTypeChart from '@/src/components/progress/ContentTypeChart';
 import ProgressBar from '@/src/components/progress/ProgressBar';
 import type { CourseMemberGradingsList } from 'types/generated';
+
+// Charts pull in recharts (~large) — load them only when this page renders
+// instead of shipping the library in the shared bundle.
+const chartLoading = () => <div className="h-64 bg-gray-100 rounded animate-pulse" />;
+const ProgressDistributionChart = dynamic(
+  () => import('@/src/components/progress/ProgressDistributionChart'),
+  { ssr: false, loading: chartLoading },
+);
+const ContentTypeChart = dynamic(
+  () => import('@/src/components/progress/ContentTypeChart'),
+  { ssr: false, loading: chartLoading },
+);
 
 const gradingsClient = new CourseMemberGradingsClient();
 
@@ -115,7 +126,7 @@ export default function TutorCourseProgressPage() {
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span className="text-gray-300 ml-1">&#8597;</span>;
-    return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '&#8593;' : '&#8595;'}</span>;
+    return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
   return (
@@ -152,11 +163,7 @@ export default function TutorCourseProgressPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Content */}
         {!loading && !error && (

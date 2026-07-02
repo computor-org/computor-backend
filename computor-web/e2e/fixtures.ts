@@ -285,6 +285,7 @@ export async function setupAnalytics(
   // Seed the cached SSO user so AuthContext treats the session as logged in.
   await page.addInitScript((user) => {
     sessionStorage.setItem('auth_user', JSON.stringify(user));
+    sessionStorage.setItem('auth_provider', 'sso');
   }, {
     id: USER.id,
     username: USER.username,
@@ -293,8 +294,6 @@ export async function setupAnalytics(
     familyName: USER.family_name,
     role: 'lecturer',
     systemRoles: [],
-    permissions: [],
-    courses: [COURSE_ID],
   });
 
   await page.route(`${API_ORIGIN}/**`, async (route) => {

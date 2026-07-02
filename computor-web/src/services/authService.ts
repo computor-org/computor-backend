@@ -1,8 +1,14 @@
-import { IAuthProviderWithLogin, AuthResponse, AuthUser } from '../interfaces/IAuthProvider';
+import { IAuthProviderWithLogin } from '../interfaces/IAuthProvider';
+import { AuthResponse, AuthUser } from '../types/auth';
 import { LogoutResponse } from '../generated/types/auth';
 import { UserGet } from '../generated/types/users';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import {
+  clearStoredSession,
+  determineRole,
+  loadStoredSession,
+  saveStoredSession,
+} from './authStorage';
+import { API_BASE_URL } from '../utils/apiClient';
 
 /**
  * Authentication Service using FastAPI Backend
@@ -14,64 +20,21 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  * - Tokens are automatically sent with all requests via cookies
  */
 export class AuthService implements IAuthProviderWithLogin {
-  private readonly USER_KEY = 'auth_user';
-  private readonly VIEWS_KEY = 'auth_views';
   private currentUser: AuthUser | null = null;
   private currentViews: string[] = [];
 
   constructor() {
-    // Load user from sessionStorage on initialization
-    this.loadUserFromStorage();
-  }
-
-  /**
-   * Load user data from sessionStorage
-   * Only runs on client-side (browser)
-   */
-  private loadUserFromStorage(): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      const storedUser = sessionStorage.getItem(this.USER_KEY);
-      const storedViews = sessionStorage.getItem(this.VIEWS_KEY);
-
-      if (storedUser) {
-        this.currentUser = JSON.parse(storedUser);
-      }
-
-      if (storedViews) {
-        this.currentViews = JSON.parse(storedViews);
-      }
-    } catch (error) {
-      console.error('Failed to load user from storage:', error);
-      this.currentUser = null;
-      this.currentViews = [];
+    const session = loadStoredSession('basic');
+    if (session) {
+      this.currentUser = session.user;
+      this.currentViews = session.views;
     }
   }
 
-  /**
-   * Save user data to sessionStorage (NOT tokens!)
-   * Only runs on client-side (browser)
-   */
-  private saveUserToStorage(user: AuthUser, views: string[]): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window === 'undefined') {
-      this.currentUser = user;
-      this.currentViews = views;
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(this.USER_KEY, JSON.stringify(user));
-      sessionStorage.setItem(this.VIEWS_KEY, JSON.stringify(views));
-      this.currentUser = user;
-      this.currentViews = views;
-    } catch (error) {
-      console.error('Failed to save user to storage:', error);
-    }
+  private saveSession(user: AuthUser, views: string[]): void {
+    saveStoredSession('basic', user, views);
+    this.currentUser = user;
+    this.currentViews = views;
   }
 
   /**
@@ -149,7 +112,7 @@ export class AuthService implements IAuthProviderWithLogin {
       const user = this.transformUserData(userInfo, views);
 
       // Store user data and views (cookies are already set by backend)
-      this.saveUserToStorage(user, views);
+      this.saveSession(user, views);
 
       return {
         success: true,
@@ -168,7 +131,7 @@ export class AuthService implements IAuthProviderWithLogin {
    * Fetch raw user information from GET /user
    * Returns UserGet data without transformation
    */
-  private async fetchUserInfo(): Promise<any | null> {
+  private async fetchUserInfo(): Promise<UserGet | null> {
     try {
       const response = await fetch(`${API_BASE_URL}/user`, {
         credentials: 'include',
@@ -208,87 +171,20 @@ export class AuthService implements IAuthProviderWithLogin {
 
   /**
    * Transform backend UserGet to frontend AuthUser
-   * Note: Role will be determined after views are fetched
    */
-  private transformUserData(userInfo: any, views?: string[]): AuthUser {
+  private transformUserData(userInfo: UserGet, views: string[]): AuthUser {
     // Extract global role IDs from user_roles (e.g. _admin)
-    const globalRoles: string[] = (userInfo.user_roles || []).map((r: any) => r.role_id);
-    const role = this.determineRole(globalRoles, views || []);
+    const globalRoles: string[] = (userInfo.user_roles || []).map((r) => r.role_id);
 
     return {
-      id: userInfo.id || userInfo.user?.id,
-      username: userInfo.username || userInfo.user?.username || '',
-      email: userInfo.email || userInfo.user?.email || '',
-      givenName: userInfo.given_name || userInfo.user?.given_name,
-      familyName: userInfo.family_name || userInfo.user?.family_name,
-      role,
+      id: userInfo.id,
+      username: userInfo.username || '',
+      email: userInfo.email || '',
+      givenName: userInfo.given_name || undefined,
+      familyName: userInfo.family_name || undefined,
+      role: determineRole(globalRoles, views),
       systemRoles: globalRoles,
-      permissions: this.mapViewsToPermissions(views || [], globalRoles),
-      courses: [],
     };
-  }
-
-  /**
-   * Determine user role from global roles and course views.
-   *
-   * Global roles (from user_roles): _admin, _user_manager, etc.
-   * Views (from course roles): student, tutor, lecturer
-   *
-   * Priority: admin (global) > lecturer/tutor (course) > student (default)
-   */
-  private determineRole(globalRoles: string[], views: string[]): 'admin' | 'lecturer' | 'student' {
-    if (globalRoles.includes('_admin')) return 'admin';
-    if (views.includes('lecturer')) return 'lecturer';
-    if (views.includes('tutor')) return 'lecturer'; // Show as lecturer in UI
-    return 'student'; // Default to student
-  }
-
-  /**
-   * Map views to permissions
-   */
-  private mapViewsToPermissions(views: string[], globalRoles: string[] = []): string[] {
-    const permissions: string[] = [];
-
-    if (globalRoles.includes('_admin')) {
-      permissions.push(
-        'view_students',
-        'view_course_students',
-        'create_assignments',
-        'view_grades',
-        'manage_course',
-        'admin_access',
-        'manage_users',
-        'system_settings',
-        'view_audit'
-      );
-    }
-
-    if (views.includes('lecturer')) {
-      permissions.push(
-        'view_students',
-        'view_course_students',
-        'create_assignments',
-        'view_grades',
-        'manage_course'
-      );
-    }
-
-    if (views.includes('tutor')) {
-      permissions.push(
-        'view_students',
-        'view_course_students',
-        'view_grades'
-      );
-    }
-
-    if (views.includes('student')) {
-      permissions.push(
-        'view_assignments',
-        'submit_assignments'
-      );
-    }
-
-    return permissions;
   }
 
   /**
@@ -306,9 +202,9 @@ export class AuthService implements IAuthProviderWithLogin {
         credentials: 'include', // Send cookies for logout
       });
 
-      if (response.ok) {
-        const logoutResponse: LogoutResponse = await response.json();
-        console.log('Logout response:', logoutResponse.message);
+      if (!response.ok) {
+        const logoutResponse: LogoutResponse | null = await response.json().catch(() => null);
+        console.error('Logout request failed:', logoutResponse?.message ?? response.status);
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -354,7 +250,7 @@ export class AuthService implements IAuthProviderWithLogin {
 
       // Transform user data with views to determine correct role
       const user = this.transformUserData(userInfo, views);
-      this.saveUserToStorage(user, views);
+      this.saveSession(user, views);
 
       return {
         success: true,
@@ -373,14 +269,9 @@ export class AuthService implements IAuthProviderWithLogin {
   /**
    * Clear local session data
    * Does NOT clear HttpOnly cookies (only backend can do that)
-   * Only runs on client-side (browser)
    */
   clearSession(): void {
-    // Check if we're in the browser (not SSR)
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem(this.USER_KEY);
-      sessionStorage.removeItem(this.VIEWS_KEY);
-    }
+    clearStoredSession();
     this.currentUser = null;
     this.currentViews = [];
   }

@@ -1,11 +1,12 @@
 import { IAuthProvider } from '../interfaces/IAuthProvider';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../utils/apiClient';
+import { refreshOnce } from '../utils/tokenRefresh';
+import { clearStoredSession } from '../services/authStorage';
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
   params?: Record<string, unknown>;
-  data?: any;
+  data?: unknown;
 }
 
 /**
@@ -124,16 +125,14 @@ class APIClient {
 
   /**
    * Clear cached session data and notify the app of an auth failure.
-   * Clears sessionStorage directly (key shared with SSOAuthService) so the UI
-   * cannot keep showing a logged-in state even when no providers were wired in.
+   * Also clears the shared session storage directly so the UI cannot keep
+   * showing a logged-in state even when no providers were wired in.
    */
   private handleAuthFailure(): void {
     this.authProviders.forEach((p) => {
       try { p.clearSession(); } catch { /* ignore */ }
     });
-    if (typeof window !== 'undefined') {
-      try { sessionStorage.removeItem('auth_user'); } catch { /* ignore */ }
-    }
+    try { clearStoredSession(); } catch { /* ignore */ }
     this.onAuthError();
   }
 
@@ -141,21 +140,21 @@ class APIClient {
     return this.request<T>(endpoint, { ...(options ?? {}), method: 'GET' });
   }
 
-  async post<T>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
     return this.request<T>(endpoint, { ...(options ?? {}), method: 'POST', data });
   }
 
-  async put<T>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> {
+  async put<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
     return this.request<T>(endpoint, { ...(options ?? {}), method: 'PUT', data });
   }
 
-  async patch<T>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> {
+  async patch<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
     return this.request<T>(endpoint, { ...(options ?? {}), method: 'PATCH', data });
   }
 
   async delete<T>(endpoint: string, options?: RequestOptions): Promise<T>;
-  async delete<T>(endpoint: string, data: any, options?: RequestOptions): Promise<T>;
-  async delete<T>(endpoint: string, dataOrOptions?: any, options?: RequestOptions): Promise<T> {
+  async delete<T>(endpoint: string, data: unknown, options?: RequestOptions): Promise<T>;
+  async delete<T>(endpoint: string, dataOrOptions?: unknown, options?: RequestOptions): Promise<T> {
     // 3-arg form (endpoint, data, options): DELETE with a request body.
     // 1/2-arg form (endpoint, options): options carries params, no body.
     if (options !== undefined) {
@@ -166,7 +165,7 @@ class APIClient {
 
   async request<T>(
     endpoint: string,
-    options: RequestOptions & { method: string; data?: any }
+    options: RequestOptions & { method: string; data?: unknown }
   ): Promise<T> {
     const {
       method,
@@ -207,7 +206,9 @@ class APIClient {
     // so an offline / VPN-down state surfaces as an inline error in the page
     // rather than a logout or a redirect.
     if (response.status === 401 && !skipAuth) {
-      const outcome = await this.tryRefresh();
+      // Coalesced app-wide (see tokenRefresh): concurrent 401s from any HTTP
+      // layer share one /auth/refresh call.
+      const outcome = await refreshOnce(() => this.tryRefresh());
       if (outcome === 'refreshed') {
         response = await fetch(url, fetchInit);
       } else if (outcome === 'failed') {

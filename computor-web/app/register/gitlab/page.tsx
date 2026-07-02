@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { OnboardingClient } from '@/src/clients/OnboardingClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -75,7 +76,7 @@ export default function GitlabRegisterPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-md">
         <div className="p-8 pb-0">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/computor_logo.png" alt="Computor" className="h-8 w-8" />
+            <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
             <span className="text-lg font-semibold text-gray-900">Computor</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Set up your login</h1>
@@ -84,7 +85,7 @@ export default function GitlabRegisterPage() {
           </p>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-xs text-blue-800 space-y-1">
-            <div>Your GitLab account's email must match your Computor account.</div>
+            <div>Your GitLab account&apos;s email must match your Computor account.</div>
             <div>The token is used only to verify you and is <strong>never stored</strong>.</div>
             <div>Already set up but forgot your password? Submit again to reset it.</div>
           </div>

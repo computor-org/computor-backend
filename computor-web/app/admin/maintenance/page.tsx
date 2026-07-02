@@ -2,20 +2,24 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
-import Notification from '@/src/components/workspaces/Notification';
-import ConfirmDialog from '@/src/components/workspaces/ConfirmDialog';
+import { useNotify } from '@/src/contexts/NotificationContext';
+import ConfirmDialog from '@/src/components/ConfirmDialog';
 
 const maintenanceClient = new MaintenanceClient();
 
 export default function MaintenancePage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAdmin } = usePermissions();
+  const notify = useNotify();
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Activate form
   const [activateMessage, setActivateMessage] = useState('The system is undergoing scheduled maintenance.');
@@ -60,10 +64,10 @@ export default function MaintenancePage() {
     setActivating(true);
     try {
       await maintenanceClient.activate(activateMessage);
-      setNotification({ message: 'Maintenance mode activated', type: 'success' });
+      notify('Maintenance mode activated', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to activate', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to activate', 'error');
     } finally {
       setActivating(false);
     }
@@ -74,10 +78,10 @@ export default function MaintenancePage() {
     setDeactivating(true);
     try {
       await maintenanceClient.deactivate();
-      setNotification({ message: 'Maintenance mode deactivated', type: 'success' });
+      notify('Maintenance mode deactivated', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to deactivate', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to deactivate', 'error');
     } finally {
       setDeactivating(false);
     }
@@ -91,11 +95,11 @@ export default function MaintenancePage() {
     try {
       const isoDate = new Date(scheduleDate).toISOString();
       await maintenanceClient.schedule(isoDate, scheduleMessage);
-      setNotification({ message: 'Maintenance scheduled', type: 'success' });
+      notify('Maintenance scheduled', 'success');
       setScheduleDate('');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to schedule', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to schedule', 'error');
     } finally {
       setScheduling(false);
     }
@@ -106,17 +110,17 @@ export default function MaintenancePage() {
     setCancelling(true);
     try {
       await maintenanceClient.cancelSchedule();
-      setNotification({ message: 'Scheduled maintenance cancelled', type: 'success' });
+      notify('Scheduled maintenance cancelled', 'success');
       await fetchStatus();
     } catch (err) {
-      setNotification({ message: err instanceof Error ? err.message : 'Failed to cancel schedule', type: 'error' });
+      notify(err instanceof Error ? err.message : 'Failed to cancel schedule', 'error');
     } finally {
       setCancelling(false);
     }
   };
 
   // Access control
-  if (!authLoading && user?.role !== 'admin') {
+  if (!authLoading && !isAdmin) {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
@@ -132,16 +136,11 @@ export default function MaintenancePage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Maintenance' }]} />
-        {notification && (
-          <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />
-        )}
-
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Maintenance Mode</h1>
-          <p className="mt-2 text-gray-600">Manage system maintenance state and schedule future maintenance windows.</p>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Maintenance' }]}
+          title="Maintenance Mode"
+          subtitle="Manage system maintenance state and schedule future maintenance windows."
+        />
 
         {/* Loading */}
         {loading && (
@@ -152,16 +151,7 @@ export default function MaintenancePage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Status Card */}
         {!loading && status && (
@@ -171,13 +161,9 @@ export default function MaintenancePage() {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-600">Status:</span>
                 {status.active ? (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                    Active
-                  </span>
+                  <Badge color="yellow" pill>Active</Badge>
                 ) : (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Inactive
-                  </span>
+                  <Badge color="green" pill>Inactive</Badge>
                 )}
               </div>
 

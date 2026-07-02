@@ -6,25 +6,20 @@
  */
 
 import { apiClient } from '../api/client';
-import { SSOAuthService } from '../services/ssoAuthService';
-import { AuthService } from '../services/authService';
+import { ssoAuthService, authService } from '../services/authInstances';
 
 /**
  * Initialize API client with authentication providers
  *
  * Auth providers are checked in order:
  * 1. SSO Authentication (Keycloak)
- * 2. Mock/Basic Authentication (for development)
+ * 2. Basic Authentication (fallback, e.g. for development)
  */
 export function configureAPIClient() {
-  // Create provider instances
-  const ssoProvider = new SSOAuthService();
-  const mockProvider = new AuthService();
-
-  // Configure API client with providers (checked in order)
+  // Configure API client with the shared provider instances (checked in order)
   apiClient.setAuthProviders([
-    ssoProvider,
-    mockProvider,
+    ssoAuthService,
+    authService,
   ]);
 }
 

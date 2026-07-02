@@ -69,9 +69,12 @@ function metaSlugAndDeps(dir: string, metaText: string | undefined): { slug: str
       meta = undefined;
     }
     if (meta && typeof meta === 'object') {
-      const m = meta as Record<string, any>;
+      const m = meta as Record<string, unknown>;
       if (typeof m.slug === 'string' && m.slug) slug = m.slug;
-      let td = m.properties && typeof m.properties === 'object' ? m.properties.testDependencies : undefined;
+      let td =
+        m.properties && typeof m.properties === 'object'
+          ? (m.properties as Record<string, unknown>).testDependencies
+          : undefined;
       if (td == null) td = m.testDependencies;
       if (Array.isArray(td)) {
         for (const item of td) {

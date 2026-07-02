@@ -26,7 +26,7 @@ export default function ExamplesPage() {
     { enabled: canManage },
   );
   const examples = data?.examples ?? [];
-  const repos = data?.repos ?? [];
+  const repos = useMemo(() => data?.repos ?? [], [data?.repos]);
 
   const repoName = useMemo(() => {
     const m: Record<string, string> = {};

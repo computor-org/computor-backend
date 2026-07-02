@@ -8,6 +8,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import Forbidden from '@/src/components/Forbidden';
 import type { GitServerGet } from '@/src/generated/types/common';
 
@@ -53,10 +54,8 @@ export default function GitServersPage() {
                   <div className="text-xs text-gray-500">{s.type} · {s.base_url}</div>
                 </div>
                 <div className="flex items-center gap-3 ml-4">
-                  {s.managed && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">managed</span>}
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${s.has_token ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {s.has_token ? 'token set' : 'no token'}
-                  </span>
+                  {s.managed && <Badge color="green">managed</Badge>}
+                  <Badge color={s.has_token ? 'blue' : 'gray'}>{s.has_token ? 'token set' : 'no token'}</Badge>
                   <span className="text-gray-300">›</span>
                 </div>
               </Link>

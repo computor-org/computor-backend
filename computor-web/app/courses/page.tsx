@@ -5,7 +5,9 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import EmptyState from '@/src/components/EmptyState';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
@@ -16,26 +18,25 @@ export default function CoursesPage() {
   return (
     <AuthenticatedLayout>
       <div className="p-6 space-y-6">
-        <Breadcrumbs items={[{ label: 'Courses' }]} />
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Courses</h1>
-            <p className="mt-2 text-gray-600">Browse and access all courses where you have permissions</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {!loading && (
-              <span className="text-sm text-gray-500">
-                {courses.length} {courses.length === 1 ? 'course' : 'courses'}
-              </span>
-            )}
-            {canCreateCourse() && (
-              <Link href="/courses/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                New Course
-              </Link>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          breadcrumbs={[{ label: 'Courses' }]}
+          title="Courses"
+          subtitle="Browse and access all courses where you have permissions"
+          actions={
+            <>
+              {!loading && (
+                <span className="text-sm text-gray-500">
+                  {courses.length} {courses.length === 1 ? 'course' : 'courses'}
+                </span>
+              )}
+              {canCreateCourse() && (
+                <Link href="/courses/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                  New Course
+                </Link>
+              )}
+            </>
+          }
+        />
 
         {/* Loading State */}
         {loading && (
@@ -51,28 +52,19 @@ export default function CoursesPage() {
         )}
 
         {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
+        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Empty State */}
         {!loading && !error && courses.length === 0 && (
-          <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No courses found</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              You do not have access to any courses yet.
-            </p>
-          </div>
+          <EmptyState
+            icon={
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            }
+            title="No courses found"
+            description="You do not have access to any courses yet."
+          />
         )}
 
         {/* Courses Grid */}

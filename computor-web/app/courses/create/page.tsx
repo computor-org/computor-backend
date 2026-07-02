@@ -73,7 +73,9 @@ function CreateInner() {
         setServerId(def);
         setGitEnabled(!!def);
       }
-    })().catch(() => {});
+    })().catch((e) => {
+      setError(e instanceof Error ? e.message : 'Failed to load course families and git servers.');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, canConfigureGit]);
 
