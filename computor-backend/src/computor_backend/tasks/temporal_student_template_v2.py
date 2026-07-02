@@ -61,6 +61,14 @@ async def process_example_for_student_template_v2(
             elif filename.startswith('content/index_') and filename.endswith('.md'):
                 lang_suffix = filename[len('content/index'):-3]  # '_de' from 'content/index_de.md'
                 (target_path / f'README{lang_suffix}.md').write_bytes(content)
+            # Handle mediaFiles directory — copy to root to preserve references in README
+            elif filename.startswith('content/mediaFiles/'):
+                # Remove 'content/' prefix to get relative path within student template
+                relative_path = filename[len('content/'):]  # 'mediaFiles/image.png'
+                media_file_path = target_path / relative_path
+                media_file_path.parent.mkdir(parents=True, exist_ok=True)
+                media_file_path.write_bytes(content)
+                logger.info(f"Copied media file: {relative_path}")
             # Everything else under content/ or localTests/ is DROPPED.
             # No fallback, no implicit copy.
 
