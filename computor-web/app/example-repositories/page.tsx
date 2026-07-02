@@ -47,7 +47,7 @@ export default function ExampleRepositoriesPage() {
             No example repositories yet. Create a MinIO repository to upload examples into.
           </div>
         ) : (
-          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
             {repos.map((r) => {
               const uploadable = r.source_type === 'minio' || r.source_type === 's3';
               return (
