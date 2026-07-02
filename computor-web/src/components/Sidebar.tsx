@@ -140,7 +140,6 @@ const getViewNavigation = (courseId: string): NavItem[] => [
       { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
       // Grading Overview isn't implemented yet — re-add the link once
       // /courses/[id]/lecturer/grading has a real page.
-      { id: 'lecturer-analytics', label: 'Analytics', path: `/courses/${courseId}/lecturer/analytics` },
     ],
   },
   {

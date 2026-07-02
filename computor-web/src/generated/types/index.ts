@@ -2,7 +2,6 @@
  * Auto-generated TypeScript interfaces from Pydantic models
  */
 
-export * from './analytics';
 export * from './auth';
 export * from './common';
 export * from './courses';

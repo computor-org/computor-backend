@@ -1,46 +1,26 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import type { CourseList } from '@/src/generated/types/courses';
-import {
-  analyticsRoleLabel,
-  listAnalyticsCourses,
-  type AnalyticsCourseAccess,
-} from '@/src/api/analytics';
-
-type DashboardCourse = {
-  id: string;
-  title: string | null;
-  path: string | null;
-  local?: CourseList;
-  analytics?: AnalyticsCourseAccess;
-};
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { showManagement, isWorkspaceUser, isUserManager, isAdmin, courseRole } = usePermissions();
   const [courses, setCourses] = useState<CourseList[]>([]);
-  const [analyticsCourses, setAnalyticsCourses] = useState<AnalyticsCourseAccess[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
     let cancelled = false;
     (async () => {
-      const [localResult, analyticsResult] = await Promise.allSettled([
-        fetchLocalCourses(),
-        listAnalyticsCourses(),
-      ]);
+      const localCourses = await fetchLocalCourses();
       if (cancelled) return;
-      setCourses(localResult.status === 'fulfilled' ? localResult.value : []);
-      setAnalyticsCourses(
-        analyticsResult.status === 'fulfilled' ? analyticsResult.value : [],
-      );
+      setCourses(localCourses);
       setLoading(false);
     })();
     return () => {
@@ -48,11 +28,9 @@ export default function DashboardPage() {
     };
   }, [authLoading, isAuthenticated]);
 
-  const dashboardCourses = mergeDashboardCourses(courses, analyticsCourses);
   const actions = [
     { label: 'Browse Courses', href: '/courses', show: true },
     { label: 'Browse Examples', href: '/examples', show: true },
-    { label: 'Analytics', href: '/lecturer/analytics', show: analyticsCourses.length > 0 || isAdmin },
     { label: 'Organizations', href: '/organizations', show: showManagement },
     { label: 'Course Families', href: '/course-families', show: showManagement },
     { label: 'Workspaces', href: '/workspaces', show: isWorkspaceUser },
@@ -72,9 +50,9 @@ export default function DashboardPage() {
           <p className="mt-2 text-gray-600">
             {loading
               ? 'Loading your courses…'
-              : dashboardCourses.length === 0
+              : courses.length === 0
               ? "You're not enrolled in any courses yet."
-              : `You have ${dashboardCourses.length} ${dashboardCourses.length === 1 ? 'course' : 'courses'}.`}
+              : `You have ${courses.length} ${courses.length === 1 ? 'course' : 'courses'}.`}
           </p>
         </div>
 
@@ -94,15 +72,12 @@ export default function DashboardPage() {
                     <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
                   ))}
                 </div>
-              ) : dashboardCourses.length === 0 ? (
+              ) : courses.length === 0 ? (
                 <p className="text-sm text-gray-500">No courses yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {dashboardCourses.slice(0, 6).map((c) => {
-                    const role = courseRole(c.id) ?? analyticsRoleLabel(c.analytics?.role);
-                    const primaryHref = c.local
-                      ? `/courses/${c.id}`
-                      : `/courses/${c.id}/lecturer/analytics`;
+                  {courses.slice(0, 6).map((c) => {
+                    const role = courseRole(c.id);
                     return (
                       <div
                         key={c.id}
@@ -110,7 +85,7 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <Link
-                            href={primaryHref}
+                            href={`/courses/${c.id}`}
                             className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
                           >
                             <span className="block truncate">{c.title || c.path}</span>
@@ -122,26 +97,6 @@ export default function DashboardPage() {
                           )}
                         </div>
                         {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {c.local && <CourseBadge>Local</CourseBadge>}
-                          {c.analytics && <CourseBadge tone="green">Analytics snapshot</CourseBadge>}
-                          {c.analytics?.source_name && (
-                            <CourseBadge tone="gray">Source {c.analytics.source_name}</CourseBadge>
-                          )}
-                          {c.analytics && (
-                            <span className="text-xs text-gray-500">
-                              {c.analytics.total_students ?? 0} students
-                            </span>
-                          )}
-                          {c.analytics && c.local && (
-                            <Link
-                              href={`/courses/${c.id}/lecturer/analytics`}
-                              className="ml-auto text-xs font-medium text-blue-600 hover:underline"
-                            >
-                              Analytics
-                            </Link>
-                          )}
-                        </div>
                       </div>
                     );
                   })}
@@ -179,57 +134,4 @@ async function fetchLocalCourses(): Promise<CourseList[]> {
   const res = await apiFetch(`${API_BASE_URL}/courses`);
   if (!res.ok) return [];
   return (await res.json()) as CourseList[];
-}
-
-function mergeDashboardCourses(
-  localCourses: CourseList[],
-  analyticsCourses: AnalyticsCourseAccess[],
-): DashboardCourse[] {
-  const byId = new Map<string, DashboardCourse>();
-  for (const course of localCourses) {
-    byId.set(course.id, {
-      id: course.id,
-      title: course.title ?? null,
-      path: course.path ?? null,
-      local: course,
-    });
-  }
-  for (const course of analyticsCourses) {
-    const current = byId.get(course.course_id);
-    if (current) {
-      current.analytics = course;
-      current.title = current.title ?? course.title ?? null;
-      current.path = current.path ?? course.path ?? null;
-    } else {
-      byId.set(course.course_id, {
-        id: course.course_id,
-        title: course.title ?? null,
-        path: course.path ?? null,
-        analytics: course,
-      });
-    }
-  }
-  return Array.from(byId.values()).sort((a, b) =>
-    (a.title || a.path || a.id).localeCompare(b.title || b.path || b.id),
-  );
-}
-
-function CourseBadge({
-  children,
-  tone = 'blue',
-}: {
-  children: ReactNode;
-  tone?: 'blue' | 'green' | 'gray';
-}) {
-  const classes =
-    tone === 'green'
-      ? 'bg-green-100 text-green-700'
-      : tone === 'gray'
-        ? 'bg-gray-100 text-gray-700'
-        : 'bg-blue-100 text-blue-700';
-  return (
-    <span className={`rounded px-2 py-0.5 text-xs font-medium ${classes}`}>
-      {children}
-    </span>
-  );
 }

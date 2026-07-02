@@ -9,8 +9,7 @@ import { useRouter } from 'next/navigation';
  * Lecturer actions are always scoped to a specific course; the real dashboard
  * lives at /courses/[id]/lecturer. The cross-course dashboard showed a
  * hardcoded student count and quick actions pointing at routes that were
- * never built. Course analytics remain available at /lecturer/analytics and
- * per course under /courses/[id]/lecturer/analytics.
+ * never built.
  */
 export default function LecturerDashboardRedirect() {
   const router = useRouter();
