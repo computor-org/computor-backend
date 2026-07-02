@@ -90,6 +90,7 @@ def process_example_for_student_template_v2(
                 dest = target_path / filename[len('content/'):]  # e.g. 'mediaFiles/foo.png'
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(content)
+                logger.info("Copied media file: %s", filename[len('content/'):])
             # Everything else under content/ or localTests/ is DROPPED.
             # No fallback, no implicit copy.
 
