@@ -63,9 +63,10 @@ class BackendSettings:
             if _pg_user and _pg_db
             else None
         )
-        self.ANALYTICS_SOURCE_DATABASE_URL = os.environ.get(
-            "ANALYTICS_SOURCE_DATABASE_URL",
-            _backend_postgres_url,
+        # `or` (not a plain default) so an empty override — which compose passes
+        # as "" when the .env var is unset — still falls back to the local DB.
+        self.ANALYTICS_SOURCE_DATABASE_URL = (
+            os.environ.get("ANALYTICS_SOURCE_DATABASE_URL") or _backend_postgres_url
         )
         self.ANALYTICS_EXPORT_CHUNK_SIZE = int(
             os.environ.get("ANALYTICS_EXPORT_CHUNK_SIZE", "100000")
