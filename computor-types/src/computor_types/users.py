@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from text_unidecode import unidecode
@@ -72,11 +72,18 @@ class UserGet(BaseEntityGet):
     properties: Optional[dict] = Field(None, description="Additional user properties")
     archived_at: Optional[datetime] = Field(None, description="Timestamp when user was archived")
     is_service: bool = Field(description="Whether this is a service account")
+    banned_at: Optional[datetime] = Field(None, description="Timestamp when the user was banned (null = not banned)")
+    ban_reason: Optional[str] = Field(None, description="Optional reason recorded when the user was banned")
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
     profile: Optional['ProfileGet'] = Field(None, description="User profile")
     user_roles: List[UserRoleGet] = Field(default=[], description="User's global roles")
-    
-    
+
+    @computed_field
+    @property
+    def banned(self) -> bool:
+        """Whether the user is currently banned from authenticating."""
+        return self.banned_at is not None
+
     @property
     def full_name(self) -> str:
         """Get the user's full name"""
@@ -103,8 +110,14 @@ class UserList(BaseEntityList):
     username: Optional[str] = Field(None, description="Unique username")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     is_service: bool = Field(description="Whether this is a service account")
-    
-    
+    banned_at: Optional[datetime] = Field(None, description="Timestamp when the user was banned (null = not banned)")
+
+    @computed_field
+    @property
+    def banned(self) -> bool:
+        """Whether the user is currently banned from authenticating."""
+        return self.banned_at is not None
+
     @property
     def display_name(self) -> str:
         """Get the user's display name for lists"""
@@ -175,6 +188,7 @@ class UserQuery(ListQuery):
     archived: Optional[bool] = None
     username: Optional[str] = None
     is_service: Optional[bool] = None
+    banned: Optional[bool] = None
     search: Optional[str] = None
     """Free-text substring match over given name, family name and email.
 
@@ -185,6 +199,15 @@ class UserQuery(ListQuery):
 
 
 # Additional user-related DTOs
+
+class UserBanRequest(BaseModel):
+    """Optional payload for the ban endpoint."""
+    reason: Optional[str] = Field(
+        None,
+        max_length=1024,
+        description="Reason for the ban (stored for audit, shown to administrators)",
+    )
+
 
 class UserPassword(BaseModel):
     """Password update request for user endpoints."""

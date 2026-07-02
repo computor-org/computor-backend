@@ -61,6 +61,7 @@ from computor_backend.api.course_families import course_family_router
 from computor_backend.api.user_roles import user_roles_router
 from computor_backend.api.role_claims import role_claim_router
 from computor_backend.api.user import user_router
+from computor_backend.api.user_ban import user_ban_router
 from computor_backend.api.tasks import tasks_router
 from computor_backend.api.storage import storage_router
 from computor_backend.api.submissions import submissions_router
@@ -365,6 +366,9 @@ def _guard_no_archive_admin(entity, permissions, db):
 _user_router = CrudRouter(UserInterface)
 _user_router.pre_archive.append(_guard_no_archive_admin)
 _user_router.register_routes(app)
+# Ban / unban lifecycle endpoints (PATCH /users/{id}/ban|unban). Distinct paths
+# from the CrudRouter, gated on admin / _user_manager inside the handlers.
+app.include_router(user_ban_router, tags=["users", "admin"])
 # accounts_router must be registered before CrudRouter(AccountInterface) so that
 # GET /accounts/providers is matched before the authenticated GET /accounts/{id} route.
 app.include_router(accounts_router, tags=["accounts"])

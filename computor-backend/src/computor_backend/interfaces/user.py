@@ -45,6 +45,11 @@ class UserInterface(UserInterfaceBase, BackendEntityInterface):
             query = query.filter(User.email == params.email)
         if params.is_service is not None:
             query = query.filter(User.is_service == params.is_service)
+        if params.banned is not None:
+            if params.banned:
+                query = query.filter(User.banned_at.isnot(None))
+            else:
+                query = query.filter(User.banned_at.is_(None))
         if params.search:
             # Free-text substring match across name + email, mirroring the
             # ``search`` convention in ``list_mentionable_users``. Runs on top
