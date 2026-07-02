@@ -51,7 +51,7 @@ Returns full course content hierarchy with submission progress for each student.
 
 **Access Control:**
 - Admins: Can access any course
-- Tutors and higher: Can access courses they are assigned to
+- Lecturers and higher: Can access courses they are assigned to
 
 **Caching:**
 - Results are cached for 30 minutes per student
@@ -105,7 +105,7 @@ Returns full course content hierarchy with detailed submission progress.
 
 **Access Control:**
 - Admins: Can access any course member
-- Tutors and higher: Can access members in courses they are assigned to
+- Lecturers and higher: Can access members in courses they are assigned to
 
 **Caching:**
 - Results are cached for 30 minutes
