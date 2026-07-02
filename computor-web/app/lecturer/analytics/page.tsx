@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
@@ -42,7 +43,7 @@ export default function LecturerAnalyticsIndexPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="space-y-6 p-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Analytics Snapshots' }]}
           title="Analytics Snapshots"
@@ -54,6 +55,7 @@ export default function LecturerAnalyticsIndexPage() {
           }
         />
 
+        <ScrollArea className="space-y-6">
         {loading && <p className="text-sm text-gray-500">Loading analytics courses...</p>}
         {!loading && <ErrorBanner>{error}</ErrorBanner>}
         {!loading && !error && courses.length === 0 && (
@@ -69,7 +71,8 @@ export default function LecturerAnalyticsIndexPage() {
             ))}
           </div>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

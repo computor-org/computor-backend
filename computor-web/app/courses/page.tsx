@@ -5,9 +5,11 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
+import Badge from '@/src/components/Badge';
 import type { CourseList } from 'types/generated';
 
 export default function CoursesPage() {
@@ -17,7 +19,7 @@ export default function CoursesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Courses' }]}
           title="Courses"
@@ -38,9 +40,12 @@ export default function CoursesPage() {
           }
         />
 
+        {/* Error State */}
+        <ErrorBanner>{error}</ErrorBanner>
+
         {/* Loading State */}
         {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
                 <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -48,11 +53,8 @@ export default function CoursesPage() {
                 <div className="h-4 bg-gray-200 rounded w-2/3"></div>
               </div>
             ))}
-          </div>
+          </ScrollArea>
         )}
-
-        {/* Error State */}
-        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Empty State */}
         {!loading && !error && courses.length === 0 && (
@@ -69,13 +71,13 @@ export default function CoursesPage() {
 
         {/* Courses Grid */}
         {!loading && !error && courses.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
               <CourseCard key={course.id} course={course} role={courseRole(course.id)} />
             ))}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }
@@ -89,9 +91,9 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
             {course.title || 'Untitled Course'}
           </h3>
           {role && (
-            <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+            <Badge color="blue" className="shrink-0">
               {role}
-            </span>
+            </Badge>
           )}
         </div>
 

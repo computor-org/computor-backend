@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -38,7 +39,7 @@ export default function GitServerDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Git Servers', href: '/admin/git-servers' }, { label: server?.name || server?.base_url || 'Git Server' }]}
           title={server?.name || server?.base_url || 'Git Server'}
@@ -56,9 +57,9 @@ export default function GitServerDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : server ? (
-          <>
+          <ScrollArea className="space-y-6">
             <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div><dt className="text-gray-500">Managed</dt><dd className="text-gray-900">{server.managed ? 'Yes — Computor operates it' : 'No (external)'}</dd></div>
               <div><dt className="text-gray-500">Service token</dt><dd className="text-gray-900">{server.has_token ? 'Set (encrypted)' : 'None'}</dd></div>
@@ -71,9 +72,9 @@ export default function GitServerDetailPage() {
                 Managed Forgejo instances are auto-registered at startup. Removing one is blocked while any course binding still references it.
               </p>
             )}
-          </>
+          </ScrollArea>
         ) : null}
-      </div>
+      </ListPageLayout>
 
       {confirmDelete && server && (
         <ConfirmDeleteDialog

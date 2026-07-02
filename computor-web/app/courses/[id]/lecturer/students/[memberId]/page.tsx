@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
@@ -79,7 +80,7 @@ export default function StudentProgressPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-6xl">
+      <ListPageLayout>
         {/* Header */}
         <div>
           <Link
@@ -115,6 +116,7 @@ export default function StudentProgressPage() {
           </div>
         </div>
 
+        <ScrollArea className="space-y-6">
         {/* Loading */}
         {loading && (
           <div className="space-y-4">
@@ -229,7 +231,8 @@ export default function StudentProgressPage() {
             <ContentTree nodes={data.nodes || []} />
           </>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

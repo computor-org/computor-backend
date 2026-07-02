@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout from '@/src/components/ListPageLayout';
+import PageHeader from '@/src/components/PageHeader';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -211,15 +213,17 @@ export default function RolesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+      <ListPageLayout>
+        <PageHeader
+          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Roles' }]}
+          title="Roles & Claims"
+          subtitle={`${roles.length} roles`}
+        />
+
+        <div className="flex-1 min-h-0 flex overflow-hidden rounded-lg border border-gray-200 bg-white">
 
         {/* Left panel — role list */}
         <div className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h1 className="text-base font-semibold text-gray-900">Roles & Claims</h1>
-            <p className="text-xs text-gray-500 mt-0.5">{roles.length} roles</p>
-          </div>
-
           <div className="flex-1 overflow-y-auto">
             {rolesLoading ? (
               <div className="p-4 text-sm text-gray-400">Loading…</div>
@@ -386,17 +390,18 @@ export default function RolesPage() {
             </div>
           ) : null}
         </div>
-      </div>
+        </div>
 
-      <ConfirmDialog
-        open={removeConfirm !== null}
-        title="Remove from role?"
-        message={`Remove ${removeConfirm?.email ?? ''} from ${selectedRoleId ?? ''}?`}
-        confirmLabel="Remove"
-        variant="danger"
-        onConfirm={() => removeConfirm && handleRemoveMember(removeConfirm.userId)}
-        onCancel={() => setRemoveConfirm(null)}
-      />
+        <ConfirmDialog
+          open={removeConfirm !== null}
+          title="Remove from role?"
+          message={`Remove ${removeConfirm?.email ?? ''} from ${selectedRoleId ?? ''}?`}
+          confirmLabel="Remove"
+          variant="danger"
+          onConfirm={() => removeConfirm && handleRemoveMember(removeConfirm.userId)}
+          onCancel={() => setRemoveConfirm(null)}
+        />
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

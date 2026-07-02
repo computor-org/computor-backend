@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import type { CourseGet } from 'types/generated';
 
@@ -53,7 +54,7 @@ export default function LecturerViewPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
@@ -64,7 +65,8 @@ export default function LecturerViewPage() {
           subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ScrollArea>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {SECTIONS.map((s) => (
             <Link
               key={s.slug}
@@ -80,8 +82,9 @@ export default function LecturerViewPage() {
               </div>
             </Link>
           ))}
-        </div>
-      </div>
+          </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

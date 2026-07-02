@@ -7,7 +7,8 @@ import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
+import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
@@ -145,30 +146,29 @@ export default function UserDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-3xl">
-        <Breadcrumbs items={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]} />
+      <ListPageLayout>
+        <PageHeader
+          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]}
+          title={user?.email || 'User'}
+          subtitle={user && <span className="text-sm text-gray-500">{user.given_name} {user.family_name}</span>}
+          actions={
+            user ? (
+              <>
+                <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  {user.archived_at ? 'Unarchive' : 'Archive'}
+                </button>
+              </>
+            ) : undefined
+          }
+        />
 
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : user ? (
-          <>
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{user.email || 'User'}</h1>
-                <p className="mt-1 text-sm text-gray-500">{user.given_name} {user.family_name}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  Edit
-                </Link>
-                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  {user.archived_at ? 'Unarchive' : 'Archive'}
-                </button>
-              </div>
-            </div>
-
+          <ScrollArea className="space-y-6 max-w-3xl">
             <section className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div><dt className="text-gray-500">Status</dt><dd className="text-gray-900">{user.archived_at ? 'Archived' : 'Active'}</dd></div>
               <div><dt className="text-gray-500">Created</dt><dd className="text-gray-900">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
@@ -239,7 +239,7 @@ export default function UserDetailPage() {
                 )}
               </div>
             </section>
-          </>
+          </ScrollArea>
         ) : null}
 
         <ConfirmDialog
@@ -264,7 +264,7 @@ export default function UserDetailPage() {
           onConfirm={() => removeAccountId && removeAccount(removeAccountId)}
           onCancel={() => setRemoveAccountId(null)}
         />
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

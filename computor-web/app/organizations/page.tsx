@@ -5,6 +5,7 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import type { OrganizationList } from '@/src/generated/types/organizations';
@@ -27,7 +28,7 @@ export default function OrganizationsPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Organizations' }]}
           title="Organizations"
@@ -44,27 +45,27 @@ export default function OrganizationsPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : orgs.length === 0 ? (
           <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
             No organizations yet{canCreateOrganization ? ' — create one to get started.' : '.'}
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg divide-y">
+          <ScrollArea className="space-y-3">
             {orgs.map((o) => (
-              <div key={o.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+              <div key={o.id} className="flex items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <Link href={`/organizations/${o.id}`} className="min-w-0 group flex-1">
                   <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">{o.title || o.path}</div>
                   <div className="text-xs text-gray-500">{o.path} · {o.organization_type}</div>
                 </Link>
-                <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-blue-600 hover:underline whitespace-nowrap ml-4">
+                <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-blue-600 hover:underline whitespace-nowrap">
                   {familyCounts[o.id] ?? 0} course {(familyCounts[o.id] ?? 0) === 1 ? 'family' : 'families'} →
                 </Link>
               </div>
             ))}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -135,13 +136,17 @@ export default function MaintenancePage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Maintenance' }]}
           title="Maintenance Mode"
           subtitle="Manage system maintenance state and schedule future maintenance windows."
         />
 
+        {/* Error */}
+        <ErrorBanner>{error}</ErrorBanner>
+
+        <ScrollArea className="space-y-6">
         {/* Loading */}
         {loading && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
@@ -149,9 +154,6 @@ export default function MaintenancePage() {
             <div className="h-4 bg-gray-200 rounded w-1/2" />
           </div>
         )}
-
-        {/* Error */}
-        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Status Card */}
         {!loading && status && (
@@ -331,6 +333,7 @@ export default function MaintenancePage() {
             </li>
           </ul>
         </div>
+        </ScrollArea>
 
         {/* Confirm Dialogs */}
         <ConfirmDialog
@@ -362,7 +365,7 @@ export default function MaintenancePage() {
           onConfirm={handleCancelSchedule}
           onCancel={() => setShowCancelConfirm(false)}
         />
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
@@ -10,6 +11,7 @@ import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBad
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import type { CoderWorkspace, WorkspaceTemplate } from '@/src/types/workspaces';
 
@@ -113,7 +115,7 @@ export default function UserDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-4xl">
+      <ListPageLayout>
         {/* Header */}
         <PageHeader
           breadcrumbs={[
@@ -122,8 +124,31 @@ export default function UserDetailPage() {
             { label: 'User Detail' },
           ]}
           title="User Detail"
+          actions={
+            user && (
+              <>
+                <button
+                  onClick={fetchUserAndWorkspaces}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleProvision}
+                  disabled={provisioning || !user.email}
+                  className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {provisioning ? 'Provisioning...' : 'Provision New Workspace'}
+                </button>
+              </>
+            )
+          }
         />
 
+        {/* Error */}
+        <ErrorBanner>{error}</ErrorBanner>
+
+        <ScrollArea className="space-y-6">
         {/* Loading */}
         {loading && !data && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
@@ -134,9 +159,6 @@ export default function UserDetailPage() {
             </div>
           </div>
         )}
-
-        {/* Error */}
-        <ErrorBanner>{error}</ErrorBanner>
 
         {/* User Info Card */}
         {user && (
@@ -167,9 +189,9 @@ export default function UserDetailPage() {
                 <span className="font-medium text-gray-600">Roles:</span>
                 <span className="ml-2">
                   {user.roles.map((role) => (
-                    <span key={role} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 mr-1.5">
+                    <Badge key={role} color="blue" pill className="mr-1.5">
                       {role}
-                    </span>
+                    </Badge>
                   ))}
                 </span>
               </div>
@@ -180,23 +202,8 @@ export default function UserDetailPage() {
         {/* Workspace Management */}
         {user && (
           <div className="bg-white rounded-lg border border-gray-200">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">Workspaces</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchUserAndWorkspaces}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Refresh
-                </button>
-                <button
-                  onClick={handleProvision}
-                  disabled={provisioning || !user.email}
-                  className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {provisioning ? 'Provisioning...' : 'Provision New Workspace'}
-                </button>
-              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -274,6 +281,7 @@ export default function UserDetailPage() {
             </div>
           </div>
         )}
+        </ScrollArea>
 
         {/* Delete confirmation */}
         <ConfirmDialog
@@ -285,7 +293,7 @@ export default function UserDetailPage() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

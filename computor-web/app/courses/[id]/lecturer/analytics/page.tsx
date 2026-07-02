@@ -8,6 +8,7 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import type { CourseGet } from 'types/generated';
 import {
   AnalyticsApiError,
@@ -141,7 +142,7 @@ export default function LecturerAnalyticsPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="space-y-6 p-2 md:p-4">
+      <ListPageLayout>
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
@@ -179,6 +180,7 @@ export default function LecturerAnalyticsPage() {
           </div>
         </header>
 
+        <ScrollArea className="space-y-6 print:overflow-visible">
         <div className="print:hidden">
           <CutoffControls
             key={`${cutoffs.submissionCutoff ?? ''}|${cutoffs.gradingCutoff ?? ''}`}
@@ -240,7 +242,8 @@ export default function LecturerAnalyticsPage() {
             <BrowserFindText examples={exampleFindEntries} />
           </>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

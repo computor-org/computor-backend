@@ -6,9 +6,11 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
+import Badge from '@/src/components/Badge';
 import type { ExampleRepositoryList } from 'types/generated';
 
 export default function ExampleRepositoriesPage() {
@@ -24,7 +26,7 @@ export default function ExampleRepositoriesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Example Repositories' }]}
           title="Example Repositories"
@@ -39,31 +41,31 @@ export default function ExampleRepositoriesPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : repos.length === 0 ? (
           <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
             No example repositories yet. Create a MinIO repository to upload examples into.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {repos.map((r) => {
               const uploadable = r.source_type === 'minio' || r.source_type === 's3';
               return (
                 <Link key={r.id} href={`/example-repositories/${r.id}`} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-all">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">{r.name}</h3>
-                    <span className={`shrink-0 px-2 py-0.5 text-xs font-medium rounded ${uploadable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <Badge color={uploadable ? 'green' : 'gray'} className="shrink-0">
                       {r.source_type}
-                    </span>
+                    </Badge>
                   </div>
                   {r.description && <p className="mt-1 text-sm text-gray-600 line-clamp-2">{r.description}</p>}
                   <p className="mt-3 text-xs text-gray-400 font-mono truncate">{r.source_url}</p>
                 </Link>
               );
             })}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

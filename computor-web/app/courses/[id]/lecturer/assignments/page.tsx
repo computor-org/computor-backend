@@ -5,26 +5,28 @@ import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge, { BadgeColor } from '@/src/components/Badge';
 import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 
 // Deployment status → badge styling. The lecturer list always carries the
 // top-level has_deployment + deployment_status (no include needed); values are
 // deployed | pending | failed | unassigned (see business_logic/lecturer_deployment).
-const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  deployed: { label: 'Deployed', cls: 'bg-green-100 text-green-700' },
-  pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-700' },
-  failed: { label: 'Failed', cls: 'bg-red-100 text-red-700' },
-  unassigned: { label: 'Unassigned', cls: 'bg-gray-100 text-gray-500' },
+const STATUS_STYLES: Record<string, { label: string; color: BadgeColor }> = {
+  deployed: { label: 'Deployed', color: 'green' },
+  pending: { label: 'Pending', color: 'yellow' },
+  failed: { label: 'Failed', color: 'red' },
+  unassigned: { label: 'Unassigned', color: 'gray' },
 };
 
-function deploymentBadge(c: CourseContentLecturerList) {
+function deploymentBadge(c: CourseContentLecturerList): { label: string; color: BadgeColor } {
   const status = c.deployment_status || (c.has_deployment ? 'deployed' : null);
   if (!status) {
-    return { label: 'No example', cls: 'bg-gray-100 text-gray-400' };
+    return { label: 'No example', color: 'gray' };
   }
-  return STATUS_STYLES[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
+  return STATUS_STYLES[status] ?? { label: status, color: 'gray' };
 }
 
 // ltree depth: "week1.assignment2" → 1 (indent), "week1" → 0
@@ -91,7 +93,7 @@ export default function LecturerContentPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
@@ -106,9 +108,9 @@ export default function LecturerContentPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading />
         ) : (
-          <>
+          <ScrollArea className="space-y-6">
             {/* Summary — the at-a-glance deployment signal */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
@@ -173,9 +175,9 @@ export default function LecturerContentPage() {
                           update available
                         </span>
                       )}
-                      <span className={`shrink-0 px-2 py-0.5 text-xs font-medium rounded ${badge.cls}`}>
+                      <Badge color={badge.color} className="shrink-0">
                         {badge.label}
-                      </span>
+                      </Badge>
                     </div>
                   );
                 })}
@@ -185,9 +187,9 @@ export default function LecturerContentPage() {
             {archivedCount > 0 && (
               <p className="text-xs text-gray-400">{archivedCount} archived content(s) hidden.</p>
             )}
-          </>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -48,7 +49,7 @@ export default function ExampleDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: example?.title || example?.directory || 'Example' }]}
           title={example?.title || example?.directory || 'Example'}
@@ -66,9 +67,9 @@ export default function ExampleDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : example ? (
-          <>
+          <ScrollArea className="space-y-6">
             <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
                 <dt className="text-gray-500">Directory</dt>
@@ -116,9 +117,9 @@ export default function ExampleDetailPage() {
                 </div>
               )}
             </div>
-          </>
+          </ScrollArea>
         ) : null}
-      </div>
+      </ListPageLayout>
 
       {confirmDelete && example && (
         <ConfirmDeleteDialog
