@@ -267,6 +267,16 @@ SSH tunnel. On `main`, snapshots are taken from **this system's own backend post
   the source view is wanted it points at this same backend's API, else it degrades to 404. (A later
   option is to read example source from local storage directly instead of via self-HTTP.)
 
+**Ops wiring — DONE (simplified, same-system).** `docker-compose.prod.yaml` gains an
+`analytics-permissions` one-shot init service (creates + chowns `raw/duckdb/jobs`) and the `uvicorn`
+service gains the analytics volume, `ANALYTICS_*` env, and a `service_completed_successfully`
+dependency on the init service. `ANALYTICS_SOURCE_DATABASE_URL` is passed blank → the backend
+defaults it to its own `POSTGRES_*` connection (the `settings.py` guard uses `or`, so an empty
+override still falls back to the local DB). `.env.common.template` documents the knobs; a simplified
+`ops/docs/ANALYTICS.md` runbook replaces the two-instance/tunnel version. **No** SSH source-tunnel,
+systemd unit, separate analytics-instance compose, or prod source-tunnel scripts. `docker compose
+config` (base + prod) validates.
+
 ### F.0 Status
 
 **Backend — DONE and VERIFIED.** Ported verbatim and wired; the ported test suite passes on `main`.

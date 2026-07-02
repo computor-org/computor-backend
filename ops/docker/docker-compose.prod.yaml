@@ -41,6 +41,34 @@ services:
       - socket-proxy
 
   # Production API service
+  # Prepare the analytics reporting-store directory (raw/duckdb/jobs) and hand
+  # ownership to the API container's UID/GID before the backend starts. Runs
+  # once and exits; the backend depends on its successful completion. Snapshots
+  # are taken from this system's own postgres, so there is no source instance
+  # or SSH tunnel to wire here.
+  analytics-permissions:
+    image: alpine:3.20
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /analytics/raw /analytics/duckdb /analytics/jobs
+        chown -R "${ANALYTICS_CONTAINER_UID:-1000}:${ANALYTICS_CONTAINER_GID:-1000}" /analytics
+        chmod -R u+rwX,go-rwx /analytics
+    volumes:
+      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:/analytics
+    restart: "no"
+    labels:
+      - "traefik.enable=false"
+
   uvicorn:
     build:
       context: ../../
@@ -62,6 +90,9 @@ services:
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
       - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
+      # Analytics reporting store (Parquet snapshots + DuckDB + job JSON),
+      # prepared by the analytics-permissions init service above.
+      - ${ANALYTICS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/analytics}:${ANALYTICS_ROOT:-/srv/computor/analytics}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     environment:
@@ -100,11 +131,35 @@ services:
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
       BACKEND_EXTERNAL_URL_PROD: ${BACKEND_EXTERNAL_URL_PROD:-}
+      # Analytics reporting store. Snapshots are taken from THIS system's own
+      # postgres: ANALYTICS_SOURCE_DATABASE_URL is left blank and the backend
+      # defaults it to its own POSTGRES_* connection (read-only transaction).
+      # Set it only to override with e.g. a dedicated read-only role.
+      ANALYTICS_ROOT: ${ANALYTICS_ROOT:-/srv/computor/analytics}
+      ANALYTICS_SOURCE_NAME: ${ANALYTICS_SOURCE_NAME:-green}
+      ANALYTICS_SOURCE_DATABASE_URL: ${ANALYTICS_SOURCE_DATABASE_URL:-}
+      ANALYTICS_EXPORT_CHUNK_SIZE: ${ANALYTICS_EXPORT_CHUNK_SIZE:-100000}
+      # Optional example-source viewer (points at this backend's own API):
+      ANALYTICS_SOURCE_API_URL: ${ANALYTICS_SOURCE_API_URL:-}
+      ANALYTICS_SOURCE_API_TOKEN: ${ANALYTICS_SOURCE_API_TOKEN:-}
+      # Optional CLI/cron refresh (python -m computor_backend.scripts.analytics_refresh):
+      ANALYTICS_REFRESH_COURSE_ID: ${ANALYTICS_REFRESH_COURSE_ID:-}
+      ANALYTICS_REFRESH_SOURCE_NAME: ${ANALYTICS_REFRESH_SOURCE_NAME:-green}
+      ANALYTICS_REFRESH_REQUESTED_BY_USER_ID: ${ANALYTICS_REFRESH_REQUESTED_BY_USER_ID:-ops}
+      ANALYTICS_REFRESH_SUBMISSION_CUTOFF: ${ANALYTICS_REFRESH_SUBMISSION_CUTOFF:-}
+      ANALYTICS_REFRESH_GRADING_CUTOFF: ${ANALYTICS_REFRESH_GRADING_CUTOFF:-}
+      ANALYTICS_REFRESH_TABLES: ${ANALYTICS_REFRESH_TABLES:-}
     depends_on:
-      - postgres
-      - minio
-      - redis
-      - temporal
+      postgres:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      temporal:
+        condition: service_started
+      analytics-permissions:
+        condition: service_completed_successfully
     labels:
       - "traefik.enable=true"
       # Service definition (required for proper routing)
