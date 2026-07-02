@@ -197,7 +197,7 @@ export default function StudentCourseContentsPage() {
                       {node.children.filter(c => c.content?.course_content_kind_id === 'assignment').length} assignments
                     </span>
                     <Link
-                      href={`/courses/${courseId}/student/course-contents/${node.content.id}`}
+                      href={`/courses/${courseId}/student/assignments/${node.content.id}`}
                       className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -241,7 +241,7 @@ export default function StudentCourseContentsPage() {
 
                     {/* View Button */}
                     <Link
-                      href={`/courses/${courseId}/student/course-contents/${node.content.id}`}
+                      href={`/courses/${courseId}/student/assignments/${node.content.id}`}
                       className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -293,7 +293,7 @@ export default function StudentCourseContentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Course Contents</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Assignments</h1>
             <p className="mt-2 text-gray-600">
               {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units · {' '}
               {courseContents.filter(c => c.course_content_kind_id === 'assignment').length} assignments

@@ -97,9 +97,9 @@ export default function LecturerContentPage() {
             { label: 'Courses', href: '/courses' },
             { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
             { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-            { label: 'Course Contents' },
+            { label: 'Assignments' },
           ]}
-          title="Course Contents"
+          title="Assignments"
           subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
         />
 

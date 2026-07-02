@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 /**
  * Redirect /assignments → /courses
  *
- * Assignments live per course at /courses/[id]/student/course-contents;
+ * Assignments live per course at /courses/[id]/student/assignments;
  * this route was an unlinked placeholder.
  */
 export default function AssignmentsRedirect() {

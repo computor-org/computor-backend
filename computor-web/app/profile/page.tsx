@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
@@ -109,7 +110,7 @@ export default function ProfilePage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-3xl">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'My Profile' }]}
           title="My Profile"
@@ -118,6 +119,8 @@ export default function ProfilePage() {
 
         <ErrorBanner>{error}</ErrorBanner>
 
+        <ScrollArea>
+          <div className="max-w-3xl space-y-6">
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : !user ? null : (
@@ -202,7 +205,9 @@ export default function ProfilePage() {
             </form>
           </>
         )}
-      </div>
+          </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }
