@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -128,7 +129,7 @@ export default function InvitesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]}
           title="Invite Links"
@@ -144,13 +145,13 @@ export default function InvitesPage() {
         />
 
         {loading ? (
-          <div className="text-gray-500 py-8 text-center">Loading…</div>
+          <ListLoading />
         ) : error ? (
           <ErrorBanner>{error}</ErrorBanner>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <ScrollPanel>
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note / Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uses</th>
@@ -207,9 +208,9 @@ export default function InvitesPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollPanel>
         )}
-      </div>
+      </ListPageLayout>
 
       {/* Create Modal */}
       {createModal.open && (

@@ -7,6 +7,7 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import type {
@@ -181,7 +182,7 @@ export default function CoursePage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-8">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
           title={course.title || 'Untitled Course'}
@@ -207,6 +208,7 @@ export default function CoursePage() {
           }
         />
 
+        <ScrollArea className="space-y-8">
         {/* Quick Access — the primary way into the course, so it leads. */}
         {viewCards.length > 0 && (
           <div className={`grid grid-cols-1 gap-4 ${quickCols}`}>
@@ -388,8 +390,8 @@ export default function CoursePage() {
             </div>
           )}
         </div>
-
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

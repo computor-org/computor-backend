@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollPanel } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
@@ -148,7 +149,7 @@ export default function WorkspaceAdminPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         {/* Header */}
         <PageHeader
           breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
@@ -217,7 +218,7 @@ export default function WorkspaceAdminPage() {
 
         {/* Loading */}
         {loading && !data && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+          <div className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
             <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -232,10 +233,9 @@ export default function WorkspaceAdminPage() {
 
         {/* Users Table */}
         {data && !error && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
+          <ScrollPanel>
               <table className="w-full text-sm divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
@@ -332,8 +332,7 @@ export default function WorkspaceAdminPage() {
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
+          </ScrollPanel>
         )}
 
         {/* Remove role confirmation */}
@@ -346,7 +345,7 @@ export default function WorkspaceAdminPage() {
           onConfirm={handleRemoveRole}
           onCancel={() => setRemoveTarget(null)}
         />
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

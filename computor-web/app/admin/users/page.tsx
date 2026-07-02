@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -54,7 +55,7 @@ export default function UsersPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Users' }]}
           title="Users"
@@ -90,11 +91,11 @@ export default function UsersPage() {
         </div>
 
         {loading ? (
-          <div className="text-gray-500 py-8 text-center">Loading users…</div>
+          <ListLoading>Loading users…</ListLoading>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <ScrollPanel>
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -128,12 +129,12 @@ export default function UsersPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollPanel>
         )}
 
         {/* Pager — total count isn't exposed via the client, so Next is
             enabled whenever a full page came back. */}
-        <div className="flex items-center justify-between">
+        <div className="shrink-0 flex items-center justify-between">
           <span className="text-sm text-gray-500">Page {page + 1}</span>
           <div className="flex gap-2">
             <button
@@ -152,7 +153,7 @@ export default function UsersPage() {
             </button>
           </div>
         </div>
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }
