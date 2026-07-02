@@ -113,7 +113,9 @@ export default function UsersPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge color={u.archived_at ? 'gray' : 'green'}>{u.archived_at ? 'Archived' : 'Active'}</Badge>
+                      <Badge color={u.banned_at ? 'red' : u.archived_at ? 'gray' : 'green'}>
+                        {u.banned_at ? 'Banned' : u.archived_at ? 'Archived' : 'Active'}
+                      </Badge>
                       {u.is_service && <Badge color="yellow" className="ml-1">Service</Badge>}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
