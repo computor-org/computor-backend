@@ -7,7 +7,7 @@ import { usePathname, useParams, useRouter, useSearchParams } from 'next/navigat
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import type { CourseGet } from 'types/generated';
+import type { CourseGet, UserScopes } from 'types/generated';
 import {
   AnalyticsApiError,
   DEFAULT_ANALYTICS_CUTOFFS,
@@ -49,11 +49,19 @@ export default function LecturerAnalyticsPage() {
     'none',
   );
   const [errorText, setErrorText] = useState<string | null>(null);
-  // Refresh gating mirrors the backend (lecturer+ or admin). The backend still
-  // enforces the real permission via `_require_course_role`; this only decides
-  // whether to show the control. The snapshot role is the source of truth here.
-  const isAdmin = user?.role === 'admin' || (user?.systemRoles ?? []).includes('_admin');
-  const canRefresh = isAdmin || analyticsRoleAtLeast(analyticsCourse?.role, '_lecturer');
+  const [courseScopeRoles, setCourseScopeRoles] = useState<string[]>([]);
+  const [scopesIsAdmin, setScopesIsAdmin] = useState(false);
+  // Refresh gating mirrors the backend (lecturer+ or admin); the backend still
+  // enforces the real permission via `_require_course_role`, this only decides
+  // whether to show the control. The LIVE course role from /user/scopes is
+  // authoritative and — unlike the analytics snapshot role — is available before
+  // the first snapshot exists, so a lecturer can trigger the very first refresh.
+  const isAdmin =
+    scopesIsAdmin || user?.role === 'admin' || (user?.systemRoles ?? []).includes('_admin');
+  const canRefresh =
+    isAdmin ||
+    courseScopeRoles.some((r) => analyticsRoleAtLeast(r, '_lecturer')) ||
+    analyticsRoleAtLeast(analyticsCourse?.role, '_lecturer');
   const selected = useMemo(
     () =>
       requestedMember
@@ -103,9 +111,10 @@ export default function LecturerAnalyticsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [localRes, analyticsRes] = await Promise.allSettled([
+        const [localRes, analyticsRes, scopesRes] = await Promise.allSettled([
           apiFetch(`${API_BASE_URL}/courses/${courseId}`),
           listAnalyticsCourses(),
+          apiFetch(`${API_BASE_URL}/user/scopes`),
         ]);
         if (cancelled) return;
         if (localRes.status === 'fulfilled' && localRes.value.ok) {
@@ -115,6 +124,11 @@ export default function LecturerAnalyticsPage() {
           setAnalyticsCourse(
             analyticsRes.value.find((entry) => entry.course_id === courseId) ?? null,
           );
+        }
+        if (scopesRes.status === 'fulfilled' && scopesRes.value.ok) {
+          const scopes: UserScopes = await scopesRes.value.json();
+          setScopesIsAdmin(Boolean(scopes.is_admin));
+          setCourseScopeRoles(scopes.course?.[courseId] ?? []);
         }
       } catch {
         /* header is best-effort */
