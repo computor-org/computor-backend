@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -103,7 +104,7 @@ function UploadInner() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 max-w-2xl">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: 'Upload' }]}
           title="Upload examples"
@@ -113,87 +114,97 @@ function UploadInner() {
               (each in its own folder with a <code className="font-mono">meta.yaml</code>).
             </>
           }
+          actions={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push('/examples')}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                {allDone ? 'Done' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={runUpload}
+                disabled={uploading || rows.length === 0 || !dirsValid || !repoId || allDone}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {uploading ? 'Uploading…' : `Upload ${rows.length || ''}`}
+              </button>
+            </div>
+          }
         />
 
-        <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-          <ErrorBanner>{error}</ErrorBanner>
+        <ErrorBanner>{error}</ErrorBanner>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Repository</label>
-            {repos.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No uploadable (MinIO/S3) repository.{' '}
-                <Link href="/example-repositories/create" className="text-blue-600 hover:underline">Create one first</Link>.
-              </p>
-            ) : (
-              <select
-                value={repoId}
-                onChange={(e) => setRepoId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— select a repository —</option>
-                {repos.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name} ({r.source_type})</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Zip file</label>
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              onChange={(e) => onPickZip(e.target.files?.[0])}
-              className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
-            />
-          </div>
-
-          {parsing && <div className="text-sm text-gray-500">Reading zip…</div>}
-          <ErrorBanner>{parseError}</ErrorBanner>
-
-          {rows.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-gray-500">Discovered {rows.length} example{rows.length > 1 ? 's' : ''}</div>
-              {rows.map((r, i) => (
-                <div key={i} className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
-                  <input
-                    value={r.directory}
-                    disabled={uploading || r.status === 'ok'}
-                    onChange={(e) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, directory: e.target.value } : x)))}
-                    className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-gray-300' : 'border-red-400'}`}
-                  />
-                  <span className="text-xs text-gray-400 shrink-0">{r.fileCount} files</span>
-                  <span
-                    className={`text-xs shrink-0 w-40 truncate text-right ${
-                      r.status === 'ok' ? 'text-green-600' : r.status === 'error' ? 'text-red-600' : r.status === 'uploading' ? 'text-amber-600' : 'text-gray-400'
-                    }`}
-                    title={r.message}
+        <ScrollArea>
+          <div className="max-w-2xl">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Repository</label>
+                {repos.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No uploadable (MinIO/S3) repository.{' '}
+                    <Link href="/example-repositories/create" className="text-blue-600 hover:underline">Create one first</Link>.
+                  </p>
+                ) : (
+                  <select
+                    value={repoId}
+                    onChange={(e) => setRepoId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   >
-                    {r.status === 'pending' ? 'ready' : r.status === 'uploading' ? 'uploading…' : r.status === 'ok' ? `uploaded ${r.message ?? ''}` : r.message}
-                  </span>
+                    <option value="">— select a repository —</option>
+                    {repos.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name} ({r.source_type})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Zip file</label>
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(e) => onPickZip(e.target.files?.[0])}
+                  className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
+                />
+              </div>
+
+              {parsing && <div className="text-sm text-gray-500">Reading zip…</div>}
+              <ErrorBanner>{parseError}</ErrorBanner>
+
+              {rows.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-gray-500">Discovered {rows.length} example{rows.length > 1 ? 's' : ''}</div>
+                  {rows.map((r, i) => (
+                    <div key={i} className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
+                      <input
+                        value={r.directory}
+                        disabled={uploading || r.status === 'ok'}
+                        onChange={(e) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, directory: e.target.value } : x)))}
+                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-gray-300' : 'border-red-400'}`}
+                      />
+                      <span className="text-xs text-gray-400 shrink-0">{r.fileCount} files</span>
+                      <span
+                        className={`text-xs shrink-0 w-40 truncate text-right ${
+                          r.status === 'ok' ? 'text-green-600' : r.status === 'error' ? 'text-red-600' : r.status === 'uploading' ? 'text-amber-600' : 'text-gray-400'
+                        }`}
+                        title={r.message}
+                      >
+                        {r.status === 'pending' ? 'ready' : r.status === 'uploading' ? 'uploading…' : r.status === 'ok' ? `uploaded ${r.message ?? ''}` : r.message}
+                      </span>
+                    </div>
+                  ))}
+                  {!dirsValid && (
+                    <p className="text-xs text-red-600">Directory names may only contain letters, numbers, dots, dashes and underscores.</p>
+                  )}
                 </div>
-              ))}
-              {!dirsValid && (
-                <p className="text-xs text-red-600">Directory names may only contain letters, numbers, dots, dashes and underscores.</p>
               )}
             </div>
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={() => router.push('/examples')} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-            {allDone ? 'Done' : 'Cancel'}
-          </button>
-          <button
-            onClick={runUpload}
-            disabled={uploading || rows.length === 0 || !dirsValid || !repoId || allDone}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {uploading ? 'Uploading…' : `Upload ${rows.length || ''}`}
-          </button>
-        </div>
-      </div>
+          </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

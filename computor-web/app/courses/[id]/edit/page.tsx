@@ -6,6 +6,7 @@ import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -140,7 +141,7 @@ export default function CourseEditPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-3xl">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
@@ -154,113 +155,115 @@ export default function CourseEditPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading />
         ) : (
-          <>
-            {/* General */}
-            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">General</h2>
-              <Field label="Title">
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
-              </Field>
-              <Field label="Description">
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Language code">
-                  <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="en" className={inputCls} />
+          <ScrollArea>
+            <div className="max-w-3xl space-y-6">
+              {/* General */}
+              <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">General</h2>
+                <Field label="Title">
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
                 </Field>
-                <Field label="Path (immutable)">
-                  <input value={course?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+                <Field label="Description">
+                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
                 </Field>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={saveGeneral} disabled={savingGeneral} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {savingGeneral ? 'Saving…' : 'Save'}
-                </button>
-                {generalMsg && <span className="text-sm text-gray-500">{generalMsg}</span>}
-              </div>
-            </section>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Language code">
+                    <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="en" className={inputCls} />
+                  </Field>
+                  <Field label="Path (immutable)">
+                    <input value={course?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+                  </Field>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={saveGeneral} disabled={savingGeneral} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {savingGeneral ? 'Saving…' : 'Save'}
+                  </button>
+                  {generalMsg && <span className="text-sm text-gray-500">{generalMsg}</span>}
+                </div>
+              </section>
 
-            {/* Git */}
-            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Git</h2>
-                {gitLocked && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded inline-flex items-center gap-1">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Locked
-                  </span>
-                )}
-              </div>
-
-              {gitLocked ? (
-                <>
-                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">
-                    {binding?.lock_reason || 'This course’s git configuration is locked.'} Changing the server or
-                    template would orphan students’ existing repositories, so these settings are read-only.
-                  </p>
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    <div><dt className="text-gray-500">Delivery</dt><dd className="text-gray-900">{binding!.delivery}</dd></div>
-                    <div><dt className="text-gray-500">Git server</dt><dd className="text-gray-900">{binding!.git_server_id ? serverLabel(binding!.git_server_id) : '—'}</dd></div>
-                    <div><dt className="text-gray-500">Student-repo modes</dt><dd className="text-gray-900">{(binding!.student_repo_modes || []).join(', ') || '—'}</dd></div>
-                    <div><dt className="text-gray-500">Template</dt><dd className="text-gray-900 font-mono text-xs break-all">{binding!.template_repo || '—'}</dd></div>
-                  </dl>
-                </>
-              ) : (
-                <>
-                  {!gitConfigured && (
-                    <p className="text-sm text-gray-500">This course has no git configuration yet. Configure it to enable student repositories.</p>
+              {/* Git */}
+              <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Git</h2>
+                  {gitLocked && (
+                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded inline-flex items-center gap-1">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Locked
+                    </span>
                   )}
-                  <Field label="Delivery">
-                    <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
-                      <option value="git">git (fork/clone)</option>
-                      <option value="download">download</option>
-                    </select>
-                  </Field>
-                  <Field label="Git server (for the template)" hint="For a managed server (Forgejo or GitLab), leave the template fields blank — the template repo is created automatically.">
-                    <select value={gitServerId} onChange={(e) => setGitServerId(e.target.value)} className={inputCls}>
-                      <option value="">— none —</option>
-                      {servers.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name || s.base_url} ({s.type})</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Template repo">
-                      <input value={templateRepo} onChange={(e) => setTemplateRepo(e.target.value)} placeholder="owner/repo" className={inputCls} />
+                </div>
+
+                {gitLocked ? (
+                  <>
+                    <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">
+                      {binding?.lock_reason || 'This course’s git configuration is locked.'} Changing the server or
+                      template would orphan students’ existing repositories, so these settings are read-only.
+                    </p>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      <div><dt className="text-gray-500">Delivery</dt><dd className="text-gray-900">{binding!.delivery}</dd></div>
+                      <div><dt className="text-gray-500">Git server</dt><dd className="text-gray-900">{binding!.git_server_id ? serverLabel(binding!.git_server_id) : '—'}</dd></div>
+                      <div><dt className="text-gray-500">Student-repo modes</dt><dd className="text-gray-900">{(binding!.student_repo_modes || []).join(', ') || '—'}</dd></div>
+                      <div><dt className="text-gray-500">Template</dt><dd className="text-gray-900 font-mono text-xs break-all">{binding!.template_repo || '—'}</dd></div>
+                    </dl>
+                  </>
+                ) : (
+                  <>
+                    {!gitConfigured && (
+                      <p className="text-sm text-gray-500">This course has no git configuration yet. Configure it to enable student repositories.</p>
+                    )}
+                    <Field label="Delivery">
+                      <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
+                        <option value="git">git (fork/clone)</option>
+                        <option value="download">download</option>
+                      </select>
                     </Field>
-                    <Field label="Default branch">
-                      <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" className={inputCls} />
+                    <Field label="Git server (for the template)" hint="For a managed server (Forgejo or GitLab), leave the template fields blank — the template repo is created automatically.">
+                      <select value={gitServerId} onChange={(e) => setGitServerId(e.target.value)} className={inputCls}>
+                        <option value="">— none —</option>
+                        {servers.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name || s.base_url} ({s.type})</option>
+                        ))}
+                      </select>
                     </Field>
-                  </div>
-                  <Field label="Template clone URL">
-                    <input value={templateUrl} onChange={(e) => setTemplateUrl(e.target.value)} placeholder="auto for managed servers" className={inputCls} />
-                  </Field>
-                  <Field label="Allowed student-repo modes">
-                    <div className="flex flex-wrap gap-3">
-                      {ALL_MODES.map((m) => (
-                        <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
-                          <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
-                          {MODE_LABELS[m] ?? m}
-                        </label>
-                      ))}
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Template repo">
+                        <input value={templateRepo} onChange={(e) => setTemplateRepo(e.target.value)} placeholder="owner/repo" className={inputCls} />
+                      </Field>
+                      <Field label="Default branch">
+                        <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" className={inputCls} />
+                      </Field>
                     </div>
-                  </Field>
-                  <div className="flex items-center gap-3">
-                    <button onClick={saveGit} disabled={savingGit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                      {savingGit ? 'Saving…' : gitConfigured ? 'Save git settings' : 'Configure git'}
-                    </button>
-                    {gitMsg && <span className="text-sm text-gray-500">{gitMsg}</span>}
-                  </div>
-                </>
-              )}
-            </section>
-          </>
+                    <Field label="Template clone URL">
+                      <input value={templateUrl} onChange={(e) => setTemplateUrl(e.target.value)} placeholder="auto for managed servers" className={inputCls} />
+                    </Field>
+                    <Field label="Allowed student-repo modes">
+                      <div className="flex flex-wrap gap-3">
+                        {ALL_MODES.map((m) => (
+                          <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
+                            <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
+                            {MODE_LABELS[m] ?? m}
+                          </label>
+                        ))}
+                      </div>
+                    </Field>
+                    <div className="flex items-center gap-3">
+                      <button onClick={saveGit} disabled={savingGit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                        {savingGit ? 'Saving…' : gitConfigured ? 'Save git settings' : 'Configure git'}
+                      </button>
+                      {gitMsg && <span className="text-sm text-gray-500">{gitMsg}</span>}
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

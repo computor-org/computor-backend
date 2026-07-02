@@ -7,6 +7,7 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
@@ -36,7 +37,7 @@ export default function CourseFamilyDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: family?.title || family?.path || 'Course Family' }]}
           title={family?.title || family?.path || 'Course Family'}
@@ -58,33 +59,37 @@ export default function CourseFamilyDetailPage() {
 
         <ErrorBanner>{error}</ErrorBanner>
 
-        {family?.description && (
-          <div className="bg-white border border-gray-200 rounded-lg p-5">
-            <p className="text-gray-700">{family.description}</p>
-          </div>
-        )}
-
-        <h2 className="text-xl font-semibold text-gray-900">
-          Courses {!loading && <span className="text-gray-400 font-normal">({courses.length})</span>}
-        </h2>
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
-        ) : courses.length === 0 ? (
-          <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">No courses in this family yet.</div>
+          <ListLoading>Loading…</ListLoading>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg divide-y">
-            {courses.map((c) => (
-              <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{c.title || c.path}</div>
-                  <div className="text-xs text-gray-500 font-mono">{c.path}</div>
-                </div>
-                <span className="text-gray-300">›</span>
-              </Link>
-            ))}
-          </div>
+          <ScrollArea className="space-y-6">
+            {family?.description && (
+              <div className="bg-white border border-gray-200 rounded-lg p-5">
+                <p className="text-gray-700">{family.description}</p>
+              </div>
+            )}
+
+            <h2 className="text-xl font-semibold text-gray-900">
+              Courses <span className="text-gray-400 font-normal">({courses.length})</span>
+            </h2>
+            {courses.length === 0 ? (
+              <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">No courses in this family yet.</div>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                {courses.map((c) => (
+                  <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{c.title || c.path}</div>
+                      <div className="text-xs text-gray-500 font-mono">{c.path}</div>
+                    </div>
+                    <span className="text-gray-300">›</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
 
       {confirmDelete && family && (
         <ConfirmDeleteDialog

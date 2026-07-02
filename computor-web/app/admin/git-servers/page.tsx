@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -25,7 +26,7 @@ export default function GitServersPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Git Servers' }]}
           title="Git Servers"
@@ -40,15 +41,15 @@ export default function GitServersPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : servers.length === 0 ? (
           <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
             No git servers registered yet — register one (e.g. your Forgejo) to enable babysat provisioning.
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg divide-y">
+          <ScrollArea className="space-y-3">
             {servers.map((s) => (
-              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">{s.name || s.base_url}</div>
                   <div className="text-xs text-gray-500">{s.type} · {s.base_url}</div>
@@ -60,9 +61,9 @@ export default function GitServersPage() {
                 </div>
               </Link>
             ))}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

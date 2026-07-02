@@ -7,6 +7,7 @@ import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
@@ -35,7 +36,7 @@ export default function OrganizationDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: org?.title || org?.path || 'Organization' }]}
           title={org?.title || org?.path || 'Organization'}
@@ -53,9 +54,9 @@ export default function OrganizationDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : org ? (
-          <>
+          <ScrollArea className="space-y-6">
             {org.description && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
                 <p className="text-gray-700">{org.description}</p>
@@ -87,9 +88,9 @@ export default function OrganizationDetailPage() {
                 </div>
               )}
             </div>
-          </>
+          </ScrollArea>
         ) : null}
-      </div>
+      </ListPageLayout>
 
       {confirmDelete && org && (
         <ConfirmDeleteDialog

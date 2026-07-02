@@ -7,6 +7,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -41,7 +42,7 @@ export default function ExamplesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Examples' }]}
           title="Examples"
@@ -64,15 +65,15 @@ export default function ExamplesPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : visible.length === 0 ? (
           <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
             {examples.length === 0 ? 'No examples yet. Upload a zip of one or more examples to get started.' : 'No examples in this repository.'}
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-lg divide-y">
+          <ScrollArea className="space-y-3">
             {visible.map((ex) => (
-              <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+              <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">{ex.title || ex.directory}</div>
                   <div className="text-xs text-gray-400 font-mono truncate">{ex.identifier}</div>
@@ -86,9 +87,9 @@ export default function ExamplesPage() {
                 </div>
               </Link>
             ))}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

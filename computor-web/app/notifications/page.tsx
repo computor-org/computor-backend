@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import type { MessageList } from 'types/generated';
 
 function authorName(m: MessageList): string {
@@ -61,7 +63,7 @@ export default function NotificationsPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6 max-w-3xl">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Notifications' }]}
           title="Notifications"
@@ -71,13 +73,15 @@ export default function NotificationsPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : messages.length === 0 ? (
-          <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
-            No notifications.
-          </div>
+          <ScrollArea>
+            <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+              No notifications.
+            </div>
+          </ScrollArea>
         ) : (
-          <div className="space-y-3">
+          <ScrollArea className="space-y-3">
             {messages.map((m) => {
               const isNew = seenUnread.has(m.id);
               return (
@@ -90,7 +94,7 @@ export default function NotificationsPage() {
                       {m.title && <div className="text-sm font-semibold text-gray-900">{m.title}</div>}
                       <div className="text-sm text-gray-700 whitespace-pre-wrap">{m.content}</div>
                     </div>
-                    {isNew && <span className="shrink-0 mt-0.5 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">new</span>}
+                    {isNew && <Badge color="blue" className="shrink-0 mt-0.5">new</Badge>}
                   </div>
                   <div className="mt-2 text-xs text-gray-400">
                     {authorName(m)} · {fmtWhen(m.created_at)}
@@ -98,9 +102,9 @@ export default function NotificationsPage() {
                 </div>
               );
             })}
-          </div>
+          </ScrollArea>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

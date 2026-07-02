@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -277,7 +278,7 @@ export default function AddCourseMembersPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
@@ -304,274 +305,276 @@ export default function AddCourseMembersPage() {
           </nav>
         </div>
 
-        {tab === 'list' && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              You can only see users your permissions allow. Users already in the course are hidden — pick a
-              role and add them.
-            </p>
-            <input
-              type="text"
-              placeholder="Search by name or email…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-
-            <ErrorBanner>{usersError}</ErrorBanner>
-
-            {usersLoading ? (
-              <div className="text-gray-500 py-8 text-center">Loading users…</div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {visibleUsers.map((u) => {
-                      const isAdded = added.has(u.id);
-                      return (
-                        <tr key={u.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-gray-900 text-sm">{userName(u)}</div>
-                            <div className="text-xs text-gray-500">{u.email ?? '—'}</div>
-                            {rowError[u.id] && (
-                              <div className="text-xs text-red-600 mt-1">{rowError[u.id]}</div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={rowRole[u.id] ?? defaultRole}
-                              disabled={isAdded}
-                              onChange={(e) => setRowRole((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                              className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                            >
-                              {roleOptions.map((r) => (
-                                <option key={r} value={r}>
-                                  {courseRoleLabel(r)}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {isAdded ? (
-                              <span className="text-sm text-green-700">Added ✓</span>
-                            ) : (
-                              <button
-                                onClick={() => addUser(u)}
-                                disabled={addingId === u.id}
-                                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                              >
-                                {addingId === u.id ? 'Adding…' : 'Add'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {visibleUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
-                          No users to add.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Page {page + 1}</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0 || usersLoading}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!hasNext || usersLoading}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === 'email' && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              importByEmail();
-            }}
-            className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 max-w-lg"
-          >
-            <p className="text-sm text-gray-500">
-              Adds the user with this email, creating the account if it does not exist yet. Use this for people
-              not yet in the system.
-            </p>
-
-            <ErrorBanner>{importError}</ErrorBanner>
-            {importMsg && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
-            )}
-
-            <Field label="Email" required>
+        <ScrollArea>
+          {tab === 'list' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                You can only see users your permissions allow. Users already in the course are hidden — pick a
+                role and add them.
+              </p>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputCls}
-                placeholder="person@example.org"
+                type="text"
+                placeholder="Search by name or email…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Given name">
-                <input value={givenName} onChange={(e) => setGivenName(e.target.value)} className={inputCls} />
-              </Field>
-              <Field label="Family name">
-                <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} className={inputCls} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Role" required>
-                <select value={emailRole} onChange={(e) => setEmailRole(e.target.value)} className={inputCls}>
-                  {roleOptions.map((r) => (
-                    <option key={r} value={r}>
-                      {courseRoleLabel(r)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Group" hint="Optional. Created if it does not exist yet.">
-                <input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} className={inputCls} />
-              </Field>
-            </div>
 
-            <button
-              type="submit"
-              disabled={importing || !email.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {importing ? 'Adding…' : 'Add by email'}
-            </button>
-          </form>
-        )}
+              <ErrorBanner>{usersError}</ErrorBanner>
 
-        {tab === 'file' && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              Upload a CSV, JSON, Excel (.xlsx) or Excel-XML student list. Review and adjust the rows, then
-              import the ones you want. Existing members are updated rather than duplicated.
-            </p>
-            <input
-              type="file"
-              accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.xml"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
-                e.target.value = '';
-              }}
-              className="block text-sm text-gray-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
-            />
-
-            <ErrorBanner>{fileError}</ErrorBanner>
-
-            {fileParsing ? (
-              <div className="text-gray-500 py-8 text-center">Parsing file…</div>
-            ) : parsedRows.length > 0 ? (
-              <>
+              {usersLoading ? (
+                <div className="text-gray-500 py-8 text-center">Loading users…</div>
+              ) : (
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-3 w-8" />
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {parsedRows.map((r, i) => {
-                        const res = fileResults[i];
-                        const name = `${r.given_name ?? ''} ${r.family_name ?? ''}`.trim() || r.email;
+                      {visibleUsers.map((u) => {
+                        const isAdded = added.has(u.id);
                         return (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-3 py-3">
-                              <input
-                                type="checkbox"
-                                checked={!!rowSel[i]}
-                                onChange={(e) => setRowSel((p) => ({ ...p, [i]: e.target.checked }))}
-                              />
-                            </td>
+                          <tr key={u.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900 text-sm">{name}</div>
-                              <div className="text-xs text-gray-500">{r.email}</div>
+                              <div className="font-medium text-gray-900 text-sm">{userName(u)}</div>
+                              <div className="text-xs text-gray-500">{u.email ?? '—'}</div>
+                              {rowError[u.id] && (
+                                <div className="text-xs text-red-600 mt-1">{rowError[u.id]}</div>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <select
-                                value={rowRoleFile[i] ?? defaultRole}
-                                onChange={(e) => setRowRoleFile((p) => ({ ...p, [i]: e.target.value }))}
-                                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                value={rowRole[u.id] ?? defaultRole}
+                                disabled={isAdded}
+                                onChange={(e) => setRowRole((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                               >
-                                {roleOptions.map((role) => (
-                                  <option key={role} value={role}>
-                                    {courseRoleLabel(role)}
+                                {roleOptions.map((r) => (
+                                  <option key={r} value={r}>
+                                    {courseRoleLabel(r)}
                                   </option>
                                 ))}
                               </select>
                             </td>
-                            <td className="px-4 py-3">
-                              <input
-                                value={rowGroupFile[i] ?? ''}
-                                onChange={(e) => setRowGroupFile((p) => ({ ...p, [i]: e.target.value }))}
-                                placeholder="—"
-                                className="w-32 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              />
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {res ? (
-                                res.ok ? (
-                                  <span className="text-green-700">Added ✓</span>
-                                ) : (
-                                  <span className="text-red-600" title={res.message}>Failed</span>
-                                )
+                            <td className="px-4 py-3 text-right">
+                              {isAdded ? (
+                                <span className="text-sm text-green-700">Added ✓</span>
                               ) : (
-                                <span className="text-gray-400">—</span>
+                                <button
+                                  onClick={() => addUser(u)}
+                                  disabled={addingId === u.id}
+                                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  {addingId === u.id ? 'Adding…' : 'Add'}
+                                </button>
                               )}
                             </td>
                           </tr>
                         );
                       })}
+                      {visibleUsers.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
+                            No users to add.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
-                <div className="flex items-center gap-3">
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Page {page + 1}</span>
+                <div className="flex gap-2">
                   <button
-                    onClick={importParsed}
-                    disabled={fileImporting || selectedFileCount === 0}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0 || usersLoading}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                   >
-                    {fileImporting ? 'Importing…' : `Import ${selectedFileCount} selected`}
+                    Previous
                   </button>
-                  {fileSummary && <span className="text-sm text-gray-600">{fileSummary}</span>}
+                  <button
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={!hasNext || usersLoading}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
-              </>
-            ) : null}
-          </div>
-        )}
-      </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'email' && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                importByEmail();
+              }}
+              className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 max-w-lg"
+            >
+              <p className="text-sm text-gray-500">
+                Adds the user with this email, creating the account if it does not exist yet. Use this for people
+                not yet in the system.
+              </p>
+
+              <ErrorBanner>{importError}</ErrorBanner>
+              {importMsg && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
+              )}
+
+              <Field label="Email" required>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputCls}
+                  placeholder="person@example.org"
+                />
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Given name">
+                  <input value={givenName} onChange={(e) => setGivenName(e.target.value)} className={inputCls} />
+                </Field>
+                <Field label="Family name">
+                  <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} className={inputCls} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Role" required>
+                  <select value={emailRole} onChange={(e) => setEmailRole(e.target.value)} className={inputCls}>
+                    {roleOptions.map((r) => (
+                      <option key={r} value={r}>
+                        {courseRoleLabel(r)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Group" hint="Optional. Created if it does not exist yet.">
+                  <input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} className={inputCls} />
+                </Field>
+              </div>
+
+              <button
+                type="submit"
+                disabled={importing || !email.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {importing ? 'Adding…' : 'Add by email'}
+              </button>
+            </form>
+          )}
+
+          {tab === 'file' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Upload a CSV, JSON, Excel (.xlsx) or Excel-XML student list. Review and adjust the rows, then
+                import the ones you want. Existing members are updated rather than duplicated.
+              </p>
+              <input
+                type="file"
+                accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.xml"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                  e.target.value = '';
+                }}
+                className="block text-sm text-gray-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+              />
+
+              <ErrorBanner>{fileError}</ErrorBanner>
+
+              {fileParsing ? (
+                <div className="text-gray-500 py-8 text-center">Parsing file…</div>
+              ) : parsedRows.length > 0 ? (
+                <>
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-3 w-8" />
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {parsedRows.map((r, i) => {
+                          const res = fileResults[i];
+                          const name = `${r.given_name ?? ''} ${r.family_name ?? ''}`.trim() || r.email;
+                          return (
+                            <tr key={i} className="hover:bg-gray-50">
+                              <td className="px-3 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={!!rowSel[i]}
+                                  onChange={(e) => setRowSel((p) => ({ ...p, [i]: e.target.checked }))}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-gray-900 text-sm">{name}</div>
+                                <div className="text-xs text-gray-500">{r.email}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={rowRoleFile[i] ?? defaultRole}
+                                  onChange={(e) => setRowRoleFile((p) => ({ ...p, [i]: e.target.value }))}
+                                  className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                  {roleOptions.map((role) => (
+                                    <option key={role} value={role}>
+                                      {courseRoleLabel(role)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  value={rowGroupFile[i] ?? ''}
+                                  onChange={(e) => setRowGroupFile((p) => ({ ...p, [i]: e.target.value }))}
+                                  placeholder="—"
+                                  className="w-32 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {res ? (
+                                  res.ok ? (
+                                    <span className="text-green-700">Added ✓</span>
+                                  ) : (
+                                    <span className="text-red-600" title={res.message}>Failed</span>
+                                  )
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={importParsed}
+                      disabled={fileImporting || selectedFileCount === 0}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {fileImporting ? 'Importing…' : `Import ${selectedFileCount} selected`}
+                    </button>
+                    {fileSummary && <span className="text-sm text-gray-600">{fileSummary}</span>}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          )}
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

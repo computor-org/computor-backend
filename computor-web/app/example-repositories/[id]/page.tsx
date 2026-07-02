@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
@@ -45,7 +46,7 @@ export default function ExampleRepositoryDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Example Repositories', href: '/example-repositories' }, { label: repo?.name || 'Repository' }]}
           title={repo?.name || 'Repository'}
@@ -66,9 +67,9 @@ export default function ExampleRepositoryDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <ListLoading>Loading…</ListLoading>
         ) : repo ? (
-          <>
+          <ScrollArea className="space-y-6">
             {repo.description && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
                 <p className="text-gray-700">{repo.description}</p>
@@ -97,9 +98,9 @@ export default function ExampleRepositoryDetailPage() {
                 </div>
               )}
             </div>
-          </>
+          </ScrollArea>
         ) : null}
-      </div>
+      </ListPageLayout>
 
       {confirmDelete && repo && (
         <ConfirmDeleteDialog

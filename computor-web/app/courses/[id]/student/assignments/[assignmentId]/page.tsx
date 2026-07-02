@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import type { CourseContentStudentGet } from 'types/generated';
 
@@ -104,7 +105,7 @@ export default function AssignmentDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex-1">
@@ -138,6 +139,7 @@ export default function AssignmentDetailPage() {
           )}
         </div>
 
+        <ScrollArea className="space-y-6">
         {/* Description */}
         {assignment.description && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -330,7 +332,8 @@ export default function AssignmentDetailPage() {
             </dl>
           </div>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

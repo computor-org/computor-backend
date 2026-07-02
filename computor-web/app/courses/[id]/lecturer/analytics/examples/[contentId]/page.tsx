@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import CodeBlock from '@/src/components/analytics/CodeBlock';
 import { getExampleSource } from '@/src/api/analytics';
 import type { ExampleSource } from '@/src/components/analytics/integrity';
@@ -49,15 +50,18 @@ export default function ExampleSourcePage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="space-y-4 p-2 md:p-4">
-        <Link href={backHref} className="text-sm text-blue-600 hover:underline">
-          ← Back to student
-        </Link>
+      <ListPageLayout>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{source?.title ?? 'Example source'}</h1>
-          {source && <p className="font-mono text-xs text-gray-400">{contentId}</p>}
+          <Link href={backHref} className="text-sm text-blue-600 hover:underline">
+            ← Back to student
+          </Link>
+          <div className="mt-2">
+            <h1 className="text-2xl font-bold text-gray-900">{source?.title ?? 'Example source'}</h1>
+            {source && <p className="font-mono text-xs text-gray-400">{contentId}</p>}
+          </div>
         </div>
 
+        <ScrollArea className="space-y-4">
         {loading && <p className="text-sm text-gray-500">Loading source…</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -91,7 +95,8 @@ export default function ExampleSourcePage() {
             </div>
           </div>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

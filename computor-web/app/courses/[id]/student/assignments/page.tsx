@@ -6,8 +6,11 @@ import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
+import Badge from '@/src/components/Badge';
 import type { CourseContentStudentList } from 'types/generated';
 
 interface TreeNode {
@@ -209,13 +212,9 @@ export default function StudentCourseContentsPage() {
                   <>
                     {/* Submission Status */}
                     {node.content.submitted ? (
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
-                        Submitted
-                      </span>
+                      <Badge color="green">Submitted</Badge>
                     ) : (
-                      <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
-                        Not Submitted
-                      </span>
+                      <Badge color="yellow">Not Submitted</Badge>
                     )}
 
                     {/* Result */}
@@ -289,35 +288,40 @@ export default function StudentCourseContentsPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Assignments</h1>
-            <p className="mt-2 text-gray-600">
-              {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units · {' '}
+      <ListPageLayout>
+        <PageHeader
+          breadcrumbs={[
+            { label: 'Courses', href: '/courses' },
+            { label: 'Assignments' },
+          ]}
+          title="Assignments"
+          subtitle={
+            <>
+              {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units ·{' '}
               {courseContents.filter(c => c.course_content_kind_id === 'assignment').length} assignments
-            </p>
-          </div>
-        </div>
+            </>
+          }
+        />
 
-        {/* Tree View */}
-        {tree.length > 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            {renderTree(tree)}
-          </div>
-        ) : (
-          <EmptyState
-            icon={
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-            title="No assignments yet"
-            description="Assignments will appear here once they are published by your instructor."
-          />
-        )}
-      </div>
+        <ScrollArea>
+          {/* Tree View */}
+          {tree.length > 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {renderTree(tree)}
+            </div>
+          ) : (
+            <EmptyState
+              icon={
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
+              title="No assignments yet"
+              description="Assignments will appear here once they are published by your instructor."
+            />
+          )}
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

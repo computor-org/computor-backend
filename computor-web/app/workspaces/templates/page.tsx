@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import PageHeader from '@/src/components/PageHeader';
@@ -47,7 +48,7 @@ export default function TemplatesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         {/* Header */}
         <PageHeader
           breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Templates' }]}
@@ -62,6 +63,10 @@ export default function TemplatesPage() {
           }
         />
 
+        {/* Error */}
+        <ErrorBanner>{error}</ErrorBanner>
+
+        <ScrollArea className="space-y-6">
         {/* Loading */}
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -74,9 +79,6 @@ export default function TemplatesPage() {
             ))}
           </div>
         )}
-
-        {/* Error */}
-        <ErrorBanner>{error}</ErrorBanner>
 
         {/* Empty */}
         {!loading && !error && templates.length === 0 && (
@@ -121,7 +123,8 @@ export default function TemplatesPage() {
             ))}
           </div>
         )}
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

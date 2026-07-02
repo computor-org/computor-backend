@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
@@ -151,7 +152,7 @@ export default function WorkspacesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="p-6 space-y-6">
+      <ListPageLayout>
         {/* Header */}
         <PageHeader
           breadcrumbs={[{ label: 'Workspaces' }]}
@@ -167,6 +168,10 @@ export default function WorkspacesPage() {
           }
         />
 
+        {/* Error State */}
+        <ErrorBanner>{error}</ErrorBanner>
+
+        <ScrollArea className="space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Health */}
@@ -237,9 +242,6 @@ export default function WorkspacesPage() {
           </div>
         )}
 
-        {/* Error State */}
-        <ErrorBanner>{error}</ErrorBanner>
-
         {/* Empty State */}
         {!loading && !error && workspaces.length === 0 && (
           <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
@@ -272,6 +274,7 @@ export default function WorkspacesPage() {
             ))}
           </div>
         )}
+        </ScrollArea>
 
         {/* Delete Confirmation */}
         <ConfirmDialog
@@ -311,7 +314,7 @@ export default function WorkspacesPage() {
             </div>
           </Modal>
         )}
-      </div>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }
