@@ -110,10 +110,10 @@ export default function AssignmentDetailPage() {
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <Link
-                href={`/courses/${courseId}/student/course-contents`}
+                href={`/courses/${courseId}/student/assignments`}
                 className="text-sm text-blue-600 hover:text-blue-700"
               >
-                ← Back to Course Contents
+                ← Back to Assignments
               </Link>
             </div>
             <div className="flex items-center space-x-3">

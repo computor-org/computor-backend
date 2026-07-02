@@ -115,7 +115,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     icon: 'student',
     ownPage: true,
     subItems: [
-      { id: 'student-course-contents', label: 'Course Contents', path: `/courses/${courseId}/student/course-contents` },
+      { id: 'student-assignments', label: 'Assignments', path: `/courses/${courseId}/student/assignments` },
     ],
   },
   {
@@ -136,7 +136,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     icon: 'lecturer',
     ownPage: true,
     subItems: [
-      { id: 'lecturer-content', label: 'Course Contents', path: `/courses/${courseId}/lecturer/content` },
+      { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
       { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
       // Grading Overview isn't implemented yet — re-add the link once
       // /courses/[id]/lecturer/grading has a real page.
