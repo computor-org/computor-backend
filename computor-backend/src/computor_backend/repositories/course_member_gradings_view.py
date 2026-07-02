@@ -5,7 +5,7 @@ This repository handles complex grading statistics queries for course members,
 providing aggregated progress data with hierarchical breakdowns.
 
 Caching is per-view (not per-user) since grading data is identical for all
-tutors/lecturers viewing the same course or member. A Redis-based lock prevents
+lecturers viewing the same course or member. A Redis-based lock prevents
 concurrent recalculation of the same view (thundering herd protection).
 """
 
@@ -99,7 +99,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         Get grading statistics for a specific course member.
 
         Uses shared (non-user-scoped) cache since grading data is identical
-        for all tutors/lecturers. A Redis lock prevents concurrent recalculation.
+        for all lecturers. A Redis lock prevents concurrent recalculation.
 
         Args:
             course_member_id: Course member ID
@@ -193,10 +193,10 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 .first()
             )
 
-            # Permission check: Admin bypasses, otherwise tutor or higher role required
+            # Permission check: Admin bypasses, otherwise lecturer or higher role required
             if not permissions.is_admin:
                 has_course_perms = check_course_permissions(
-                    permissions, CourseMember, "_tutor", self.db
+                    permissions, CourseMember, "_lecturer", self.db
                 ).filter(
                     CourseMember.course_id == course_id,
                     CourseMember.user_id == user_id
@@ -205,7 +205,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
                 if not has_course_perms:
                     raise ForbiddenException(
                         detail="You don't have permission to view this course member's grading statistics. "
-                               "Tutor role or higher is required."
+                               "Lecturer role or higher is required."
                     )
 
             data_repo = CourseMemberGradingsRepository(self.db)
@@ -262,7 +262,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         course_id = params.course_id or str(course_member.course_id)
 
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_tutor", self.db
+            permissions, CourseMember, "_lecturer", self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id
@@ -271,7 +271,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if not has_course_perms:
             raise ForbiddenException(
                 detail="You don't have permission to view this course member's grading statistics. "
-                       "Tutor role or higher is required."
+                       "Lecturer role or higher is required."
             )
 
     async def list_course_member_gradings(
@@ -371,7 +371,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             return
 
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_tutor", self.db
+            permissions, CourseMember, "_lecturer", self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id
@@ -380,5 +380,5 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         if not has_course_perms:
             raise ForbiddenException(
                 detail="You don't have permission to view course member grading statistics. "
-                       "Tutor role or higher is required."
+                       "Lecturer role or higher is required."
             )
