@@ -2,8 +2,9 @@
 
 /**
  * Cumulative submission curve — a step curve of how many assignments the
- * student had officially submitted over time, with a configurable due date
- * drawn as a vertical guide. Dots after the due date are marked late (red).
+ * student had officially submitted over time, windowed to an optional start
+ * date and with a configurable due date drawn as a vertical guide. Dots after
+ * the due date are marked late (red).
  *
  * Ported from the retired analytics dashboard, but here it runs off the grading
  * data already loaded (each submittable node's latest official submission), so
@@ -31,34 +32,42 @@ function fmt(iso: string): string {
 export default function SubmissionCurve({
   points,
   total,
+  startDate,
   dueDate,
 }: {
   points: CurvePoint[];
   total: number;
+  startDate: string | null;
   dueDate: string | null;
 }) {
-  const sorted = [...points]
+  const startMs = startDate ? new Date(startDate).getTime() : NaN;
+  const startValid = !Number.isNaN(startMs);
+  const dueMs = dueDate ? new Date(dueDate).getTime() : NaN;
+  const dueValid = !Number.isNaN(dueMs);
+
+  // Sort, then window to submissions on/after the start date.
+  const windowed = [...points]
     .filter((p) => p.at && !Number.isNaN(new Date(p.at).getTime()))
+    .filter((p) => !startValid || new Date(p.at).getTime() >= startMs)
     .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-  if (sorted.length === 0) {
+  if (windowed.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Submission timeline</h3>
         <p className="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-gray-500">
-          No official submissions to plot.
+          {startValid ? 'No official submissions in the selected window.' : 'No official submissions to plot.'}
         </p>
       </div>
     );
   }
 
-  const times = sorted.map((p) => new Date(p.at).getTime());
-  const dueMs = dueDate ? new Date(dueDate).getTime() : NaN;
-  const dueValid = !Number.isNaN(dueMs);
-  const minT = Math.min(...times, dueValid ? dueMs : Infinity);
+  const times = windowed.map((p) => new Date(p.at).getTime());
+  // Axis begins at the start date (when set), else the first submission.
+  const minT = Math.min(...times, startValid ? startMs : Infinity, dueValid ? dueMs : Infinity);
   const maxT = Math.max(...times, dueValid ? dueMs : -Infinity);
   const span = Math.max(maxT - minT, 1);
-  const denom = Math.max(total, sorted.length, 1);
+  const denom = Math.max(total, windowed.length, 1);
 
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
@@ -133,7 +142,7 @@ export default function SubmissionCurve({
         ))}
 
         <text x={PAD.left} y={H - 8} className="fill-gray-400 text-[10px]">
-          {fmt(sorted[0].at)}
+          {fmt(new Date(minT).toISOString())}
         </text>
         <text
           x={W - PAD.right}
@@ -141,11 +150,12 @@ export default function SubmissionCurve({
           textAnchor="end"
           className="fill-gray-400 text-[10px]"
         >
-          {fmt(sorted[sorted.length - 1].at)}
+          {fmt(new Date(maxT).toISOString())}
         </text>
       </svg>
       <figcaption className="mt-2 text-center text-xs text-gray-400">
-        Cumulative assignments submitted ({sorted.length}/{total})
+        Cumulative assignments submitted ({windowed.length}/{total})
+        {startValid && <span> · from start date</span>}
         {dueValid && lateCount > 0 && (
           <span className="text-red-500"> · {lateCount} after due date</span>
         )}

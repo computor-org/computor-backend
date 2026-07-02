@@ -57,29 +57,34 @@ export default function StudentProgressPage() {
   const [data, setData] = useState<CourseMemberGradingsGet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Configurable due date, drawn on the curve and used to flag late work.
-  // Persisted per course so it carries across students.
+  // Configurable start/due dates: the start date windows the curve, the due
+  // date is drawn as a guide and flags late work. Persisted per course so they
+  // carry across students.
+  const [startDate, setStartDate] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) return;
     try {
+      setStartDate(localStorage.getItem(`grading-start-date:${courseId}`) || null);
       setDueDate(localStorage.getItem(`grading-due-date:${courseId}`) || null);
     } catch {
       /* storage unavailable */
     }
   }, [courseId]);
 
-  const onDueDateChange = (value: string) => {
+  const makeDateHandler = (key: string, set: (v: string | null) => void) => (value: string) => {
     const iso = localInputToIso(value);
-    setDueDate(iso);
+    set(iso);
     try {
-      if (iso) localStorage.setItem(`grading-due-date:${courseId}`, iso);
-      else localStorage.removeItem(`grading-due-date:${courseId}`);
+      if (iso) localStorage.setItem(`${key}:${courseId}`, iso);
+      else localStorage.removeItem(`${key}:${courseId}`);
     } catch {
       /* storage unavailable */
     }
   };
+  const onStartDateChange = makeDateHandler('grading-start-date', setStartDate);
+  const onDueDateChange = makeDateHandler('grading-due-date', setDueDate);
 
   const fetchData = useCallback(async () => {
     try {
@@ -157,6 +162,18 @@ export default function StudentProgressPage() {
                 )}
               </div>
               <div className="flex items-end gap-2 print:hidden">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="start-date" className="text-xs font-medium text-gray-600">
+                    Start date
+                  </label>
+                  <input
+                    id="start-date"
+                    type="datetime-local"
+                    value={isoToLocalInput(startDate)}
+                    onChange={(e) => onStartDateChange(e.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="due-date" className="text-xs font-medium text-gray-600">
                     Due date
@@ -252,6 +269,7 @@ export default function StudentProgressPage() {
               <SubmissionCurve
                 points={submissionPoints}
                 total={data.total_max_assignments}
+                startDate={startDate}
                 dueDate={dueDate}
               />
 
