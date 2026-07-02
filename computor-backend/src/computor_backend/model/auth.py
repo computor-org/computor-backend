@@ -26,6 +26,12 @@ class User(Base):
     # Service user flag (added via migration 19266bf266e9)
     is_service = Column(Boolean, nullable=False, server_default=text("false"))
 
+    # Ban marker: when ``banned_at`` is set the user is blocked from
+    # authenticating (mirrors the ``archived_at`` soft-marker pattern).
+    # ``ban_reason`` is optional audit text shown to administrators.
+    banned_at = Column(DateTime(timezone=True))
+    ban_reason = Column(String(1024))
+
     # Relationships
     course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
     # user can have multiple student_profiles (one per organization)
