@@ -23,7 +23,7 @@ from computor_backend.database import get_db_session
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
 from computor_backend.model.service import ApiToken
-from computor_backend.exceptions import NotFoundException, UnauthorizedException
+from computor_backend.exceptions import NotFoundException, UnauthorizedException, ForbiddenException
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.api_token import hash_api_token, validate_token_format
 import logging
@@ -44,6 +44,42 @@ AUTH_CACHE_TTL = 900  # 15 minutes - balanced performance vs permission freshnes
 SSO_SESSION_TTL = 3600  # 1 hour for SSO sessions
 # Note: Can increase AUTH_CACHE_TTL to 3600s (1 hour) when implementing cache invalidation
 # on role/permission PATCH endpoints for even better performance
+
+# Ban kill-switch. ``PrincipalBuilder.build`` reads ``User.banned_at`` from the
+# DB (source of truth) on every cache MISS / fresh auth, but a warm principal
+# cache would otherwise let a banned user keep going for up to AUTH_CACHE_TTL.
+# To make a ban effective immediately we also stamp a lightweight per-user flag
+# in Redis and check it on the cache-HIT fast path. Best-effort: if Redis loses
+# the flag the principal cache is gone too, so the next request is a cache miss
+# and the DB gate takes over.
+BANNED_FLAG_PREFIX = "user:banned:"
+
+
+async def mark_user_banned(user_id: str) -> None:
+    """Set the immediate-cutoff ban flag for a user (called on ban)."""
+    cache = await get_redis_client()
+    await cache.set(f"{BANNED_FLAG_PREFIX}{user_id}", "1")
+
+
+async def clear_user_banned(user_id: str) -> None:
+    """Clear the immediate-cutoff ban flag for a user (called on unban)."""
+    cache = await get_redis_client()
+    await cache.delete(f"{BANNED_FLAG_PREFIX}{user_id}")
+
+
+async def is_user_banned_cached(user_id: str) -> bool:
+    """Return True if the per-user ban flag is set in Redis.
+
+    Used on the principal cache-HIT path, where ``PrincipalBuilder.build`` (and
+    its DB check) never runs. Fails open on Redis errors — the DB gate on the
+    next cache miss remains the durable backstop.
+    """
+    try:
+        cache = await get_redis_client()
+        return bool(await cache.get(f"{BANNED_FLAG_PREFIX}{user_id}"))
+    except Exception as e:  # pragma: no cover - redis hiccup
+        logger.warning(f"Ban-flag check failed for {user_id}: {e}")
+        return False
 
 
 class AuthenticationResult:
@@ -238,11 +274,22 @@ class PrincipalBuilder:
         # without re-querying the DB. Used by worker-facing endpoints
         # (e.g. tutor test ``input/download``) to bypass per-user
         # ownership checks for the test-runner service account.
-        is_service = bool(
-            db.query(User.is_service)
+        # Load ``is_service`` and the ban marker in one query. This is the
+        # single place both SSO and API-token auth resolve the User row, and it
+        # runs on every cache MISS and every websocket auth — so it is the
+        # durable ban gate (source of truth). Reject banned users before a
+        # Principal is ever constructed.
+        row = (
+            db.query(User.is_service, User.banned_at)
             .filter(User.id == auth_result.user_id)
-            .scalar()
+            .first()
         )
+        if row is not None and row.banned_at is not None:
+            raise ForbiddenException(
+                error_code="AUTHZ_002",
+                detail="User account is banned",
+            )
+        is_service = bool(row.is_service) if row is not None else False
 
         # Create Principal
         return Principal(
@@ -264,7 +311,15 @@ class PrincipalBuilder:
             cached_data = await cache.get(cache_key)
             if cached_data:
                 logger.debug(f"Principal cache hit for {cache_key}")
-                return Principal.model_validate(json.loads(cached_data), from_attributes=True)
+                principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
+                if await is_user_banned_cached(principal.user_id):
+                    raise ForbiddenException(
+                        error_code="AUTHZ_002",
+                        detail="User account is banned",
+                    )
+                return principal
+        except ForbiddenException:
+            raise
         except Exception as e:
             logger.warning(f"Cache retrieval error: {e}")
         
@@ -354,7 +409,18 @@ async def get_current_principal(
             cached_data = await cache.get(cache_key)
             if cached_data:
                 logger.debug(f"Principal cache HIT for {cache_key[:16]}... (no DB connection)")
-                return Principal.model_validate(json.loads(cached_data), from_attributes=True)
+                principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
+                # The DB ban gate in PrincipalBuilder.build never runs on a cache
+                # hit; honour the per-user kill-switch flag so a ban takes effect
+                # immediately instead of waiting out AUTH_CACHE_TTL.
+                if await is_user_banned_cached(principal.user_id):
+                    raise ForbiddenException(
+                        error_code="AUTHZ_002",
+                        detail="User account is banned",
+                    )
+                return principal
+        except ForbiddenException:
+            raise
         except Exception as e:
             logger.warning(f"Cache retrieval error: {e}")
 

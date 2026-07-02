@@ -537,6 +537,15 @@ async def handle_sso_callback(
             if not existing_admin:
                 db.add(UserRole(user_id=user.id, role_id="_admin"))
 
+        # Refuse to mint a session for a banned user. A freshly created user
+        # (is_new_user) can never be banned, so this only bites returning users.
+        # Defence in depth alongside the per-request gate in PrincipalBuilder.build.
+        if user.banned_at is not None:
+            raise ForbiddenException(
+                error_code="AUTHZ_002",
+                detail="User account is banned",
+            )
+
         # Capture primitives before commit — attributes expire after commit
         user_primitives = {
             "id": str(user.id),
