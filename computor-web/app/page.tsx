@@ -74,7 +74,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -112,7 +112,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-4 py-16 flex-1">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           {/* Hero Title */}
           <div className="space-y-4">
@@ -148,14 +148,7 @@ export default function Home() {
                 </svg>
                 <span>Download VS Code Extension</span>
               </button>
-            ) : (
-              <div className="px-8 py-4 bg-gray-100 text-gray-500 rounded-lg border-2 border-gray-300 font-semibold text-lg flex items-center space-x-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>Extension Not Available</span>
-              </div>
-            )}
+            ) : null}
             {gettingStartedUrl ? (
               <button
                 onClick={handleGettingStarted}
@@ -163,14 +156,7 @@ export default function Home() {
               >
                 Get Started →
               </button>
-            ) : (
-              <Link
-                href="/login"
-                className="px-8 py-4 bg-white text-blue-600 rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition-all font-semibold text-lg"
-              >
-                Get Started →
-              </Link>
-            )}
+            ) : null}
           </div>
 
           {/* VS Code Extension Card */}
@@ -197,7 +183,7 @@ export default function Home() {
                 ✓ Live Feedback
               </div>
               <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
-                ✓ GitLab Integration
+                ✓ Git Integration
               </div>
             </div>
           </div>
@@ -242,10 +228,10 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-16">
+      <footer className="border-t bg-white">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-gray-600">
-            <p>&copy; 2025 Computor. Educational Platform for Programming.</p>
+            <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
           </div>
         </div>
       </footer>
