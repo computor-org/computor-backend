@@ -51,16 +51,24 @@ async def process_example_for_student_template_v2(
         #   2. README_<lang>.md <- content/index_<lang>.md  (same)
         #   3. additionalFiles  (from meta.yaml's typed columns)
         #   4. studentSubmissionFiles  (filled from studentTemplates or empty)
-        # The entire content/ directory and the entire localTests/ directory
-        # must NEVER appear in the student template.
+        #   5. content/mediaFiles/**  (figures the README references — copied to
+        #      mediaFiles/** so the README's relative image links resolve)
+        # The rest of content/ and the entire localTests/ directory must NEVER
+        # appear in the student template.
         for filename, content in example_files.items():
-            # Handle index*.md inside content/ — these are the ONLY files we
-            # take out of content/, and they get renamed to README.
+            # Handle index*.md inside content/ — renamed to README.
             if filename == 'content/index.md':
                 (target_path / 'README.md').write_bytes(content)
             elif filename.startswith('content/index_') and filename.endswith('.md'):
                 lang_suffix = filename[len('content/index'):-3]  # '_de' from 'content/index_de.md'
                 (target_path / f'README{lang_suffix}.md').write_bytes(content)
+            elif filename.startswith('content/mediaFiles/'):
+                # Figures referenced by the README. Copy under the assignment root
+                # preserving the mediaFiles/ subpath (strip 'content/') so the
+                # README's relative image links resolve. Public assets, not solutions.
+                dest = target_path / filename[len('content/'):]  # e.g. 'mediaFiles/foo.png'
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(content)
             # Everything else under content/ or localTests/ is DROPPED.
             # No fallback, no implicit copy.
 
@@ -167,13 +175,18 @@ def process_example_for_reference_v2(example_files, target_path, additional_file
 
     target_path.mkdir(parents=True, exist_ok=True)
 
-    # content/index*.md -> README*.md (identical to the template).
+    # content/index*.md -> README*.md and content/mediaFiles/** -> mediaFiles/**
+    # (identical to the template — the README's relative image links resolve).
     for filename, data in example_files.items():
         if filename == "content/index.md":
             (target_path / "README.md").write_bytes(data)
         elif filename.startswith("content/index_") and filename.endswith(".md"):
             lang_suffix = filename[len("content/index"):-3]  # '_de' from 'content/index_de.md'
             (target_path / f"README{lang_suffix}.md").write_bytes(data)
+        elif filename.startswith("content/mediaFiles/"):
+            dest = target_path / filename[len("content/"):]  # 'mediaFiles/foo.png'
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
 
     # additionalFiles -> assignment root (identical to the template).
     for file_name in additional_files:
