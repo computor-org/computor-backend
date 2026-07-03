@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -24,6 +24,9 @@ const STATUS_STYLES: Record<string, { label: string; color: BadgeColor }> = {
 function deploymentBadge(c: CourseContentLecturerList): { label: string; color: BadgeColor } {
   const status = c.deployment_status || (c.has_deployment ? 'deployed' : null);
   if (!status) {
+    // A unit isn't deployable (no example of its own) — label it as such rather
+    // than implying a submittable assignment is missing its example.
+    if (!c.is_submittable) return { label: 'Unit', color: 'gray' };
     return { label: 'No example', color: 'gray' };
   }
   return STATUS_STYLES[status] ?? { label: status, color: 'gray' };
@@ -42,6 +45,8 @@ export default function LecturerContentPage() {
   const [typeMap, setTypeMap] = useState<Record<string, CourseContentTypeList>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState<string | null>(null);
+  const [releaseMsg, setReleaseMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -80,6 +85,50 @@ export default function LecturerContentPage() {
     };
   }, [courseId, authLoading, isAuthenticated]);
 
+  // Re-fetch just the content list (badges move pending → deploying → deployed as
+  // the release workflow runs).
+  const reload = useCallback(async () => {
+    try {
+      const ccRes = await apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`);
+      if (ccRes.ok) {
+        const list: CourseContentLecturerList[] = await ccRes.json();
+        list.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.position - b.position));
+        setContents(list);
+      }
+    } catch {
+      /* ignore refresh errors */
+    }
+  }, [courseId]);
+
+  // "Release" == deploy the assigned example(s) into the student-template repo via
+  // the course-git-aware generate-student-template workflow. No ids => all pending.
+  async function release(key: string, ids?: string[], force?: boolean) {
+    setReleasing(key);
+    setReleaseMsg(null);
+    try {
+      const body: Record<string, unknown> = ids && ids.length ? { release: { course_content_ids: ids } } : {};
+      // force_redeploy re-processes already-'deployed' contents too — needed to
+      // backfill the reference repo for assignments whose template was pushed
+      // before reference support existed.
+      if (force) body.force_redeploy = true;
+      const res = await apiFetch(`${API_BASE_URL}/system/courses/${courseId}/generate-student-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail || err?.message || `Release failed (${res.status})`);
+      }
+      setReleaseMsg('Release started — badges move to “deploying”, then “deployed”.');
+      setTimeout(() => reload(), 3000);
+    } catch (e) {
+      setReleaseMsg(e instanceof Error ? e.message : 'Release failed');
+    } finally {
+      setReleasing(null);
+    }
+  }
+
   const active = contents.filter((c) => !c.archived_at);
   const archivedCount = contents.length - active.length;
   const submittable = active.filter((c) => c.is_submittable).length;
@@ -90,6 +139,13 @@ export default function LecturerContentPage() {
     failed: active.filter((c) => c.deployment_status === 'failed').length,
     none: active.filter((c) => !c.deployment_status && !c.has_deployment).length,
   };
+
+  // A unit's nested submittable contents that have an example assigned (only those
+  // can be released).
+  const releasableDescendants = (unit: CourseContentLecturerList) =>
+    active.filter(
+      (c) => c.path.startsWith(unit.path + '.') && c.is_submittable && (c.has_deployment || !!c.deployment_status),
+    );
 
   return (
     <AuthenticatedLayout>
@@ -133,6 +189,29 @@ export default function LecturerContentPage() {
               </div>
             )}
 
+            {/* Release toolbar */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => release('all')}
+                disabled={releasing !== null || counts.pending + counts.failed === 0}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                title="Deploy every pending/failed assignment into the template repo"
+              >
+                {releasing === 'all' ? 'Releasing…' : `Release all pending (${counts.pending + counts.failed})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => release('all-force', undefined, true)}
+                disabled={releasing !== null || counts.deployed + counts.pending + counts.failed === 0}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                title="Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos"
+              >
+                {releasing === 'all-force' ? 'Re-releasing…' : 'Re-release all (force)'}
+              </button>
+              {releaseMsg && <span className="text-sm text-gray-500">{releaseMsg}</span>}
+            </div>
+
             {/* Content tree with deployment badges */}
             {active.length === 0 ? (
               <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
@@ -175,6 +254,36 @@ export default function LecturerContentPage() {
                           update available
                         </span>
                       )}
+                      {(() => {
+                        const canReleaseOne = c.is_submittable && (c.has_deployment || !!c.deployment_status);
+                        const unitKids = c.is_submittable ? [] : releasableDescendants(c);
+                        if (canReleaseOne) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => release(c.id, [c.id])}
+                              disabled={releasing !== null}
+                              className="shrink-0 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50"
+                            >
+                              {releasing === c.id ? '…' : 'Release'}
+                            </button>
+                          );
+                        }
+                        if (unitKids.length > 0) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => release(c.id, unitKids.map((k) => k.id))}
+                              disabled={releasing !== null}
+                              className="shrink-0 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50"
+                              title={`Release ${unitKids.length} assignment(s) in this unit`}
+                            >
+                              {releasing === c.id ? '…' : `Release unit (${unitKids.length})`}
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
                       <Badge color={badge.color} className="shrink-0">
                         {badge.label}
                       </Badge>

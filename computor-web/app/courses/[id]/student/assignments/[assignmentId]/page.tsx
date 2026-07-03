@@ -179,9 +179,9 @@ export default function AssignmentDetailPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Repository</h2>
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Full Path:</span>
-                <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 shrink-0">Full Path:</span>
+                <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded break-all">
                   {assignment.submission_group.repository.full_path}
                 </code>
               </div>
@@ -192,7 +192,11 @@ export default function AssignmentDetailPage() {
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                 >
-                  Open in GitLab
+                  Open in {assignment.submission_group.repository.provider === 'gitlab'
+                    ? 'GitLab'
+                    : assignment.submission_group.repository.provider === 'forgejo'
+                      ? 'Forgejo'
+                      : 'Repository'}
                 </a>
                 <button
                   onClick={() => navigator.clipboard.writeText(assignment.submission_group!.repository!.clone_url!)}

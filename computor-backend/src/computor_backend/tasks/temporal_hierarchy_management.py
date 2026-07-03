@@ -89,7 +89,17 @@ async def create_course_activity(
 
             git_binding = None
             git_cfg = course_config.get("git") or {}
-            if git_cfg.get("git_server_id"):
+            # Accept both the runtime shape (a git_server_id UUID, from the
+            # web/VSCode course-create form) and the portable deploy-file shape
+            # (provider + base_url, resolved here to a GitServer). parent_group_id
+            # + token are the per-course GitLab credentials carried on the binding.
+            git_server_id = git_cfg.get("git_server_id")
+            if not git_server_id and git_cfg.get("provider"):
+                from ..business_logic.git_registry import resolve_git_server_ref
+
+                server = resolve_git_server_ref(git_cfg.get("provider"), git_cfg.get("base_url"), db)
+                git_server_id = str(server.id) if server is not None else None
+            if git_server_id or git_cfg.get("provider"):
                 from computor_types.course_git import CourseGitBindingUpsert
                 from ..business_logic.course_git import _apply_course_git_binding
 
@@ -97,7 +107,9 @@ async def create_course_activity(
                     course,
                     CourseGitBindingUpsert(
                         delivery=git_cfg.get("delivery") or "git",
-                        git_server_id=git_cfg.get("git_server_id"),
+                        git_server_id=git_server_id,
+                        parent_group_id=git_cfg.get("parent_group_id"),
+                        token=git_cfg.get("token"),
                         template_repo=git_cfg.get("template_repo"),
                         template_url=git_cfg.get("template_url"),
                         default_branch=git_cfg.get("default_branch"),

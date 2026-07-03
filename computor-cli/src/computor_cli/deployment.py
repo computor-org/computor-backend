@@ -1838,6 +1838,14 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         
         # Validate by creating the config object
         config = ComputorDeploymentConfig(**yaml_data)
+        # Expand ${ENV_VAR} in per-course git tokens from the operator's shell
+        # (client-side, like the service tokens below) so the backend receives a
+        # real GitLab credential rather than a literal placeholder.
+        for _org in config.organizations:
+            for _family in _org.course_families:
+                for _course in _family.courses:
+                    if _course.git and _course.git.token:
+                        _course.git.token = os.path.expandvars(_course.git.token)
         click.echo("✅ Configuration validated successfully")
         
         if dry_run:
@@ -1861,7 +1869,17 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                     
                     for course_idx, course in enumerate(family.courses):
                         click.echo(f"    Course {course_idx + 1}: {course.name} ({course.path})")
-            
+                        if course.git:
+                            g = course.git
+                            if g.delivery == "download":
+                                click.echo(f"      Git: download (provider: {g.provider or 'none'})")
+                            else:
+                                where = g.provider or "unconfigured"
+                                if g.base_url:
+                                    where += f" @ {g.base_url}"
+                                modes = ", ".join(g.student_repo_modes or []) or "none"
+                                click.echo(f"      Git: {where} — modes: {modes}")
+
             # Show all paths that will be created
             paths = config.get_deployment_paths()
             if paths:

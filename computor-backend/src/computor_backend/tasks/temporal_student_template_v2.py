@@ -51,16 +51,24 @@ async def process_example_for_student_template_v2(
         #   2. README_<lang>.md <- content/index_<lang>.md  (same)
         #   3. additionalFiles  (from meta.yaml's typed columns)
         #   4. studentSubmissionFiles  (filled from studentTemplates or empty)
-        # The entire content/ directory and the entire localTests/ directory
-        # must NEVER appear in the student template.
+        #   5. content/mediaFiles/**  (figures the README references — copied to
+        #      mediaFiles/** so the README's relative image links resolve)
+        # The rest of content/ and the entire localTests/ directory must NEVER
+        # appear in the student template.
         for filename, content in example_files.items():
-            # Handle index*.md inside content/ — these are the ONLY files we
-            # take out of content/, and they get renamed to README.
+            # Handle index*.md inside content/ — renamed to README.
             if filename == 'content/index.md':
                 (target_path / 'README.md').write_bytes(content)
             elif filename.startswith('content/index_') and filename.endswith('.md'):
                 lang_suffix = filename[len('content/index'):-3]  # '_de' from 'content/index_de.md'
                 (target_path / f'README{lang_suffix}.md').write_bytes(content)
+            elif filename.startswith('content/mediaFiles/'):
+                # Figures referenced by the README. Copy under the assignment root
+                # preserving the mediaFiles/ subpath (strip 'content/') so the
+                # README's relative image links resolve. Public assets, not solutions.
+                dest = target_path / filename[len('content/'):]  # e.g. 'mediaFiles/foo.png'
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(content)
             # Everything else under content/ or localTests/ is DROPPED.
             # No fallback, no implicit copy.
 
@@ -141,6 +149,75 @@ async def process_example_for_student_template_v2(
     except Exception as e:
         logger.error(f"Failed to process example content {course_content.path}: {e}")
         return {"success": False, "error": str(e)}
+
+
+# When True, the reference repo receives a verbatim copy of the WHOLE example
+# (the original behavior — solutions, localTests/, content/, everything). When
+# False (default), it receives a template-like layout via
+# ``process_example_for_reference_v2`` below: README from content/index,
+# additionalFiles, studentSubmissionFiles filled with the SOLUTION, plus
+# meta.yaml/test.yaml. The whole-copy path is kept (flag-gated) so the original
+# behavior is one switch away, not deleted.
+REFERENCE_INCLUDE_FULL_EXAMPLE = False
+
+
+def process_example_for_reference_v2(example_files, target_path, additional_files, submission_files):
+    """Staff **reference** variant of the student-template converter.
+
+    Same layout as ``process_example_for_student_template_v2`` — ``content/index*.md``
+    renamed to ``README*.md``, ``additionalFiles`` copied to the assignment root —
+    but ``studentSubmissionFiles`` are filled with the **solution** content (the
+    example's own file at the submission path, else its ``localTests/correctSolution``
+    copy) instead of the emptied student template, and ``meta.yaml``/``test.yaml``
+    are exposed (staff-only). Synchronous; the caller (`_push_reference_repo`) is sync.
+    """
+    from pathlib import Path
+
+    target_path.mkdir(parents=True, exist_ok=True)
+
+    # content/index*.md -> README*.md and content/mediaFiles/** -> mediaFiles/**
+    # (identical to the template — the README's relative image links resolve).
+    for filename, data in example_files.items():
+        if filename == "content/index.md":
+            (target_path / "README.md").write_bytes(data)
+        elif filename.startswith("content/index_") and filename.endswith(".md"):
+            lang_suffix = filename[len("content/index"):-3]  # '_de' from 'content/index_de.md'
+            (target_path / f"README{lang_suffix}.md").write_bytes(data)
+        elif filename.startswith("content/mediaFiles/"):
+            dest = target_path / filename[len("content/"):]  # 'mediaFiles/foo.png'
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+
+    # additionalFiles -> assignment root (identical to the template).
+    for file_name in additional_files:
+        if file_name in example_files:
+            fp = target_path / Path(file_name).name
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            fp.write_bytes(example_files[file_name])
+
+    # studentSubmissionFiles -> the SOLUTION content (the reference difference).
+    for submission_file in submission_files:
+        sp = target_path / submission_file
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        candidates = [
+            submission_file,                                          # author's canonical solution at the submission path
+            f"localTests/correctSolution/{submission_file}",         # correct-solution copy used by tests
+            f"localTests/correctSolution/{Path(submission_file).name}",
+        ]
+        data = next((example_files[c] for c in candidates if c in example_files), None)
+        if data is None:
+            # Last resort: match by filename, preferring a non-studentTemplate path.
+            name = Path(submission_file).name
+            data = next(
+                (d for p, d in example_files.items() if Path(p).name == name and "studentTemplate" not in p),
+                None,
+            )
+        sp.write_bytes(data if data is not None else b"")
+
+    # Expose meta.yaml + test.yaml (staff-only reference).
+    for meta_name in ("meta.yaml", "test.yaml"):
+        if meta_name in example_files:
+            (target_path / meta_name).write_bytes(example_files[meta_name])
 
 
 async def download_example_files(repository: Any, version: Any) -> Dict[str, bytes]:
@@ -249,6 +326,106 @@ async def download_example_from_object_storage(
             logger.error(f"Failed to download {obj.object_name}: {e}")
     
     return example_files
+
+
+def _push_reference_repo(binding, reference_files, gitlab_token, server_type, git_email, git_name):
+    """Push the course's staff-only reference repo — the solution mirror of the
+    student template. By default each assignment gets a template-like layout with
+    the SOLUTION filled in (see ``process_example_for_reference_v2``); the legacy
+    verbatim whole-example copy is available via ``REFERENCE_INCLUDE_FULL_EXAMPLE``.
+
+    Best-effort: the caller wraps this in try/except so a reference-push failure
+    never affects the student-template deploy (the student-facing artifact). The
+    reference repo ref comes from the course git binding
+    (``properties.gitlab.reference_path`` for GitLab, ``properties.forgejo.reference_repo``
+    for Forgejo); credentials are the same per-course binding token as the template.
+    """
+    # tempfile/os/git are imported locally inside the activity (not at module
+    # scope), so this module-level helper must import them itself.
+    import tempfile
+    import os
+    import git
+
+    if binding is None or binding.git_server is None or not reference_files:
+        return
+    props = binding.properties or {}
+    reference_ref = (
+        (props.get("gitlab") or {}).get("reference_path")
+        or (props.get("forgejo") or {}).get("reference_repo")
+    )
+    if not reference_ref:
+        logger.info("No reference repo configured for this course; skipping reference push")
+        return
+
+    from computor_backend.git_provider import backend_reachable_base_url
+
+    public_base = (binding.git_server.base_url or "").rstrip("/")
+    reachable_base = backend_reachable_base_url(binding.git_server)
+    reference_url = f"{public_base}/{reference_ref}.git"
+    push_url = reference_url
+    if reachable_base and reachable_base != public_base and reference_url.startswith(public_base):
+        push_url = reachable_base + reference_url[len(public_base):]
+    auth_url = make_provider_auth_url(push_url, gitlab_token, server_type) if gitlab_token else push_url
+
+    with tempfile.TemporaryDirectory() as ref_temp:
+        ref_path = os.path.join(ref_temp, "reference")
+        try:
+            repo = git.Repo.clone_from(auth_url, ref_path)
+        except Exception as e:
+            logger.info(f"Could not clone reference repo, creating new: {e}")
+            os.makedirs(ref_path, exist_ok=True)
+            repo = git.Repo.init(ref_path)
+            repo.git.checkout("-b", "main")
+            repo.create_remote("origin", auth_url)
+        repo.git.config("user.email", git_email)
+        repo.git.config("user.name", git_name)
+
+        # Write each assignment's reference content. Default = a template-like
+        # layout (README from content/index, additionalFiles, studentSubmissionFiles
+        # filled with the SOLUTION) plus meta.yaml/test.yaml. The legacy verbatim
+        # whole-example copy is kept, flag-gated by REFERENCE_INCLUDE_FULL_EXAMPLE.
+        from pathlib import Path
+
+        for target_dir, tgt in reference_files.items():
+            files = tgt["files"]
+            if REFERENCE_INCLUDE_FULL_EXAMPLE:
+                for rel_path, data in files.items():
+                    dest = os.path.join(ref_path, target_dir, rel_path)
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with open(dest, "wb") as fh:
+                        fh.write(data if isinstance(data, (bytes, bytearray)) else str(data).encode())
+            else:
+                process_example_for_reference_v2(
+                    files,
+                    Path(os.path.join(ref_path, target_dir)),
+                    tgt.get("additional_files") or [],
+                    tgt.get("submission_files") or [],
+                )
+
+        with open(os.path.join(ref_path, "README.md"), "w") as fh:
+            fh.write(
+                "# Reference (full solutions)\n\n"
+                "Staff-only. Mirrors the student template's assignments with the "
+                "complete example content (solutions included). Generated by Computor.\n"
+            )
+
+        repo.git.add(A=True)
+        if repo.is_dirty() or repo.untracked_files:
+            repo.index.commit("System Reference")
+            if "origin" in [r.name for r in repo.remotes]:
+                for attempt in range(3):
+                    try:
+                        repo.git.push("origin", "main")
+                        logger.info("Pushed reference repo (%d assignment dirs)", len(reference_files))
+                        break
+                    except git.GitCommandError as pe:
+                        msg = str(pe).lower()
+                        if attempt < 2 and ("non-fast-forward" in msg or "fetch first" in msg or "failed to push" in msg):
+                            repo.git.pull("--rebase", "origin", "main")
+                        else:
+                            raise
+        else:
+            logger.info("Reference repo already up to date")
 
 
 # Activities
@@ -409,12 +586,18 @@ async def generate_student_template_activity_v2(
             from computor_backend.git_provider import backend_reachable_base_url
             binding = db.query(CourseGitBinding).filter(CourseGitBinding.course_id == course_id).first()
             if binding is not None and binding.git_server is not None:
-                if binding.git_server.token:
-                    gitlab_token = decrypt_secret(binding.git_server.token)
+                # External-GitLab courses carry the group token on the BINDING (the
+                # git_server is a tokenless instance pointer); managed Forgejo and
+                # legacy managed GitLab keep it on the git_server. Prefer the binding.
+                token_source = binding.token or binding.git_server.token
+                if token_source:
+                    gitlab_token = decrypt_secret(token_source)
                     server_type = (binding.git_server.type or "gitlab").lower()
                     if gitlab_token:
                         logger.info(
-                            f"Using service token from git server {binding.git_server.base_url} ({server_type})"
+                            "Using %s token for git server %s (%s)",
+                            "binding" if binding.token else "git server",
+                            binding.git_server.base_url, server_type,
                         )
                 # The stored template_url uses the public base_url (student-facing).
                 # A backend component must clone/push via the address it can reach
@@ -573,6 +756,7 @@ async def generate_student_template_activity_v2(
             processed_count = 0
             errors = []
             successfully_processed = []  # Track which content was successfully processed
+            reference_files: Dict[str, dict] = {}  # target_dir -> {files, additional_files, submission_files} for the reference repo
             
             for content in course_contents:
                 try:
@@ -731,6 +915,9 @@ async def generate_student_template_activity_v2(
                     # Use the example identifier as directory name for better organization
                     target_dir = str(directory_name)
                     full_target_path = os.path.join(template_repo_path, target_dir)
+                    # Snapshot the FULL files (before solution-stripping) so the reference
+                    # repo can mirror them; recorded only after successful processing below.
+                    full_files_snapshot = dict(files)
                     
                     # Process the example files for student template
                     # This function handles meta.yaml properties like studentSubmissionFiles,
@@ -760,6 +947,15 @@ async def generate_student_template_activity_v2(
 
                     # Track that we processed it successfully
                     successfully_processed.append(content)
+                    # Collect this assignment's reference inputs (pushed after the
+                    # template push, best-effort): the full files plus the typed
+                    # file lists the reference converter needs.
+                    _ev = content.deployment.example_version
+                    reference_files[target_dir] = {
+                        "files": full_files_snapshot,
+                        "additional_files": list(getattr(_ev, "additional_files", None) or []),
+                        "submission_files": list(getattr(_ev, "student_submission_files", None) or []),
+                    }
                     
                 except Exception as e:
                     error_msg = f"Failed to process {content.path}: {str(e)}"
@@ -914,6 +1110,25 @@ async def generate_student_template_activity_v2(
                     logger.error(error_msg)
                     errors.append(error_msg)
                     git_push_successful = False
+
+            # ----- reference repo (full solutions) — best-effort, never blocks the template -----
+            # Mirror the SAME assignments into the staff-only reference repo, but with the
+            # FULL example content (solutions included). Any failure is logged and ignored:
+            # the student template is the student-facing artifact and must not be held
+            # hostage to the reference push.
+            if reference_files:
+                try:
+                    from computor_backend.model.git_server import CourseGitBinding
+                    ref_binding = (
+                        db.query(CourseGitBinding)
+                        .filter(CourseGitBinding.course_id == course_id)
+                        .first()
+                    )
+                    _push_reference_repo(
+                        ref_binding, reference_files, gitlab_token, server_type, git_email, git_name
+                    )
+                except Exception as e:
+                    logger.warning(f"Reference repo push failed (non-fatal) for course {course_id}: {e}")
             
             # Now update deployment statuses based on git push result
             # Only update deployments that were marked as "deploying" at the start

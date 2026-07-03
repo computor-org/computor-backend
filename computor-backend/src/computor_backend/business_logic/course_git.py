@@ -43,8 +43,52 @@ from computor_types.course_git import (
     GitTemplateRef,
     StudentRepositoryProvisioned,
 )
+from computor_types.encryption import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# GitLab credential helpers (per-course token on the binding)
+# ---------------------------------------------------------------------------
+#
+# GitLab courses carry their own credentials on the ``CourseGitBinding`` (a
+# group access token + parent group), so an external GitLab needs no shared
+# managed registry server — the server row is just a tokenless instance pointer.
+# Forgejo is unchanged: it uses the system server's token.
+
+
+def _get_gitlab_client(server: GitServer, raw_token: Optional[str]):
+    """GitLab provider client for ``server`` authenticated with an explicit
+    (already-decrypted) token — the course's own binding token."""
+    from computor_backend.git_provider import backend_reachable_base_url
+    from computor_backend.git_provider.gitlab import GitLabProviderClient
+
+    return GitLabProviderClient(backend_reachable_base_url(server), raw_token or "", None)
+
+
+def get_gitlab_client_for_binding(binding: CourseGitBinding, server: GitServer):
+    """GitLab client using the course's own token (the binding), falling back to
+    the registry server's token for legacy managed-GitLab courses."""
+    if getattr(binding, "token", None):
+        token = decrypt_secret(binding.token)
+    elif server is not None and server.token:
+        token = decrypt_secret(server.token)
+    else:
+        token = None
+    return _get_gitlab_client(server, token)
+
+
+def _binding_has_managed_creds(binding: CourseGitBinding, server: Optional[GitServer]) -> bool:
+    """Whether the course can back-babysat student repos: a Forgejo system token,
+    a legacy managed-GitLab server token, or a per-course GitLab binding token."""
+    if server is None:
+        return False
+    if server.type == "forgejo":
+        return bool(server.managed and server.token)
+    if server.type == "gitlab":
+        return bool(getattr(binding, "token", None) or (server.managed and server.token))
+    return False
 
 
 def build_course_git_descriptor(
@@ -198,11 +242,14 @@ def _binding_lock_state(binding: Optional[CourseGitBinding], db: Session) -> tup
 
 def _binding_to_get(b: CourseGitBinding, db: Session) -> CourseGitBindingGet:
     locked, lock_reason = _binding_lock_state(b, db)
+    parent_group_id = ((b.properties or {}).get("gitlab") or {}).get("parent_group_id")
     return CourseGitBindingGet(
         id=str(b.id),
         course_id=str(b.course_id),
         delivery=b.delivery,
         git_server_id=str(b.git_server_id) if b.git_server_id else None,
+        parent_group_id=parent_group_id,
+        has_token=bool(b.token),
         template_repo=b.template_repo,
         template_url=b.template_url,
         default_branch=b.default_branch,
@@ -320,32 +367,40 @@ def _apply_course_git_binding(
         if not template_url:
             template_url = f"{server.base_url.rstrip('/')}/{template_repo}.git"
 
-    # For a managed GitLab, provision the flat course structure under the
-    # registered parent group (course group + template/reference projects +
-    # students subgroup) and adopt the template project as the binding template.
+    # For a managed GitLab, provision the flat course structure under the parent
+    # group (course group + template/reference projects + students subgroup) and
+    # adopt the template project. Credentials come from the COURSE — the binding's
+    # own token + parent_group_id — falling back to a legacy managed server's
+    # token, so an external GitLab needs no shared managed registry server.
     gitlab_structure = None
-    if data.delivery == "git" and server is not None and server.type == "gitlab" and server.managed:
-        gl_server_props = (server.properties or {}).get("gitlab") or {}
-        parent_group_id = gl_server_props.get("parent_group_id")
-        if not parent_group_id:
-            raise BadRequestException(
-                "The bound GitLab server has no parent_group_id configured "
-                "(set it on the git server's properties.gitlab)."
-            )
-        course_slug = str(course.path).replace(".", "-")
-        client = get_provider_client_for_server(server)
-        try:
-            gitlab_structure = client.ensure_course_structure(
-                parent_group_id, course_slug, course.title or course_slug
-            )
-        except Exception as exc:  # materialization is essential — fail loudly
-            logger.warning("GitLab course-structure provisioning failed: %s", exc)
-            raise BadRequestException(
-                "Could not provision the GitLab course structure on the bound server.",
-                context={"error": str(exc)},
-            ) from exc
-        template_repo = gitlab_structure.get("template_path") or template_repo
-        template_url = gitlab_structure.get("template_url") or template_url
+    if data.delivery == "git" and server is not None and server.type == "gitlab":
+        gl_token = (
+            (data.token or "").strip()
+            or (decrypt_secret(binding.token) if (binding is not None and binding.token) else None)
+            or (decrypt_secret(server.token) if (server.managed and server.token) else None)
+        )
+        if gl_token:
+            gl_server_props = (server.properties or {}).get("gitlab") or {}
+            parent_group_id = data.parent_group_id or gl_server_props.get("parent_group_id")
+            if not parent_group_id:
+                raise BadRequestException(
+                    "A managed GitLab course needs a parent_group_id — set it on the "
+                    "course git binding (or, for a legacy managed server, on the server)."
+                )
+            course_slug = str(course.path).replace(".", "-")
+            client = _get_gitlab_client(server, gl_token)
+            try:
+                gitlab_structure = client.ensure_course_structure(
+                    parent_group_id, course_slug, course.title or course_slug
+                )
+            except Exception as exc:  # materialization is essential — fail loudly
+                logger.warning("GitLab course-structure provisioning failed: %s", exc)
+                raise BadRequestException(
+                    "Could not provision the GitLab course structure on the bound server.",
+                    context={"error": str(exc)},
+                ) from exc
+            template_repo = gitlab_structure.get("template_path") or template_repo
+            template_url = gitlab_structure.get("template_url") or template_url
 
     if binding is None:
         binding = CourseGitBinding(course_id=course.id, created_by=user_id)
@@ -357,8 +412,19 @@ def _apply_course_git_binding(
     binding.template_url = template_url
     binding.default_branch = data.default_branch or "main"
     binding.student_repo_modes = list(data.student_repo_modes or [])
-    if gitlab_structure is not None:
-        binding.properties = {**(binding.properties or {}), "gitlab": gitlab_structure}
+    # Per-course GitLab credential: persist the token (encrypted) when supplied;
+    # keep an existing one so a metadata-only re-apply doesn't drop it.
+    if data.token:
+        binding.token = encrypt_secret(data.token)
+    # GitLab structure ids (from provisioning) + the parent_group_id both live
+    # under properties.gitlab.
+    if gitlab_structure is not None or data.parent_group_id:
+        gl_props = {**((binding.properties or {}).get("gitlab") or {})}
+        if gitlab_structure is not None:
+            gl_props.update(gitlab_structure)
+        if data.parent_group_id:
+            gl_props["parent_group_id"] = data.parent_group_id
+        binding.properties = {**(binding.properties or {}), "gitlab": gl_props}
     if forgejo_reference_repo is not None or forgejo_layout is not None:
         forgejo_props = {**((binding.properties or {}).get("forgejo") or {})}
         if forgejo_reference_repo is not None:
@@ -740,7 +806,7 @@ def _provision_gitlab_managed(
         )
     handle = _resolve_oidc_handle(user_id, db) or str(member.id)
     slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", handle).strip("-._") or str(member.id)
-    client = get_provider_client_for_server(server)
+    client = get_gitlab_client_for_binding(binding, server)
     result = client.provision_student_fork(template_project_id, students_group_id, slug)
     full_path = (result.properties.get("gitlab") or {}).get("full_path")
     rec = CourseMemberRepository(
@@ -811,7 +877,7 @@ def provision_student_repository(
         raise BadRequestException("This course is not configured for git provisioning")
 
     server = binding.git_server
-    if server is None or not server.managed or not server.token:
+    if not _binding_has_managed_creds(binding, server):
         raise BadRequestException("No managed git server is bound to this course")
 
     # Idempotent: one working repo per course membership. On re-provision,
@@ -1001,7 +1067,7 @@ def register_gitlab_managed_access(
         raise BadRequestException("This course does not offer managed repositories")
 
     server = binding.git_server
-    if server is None or server.type != "gitlab" or not server.managed or not server.token:
+    if server is None or server.type != "gitlab" or not _binding_has_managed_creds(binding, server):
         raise BadRequestException("No managed GitLab server is bound to this course")
 
     if not provider_access_token:
@@ -1032,7 +1098,7 @@ def register_gitlab_managed_access(
             "Your GitLab repository is missing its project id; re-provision and retry."
         )
 
-    client = get_provider_client_for_server(server)
+    client = get_gitlab_client_for_binding(binding, server)
     client.add_member(project_id, gitlab_user_id, _GITLAB_MAINTAINER)
     # Read access on the course template so the student can pull upstream updates.
     template_project_id = ((binding.properties or {}).get("gitlab") or {}).get("template_project_id")
@@ -1076,7 +1142,6 @@ def get_template_archive_source(
     something every course member is entitled to.
     """
     from urllib.parse import quote
-    from computor_types.encryption import decrypt_secret
 
     user_id = permissions.get_user_id()
     if not user_id:
@@ -1098,10 +1163,11 @@ def get_template_archive_source(
     if binding is None or not binding.git_server_id or not binding.template_repo:
         raise BadRequestException("This course has no downloadable template")
     server = binding.git_server
-    if server is None or not server.token:
+    binding_token = getattr(binding, "token", None)
+    if server is None or not (binding_token or server.token):
         raise BadRequestException("This course's git server is not available")
 
-    token = decrypt_secret(server.token)
+    token = decrypt_secret(binding_token or server.token)
     branch = binding.default_branch or "main"
     base = server.base_url.rstrip("/")
     repo = binding.template_repo

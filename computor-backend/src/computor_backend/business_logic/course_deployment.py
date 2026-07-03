@@ -312,6 +312,24 @@ def deploy_course_from_config(
     # Validation pass (no writes).
     _walk(config.contents or [], None, None, [1.0], set())
 
+    # --- validate the optional git block (structural only; provisioning happens
+    # on apply, never during validate_only).
+    if config.git is not None:
+        gitcfg = config.git
+        valid_modes = {"managed", "external", "download"}
+        bad_modes = [m for m in (gitcfg.student_repo_modes or []) if m not in valid_modes]
+        if bad_modes:
+            errors.append(
+                f"git.student_repo_modes has invalid modes {bad_modes} "
+                f"(allowed: {sorted(valid_modes)})"
+            )
+        if gitcfg.provider not in (None, "forgejo", "gitlab"):
+            errors.append(
+                f"git: unsupported provider '{gitcfg.provider}' (expected 'forgejo' or 'gitlab')"
+            )
+        if gitcfg.delivery == "git" and gitcfg.provider == "gitlab" and not gitcfg.base_url:
+            errors.append("git: an external GitLab requires 'base_url'")
+
     result = CourseDeployResult(
         validated=True,
         applied=False,
@@ -385,6 +403,46 @@ def deploy_course_from_config(
     summary.examples_assigned = 0
     _walk(config.contents or [], None, ct_rows, [1.0], None)
     db.commit()
+
+    # ----- git binding (optional) -----
+    # Resolve the portable git reference (provider + base_url -> GitServer) and
+    # bind the course. This is the single server-side "git from the file" apply
+    # that the web upload AND the VSCode deploy command both inherit. It provisions
+    # real provider resources for delivery='git' with managed creds; on failure we
+    # keep the already-committed course + contents and surface a warning, so a
+    # transient git error doesn't discard the whole deploy (git can be reconfigured
+    # from the course's git binding UI). The token is taken literally here — env
+    # (${VAR}) interpolation is a client-side concern (the CLI expands before it
+    # sends; a web/VSCode upload should carry a real token).
+    if config.git is not None:
+        try:
+            from computor_backend.business_logic.git_registry import resolve_git_server_ref
+            from computor_backend.business_logic.course_git import _apply_course_git_binding
+            from computor_types.course_git import CourseGitBindingUpsert
+
+            gitcfg = config.git
+            server = resolve_git_server_ref(gitcfg.provider, gitcfg.base_url, db)
+            _apply_course_git_binding(
+                course,
+                CourseGitBindingUpsert(
+                    delivery=gitcfg.delivery,
+                    git_server_id=str(server.id) if server is not None else None,
+                    parent_group_id=gitcfg.parent_group_id,
+                    token=gitcfg.token,
+                    template_repo=gitcfg.template_repo,
+                    template_url=gitcfg.template_url,
+                    default_branch=gitcfg.default_branch,
+                    student_repo_modes=gitcfg.student_repo_modes or [],
+                ),
+                permissions.user_id,
+                db,
+            )  # commits the binding (+ any provisioning)
+        except Exception as e:  # noqa: BLE001 - keep the course, surface the git failure
+            logger.warning("git binding failed for course %s: %s", config.path, e)
+            db.rollback()
+            result.warnings.append(
+                CourseDeployWarning(reason=f"Git binding was not applied: {e}")
+            )
 
     result.applied = True
     result.course_id = str(course.id)
