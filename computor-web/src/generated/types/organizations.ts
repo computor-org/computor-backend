@@ -204,13 +204,6 @@ export interface OrganizationMemberQuery {
   organization_role_id?: string | null;
 }
 
-/**
- * Request to create an organization via Temporal workflow.
- */
-export interface OrganizationTaskRequest {
-  organization: Record<string, any>;
-}
-
 export interface OrganizationRoleGet {
   id: string;
   title?: string | null;

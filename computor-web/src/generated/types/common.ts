@@ -31,6 +31,30 @@ export interface CoderSessionResponse {
   message: string;
 }
 
+/**
+ * Request model for deployment from configuration.
+ */
+export interface DeploymentRequest {
+  /** Deployment configuration as dictionary */
+  deployment_config: Record<string, unknown>;
+  /** If true, only validate the configuration without deploying */
+  validate_only?: boolean;
+}
+
+/**
+ * Response model for deployment operations.
+ */
+export interface DeploymentResponse {
+  /** Temporal workflow ID */
+  workflow_id: string;
+  /** Deployment status */
+  status: string;
+  /** Status message */
+  message: string;
+  /** Full deployment path */
+  deployment_path?: string | null;
+}
+
 export interface StudentProfileCreate {
   student_id?: string | null;
   student_email?: string | null;

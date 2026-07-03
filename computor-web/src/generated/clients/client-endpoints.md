@@ -587,9 +587,7 @@
 | `generateAssignmentsSystemCoursesCourseIdGenerateAssignmentsPost` | POST | `/system/courses/{course_id}/generate-assignments` | `GenerateAssignmentsRequest` | `GenerateAssignmentsResponse` |
 | `generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost` | POST | `/system/courses/{course_id}/generate-student-template` | `GenerateTemplateRequest` | `GenerateTemplateResponse` |
 | `getCourseGitlabStatusSystemCoursesCourseIdGitlabStatusGet` | GET | `/system/courses/{course_id}/gitlab-status` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `createCourseFamilyAsyncSystemDeployCourseFamiliesPost` | POST | `/system/deploy/course-families` | `CourseFamilyTaskRequest` | `TaskResponse` |
 | `createCourseAsyncSystemDeployCoursesPost` | POST | `/system/deploy/courses` | `CourseTaskRequest` | `TaskResponse` |
-| `createOrganizationAsyncSystemDeployOrganizationsPost` | POST | `/system/deploy/organizations` | `OrganizationTaskRequest` | `TaskResponse` |
 | `createHierarchySystemHierarchyCreatePost` | POST | `/system/hierarchy/create` | `Record<string, unknown> & Record<string, unknown>` | `Record<string, unknown> & Record<string, unknown>` |
 | `getHierarchyStatusSystemHierarchyStatusWorkflowIdGet` | GET | `/system/hierarchy/status/{workflow_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `activateMaintenanceSystemMaintenanceActivatePost` | POST | `/system/maintenance/activate` | `MaintenanceActivate` | `void` |
