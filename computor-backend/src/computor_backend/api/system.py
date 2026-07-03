@@ -18,7 +18,7 @@ from computor_backend.permissions.principal import Principal
 
 from computor_backend.database import get_db
 from computor_types.system import (
-    OrganizationTaskRequest, CourseFamilyTaskRequest, CourseTaskRequest, TaskResponse,
+    CourseTaskRequest, TaskResponse,
     GenerateTemplateRequest, GenerateTemplateResponse,
     GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
@@ -35,126 +35,6 @@ from computor_backend.business_logic.release_validation import (
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
 
-
-@system_router.post("/deploy/organizations", response_model=TaskResponse)
-async def create_organization_async(
-    request: OrganizationTaskRequest,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
-):
-    """Create an organization asynchronously using Temporal workflows."""
-
-    # Check permissions
-    check_permissions(permissions, Organization, "create", db)
-
-    org_config = {
-        "name": request.organization.get("title", ""),
-        "path": request.organization.get("path", ""),
-        "description": request.organization.get("description", ""),
-        "organization_type": request.organization.get("organization_type", "organization"),
-    }
-
-    try:
-        task_tracker = await get_task_tracker()
-        task_submission = TaskSubmission(
-            task_name="create_organization",
-            parameters={
-                "org_config": org_config,
-                "user_id": permissions.user_id
-            },
-            queue="computor-tasks"
-        )
-
-        task_id = await task_tracker.submit_and_track_task(
-            task_submission=task_submission,
-            created_by=permissions.user_id,
-            user_id=permissions.user_id,
-            entity_type="organization",
-            description=f"Create organization: {org_config['name']}"
-        )
-    except ComputorException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting organization creation task: {e}")
-        raise TemporalServiceException(
-            detail=f"Failed to submit organization creation task: {str(e)}",
-            context={"operation": "create_organization"}
-        ) from e
-
-    return TaskResponse(
-        task_id=task_id,
-        status="submitted",
-        message="Organization creation task submitted successfully"
-    )
-
-@system_router.post("/deploy/course-families", response_model=TaskResponse)
-async def create_course_family_async(
-    request: CourseFamilyTaskRequest,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
-):
-    """Create a course family asynchronously using Temporal workflows."""
-
-    # Check permissions
-    check_permissions(permissions, CourseFamily, "create", db)
-
-    # Validate parent organization exists
-    organization = db.query(Organization).filter(Organization.id == request.organization_id).first()
-    if not organization:
-        raise NotFoundException(
-            detail=f"Organization with ID {request.organization_id} not found",
-            context={"organization_id": request.organization_id}
-        )
-
-    # Check if organization has GitLab integration (legacy org-scoped model;
-    # orgs may carry no properties in the course-level model, so guard the None).
-    parent_gitlab_config = (organization.properties or {}).get("gitlab", {})
-    has_gitlab = bool(parent_gitlab_config.get("group_id"))
-
-    # Convert to course family config format
-    family_config = {
-        "name": request.course_family.get("title", ""),
-        "path": request.course_family.get("path", ""),
-        "description": request.course_family.get("description", ""),
-        "organization_id": request.organization_id,
-        "has_gitlab": has_gitlab
-    }
-
-    # Submit task using Temporal and track for permission-aware polling
-    try:
-        task_tracker = await get_task_tracker()
-        task_submission = TaskSubmission(
-            task_name="create_course_family",
-            parameters={
-                "family_config": family_config,
-                "organization_id": request.organization_id,
-                "user_id": permissions.user_id
-            },
-            queue="computor-tasks"
-        )
-
-        task_id = await task_tracker.submit_and_track_task(
-            task_submission=task_submission,
-            created_by=permissions.user_id,
-            user_id=permissions.user_id,
-            organization_id=request.organization_id,
-            entity_type="course_family",
-            description=f"Create course family: {family_config['name']}"
-        )
-    except ComputorException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting course family creation task: {e}")
-        raise TemporalServiceException(
-            detail=f"Failed to submit course family creation task: {str(e)}",
-            context={"operation": "create_course_family", "organization_id": request.organization_id}
-        ) from e
-
-    return TaskResponse(
-        task_id=task_id,
-        status="submitted",
-        message="Course family creation task submitted successfully"
-    )
 
 @system_router.post("/deploy/courses", response_model=TaskResponse)
 async def create_course_async(
@@ -691,18 +571,23 @@ async def create_hierarchy(
             "deployment_path": config.get_full_course_path()
         }
     
-    # Submit to Temporal workflow
+    # Organizations + course families are plain DB inserts (course-level git
+    # model) — create them synchronously, then the workflow only creates courses.
+    from computor_backend.business_logic.deployment import precreate_hierarchy_and_collect_courses
+    courses = precreate_hierarchy_and_collect_courses(config, str(permissions.user_id), db)
+
+    # Submit to Temporal workflow (courses only)
     task_executor = get_task_executor()
-    
+
     task_submission = TaskSubmission(
         task_name="deploy_computor_hierarchy",
         parameters={
-            "deployment_config": config.model_dump(),
+            "courses": courses,
             "user_id": permissions.user_id
         },
         queue="computor-tasks"
     )
-    
+
     workflow_id = await task_executor.submit_task(task_submission)
     
     # Get first organization name for message

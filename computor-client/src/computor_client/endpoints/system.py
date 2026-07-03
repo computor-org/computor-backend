@@ -10,13 +10,11 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 
 from computor_types.system import (
-    CourseFamilyTaskRequest,
     CourseTaskRequest,
     GenerateAssignmentsRequest,
     GenerateAssignmentsResponse,
     GenerateTemplateRequest,
     GenerateTemplateResponse,
-    OrganizationTaskRequest,
     TaskResponse,
 )
 
@@ -30,24 +28,6 @@ class SystemClient:
 
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
-
-    async def deploy_organizations(
-        self,
-        data: Union[OrganizationTaskRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> TaskResponse:
-        """Create Organization Async"""
-        response = await self._http.post(f"/system/deploy/organizations", json_data=data, params=kwargs)
-        return TaskResponse.model_validate(response.json())
-
-    async def deploy_course_families(
-        self,
-        data: Union[CourseFamilyTaskRequest, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> TaskResponse:
-        """Create Course Family Async"""
-        response = await self._http.post(f"/system/deploy/course-families", json_data=data, params=kwargs)
-        return TaskResponse.model_validate(response.json())
 
     async def deploy_courses(
         self,

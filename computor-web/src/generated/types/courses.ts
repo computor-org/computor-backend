@@ -1261,14 +1261,6 @@ export interface CourseQuery {
 }
 
 /**
- * Request to create a course family via Temporal workflow.
- */
-export interface CourseFamilyTaskRequest {
-  course_family: Record<string, any>;
-  organization_id: string;
-}
-
-/**
  * Request to create a course via Temporal workflow.
  */
 export interface CourseTaskRequest {

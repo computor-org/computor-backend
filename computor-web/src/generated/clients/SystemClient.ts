@@ -3,7 +3,7 @@
  * Endpoint: /system
  */
 
-import type { CourseFamilyTaskRequest, CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, MaintenanceActivate, MaintenanceSchedule, MaintenanceStatusGet, OrganizationTaskRequest, TaskResponse } from 'types/generated';
+import type { CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, MaintenanceActivate, MaintenanceSchedule, MaintenanceStatusGet, TaskResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -52,17 +52,6 @@ export class SystemClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Course Family Async
-   * Create a course family asynchronously using Temporal workflows.
-   */
-  async createCourseFamilyAsyncSystemDeployCourseFamiliesPost({ userId, body }: { userId?: string | null; body: CourseFamilyTaskRequest }): Promise<TaskResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<TaskResponse>(this.buildPath('deploy', 'course-families'), body, { params: queryParams });
-  }
-
-  /**
    * Create Course Async
    * Create a course asynchronously using Temporal workflows.
    */
@@ -71,17 +60,6 @@ export class SystemClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<TaskResponse>(this.buildPath('deploy', 'courses'), body, { params: queryParams });
-  }
-
-  /**
-   * Create Organization Async
-   * Create an organization asynchronously using Temporal workflows.
-   */
-  async createOrganizationAsyncSystemDeployOrganizationsPost({ userId, body }: { userId?: string | null; body: OrganizationTaskRequest }): Promise<TaskResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<TaskResponse>(this.buildPath('deploy', 'organizations'), body, { params: queryParams });
   }
 
   /**
