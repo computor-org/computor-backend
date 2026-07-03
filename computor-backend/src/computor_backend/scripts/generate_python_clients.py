@@ -347,7 +347,6 @@ SCHEMA_TO_MODULE = {
     "GitCommit": "git",
     "GitLabConfig": "deployments",
     "GitLabConfigGet": "deployments",
-    "GitLabCredentials": "system",
     "GitLabPATCredentials": "password_management",
     "GitLabSyncRequest": "lecturer_gitlab_sync",
     "GitLabSyncResult": "lecturer_gitlab_sync",

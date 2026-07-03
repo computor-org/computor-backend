@@ -65,13 +65,6 @@ class Organization(Base):
         back_populates='organization',
         cascade='all, delete-orphan',
     )
-    git_providers = relationship(
-        'GitProvider',
-        back_populates='organization',
-        cascade='all, delete-orphan',
-        uselist=True,
-        lazy='select',
-    )
 
 
 class OrganizationRole(Base):

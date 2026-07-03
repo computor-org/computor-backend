@@ -10,8 +10,6 @@
 
 import type { GitLabConfig, GitLabConfigGet } from './common';
 
-import type { GitProviderCredentials } from './sso';
-
 import type { UserList } from './users';
 
 
@@ -211,7 +209,6 @@ export interface OrganizationMemberQuery {
  */
 export interface OrganizationTaskRequest {
   organization: Record<string, any>;
-  git_provider: GitProviderCredentials;
 }
 
 export interface OrganizationRoleGet {

@@ -11,23 +11,9 @@ from pydantic import BaseModel, Field
 from computor_types.course_git import CourseGitBindingUpsert
 
 
-class GitLabCredentials(BaseModel):
-    """GitLab connection credentials (kept for backwards compatibility)."""
-    gitlab_url: str
-    gitlab_token: str
-
-
-class GitProviderCredentials(BaseModel):
-    """Git provider connection credentials — provider-agnostic."""
-    type: str   # 'gitlab' | 'forgejo' | 'github'
-    url: str
-    token: str
-
-
 class OrganizationTaskRequest(BaseModel):
     """Request to create an organization via Temporal workflow."""
     organization: Dict
-    git_provider: GitProviderCredentials
 
 
 class CourseFamilyTaskRequest(BaseModel):

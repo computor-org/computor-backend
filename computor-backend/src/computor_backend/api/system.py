@@ -51,6 +51,7 @@ async def create_organization_async(
         "name": request.organization.get("title", ""),
         "path": request.organization.get("path", ""),
         "description": request.organization.get("description", ""),
+        "organization_type": request.organization.get("organization_type", "organization"),
     }
 
     try:
@@ -59,9 +60,6 @@ async def create_organization_async(
             task_name="create_organization",
             parameters={
                 "org_config": org_config,
-                "git_provider_type": request.git_provider.type,
-                "git_provider_url": request.git_provider.url,
-                "git_provider_token": request.git_provider.token,
                 "user_id": permissions.user_id
             },
             queue="computor-tasks"

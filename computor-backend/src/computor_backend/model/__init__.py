@@ -28,7 +28,6 @@ from .deployment import CourseContentDeployment, DeploymentHistory
 from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
 from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
-from .git_provider import GitProvider
 from .git_server import GitServer, CourseGitBinding, CourseMemberRepository
 
 # Import all models to ensure relationships are properly set up
@@ -36,7 +35,6 @@ from . import (
     auth,
     language,
     organization,
-    git_provider,
     role,
     group,
     course,
@@ -118,8 +116,6 @@ __all__ = [
     'ApiToken',
     # Invite link
     'InviteLink',
-    # Git provider (legacy, organization-scoped)
-    'GitProvider',
     # Course-level git: server registry + per-course binding + student repo
     'GitServer',
     'CourseGitBinding',

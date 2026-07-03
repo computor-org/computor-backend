@@ -2800,14 +2800,6 @@ export interface DeploymentSummary {
 }
 
 /**
- * GitLab connection credentials (kept for backwards compatibility).
- */
-export interface GitLabCredentials {
-  gitlab_url: string;
-  gitlab_token: string;
-}
-
-/**
  * Per-item override for release commit selection.
  */
 export interface ReleaseOverride {
