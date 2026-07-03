@@ -105,7 +105,7 @@ export default function ProfilePage() {
     }
   }
 
-  const fullName = [givenName, familyName].filter(Boolean).join(' ') || user?.username || user?.email || '—';
+  const fullName = [givenName, familyName].filter(Boolean).join(' ') || user?.email || '—';
   const previewColorInt = avatarColor ? parseInt(avatarColor.replace('#', ''), 16) : null;
 
   return (

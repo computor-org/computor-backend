@@ -139,7 +139,7 @@ export class SSOAuthService implements ISSOAuthProvider {
     const roleIds: string[] = (userInfo.user_roles || []).map((r) => r.role_id);
     return {
       id: userInfo.id,
-      username: userInfo.username || userInfo.email || '',
+      username: userInfo.email || '',
       email: userInfo.email || '',
       givenName: userInfo.given_name || undefined,
       familyName: userInfo.family_name || undefined,

@@ -178,7 +178,7 @@ export class AuthService implements IAuthProviderWithLogin {
 
     return {
       id: userInfo.id,
-      username: userInfo.username || '',
+      username: userInfo.email || '',
       email: userInfo.email || '',
       givenName: userInfo.given_name || undefined,
       familyName: userInfo.family_name || undefined,
