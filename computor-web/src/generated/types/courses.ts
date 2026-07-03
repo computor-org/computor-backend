@@ -1046,6 +1046,10 @@ export interface CourseGitBindingUpsert {
   delivery?: "git" | "download";
   /** Registry server hosting the student-template */
   git_server_id?: string | null;
+  /** GitLab parent group id/path the course group is created under (GitLab only) */
+  parent_group_id?: string | null;
+  /** GitLab group access token bound to this course (GitLab only; stored encrypted, never returned) */
+  token?: string | null;
   /** Repo/project reference of the student-template */
   template_repo?: string | null;
   /** Clone/web URL of the student-template */
@@ -1064,6 +1068,10 @@ export interface CourseGitBindingGet {
   course_id: string;
   delivery: string;
   git_server_id?: string | null;
+  /** GitLab parent group id/path (GitLab only) */
+  parent_group_id?: string | null;
+  /** Whether a per-course git token is stored on the binding (the token itself is never returned) */
+  has_token?: boolean;
   template_repo?: string | null;
   template_url?: string | null;
   default_branch?: string | null;

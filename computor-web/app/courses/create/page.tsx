@@ -47,7 +47,11 @@ function CreateInner() {
   const [description, setDescription] = useState('');
   const [gitEnabled, setGitEnabled] = useState(true);
   const [serverId, setServerId] = useState('');
+  const [delivery, setDelivery] = useState<'git' | 'download'>('git');
+  const [parentGroupId, setParentGroupId] = useState('');
+  const [token, setToken] = useState('');
   const [modes, setModes] = useState<string[]>(['managed']);
+  const [deployNow, setDeployNow] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,11 +123,35 @@ function CreateInner() {
 
   async function configureGit(courseId: string) {
     if (canConfigureGit && gitEnabled && serverId) {
+      const selected = servers.find((s) => s.id === serverId);
+      const body: Record<string, unknown> = {
+        delivery,
+        git_server_id: serverId,
+        student_repo_modes: modes,
+      };
+      // External GitLab: the course brings its own parent group + group token
+      // (stored encrypted on the binding). Forgejo needs neither.
+      if (selected?.type === 'gitlab') {
+        if (parentGroupId.trim()) body.parent_group_id = parentGroupId.trim();
+        if (token.trim()) body.token = token.trim();
+      }
       try {
-        await api.put(`/courses/${courseId}/git`, { delivery: 'git', git_server_id: serverId, student_repo_modes: modes });
+        await api.put(`/courses/${courseId}/git`, body);
       } catch (e) {
         throw new Error('Course created, but git setup failed: ' + (e instanceof Error ? e.message : ''));
       }
+    }
+  }
+
+  // Opt-in: once the course exists (and has a git binding), kick off the
+  // student-template deploy for all pending assignments. Best-effort — the course
+  // is already created, so a deploy hiccup can be retried from the assignments page.
+  async function triggerDeploy(courseId: string) {
+    if (!deployNow) return;
+    try {
+      await api.post(`/system/courses/${courseId}/generate-student-template`, {});
+    } catch {
+      /* best-effort; ignore */
     }
   }
 
@@ -137,7 +165,11 @@ function CreateInner() {
           validate_only: false,
         });
         if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
-        await configureGit(res.course_id);
+        // Git comes from the uploaded file's `git:` block (applied server-side by
+        // deploy-course). Do NOT also call configureGit here — that would clobber
+        // the file's binding with the manual UI selection (and 409 once the file's
+        // binding has materialized a template).
+        await triggerDeploy(res.course_id);
         if (res.warnings?.length) {
           // The course was created, but something is off (e.g. a service slug
           // didn't resolve, so assignments have no testing service). Surface the
@@ -158,6 +190,7 @@ function CreateInner() {
       });
       // One step: configure git immediately so a course is never left without it.
       await configureGit(course.id);
+      await triggerDeploy(course.id);
       router.push(`/courses/${course.id}`);
     } catch (e) {
       setSaving(false);
@@ -170,6 +203,7 @@ function CreateInner() {
   }
 
   const blocked = hasFile && (check?.errors?.length ?? 0) > 0;
+  const selectedServer = servers.find((s) => s.id === serverId);
 
   return (
     <AuthenticatedLayout>
@@ -179,8 +213,8 @@ function CreateInner() {
         description="A course is one run of a lecture in a single term — students enroll here, get their repositories, and submit their work. It belongs to a course family (the lecture)."
         error={error}
         submitting={saving}
-        disabled={!familyId || (hasFile ? blocked : !path.trim())}
-        submitLabel={hasFile ? 'Create from file' : 'Create'}
+        disabled={!familyId || !!createdCourseId || (hasFile ? blocked : !path.trim())}
+        submitLabel={createdCourseId ? 'Created ✓' : hasFile ? 'Create from file' : 'Create'}
         onCancel={() => router.push('/courses')}
         onSubmit={save}
       >
@@ -281,7 +315,16 @@ function CreateInner() {
           </>
         )}
 
-        {canConfigureGit && servers.length > 0 && (
+        {hasFile && canConfigureGit && (
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-xs text-gray-500">
+              Git is configured by the uploaded file&apos;s <code className="font-mono">git:</code> block
+              (or left unbound if it has none — you can set it later on the course&apos;s edit page).
+            </p>
+          </div>
+        )}
+
+        {!hasFile && canConfigureGit && servers.length > 0 && (
           <div className="border-t border-gray-200 pt-4 space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               <input type="checkbox" checked={gitEnabled} onChange={(e) => setGitEnabled(e.target.checked)} />
@@ -296,6 +339,22 @@ function CreateInner() {
                     ))}
                   </select>
                 </Field>
+                <Field label="Delivery" hint="How students get assignments: fork/clone a template repo (git), or download an archive.">
+                  <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
+                    <option value="git">Git (fork/clone template)</option>
+                    <option value="download">Download (archive)</option>
+                  </select>
+                </Field>
+                {selectedServer?.type === 'gitlab' && (
+                  <>
+                    <Field label="GitLab parent group id" hint="The course's own GitLab group is created under this parent group.">
+                      <input value={parentGroupId} onChange={(e) => setParentGroupId(e.target.value)} placeholder="12345" className={inputCls} />
+                    </Field>
+                    <Field label="GitLab group token" hint="A group access token scoped to the parent group — stored encrypted on this course, never shown again.">
+                      <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="glpat-…" className={inputCls} />
+                    </Field>
+                  </>
+                )}
                 <Field label="Student-repo modes">
                   <div className="flex flex-wrap gap-3">
                     {ALL_MODES.map((m) => (
@@ -310,6 +369,13 @@ function CreateInner() {
               </>
             )}
           </div>
+        )}
+
+        {canConfigureGit && (
+          <label className="flex items-center gap-2 border-t border-gray-200 pt-4 text-sm text-gray-700">
+            <input type="checkbox" checked={deployNow} onChange={(e) => setDeployNow(e.target.checked)} />
+            Deploy assignments now — push them into the template repo once the course is created
+          </label>
         )}
       </FormPanel>
     </AuthenticatedLayout>

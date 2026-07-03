@@ -92,6 +92,82 @@ def ensure_managed_forgejo_registered() -> None:
         db.commit()
 
 
+def resolve_git_server_ref(
+    provider: str | None,
+    base_url: str | None,
+    db: Session,
+    *,
+    create_if_missing: bool = True,
+) -> GitServer | None:
+    """Resolve a deploy-file git reference (``provider`` + ``base_url``) to a ``GitServer``.
+
+    Portable counterpart to a raw ``git_server_id`` UUID, for deployment files
+    that must work across systems:
+
+    * ``provider='forgejo'`` with no ``base_url`` → the in-system managed Forgejo
+      (by the configured ``GIT_SERVER_URL``); errors if it isn't registered yet.
+    * ``provider='gitlab'`` + ``base_url`` → the GitLab instance pointer at that
+      URL. Auto-created tokenless (``managed=False``) when missing and
+      ``create_if_missing`` — the per-course token lives on the *binding*, so the
+      registry row is only an instance pointer (no secrets).
+
+    Returns ``None`` when ``provider`` is falsy (e.g. a pure-download course with
+    no template host), or when a GitLab pointer is missing and
+    ``create_if_missing`` is False (validate-only).
+    """
+    if not provider:
+        return None
+    provider = provider.lower()
+    url = (base_url or "").strip().rstrip("/")
+
+    if provider == "forgejo":
+        if not url:
+            from computor_backend.git_server.config import get_git_server_settings
+
+            cfg = get_git_server_settings()
+            if not (cfg.is_forgejo and cfg.git_server_url):
+                raise BadRequestException(
+                    "No in-system managed Forgejo is configured "
+                    "(set GIT_SERVER=forgejo and GIT_SERVER_URL)."
+                )
+            url = cfg.git_server_url.rstrip("/")
+        server = (
+            db.query(GitServer)
+            .filter(GitServer.type == "forgejo", GitServer.base_url == url)
+            .first()
+        )
+        if server is None:
+            raise BadRequestException(
+                f"No Forgejo git server is registered at {url}. The managed Forgejo "
+                f"is auto-registered at startup once it is reachable."
+            )
+        return server
+
+    if provider == "gitlab":
+        if not url:
+            raise BadRequestException("An external GitLab reference requires 'base_url'.")
+        server = (
+            db.query(GitServer)
+            .filter(GitServer.type == "gitlab", GitServer.base_url == url)
+            .first()
+        )
+        if server is None:
+            if not create_if_missing:
+                return None
+            # Tokenless instance pointer — per-course credentials live on the binding.
+            server = GitServer(
+                type="gitlab", base_url=url, name=f"GitLab ({url})", managed=False
+            )
+            db.add(server)
+            db.flush()
+            logger.info("Auto-registered tokenless GitLab instance pointer %s", url)
+        return server
+
+    raise BadRequestException(
+        f"Unsupported git provider {provider!r} (expected 'forgejo' or 'gitlab')."
+    )
+
+
 def is_registry_admin(principal: Principal) -> bool:
     """Who may manage the git server registry: admins and ``_organization_manager``."""
     return bool(principal.is_admin or "_organization_manager" in (principal.roles or []))

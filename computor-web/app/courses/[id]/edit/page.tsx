@@ -46,6 +46,9 @@ export default function CourseEditPage() {
   const [templateUrl, setTemplateUrl] = useState('');
   const [branch, setBranch] = useState('main');
   const [modes, setModes] = useState<string[]>([]);
+  const [parentGroupId, setParentGroupId] = useState('');
+  const [token, setToken] = useState('');
+  const [hasToken, setHasToken] = useState(false);
   const [savingGit, setSavingGit] = useState(false);
   const [gitMsg, setGitMsg] = useState<string | null>(null);
 
@@ -70,6 +73,9 @@ export default function CourseEditPage() {
         setTemplateUrl(b.template_url || '');
         setBranch(b.default_branch || 'main');
         setModes(b.student_repo_modes || []);
+        setParentGroupId(b.parent_group_id || '');
+        setHasToken(!!b.has_token);
+        setToken('');
       } else {
         // No binding yet — default to a managed server + the managed mode.
         setGitServerId(srv.find((s) => s.managed)?.id ?? srv[0]?.id ?? '');
@@ -111,14 +117,22 @@ export default function CourseEditPage() {
     setSavingGit(true);
     setGitMsg(null);
     try {
-      await api.put(`/courses/${courseId}/git`, {
+      const selected = servers.find((s) => s.id === gitServerId);
+      const body: Record<string, unknown> = {
         delivery,
         git_server_id: gitServerId || null,
         template_repo: templateRepo.trim() || null,
         template_url: templateUrl.trim() || null,
         default_branch: branch.trim() || 'main',
         student_repo_modes: modes,
-      });
+      };
+      // External GitLab carries its own parent group + group token on the course.
+      // Only send the token when the field was filled (blank keeps the stored one).
+      if (selected?.type === 'gitlab') {
+        if (parentGroupId.trim()) body.parent_group_id = parentGroupId.trim();
+        if (token.trim()) body.token = token.trim();
+      }
+      await api.put(`/courses/${courseId}/git`, body);
       setGitMsg('Saved.');
       await load();
     } catch (e) {
@@ -138,6 +152,7 @@ export default function CourseEditPage() {
   };
   const gitConfigured = binding && binding.delivery;
   const gitLocked = !!binding?.locked;
+  const selectedServer = servers.find((s) => s.id === gitServerId);
 
   return (
     <AuthenticatedLayout>
@@ -230,6 +245,16 @@ export default function CourseEditPage() {
                         ))}
                       </select>
                     </Field>
+                    {selectedServer?.type === 'gitlab' && (
+                      <>
+                        <Field label="GitLab parent group id" hint="The course's own GitLab group is created under this parent group.">
+                          <input value={parentGroupId} onChange={(e) => setParentGroupId(e.target.value)} placeholder="12345" className={inputCls} />
+                        </Field>
+                        <Field label="GitLab group token" hint={hasToken ? 'A token is already stored — enter a new one to replace it.' : 'A group access token scoped to the parent group — stored encrypted on this course, never shown again.'}>
+                          <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={hasToken ? '•••••••• (stored)' : 'glpat-…'} className={inputCls} />
+                        </Field>
+                      </>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Template repo">
                         <input value={templateRepo} onChange={(e) => setTemplateRepo(e.target.value)} placeholder="owner/repo" className={inputCls} />

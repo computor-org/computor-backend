@@ -98,6 +98,12 @@ class CourseGitBinding(Base):
     template_repo = Column(String(2048))      # repo/project ref of the template on the server
     template_url = Column(String(2048))       # clone/web url of the template
     default_branch = Column(String(255), server_default=text("'main'"))
+    # Per-course git credential (a GitLab group access token), encrypted at rest.
+    # For managed GitLab the token + parent_group_id (in ``properties.gitlab``)
+    # live on the binding — the course brings its own creds instead of sharing a
+    # managed registry server. Forgejo uses the system server's token, so this
+    # stays null for Forgejo-backed courses.
+    token = Column(String(4096))
     # Allowed student-repo hosting modes, e.g. ["managed", "external", "download"].
     student_repo_modes = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     properties = Column(JSONB)

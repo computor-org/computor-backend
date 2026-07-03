@@ -8,7 +8,7 @@ The deprecated CodeAbility classes have been moved to codeability_meta.py
 and test-related enums should be in their own module.
 """
 
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Literal
 from pydantic import BaseModel, Field
 
 from .deployment_base import BaseDeployment, DeploymentFactory  # noqa: F401
@@ -311,6 +311,57 @@ class CourseContentConfig(BaseDeployment):
         description="Additional properties for the content"
     )
 
+class CourseGitConfig(BaseDeployment):
+    """Portable per-course git configuration for a deployment file.
+
+    Resolved server-side into a ``CourseGitBinding`` when the course is deployed
+    (CLI, web upload, or VSCode). A git server is referenced by ``provider``
+    (+ ``base_url`` for external instances) instead of a machine-specific
+    ``git_server_id`` UUID, so the file stays portable across systems.
+
+    - In-system managed **Forgejo**: ``provider: forgejo`` (no ``base_url``);
+      credentials are the system server's — nothing lives here.
+    - External **GitLab**: ``provider: gitlab`` + ``base_url``; the course brings
+      its own ``parent_group_id`` (its GitLab group is created under it) and
+      ``token`` (a group access token, stored encrypted ON THE BINDING).
+    - Pure **download**: ``delivery: download`` (with a ``provider`` to host the
+      template archive, or none for an unbound course).
+    """
+    delivery: Literal['git', 'download'] = Field(
+        'git', description="Assignment delivery: 'git' (fork/clone) or 'download' (archive)"
+    )
+    provider: Optional[Literal['forgejo', 'gitlab']] = Field(
+        None,
+        description="Git provider. 'forgejo' with no base_url = the in-system managed Forgejo.",
+    )
+    base_url: Optional[str] = Field(
+        None,
+        description="Git server base URL. Required for external GitLab; omit for the in-system managed Forgejo.",
+    )
+    parent_group_id: Optional[str] = Field(
+        None,
+        description="GitLab parent group id/path the course group is created under (GitLab only).",
+    )
+    token: Optional[str] = Field(
+        None,
+        description="GitLab group access token bound to this course (GitLab only; stored encrypted). "
+        "Supports ${ENV_VAR} interpolation at deploy time.",
+    )
+    template_repo: Optional[str] = Field(
+        None, description="Explicit template repo/project ref (optional; auto-derived for managed servers)."
+    )
+    template_url: Optional[str] = Field(
+        None, description="Explicit template clone/web URL (optional)."
+    )
+    default_branch: Optional[str] = Field(
+        None, description="Default branch of the template (defaults to 'main')."
+    )
+    student_repo_modes: List[str] = Field(
+        default_factory=list,
+        description="Allowed student-repo hosting modes: subset of ['managed', 'external', 'download'].",
+    )
+
+
 class CourseConfig(BaseDeployment):
     """Course configuration."""
     name: str = Field(description="Course display name")
@@ -337,6 +388,11 @@ class CourseConfig(BaseDeployment):
     contents: Optional[List[CourseContentConfig]] = Field(
         default_factory=list,
         description="Course contents hierarchy (assignments, units, etc.)"
+    )
+    git: Optional[CourseGitConfig] = Field(
+        None,
+        description="Optional git configuration, bound to the course at deploy time. "
+        "Omit to create an unbound course (configure git later in the UI).",
     )
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
 

@@ -52,6 +52,14 @@ class CourseGitBindingUpsert(BaseModel):
 
     delivery: Literal['git', 'download'] = 'git'
     git_server_id: Optional[str] = Field(None, description="Registry server hosting the student-template")
+    parent_group_id: Optional[str] = Field(
+        None,
+        description="GitLab parent group id/path the course group is created under (GitLab only)",
+    )
+    token: Optional[str] = Field(
+        None,
+        description="GitLab group access token bound to this course (GitLab only; stored encrypted, never returned)",
+    )
     template_repo: Optional[str] = Field(None, description="Repo/project reference of the student-template")
     template_url: Optional[str] = Field(None, description="Clone/web URL of the student-template")
     default_branch: Optional[str] = Field(None, description="Default branch (defaults to 'main')")
@@ -78,6 +86,11 @@ class CourseGitBindingGet(BaseModel):
     course_id: str
     delivery: str
     git_server_id: Optional[str] = None
+    parent_group_id: Optional[str] = Field(None, description="GitLab parent group id/path (GitLab only)")
+    has_token: bool = Field(
+        False,
+        description="Whether a per-course git token is stored on the binding (the token itself is never returned)",
+    )
     template_repo: Optional[str] = None
     template_url: Optional[str] = None
     default_branch: Optional[str] = None
