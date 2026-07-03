@@ -53,7 +53,13 @@ services:
       - redis
       - minio
     ulimits:
-      nproc: 2048
+      # NOTE: do NOT set `nproc` here. The MATLAB base image runs as UID 1000,
+      # which collides with the typical host login user (also UID 1000). RLIMIT_NPROC
+      # is enforced per real-UID *host-wide* (not per container, since there's no
+      # userns-remap), so a cap of e.g. 2048 is exhausted by the host desktop's own
+      # tasks before the worker starts -> fork/exec fails with EAGAIN ("resource
+      # temporarily unavailable") and the container restart-loops. Use pids_limit
+      # (cgroup pids controller, namespace-scoped) to bound the container instead.
       nofile:
         soft: 8192
         hard: 16384
