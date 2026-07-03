@@ -788,7 +788,6 @@ except Exception as e:
     'GenerateTemplateResponse': 'system',
     'GitLabConfig': 'deployments',
     'GitLabConfigGet': 'deployments',
-    'GitLabCredentials': 'system',
     'GradedArtifactInfo': 'tutor_grading',
     'GradedByCourseMember': 'grading',
     'GradingAuthor': 'grading',

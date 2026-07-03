@@ -8,7 +8,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
+from computor_types.deployments_refactored import CourseFamilyConfig, CourseConfig
 from ..database import get_db_session
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
@@ -20,64 +20,69 @@ logger = logging.getLogger(__name__)
 @activity.defn(name="create_organization_activity")
 async def create_organization_activity(
     org_config: Dict[str, Any],
-    git_provider_type: str,
-    git_provider_url: str,
-    git_provider_token: str,   # plaintext — encrypted before storage
     user_id: str,
 ) -> Dict[str, Any]:
+    """Create an organization row and enroll the creator as ``_owner``.
+
+    Course-level git model: organizations carry no git configuration — git is
+    per-course (see the course's ``CourseGitBinding``). Authorization happened
+    at the API edge. Idempotent on (organization_type, path).
     """
-    Create an organization and its git provider row.
-    The provider row is created here because the org doesn't exist yet when
-    the task is submitted (chicken-and-egg: git_provider FK requires org.id).
-    """
-    from ..generator.gitlab_builder import GitLabBuilder
-    from ..model.git_provider import GitProvider
-    from computor_types.encryption import encrypt_secret
-    from computor_types.gitlab import GitLabConfig
+    from ..custom_types import Ltree
+    from ..model.organization import OrganizationMember
 
     logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
     try:
-        gitlab_config = GitLabConfig(
-            url=git_provider_url,
-            token=git_provider_token,
-            parent=org_config.get("gitlab", {}).get("parent"),
-            path=org_config.get("path"),
-        )
-        config = OrganizationConfig(
-            name=org_config.get("name"),
-            path=org_config.get("path"),
-            description=org_config.get("description", ""),
-            gitlab=gitlab_config,
-        )
+        org_type = org_config.get("organization_type") or "organization"
         with get_db_session() as db:
-            if git_provider_type == "gitlab":
-                builder = GitLabBuilder(db, git_provider_url, git_provider_token)
-                result = builder._create_organization(config, user_id)
-                if not result["success"]:
-                    raise RuntimeError(f"Organization creation failed: {result.get('error')}")
-                org = result["organization"]
-            else:
-                raise NotImplementedError(f"Provider type {git_provider_type!r} not yet supported for org creation")
-
-            # Create the git_provider row now that we have the org id
-            encrypted = encrypt_secret(git_provider_token)
-            provider_row = GitProvider(
-                organization_id=str(org.id),
-                type=git_provider_type,
-                url=git_provider_url,
-                token=encrypted,
-                created_by=user_id,
-                updated_by=user_id,
+            org = (
+                db.query(Organization)
+                .filter(
+                    Organization.organization_type == org_type,
+                    Organization.path == Ltree(org_config["path"]),
+                )
+                .first()
             )
-            db.add(provider_row)
-            db.commit()
+            if org is None:
+                org = Organization(
+                    title=org_config.get("name"),
+                    description=org_config.get("description", ""),
+                    path=Ltree(org_config["path"]),
+                    organization_type=org_type,
+                    properties={},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                db.add(org)
+                db.flush()
 
+            # Enroll the creator as org owner (write/admin on the org and its
+            # descendants). Idempotent on unique (user_id, organization_id).
+            if user_id and (
+                db.query(OrganizationMember)
+                .filter(
+                    OrganizationMember.organization_id == org.id,
+                    OrganizationMember.user_id == user_id,
+                )
+                .first()
+            ) is None:
+                db.add(OrganizationMember(
+                    organization_id=org.id,
+                    user_id=user_id,
+                    organization_role_id="_owner",
+                    created_by=user_id,
+                    updated_by=user_id,
+                ))
+
+            db.commit()
+            logger.info(
+                f"Created organization (course-level git model): "
+                f"{org_config.get('path')} (ID: {org.id})"
+            )
             return {
                 "organization_id": str(org.id),
-                "git_provider_id": str(provider_row.id),
                 "status": "created",
                 "name": org_config.get("name"),
-                "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
             }
     except Exception as e:
         logger.exception(f"Exception in organization creation activity: {e}")
@@ -90,10 +95,6 @@ async def create_course_family_activity(
     organization_id: str,
     user_id: str,
 ) -> Dict[str, Any]:
-    from ..git_provider import get_provider_client_from_db
-    from ..model.git_provider import GitProvider
-    from ..generator.gitlab_builder import GitLabBuilder
-
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
     try:
         config = CourseFamilyConfig(
@@ -106,99 +107,59 @@ async def create_course_family_activity(
             if not org:
                 raise ValueError(f"Organization {organization_id} not found")
 
-            provider_row = db.query(GitProvider).filter(GitProvider.organization_id == organization_id).first()
-            if not provider_row:
-                # Course-level model: no legacy org-scoped GitProvider. Create the
-                # family row and enroll the creator as owner. Course families carry
-                # no git config in this model (git is per-course). Authorization
-                # happened at the API edge.
-                from ..custom_types import Ltree
-                from ..model.course import CourseFamilyMember
+            # Course-level git model: course families carry no git config (git is
+            # per-course). Create the family row and enroll the creator as owner.
+            # Authorization happened at the API edge.
+            from ..custom_types import Ltree
+            from ..model.course import CourseFamilyMember
 
-                family = (
-                    db.query(CourseFamily)
-                    .filter(
-                        CourseFamily.organization_id == org.id,
-                        CourseFamily.path == Ltree(config.path),
-                    )
-                    .first()
+            family = (
+                db.query(CourseFamily)
+                .filter(
+                    CourseFamily.organization_id == org.id,
+                    CourseFamily.path == Ltree(config.path),
                 )
-                if family is None:
-                    family = CourseFamily(
-                        title=config.name,
-                        description=config.description or "",
-                        path=Ltree(config.path),
-                        organization_id=org.id,
-                        properties={},
-                        created_by=user_id,
-                        updated_by=user_id,
-                    )
-                    db.add(family)
-                    db.flush()
+                .first()
+            )
+            if family is None:
+                family = CourseFamily(
+                    title=config.name,
+                    description=config.description or "",
+                    path=Ltree(config.path),
+                    organization_id=org.id,
+                    properties={},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                db.add(family)
+                db.flush()
 
-                # Enroll the creator as family owner (manage courses under it).
-                # Idempotent on unique (user_id, course_family_id).
-                if user_id and (
-                    db.query(CourseFamilyMember)
-                    .filter(
-                        CourseFamilyMember.course_family_id == family.id,
-                        CourseFamilyMember.user_id == user_id,
-                    )
-                    .first()
-                ) is None:
-                    db.add(CourseFamilyMember(
-                        course_family_id=family.id,
-                        user_id=user_id,
-                        course_family_role_id="_owner",
-                        created_by=user_id,
-                        updated_by=user_id,
-                    ))
+            # Enroll the creator as family owner (manage courses under it).
+            # Idempotent on unique (user_id, course_family_id).
+            if user_id and (
+                db.query(CourseFamilyMember)
+                .filter(
+                    CourseFamilyMember.course_family_id == family.id,
+                    CourseFamilyMember.user_id == user_id,
+                )
+                .first()
+            ) is None:
+                db.add(CourseFamilyMember(
+                    course_family_id=family.id,
+                    user_id=user_id,
+                    course_family_role_id="_owner",
+                    created_by=user_id,
+                    updated_by=user_id,
+                ))
 
-                db.commit()
-                logger.info(f"Created course family (course-level model): {config.path} (ID: {family.id})")
-                return {
-                    "course_family_id": str(family.id),
-                    "status": "created",
-                    "name": family_config.get("name"),
-                    "provider_entity_id": None,
-                }
-
-            from ..git_provider import _decrypt
-            token = _decrypt(provider_row.token)
-
-            if provider_row.type == "gitlab":
-                builder = GitLabBuilder(db, provider_row.url, token)
-                result = builder._create_course_family(config, org, user_id)
-                if not result["success"]:
-                    raise RuntimeError(f"Course family creation failed: {result.get('error')}")
-                db.commit()
-                return {
-                    "course_family_id": str(result["course_family"].id) if result.get("course_family") else None,
-                    "status": "created",
-                    "name": family_config.get("name"),
-                    "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
-                }
-            elif provider_row.type == "forgejo":
-                from ..git_provider.forgejo import ForgejoProviderClient
-                client = ForgejoProviderClient(provider_row.url, token)
-                # For Forgejo, we need the family DB entity first
-                from ..repositories.course_family import CourseFamilyRepository
-                family = CourseFamilyRepository(db).get_or_create(config, org, user_id)
-                provider_result = client.setup_course_family(config, org, family, user_id)
-                from sqlalchemy.orm.attributes import flag_modified
-                props = family.properties or {}
-                props.update(provider_result.properties)
-                family.properties = props
-                flag_modified(family, "properties")
-                db.commit()
-                return {
-                    "course_family_id": str(family.id),
-                    "status": "created",
-                    "name": family_config.get("name"),
-                    "provider_entity_id": provider_result.provider_entity_id,
-                }
-            else:
-                raise NotImplementedError(f"Provider type {provider_row.type!r} not supported")
+            db.commit()
+            logger.info(f"Created course family: {config.path} (ID: {family.id})")
+            return {
+                "course_family_id": str(family.id),
+                "status": "created",
+                "name": family_config.get("name"),
+                "provider_entity_id": None,
+            }
 
     except Exception as e:
         logger.exception(f"Exception in course family creation activity: {e}")
@@ -211,9 +172,6 @@ async def create_course_activity(
     course_family_id: str,
     user_id: str,
 ) -> Dict[str, Any]:
-    from ..model.git_provider import GitProvider
-    from ..generator.gitlab_builder import GitLabBuilder
-
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
     try:
         config = CourseConfig(
@@ -229,124 +187,84 @@ async def create_course_activity(
             if not org:
                 raise ValueError(f"Organization {family.organization_id} not found")
 
-            provider_row = db.query(GitProvider).filter(GitProvider.organization_id == str(org.id)).first()
-            if not provider_row:
-                # New course-level git model: no legacy org-scoped GitProvider.
-                # Create the course row, then bind it to a registry git server if
-                # one was chosen at creation. Git is per-course now — not inherited
-                # from the org/family. Authorization happened at the API edge.
-                from ..custom_types import Ltree
+            # Course-level git model: create the course row, then bind it to a
+            # registry git server if one was chosen at creation. Git is per-course
+            # — not inherited from the org/family. Authorization at the API edge.
+            from ..custom_types import Ltree
 
-                course = (
-                    db.query(Course)
-                    .filter(
-                        Course.course_family_id == family.id,
-                        Course.path == Ltree(config.path),
-                    )
-                    .first()
+            course = (
+                db.query(Course)
+                .filter(
+                    Course.course_family_id == family.id,
+                    Course.path == Ltree(config.path),
                 )
-                if course is None:
-                    course = Course(
-                        title=config.name,
-                        description=config.description or "",
-                        path=Ltree(config.path),
-                        course_family_id=family.id,
-                        organization_id=org.id,
-                        properties={},
-                        created_by=user_id,
-                        updated_by=user_id,
-                    )
-                    db.add(course)
-                    db.flush()
+                .first()
+            )
+            if course is None:
+                course = Course(
+                    title=config.name,
+                    description=config.description or "",
+                    path=Ltree(config.path),
+                    course_family_id=family.id,
+                    organization_id=org.id,
+                    properties={},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                db.add(course)
+                db.flush()
 
-                # Enroll the creator as course owner so they can manage the course
-                # immediately (assign examples, release, ...). The legacy GitLab
-                # path relied on group-membership sync; the course-level model
-                # records ownership directly. Idempotent on unique (user_id, course_id).
-                from ..model.course import CourseMember
-                if user_id and (
-                    db.query(CourseMember)
-                    .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
-                    .first()
-                ) is None:
-                    db.add(CourseMember(
-                        course_id=course.id,
-                        user_id=user_id,
-                        course_role_id="_owner",
-                        created_by=user_id,
-                        updated_by=user_id,
-                    ))
+            # Enroll the creator as course owner so they can manage the course
+            # immediately (assign examples, release, ...). Idempotent on unique
+            # (user_id, course_id).
+            from ..model.course import CourseMember
+            if user_id and (
+                db.query(CourseMember)
+                .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
+                .first()
+            ) is None:
+                db.add(CourseMember(
+                    course_id=course.id,
+                    user_id=user_id,
+                    course_role_id="_owner",
+                    created_by=user_id,
+                    updated_by=user_id,
+                ))
 
-                git_binding = None
-                git_cfg = course_config.get("git") or {}
-                if git_cfg.get("git_server_id"):
-                    from computor_types.course_git import CourseGitBindingUpsert
-                    from ..business_logic.course_git import _apply_course_git_binding
+            git_binding = None
+            git_cfg = course_config.get("git") or {}
+            if git_cfg.get("git_server_id"):
+                from computor_types.course_git import CourseGitBindingUpsert
+                from ..business_logic.course_git import _apply_course_git_binding
 
-                    binding = _apply_course_git_binding(
-                        course,
-                        CourseGitBindingUpsert(
-                            delivery=git_cfg.get("delivery") or "git",
-                            git_server_id=git_cfg.get("git_server_id"),
-                            template_repo=git_cfg.get("template_repo"),
-                            template_url=git_cfg.get("template_url"),
-                            default_branch=git_cfg.get("default_branch"),
-                            student_repo_modes=git_cfg.get("student_repo_modes") or [],
-                        ),
-                        user_id,
-                        db,
-                    )  # commits the course + binding together
-                    git_binding = {
-                        "git_server_id": str(binding.git_server_id) if binding.git_server_id else None,
-                        "template_url": binding.template_url,
-                    }
-                else:
-                    db.commit()
-
-                logger.info(f"Created course (course-level git model): {config.path} (ID: {course.id})")
-                return {
-                    "course_id": str(course.id),
-                    "status": "created",
-                    "name": course_config.get("name"),
-                    "provider_entity_id": None,
-                    "git_binding": git_binding,
-                }
-
-            from ..git_provider import _decrypt
-            token = _decrypt(provider_row.token)
-
-            if provider_row.type == "gitlab":
-                builder = GitLabBuilder(db, provider_row.url, token)
-                result = builder._create_course(config, org, family, user_id)
-                if not result["success"]:
-                    raise RuntimeError(f"Course creation failed: {result.get('error')}")
-                db.commit()
-                return {
-                    "course_id": str(result["course"].id) if result.get("course") else None,
-                    "status": "created",
-                    "name": course_config.get("name"),
-                    "provider_entity_id": str(result["gitlab_group"].id) if result.get("gitlab_group") else None,
-                }
-            elif provider_row.type == "forgejo":
-                from ..git_provider.forgejo import ForgejoProviderClient
-                client = ForgejoProviderClient(provider_row.url, token)
-                from ..repositories.course import CourseRepository
-                course = CourseRepository(db).get_or_create(config, org, family, user_id)
-                provider_result = client.setup_course(config, org, family, course, user_id)
-                from sqlalchemy.orm.attributes import flag_modified
-                props = course.properties or {}
-                props.update(provider_result.properties)
-                course.properties = props
-                flag_modified(course, "properties")
-                db.commit()
-                return {
-                    "course_id": str(course.id),
-                    "status": "created",
-                    "name": course_config.get("name"),
-                    "provider_entity_id": provider_result.provider_entity_id,
+                binding = _apply_course_git_binding(
+                    course,
+                    CourseGitBindingUpsert(
+                        delivery=git_cfg.get("delivery") or "git",
+                        git_server_id=git_cfg.get("git_server_id"),
+                        template_repo=git_cfg.get("template_repo"),
+                        template_url=git_cfg.get("template_url"),
+                        default_branch=git_cfg.get("default_branch"),
+                        student_repo_modes=git_cfg.get("student_repo_modes") or [],
+                    ),
+                    user_id,
+                    db,
+                )  # commits the course + binding together
+                git_binding = {
+                    "git_server_id": str(binding.git_server_id) if binding.git_server_id else None,
+                    "template_url": binding.template_url,
                 }
             else:
-                raise NotImplementedError(f"Provider type {provider_row.type!r} not supported")
+                db.commit()
+
+            logger.info(f"Created course (course-level git model): {config.path} (ID: {course.id})")
+            return {
+                "course_id": str(course.id),
+                "status": "created",
+                "name": course_config.get("name"),
+                "provider_entity_id": None,
+                "git_binding": git_binding,
+            }
 
     except Exception as e:
         logger.exception(f"Exception in course creation activity: {e}")
@@ -379,11 +297,9 @@ class CreateOrganizationWorkflow(BaseWorkflow):
         Args:
             parameters: Dictionary containing:
                 - org_config: Organization configuration
-                - gitlab_url: GitLab URL
-                - gitlab_token: GitLab access token
                 - user_id: User ID creating the organization
         """
-        required_params = ['org_config', 'git_provider_type', 'git_provider_url', 'git_provider_token', 'user_id']
+        required_params = ['org_config', 'user_id']
         missing_params = [param for param in required_params if not parameters.get(param)]
         if missing_params:
             error_msg = f"Missing required parameters: {', '.join(missing_params)}"
@@ -396,9 +312,6 @@ class CreateOrganizationWorkflow(BaseWorkflow):
             )
 
         org_config = parameters.get('org_config', {})
-        git_provider_type = parameters.get('git_provider_type')
-        git_provider_url = parameters.get('git_provider_url')
-        git_provider_token = parameters.get('git_provider_token')
         user_id = parameters.get('user_id')
 
         if not org_config.get('name') or not org_config.get('path'):
@@ -416,7 +329,7 @@ class CreateOrganizationWorkflow(BaseWorkflow):
         try:
             result = await workflow.execute_activity(
                 create_organization_activity,
-                args=[org_config, git_provider_type, git_provider_url, git_provider_token, user_id],
+                args=[org_config, user_id],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=1),
@@ -685,24 +598,9 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
             for org_idx, org_config in enumerate(organizations):
                 workflow.logger.info(f"Processing organization {org_idx + 1}/{total_orgs}: {org_config['name']}")
 
-                # Prepare git provider configuration for this organization
-                git_provider_cfg = org_config.get("git_provider", {})
-                git_provider_type = git_provider_cfg.get("type", "gitlab")
-                git_provider_url = git_provider_cfg.get("url", "")
-                git_provider_token = git_provider_cfg.get("token", "")
-
-                # Handle environment variable substitution in token
-                if git_provider_token.startswith("${") and git_provider_token.endswith("}"):
-                    import os
-                    env_var = git_provider_token[2:-1]
-                    git_provider_token = os.environ.get(env_var, "")
-
-                # Create organization
+                # Create organization (course-level git model: orgs carry no git config)
                 org_params = {
                     "org_config": org_config,
-                    "git_provider_type": git_provider_type,
-                    "git_provider_url": git_provider_url,
-                    "git_provider_token": git_provider_token,
                     "user_id": user_id
                 }
 
