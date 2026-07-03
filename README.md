@@ -122,8 +122,12 @@ Environment Variables:
 
 ## Documentation
 
-- [Architecture Overview](docs/architecture-overview.md)
-- [Developer Guidelines](docs/developer-guideline.md)
+Start at **[docs/README.md](docs/README.md)** — the index and quick start. From there:
+
+- [Architecture](docs/architecture.md) — packages, layered backend, infrastructure
+- [Development](docs/development.md) — setup, daily cycle, entities, migrations, codegen, tests
+- [Backend Patterns](docs/backend-patterns.md) — EntityInterface/DTOs, permissions, Temporal
+- [Git Integration](docs/git-integration.md) — course git: Forgejo vs. GitLab, deploy-from-file
 
 ## License
 
