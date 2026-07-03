@@ -41,7 +41,6 @@
 | `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `Record<string, unknown> & Record<string, unknown>` |
-| `registerViaGitlabAuthGitlabRegisterPost` | POST | `/auth/gitlab/register` | `GitLabRegisterRequest` | `GitLabRegisterResponse` |
 | `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
 | `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
 | `refreshTokenAuthRefreshPost` | POST | `/auth/refresh` | `TokenRefreshRequest` | `TokenRefreshResponse` |

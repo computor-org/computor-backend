@@ -6,13 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../src/contexts/AuthContext';
 import { API_BASE_URL } from '../src/utils/apiClient';
-import SetupLoginMenu from '../src/components/SetupLoginMenu';
 
 export default function Home() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [extensionUrl, setExtensionUrl] = useState<string | null>(null);
-  const [extensionLoading, setExtensionLoading] = useState(true);
   const [gettingStartedUrl, setGettingStartedUrl] = useState<string | null>(null);
 
   // `/` is the public landing page and stays viewable when signed in (the header
@@ -32,8 +30,6 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to fetch extension URL:', error);
         setExtensionUrl(null);
-      } finally {
-        setExtensionLoading(false);
       }
     }
 
@@ -99,7 +95,6 @@ export default function Home() {
             </div>
           ) : (
             <div className="flex items-center space-x-3">
-              <SetupLoginMenu />
               <Link
                 href="/login"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -112,7 +107,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-4 pt-16 pb-24">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           {/* Hero Title */}
           <div className="space-y-4">
@@ -127,18 +122,7 @@ export default function Home() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {extensionLoading ? (
-              <button
-                disabled
-                className="px-8 py-4 bg-gray-400 text-white rounded-lg font-semibold text-lg shadow-lg flex items-center space-x-2 cursor-not-allowed"
-              >
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Loading...</span>
-              </button>
-            ) : extensionUrl ? (
+            {extensionUrl ? (
               <button
                 className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
                 onClick={handleDownload}
@@ -148,14 +132,7 @@ export default function Home() {
                 </svg>
                 <span>Download VS Code Extension</span>
               </button>
-            ) : (
-              <div className="px-8 py-4 bg-gray-100 text-gray-500 rounded-lg border-2 border-gray-300 font-semibold text-lg flex items-center space-x-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>Extension Not Available</span>
-              </div>
-            )}
+            ) : null}
             {gettingStartedUrl ? (
               <button
                 onClick={handleGettingStarted}
@@ -163,14 +140,7 @@ export default function Home() {
               >
                 Get Started →
               </button>
-            ) : (
-              <Link
-                href="/login"
-                className="px-8 py-4 bg-white text-blue-600 rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition-all font-semibold text-lg"
-              >
-                Get Started →
-              </Link>
-            )}
+            ) : null}
           </div>
 
           {/* VS Code Extension Card */}
@@ -197,7 +167,7 @@ export default function Home() {
                 ✓ Live Feedback
               </div>
               <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
-                ✓ GitLab Integration
+                ✓ Git Integration
               </div>
             </div>
           </div>
@@ -242,10 +212,10 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-16">
-        <div className="container mx-auto px-4 py-8">
+      <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-white">
+        <div className="container mx-auto px-4 py-4">
           <div className="text-center text-gray-600">
-            <p>&copy; 2025 Computor. Educational Platform for Programming.</p>
+            <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
           </div>
         </div>
       </footer>

@@ -1223,35 +1223,6 @@ export interface BaseEntityGet {
 }
 
 /**
- * Self-service migration: set a Keycloak password, gated by a GitLab PAT.
- * 
- * The PAT proves the caller controls a GitLab account whose email matches an
- * existing computor user (by User.email or the org-scoped StudentProfile email).
- * No password is read from our database (local auth is gone); the PAT is only
- * used for verification and is never stored.
- */
-export interface GitLabRegisterRequest {
-  /** GitLab instance URL the PAT was issued on */
-  gitlab_url: string;
-  /** GitLab Personal Access Token (verification only, not stored) */
-  gitlab_pat: string;
-  /** Password to set for Keycloak login */
-  new_password: string;
-}
-
-/**
- * Response after provisioning/resetting a Keycloak login via GitLab PAT.
- */
-export interface GitLabRegisterResponse {
-  /** User ID in Computor */
-  user_id: string;
-  /** Email address (Keycloak username) */
-  email: string;
-  /** True if the Keycloak user was created, False if its password was reset */
-  created: boolean;
-}
-
-/**
  * Base fields shared across all service type DTOs.
  */
 export interface ServiceTypeBase {
