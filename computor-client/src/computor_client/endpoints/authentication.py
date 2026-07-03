@@ -143,11 +143,3 @@ class AuthenticationClient:
         response = await self._http.get(f"/auth/verify-coder-access", params=kwargs)
         return response.json()
 
-    async def auth_gitlab_register(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Register Via Gitlab"""
-        response = await self._http.post(f"/auth/gitlab/register", params=kwargs)
-        return response.json()
-
