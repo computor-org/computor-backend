@@ -35,3 +35,12 @@ class CourseMemberImportClient:
         response = await self._http.post(f"/course-member-import/{course_id}", json_data=data, params=kwargs)
         return CourseMemberImportResponse.model_validate(response.json())
 
+    async def parse(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Parse Member File"""
+        response = await self._http.post(f"/course-member-import/parse/{course_id}", params=kwargs)
+        return response.json()
+

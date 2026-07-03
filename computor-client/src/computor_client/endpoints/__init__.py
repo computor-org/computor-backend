@@ -11,6 +11,7 @@ from computor_client.endpoints.coder import CoderClient
 from computor_client.endpoints.course_content_kinds import CourseContentKindsClient
 from computor_client.endpoints.course_content_types import CourseContentTypesClient
 from computor_client.endpoints.course_contents import CourseContentsClient
+from computor_client.endpoints.course_deployment import CourseDeploymentClient
 from computor_client.endpoints.course_families import CourseFamiliesClient
 from computor_client.endpoints.course_family_members import CourseFamilyMembersClient
 from computor_client.endpoints.course_family_roles import CourseFamilyRolesClient
@@ -63,6 +64,7 @@ __all__ = [
     "CourseContentKindsClient",
     "CourseContentTypesClient",
     "CourseContentsClient",
+    "CourseDeploymentClient",
     "CourseFamiliesClient",
     "CourseFamilyMembersClient",
     "CourseFamilyRolesClient",

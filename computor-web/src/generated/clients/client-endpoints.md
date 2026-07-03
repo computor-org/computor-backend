@@ -104,6 +104,7 @@
 | `listCourseFamiliesCourseFamiliesGet` | GET | `/course-families` | — | `CourseFamilyList[]` |
 | `createCourseFamiliesCourseFamiliesPost` | POST | `/course-families` | `CourseFamilyCreate` | `CourseFamilyGet` |
 | `deleteCourseFamilyEndpointCourseFamiliesCourseFamilyIdDelete` | DELETE | `/course-families/{course_family_id}` | — | `CascadeDeleteResult` |
+| `deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost` | POST | `/course-families/{course_family_id}/deploy-course` | `CourseDeployRequest` | `CourseDeployResult` |
 | `deleteCourseFamiliesCourseFamiliesIdDelete` | DELETE | `/course-families/{id}` | — | `void` |
 | `getCourseFamiliesCourseFamiliesIdGet` | GET | `/course-families/{id}` | — | `CourseFamilyGet` |
 | `updateCourseFamiliesCourseFamiliesIdPatch` | PATCH | `/course-families/{id}` | `CourseFamilyUpdate` | `CourseFamilyGet` |
@@ -167,6 +168,7 @@
 
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
+| `parseMemberFileCourseMemberImportParseCourseIdPost` | POST | `/course-member-import/parse/{course_id}` | `CourseMemberImportFileParseRequest` | `CourseMemberImportParseResponse` |
 | `importMemberCourseMemberImportCourseIdPost` | POST | `/course-member-import/{course_id}` | `CourseMemberImportRequest` | `CourseMemberImportResponse` |
 
 ## CourseMembersClient
@@ -350,6 +352,7 @@
 | --- | --- | --- | --- | --- |
 | `listMessagesMessagesGet` | GET | `/messages` | — | `MessageList[]` |
 | `createMessageMessagesPost` | POST | `/messages` | `MessageCreate` | `MessageGet` |
+| `listMentionableUsersEndpointMessagesMentionableUsersGet` | GET | `/messages/mentionable-users` | — | `MessageMentionRef[]` |
 | `deleteMessageMessagesIdDelete` | DELETE | `/messages/{id}` | — | `void` |
 | `getMessageMessagesIdGet` | GET | `/messages/{id}` | — | `MessageGet` |
 | `updateMessageMessagesIdPatch` | PATCH | `/messages/{id}` | `MessageUpdate` | `MessageGet` |
@@ -669,8 +672,10 @@
 | `getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet` | GET | `/user/courses/{course_id}/git` | — | `CourseGitDescriptor` |
 | `provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost` | POST | `/user/courses/{course_id}/provision-repository` | — | `StudentRepositoryProvisioned` |
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
+| `registerGitlabManagedEndpointUserCoursesCourseIdRegisterGitlabPost` | POST | `/user/courses/{course_id}/register-gitlab` | `CourseMemberValidationRequest` | `CourseMemberRepositoryGet` |
 | `registerStudentRepositoryEndpointUserCoursesCourseIdRegisterRepositoryPost` | POST | `/user/courses/{course_id}/register-repository` | `CourseMemberRepositoryRegister` | `CourseMemberRepositoryGet` |
 | `getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet` | GET | `/user/courses/{course_id}/repository` | — | `CourseMemberRepositoryGet | null` |
+| `downloadTemplateArchiveEndpointUserCoursesCourseIdTemplateArchiveGet` | GET | `/user/courses/{course_id}/template/archive` | — | `void` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
 | `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
@@ -700,6 +705,8 @@
 | `updateUsersUsersIdPatch` | PATCH | `/users/{id}` | `UserUpdate` | `UserGet` |
 | `routeUsersUsersIdArchivePatch` | PATCH | `/users/{id}/archive` | — | `void` |
 | `unarchiveUsersUsersIdUnarchivePatch` | PATCH | `/users/{id}/unarchive` | — | `void` |
+| `banUserUsersUserIdBanPatch` | PATCH | `/users/{user_id}/ban` | `UserBanRequest | null` (optional) | `UserGet` |
+| `unbanUserUsersUserIdUnbanPatch` | PATCH | `/users/{user_id}/unban` | — | `UserGet` |
 
 ## WorkspacesClient
 - Base path: `/workspaces`

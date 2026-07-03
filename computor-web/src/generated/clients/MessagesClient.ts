@@ -3,7 +3,7 @@
  * Endpoint: /messages
  */
 
-import type { MessageCreate, MessageGet, MessageList, MessageThread, MessageUpdate } from 'types/generated';
+import type { MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageThread, MessageUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -32,7 +32,7 @@ export class MessagesClient extends BaseEndpointClient {
    * - ``tags_match_all``: True = must match ALL tags, False = match ANY tag
    * - ``tag_scope``: tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
    */
-  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, createdAfter, createdBefore, id, limit, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
+  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, createdAfter, createdBefore, id, limit, mentionedUserId, mentionsMe, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; mentionedUserId?: string | null; mentionsMe?: boolean | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
     const queryParams: Record<string, unknown> = {
       author_id: authorId,
       course_content_id: courseContentId,
@@ -44,6 +44,8 @@ export class MessagesClient extends BaseEndpointClient {
       created_before: createdBefore,
       id,
       limit,
+      mentioned_user_id: mentionedUserId,
+      mentions_me: mentionsMe,
       organization_id: organizationId,
       parent_id: parentId,
       scope,
@@ -67,6 +69,33 @@ export class MessagesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<MessageGet>(this.basePath, body, { params: queryParams });
+  }
+
+  /**
+   * List Mentionable Users Endpoint
+   * List the users who may be @mentioned in a message of the given scope.
+   * Returns the message audience (submission_group members + course staff,
+   * course members, etc.) — exactly the set the mention gate enforces — so the
+   * compose UI only ever offers valid mentions. Provide the same scope target
+   * you would post to, or ``parent_id`` to inherit a thread's scope. The caller
+   * must themselves be in that audience (you cannot enumerate a scope you can't
+   * see). Global scope (no target) requires a ``search`` term.
+   */
+  async listMentionableUsersEndpointMessagesMentionableUsersGet({ courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, limit, organizationId, parentId, search, submissionGroupId, userId }: { courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; limit?: number; organizationId?: string | null; parentId?: string | null; search?: string | null; submissionGroupId?: string | null; userId?: string | null }): Promise<MessageMentionRef[]> {
+    const queryParams: Record<string, unknown> = {
+      course_content_id: courseContentId,
+      course_family_id: courseFamilyId,
+      course_group_id: courseGroupId,
+      course_id: courseId,
+      course_member_id: courseMemberId,
+      limit,
+      organization_id: organizationId,
+      parent_id: parentId,
+      search,
+      submission_group_id: submissionGroupId,
+      user_id: userId,
+    };
+    return this.client.get<MessageMentionRef[]>(this.buildPath('mentionable-users'), { params: queryParams });
   }
 
   /**

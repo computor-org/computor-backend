@@ -99,3 +99,21 @@ class UsersClient:
         response = await self._http.patch(f"/users/{id}/unarchive", params=kwargs)
         return
 
+    async def ban(
+        self,
+        user_id: str,
+        **kwargs: Any,
+    ) -> UserGet:
+        """Ban User"""
+        response = await self._http.patch(f"/users/{user_id}/ban", params=kwargs)
+        return UserGet.model_validate(response.json())
+
+    async def unban(
+        self,
+        user_id: str,
+        **kwargs: Any,
+    ) -> UserGet:
+        """Unban User"""
+        response = await self._http.patch(f"/users/{user_id}/unban", params=kwargs)
+        return UserGet.model_validate(response.json())
+

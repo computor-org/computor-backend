@@ -25,7 +25,7 @@ export class CourseMemberGradingsClient extends BaseEndpointClient {
    * - Latest submission dates
    * **Access Control:**
    * - Admins: Can access any course
-   * - Tutors and higher: Can access courses they are assigned to
+   * - Lecturers and higher: Can access courses they are assigned to
    * **Caching:**
    * - Results are cached for 30 minutes per student
    * - Cache automatically invalidates on submissions and grading changes
@@ -52,7 +52,7 @@ export class CourseMemberGradingsClient extends BaseEndpointClient {
    * - **Latest submissions**: Most recent submission date per level
    * **Access Control:**
    * - Admins: Can access any course member
-   * - Tutors and higher: Can access members in courses they are assigned to
+   * - Lecturers and higher: Can access members in courses they are assigned to
    * **Caching:**
    * - Results are cached for 30 minutes
    * - Cache automatically invalidates on submissions and grading changes

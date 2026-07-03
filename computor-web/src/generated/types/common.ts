@@ -295,8 +295,6 @@ export interface UserDeployment {
   email?: string | null;
   /** User number/identifier (student ID) */
   number?: string | null;
-  /** Unique username */
-  username?: string | null;
   /** Type of user account (user or token) */
   user_type?: string;
   /** Additional user properties */
@@ -305,7 +303,7 @@ export interface UserDeployment {
   password?: string | null;
   /** System roles to assign to the user */
   roles?: string[] | null;
-  /** GitLab username (if different from username) */
+  /** GitLab username (if different from the login handle) */
   gitlab_username?: string | null;
   /** GitLab email (if different from email) */
   gitlab_email?: string | null;
@@ -412,23 +410,6 @@ export interface ExecutionBackendReference {
 }
 
 /**
- * User configuration for a service.
- * 
- * DEPRECATED: Use UserDeployment directly in ServiceConfig instead.
- * Kept for backwards compatibility.
- */
-export interface ServiceUserConfig {
-  /** Username for the service user */
-  username: string;
-  /** Email for the service user */
-  email?: string | null;
-  /** Given name */
-  given_name?: string | null;
-  /** Family name */
-  family_name?: string | null;
-}
-
-/**
  * API token configuration for a service.
  */
 export interface ServiceApiTokenConfig {
@@ -475,6 +456,27 @@ export interface ServiceConfig {
 export interface ServiceReference {
   /** Slug of the service to link */
   slug: string;
+}
+
+/**
+ * Bootstrap configuration for an Example Repository.
+ * 
+ * Applied idempotently at API startup (keyed on ``source_url``, which is
+ * unique) so a fresh install has a default repository to upload examples into.
+ * Mirrors ``ExampleRepositoryCreate`` but is deployment-file friendly (no
+ * ``organization_id`` UUID required — global if omitted).
+ */
+export interface ExampleRepositoryConfig {
+  /** Human-readable name of the repository */
+  name: string;
+  /** Description of the repository and its contents */
+  description?: string | null;
+  /** Source type: minio, s3, git, github, gitlab. Use 'minio' for an uploadable repository. */
+  source_type?: string;
+  /** Repository URL. For minio/s3 the first path segment is the bucket name (e.g. 'computor-storage'). Must be unique across repositories. */
+  source_url: string;
+  /** Optional owning organization id. Global (organization-less) if omitted. */
+  organization_id?: string | null;
 }
 
 /**
@@ -667,6 +669,8 @@ export interface HierarchicalOrganizationConfig {
 export interface ComputorDeploymentConfig {
   /** List of services to create or ensure exist in the system (deployed in Phase 1) */
   services?: ServiceConfig[] | null;
+  /** List of example repositories to create or ensure exist in the system (deployed in Phase 1) */
+  example_repositories?: ExampleRepositoryConfig[] | null;
   /** DEPRECATED: Use 'services' instead. List of execution backends to create or ensure exist in the system */
   execution_backends?: ExecutionBackendConfig[] | null;
   /** List of organizations with nested course families and courses */
@@ -1571,12 +1575,6 @@ export interface SemanticVersion {
   prerelease?: string | null;
 }
 
-export interface GitServerHealthResponse {
-  status: string;
-  server_type: string;
-  version?: string | null;
-}
-
 /**
  * Request to sync GitLab permissions for a course member.
  */
@@ -1931,8 +1929,6 @@ export interface ServiceCreate {
   description?: string | null;
   /** Service type (e.g., 'temporal_worker', 'grading', 'notification') */
   service_type: string;
-  /** Username for service user (defaults to slug) */
-  username?: string | null;
   /** Email for service user */
   email?: string | null;
   /** Given name for service user (defaults to first word of name) */
@@ -3300,6 +3296,68 @@ export interface PasswordOperationResponse {
  * Base class for all deployment configurations.
  */
 export interface BaseDeployment {
+}
+
+/**
+ * Upload payload for the course-deployment endpoint.
+ * 
+ * The raw YAML text is sent as-is and parsed server-side into a
+ * ``HierarchicalCourseConfig`` — the client never needs to model the schema.
+ */
+export interface CourseDeployRequest {
+  /** Raw contents of the course_deployment.yaml file */
+  yaml: string;
+  /** When true, parse and check the config (examples resolve, content types exist, path free) without creating anything. */
+  validate_only?: boolean;
+}
+
+/**
+ * A non-fatal issue found while validating/applying the config.
+ * 
+ * Warnings never block a deploy; the affected content is still created (just
+ * without an example, typically).
+ */
+export interface CourseDeployWarning {
+  /** Dotted course-content path the warning relates to */
+  path?: string | null;
+  /** Example identifier the warning relates to */
+  example_identifier?: string | null;
+  /** Human-readable explanation */
+  reason: string;
+}
+
+/**
+ * Counts of what was (or would be) created.
+ */
+export interface CourseDeploySummary {
+  /** Number of content types */
+  content_types?: number;
+  /** Number of non-submittable contents (units) */
+  units?: number;
+  /** Number of submittable contents (assignments) */
+  assignments?: number;
+  /** Number of examples assigned to assignments */
+  examples_assigned?: number;
+}
+
+/**
+ * Outcome of a validate or apply run.
+ */
+export interface CourseDeployResult {
+  /** Whether the config parsed and the checks ran */
+  validated: boolean;
+  /** Whether the course was actually created */
+  applied: boolean;
+  /** ID of the created course (apply only) */
+  course_id?: string | null;
+  /** Course path/slug from the file */
+  course_path: string;
+  /** Course title/name from the file */
+  course_title?: string | null;
+  summary?: CourseDeploySummary;
+  warnings?: CourseDeployWarning[];
+  /** Fatal problems that block an apply (e.g. unknown content type, path taken) */
+  errors?: string[];
 }
 
 export interface ProfileCreate {

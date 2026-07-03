@@ -15,7 +15,7 @@ export class UsersClient extends BaseEndpointClient {
   /**
    * List Users
    */
-  async listUsersUsersGet({ archived, banned, email, familyName, givenName, id, isService, limit, search, skip, userId, username }: { archived?: boolean | null; banned?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; search?: string | null; skip?: number | null; userId?: string | null; username?: string | null }): Promise<UserList[]> {
+  async listUsersUsersGet({ archived, banned, email, familyName, givenName, id, isService, limit, search, skip, userId }: { archived?: boolean | null; banned?: boolean | null; email?: string | null; familyName?: string | null; givenName?: string | null; id?: string | null; isService?: boolean | null; limit?: number | null; search?: string | null; skip?: number | null; userId?: string | null }): Promise<UserList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
       banned,
@@ -28,7 +28,6 @@ export class UsersClient extends BaseEndpointClient {
       search,
       skip,
       user_id: userId,
-      username,
     };
     return this.client.get<UserList[]>(this.basePath, { params: queryParams });
   }

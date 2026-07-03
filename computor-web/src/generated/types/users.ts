@@ -206,8 +206,6 @@ export interface UserCreate {
   family_name?: string | null;
   /** User's email address */
   email?: string | null;
-  /** Unique username */
-  username?: string | null;
   /** Additional user properties */
   properties?: any | null;
 }
@@ -227,8 +225,6 @@ export interface UserGet {
   family_name?: string | null;
   /** User's email address */
   email?: string | null;
-  /** Unique username */
-  username?: string | null;
   /** Additional user properties */
   properties?: any | null;
   /** Timestamp when user was archived */
@@ -262,8 +258,6 @@ export interface UserList {
   family_name?: string | null;
   /** User's email address */
   email?: string | null;
-  /** Unique username */
-  username?: string | null;
   /** Archive timestamp */
   archived_at?: string | null;
   /** Whether this is a service account */
@@ -281,8 +275,6 @@ export interface UserUpdate {
   family_name?: string | null;
   /** User's email address */
   email?: string | null;
-  /** Unique username */
-  username?: string | null;
   /** Additional user properties */
   properties?: any | null;
 }
@@ -295,7 +287,6 @@ export interface UserQuery {
   family_name?: string | null;
   email?: string | null;
   archived?: boolean | null;
-  username?: string | null;
   is_service?: boolean | null;
   banned?: boolean | null;
   search?: string | null;
@@ -313,8 +304,6 @@ export interface UserBanRequest {
  * Password update request for user endpoints.
  */
 export interface UserPassword {
-  /** Target username (admin only, otherwise current user) */
-  username?: string | null;
   /** New password */
   password: string;
   /** Old password (required for non-admin password changes) */

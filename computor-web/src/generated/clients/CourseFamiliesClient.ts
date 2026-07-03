@@ -3,7 +3,7 @@
  * Endpoint: /course-families
  */
 
-import type { CascadeDeleteResult, CourseFamilyCreate, CourseFamilyGet, CourseFamilyList, CourseFamilyUpdate } from 'types/generated';
+import type { CascadeDeleteResult, CourseDeployRequest, CourseDeployResult, CourseFamilyCreate, CourseFamilyGet, CourseFamilyList, CourseFamilyUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -53,6 +53,21 @@ export class CourseFamiliesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.delete<CascadeDeleteResult>(this.buildPath(courseFamilyId), { params: queryParams });
+  }
+
+  /**
+   * Deploy Course
+   * Validate (and optionally apply) a single-course deployment under a family.
+   * Raises:
+   * 400: invalid YAML / config, or (on apply) blocking validation errors
+   * 403: caller may not create courses in this family
+   * 404: course family not found
+   */
+  async deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({ courseFamilyId, userId, body }: { courseFamilyId: string | string; userId?: string | null; body: CourseDeployRequest }): Promise<CourseDeployResult> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<CourseDeployResult>(this.buildPath(courseFamilyId, 'deploy-course'), body, { params: queryParams });
   }
 
   /**
