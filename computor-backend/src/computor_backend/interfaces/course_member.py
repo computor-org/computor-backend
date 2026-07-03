@@ -13,9 +13,28 @@ from computor_types.course_members import (
 from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import CourseMember
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.exceptions import BadRequestException, ForbiddenException
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_uuid(field: str, value: Any) -> str:
+    """Validate a query-param value that filters a UUID column.
+
+    These params arrive as free-form strings (``Optional[str]`` on the query
+    model), so an invalid value like the tutor UI's ``__no_group__`` sentinel
+    would otherwise reach psycopg2 and raise a raw ``ValueError`` -> unhandled
+    500. We validate and surface a clean 400 instead.
+
+    The id columns are ``UUID(as_uuid=False)``: the ORM bind layer expects a
+    *string* and converts it to a ``uuid.UUID`` itself. So we must return a
+    normalized string, not a ``UUID`` object — handing back a ``UUID`` makes
+    psycopg2 call ``.replace`` on it (``AttributeError``).
+    """
+    try:
+        return str(UUID(str(value)))
+    except (ValueError, AttributeError, TypeError):
+        raise BadRequestException(detail=f"'{field}' must be a valid UUID")
 
 
 async def post_create_course_member(course_member: CourseMember, db: Session):
@@ -217,14 +236,17 @@ class CourseMemberInterface(CourseMemberInterfaceBase, BackendEntityInterface):
             return query
 
         if params.id is not None:
-            query = query.filter(CourseMember.id == params.id)
+            query = query.filter(CourseMember.id == _validate_uuid("id", params.id))
         if params.user_id is not None:
-            query = query.filter(CourseMember.user_id == params.user_id)
+            query = query.filter(CourseMember.user_id == _validate_uuid("user_id", params.user_id))
         if params.course_id is not None:
-            query = query.filter(CourseMember.course_id == params.course_id)
+            query = query.filter(CourseMember.course_id == _validate_uuid("course_id", params.course_id))
         if params.course_group_id is not None:
-            query = query.filter(CourseMember.course_group_id == params.course_group_id)
+            query = query.filter(
+                CourseMember.course_group_id == _validate_uuid("course_group_id", params.course_group_id)
+            )
         if params.course_role_id is not None:
+            # course_role_id is a string identifier (not a UUID), keep as-is.
             query = query.filter(CourseMember.course_role_id == params.course_role_id)
 
         return query
