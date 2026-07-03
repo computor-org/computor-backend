@@ -3,7 +3,7 @@
  * Endpoint: /auth
  */
 
-import type { GitLabRegisterRequest, GitLabRegisterResponse, LocalTokenRefreshRequest, LocalTokenRefreshResponse, LogoutResponse, ProviderInfo, TokenRefreshRequest, TokenRefreshResponse } from 'types/generated';
+import type { LocalTokenRefreshRequest, LocalTokenRefreshResponse, LogoutResponse, ProviderInfo, TokenRefreshRequest, TokenRefreshResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -43,21 +43,6 @@ export class AuthenticationClient extends BaseEndpointClient {
    */
   async enablePluginAuthAdminPluginsPluginNameEnablePost({ pluginName }: { pluginName: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
     return this.client.post<Record<string, unknown> & Record<string, unknown>>(this.buildPath('admin', 'plugins', pluginName, 'enable'));
-  }
-
-  /**
-   * Register Via Gitlab
-   * Provision (or reset) a user's Keycloak login using a GitLab PAT as proof.
-   * Idempotent by design: if the Keycloak user already exists, its password is
-   * reset — so a user who forgot their credentials simply re-runs this with a
-   * new password. The Keycloak account links to the existing computor user on
-   * first SSO login via the email match in handle_sso_callback.
-   */
-  async registerViaGitlabAuthGitlabRegisterPost({ userId, body }: { userId?: string | null; body: GitLabRegisterRequest }): Promise<GitLabRegisterResponse> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.post<GitLabRegisterResponse>(this.buildPath('gitlab', 'register'), body, { params: queryParams });
   }
 
   /**

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import { OnboardingClient } from '@/src/clients/OnboardingClient';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -17,11 +16,8 @@ const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
 const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
 const accountConsoleUrl = KC_URL ? `${KC_URL.replace(/\/$/, '')}/realms/${KC_REALM}/account/` : null;
 
-const onboarding = new OnboardingClient();
-
 // The generated AccountGet doesn't carry `builtin` until the types are regenerated.
 type AccountRow = AccountGet & { builtin?: boolean };
-type LinkProvider = { id: string; display_name: string };
 
 function Section({ title, description, children, actions }: {
   title: string;
@@ -47,119 +43,12 @@ function fmtDate(s?: string | null): string {
   return s ? new Date(s).toLocaleDateString() : '—';
 }
 
-/** Inline "Link account" flow: choose the account type, then its fields appear —
- * rendered inside Settings so the chrome (top bar + sidebar) stays put. */
-function LinkAccountPanel({ providers, onLinked, onCancel }: {
-  providers: LinkProvider[];
-  onLinked: () => void;
-  onCancel: () => void;
-}) {
-  const [providerId, setProviderId] = useState('');
-  const [gitlabUrl, setGitlabUrl] = useState('');
-  const [gitlabPat, setGitlabPat] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-
-  async function submitGitlab() {
-    setError(null);
-    if (password !== confirm) return setError('Passwords do not match');
-    if (password.length < 8) return setError('Password must be at least 8 characters');
-    setSubmitting(true);
-    try {
-      const res = await onboarding.registerViaGitlab({
-        gitlab_url: gitlabUrl.trim(),
-        gitlab_pat: gitlabPat.trim(),
-        new_password: password,
-      });
-      setDone(res.email);
-      onLinked();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Linking failed');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (done) {
-    return (
-      <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
-        Verified <strong>{done}</strong> and linked your GitLab account.
-        <button onClick={onCancel} className="ml-3 text-green-700 underline">Close</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-      <ErrorBanner>{error}</ErrorBanner>
-
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Account type</label>
-        <select className={inputCls} value={providerId} onChange={(e) => setProviderId(e.target.value)}>
-          <option value="">— choose a type —</option>
-          {providers.map((p) => (
-            <option key={p.id} value={p.id}>{p.display_name}</option>
-          ))}
-        </select>
-      </div>
-
-      {providerId === 'gitlab' && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            submitGitlab();
-          }}
-          className="space-y-3"
-        >
-          <p className="text-xs text-gray-500">
-            Verify with a GitLab Personal Access Token (read profile), then set your Computor password. The token is never stored.
-          </p>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">GitLab URL</label>
-            <input type="url" required className={inputCls} value={gitlabUrl} onChange={(e) => setGitlabUrl(e.target.value)} placeholder="https://gitlab.example.com" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Personal Access Token</label>
-            <input type="password" required className={inputCls} value={gitlabPat} onChange={(e) => setGitlabPat(e.target.value)} placeholder="glpat-…" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-              <input type="password" required minLength={8} className={inputCls} value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Confirm password</label>
-              <input type="password" required className={inputCls} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              {submitting ? 'Verifying…' : 'Verify & link'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {providerId === '' && (
-        <div className="flex justify-end">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function SettingsPage() {
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
 
   const [tokens, setTokens] = useState<ApiTokenGet[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
-  const [providers, setProviders] = useState<LinkProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,7 +59,6 @@ export default function SettingsPage() {
   const [createdToken, setCreatedToken] = useState<ApiTokenCreateResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [linkOpen, setLinkOpen] = useState(false);
   const [confirm, setConfirm] = useState<
     { title: string; message: string; confirmWord: string; onConfirm: () => Promise<void> } | null
   >(null);
@@ -178,14 +66,12 @@ export default function SettingsPage() {
   async function load() {
     if (!authUser) return;
     try {
-      const [tk, ac, pv] = await Promise.all([
+      const [tk, ac] = await Promise.all([
         api.get<ApiTokenGet[]>('/api-tokens'),
         api.get<AccountRow[]>(`/accounts?user_id=${authUser.id}`).catch(() => [] as AccountRow[]),
-        api.get<LinkProvider[]>('/accounts/providers').catch(() => [] as LinkProvider[]),
       ]);
       setTokens(tk);
       setAccounts(ac);
-      setProviders(pv);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings');
     } finally {
@@ -338,28 +224,8 @@ export default function SettingsPage() {
             {/* Accounts */}
             <Section
               title="Accounts"
-              description="Your sign-in and Git-server identities, plus any external accounts you’ve linked."
-              actions={
-                !linkOpen && providers.length > 0 ? (
-                  <button
-                    onClick={() => setLinkOpen(true)}
-                    className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
-                  >
-                    Link account
-                  </button>
-                ) : undefined
-              }
+              description="Your sign-in and Git-server identities."
             >
-              {linkOpen && (
-                <div className="mb-5">
-                  <LinkAccountPanel
-                    providers={providers}
-                    onLinked={load}
-                    onCancel={() => setLinkOpen(false)}
-                  />
-                </div>
-              )}
-
               {loading ? (
                 <div className="text-sm text-gray-500">Loading…</div>
               ) : accounts.length === 0 ? (
