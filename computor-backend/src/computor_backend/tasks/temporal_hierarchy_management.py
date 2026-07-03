@@ -8,7 +8,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from computor_types.deployments_refactored import CourseFamilyConfig, CourseConfig
+from computor_types.deployments_refactored import CourseConfig
 from ..database import get_db_session
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
@@ -17,155 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 # Activities
-@activity.defn(name="create_organization_activity")
-async def create_organization_activity(
-    org_config: Dict[str, Any],
-    user_id: str,
-) -> Dict[str, Any]:
-    """Create an organization row and enroll the creator as ``_owner``.
-
-    Course-level git model: organizations carry no git configuration — git is
-    per-course (see the course's ``CourseGitBinding``). Authorization happened
-    at the API edge. Idempotent on (organization_type, path).
-    """
-    from ..custom_types import Ltree
-    from ..model.organization import OrganizationMember
-
-    logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
-    try:
-        org_type = org_config.get("organization_type") or "organization"
-        with get_db_session() as db:
-            org = (
-                db.query(Organization)
-                .filter(
-                    Organization.organization_type == org_type,
-                    Organization.path == Ltree(org_config["path"]),
-                )
-                .first()
-            )
-            if org is None:
-                org = Organization(
-                    title=org_config.get("name"),
-                    description=org_config.get("description", ""),
-                    path=Ltree(org_config["path"]),
-                    organization_type=org_type,
-                    properties={},
-                    created_by=user_id,
-                    updated_by=user_id,
-                )
-                db.add(org)
-                db.flush()
-
-            # Enroll the creator as org owner (write/admin on the org and its
-            # descendants). Idempotent on unique (user_id, organization_id).
-            if user_id and (
-                db.query(OrganizationMember)
-                .filter(
-                    OrganizationMember.organization_id == org.id,
-                    OrganizationMember.user_id == user_id,
-                )
-                .first()
-            ) is None:
-                db.add(OrganizationMember(
-                    organization_id=org.id,
-                    user_id=user_id,
-                    organization_role_id="_owner",
-                    created_by=user_id,
-                    updated_by=user_id,
-                ))
-
-            db.commit()
-            logger.info(
-                f"Created organization (course-level git model): "
-                f"{org_config.get('path')} (ID: {org.id})"
-            )
-            return {
-                "organization_id": str(org.id),
-                "status": "created",
-                "name": org_config.get("name"),
-            }
-    except Exception as e:
-        logger.exception(f"Exception in organization creation activity: {e}")
-        raise
-
-
-@activity.defn(name="create_course_family_activity")
-async def create_course_family_activity(
-    family_config: Dict[str, Any],
-    organization_id: str,
-    user_id: str,
-) -> Dict[str, Any]:
-    logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
-    try:
-        config = CourseFamilyConfig(
-            name=family_config.get("name"),
-            path=family_config.get("path"),
-            description=family_config.get("description", ""),
-        )
-        with get_db_session() as db:
-            org = db.query(Organization).filter(Organization.id == organization_id).first()
-            if not org:
-                raise ValueError(f"Organization {organization_id} not found")
-
-            # Course-level git model: course families carry no git config (git is
-            # per-course). Create the family row and enroll the creator as owner.
-            # Authorization happened at the API edge.
-            from ..custom_types import Ltree
-            from ..model.course import CourseFamilyMember
-
-            family = (
-                db.query(CourseFamily)
-                .filter(
-                    CourseFamily.organization_id == org.id,
-                    CourseFamily.path == Ltree(config.path),
-                )
-                .first()
-            )
-            if family is None:
-                family = CourseFamily(
-                    title=config.name,
-                    description=config.description or "",
-                    path=Ltree(config.path),
-                    organization_id=org.id,
-                    properties={},
-                    created_by=user_id,
-                    updated_by=user_id,
-                )
-                db.add(family)
-                db.flush()
-
-            # Enroll the creator as family owner (manage courses under it).
-            # Idempotent on unique (user_id, course_family_id).
-            if user_id and (
-                db.query(CourseFamilyMember)
-                .filter(
-                    CourseFamilyMember.course_family_id == family.id,
-                    CourseFamilyMember.user_id == user_id,
-                )
-                .first()
-            ) is None:
-                db.add(CourseFamilyMember(
-                    course_family_id=family.id,
-                    user_id=user_id,
-                    course_family_role_id="_owner",
-                    created_by=user_id,
-                    updated_by=user_id,
-                ))
-
-            db.commit()
-            logger.info(f"Created course family: {config.path} (ID: {family.id})")
-            return {
-                "course_family_id": str(family.id),
-                "status": "created",
-                "name": family_config.get("name"),
-                "provider_entity_id": None,
-            }
-
-    except Exception as e:
-        logger.exception(f"Exception in course family creation activity: {e}")
-        raise
-
-
+#
+# Organization and course-family creation are NOT Temporal activities: with the
+# course-level git model they are plain DB inserts with no external side
+# effects, so they run synchronously via ``business_logic.deployment`` (CRUD).
+# Only course creation stays here — it still provisions git / student templates.
 @activity.defn(name="create_course_activity")
 async def create_course_activity(
     course_config: Dict[str, Any],
@@ -273,172 +129,6 @@ async def create_course_activity(
 
 # Workflows
 @register_task
-@workflow.defn(name="create_organization", sandboxed=False)
-class CreateOrganizationWorkflow(BaseWorkflow):
-    """Workflow for creating an organization."""
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "create_organization"
-
-    @classmethod
-    def get_task_queue(cls) -> str:
-        return "computor-tasks"
-
-    @classmethod
-    def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=10)
-
-    @workflow.run
-    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
-        """
-        Create organization workflow.
-
-        Args:
-            parameters: Dictionary containing:
-                - org_config: Organization configuration
-                - user_id: User ID creating the organization
-        """
-        required_params = ['org_config', 'user_id']
-        missing_params = [param for param in required_params if not parameters.get(param)]
-        if missing_params:
-            error_msg = f"Missing required parameters: {', '.join(missing_params)}"
-            workflow.logger.error(error_msg)
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=error_msg,
-                metadata={"workflow_type": "create_organization"}
-            )
-
-        org_config = parameters.get('org_config', {})
-        user_id = parameters.get('user_id')
-
-        if not org_config.get('name') or not org_config.get('path'):
-            error_msg = "Organization config must include 'name' and 'path'"
-            workflow.logger.error(error_msg)
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=error_msg,
-                metadata={"workflow_type": "create_organization"}
-            )
-
-        workflow.logger.info(f"Creating organization: {org_config.get('name')}")
-
-        try:
-            result = await workflow.execute_activity(
-                create_organization_activity,
-                args=[org_config, user_id],
-                start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(seconds=1),
-                    backoff_coefficient=2.0,
-                    maximum_attempts=3,
-                )
-            )
-
-            return WorkflowResult(
-                status="completed",
-                result=result,
-                metadata={"workflow_type": "create_organization"}
-            )
-
-        except Exception as e:
-            workflow.logger.error(f"Organization creation failed: {str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={"workflow_type": "create_organization"}
-            )
-
-
-@register_task
-@workflow.defn(name="create_course_family", sandboxed=False)
-class CreateCourseFamilyWorkflow(BaseWorkflow):
-    """Workflow for creating a course family."""
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "create_course_family"
-
-    @classmethod
-    def get_task_queue(cls) -> str:
-        return "computor-tasks"
-
-    @classmethod
-    def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=10)
-
-    @workflow.run
-    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
-        """
-        Create course family workflow.
-
-        Args:
-            parameters: Dictionary containing:
-                - family_config: Course family configuration
-                - organization_id: Parent organization ID
-                - user_id: User ID creating the course family
-        """
-        required_params = ['family_config', 'organization_id', 'user_id']
-        missing_params = [param for param in required_params if not parameters.get(param)]
-        if missing_params:
-            error_msg = f"Missing required parameters: {', '.join(missing_params)}"
-            workflow.logger.error(error_msg)
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=error_msg,
-                metadata={"workflow_type": "create_course_family"}
-            )
-
-        family_config = parameters.get('family_config', {})
-        organization_id = parameters.get('organization_id')
-        user_id = parameters.get('user_id')
-
-        if not family_config.get('name') or not family_config.get('path'):
-            error_msg = "Course family config must include 'name' and 'path'"
-            workflow.logger.error(error_msg)
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=error_msg,
-                metadata={"workflow_type": "create_course_family"}
-            )
-
-        workflow.logger.info(f"Creating course family: {family_config.get('name')}")
-
-        try:
-            result = await workflow.execute_activity(
-                create_course_family_activity,
-                args=[family_config, organization_id, user_id],
-                start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(seconds=1),
-                    backoff_coefficient=2.0,
-                    maximum_attempts=3,
-                )
-            )
-
-            return WorkflowResult(
-                status="completed",
-                result=result,
-                metadata={"workflow_type": "create_course_family"}
-            )
-
-        except Exception as e:
-            workflow.logger.error(f"Course family creation failed: {str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={"workflow_type": "create_course_family"}
-            )
-
-
-@register_task
 @workflow.defn(name="create_course", sandboxed=False)
 class CreateCourseWorkflow(BaseWorkflow):
     """Workflow for creating a course."""
@@ -526,11 +216,13 @@ class CreateCourseWorkflow(BaseWorkflow):
 @workflow.defn(name="deploy_computor_hierarchy", sandboxed=False)
 class DeployComputorHierarchyWorkflow(BaseWorkflow):
     """
-    Orchestrator workflow that chains existing workflows to deploy a complete
-    organization -> course family -> course hierarchy from a deployment configuration.
+    Orchestrator workflow that creates the courses of a deployment.
 
-    This workflow reuses the CreateOrganizationWorkflow, CreateCourseFamilyWorkflow,
-    and CreateCourseWorkflow to create the full hierarchy from a YAML configuration.
+    Organizations and course families are created synchronously (plain DB
+    inserts, course-level git model) by ``business_logic.deployment`` before
+    this workflow is submitted. This workflow only creates the courses — they
+    still need Temporal for git / student-template provisioning — via
+    ``CreateCourseWorkflow``.
     """
 
     @classmethod
@@ -548,17 +240,16 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
-        Execute the hierarchical deployment orchestration.
-
-        Deploys multiple organizations, each containing multiple course families and courses.
+        Create the deployment's courses under their (already-created) families.
 
         Args:
             parameters: Dictionary containing:
-                - deployment_config: Hierarchical deployment configuration with organizations list
+                - courses: flat list of {course_config, course_family_id} items
+                  (the org/family rows they hang under already exist)
                 - user_id: ID of the user initiating the deployment
         """
-        if not parameters.get('deployment_config') or not parameters.get('user_id'):
-            error_msg = "Missing required parameters: deployment_config and user_id"
+        if not parameters.get('user_id'):
+            error_msg = "Missing required parameter: user_id"
             workflow.logger.error(error_msg)
             return WorkflowResult(
                 status="failed",
@@ -567,126 +258,52 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
                 metadata={"workflow_type": "deploy_computor_hierarchy"}
             )
 
-        deployment_config = parameters['deployment_config']
+        courses = parameters.get('courses') or []
         user_id = parameters['user_id']
 
-        # Track created entities
-        created_entities = {
-            "organizations": [],
-            "course_families": [],
-            "courses": []
-        }
+        created_entities = {"courses": []}
 
         try:
-            workflow.logger.info("Starting hierarchical deployment orchestration")
+            workflow.logger.info(f"Deploying {len(courses)} course(s)")
 
-            organizations = deployment_config.get("organizations", [])
-            if not organizations:
-                raise Exception("No organizations specified in deployment configuration")
+            for course_idx, item in enumerate(courses):
+                course_config = item.get("course_config", {})
+                course_family_id = item.get("course_family_id")
+                workflow.logger.info(
+                    f"Processing course {course_idx + 1}/{len(courses)}: {course_config.get('name')}"
+                )
 
-            total_orgs = len(organizations)
-            total_families = sum(len(org.get("course_families", [])) for org in organizations)
-            total_courses = sum(
-                len(family.get("courses", []))
-                for org in organizations
-                for family in org.get("course_families", [])
-            )
-
-            workflow.logger.info(f"Deploying {total_orgs} organizations, {total_families} course families, {total_courses} courses")
-
-            # Process each organization
-            for org_idx, org_config in enumerate(organizations):
-                workflow.logger.info(f"Processing organization {org_idx + 1}/{total_orgs}: {org_config['name']}")
-
-                # Create organization (course-level git model: orgs carry no git config)
-                org_params = {
-                    "org_config": org_config,
-                    "user_id": user_id
-                }
-
-                org_workflow_handle = await workflow.start_child_workflow(
-                    CreateOrganizationWorkflow.run,
-                    args=[org_params],
-                    id=f"create-org-{org_idx}-{workflow.info().workflow_id}",
+                course_workflow_handle = await workflow.start_child_workflow(
+                    CreateCourseWorkflow.run,
+                    args=[{
+                        "course_config": course_config,
+                        "course_family_id": course_family_id,
+                        "user_id": user_id,
+                    }],
+                    id=f"create-course-{course_idx}-{workflow.info().workflow_id}",
                     task_queue="computor-tasks",
                     execution_timeout=timedelta(minutes=10)
                 )
 
-                org_result = await org_workflow_handle
-                if org_result.status != "completed":
-                    raise Exception(f"Organization '{org_config['name']}' creation failed: {org_result.error}")
+                course_result = await course_workflow_handle
+                if course_result.status != "completed":
+                    raise Exception(f"Course '{course_config.get('name')}' creation failed: {course_result.error}")
 
-                created_entities["organizations"].append(org_result.result)
-                org_id = org_result.result.get("organization_id")
+                created_entities["courses"].append(course_result.result)
 
-                # Process course families for this organization
-                course_families = org_config.get("course_families", [])
-                for family_idx, family_config in enumerate(course_families):
-                    workflow.logger.info(f"Processing course family {family_idx + 1}/{len(course_families)}: {family_config['name']}")
-
-                    family_params = {
-                        "family_config": family_config,
-                        "organization_id": org_id,
-                        "user_id": user_id
-                    }
-
-                    family_workflow_handle = await workflow.start_child_workflow(
-                        CreateCourseFamilyWorkflow.run,
-                        args=[family_params],
-                        id=f"create-family-{org_idx}-{family_idx}-{workflow.info().workflow_id}",
-                        task_queue="computor-tasks",
-                        execution_timeout=timedelta(minutes=10)
-                    )
-
-                    family_result = await family_workflow_handle
-                    if family_result.status != "completed":
-                        raise Exception(f"Course family '{family_config['name']}' creation failed: {family_result.error}")
-
-                    created_entities["course_families"].append(family_result.result)
-                    family_id = family_result.result.get("course_family_id")
-
-                    # Process courses for this course family
-                    courses = family_config.get("courses", [])
-                    for course_idx, course_config in enumerate(courses):
-                        workflow.logger.info(f"Processing course {course_idx + 1}/{len(courses)}: {course_config['name']}")
-
-                        course_params = {
-                            "course_config": course_config,
-                            "course_family_id": family_id,
-                            "user_id": user_id
-                        }
-
-                        course_workflow_handle = await workflow.start_child_workflow(
-                            CreateCourseWorkflow.run,
-                            args=[course_params],
-                            id=f"create-course-{org_idx}-{family_idx}-{course_idx}-{workflow.info().workflow_id}",
-                            task_queue="computor-tasks",
-                            execution_timeout=timedelta(minutes=10)
-                        )
-
-                        course_result = await course_workflow_handle
-                        if course_result.status != "completed":
-                            raise Exception(f"Course '{course_config['name']}' creation failed: {course_result.error}")
-
-                        created_entities["courses"].append(course_result.result)
-
-            workflow.logger.info(f"Hierarchical deployment completed: {total_orgs} orgs, {total_families} families, {total_courses} courses")
+            workflow.logger.info(f"Course deployment completed: {len(courses)} course(s)")
 
             return WorkflowResult(
                 status="completed",
                 result={
                     "created_entities": created_entities,
-                    "counts": {
-                        "organizations": total_orgs,
-                        "course_families": total_families,
-                        "courses": total_courses
-                    }
+                    "counts": {"courses": len(courses)},
                 },
                 metadata={"workflow_type": "deploy_computor_hierarchy"}
             )
 
         except Exception as e:
-            error_msg = f"Deployment orchestration failed: {str(e)}"
+            error_msg = f"Course deployment failed: {str(e)}"
             workflow.logger.error(error_msg, exc_info=True)
             return WorkflowResult(
                 status="failed",
@@ -697,14 +314,10 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
 
 
 WORKFLOWS = [
-    CreateOrganizationWorkflow,
-    CreateCourseFamilyWorkflow,
     CreateCourseWorkflow,
     DeployComputorHierarchyWorkflow,
 ]
 
 ACTIVITIES = [
-    create_organization_activity,
-    create_course_family_activity,
     create_course_activity,
 ]

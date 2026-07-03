@@ -11,17 +11,6 @@ from pydantic import BaseModel, Field
 from computor_types.course_git import CourseGitBindingUpsert
 
 
-class OrganizationTaskRequest(BaseModel):
-    """Request to create an organization via Temporal workflow."""
-    organization: Dict
-
-
-class CourseFamilyTaskRequest(BaseModel):
-    """Request to create a course family via Temporal workflow."""
-    course_family: Dict
-    organization_id: str
-
-
 class CourseTaskRequest(BaseModel):
     """Request to create a course via Temporal workflow."""
     course: Dict
