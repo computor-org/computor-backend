@@ -11,7 +11,6 @@ export default function Home() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [extensionUrl, setExtensionUrl] = useState<string | null>(null);
-  const [extensionLoading, setExtensionLoading] = useState(true);
   const [gettingStartedUrl, setGettingStartedUrl] = useState<string | null>(null);
 
   // `/` is the public landing page and stays viewable when signed in (the header
@@ -31,8 +30,6 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to fetch extension URL:', error);
         setExtensionUrl(null);
-      } finally {
-        setExtensionLoading(false);
       }
     }
 
@@ -73,7 +70,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -110,7 +107,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 py-16 flex-1">
+      <main className="container mx-auto px-4 pt-16 pb-24">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           {/* Hero Title */}
           <div className="space-y-4">
@@ -125,18 +122,7 @@ export default function Home() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {extensionLoading ? (
-              <button
-                disabled
-                className="px-8 py-4 bg-gray-400 text-white rounded-lg font-semibold text-lg shadow-lg flex items-center space-x-2 cursor-not-allowed"
-              >
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Loading...</span>
-              </button>
-            ) : extensionUrl ? (
+            {extensionUrl ? (
               <button
                 className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
                 onClick={handleDownload}
@@ -226,8 +212,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white">
-        <div className="container mx-auto px-4 py-8">
+      <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-white">
+        <div className="container mx-auto px-4 py-4">
           <div className="text-center text-gray-600">
             <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
           </div>
