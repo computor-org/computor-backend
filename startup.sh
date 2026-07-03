@@ -391,6 +391,10 @@ if [ ! -f "data/deployments/testing-worker.yaml" ] && [ -f "data/deployments/tes
     echo "  Seeding data/deployments/testing-worker.yaml from example..."
     cp "data/deployments/testing-worker.example.yaml" "data/deployments/testing-worker.yaml"
 fi
+if [ ! -f "data/deployments/example-repository.yaml" ] && [ -f "data/deployments/example-repository.example.yaml" ]; then
+    echo "  Seeding data/deployments/example-repository.yaml from example..."
+    cp "data/deployments/example-repository.example.yaml" "data/deployments/example-repository.yaml"
+fi
 for f in data/deployments/*.yaml data/deployments/*.yml; do
     [ -f "$f" ] || continue
     case "$f" in *.example.yaml | *.example.yml) continue ;; esac

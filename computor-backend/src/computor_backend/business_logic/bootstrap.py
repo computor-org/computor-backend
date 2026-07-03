@@ -13,8 +13,12 @@ passes as ``API_TOKEN``. They can't drift.
 
 Mirrors the style of ``ensure_managed_forgejo_registered`` /
 ``db_apply_roles``: synchronous, best-effort, logged, never raises into startup.
-Only the ``services:`` section is applied here — organizations/users/contents are
-out of scope for boot seeding.
+Only the ``services:`` and ``example_repositories:`` sections are applied here —
+organizations/users/contents are out of scope for boot seeding.
+
+The ``example_repositories:`` section seeds a default Example Repository so a
+fresh install has somewhere to upload examples into (MinIO-backed by default);
+it is idempotent on ``source_url`` (the model's unique key).
 """
 from __future__ import annotations
 
@@ -26,12 +30,17 @@ from pathlib import Path
 import yaml
 
 from computor_types.api_tokens import ApiTokenAdminCreate
-from computor_types.deployments_refactored import ComputorDeploymentConfig, ServiceConfig
+from computor_types.deployments_refactored import (
+    ComputorDeploymentConfig,
+    ExampleRepositoryConfig,
+    ServiceConfig,
+)
 from computor_types.services import ServiceCreate
 
 from computor_backend.business_logic.api_tokens import create_api_token_admin
 from computor_backend.business_logic.service_accounts import create_service_account
 from computor_backend.database import get_db_session
+from computor_backend.model.example import ExampleRepository
 from computor_backend.model.service import ApiToken, Service
 from computor_backend.permissions.principal import Principal
 
@@ -94,6 +103,16 @@ def ensure_bootstrap_services() -> None:
                     print(f"[STARTUP] Bootstrap service '{svc.slug}': {status}")
                 except Exception as exc:  # noqa: BLE001 - best-effort per service
                     print(f"[STARTUP] Bootstrap service '{getattr(svc, 'slug', '?')}' failed: {exc}")
+
+            for repo in (config.example_repositories or []):
+                try:
+                    status = _ensure_example_repository(repo, system, db)
+                    print(f"[STARTUP] Bootstrap example repository '{repo.name}': {status}")
+                except Exception as exc:  # noqa: BLE001 - best-effort per repository
+                    print(
+                        f"[STARTUP] Bootstrap example repository "
+                        f"'{getattr(repo, 'name', '?')}' failed: {exc}"
+                    )
 
 
 def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
@@ -161,3 +180,45 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
         db,
     )
     return f"{'created' if created_now else 'present'} + token set"
+
+
+def _ensure_example_repository(cfg: ExampleRepositoryConfig, system: Principal, db) -> str:
+    """Ensure one Example Repository exists. Returns a short human status.
+
+    Idempotent on ``source_url`` (the model's unique key). ``created_by`` stays
+    NULL — this is the trusted boot context, mirroring ``_ensure_service``. For
+    object-store repos (minio/s3) the target bucket is ensured best-effort so
+    uploads work out of the box without blocking startup on MinIO availability.
+    """
+    existing = (
+        db.query(ExampleRepository)
+        .filter(ExampleRepository.source_url == cfg.source_url)
+        .first()
+    )
+    if existing is not None:
+        return "already present"
+
+    repo = ExampleRepository(
+        name=cfg.name,
+        description=cfg.description,
+        source_type=cfg.source_type,
+        source_url=cfg.source_url,
+        organization_id=cfg.organization_id,
+    )
+    db.add(repo)
+    db.flush()
+
+    if cfg.source_type in ("minio", "s3"):
+        bucket = cfg.source_url.split("/")[0]
+        try:
+            from computor_backend.minio_client import get_minio_client
+
+            client = get_minio_client()
+            if not client.bucket_exists(bucket):
+                client.make_bucket(bucket)
+                return f"created + bucket '{bucket}' created"
+            return f"created (bucket '{bucket}' present)"
+        except Exception as exc:  # noqa: BLE001 - MinIO may be down; repo row still stands
+            return f"created WITHOUT ensuring bucket '{bucket}' (MinIO unavailable: {exc})"
+
+    return "created"

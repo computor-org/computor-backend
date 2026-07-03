@@ -1,0 +1,31 @@
+# Bootstrap deployment — applied idempotently at API startup (see
+# computor_backend.business_logic.bootstrap.ensure_bootstrap_services). Every
+# *.yaml under data/deployments/ has its `services:` and `example_repositories:`
+# sections applied on each start: created once, then a no-op.
+#
+# This file defines the DEFAULT Example Repository so a fresh install has
+# somewhere to upload examples into out of the box. Without it, no repository
+# exists initially and the first example upload has nothing to target.
+#
+# To use it, drop a real file in this directory (e.g. example-repository.yaml —
+# gitignored, like .env); startup.sh also seeds one from this example on first
+# run. Edit the copy, not this template.
+#
+# Idempotency: the `source_url` is the unique key. Re-running with the same
+# source_url is a no-op; changing it creates a second repository. The default
+# `minio` source stores examples in the object store — the first path segment of
+# source_url is the MinIO bucket (matches the web-UI create form default,
+# `computor-storage`, i.e. MINIO_DEFAULT_BUCKET). The bucket is ensured to exist
+# at boot (best-effort; MinIO creds come from MINIO_ACCESS_KEY/SECRET_KEY,
+# falling back to MINIO_ROOT_USER/MINIO_ROOT_PASSWORD).
+#
+# Only the `example_repositories:` (and `services:`) section is applied at boot —
+# no organizations/users/contents.
+
+example_repositories:
+  - name: Default Examples                 # human-readable name shown in the UI / tree view
+    description: Default MinIO-backed example repository (uploadable)
+    source_type: minio                     # minio | s3 = uploadable; git = read-only (synced via push)
+    source_url: computor-storage           # for minio/s3 the first path segment is the bucket name;
+                                             # must be unique across repositories
+    # organization_id:                     # optional owning organization id; global (org-less) if omitted

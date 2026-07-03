@@ -222,6 +222,32 @@ class ServiceReference(BaseDeployment):
     slug: str = Field(description="Slug of the service to link")
 
 
+class ExampleRepositoryConfig(BaseDeployment):
+    """Bootstrap configuration for an Example Repository.
+
+    Applied idempotently at API startup (keyed on ``source_url``, which is
+    unique) so a fresh install has a default repository to upload examples into.
+    Mirrors ``ExampleRepositoryCreate`` but is deployment-file friendly (no
+    ``organization_id`` UUID required — global if omitted).
+    """
+    name: str = Field(description="Human-readable name of the repository")
+    description: Optional[str] = Field(None, description="Description of the repository and its contents")
+    source_type: str = Field(
+        "minio",
+        description="Source type: minio, s3, git, github, gitlab. Use 'minio' for an uploadable repository.",
+    )
+    source_url: str = Field(
+        description=(
+            "Repository URL. For minio/s3 the first path segment is the bucket name "
+            "(e.g. 'computor-storage'). Must be unique across repositories."
+        )
+    )
+    organization_id: Optional[str] = Field(
+        None,
+        description="Optional owning organization id. Global (organization-less) if omitted.",
+    )
+
+
 class CourseContentTypeConfig(BaseDeployment):
     """Course content type configuration for deployment."""
     slug: str = Field(description="Unique identifier for the content type")
@@ -358,6 +384,12 @@ class ComputorDeploymentConfig(BaseDeployment):
     services: Optional[List[ServiceConfig]] = Field(
         None,
         description="List of services to create or ensure exist in the system (deployed in Phase 1)"
+    )
+
+    # Example repositories to be created (deployed in Phase 1, idempotent on source_url)
+    example_repositories: Optional[List[ExampleRepositoryConfig]] = Field(
+        None,
+        description="List of example repositories to create or ensure exist in the system (deployed in Phase 1)"
     )
 
     # Deprecated: Use 'services' instead
