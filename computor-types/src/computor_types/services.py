@@ -18,7 +18,6 @@ class ServiceCreate(BaseModel):
     description: Optional[str] = Field(None, description="Service description")
     service_type: str = Field(..., min_length=1, max_length=63,
                              description="Service type (e.g., 'temporal_worker', 'grading', 'notification')")
-    username: Optional[str] = Field(None, description="Username for service user (defaults to slug)")
     email: Optional[str] = Field(None, description="Email for service user")
     given_name: Optional[str] = Field(None, max_length=255, description="Given name for service user (defaults to first word of name)")
     family_name: Optional[str] = Field(None, max_length=255, description="Family name for service user (defaults to rest of name)")

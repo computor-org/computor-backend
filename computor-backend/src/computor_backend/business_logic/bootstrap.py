@@ -125,7 +125,6 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
                 name=(svc.user.given_name or svc.slug.replace("-", " ").replace(".", " ").title()),
                 description=svc.description or f"Service for {svc.slug}",
                 service_type=svc.service_type_path,
-                username=svc.user.username,
                 email=svc.user.email,
                 given_name=svc.user.given_name,
                 family_name=svc.user.family_name,

@@ -27,14 +27,11 @@ class TestUserValidation:
             given_name="John",
             family_name="Doe",
             email="john.doe@example.com",
-            username="johndoe123",
-            number="12345"
         )
         assert user.given_name == "John"
         assert user.family_name == "Doe"
         assert user.email == "john.doe@example.com"
-        assert user.username == "johndoe123"
-    
+
     def test_user_create_invalid_email(self):
         """Test UserCreate with invalid email"""
         with pytest.raises(ValidationError) as exc_info:
@@ -43,21 +40,7 @@ class TestUserValidation:
                 email="invalid-email"
             )
         assert "Email must contain @ symbol" in str(exc_info.value)
-    
-    def test_user_create_invalid_username(self):
-        """Test UserCreate with invalid username (special characters)"""
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreate(
-                username="user@name!"
-            )
-        assert "Username can only contain alphanumeric characters" in str(exc_info.value)
-    
-    def test_user_create_short_username(self):
-        """Test UserCreate with too short username"""
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreate(username="ab")
-        assert "at least 3 characters" in str(exc_info.value)
-    
+
     def test_user_create_empty_name_validation(self):
         """Test UserCreate with empty names"""
         with pytest.raises(ValidationError) as exc_info:
@@ -80,10 +63,10 @@ class TestUserValidation:
         assert user_partial.full_name == "John"
         assert user_partial.display_name == "John"
         
-        # Test with neither name
-        user_minimal = UserGet(id="123", username="johndoe")
+        # Test with neither name (falls back to a stable id-based label)
+        user_minimal = UserGet(id="123")
         assert user_minimal.full_name == ""
-        assert user_minimal.display_name == "johndoe"
+        assert user_minimal.display_name == "User 123"
 
 
 class TestOrganizationValidation:
@@ -424,7 +407,7 @@ class TestFieldConstraints:
         
         # Test min length
         with pytest.raises(ValidationError):
-            UserCreate(username="ab")  # Min 3
+            UserCreate(given_name="")  # Min 1
     
     def test_field_descriptions_present(self):
         """Test that Field descriptions are present"""

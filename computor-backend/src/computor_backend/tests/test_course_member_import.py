@@ -139,7 +139,6 @@ def test_import_duplicate_member(db: Session, test_course: Course, admin_princip
     user = User(
         id=uuid4(),
         email="existing@example.com",
-        username="existing",
         given_name="Existing",
         family_name="User"
     )
