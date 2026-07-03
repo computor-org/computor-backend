@@ -26,14 +26,13 @@ def service():
 @click.option('--name', required=True, help='Human-readable service name')
 @click.option('--service-type', required=True, help='Service type path (e.g., "testing.temporal", "testing.matlab")')
 @click.option('--description', help='Service description')
-@click.option('--username', help='Username for service user (defaults to slug)')
 @click.option('--email', help='Email for service user')
 @click.option('--enabled/--disabled', default=True, help='Whether the service is enabled (default: enabled)')
 @click.option('--create-token', is_flag=True, help='Also create an API token for this service')
 @click.option('--token-name', help='Name for the API token (used with --create-token)')
 @click.option('--token-expires-days', type=int, default=365, help='Token expiration in days (default: 365)')
 @authenticate
-def create(slug, name, service_type, description, username, email, enabled, create_token, token_name, token_expires_days, auth: CLIAuthConfig):
+def create(slug, name, service_type, description, email, enabled, create_token, token_name, token_expires_days, auth: CLIAuthConfig):
     """
     Create a new service account via the REST API.
 
@@ -70,7 +69,6 @@ def create(slug, name, service_type, description, username, email, enabled, crea
         name=name,
         service_type=service_type,
         description=description,
-        username=username or slug,
         email=email,
         enabled=enabled,
     )
@@ -79,7 +77,6 @@ def create(slug, name, service_type, description, username, email, enabled, crea
     click.echo(f"   Slug:         {slug}")
     click.echo(f"   Name:         {name}")
     click.echo(f"   Type:         {service_type}")
-    click.echo(f"   Username:     {username or slug}")
     if description:
         click.echo(f"   Description:  {description}")
     if email:

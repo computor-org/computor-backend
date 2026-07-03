@@ -18,7 +18,6 @@ class UserCreate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
 
     @field_validator('email')
@@ -48,14 +47,6 @@ class UserCreate(BaseModel):
             raise ValueError('Email cannot contain consecutive dots')
         return v
 
-    @field_validator('username')
-    @classmethod
-    def validate_username(cls, v):
-        if v is not None:
-            if not v.replace('_', '').replace('-', '').replace('.', '').isalnum():
-                raise ValueError('Username can only contain alphanumeric characters, underscores, hyphens, and dots')
-        return v
-    
     @field_validator('given_name', 'family_name')
     @classmethod
     def validate_names(cls, v):
@@ -68,7 +59,6 @@ class UserGet(BaseEntityGet):
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    username: Optional[str] = Field(None, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     archived_at: Optional[datetime] = Field(None, description="Timestamp when user was archived")
     is_service: bool = Field(description="Whether this is a service account")
@@ -96,9 +86,9 @@ class UserGet(BaseEntityGet):
     
     @property
     def display_name(self) -> str:
-        """Get the user's display name (full name or username)"""
+        """Get the user's display name (full name or a stable id-based label)"""
         full_name = self.full_name
-        return full_name if full_name else (self.username or f"User {self.id[:8]}")
+        return full_name if full_name else f"User {self.id[:8]}"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -107,7 +97,6 @@ class UserList(BaseEntityList):
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    username: Optional[str] = Field(None, description="Unique username")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     is_service: bool = Field(description="Whether this is a service account")
     banned_at: Optional[datetime] = Field(None, description="Timestamp when the user was banned (null = not banned)")
@@ -125,8 +114,6 @@ class UserList(BaseEntityList):
             return f"{self.given_name} {self.family_name}"
         elif self.given_name:
             return self.given_name
-        elif self.username:
-            return self.username
         return f"User {self.id[:8]}"
 
     model_config = ConfigDict(from_attributes=True)
@@ -135,9 +122,8 @@ class UserUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
-    username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
-    
+
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
@@ -164,15 +150,7 @@ class UserUpdate(BaseModel):
         if '..' in v:
             raise ValueError('Email cannot contain consecutive dots')
         return v
-    
-    @field_validator('username')
-    @classmethod
-    def validate_username(cls, v):
-        if v is not None:
-            if not v.replace('_', '').replace('-', '').replace('.', '').isalnum():
-                raise ValueError('Username can only contain alphanumeric characters, underscores, hyphens, and dots')
-        return v
-    
+
     @field_validator('given_name', 'family_name')
     @classmethod
     def validate_names(cls, v):
@@ -186,7 +164,6 @@ class UserQuery(ListQuery):
     family_name: Optional[str] = None
     email: Optional[str] = None
     archived: Optional[bool] = None
-    username: Optional[str] = None
     is_service: Optional[bool] = None
     banned: Optional[bool] = None
     search: Optional[str] = None
@@ -211,7 +188,6 @@ class UserBanRequest(BaseModel):
 
 class UserPassword(BaseModel):
     """Password update request for user endpoints."""
-    username: Optional[str] = Field(None, description="Target username (admin only, otherwise current user)")
     password: str = Field(..., description="New password")
     password_old: Optional[str] = Field(None, description="Old password (required for non-admin password changes)")
 

@@ -29,17 +29,6 @@ class TestValidationEdgeCases:
             UserCreate(given_name="a" * 256)  # 256 chars - should fail
         assert "at most 255 characters" in str(exc_info.value)
     
-    def test_min_length_boundaries(self):
-        """Test minimum length boundaries"""
-        # Test exactly at min length
-        user = UserCreate(username="abc")  # Exactly 3 chars
-        assert user.username == "abc"
-        
-        # Test one character under min length
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreate(username="ab")  # 2 chars - should fail
-        assert "at least 3 characters" in str(exc_info.value)
-    
     def test_unicode_and_special_characters(self):
         """Test handling of Unicode and special characters"""
         # Unicode characters in names
@@ -254,13 +243,6 @@ class TestValidationErrorMessages:
     
     def test_field_specific_error_messages(self):
         """Test that error messages are field-specific and clear"""
-        # Username validation error
-        with pytest.raises(ValidationError) as exc_info:
-            UserCreate(username="user@name!")
-        error_msg = str(exc_info.value)
-        assert "username" in error_msg.lower()
-        assert "alphanumeric" in error_msg.lower()
-        
         # Email validation error
         with pytest.raises(ValidationError) as exc_info:
             UserCreate(email="invalid-email")
@@ -285,12 +267,11 @@ class TestValidationErrorMessages:
             UserCreate(
                 given_name="",  # Empty name
                 email="invalid-email",  # Invalid email
-                username="ab"  # Too short username
             )
-        
+
         error_msg = str(exc_info.value)
         # Should mention multiple field errors
-        assert "given_name" in error_msg or "email" in error_msg or "username" in error_msg
+        assert "given_name" in error_msg or "email" in error_msg
     
     def test_business_logic_error_messages(self):
         """Test business logic validation error messages"""
@@ -325,14 +306,10 @@ class TestCornerCases:
             given_name="a" * 255,
             family_name="b" * 255,
             email="c" * 50 + "@example.com",  # Reasonable email length
-            username="d" * 50,  # Maximum username length
-            number="e" * 255
         )
-        
+
         assert len(max_user.given_name) == 255
         assert len(max_user.family_name) == 255
-        assert len(max_user.username) == 50
-        assert len(max_user.number) == 255
     
     def test_ip_address_edge_cases(self):
         """Test IP address validation edge cases"""
@@ -479,11 +456,7 @@ class TestUpdateValidation:
         # Invalid email in update
         with pytest.raises(ValidationError):
             UserUpdate(email="invalid-email")
-        
-        # Invalid username in update
-        with pytest.raises(ValidationError):
-            UserUpdate(username="ab")  # Too short
-        
+
         # Invalid avatar color in profile update
         with pytest.raises(ValidationError):
             ProfileUpdate(avatar_color=16777216)  # Too large

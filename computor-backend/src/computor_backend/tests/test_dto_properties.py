@@ -38,17 +38,8 @@ class TestComputedProperties:
         )
         assert user_given.full_name == "John"
         assert user_given.display_name == "John"
-        
-        # Only username
-        user_username = UserGet(
-            id="123",
-            username="johndoe",
-            email="john@example.com"
-        )
-        assert user_username.full_name == ""
-        assert user_username.display_name == "johndoe"
-        
-        # Fallback to user ID
+
+        # Fallback to user ID (email is not used as a display name)
         user_minimal = UserGet(
             id="123456789",
             email="john@example.com"
@@ -66,15 +57,7 @@ class TestComputedProperties:
             email="jane@example.com"
         )
         assert user_list.display_name == "Jane Smith"
-        
-        # Username fallback
-        user_list_username = UserList(
-            id="123",
-            username="janesmith",
-            email="jane@example.com"
-        )
-        assert user_list_username.display_name == "janesmith"
-        
+
         # ID fallback
         user_list_minimal = UserList(
             id="123456789",
@@ -257,7 +240,6 @@ class TestPropertyEdgeCases:
             id="123",
             given_name="",
             family_name="",
-            username="",
             email="test@example.com"
         )
         assert user.full_name == ""
@@ -278,7 +260,6 @@ class TestPropertyEdgeCases:
             id="123",
             given_name=None,
             family_name=None,
-            username=None,
             email="test@example.com"
         )
         assert user.full_name == ""

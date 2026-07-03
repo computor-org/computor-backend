@@ -47,7 +47,7 @@ def create_service_account(
         Created service account
 
     Raises:
-        BadRequestException: If service slug or username already exists
+        BadRequestException: If service slug or service user already exists
         ForbiddenException: If user lacks admin permissions
     """
     # Check permissions (admin only)

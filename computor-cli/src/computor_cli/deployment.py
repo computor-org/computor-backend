@@ -25,7 +25,6 @@ from computor_types.deployments_refactored import (
     ExecutionBackendReference,
     ServiceConfig,
     ServiceReference,
-    ServiceUserConfig,
     ServiceApiTokenConfig,
     CourseProjects,
     CourseContentConfig,
@@ -243,18 +242,14 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
 
     for user_deployment in config.users:
         user_dep = user_deployment.user
-        click.echo(f"\n👤 Processing: {user_dep.display_name} ({user_dep.username})")
+        click.echo(f"\n👤 Processing: {user_dep.display_name} ({user_dep.email})")
 
         try:
-            # Check if user already exists by email or username
+            # Check if user already exists by email
             existing_users = []
             if user_dep.email:
                 existing_users.extend(run_async(user_client.list(UserQuery(email=user_dep.email))))
 
-            # Also check by username if not found by email
-            if not existing_users and user_dep.username:
-                existing_users.extend(run_async(user_client.list(UserQuery(username=user_dep.username))))
-            
             if existing_users:
                 user = existing_users[0]
                 click.echo(f"  ℹ️  User already exists: {user.display_name}")
@@ -265,7 +260,6 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                     family_name=user_dep.family_name,
                     email=user_dep.email,
                     number=user_dep.number,
-                    username=user_dep.username,
                     user_type=user_dep.user_type,
                     properties=user_dep.properties
                 )
@@ -312,7 +306,6 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 try:
                     import httpx
                     password_payload = {
-                        "username": user_dep.username,
                         "password": user_dep.password
                     }
                     # Use direct HTTP call since client doesn't have this method
@@ -590,10 +583,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
 
             # Only create service if it doesn't exist yet
             if not existing_services or len(existing_services) == 0:
-                # 1. Get username for the service (API will create user if needed)
-                user_username = service_config.user.username
-
-                # 2. Look up ServiceType by path
+                # 1. Look up ServiceType by path
                 service_type = None
                 if service_config.service_type_path:
                     service_types = run_async(service_type_client.list(
@@ -615,7 +605,6 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
                     name=service_config.user.given_name or service_config.slug.replace('-', ' ').title(),
                     description=service_config.description or f"Service for {service_config.slug}",
                     service_type=service_config.service_type_path if service_type else "custom",
-                    username=user_username,
                     email=service_config.user.email,
                     given_name=service_config.user.given_name,
                     family_name=service_config.user.family_name,
@@ -1885,7 +1874,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"\nUsers to be created:")
                 for user_deployment in config.users:
                     user = user_deployment.user
-                    click.echo(f"  - {user.display_name} ({user.username})")
+                    click.echo(f"  - {user.display_name} ({user.email})")
                     if user_deployment.accounts:
                         for account in user_deployment.accounts:
                             click.echo(f"    Account: {account.type} @ {account.provider}")

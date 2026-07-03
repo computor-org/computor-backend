@@ -23,7 +23,6 @@ services:
     language: python                     # the testing worker also handles octave/R/julia/...
     description: Default testing worker
     user:
-      username: testing-worker
       email: testing-worker@computor.local
       given_name: Testing
       family_name: Worker

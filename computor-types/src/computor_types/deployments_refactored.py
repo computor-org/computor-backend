@@ -21,7 +21,6 @@ class UserDeployment(BaseDeployment):
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
     number: Optional[str] = Field(None, description="User number/identifier (student ID)")
-    username: Optional[str] = Field(None, description="Unique username")
     user_type: str = Field("user", description="Type of user account (user or token)")
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional user properties")
     
@@ -32,7 +31,7 @@ class UserDeployment(BaseDeployment):
     roles: Optional[List[str]] = Field(None, description="System roles to assign to the user")
     
     # GitLab-specific properties
-    gitlab_username: Optional[str] = Field(None, description="GitLab username (if different from username)")
+    gitlab_username: Optional[str] = Field(None, description="GitLab username (if different from the login handle)")
     gitlab_email: Optional[str] = Field(None, description="GitLab email (if different from email)")
     
     @property
@@ -49,7 +48,7 @@ class UserDeployment(BaseDeployment):
     def display_name(self) -> str:
         """Get the user's display name."""
         full_name = self.full_name
-        return full_name if full_name else (self.username or "Unknown User")
+        return full_name if full_name else (self.email or "Unknown User")
 
 class AccountDeployment(BaseDeployment):
     """Account deployment configuration for external service accounts (e.g., GitLab)."""
@@ -154,18 +153,6 @@ class ExecutionBackendReference(BaseDeployment):
 
 
 # Service Configuration Classes (New Architecture)
-
-class ServiceUserConfig(BaseDeployment):
-    """User configuration for a service.
-
-    DEPRECATED: Use UserDeployment directly in ServiceConfig instead.
-    Kept for backwards compatibility.
-    """
-    username: str = Field(description="Username for the service user")
-    email: Optional[str] = Field(None, description="Email for the service user")
-    given_name: Optional[str] = Field(None, description="Given name")
-    family_name: Optional[str] = Field(None, description="Family name")
-
 
 class ServiceApiTokenConfig(BaseDeployment):
     """API token configuration for a service."""
@@ -671,7 +658,6 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 given_name="John",
                 family_name="Doe",
                 email="john.doe@university.edu",
-                username="jdoe",
                 password="<password>"
             ),
             accounts=[
@@ -691,7 +677,6 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 given_name="Jane",
                 family_name="Smith",
                 email="jane.smith@university.edu",
-                username="jsmith",
                 password="<password>"
             ),
             accounts=[
@@ -711,7 +696,6 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 given_name="Course",
                 family_name="Manager",
                 email="course.manager@university.edu",
-                username="course_manager",
                 user_type="user",
                 password="<password>"
             ),
