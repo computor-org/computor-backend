@@ -38,8 +38,6 @@ from computor_types.auth import (
     LoginRequest,
     TokenRefreshRequest,
     TokenRefreshResponse,
-    GitLabRegisterRequest,
-    GitLabRegisterResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -624,56 +622,3 @@ async def verify_coder_access(
         status_code=200,
         content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
     )
-
-
-@auth_router.post("/gitlab/register", response_model=GitLabRegisterResponse)
-async def register_via_gitlab(
-    request: GitLabRegisterRequest,
-    db: Session = Depends(get_db),
-) -> GitLabRegisterResponse:
-    """Provision (or reset) a user's Keycloak login using a GitLab PAT as proof.
-
-    Idempotent by design: if the Keycloak user already exists, its password is
-    reset — so a user who forgot their credentials simply re-runs this with a
-    new password. The Keycloak account links to the existing computor user on
-    first SSO login via the email match in handle_sso_callback.
-    """
-    from computor_backend.business_logic.auth import (
-        verify_user_with_gitlab_pat,
-        find_or_create_gitlab_account,
-        provision_keycloak_login,
-    )
-
-    # 1. Prove identity. Matches the GitLab-profile email against User.email or
-    #    the org-scoped StudentProfile.student_email; raises if no match.
-    user, gitlab_url, gitlab_user_data = await verify_user_with_gitlab_pat(
-        access_token=request.gitlab_pat,
-        gitlab_url=request.gitlab_url,
-        db=db,
-    )
-
-    if not user.email:
-        raise BadRequestException("Verified user has no email on record; cannot provision Keycloak login.")
-
-    # 2. Create or reset the Keycloak login (PAT was the authorization proof).
-    email = user.email
-    kc_user_id, created = await provision_keycloak_login(
-        email=email,
-        password=request.new_password,
-        given_name=user.given_name,
-        family_name=user.family_name,
-    )
-
-    # 3. Link the GitLab account (PAT is not stored).
-    await find_or_create_gitlab_account(
-        user=user,
-        gitlab_url=gitlab_url,
-        gitlab_user_data=gitlab_user_data,
-        db=db,
-    )
-
-    logger.info(
-        f"GitLab-PAT Keycloak provisioning for {email} "
-        f"(user {user.id}, kc {kc_user_id}, created={created})"
-    )
-    return GitLabRegisterResponse(user_id=str(user.id), email=email, created=created)
