@@ -28,6 +28,11 @@ class BackendSettings:
         self.API_ADMIN_EMAIL = os.environ.get("API_ADMIN_EMAIL", None)
         self.API_ADMIN_PASSWORD = os.environ.get("API_ADMIN_PASSWORD", None)
 
+        # GDPR consent gate (middleware/consent.py). The gate is additionally
+        # inactive while no policy_versions row is effective, so this flag is
+        # an operational escape hatch, not the primary rollout switch.
+        self.CONSENT_GATE_ENABLED = os.environ.get("CONSENT_GATE_ENABLED", "true").lower() in ["true", "1", "yes", "on"]
+
         # Extension public download URL
         self.EXTENSION_PUBLIC_DOWNLOAD_URL = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
 

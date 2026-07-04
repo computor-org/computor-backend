@@ -1,5 +1,5 @@
 import { IAuthProvider } from '../interfaces/IAuthProvider';
-import { API_BASE_URL } from '../utils/apiClient';
+import { API_BASE_URL, isConsentRequired, redirectToConsent } from '../utils/apiClient';
 import { refreshOnce } from '../utils/tokenRefresh';
 import { clearStoredSession } from '../services/authStorage';
 
@@ -65,6 +65,11 @@ class APIClient {
    */
   private async handleResponse<T>(response: Response, method?: string): Promise<T> {
     if (!response.ok) {
+      // Consent gate: route to /consent, remembering the current route.
+      if (await isConsentRequired(response)) {
+        redirectToConsent();
+      }
+
       const error = await response.text();
       throw new Error(error || `HTTP error! status: ${response.status}`);
     }

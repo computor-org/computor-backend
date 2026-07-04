@@ -79,6 +79,7 @@ from computor_backend.api.course_member_gradings import course_member_gradings_r
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
 from computor_backend.api.invites import invites_router
+from computor_backend.api.consent import consent_router
 from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
@@ -336,11 +337,17 @@ origins = [
 ]
 
 # Middleware order (last added = outermost = runs first):
-# 1. CORS (outermost) - ensures CORS headers on all responses including 503
+# 1. CORS (outermost) - ensures CORS headers on all responses including 503/403
 # 2. Maintenance - blocks non-GET for non-admins during maintenance
-# 3. Upload size limiter (innermost) - enforces body size limits
-from computor_backend.middleware import UploadSizeLimiterMiddleware, MaintenanceMiddleware
+# 3. Consent gate - 403 consent_required for authenticated users without
+#    current GDPR consent. Auth in this app is a per-route dependency, so the
+#    gate resolves the user itself from the Redis principal/session caches
+#    (see middleware/consent.py); it must only run inside CORS so blocked
+#    responses carry CORS headers.
+# 4. Upload size limiter (innermost) - enforces body size limits
+from computor_backend.middleware import UploadSizeLimiterMiddleware, MaintenanceMiddleware, ConsentGateMiddleware
 app.add_middleware(UploadSizeLimiterMiddleware)
+app.add_middleware(ConsentGateMiddleware)
 app.add_middleware(MaintenanceMiddleware)
 
 app.add_middleware(
@@ -549,6 +556,14 @@ app.include_router(
 app.include_router(
     invites_router,
     tags=["invites", "user-management"]
+)
+
+# GDPR consent gate endpoints. Whitelisted in ConsentGateMiddleware — they must
+# be reachable by authenticated-but-unconsented users.
+app.include_router(
+    consent_router,
+    prefix="/consent",
+    tags=["consent", "gdpr"]
 )
 
 app.include_router(
