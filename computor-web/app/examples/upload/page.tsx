@@ -28,7 +28,7 @@ function UploadInner() {
   const forcedDirectory = useSearchParam('directory');
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canManageExamples: canManage } = usePermissions();
 
   const [repos, setRepos] = useState<ExampleRepositoryList[]>([]);
   const [repoId, setRepoId] = useState(initialRepo);

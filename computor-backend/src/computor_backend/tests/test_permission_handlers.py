@@ -17,10 +17,13 @@ from computor_backend.permissions.handlers_impl import (
     CourseContentTypePermissionHandler,
     CourseContentPermissionHandler,
     CourseMemberPermissionHandler,
+    ExamplePermissionHandler,
     ReadOnlyPermissionHandler,
 )
+from computor_backend.permissions.role_setup import claims_example_manager
 from computor_backend.model.auth import User
 from computor_backend.model.course import Course, CourseContentType, CourseMember
+from computor_backend.model.example import Example, ExampleRepository
 
 
 def make_db():
@@ -141,3 +144,114 @@ class TestCourseMemberPermissionHandler:
         # Should return a query-like object without raising
         q = handler.build_query(principal, 'get', db)
         assert q is not None
+
+
+class TestExamplePermissionHandler:
+    """Pins the read/write split introduced with the _example_manager role.
+
+    - Admin: everything.
+    - General claim holder (``_example_manager`` for authoring,
+      ``_organization_manager`` for reads): allowed per-action.
+    - Course ``_lecturer``: read-only (get/list/download); authoring denied.
+    - tutor/student/none: nothing.
+    """
+
+    def _example_manager(self):
+        # Full example-authoring claim set, exactly as the role is seeded.
+        return Principal(
+            user_id='em',
+            roles=['_example_manager'],
+            claims=build_claims(claims_example_manager()),
+        )
+
+    def _org_manager_readonly(self):
+        # Mirrors claims_organization_manager()'s example portion.
+        return Principal(
+            user_id='om',
+            roles=['_organization_manager'],
+            claims=build_claims([
+                ('permissions', 'example:get'),
+                ('permissions', 'example:list'),
+                ('permissions', 'example:download'),
+                ('permissions', 'example_repository:get'),
+                ('permissions', 'example_repository:list'),
+            ]),
+        )
+
+    def _lecturer(self):
+        return Principal(
+            user_id='lec',
+            roles=['user'],
+            claims=build_claims([('permissions', 'course:_lecturer:c1')]),
+        )
+
+    # --- Admin ---------------------------------------------------------------
+    @pytest.mark.parametrize('action', ['get', 'list', 'create', 'update', 'delete'])
+    def test_admin_allowed_everything(self, action):
+        handler = ExamplePermissionHandler(Example)
+        admin = Principal(user_id='a', is_admin=True, roles=['_admin'])
+        assert handler.can_perform_action(admin, action) is True
+
+    # --- _example_manager ----------------------------------------------------
+    @pytest.mark.parametrize('action', ['get', 'list', 'download', 'create', 'update', 'delete'])
+    def test_example_manager_allowed_authoring(self, action):
+        handler = ExamplePermissionHandler(Example)
+        assert handler.can_perform_action(self._example_manager(), action) is True
+
+    @pytest.mark.parametrize('action', ['get', 'list', 'create', 'update', 'delete'])
+    def test_example_manager_allowed_on_repository(self, action):
+        handler = ExamplePermissionHandler(ExampleRepository)
+        assert handler.can_perform_action(self._example_manager(), action) is True
+
+    # --- _organization_manager (read-only) -----------------------------------
+    @pytest.mark.parametrize('action', ['get', 'list', 'download'])
+    def test_org_manager_can_read(self, action):
+        handler = ExamplePermissionHandler(Example)
+        assert handler.can_perform_action(self._org_manager_readonly(), action) is True
+
+    @pytest.mark.parametrize('action', ['create', 'update', 'delete', 'upload'])
+    def test_org_manager_cannot_author(self, action):
+        handler = ExamplePermissionHandler(Example)
+        assert handler.can_perform_action(self._org_manager_readonly(), action) is False
+
+    def test_org_manager_cannot_author_repository(self):
+        handler = ExamplePermissionHandler(ExampleRepository)
+        om = self._org_manager_readonly()
+        assert handler.can_perform_action(om, 'get') is True
+        for action in ('create', 'update', 'delete'):
+            assert handler.can_perform_action(om, action) is False
+
+    # --- course _lecturer: read-only ----------------------------------------
+    @pytest.mark.parametrize('action', ['get', 'list', 'download'])
+    def test_lecturer_can_read(self, action):
+        handler = ExamplePermissionHandler(Example)
+        assert handler.can_perform_action(self._lecturer(), action) is True
+
+    @pytest.mark.parametrize('action', ['create', 'update', 'delete'])
+    def test_lecturer_cannot_author(self, action):
+        handler = ExamplePermissionHandler(Example)
+        # This is the loophole the change closes: a lecturer could previously
+        # create/update/delete example repositories via the CrudRouter.
+        assert handler.can_perform_action(self._lecturer(), action) is False
+
+    def test_lecturer_cannot_author_repository_build_query_raises(self):
+        db = make_db()
+        handler = ExamplePermissionHandler(ExampleRepository)
+        with pytest.raises(ForbiddenException):
+            handler.build_query(self._lecturer(), 'delete', db)
+
+    def test_lecturer_read_build_query_returns(self):
+        db = make_db()
+        handler = ExamplePermissionHandler(Example)
+        q = handler.build_query(self._lecturer(), 'list', db)
+        assert q is db.query.return_value
+
+    # --- tutor / student / anonymous ----------------------------------------
+    @pytest.mark.parametrize('action', ['get', 'list', 'create', 'delete'])
+    def test_non_lecturer_denied(self, action):
+        handler = ExamplePermissionHandler(Example)
+        tutor = Principal(
+            user_id='tut', roles=['user'],
+            claims=build_claims([('permissions', 'course:_tutor:c1')]),
+        )
+        assert handler.can_perform_action(tutor, action) is False

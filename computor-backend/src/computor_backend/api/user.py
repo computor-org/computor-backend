@@ -86,9 +86,10 @@ async def get_course_views_for_current_user(
     """Get available views for the current user.
 
     The ``lecturer`` view is the org → course-family → course creation
-    pipeline, so it is granted to ``_admin``, ``_organization_manager``,
-    any organization- or course-family-scoped role, and course lecturers
-    (or higher). Computed purely from the principal — no DB hit.
+    pipeline plus the example library, so it is granted to ``_admin``,
+    ``_organization_manager``, ``_example_manager``, any organization- or
+    course-family-scoped role, and course lecturers (or higher). Computed
+    purely from the principal — no DB hit.
     """
     if not permissions.get_user_id():
         return []

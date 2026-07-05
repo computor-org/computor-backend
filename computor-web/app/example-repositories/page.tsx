@@ -15,12 +15,12 @@ import type { ExampleRepositoryList } from 'types/generated';
 
 export default function ExampleRepositoriesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canViewExamples, canManageExamples } = usePermissions();
 
-  const { data, loading, error } = useResource(() => api.get<ExampleRepositoryList[]>('/example-repositories?limit=200'), [], { enabled: canManage });
+  const { data, loading, error } = useResource(() => api.get<ExampleRepositoryList[]>('/example-repositories?limit=200'), [], { enabled: canViewExamples });
   const repos = data ?? [];
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canViewExamples) {
     return <Forbidden message="You do not have access to example repositories." />;
   }
 
@@ -32,9 +32,11 @@ export default function ExampleRepositoriesPage() {
           title="Example Repositories"
           subtitle="Storage backends that hold examples. Upload examples into a MinIO repository."
           actions={
-            <Link href="/example-repositories/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-              New repository
-            </Link>
+            canManageExamples ? (
+              <Link href="/example-repositories/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                New repository
+              </Link>
+            ) : undefined
           }
         />
 

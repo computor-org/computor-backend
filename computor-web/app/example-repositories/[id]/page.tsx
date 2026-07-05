@@ -19,7 +19,7 @@ export default function ExampleRepositoryDetailPage() {
   const repoId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canViewExamples, canManageExamples } = usePermissions();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, loading, error } = useResource(
@@ -28,7 +28,7 @@ export default function ExampleRepositoryDetailPage() {
       examples: await api.get<ExampleList[]>(`/examples?repository_id=${repoId}&limit=500`).catch(() => [] as ExampleList[]),
     }),
     [repoId],
-    { enabled: canManage },
+    { enabled: canViewExamples },
   );
   const repo = data?.repo ?? null;
   const examples = data?.examples ?? [];
@@ -38,7 +38,7 @@ export default function ExampleRepositoryDetailPage() {
     router.push('/example-repositories');
   }
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canViewExamples) {
     return <Forbidden message="You do not have access to example repositories." backLink="/example-repositories" backText="Back" />;
   }
 
@@ -52,7 +52,7 @@ export default function ExampleRepositoryDetailPage() {
           title={repo?.name || 'Repository'}
           subtitle={repo && <span className="font-mono text-sm text-gray-500">{repo.source_type} · {repo.source_url}</span>}
           actions={
-            repo ? (
+            repo && canManageExamples ? (
               <>
                 {uploadable && (
                   <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Upload examples</Link>

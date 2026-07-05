@@ -13,6 +13,7 @@ const ROLE_ORDER = [
   '_admin',
   '_user_manager',
   '_organization_manager',
+  '_example_manager',
   '_workspace_user',
   '_workspace_maintainer',
   '_git_manager',

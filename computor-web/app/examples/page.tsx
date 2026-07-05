@@ -15,7 +15,7 @@ import type { ExampleList, ExampleRepositoryList } from 'types/generated';
 
 export default function ExamplesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canViewExamples, canManageExamples } = usePermissions();
   const [repoFilter, setRepoFilter] = useState('');
 
   const { data, loading, error } = useResource(
@@ -24,7 +24,7 @@ export default function ExamplesPage() {
       repos: await api.get<ExampleRepositoryList[]>('/example-repositories?limit=200').catch(() => [] as ExampleRepositoryList[]),
     }),
     [],
-    { enabled: canManage },
+    { enabled: canViewExamples },
   );
   const examples = data?.examples ?? [];
   const repos = useMemo(() => data?.repos ?? [], [data?.repos]);
@@ -36,7 +36,7 @@ export default function ExamplesPage() {
   }, [repos]);
   const visible = repoFilter ? examples.filter((e) => e.example_repository_id === repoFilter) : examples;
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canViewExamples) {
     return <Forbidden message="You do not have access to examples." />;
   }
 
@@ -57,7 +57,9 @@ export default function ExamplesPage() {
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
-              <Link href="/examples/upload" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Upload examples</Link>
+              {canManageExamples && (
+                <Link href="/examples/upload" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Upload examples</Link>
+              )}
             </>
           }
         />

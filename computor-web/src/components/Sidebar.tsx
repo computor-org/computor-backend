@@ -218,7 +218,7 @@ const icons: Record<string, React.ReactElement> = {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, showManagement } = usePermissions();
+  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isExampleManager, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
   // Sub-sections the user has explicitly toggled open. The section containing
@@ -487,13 +487,20 @@ export default function Sidebar() {
       {/* Navigation - Main Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {renderNavItems(coursesNavigation)}
-        {showManagement &&
+        {(showManagement || isExampleManager) &&
           renderNavItems(
             isAdmin || isOrganizationManager
               ? managementNavigation
               : managementNavigation.map((n) => ({
                   ...n,
-                  subItems: n.subItems?.filter((s) => s.id !== 'mgmt-gitservers'),
+                  subItems: n.subItems?.filter((s) => {
+                    // Git Servers is admin / org-manager only.
+                    if (s.id === 'mgmt-gitservers') return false;
+                    // A user who reaches this section only via _example_manager
+                    // (no org/family/lecturer access) sees just the example links.
+                    if (!showManagement) return s.id === 'mgmt-examples' || s.id === 'mgmt-example-repos';
+                    return true;
+                  }),
                 })),
           )}
         {isUserManager && renderNavItems(userMgmtNavigation)}

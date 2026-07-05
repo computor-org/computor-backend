@@ -589,8 +589,8 @@ async def delete_example_version_endpoint(
     db: Session = Depends(get_db),
     dry_run: bool = Query(default=False, description="If true, only returns preview without deleting"),
 ) -> ExampleVersionDeleteResult:
-    if not permissions.is_admin:
-        raise ForbiddenException("Deletion requires admin permissions")
+    if not permissions.permitted("example", "delete"):
+        raise ForbiddenException("Deletion requires the _example_manager role or admin")
 
     version = db.query(ExampleVersion).filter(ExampleVersion.id == version_id).first()
     if not version:
@@ -1413,8 +1413,8 @@ async def delete_examples_by_pattern_endpoint(
     ),
 ) -> ExampleBulkDeleteResult:
     """Delete examples matching an identifier pattern."""
-    if not permissions.is_admin:
-        raise ForbiddenException("Deletion requires admin permissions")
+    if not permissions.permitted("example", "delete"):
+        raise ForbiddenException("Deletion requires the _example_manager role or admin")
 
     # Build request object from query params
     request = ExampleBulkDeleteRequest(

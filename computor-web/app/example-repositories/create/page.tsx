@@ -13,7 +13,7 @@ import type { ExampleRepositoryGet } from 'types/generated';
 export default function ExampleRepositoryCreatePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canManageExamples: canManage } = usePermissions();
 
   const [name, setName] = useState('');
   const [sourceType, setSourceType] = useState<'minio' | 's3' | 'git'>('minio');

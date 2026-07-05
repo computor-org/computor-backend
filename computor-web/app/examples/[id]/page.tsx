@@ -19,7 +19,7 @@ export default function ExampleDetailPage() {
   const exampleId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canViewExamples, canManageExamples } = usePermissions();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, loading, error } = useResource(
@@ -28,7 +28,7 @@ export default function ExampleDetailPage() {
       versions: await api.get<ExampleVersionList[]>(`/examples/${exampleId}/versions?limit=200`).catch(() => [] as ExampleVersionList[]),
     }),
     [exampleId],
-    { enabled: canManage },
+    { enabled: canViewExamples },
   );
   const example = data?.example ?? null;
   const versions = data?.versions ?? [];
@@ -38,7 +38,7 @@ export default function ExampleDetailPage() {
     router.push('/examples');
   }
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canViewExamples) {
     return <Forbidden message="You do not have access to examples." backLink="/examples" backText="Back" />;
   }
 
@@ -55,7 +55,7 @@ export default function ExampleDetailPage() {
           title={example?.title || example?.directory || 'Example'}
           subtitle={example && <span className="font-mono text-sm text-gray-400">{example.identifier}</span>}
           actions={
-            example ? (
+            example && canManageExamples ? (
               <>
                 <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Upload new version</Link>
                 <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
