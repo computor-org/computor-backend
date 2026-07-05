@@ -602,6 +602,43 @@ export interface CourseContentConfig {
 }
 
 /**
+ * Portable per-course git configuration for a deployment file.
+ * 
+ * Resolved server-side into a ``CourseGitBinding`` when the course is deployed
+ * (CLI, web upload, or VSCode). A git server is referenced by ``provider``
+ * (+ ``base_url`` for external instances) instead of a machine-specific
+ * ``git_server_id`` UUID, so the file stays portable across systems.
+ * 
+ * - In-system managed **Forgejo**: ``provider: forgejo`` (no ``base_url``);
+ * credentials are the system server's — nothing lives here.
+ * - External **GitLab**: ``provider: gitlab`` + ``base_url``; the course brings
+ * its own ``parent_group_id`` (its GitLab group is created under it) and
+ * ``token`` (a group access token, stored encrypted ON THE BINDING).
+ * - Pure **download**: ``delivery: download`` (with a ``provider`` to host the
+ * template archive, or none for an unbound course).
+ */
+export interface CourseGitConfig {
+  /** Assignment delivery: 'git' (fork/clone) or 'download' (archive) */
+  delivery?: "git" | "download";
+  /** Git provider. 'forgejo' with no base_url = the in-system managed Forgejo. */
+  provider?: "forgejo" | "gitlab" | null;
+  /** Git server base URL. Required for external GitLab; omit for the in-system managed Forgejo. */
+  base_url?: string | null;
+  /** GitLab parent group id/path the course group is created under (GitLab only). */
+  parent_group_id?: string | null;
+  /** GitLab group access token bound to this course (GitLab only; stored encrypted). Supports ${ENV_VAR} interpolation at deploy time. */
+  token?: string | null;
+  /** Explicit template repo/project ref (optional; auto-derived for managed servers). */
+  template_repo?: string | null;
+  /** Explicit template clone/web URL (optional). */
+  template_url?: string | null;
+  /** Default branch of the template (defaults to 'main'). */
+  default_branch?: string | null;
+  /** Allowed student-repo hosting modes: subset of ['managed', 'external', 'download']. */
+  student_repo_modes?: string[];
+}
+
+/**
  * Course configuration.
  */
 export interface CourseConfig {
@@ -621,6 +658,8 @@ export interface CourseConfig {
   content_types?: CourseContentTypeConfig[] | null;
   /** Course contents hierarchy (assignments, units, etc.) */
   contents?: CourseContentConfig[] | null;
+  /** Optional git configuration, bound to the course at deploy time. Omit to create an unbound course (configure git later in the UI). */
+  git?: CourseGitConfig | null;
   /** Course-specific settings */
   settings?: Record<string, unknown> | null;
 }
@@ -645,6 +684,8 @@ export interface HierarchicalCourseConfig {
   content_types?: CourseContentTypeConfig[] | null;
   /** Course contents hierarchy (assignments, units, etc.) */
   contents?: CourseContentConfig[] | null;
+  /** Optional git configuration, bound to the course at deploy time. Omit to create an unbound course (configure git later in the UI). */
+  git?: CourseGitConfig | null;
   /** Course-specific settings */
   settings?: Record<string, unknown> | null;
 }
@@ -1082,6 +1123,55 @@ export interface ComputorMeta {
   content?: ContentMetadata | null;
   /** Assignment-specific properties */
   properties?: ComputorMetaProperties | null;
+}
+
+/**
+ * Answer to 'may this user pass the consent gate right now?'.
+ */
+export interface ConsentStatusGet {
+  /** Current policy version; null if no policy is configured (gate inactive) */
+  required_version?: string | null;
+  has_consented: boolean;
+  granted_at?: string | null;
+}
+
+export interface ConsentCreate {
+  /** Must match the current policy version */
+  policy_version: string;
+  /** Granular opt-in purposes, if the policy defines any */
+  purposes?: Record<string, boolean> | null;
+}
+
+export interface PolicyTextGet {
+  version: string;
+  /** Language actually served (after fallback) */
+  lang: string;
+  /** Languages available for this version */
+  languages?: string[];
+  effective_from?: string | null;
+  /** Markdown text of the privacy notice */
+  content: string;
+}
+
+/**
+ * Admin: publish a new policy version (append-only; texts are write-once).
+ */
+export interface PolicyVersionCreate {
+  /** e.g. 2026-07-04 */
+  version: string;
+  /** When this version becomes current; defaults to now. May be in the future (scheduled). */
+  effective_from?: string | null;
+  /** Mapping of language code -> Markdown notice text, e.g. {'de': ..., 'en': ...} */
+  texts: Record<string, string>;
+}
+
+export interface PolicyVersionGet {
+  id: string;
+  version: string;
+  languages?: string[];
+  effective_from: string;
+  content_hashes?: Record<string, string> | null;
+  created_at?: string | null;
 }
 
 /**

@@ -250,6 +250,17 @@ async def startup_logic():
     except Exception as e:
         print(f"[STARTUP] Bootstrap services seeding failed (non-fatal): {e}")
 
+    # Publish privacy notices from data/consent/* idempotently (write-once), so a
+    # fresh system comes up with its consent notice already in force. Awaited
+    # directly (not off-thread): publishing uploads Markdown to MinIO via async
+    # storage. Best-effort; never blocks startup. Disable with
+    # CONSENT_BOOTSTRAP_ENABLED=false to keep publishing an explicit CLI/UI action.
+    from computor_backend.business_logic.bootstrap import ensure_bootstrap_policies
+    try:
+        await ensure_bootstrap_policies()
+    except Exception as e:
+        print(f"[STARTUP] Bootstrap policies seeding failed (non-fatal): {e}")
+
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
         from computor_backend.coder.client import CoderClient
