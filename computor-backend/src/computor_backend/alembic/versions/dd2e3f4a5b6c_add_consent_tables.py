@@ -1,16 +1,19 @@
 """Add GDPR consent tables (policy_versions, user_consents)
 
 Revision ID: dd2e3f4a5b6c
-Revises: cc1d2e3f4a5b
+Revises: c9a1b2d3e4f5
 Create Date: 2026-07-04 12:00:00.000000
 
+Re-parented onto the release/2026.10 head (c9a1b2d3e4f5) when that branch was
+merged into feat/consent-gate: the consent tables are independent of the
+intervening migrations, so they simply apply last.
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'dd2e3f4a5b6c'
-down_revision = 'cc1d2e3f4a5b'
+down_revision = 'c9a1b2d3e4f5'
 branch_labels = None
 depends_on = None
 
