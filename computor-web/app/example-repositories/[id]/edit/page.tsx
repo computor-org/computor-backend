@@ -14,7 +14,7 @@ export default function ExampleRepositoryEditPage() {
   const repoId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canManageExamples: canManage } = usePermissions();
 
   const [repo, setRepo] = useState<ExampleRepositoryGet | null>(null);
   const [name, setName] = useState('');

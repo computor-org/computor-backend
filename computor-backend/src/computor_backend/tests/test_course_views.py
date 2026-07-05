@@ -36,6 +36,14 @@ class TestLecturerPipelineView:
             _principal(["_organization_manager"])
         ) == ["lecturer"]
 
+    def test_example_manager_gets_lecturer(self):
+        # _example_manager owns the example library, which lives under the
+        # lecturer authoring surface in the clients (the VS Code example tree
+        # is gated on this view) — without it the role could not author.
+        assert get_course_views_for_user(
+            _principal(["_example_manager"])
+        ) == ["lecturer"]
+
     def test_any_organization_role_gets_lecturer(self):
         for role in ("_owner", "_manager", "_developer"):
             views = get_course_views_for_user(

@@ -91,11 +91,14 @@ def get_course_views_for_user(principal: Principal) -> List[str]:
     mirroring ``get_user_scopes_from_principal``.
 
     The ``lecturer`` view is the *org → course-family → course creation
-    pipeline*, NOT "lecturer of one course". It is therefore granted to
-    anyone who can create or manage any of those scopes:
+    pipeline* plus the example library, NOT "lecturer of one course". It is
+    therefore granted to anyone who can create or manage any of those scopes:
 
       * global ``_admin`` or ``_organization_manager`` — manage ALL
         organizations, families and courses;
+      * global ``_example_manager`` — owns the example library, which lives
+        under the same authoring surface in the clients (web "Management"
+        section, VS Code lecturer tree);
       * any organization-scoped role (``_owner``/``_manager``/``_developer``);
       * any course-family-scoped role (same three);
       * a course role of ``_lecturer`` or higher.
@@ -106,9 +109,15 @@ def get_course_views_for_user(principal: Principal) -> List[str]:
     """
     views = set()
 
-    # 1. Global roles. _admin and _organization_manager manage every scope,
-    #    so they always get the full pipeline (lecturer) view.
-    if principal.is_admin or "_organization_manager" in principal.roles:
+    # 1. Global roles. _admin and _organization_manager manage every scope, and
+    #    _example_manager owns the example library — all three surface under the
+    #    lecturer authoring view in the clients, so without it that surface never
+    #    renders (e.g. the VS Code example tree is gated on the lecturer view).
+    if (
+        principal.is_admin
+        or "_organization_manager" in principal.roles
+        or "_example_manager" in principal.roles
+    ):
         views.add("lecturer")
     if principal.is_admin or "_user_manager" in principal.roles:
         views.add("user_manager")

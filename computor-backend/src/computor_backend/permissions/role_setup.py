@@ -19,11 +19,9 @@ from computor_backend.interfaces import (
     UserInterface,
     StudentProfileInterface,
     ProfileInterface,
-    ExampleInterface,
-    ExampleRepositoryInterface,
     ExtensionInterface,
 )
-from computor_backend.model.example import Example
+from computor_backend.model.example import Example, ExampleRepository
 
 
 def get_all_claim_values() -> Generator[Tuple[str, str], None, None]:
@@ -69,15 +67,25 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     claims.extend(OrganizationInterface().claim_values())
     claims.extend(CourseFamilyInterface().claim_values())
     claims.extend(CourseInterface().claim_values())
-    claims.extend(ExampleInterface().claim_values())
+    # Examples: managers may READ the example library and (via their per-course
+    # roles) assign examples to courses, but authoring — uploading examples and
+    # versions, editing dependencies, and deleting examples/versions/repos — is
+    # reserved to the ``_example_manager`` role (see ``claims_example_manager``).
+    # So grant read-only claims here, not the full CRUD ``claim_values()``.
+    #
     # ExampleRepository is a distinct resource (tablename ``example_repository``)
-    # behind its own CrudRouter. ExamplePermissionHandler keys general
-    # permission checks off the per-entity tablename, so the ``example:*``
-    # claims above do NOT cover the example-repositories endpoints — without
-    # these, managers fall through to the lecturer-in-a-course check and get
-    # 403 "Examples are only accessible to lecturers and above" on the
-    # examples repository page.
-    claims.extend(ExampleRepositoryInterface().claim_values())
+    # behind its own CrudRouter. ExamplePermissionHandler keys general-permission
+    # checks off the per-entity tablename, so the ``example:*`` claims do NOT
+    # cover the example-repositories endpoints — without ``example_repository``
+    # read claims managers fall through to the lecturer-in-a-course check and
+    # 403 "Examples are only accessible to lecturers and above" on that page.
+    claims.extend([
+        ("permissions", f"{Example.__tablename__}:get"),
+        ("permissions", f"{Example.__tablename__}:list"),
+        ("permissions", f"{Example.__tablename__}:download"),
+        ("permissions", f"{ExampleRepository.__tablename__}:get"),
+        ("permissions", f"{ExampleRepository.__tablename__}:list"),
+    ])
     claims.extend(ExtensionInterface().claim_values())
     # Membership tables: managers need to be able to seat / promote /
     # remove users on the orgs and families they manage. Without these
@@ -88,14 +96,33 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     claims.extend(OrganizationMemberInterface().claim_values())
     claims.extend(CourseFamilyMemberInterface().claim_values())
 
-    # Add specific example permissions
-    claims.extend([
-        ("permissions", f"{Example.__tablename__}:get"),
-        ("permissions", f"{Example.__tablename__}:list"),
-        ("permissions", f"{Example.__tablename__}:create"),
-        ("permissions", f"{Example.__tablename__}:upload"),
-        ("permissions", f"{Example.__tablename__}:download")
-    ])
+    return claims
+
+
+def claims_example_manager() -> List[Tuple[str, str]]:
+    """Generate claims for the example manager role.
+
+    ``_example_manager`` owns the example library: uploading examples and
+    example versions, editing example metadata/dependencies, and deleting
+    examples, versions, and repositories. Reading examples and assigning
+    them to courses is intentionally NOT exclusive to this role — a per-course
+    ``_lecturer`` and ``_organization_manager`` keep read access, and
+    assignment stays gated on course membership.
+
+    The custom ``/examples`` endpoints authorize via
+    ``permitted("example", <action>)`` (admin or the general ``example:*``
+    claim), while the ``/example-repositories`` CrudRouter goes through
+    ``ExamplePermissionHandler``, which keys general-permission checks off the
+    per-entity tablename — hence both ``example`` and ``example_repository``
+    claim sets are granted here.
+    """
+    claims: List[Tuple[str, str]] = []
+
+    for action in ("get", "list", "download", "create", "update", "upload", "delete"):
+        claims.append(("permissions", f"{Example.__tablename__}:{action}"))
+
+    for action in ("get", "list", "create", "update", "delete"):
+        claims.append(("permissions", f"{ExampleRepository.__tablename__}:{action}"))
 
     return claims
 

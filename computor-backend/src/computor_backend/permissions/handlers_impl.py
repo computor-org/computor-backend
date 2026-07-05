@@ -862,39 +862,50 @@ class UserRolePermissionHandler(PermissionHandler):
 
 
 class ExamplePermissionHandler(PermissionHandler):
-    """Permission handler for Example entities - restricted to lecturers and above.
+    """Permission handler for Example entities.
 
     Access rules:
-    - _lecturer and above: Full read/write access
-    - _tutor and _student: NO access
-    - Admin: Full access
+    - Admin: full access.
+    - Holder of the general ``<entity>:<action>`` claim: full access for that
+      action. Example authoring (create/update/delete) is granted only to
+      ``_example_manager`` (see ``claims_example_manager``);
+      ``_organization_manager`` holds the read claims (get/list) only.
+    - A course ``_lecturer`` and above (in ANY course): READ-ONLY access
+      (get/list/download) — lecturers may browse the shared example library
+      but not author it.
+    - _tutor / _student: no access.
     """
+
+    # Actions a course lecturer may perform on the shared example library.
+    # Authoring actions (create/update/delete/upload) are deliberately absent
+    # so they fall through to the admin-or-general-claim check and are thus
+    # reserved to ``_example_manager`` / admin.
+    READ_ACTIONS = frozenset({"get", "list", "download"})
 
     ACTION_ROLE_MAP = {
         "get": "_lecturer",
         "list": "_lecturer",
-        "create": "_lecturer",
-        "update": "_lecturer",
-        "delete": "_lecturer",
         "download": "_lecturer",
     }
+
+    def _lecturer_read_allowed(self, principal: Principal, action: str) -> bool:
+        """True if a lecturer-in-any-course may perform this (read-only) action."""
+        if action not in self.READ_ACTIONS:
+            return False
+        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
+        return bool(principal.get_courses_with_role(min_role))
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
 
-        # Check if user has general permission for this action
+        # Holder of the general <entity>:<action> claim — _example_manager for
+        # authoring, _organization_manager for reads.
         if self.check_general_permission(principal, action):
             return True
 
-        # Check if user has lecturer role in ANY course
-        # This allows lecturers to view examples from any course
-        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
-        courses_with_role = principal.get_courses_with_role(min_role)
-        if courses_with_role:  # Has lecturer role in at least one course
-            return True
-
-        return False
+        # Lecturers get read-only access to the shared example library.
+        return self._lecturer_read_allowed(principal, action)
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         if self.check_admin(principal):
@@ -903,14 +914,11 @@ class ExamplePermissionHandler(PermissionHandler):
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
 
-        # Check if user has lecturer role in any course
-        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
-        courses_with_role = principal.get_courses_with_role(min_role)
-        if courses_with_role:  # Has lecturer role in at least one course
+        if self._lecturer_read_allowed(principal, action):
             return db.query(self.entity)
 
-        # No access for students or tutors
-        raise ForbiddenException(detail={"entity": self.resource_name, "message": "Examples are only accessible to lecturers and above"})
+        # No access for students, tutors, or lecturers attempting to author.
+        raise ForbiddenException(detail={"entity": self.resource_name, "message": "Examples are only accessible to lecturers and above; authoring is restricted to the _example_manager role"})
 
 
 class MessagePermissionHandler(PermissionHandler):

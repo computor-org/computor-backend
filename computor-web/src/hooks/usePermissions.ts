@@ -46,9 +46,19 @@ export function usePermissions() {
     Boolean(scopes?.is_admin) || systemRoles.includes('_admin') || user?.role === 'admin';
   const isOrganizationManager = systemRoles.includes('_organization_manager');
   const isUserManager = isAdmin || systemRoles.includes('_user_manager');
-  // The cohort allowed to manage the org → family → course → git/examples
+  // The cohort allowed to manage the org → family → course → git
   // registry surfaces (the manage/edit/delete actions on those pages).
   const canManageHierarchy = isAdmin || isOrganizationManager;
+  // Example library authoring (upload / create / edit / delete of examples and
+  // example repositories) is reserved to the _example_manager system role
+  // (admins bypass). Mirrors the backend, where these claims moved off
+  // _organization_manager onto _example_manager.
+  const isExampleManager = isAdmin || systemRoles.includes('_example_manager');
+  // Who may AUTHOR examples/repositories.
+  const canManageExamples = isExampleManager;
+  // Who may BROWSE the example library (read-only): the management cohort keeps
+  // read access, plus example managers. Admins bypass via both flags.
+  const canViewExamples = canManageHierarchy || isExampleManager;
   // Coder/workspace access is controlled by the _workspace_user system role
   // (admins bypass). Gates the Workspaces sidebar section.
   const isWorkspaceUser = isAdmin || systemRoles.includes('_workspace_user');
@@ -122,6 +132,9 @@ export function usePermissions() {
     isOrganizationManager,
     isUserManager,
     canManageHierarchy,
+    isExampleManager,
+    canManageExamples,
+    canViewExamples,
     isWorkspaceUser,
     hasView,
     views,
