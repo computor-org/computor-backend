@@ -29,6 +29,7 @@ from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, Submi
 from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
 from .git_server import GitServer, CourseGitBinding, CourseMemberRepository
+from .consent import PolicyVersion, UserConsent
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -48,6 +49,7 @@ from . import (
     service,
     invite,
     git_server,
+    consent,
 )
 
 __all__ = [
@@ -120,4 +122,7 @@ __all__ = [
     'GitServer',
     'CourseGitBinding',
     'CourseMemberRepository',
+    # GDPR consent
+    'PolicyVersion',
+    'UserConsent',
 ]

@@ -85,6 +85,7 @@ const adminNavigation: NavItem[] = [
     icon: 'admin',
     subItems: [
       { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
+      { id: 'sys-consent', label: 'Privacy Notices', path: '/admin/consent' },
     ],
   },
 ];

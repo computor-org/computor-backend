@@ -6,6 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
+import { API_BASE_URL, apiGet, redirectToConsent } from '../utils/apiClient';
+import type { ConsentStatus } from '../types/consent';
+
+// Consent bootstrap check runs once per authenticated session per page load;
+// mid-session changes (withdrawal, policy version bump) are caught by the 403
+// consent_required interceptor in apiClient. Reset on logout so a different
+// user signing in without a full reload is checked again.
+let consentChecked = false;
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,9 +21,26 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      consentChecked = false;
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || consentChecked) return;
+    consentChecked = true;
+    apiGet(`${API_BASE_URL}/consent/status`)
+      .then(async (response) => {
+        if (!response.ok) return;
+        const status: ConsentStatus = await response.json();
+        if (status.required_version && !status.has_consented) {
+          redirectToConsent();
+        }
+      })
+      .catch(() => {
+        // Best-effort: the consent interceptor gates on the next API call anyway.
+      });
+  }, [isAuthenticated, isLoading]);
 
   if (isLoading) {
     return (

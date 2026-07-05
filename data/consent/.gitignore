@@ -1,0 +1,7 @@
+# Privacy-notice version directories (e.g. 2026-07-05/) are deployment-specific:
+# they hold the actual notice text and are auto-published at startup. Keep them
+# local — do NOT commit them.
+#
+# This directory itself stays tracked (.gitkeep + README.md) so its location and
+# expected format remain discoverable. See README.md for the layout.
+/*/

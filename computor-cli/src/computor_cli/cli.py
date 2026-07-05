@@ -9,6 +9,7 @@ from computor_cli.documents import documents
 from computor_cli.service_cli import service
 from computor_cli.delete import delete
 from computor_cli.grading import grading
+from computor_cli.consent import consent
 
 
 @click.group()
@@ -35,6 +36,7 @@ cli.add_command(documents, "documents")
 cli.add_command(service, "service")
 cli.add_command(delete, "delete")
 cli.add_command(grading, "grading")
+cli.add_command(consent, "consent")
 
 if __name__ == '__main__':
     cli()

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -11,6 +12,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { inputCls } from '@/src/components/FormPanel';
 import type { ApiTokenGet, ApiTokenCreateResponse, AccountGet } from 'types/generated';
+import type { ConsentStatus } from '@/src/types/consent';
 
 const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
 const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
@@ -44,6 +46,7 @@ function fmtDate(s?: string | null): string {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
 
@@ -51,6 +54,12 @@ export default function SettingsPage() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Consent / privacy
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
+  const [consentLoading, setConsentLoading] = useState(true);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
 
   // Token creation
   const [newName, setNewName] = useState('');
@@ -107,6 +116,33 @@ export default function SettingsPage() {
   }
 
   const activeTokens = tokens.filter((t) => !t.revoked_at);
+
+  useEffect(() => {
+    async function fetchConsentStatus() {
+      try {
+        setConsentStatus(await api.get<ConsentStatus>('/consent/status'));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load consent status');
+      } finally {
+        setConsentLoading(false);
+      }
+    }
+    fetchConsentStatus();
+  }, []);
+
+  const handleWithdraw = async () => {
+    setWithdrawing(true);
+    setError(null);
+    try {
+      await api.post('/consent/withdraw');
+      // Access is gated again; the consent page is the only place left to go.
+      router.push('/consent');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to withdraw consent');
+      setWithdrawing(false);
+      setConfirmWithdraw(false);
+    }
+  };
 
   return (
     <AuthenticatedLayout>
@@ -263,6 +299,72 @@ export default function SettingsPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </Section>
+
+            {/* Privacy & Consent */}
+            <Section
+              title="Privacy & Consent"
+              description="Review the current privacy notice and manage your consent."
+            >
+              {consentLoading ? (
+                <div className="text-sm text-gray-500">Loading…</div>
+              ) : !consentStatus?.required_version ? (
+                <div className="text-sm text-gray-500">No privacy notice is currently configured.</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <p>
+                      Privacy notice version:{' '}
+                      <span className="font-mono">{consentStatus.required_version}</span>
+                    </p>
+                    {consentStatus.has_consented && consentStatus.granted_at ? (
+                      <p>Consent given on {new Date(consentStatus.granted_at).toLocaleString()}.</p>
+                    ) : (
+                      <p className="text-amber-700">You have not consented to the current privacy notice.</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href="/consent?review=1"
+                      className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                    >
+                      View privacy notice
+                    </a>
+
+                    {consentStatus.has_consented && (
+                      confirmWithdraw ? (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm text-gray-600">
+                            Withdrawing consent will block access to the platform until you consent again. Continue?
+                          </span>
+                          <button
+                            onClick={handleWithdraw}
+                            disabled={withdrawing}
+                            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-300 text-sm font-medium"
+                          >
+                            {withdrawing ? 'Withdrawing…' : 'Yes, withdraw'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmWithdraw(false)}
+                            disabled={withdrawing}
+                            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmWithdraw(true)}
+                          className="px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 text-sm font-medium"
+                        >
+                          Withdraw consent
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
               )}
             </Section>
