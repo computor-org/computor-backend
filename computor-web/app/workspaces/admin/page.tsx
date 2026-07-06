@@ -155,6 +155,14 @@ export default function WorkspaceAdminPage() {
           breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
           title="Workspace Administration"
           subtitle="Manage workspace roles and user access"
+          actions={
+            <Link
+              href="/workspaces/admin/fleet"
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Fleet &amp; rollout
+            </Link>
+          }
         />
 
         {/* Assign Role Form */}
