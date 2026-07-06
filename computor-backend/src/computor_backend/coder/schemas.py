@@ -102,6 +102,12 @@ class CoderWorkspace(BaseModel):
     owner_name: Optional[str] = Field(None, description="Owner username")
     template_id: str = Field(..., description="Template ID")
     template_name: Optional[str] = Field(None, description="Template name")
+    template_version_id: Optional[str] = Field(
+        None, description="Template version the latest build ran (for fleet/update views)"
+    )
+    template_version_name: Optional[str] = Field(
+        None, description="Human-readable template version name of the latest build"
+    )
     latest_build_status: Optional[WorkspaceBuildStatus] = Field(
         None,
         description="Latest build status"
