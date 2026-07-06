@@ -28,7 +28,10 @@ Gate logic per request:
      so gate and API always agree on the required version. No version
      configured -> gate inactive, pass.
   6. Check consent (Redis `consent:{user_id}:{version}`, DB fallback).
-  7. No valid consent -> 403 {"error": "consent_required", "required_version": ...}.
+  7. No valid consent -> 403 {"error": "consent_required", "required_version": ...,
+     "error_code": "AUTHZ_006", "message": ...}. The `error`/`required_version`
+     keys are the stable web contract; `error_code`/`message` are the standard
+     error envelope so catalog-driven clients surface a real reason.
 
 Fail-open: on Redis/DB errors the request passes (logged). Consistent with
 MaintenanceMiddleware — an infrastructure outage must not take down the API.
@@ -75,6 +78,9 @@ EXEMPT_PATH_PREFIXES = (
 EXEMPT_GET_PATHS_EXACT = (
     "/user",
     "/user/views",
+    "/instance-info",      # web app / git-server URLs — lets a consent-blocked
+                           # client (e.g. the VSCode extension) find the web app
+                           # to accept the policy.
 )
 
 
@@ -112,8 +118,21 @@ class ConsentGateMiddleware:
             response = JSONResponse(
                 status_code=403,
                 content={
+                    # Stable web contract — apiClient.isConsentRequired keys on
+                    # `error`; do not rename. `required_version` tells the client
+                    # which policy version to present.
                     "error": "consent_required",
                     "required_version": required_version,
+                    # Standard error envelope (error_code + message) so
+                    # catalog-driven clients (e.g. the VSCode extension) render a
+                    # real reason instead of a bare "HTTP 403: Forbidden". See
+                    # AUTHZ_006 in error_registry.yaml.
+                    "error_code": "AUTHZ_006",
+                    "message": (
+                        f"You must review and accept the current privacy policy "
+                        f"(version {required_version}) before you can continue. "
+                        f"Open the Computor web app to give your consent."
+                    ),
                 },
             )
             await response(scope, receive, send)

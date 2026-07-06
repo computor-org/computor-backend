@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 70
+**Total errors:** 71
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -360,6 +360,33 @@ User attempted to assign a course role higher than their own privilege level
 **Resolution Steps:**
 1. Request a user with higher privileges to perform this action
 2. Assign a role at or below your own privilege level
+
+---
+
+### AUTHZ_006 - Privacy Policy Consent Required
+
+**HTTP Status:** `403`  
+**Severity:** `warning`  
+**Category:** `authorization`  
+**Documentation:** [/docs/consent](/docs/consent)  
+
+**Description:**  
+The GDPR consent gate (ConsentGateMiddleware) blocked the request: the authenticated user has not consented to the current privacy-policy version.
+
+**User Message:**  
+> You must accept the current privacy policy before you can continue.
+
+**Affected Functions:**
+- `ConsentGateMiddleware`
+
+**Common Causes:**
+- User has never accepted the privacy policy
+- A new privacy-policy version became effective and requires renewed consent
+
+**Resolution Steps:**
+1. Open the Computor web app
+2. Review and accept the current privacy policy on the consent page
+3. Retry the action
 
 ---
 

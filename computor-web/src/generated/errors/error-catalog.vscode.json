@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 70,
+  "error_count": 71,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -129,6 +129,19 @@
         "plain": "You cannot assign a role higher than your own.",
         "markdown": "**Role Escalation Denied**\n\nYou cannot assign the role '{target_role}'. Your role '{user_role}' can only assign roles at or below your privilege level.",
         "html": "<strong>Role Escalation Denied</strong><p>You cannot assign the role <code>{target_role}</code>. Your role <code>{user_role}</code> can only assign roles at or below your privilege level.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_006": {
+      "code": "AUTHZ_006",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Privacy Policy Consent Required",
+      "message": {
+        "plain": "You must accept the current privacy policy before you can continue.",
+        "markdown": "**Privacy Policy Consent Required**\n\nYou must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.",
+        "html": "<strong>Privacy Policy Consent Required</strong><p>You must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.</p>"
       },
       "retry_after": null
     },

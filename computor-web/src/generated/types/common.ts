@@ -2173,6 +2173,16 @@ export interface TestCreate {
 }
 
 /**
+ * Public navigation URLs for this Computor instance.
+ */
+export interface InstanceInfoGet {
+  /** Public base URL of the Computor web app (e.g. https://computor.example.org); null if not configured. */
+  web_url?: string | null;
+  /** Public base URL of the managed Forgejo git server; null if no managed Forgejo is configured. */
+  forgejo_url?: string | null;
+}
+
+/**
  * Payload describing a manual submission request.
  */
 export interface SubmissionCreate {
@@ -4289,4 +4299,4 @@ export type ErrorCategory = "authentication" | "authorization" | "validation" | 
 
 export type GradingStatus = 0 | 1 | 2 | 3;
 
-export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
+export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_006" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";

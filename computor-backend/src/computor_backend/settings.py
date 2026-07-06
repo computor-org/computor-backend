@@ -36,6 +36,18 @@ class BackendSettings:
         # Extension public download URL
         self.EXTENSION_PUBLIC_DOWNLOAD_URL = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
 
+        # Public base URL of the whole deployment (full URL incl. scheme, e.g.
+        # https://computor.example.org). The web app is served at its root, the
+        # API at $PUBLIC_DOMAIN/api, etc. Primary source for the web app URL
+        # surfaced by GET /instance-info (so clients like the VSCode extension
+        # can deep-link users to the consent page).
+        self.PUBLIC_DOMAIN = os.environ.get("PUBLIC_DOMAIN", None)
+
+        # Optional override for the web app URL when it is NOT at the root of
+        # PUBLIC_DOMAIN (split deployment) or in dev (PUBLIC_DOMAIN empty, web on
+        # localhost:3000). When unset, /instance-info uses PUBLIC_DOMAIN.
+        self.WEB_APP_URL = os.environ.get("WEB_APP_URL", None)
+
         # WebSocket settings
         self.WS_MAX_CONNECTIONS_PER_USER = int(os.environ.get("WS_MAX_CONNECTIONS_PER_USER", "10"))
         self.WS_MAX_TOTAL_CONNECTIONS = int(os.environ.get("WS_MAX_TOTAL_CONNECTIONS", "10000"))
