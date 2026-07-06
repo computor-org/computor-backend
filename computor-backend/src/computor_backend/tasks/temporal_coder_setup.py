@@ -89,9 +89,16 @@ async def build_workspace_image(
     template_key: str,
     templates_dir: str,
     registry_host: str,
+    image_tag: str = "latest",
 ) -> Dict[str, Any]:
     """
     Build a workspace Docker image and push it to the local registry.
+
+    Pushes two tags: the moving ``:latest`` and an immutable ``:<image_tag>``.
+    The versioned tag is what a Coder template version pins to, so rebuilt
+    workspaces actually pull the new image (a moved ``:latest`` would not be
+    re-pulled by the docker provider's ``keep_locally`` image resource) and a
+    rollback target exists.
 
     Uses the Docker SDK (already a dependency) to build and push.
     """
@@ -113,7 +120,11 @@ async def build_workspace_image(
         logger.warning(f"No Dockerfile found at {dockerfile_path}, skipping {template_key}")
         return {"success": True, "template": template_key, "skipped": True, "reason": "No Dockerfile"}
 
-    tag = f"{registry_host}/{info['image_name']}:latest"
+    repo = f"{registry_host}/{info['image_name']}"
+    # Always publish :latest; add the versioned tag when it is distinct.
+    push_tags = ["latest"]
+    if image_tag and image_tag != "latest":
+        push_tags.append(image_tag)
 
     # Collect build args from environment variables
     buildargs = {}
@@ -122,24 +133,39 @@ async def build_workspace_image(
         if val:
             buildargs[env_name] = val
 
-    logger.info(f"Building image {tag} from {build_dir}" + (f" (build_args: {list(buildargs.keys())})" if buildargs else ""))
+    logger.info(
+        f"Building image {repo} tags={push_tags} from {build_dir}"
+        + (f" (build_args: {list(buildargs.keys())})" if buildargs else "")
+    )
 
     try:
         client = docker_sdk.DockerClient(base_url="unix://" + os.environ.get("DOCKER_SOCKET_PATH", "/var/run/docker.sock"))
 
-        # Build
-        image, build_logs = client.images.build(path=build_dir, tag=tag, rm=True, buildargs=buildargs or None)
+        # Build (tagged with the first tag), then apply the remaining tags to the
+        # same image id so every tag is byte-identical.
+        image, build_logs = client.images.build(
+            path=build_dir, tag=f"{repo}:{push_tags[0]}", rm=True, buildargs=buildargs or None
+        )
         for chunk in build_logs:
             if "stream" in chunk:
                 line = chunk["stream"].strip()
                 if line:
                     logger.info(f"[build:{template_key}] {line}")
 
-        # Push
-        push_output = client.images.push(registry_host + "/" + info["image_name"], tag="latest")
-        logger.info(f"Push output for {template_key}: {push_output}")
+        for extra in push_tags[1:]:
+            image.tag(repo, tag=extra)
 
-        return {"success": True, "template": template_key, "image": tag}
+        # Push every tag
+        for t in push_tags:
+            push_output = client.images.push(repo, tag=t)
+            logger.info(f"Push output for {template_key} ({repo}:{t}): {push_output}")
+
+        return {
+            "success": True,
+            "template": template_key,
+            "image": f"{repo}:{image_tag}",
+            "tags": push_tags,
+        }
 
     except Exception as e:
         logger.exception(f"Failed to build/push image for {template_key}")
@@ -158,10 +184,19 @@ async def push_coder_template(
     dev_forward_ports: str,
     ttl_ms: int,
     activity_bump_ms: int,
+    registry_host: str = "localhost:5000",
+    image_tag: str = "latest",
 ) -> Dict[str, Any]:
     """
     Push a Coder template (Terraform config) using the coder CLI,
     then set TTL via the Coder REST API.
+
+    Pins the template's ``workspace_image`` variable to the immutable
+    ``<registry>/<image>:<image_tag>`` ref so this new template version is tied
+    to a specific image build (and so rolling workspaces onto it actually
+    changes the running image). ``registry_host`` here is the provisioner's view
+    of the registry (matches the template's default host), NOT the worker's push
+    host, so it is intentionally not overridden by CODER_REGISTRY_HOST.
     """
     import httpx
 
@@ -202,12 +237,15 @@ async def push_coder_template(
     env["CODER_SESSION_TOKEN"] = session_token
     env["CODER_URL"] = coder_url
 
+    image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
+
     cmd = [
         "coder", "templates", "push", coder_template_name,
         "--directory", template_dir,
         "--variable", f"computor_backend_internal={backend_internal_url}",
         "--variable", f"computor_backend_url={backend_external_url}",
         "--variable", f"dev_forward_ports={dev_forward_ports}",
+        "--variable", f"workspace_image={image_ref}",
         "--yes",
     ]
     logger.info(f"Running: {' '.join(cmd)}")
@@ -259,7 +297,12 @@ async def push_coder_template(
             "warning": f"Template pushed but TTL update failed: {e}",
         }
 
-    return {"success": True, "template": template_key, "coder_template": coder_template_name}
+    return {
+        "success": True,
+        "template": template_key,
+        "coder_template": coder_template_name,
+        "image": image_ref,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +332,8 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         templates_dir = parameters.get("templates_dir", "/templates")
         registry_host = parameters.get("registry_host", "localhost:5000")
         requested = parameters.get("templates")
+        # One immutable image tag per run; workflow.now() is replay-deterministic.
+        image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
 
         # Discovery happens inside the activity (which runs on the worker).
         # The workflow just needs to know which keys to iterate over.
@@ -316,7 +361,7 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         for key in template_keys:
             result = await workflow.execute_activity(
                 build_workspace_image,
-                args=[key, templates_dir, registry_host],
+                args=[key, templates_dir, registry_host, image_tag],
                 start_to_close_timeout=timedelta(minutes=15),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=5),
@@ -330,14 +375,14 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
-                result={"builds": results},
+                result={"builds": results, "image_tag": image_tag},
                 error=f"{len(failed)} build(s) failed",
                 metadata={"workflow_type": "build_workspace_images"},
             )
 
         return WorkflowResult(
             status="completed",
-            result={"builds": results},
+            result={"builds": results, "image_tag": image_tag},
             metadata={"workflow_type": "build_workspace_images"},
         )
 
@@ -372,6 +417,9 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         dev_forward_ports = parameters.get("dev_forward_ports", "")
         ttl_ms = parameters.get("ttl_ms", 3600000)  # 1 hour default
         activity_bump_ms = parameters.get("activity_bump_ms", 3600000)
+        # One immutable image tag for this run, shared by the build and the
+        # template's pinned workspace_image. workflow.now() is replay-safe.
+        image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
 
         if not coder_admin_email or not coder_admin_password:
             return WorkflowResult(
@@ -404,7 +452,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
             for key in template_keys:
                 await workflow.execute_activity(
                     build_workspace_image,
-                    args=[key, templates_dir, registry_host],
+                    args=[key, templates_dir, registry_host, image_tag],
                     start_to_close_timeout=timedelta(minutes=15),
                     retry_policy=RetryPolicy(
                         initial_interval=timedelta(seconds=5),
@@ -431,6 +479,8 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     dev_forward_ports,
                     ttl_ms,
                     activity_bump_ms,
+                    registry_host,
+                    image_tag,
                 ],
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
@@ -445,15 +495,143 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
-                result={"pushes": results},
+                result={"pushes": results, "image_tag": image_tag},
                 error=f"{len(failed)} push(es) failed",
                 metadata={"workflow_type": "push_coder_templates"},
             )
 
         return WorkflowResult(
             status="completed",
-            result={"pushes": results},
+            result={"pushes": results, "image_tag": image_tag},
             metadata={"workflow_type": "push_coder_templates"},
+        )
+
+
+@activity.defn(name="rollout_template_workspaces")
+async def rollout_template_workspaces(
+    template_key: str,
+    templates_dir: str,
+) -> Dict[str, Any]:
+    """Roll every workspace of one template onto its active version.
+
+    Policy: enable automatic updates for every workspace (so stopped ones adopt
+    the active version on their next start), and additionally issue an immediate
+    update build for workspaces that are currently up. In-progress, stopped and
+    failed workspaces are left to auto-update rather than being force-started.
+    """
+    from computor_backend.coder.client import CoderClient
+
+    discovered = _discover_templates(templates_dir)
+    info = discovered.get(template_key)
+    if not info:
+        return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
+    coder_template_name = info["coder_template_name"]
+
+    updated_now = 0
+    auto_on_start = 0
+    already_current = 0
+    errors: List[str] = []
+
+    try:
+        async with CoderClient() as client:
+            version_id = await client.get_template_active_version(coder_template_name)
+            targets = [
+                w for w in await client.list_all_workspaces()
+                if w.template_name == coder_template_name
+            ]
+
+            for w in targets:
+                try:
+                    # Always enable auto-update so a stopped/failed workspace
+                    # adopts this version on its next start.
+                    await client.set_workspace_auto_update(w.id, True)
+
+                    if w.template_version_id == version_id:
+                        already_current += 1
+                        continue
+
+                    status = w.latest_build_status.value if w.latest_build_status else ""
+                    is_up = w.latest_build_transition == "start" and status in ("succeeded", "running")
+                    if is_up:
+                        if await client.update_workspace_to_version(w.id, version_id):
+                            updated_now += 1
+                        else:
+                            errors.append(w.name)
+                    else:
+                        auto_on_start += 1
+                except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+                    errors.append(f"{w.name}: {e}")
+
+        return {
+            "success": len(errors) == 0,
+            "template": coder_template_name,
+            "active_version": version_id,
+            "targets": len(targets),
+            "updated_now": updated_now,
+            "auto_update_on_start": auto_on_start,
+            "already_current": already_current,
+            "errors": errors,
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"Rollout failed for {template_key}")
+        return {"success": False, "template": template_key, "error": str(e)}
+
+
+@register_task
+@workflow.defn(name="rollout_workspaces", sandboxed=False)
+class RolloutWorkspacesWorkflow(BaseWorkflow):
+    """Roll existing workspaces onto their template's active version."""
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "rollout_workspaces"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return "coder-tasks"
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        return timedelta(minutes=40)
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        templates_dir = parameters.get("templates_dir", "/templates")
+        requested = parameters.get("templates")
+
+        template_keys = await workflow.execute_activity(
+            discover_template_keys,
+            args=[templates_dir, requested],
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        if not template_keys:
+            return WorkflowResult(
+                status="failed",
+                result=None,
+                error="No valid templates found in " + templates_dir,
+                metadata={"workflow_type": "rollout_workspaces"},
+            )
+
+        results = []
+        for key in template_keys:
+            result = await workflow.execute_activity(
+                rollout_template_workspaces,
+                args=[key, templates_dir],
+                start_to_close_timeout=timedelta(minutes=20),
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(seconds=5),
+                    backoff_coefficient=2.0,
+                    maximum_attempts=2,
+                ),
+            )
+            results.append(result)
+
+        failed = [r for r in results if not r.get("success")]
+        return WorkflowResult(
+            status="completed_with_errors" if failed else "completed",
+            result={"rollouts": results},
+            error=(f"{len(failed)} rollout(s) had errors" if failed else None),
+            metadata={"workflow_type": "rollout_workspaces"},
         )
 
 
@@ -475,10 +653,12 @@ async def discover_template_keys(
 WORKFLOWS = [
     BuildWorkspaceImagesWorkflow,
     PushCoderTemplatesWorkflow,
+    RolloutWorkspacesWorkflow,
 ]
 
 ACTIVITIES = [
     build_workspace_image,
     discover_template_keys,
     push_coder_template,
+    rollout_template_workspaces,
 ]

@@ -11,6 +11,11 @@ import type {
   WorkspaceActionResponse,
   WorkspaceProvisionRequest,
   ProvisionResult,
+  ImageBuildRequest,
+  TemplatePushRequest,
+  WorkspaceRolloutRequest,
+  CoderAdminTaskResponse,
+  TaskInfo,
 } from '@/src/types/workspaces';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
@@ -83,5 +88,42 @@ export class CoderClient extends BaseEndpointClient {
    */
   async deleteWorkspace({ username, workspaceName }: { username: string; workspaceName: string }): Promise<WorkspaceActionResponse> {
     return this.client.delete<WorkspaceActionResponse>(this.buildPath('workspaces', username, workspaceName));
+  }
+
+  // --- Admin: fleet view + extension rollout (workspace:manage) ---
+
+  /**
+   * List every workspace on the server, across all users (admin fleet view).
+   */
+  async listAllWorkspaces(): Promise<WorkspaceListResponse> {
+    return this.client.get<WorkspaceListResponse>(this.buildPath('workspaces', 'all'));
+  }
+
+  /**
+   * Build workspace Docker images (optionally a specific image tag).
+   */
+  async buildImages(body: ImageBuildRequest = {}): Promise<CoderAdminTaskResponse> {
+    return this.client.post<CoderAdminTaskResponse>(this.buildPath('admin', 'images', 'build'), body);
+  }
+
+  /**
+   * Push Coder templates (optionally building images first).
+   */
+  async pushTemplates(body: TemplatePushRequest = {}): Promise<CoderAdminTaskResponse> {
+    return this.client.post<CoderAdminTaskResponse>(this.buildPath('admin', 'templates', 'push'), body);
+  }
+
+  /**
+   * Roll existing workspaces onto their template's active version.
+   */
+  async rolloutWorkspaces(body: WorkspaceRolloutRequest = {}): Promise<CoderAdminTaskResponse> {
+    return this.client.post<CoderAdminTaskResponse>(this.buildPath('admin', 'templates', 'rollout'), body);
+  }
+
+  /**
+   * Poll the status of an admin task (image build / template push / rollout).
+   */
+  async getAdminTask(workflowId: string): Promise<TaskInfo> {
+    return this.client.get<TaskInfo>(this.buildPath('admin', 'tasks', workflowId));
   }
 }

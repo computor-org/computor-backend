@@ -49,6 +49,7 @@ const workspacesNavigation: NavItem[] = [
     icon: 'workspaces',
     ownPage: true,
     subItems: [
+      { id: 'ws-list', label: 'Workspaces', path: '/workspaces' },
       { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
       { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
       { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
@@ -283,6 +284,15 @@ export default function Sidebar() {
       const sectionActive = hasSubItems
         ? navItem.subItems!.some((s) => pathMatches(s.path, pathname))
         : false;
+      // Only the MOST specific matching sub-item is active. Several sub-item
+      // paths can prefix-match the route at once (a group's self-referential
+      // first item like "/workspaces" is a prefix of "/workspaces/templates"),
+      // so pick the longest match instead of lighting up every prefix.
+      const activeSubPath = hasSubItems
+        ? navItem.subItems!
+            .filter((s) => pathMatches(s.path, pathname))
+            .reduce<string | null>((best, s) => (s.path.length > (best?.length ?? -1) ? s.path : best), null)
+        : null;
       // While a child is the active page the section stays expanded — it can't
       // be collapsed out from under the selected item.
       const isExpanded = expandedViews[navItem.id] || sectionActive;
@@ -334,7 +344,7 @@ export default function Sidebar() {
           {!collapsed && isExpanded && navItem.subItems && (
             <div className="ml-8 space-y-1">
               {navItem.subItems.map((subItem) => {
-                const isSubActive = pathname === subItem.path || pathname.startsWith(subItem.path + '/');
+                const isSubActive = subItem.path === activeSubPath;
 
                 return (
                   <Link

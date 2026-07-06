@@ -573,9 +573,67 @@ class CoderClient:
 
         raise CoderTemplateNotFoundError(template_name)
 
+    async def get_template_active_version(self, template_name: str) -> str:
+        """Return the active (latest published) template version id by name.
+
+        This is the version a fleet rollout moves workspaces onto.
+
+        Raises:
+            CoderTemplateNotFoundError: If template not found
+            CoderAPIError: If the template has no active version
+        """
+        for tpl in await self.list_templates():
+            if tpl.name == template_name:
+                if not tpl.active_version_id:
+                    raise CoderAPIError(f"Template '{template_name}' has no active version")
+                return tpl.active_version_id
+        raise CoderTemplateNotFoundError(template_name)
+
     # -------------------------------------------------------------------------
     # Workspace operations
     # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_workspace_summary(ws: dict) -> CoderWorkspace:
+        """Build a CoderWorkspace from a Coder /workspaces list entry."""
+        latest = ws.get("latest_build") or {}
+        return CoderWorkspace(
+            id=ws["id"],
+            name=ws["name"],
+            owner_id=ws["owner_id"],
+            owner_name=ws.get("owner_name"),
+            template_id=ws["template_id"],
+            template_name=ws.get("template_display_name") or ws.get("template_name"),
+            template_version_id=latest.get("template_version_id"),
+            template_version_name=latest.get("template_version_name"),
+            latest_build_transition=latest.get("transition"),
+            latest_build_status=latest.get("status"),
+            created_at=ws.get("created_at"),
+            updated_at=ws.get("updated_at"),
+        )
+
+    async def list_all_workspaces(self, limit: int = 1000) -> list[CoderWorkspace]:
+        """List every workspace on the server (admin-only fleet view).
+
+        Uses the same /workspaces endpoint as ``get_user_workspaces`` but with
+        no owner filter, so an admin session sees all users' workspaces.
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        resp = await client.get(
+            "/api/v2/workspaces",
+            headers={"Coder-Session-Token": token},
+            params={"limit": limit},
+        )
+
+        if resp.status_code != 200:
+            raise CoderAPIError(
+                "Failed to list all workspaces",
+                status_code=resp.status_code,
+            )
+
+        return [self._parse_workspace_summary(ws) for ws in resp.json().get("workspaces", [])]
 
     async def get_workspace(
         self,
@@ -636,22 +694,7 @@ class CoderClient:
             )
 
         data = resp.json()
-        workspaces = data.get("workspaces", [])
-
-        return [
-            CoderWorkspace(
-                id=ws["id"],
-                name=ws["name"],
-                owner_id=ws["owner_id"],
-                owner_name=ws.get("owner_name"),
-                template_id=ws["template_id"],
-                template_name=ws.get("template_display_name") or ws.get("template_name"),
-                latest_build_status=ws.get("latest_build", {}).get("status"),
-                created_at=ws.get("created_at"),
-                updated_at=ws.get("updated_at"),
-            )
-            for ws in workspaces
-        ]
+        return [self._parse_workspace_summary(ws) for ws in data.get("workspaces", [])]
 
     async def workspace_exists(
         self,
@@ -1054,6 +1097,94 @@ class CoderClient:
             logger.info(f"Workspace {workspace_id}: token update build initiated")
         else:
             logger.error(f"Failed to update workspace token: {resp.status_code} - {resp.text}")
+        return success
+
+    async def _get_build_param(
+        self, build_id: str, name: str, token: str
+    ) -> Optional[str]:
+        """Read one rich-parameter value from a workspace build so it can be
+        preserved across a new build (omitted params reset to their default)."""
+        client = await self._ensure_client()
+        resp = await client.get(
+            f"/api/v2/workspacebuilds/{build_id}/parameters",
+            headers=self._get_headers(token),
+        )
+        if resp.status_code != 200:
+            return None
+        for p in resp.json():
+            if p.get("name") == name:
+                return p.get("value")
+        return None
+
+    async def set_workspace_auto_update(
+        self, workspace_id: str, always: bool = True
+    ) -> bool:
+        """Set a workspace's automatic-updates policy so it adopts the template's
+        active version on its next start. Best-effort."""
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+        resp = await client.put(
+            f"/api/v2/workspaces/{workspace_id}/autoupdates",
+            headers=self._get_headers(token),
+            json={"automatic_updates": "always" if always else "never"},
+        )
+        return resp.status_code in (200, 204)
+
+    async def update_workspace_to_version(
+        self,
+        workspace_id: str,
+        template_version_id: str,
+    ) -> bool:
+        """Rebuild a workspace onto a specific template version (fleet update),
+        preserving its computor_auth_token so the extension stays authenticated.
+
+        Issues a ``start`` build on the new version — for workspaces to update
+        immediately. For stopped workspaces prefer ``set_workspace_auto_update``
+        so they adopt the new version on next start rather than being
+        force-started.
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        resp = await client.get(
+            f"/api/v2/workspaces/{workspace_id}",
+            headers=self._get_headers(token),
+        )
+        if resp.status_code != 200:
+            logger.error(
+                f"Failed to load workspace {workspace_id} for version update: {resp.status_code}"
+            )
+            return False
+        latest = (resp.json() or {}).get("latest_build") or {}
+
+        # Preserve the current auth token; omitting it resets the param to its
+        # "" default and de-authenticates the extension.
+        rich_params: list[dict] = []
+        build_id = latest.get("id")
+        if build_id:
+            current_token = await self._get_build_param(build_id, "computor_auth_token", token)
+            if current_token is not None:
+                rich_params.append({"name": "computor_auth_token", "value": current_token})
+
+        resp = await client.post(
+            f"/api/v2/workspaces/{workspace_id}/builds",
+            headers=self._get_headers(token),
+            json={
+                "template_version_id": template_version_id,
+                "transition": "start",
+                "rich_parameter_values": rich_params,
+            },
+            timeout=self.settings.workspace_timeout,
+        )
+        success = resp.status_code in (200, 201)
+        if success:
+            logger.info(
+                f"Workspace {workspace_id}: update to version {template_version_id} initiated"
+            )
+        else:
+            logger.error(
+                f"Failed to update workspace {workspace_id} to version: {resp.status_code} - {resp.text}"
+            )
         return success
 
     # -------------------------------------------------------------------------

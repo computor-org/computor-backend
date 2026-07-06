@@ -57,6 +57,9 @@ export interface CoderWorkspace {
   owner_name?: string | null;
   template_id: string;
   template_name?: string | null;
+  template_version_id?: string | null;
+  template_version_name?: string | null;
+  latest_build_transition?: string | null;
   latest_build_status?: WorkspaceBuildStatus | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -132,4 +135,44 @@ export interface WorkspaceProvisionRequest {
   email?: string | null;
   template?: WorkspaceTemplate;
   workspace_name?: string | null;
+}
+
+// --- Admin: image build / template push / fleet rollout ---
+
+export interface ImageBuildRequest {
+  templates?: string[] | null;
+  image_tag?: string | null;
+}
+
+export interface TemplatePushRequest {
+  templates?: string[] | null;
+  build_images?: boolean;
+  image_tag?: string | null;
+}
+
+export interface WorkspaceRolloutRequest {
+  templates?: string[] | null;
+}
+
+export interface CoderAdminTaskResponse {
+  workflow_id: string;
+  task_name: string;
+  status: string;
+}
+
+export enum TaskStatus {
+  QUEUED = 'queued',
+  STARTED = 'started',
+  FINISHED = 'finished',
+  FAILED = 'failed',
+  DEFERRED = 'deferred',
+  CANCELLED = 'cancelled',
+}
+
+export interface TaskInfo {
+  task_id: string;
+  task_name: string;
+  status: TaskStatus;
+  error?: string | null;
+  progress?: Record<string, unknown> | null;
 }
