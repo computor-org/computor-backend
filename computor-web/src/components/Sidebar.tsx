@@ -49,6 +49,7 @@ const workspacesNavigation: NavItem[] = [
     icon: 'workspaces',
     ownPage: true,
     subItems: [
+      { id: 'ws-list', label: 'Workspaces', path: '/workspaces' },
       { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
       { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
       { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
