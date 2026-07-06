@@ -70,6 +70,7 @@ export const ErrorCodes = {
   AUTHZ_003: "AUTHZ_003", // Course Access Denied
   AUTHZ_004: "AUTHZ_004", // Insufficient Course Role
   AUTHZ_005: "AUTHZ_005", // Role Escalation Denied
+  AUTHZ_006: "AUTHZ_006", // Privacy Policy Consent Required
   AUTHZ_010: "AUTHZ_010", // Service Account Required
   VAL_001: "VAL_001", // Invalid Request Data
   VAL_002: "VAL_002", // Missing Required Field
@@ -293,6 +294,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/permissions#role-assignment",
+  },
+  AUTHZ_006: {
+    code: "AUTHZ_006",
+    httpStatus: 403,
+    category: ErrorCategory.AUTHORIZATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Privacy Policy Consent Required",
+    message: {
+      plain: "You must accept the current privacy policy before you can continue.",
+      markdown: "**Privacy Policy Consent Required**\n\nYou must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.",
+      html: "<strong>Privacy Policy Consent Required</strong><p>You must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/consent",
   },
   AUTHZ_010: {
     code: "AUTHZ_010",

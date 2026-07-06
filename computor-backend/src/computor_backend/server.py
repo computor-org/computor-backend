@@ -80,6 +80,7 @@ from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
 from computor_backend.api.invites import invites_router
 from computor_backend.api.consent import consent_router
+from computor_backend.api.instance import instance_router
 from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
@@ -576,6 +577,14 @@ app.include_router(
     consent_router,
     prefix="/consent",
     tags=["consent", "gdpr"]
+)
+
+# Public instance navigation URLs (web app + managed Forgejo). Also whitelisted
+# in ConsentGateMiddleware so a consent-blocked client can discover where to
+# accept the privacy policy.
+app.include_router(
+    instance_router,
+    tags=["instance"]
 )
 
 app.include_router(

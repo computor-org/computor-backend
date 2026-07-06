@@ -245,6 +245,27 @@ errors:
       - "Assign a role at or below your own privilege level"
     documentation_url: "/docs/permissions#role-assignment"
 
+  - code: AUTHZ_006
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Privacy Policy Consent Required"
+    message:
+      plain: "You must accept the current privacy policy before you can continue."
+      markdown: "**Privacy Policy Consent Required**\n\nYou must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent."
+      html: "<strong>Privacy Policy Consent Required</strong><p>You must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.</p>"
+    internal_description: "The GDPR consent gate (ConsentGateMiddleware) blocked the request: the authenticated user has not consented to the current privacy-policy version."
+    affected_functions:
+      - "ConsentGateMiddleware"
+    common_causes:
+      - "User has never accepted the privacy policy"
+      - "A new privacy-policy version became effective and requires renewed consent"
+    resolution_steps:
+      - "Open the Computor web app"
+      - "Review and accept the current privacy policy on the consent page"
+      - "Retry the action"
+    documentation_url: "/docs/consent"
+
   - code: AUTHZ_010
     http_status: 403
     category: authorization
