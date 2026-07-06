@@ -151,6 +151,7 @@ const getViewNavigation = (courseId: string): NavItem[] => [
     icon: 'admin',
     subItems: [
       { id: 'management-members', label: 'Course Members', path: `/courses/${courseId}/management/members` },
+      { id: 'management-groups', label: 'Course Groups', path: `/courses/${courseId}/management/groups` },
     ],
   },
 ];
