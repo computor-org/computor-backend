@@ -108,6 +108,9 @@ class CoderWorkspace(BaseModel):
     template_version_name: Optional[str] = Field(
         None, description="Human-readable template version name of the latest build"
     )
+    latest_build_transition: Optional[str] = Field(
+        None, description="Transition of the latest build: start | stop | delete"
+    )
     latest_build_status: Optional[WorkspaceBuildStatus] = Field(
         None,
         description="Latest build status"
@@ -212,6 +215,15 @@ class TemplatePushRequest(BaseModel):
     image_tag: Optional[str] = Field(
         None,
         description="Immutable image tag the pushed template version pins to (and builds, when build_images). None = auto-generated from the run time.",
+    )
+
+
+class WorkspaceRolloutRequest(BaseModel):
+    """Request to roll existing workspaces onto their template's active version."""
+
+    templates: Optional[list[str]] = Field(
+        None,
+        description="Template names to roll out (e.g. ['python3.13']). None = all templates."
     )
 
 

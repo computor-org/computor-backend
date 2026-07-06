@@ -606,6 +606,7 @@ class CoderClient:
             template_name=ws.get("template_display_name") or ws.get("template_name"),
             template_version_id=latest.get("template_version_id"),
             template_version_name=latest.get("template_version_name"),
+            latest_build_transition=latest.get("transition"),
             latest_build_status=latest.get("status"),
             created_at=ws.get("created_at"),
             updated_at=ws.get("updated_at"),

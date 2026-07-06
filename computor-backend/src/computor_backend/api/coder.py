@@ -39,6 +39,7 @@ from computor_backend.coder.schemas import (
     WorkspaceActionResponse,
     WorkspaceDetails,
     WorkspaceListResponse,
+    WorkspaceRolloutRequest,
 )
 from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_types.tasks import TaskInfo
@@ -268,6 +269,26 @@ async def get_workspaces(
         )
     except CoderNotFoundError:
         return WorkspaceListResponse(workspaces=[], count=0)
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
+
+@router.get(
+    "/workspaces/all",
+    response_model=WorkspaceListResponse,
+    summary="List all workspaces (admin fleet view)",
+)
+async def list_all_workspaces_endpoint(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+) -> WorkspaceListResponse:
+    """List every workspace on the server, across all users. Requires
+    workspace:manage — the fleet view behind the admin rollout."""
+    _check_workspace_access(permissions, "manage")
+    try:
+        workspaces = await client.list_all_workspaces()
+        return WorkspaceListResponse(workspaces=workspaces, count=len(workspaces))
     except Exception as e:
         raise _handle_coder_error(e) from e
 
@@ -560,6 +581,42 @@ async def push_coder_templates(
     return CoderAdminTaskResponse(
         workflow_id=workflow_id,
         task_name="push_coder_templates",
+        status="submitted",
+    )
+
+
+@router.post(
+    "/admin/templates/rollout",
+    response_model=CoderAdminTaskResponse,
+    summary="Roll existing workspaces onto the active template version",
+)
+async def rollout_workspaces_endpoint(
+    request: WorkspaceRolloutRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> CoderAdminTaskResponse:
+    """
+    Roll every existing workspace onto its template's active version — running
+    ones are rebuilt now, stopped ones adopt it on their next start. Run this
+    after a template push to propagate a new workspace image/extension to the
+    whole fleet. Requires workspace:manage permission.
+    """
+    _check_workspace_access(permissions, "manage")
+
+    executor = get_task_executor()
+    submission = TaskSubmission(
+        task_name="rollout_workspaces",
+        parameters={
+            "templates": request.templates,
+            "templates_dir": settings.templates_dir,
+        },
+        queue="coder-tasks",
+    )
+    workflow_id = await executor.submit_task(submission)
+
+    return CoderAdminTaskResponse(
+        workflow_id=workflow_id,
+        task_name="rollout_workspaces",
         status="submitted",
     )
 

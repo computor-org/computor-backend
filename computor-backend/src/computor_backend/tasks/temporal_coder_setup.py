@@ -507,6 +507,134 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         )
 
 
+@activity.defn(name="rollout_template_workspaces")
+async def rollout_template_workspaces(
+    template_key: str,
+    templates_dir: str,
+) -> Dict[str, Any]:
+    """Roll every workspace of one template onto its active version.
+
+    Policy: enable automatic updates for every workspace (so stopped ones adopt
+    the active version on their next start), and additionally issue an immediate
+    update build for workspaces that are currently up. In-progress, stopped and
+    failed workspaces are left to auto-update rather than being force-started.
+    """
+    from computor_backend.coder.client import CoderClient
+
+    discovered = _discover_templates(templates_dir)
+    info = discovered.get(template_key)
+    if not info:
+        return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
+    coder_template_name = info["coder_template_name"]
+
+    updated_now = 0
+    auto_on_start = 0
+    already_current = 0
+    errors: List[str] = []
+
+    try:
+        async with CoderClient() as client:
+            version_id = await client.get_template_active_version(coder_template_name)
+            targets = [
+                w for w in await client.list_all_workspaces()
+                if w.template_name == coder_template_name
+            ]
+
+            for w in targets:
+                try:
+                    # Always enable auto-update so a stopped/failed workspace
+                    # adopts this version on its next start.
+                    await client.set_workspace_auto_update(w.id, True)
+
+                    if w.template_version_id == version_id:
+                        already_current += 1
+                        continue
+
+                    status = w.latest_build_status.value if w.latest_build_status else ""
+                    is_up = w.latest_build_transition == "start" and status in ("succeeded", "running")
+                    if is_up:
+                        if await client.update_workspace_to_version(w.id, version_id):
+                            updated_now += 1
+                        else:
+                            errors.append(w.name)
+                    else:
+                        auto_on_start += 1
+                except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+                    errors.append(f"{w.name}: {e}")
+
+        return {
+            "success": len(errors) == 0,
+            "template": coder_template_name,
+            "active_version": version_id,
+            "targets": len(targets),
+            "updated_now": updated_now,
+            "auto_update_on_start": auto_on_start,
+            "already_current": already_current,
+            "errors": errors,
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"Rollout failed for {template_key}")
+        return {"success": False, "template": template_key, "error": str(e)}
+
+
+@register_task
+@workflow.defn(name="rollout_workspaces", sandboxed=False)
+class RolloutWorkspacesWorkflow(BaseWorkflow):
+    """Roll existing workspaces onto their template's active version."""
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "rollout_workspaces"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return "coder-tasks"
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        return timedelta(minutes=40)
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        templates_dir = parameters.get("templates_dir", "/templates")
+        requested = parameters.get("templates")
+
+        template_keys = await workflow.execute_activity(
+            discover_template_keys,
+            args=[templates_dir, requested],
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        if not template_keys:
+            return WorkflowResult(
+                status="failed",
+                result=None,
+                error="No valid templates found in " + templates_dir,
+                metadata={"workflow_type": "rollout_workspaces"},
+            )
+
+        results = []
+        for key in template_keys:
+            result = await workflow.execute_activity(
+                rollout_template_workspaces,
+                args=[key, templates_dir],
+                start_to_close_timeout=timedelta(minutes=20),
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(seconds=5),
+                    backoff_coefficient=2.0,
+                    maximum_attempts=2,
+                ),
+            )
+            results.append(result)
+
+        failed = [r for r in results if not r.get("success")]
+        return WorkflowResult(
+            status="completed_with_errors" if failed else "completed",
+            result={"rollouts": results},
+            error=(f"{len(failed)} rollout(s) had errors" if failed else None),
+            metadata={"workflow_type": "rollout_workspaces"},
+        )
+
+
 @activity.defn(name="discover_template_keys")
 async def discover_template_keys(
     templates_dir: str,
@@ -525,10 +653,12 @@ async def discover_template_keys(
 WORKFLOWS = [
     BuildWorkspaceImagesWorkflow,
     PushCoderTemplatesWorkflow,
+    RolloutWorkspacesWorkflow,
 ]
 
 ACTIVITIES = [
     build_workspace_image,
     discover_template_keys,
     push_coder_template,
+    rollout_template_workspaces,
 ]
