@@ -186,6 +186,10 @@ class ImageBuildRequest(BaseModel):
         None,
         description="Template names to build (e.g. ['python3.13', 'matlab']). None = all templates."
     )
+    image_tag: Optional[str] = Field(
+        None,
+        description="Immutable image tag to publish alongside :latest (e.g. 'v20260706-1400'). None = auto-generated from the run time.",
+    )
 
 
 class TemplatePushRequest(BaseModel):
@@ -198,6 +202,10 @@ class TemplatePushRequest(BaseModel):
     build_images: bool = Field(
         False,
         description="Build workspace images before pushing templates."
+    )
+    image_tag: Optional[str] = Field(
+        None,
+        description="Immutable image tag the pushed template version pins to (and builds, when build_images). None = auto-generated from the run time.",
     )
 
 

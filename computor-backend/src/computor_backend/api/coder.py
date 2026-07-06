@@ -512,6 +512,7 @@ async def build_workspace_images(
         "templates": request.templates,
         "templates_dir": settings.templates_dir,
         "registry_host": settings.registry_host,
+        "image_tag": request.image_tag,
     }
     submission = TaskSubmission(
         task_name="build_workspace_images",
@@ -547,6 +548,7 @@ async def push_coder_templates(
     params = _build_template_parameters(settings)
     params["templates"] = request.templates
     params["build_images"] = request.build_images
+    params["image_tag"] = request.image_tag
 
     submission = TaskSubmission(
         task_name="push_coder_templates",
