@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -13,14 +14,16 @@ import Forbidden from '@/src/components/Forbidden';
 import { Field, inputCls } from '@/src/components/FormPanel';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberImportClient';
+import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
-import type { CourseMemberImportRow, UserList } from 'types/generated';
+import type { CourseGroupList, CourseMemberImportRow, UserList } from 'types/generated';
 import { assignableRoles, courseRoleLabel, highestCourseRole, maxAssignableRole } from '@/src/utils/courseRoles';
 
 const PAGE_SIZE = 10;
 const membersClient = new CourseMembersClient();
 const importClient = new CourseMemberImportClient();
+const groupsClient = new CourseGroupsClient();
 const usersClient = new UsersClient();
 const coursesClient = new CoursesClient();
 
@@ -51,6 +54,7 @@ export default function AddCourseMembersPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowRole, setRowRole] = useState<Record<string, string>>({});
+  const [rowGroup, setRowGroup] = useState<Record<string, string>>({});
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -96,17 +100,46 @@ export default function AddCourseMembersPage() {
     () => new Set((memberData ?? []).map((m) => m.user_id)),
     [memberData],
   );
+
+  // Course groups — a student must be assigned to one (DB constraint), so the
+  // user-list tab needs a group picker. Also feeds a sensible default below.
+  const { data: groupData } = useResource(
+    () =>
+      groupsClient
+        .listCourseGroupsCourseGroupsGet({ courseId, limit: 500 })
+        .catch(() => [] as CourseGroupList[]),
+    [courseId],
+    { enabled: canManage },
+  );
+  const groups = groupData ?? [];
   // Keep users added in this session visible (with "Added ✓") — memberData
   // isn't refetched after an add.
   const visibleUsers = users.filter((u) => added.has(u.id) || !memberIds.has(u.id));
 
   async function addUser(u: UserList) {
     const role = rowRole[u.id] ?? defaultRole;
+    const groupId = rowGroup[u.id] || '';
+    // Students must belong to a group (enforced by a DB check constraint). Catch
+    // it here with a clear message instead of surfacing the raw constraint error.
+    if (role === '_student' && !groupId) {
+      setRowError((prev) => ({
+        ...prev,
+        [u.id]: groups.length
+          ? 'Pick a group — students must be assigned to one.'
+          : 'Create a course group first — students must be assigned to one.',
+      }));
+      return;
+    }
     setAddingId(u.id);
     setRowError((prev) => ({ ...prev, [u.id]: '' }));
     try {
       await membersClient.createCourseMembersCourseMembersPost({
-        body: { user_id: u.id, course_id: courseId, course_role_id: role },
+        body: {
+          user_id: u.id,
+          course_id: courseId,
+          course_role_id: role,
+          course_group_id: groupId || null,
+        },
       });
       setAdded((prev) => new Set(prev).add(u.id));
     } catch (e) {
@@ -310,8 +343,20 @@ export default function AddCourseMembersPage() {
             <div className="space-y-4">
               <p className="text-sm text-gray-500">
                 You can only see users your permissions allow. Users already in the course are hidden — pick a
-                role and add them.
+                role and add them. Students must be assigned to a group.
               </p>
+              {groups.length === 0 && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  This course has no groups yet, so students cannot be added.{' '}
+                  <Link
+                    href={`/courses/${courseId}/management/groups/create`}
+                    className="font-medium text-amber-800 underline hover:no-underline"
+                  >
+                    Create a group
+                  </Link>{' '}
+                  first.
+                </p>
+              )}
               <input
                 type="text"
                 placeholder="Search by name or email…"
@@ -331,6 +376,7 @@ export default function AddCourseMembersPage() {
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
                         <th className="px-4 py-3" />
                       </tr>
                     </thead>
@@ -360,6 +406,21 @@ export default function AddCourseMembersPage() {
                                 ))}
                               </select>
                             </td>
+                            <td className="px-4 py-3">
+                              <select
+                                value={rowGroup[u.id] ?? ''}
+                                disabled={isAdded}
+                                onChange={(e) => setRowGroup((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                              >
+                                <option value="">— no group —</option>
+                                {groups.map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.title || g.id}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
                             <td className="px-4 py-3 text-right">
                               {isAdded ? (
                                 <span className="text-sm text-green-700">Added ✓</span>
@@ -378,7 +439,7 @@ export default function AddCourseMembersPage() {
                       })}
                       {visibleUsers.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
+                          <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
                             No users to add.
                           </td>
                         </tr>

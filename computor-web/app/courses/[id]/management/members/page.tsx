@@ -72,6 +72,7 @@ export default function CourseMembersPage() {
 
   const members = data?.members ?? [];
   const course = data?.course ?? null;
+  const groups = data?.groups ?? [];
   const groupName = useMemo(() => {
     const map = new Map<string, string>();
     for (const g of data?.groups ?? []) map.set(g.id, g.title || g.id);
@@ -92,6 +93,30 @@ export default function CourseMembersPage() {
       await reload();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Failed to change role');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function changeGroup(member: CourseMemberList, groupId: string) {
+    const next = groupId || null;
+    if (next === (member.course_group_id ?? null)) return;
+    // A student must keep a group (DB check constraint); block clearing it with a
+    // clear message rather than surfacing the raw constraint error.
+    if (!next && member.course_role_id === '_student') {
+      setActionError('Students must be assigned to a group.');
+      return;
+    }
+    setSavingId(member.id);
+    setActionError(null);
+    try {
+      await membersClient.updateCourseMembersCourseMembersIdPatch({
+        id: member.id,
+        body: { course_group_id: next },
+      });
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to change group');
     } finally {
       setSavingId(null);
     }
@@ -187,8 +212,26 @@ export default function CourseMembersPage() {
                           <Badge color="gray">{courseRoleLabel(m.course_role_id)}</Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {m.course_group_id ? groupName.get(m.course_group_id) ?? '—' : '—'}
+                      <td className="px-4 py-3">
+                        {manageable ? (
+                          <select
+                            value={m.course_group_id ?? ''}
+                            disabled={savingId === m.id}
+                            onChange={(e) => changeGroup(m, e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                          >
+                            <option value="">— no group —</option>
+                            {groups.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.title || g.id}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-sm text-gray-600">
+                            {m.course_group_id ? groupName.get(m.course_group_id) ?? '—' : '—'}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {manageable && (
