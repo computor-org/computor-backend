@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
-import WorkspaceCard from '@/src/components/workspaces/WorkspaceCard';
+import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
+import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Modal from '@/src/components/Modal';
 import PageHeader from '@/src/components/PageHeader';
@@ -37,6 +38,9 @@ export default function WorkspacesPage() {
     return (await coderClient.listWorkspaces()).workspaces;
   }, []);
   const workspaces = data ?? [];
+  const runningCount = workspaces.filter(
+    (ws) => categorizeStatus(ws.latest_build_status) === 'running',
+  ).length;
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
@@ -153,97 +157,56 @@ export default function WorkspacesPage() {
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        {/* Header */}
         <PageHeader
           breadcrumbs={[{ label: 'Workspaces' }]}
           title="Workspaces"
           subtitle="Manage your development workspaces"
           actions={
-            <Link
-              href="/workspaces/provision"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              New Workspace
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => reload()}
+                disabled={loading}
+                className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Refresh
+              </button>
+              <Link
+                href="/workspaces/provision"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                New Workspace
+              </Link>
+            </div>
           }
         />
 
-        {/* Error State */}
         <ErrorBanner>{error}</ErrorBanner>
 
-        <ScrollArea className="space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Health */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Coder Server</p>
-                <p className="text-lg font-semibold mt-1">
-                  {health === null ? (
-                    <span className="text-gray-400">Checking...</span>
-                  ) : health.healthy ? (
-                    <span className="text-green-600">Healthy</span>
-                  ) : (
-                    <span className="text-red-600">Unhealthy</span>
-                  )}
-                </p>
-              </div>
-              <div className={`p-2 rounded-lg ${health?.healthy ? 'bg-green-100' : 'bg-gray-100'}`}>
-                <svg className={`h-6 w-6 ${health?.healthy ? 'text-green-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                </svg>
-              </div>
-            </div>
-            {health?.version && <p className="text-xs text-gray-500 mt-2">v{health.version}</p>}
-          </div>
-
-          {/* Workspaces count */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">My Workspaces</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{loading ? '-' : workspaces.length}</p>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Templates count */}
-          <Link href="/workspaces/templates" className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Templates</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{templateCount}</p>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                </svg>
-              </div>
-            </div>
+        {/* Compact status strip — replaces the old oversized stat cards. */}
+        <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                health === null ? 'bg-gray-300' : health.healthy ? 'bg-green-500' : 'bg-red-500'
+              }`}
+            />
+            {health === null
+              ? 'Checking Coder…'
+              : health.healthy
+                ? `Coder healthy${health.version ? ` · v${health.version}` : ''}`
+                : 'Coder unreachable'}
+          </span>
+          <span className="text-gray-300">·</span>
+          <span>{loading ? '—' : `${runningCount} running / ${workspaces.length} total`}</span>
+          <span className="text-gray-300">·</span>
+          <Link href="/workspaces/templates" className="text-blue-600 hover:underline">
+            {templateCount} {templateCount === 1 ? 'template' : 'templates'}
           </Link>
         </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4" />
-                <div className="h-4 bg-gray-200 rounded w-full mb-2" />
-                <div className="h-4 bg-gray-200 rounded w-2/3" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && !error && workspaces.length === 0 && (
+        {loading ? (
+          <ListLoading>Loading workspaces…</ListLoading>
+        ) : !error && workspaces.length === 0 ? (
           <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -257,24 +220,17 @@ export default function WorkspacesPage() {
               New Workspace
             </Link>
           </div>
-        )}
-
-        {/* Workspace Grid */}
-        {!loading && !error && workspaces.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {workspaces.map((ws) => (
-              <WorkspaceCard
-                key={ws.id}
-                workspace={ws}
-                onStart={handleStart}
-                onStop={handleStop}
-                onDelete={(owner, name) => setDeleteTarget({ owner, name })}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
-          </div>
-        )}
-        </ScrollArea>
+        ) : !error ? (
+          <ScrollPanel>
+            <WorkspaceTable
+              workspaces={workspaces}
+              onStart={handleStart}
+              onStop={handleStop}
+              onDelete={(owner, name) => setDeleteTarget({ owner, name })}
+              onViewDetails={handleViewDetails}
+            />
+          </ScrollPanel>
+        ) : null}
 
         {/* Delete Confirmation */}
         <ConfirmDialog

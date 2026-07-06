@@ -186,6 +186,13 @@ async def import_course_member(
             else:
                 message = "Course member updated successfully"
         else:
+            # A student must belong to a group (DB check constraint). Fail with a
+            # clear message instead of letting the raw constraint error surface.
+            if member_request.course_role_id == "_student" and course_group_id is None:
+                raise BadRequestException(
+                    "Students must be assigned to a course group. Provide a group "
+                    "for this member (create_missing_group creates it if needed)."
+                )
             # Create new course member
             new_member = CourseMember(
                 user_id=user.id,
