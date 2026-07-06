@@ -111,6 +111,9 @@ services:
       # since uvicorn reaches Forgejo over computor-network, not localhost.
       GIT_SERVER: ${GIT_SERVER}
       GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
+      # User-reachable git URL, used to rewrite template/clone links in API
+      # responses (the internal host is not reachable from a browser).
+      GIT_SERVER_URL_PUBLIC: ${GIT_SERVER_URL}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
       # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's

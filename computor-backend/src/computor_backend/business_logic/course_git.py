@@ -21,6 +21,7 @@ from computor_backend.exceptions import (
     NotFoundException,
 )
 from computor_backend.git_provider import get_provider_client_for_server
+from computor_backend.git_server.config import to_public_git_url
 from computor_backend.model.auth import Account
 from computor_backend.model.course import Course, CourseFamily, CourseMember
 from computor_backend.model.git_server import (
@@ -108,9 +109,11 @@ def build_course_git_descriptor(
     if server is not None:
         template = GitTemplateRef(
             server_type=server.type,
-            base_url=server.base_url,
+            # This descriptor is student-facing (clone target), so expose the
+            # user-reachable host, not the backend-internal one.
+            base_url=to_public_git_url(server.base_url),
             repo=binding.template_repo,
-            clone_url=binding.template_url,
+            clone_url=to_public_git_url(binding.template_url),
             default_branch=binding.default_branch or "main",
         )
 
@@ -251,7 +254,8 @@ def _binding_to_get(b: CourseGitBinding, db: Session) -> CourseGitBindingGet:
         parent_group_id=parent_group_id,
         has_token=bool(b.token),
         template_repo=b.template_repo,
-        template_url=b.template_url,
+        # Stored URL uses the backend-internal git host; surface the public one.
+        template_url=to_public_git_url(b.template_url),
         default_branch=b.default_branch,
         student_repo_modes=list(b.student_repo_modes or []),
         locked=locked,
