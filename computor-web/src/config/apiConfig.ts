@@ -6,21 +6,16 @@
  */
 
 import { apiClient } from '../api/client';
-import { ssoAuthService, authService } from '../services/authInstances';
+import { ssoAuthService } from '../services/authInstances';
 
 /**
- * Initialize API client with authentication providers
+ * Initialize API client with the SSO authentication provider.
  *
- * Auth providers are checked in order:
- * 1. SSO Authentication (Keycloak)
- * 2. Basic Authentication (fallback, e.g. for development)
+ * Keycloak SSO is the only identity provider; the client refreshes its
+ * HttpOnly cookies through this provider on a 401.
  */
 export function configureAPIClient() {
-  // Configure API client with the shared provider instances (checked in order)
-  apiClient.setAuthProviders([
-    ssoAuthService,
-    authService,
-  ]);
+  apiClient.setAuthProviders([ssoAuthService]);
 }
 
 /**
