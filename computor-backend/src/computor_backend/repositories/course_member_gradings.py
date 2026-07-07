@@ -477,7 +477,8 @@ class CourseMemberGradingsRepository:
                 COUNT(gc.content_id) as graded_assignments,
                 -- average_grading = average including 0s for unsubmitted and ungraded items
                 AVG(gc.grade) as average_grading,
-                -- grading_status aggregation rules (returns string):
+                -- grading_status aggregation rules (returns string); ints/slugs
+                -- mirror computor_types.grading.GradingStatus - keep in sync:
                 -- 1. If ANY CORRECTION_NECESSARY(2) exists -> 'correction_necessary'
                 -- 2. Else if ANY IMPROVEMENT_POSSIBLE(3) exists -> 'improvement_possible'
                 -- 3. Else if ALL are CORRECTED(1) -> 'corrected'

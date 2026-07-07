@@ -168,7 +168,7 @@ class SubmissionGrade(Base):
 
     # Grading data
     grade = Column(Float(53), nullable=False)  # Grade as percentage (0.0 to 1.0)
-    status = Column(Integer, nullable=False, server_default=text("0"))  # GradingStatus enum (0=not_reviewed, 1=corrected, 2=correction_necessary, 3=improvement_possible)
+    status = Column(Integer, nullable=False, server_default=text("0"))  # computor_types.grading.GradingStatus int value
     comment = Column(String(4096), nullable=True)  # Grader feedback
 
     # Relationships

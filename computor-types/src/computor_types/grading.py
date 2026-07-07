@@ -21,11 +21,29 @@ class GradedByCourseMember(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class GradingStatus(IntEnum):
-    """Enumeration for grading status values."""
+    """Enumeration for grading status values.
+
+    Single source of truth for the grading-status vocabulary. The integer
+    values are persisted (``submission_grade.status``) and mirrored in raw
+    SQL aggregation (backend ``course_member_gradings.py``) — keep them
+    stable when adding members.
+    """
     NOT_REVIEWED = 0
     CORRECTED = 1
     CORRECTION_NECESSARY = 2
     IMPROVEMENT_POSSIBLE = 3
+
+    def to_slug(self) -> str:
+        """Snake-case string form used by the student/tutor view DTOs."""
+        return self.name.lower()
+
+    @classmethod
+    def from_int(cls, value: Optional[int]) -> "GradingStatus":
+        """Map a stored int to the enum; None/unknown fall back to NOT_REVIEWED."""
+        try:
+            return cls(value)
+        except (ValueError, TypeError):
+            return cls.NOT_REVIEWED
 
 class SubmissionGroupGradingCreate(BaseModel):
     """Create a new grading for a submission group."""
