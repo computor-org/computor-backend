@@ -5,16 +5,26 @@ This module handles test execution for submission artifacts.
 from typing import Annotated, Optional
 import logging
 import uuid
-import json
 from fastapi import Depends, APIRouter
-from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import BadRequestException, NotFoundException, ForbiddenException, RateLimitException
+from computor_backend.exceptions import BadRequestException, NotFoundException, RateLimitException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.course_access import require_submission_group_access
+from computor_backend.business_logic.testing_orchestration import (
+    IN_PROGRESS_STATUSES,
+    build_testing_submission,
+    enforce_max_test_runs,
+    find_active_test,
+    resolve_artifact_for_test,
+    resolve_task_queue,
+    service_config_payload,
+    service_type_config_payload,
+    sync_result_status_from_temporal,
+)
+from computor_types.tasks import ResultStatus
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.cache import Cache
@@ -30,14 +40,14 @@ from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_backend.model.course import (
     Course, CourseContent, CourseContentType,
-    CourseMember, SubmissionGroup, SubmissionGroupMember, CourseFamily
+    CourseMember, SubmissionGroup, CourseFamily
 )
 from computor_backend.model.organization import Organization
 from computor_backend.model.service import Service, ServiceType
 from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.example import Example, ExampleVersion
 from computor_backend.custom_types import Ltree
-from computor_backend.tasks import get_task_executor, TaskSubmission
+from computor_backend.tasks import get_task_executor
 from computor_types.tasks import map_int_to_task_status
 
 logger = logging.getLogger(__name__)
@@ -126,52 +136,7 @@ async def create_test_run(
     set_db_user(db, user_id)
 
     # Determine which artifact to test
-    artifact = None
-
-    if test_create.artifact_id:
-        # Direct artifact ID provided
-        artifact = db.query(SubmissionArtifact).filter(
-            SubmissionArtifact.id == test_create.artifact_id
-        ).first()
-
-        if not artifact:
-            raise NotFoundException(
-                error_code="SUBMIT_001",
-                detail="Submission artifact not found"
-            )
-
-    elif test_create.submission_group_id:
-        # Find artifact by submission group and optional version
-        if test_create.version_identifier:
-            # Find specific version
-            artifact = db.query(SubmissionArtifact).filter(
-                SubmissionArtifact.submission_group_id == test_create.submission_group_id,
-                SubmissionArtifact.version_identifier == test_create.version_identifier
-            ).order_by(SubmissionArtifact.created_at.desc()).first()
-
-            if not artifact:
-                raise NotFoundException(
-                    error_code="SUBMIT_001",
-                    detail=f"No artifact found for submission group {test_create.submission_group_id} "
-                           f"with version {test_create.version_identifier}"
-                )
-        else:
-            # Get latest submission for the group
-            artifact = db.query(SubmissionArtifact).filter(
-                SubmissionArtifact.submission_group_id == test_create.submission_group_id
-            ).order_by(SubmissionArtifact.created_at.desc()).first()
-
-            if not artifact:
-                raise NotFoundException(
-                    error_code="SUBMIT_001",
-                    detail=f"No artifacts found for submission group {test_create.submission_group_id}. "
-                           f"Student must submit first."
-                )
-    else:
-        raise BadRequestException(
-            error_code="SUBMIT_007",
-            detail="Must provide either artifact_id or submission_group_id to identify what to test"
-        )
+    artifact = resolve_artifact_for_test(test_create, db)
 
     # Get the submission group with permission check
     submission_group = check_course_permissions(
@@ -198,33 +163,18 @@ async def create_test_run(
             detail="You are not a member of this course"
         )
 
-    # Check for existing test results for this artifact by this member
-    # Apply test limitation: prevent multiple successful tests
-    existing_test = db.query(Result).filter(
-        and_(
-            Result.submission_artifact_id == artifact.id,
-            Result.course_member_id == course_member.id,
-            ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
-        )
-    ).first()
+    # Test limitation: a member's earlier non-retryable test blocks a re-run
+    existing_test = find_active_test(artifact.id, course_member.id, db)
 
     if existing_test:
         # Check if still running
-        if existing_test.status in [3, 4, 5, 7]:  # SCHEDULED, PENDING, RUNNING, PAUSED
-            # Check actual Temporal workflow status if available
-            if existing_test.test_system_id:
-                try:
-                    task_executor = get_task_executor()
-                    actual_status = await task_executor.get_task_status(existing_test.test_system_id)
-
-                    if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
-                        # Still running, return the existing one
-                        return ResultList.model_validate(existing_test)
-                except Exception as e:
-                    logger.warning(f"Could not check Temporal status: {e}")
+        if existing_test.status in IN_PROGRESS_STATUSES:
+            if await sync_result_status_from_temporal(existing_test, db):
+                # Still running, return the existing one
+                return ResultList.model_validate(existing_test)
 
         # If completed successfully, don't allow another test
-        elif existing_test.status == 0:  # COMPLETED/FINISHED
+        elif existing_test.status == int(ResultStatus.FINISHED):
             raise BadRequestException(
                 error_code="SUBMIT_008",
                 detail="You have already tested this artifact. "
@@ -232,16 +182,7 @@ async def create_test_run(
             )
 
     # Check max test runs limit for the submission group
-    if submission_group.max_test_runs is not None:
-        test_count = db.query(func.count(Result.id)).filter(
-            Result.submission_artifact_id == artifact.id
-        ).scalar()
-
-        if test_count >= submission_group.max_test_runs:
-            raise BadRequestException(
-                error_code="SUBMIT_004",
-                detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
-            )
+    enforce_max_test_runs(artifact.id, submission_group, db, error_code="SUBMIT_004")
 
     # Get course content (assignment)
     course_content = db.query(CourseContent).filter(
@@ -327,41 +268,11 @@ async def create_test_run(
     ).first()
 
     if existing_result:
-        # Check if the Temporal workflow is still actually running
-        workflow_still_running = False
-        if existing_result.test_system_id:
-            try:
-                task_executor = get_task_executor()
-                task_info = await task_executor.get_task_status(existing_result.test_system_id)
+        # Sync against Temporal; a stale row is corrected, a live one blocks
+        workflow_still_running = await sync_result_status_from_temporal(
+            existing_result, db, treat_missing_as_crashed=True
+        )
 
-                # Check if workflow is still running
-                if task_info.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
-                    workflow_still_running = True
-                    logger.info(f"Temporal workflow {existing_result.test_system_id} is still running, rejecting duplicate test")
-                else:
-                    # Workflow is done but Result status is stale - sync it
-                    logger.warning(f"Result {existing_result.id} has stale status {existing_result.status}, Temporal workflow is {task_info.status}")
-
-                    # Update Result status to match Temporal reality
-                    if task_info.status == TaskStatus.FINISHED:
-                        existing_result.status = 0  # FINISHED
-                    elif task_info.status == TaskStatus.FAILED:
-                        existing_result.status = 1  # FAILED
-                    elif task_info.status == TaskStatus.CANCELLED:
-                        existing_result.status = 2  # CANCELLED
-                    else:
-                        existing_result.status = 6  # CRASHED (unknown state)
-
-                    logger.info(f"Status synced from Temporal for Result {existing_result.id}: {task_info.status} -> status {existing_result.status}")
-                    db.commit()
-                    logger.info(f"Updated stale Result {existing_result.id} to status {existing_result.status}")
-            except Exception as e:
-                # Workflow doesn't exist in Temporal - mark as crashed
-                logger.warning(f"Temporal workflow {existing_result.test_system_id} not found, marking Result {existing_result.id} as CRASHED: {e}")
-                existing_result.status = 6  # CRASHED
-                db.commit()
-
-        # If workflow is still running, reject the duplicate test
         if workflow_still_running:
             raise BadRequestException(
                 error_code="SUBMIT_003",
@@ -370,51 +281,7 @@ async def create_test_run(
 
     # Validate task queue configuration BEFORE creating the Result record
     # This prevents duplicate key errors when retrying with misconfigured services
-    task_queue = None
-    if str(service_type.path).startswith("testing."):
-        # Task queue MUST be in service.config.temporal.task_queue
-        if service.config and isinstance(service.config, dict):
-            temporal_config = service.config.get("temporal", {})
-            if isinstance(temporal_config, dict):
-                task_queue = temporal_config.get("task_queue")
-
-            # Warn about common misconfiguration - task_queue at root level
-            if not task_queue and "task_queue" in service.config:
-                logger.warning(
-                    f"Service '{service.name}' has task_queue at root level. "
-                    f"It should be nested under 'temporal': {{'temporal': {{'task_queue': 'queue-name'}}}}"
-                )
-
-        # Validate that we have a task queue
-        if not task_queue:
-            # Provide helpful error message with proper JSON formatting
-            config_example = {
-                "temporal": {
-                    "task_queue": "testing-matlab",
-                    "max_retries": 3,
-                    "timeout_minutes": 30
-                }
-            }
-            raise BadRequestException(
-                error_code="EXT_005",
-                detail=(
-                    f"Testing service '{service.name}' is not properly configured. "
-                    f"No task queue specified. Service configuration must include: "
-                    f"{json.dumps(config_example, indent=2)}"
-                )
-            )
-
-        # Warn if using default queue for specialized testing service
-        if task_queue == "computor-tasks" and "matlab" in service.name.lower():
-            logger.warning(
-                f"Service '{service.name}' appears to be a MATLAB testing service but is using the default queue. "
-                f"Consider using a specialized queue like 'testing-matlab'"
-            )
-    else:
-        raise BadRequestException(
-            error_code="TASK_003",
-            detail=f"Service type '{service_type.path}' is not a testing service. Expected path starting with 'testing.', got '{service_type.path}'"
-        )
+    task_queue = resolve_task_queue(service, service_type)
 
     # Create test result record (only after validation passes)
     result = Result(
@@ -442,26 +309,16 @@ async def create_test_run(
         # Task queue has already been validated above
         task_executor = get_task_executor()
 
-        task_submission = TaskSubmission(
+        task_submission = build_testing_submission(
             task_name="student_testing",
             workflow_id=workflow_id,
             parameters={
                 "test_job": job,  # Already a dict, no need for model_dump()
-                "service_config": {
-                    "id": str(service.id),
-                    "slug": service.slug,
-                    "name": service.name,
-                    "config": service.config or {},
-                },
-                "service_type_config": {
-                    "id": str(service_type.id),
-                    "path": str(service_type.path),
-                    "schema": service_type.schema or {},
-                    "properties": service_type.properties or {},
-                },
+                "service_config": service_config_payload(service),
+                "service_type_config": service_type_config_payload(service_type),
                 "result_id": str(result.id),
             },
-            queue=task_queue
+            queue=task_queue,
         )
 
         submitted_id = await task_executor.submit_task(task_submission)
@@ -526,20 +383,11 @@ async def get_test_status(
 
     # If test has a workflow ID, check Temporal status for running tests
     status = result_data.status
-    if result_data.test_system_id and status in [3, 4, 5, 7]:  # Running statuses
-        try:
-            task_executor = get_task_executor()
-            actual_status = await task_executor.get_task_status(result_data.test_system_id)
-
-            # Update database if status changed
-            new_status = map_task_status_to_int(actual_status.status)
-            if new_status != status:
-                # Update only the status field
-                db.query(Result).filter(Result.id == result_id).update({"status": new_status})
-                db.commit()
-                status = new_status
-        except Exception as e:
-            logger.warning(f"Could not check Temporal status: {e}")
+    if result_data.test_system_id and status in IN_PROGRESS_STATUSES:
+        result_row = db.query(Result).filter(Result.id == result_id).first()
+        if result_row is not None:
+            await sync_result_status_from_temporal(result_row, db, sync_in_progress=True)
+            status = result_row.status
 
     return {
         "id": str(result_data.id),

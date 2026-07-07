@@ -903,31 +903,9 @@ async def create_test_result(
         )
 
     # Check test limitations (prevent multiple successful tests by same member)
-    existing_test = db.query(Result).filter(
-        and_(
-            Result.submission_artifact_id == artifact_id,
-            Result.course_member_id == course_member_id,
-            ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
-        )
-    ).first()
+    from computor_backend.business_logic.testing_orchestration import enforce_test_limits
 
-    if existing_test:
-        raise BadRequestException(
-            detail="You have already run a test on this artifact. "
-                   "Multiple tests are not allowed unless the previous test crashed or was cancelled."
-        )
-
-    # Check max test runs limit if configured
-    submission_group = artifact.submission_group
-    if submission_group.max_test_runs is not None:
-        test_count = db.query(Result).filter(
-            Result.submission_artifact_id == artifact_id
-        ).count()
-
-        if test_count >= submission_group.max_test_runs:
-            raise BadRequestException(
-                detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
-            )
+    enforce_test_limits(artifact, course_member_id, artifact.submission_group, db)
 
     # Create the test result (use authenticated user's course member id)
     from computor_types.tasks import map_task_status_to_int
