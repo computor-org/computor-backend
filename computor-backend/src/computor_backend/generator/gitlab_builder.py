@@ -69,12 +69,12 @@ class GitLabBuilder:
         self.gitlab_url = gitlab_url  # Store original URL for database
         self.gitlab_token = gitlab_token
         
-        # Transform URL for Docker environment if needed (API calls only)
+        # Docker-aware client on a stable base URL
+        from ..git_provider.gitlab import make_gitlab_client
         from ..utils.docker_utils import transform_localhost_url
-        api_url = transform_localhost_url(gitlab_url)
-        
-        # Initialize GitLab connection with transformed URL
-        self.gitlab = Gitlab(url=api_url, private_token=gitlab_token, keep_base_url=True)
+        api_url = transform_localhost_url(gitlab_url)  # kept for log messages below
+
+        self.gitlab = make_gitlab_client(gitlab_url, gitlab_token)
         try:
             # For group tokens, gl.auth() doesn't work properly
             # Test with a simple API call instead

@@ -71,13 +71,9 @@ def _get_gitlab_client(server: GitServer, raw_token: Optional[str]):
 def get_gitlab_client_for_binding(binding: CourseGitBinding, server: GitServer):
     """GitLab client using the course's own token (the binding), falling back to
     the registry server's token for legacy managed-GitLab courses."""
-    if getattr(binding, "token", None):
-        token = decrypt_secret(binding.token)
-    elif server is not None and server.token:
-        token = decrypt_secret(server.token)
-    else:
-        token = None
-    return _get_gitlab_client(server, token)
+    from computor_backend.git_provider.token_resolution import resolve_binding_token
+
+    return _get_gitlab_client(server, resolve_binding_token(binding, server))
 
 
 def _binding_has_managed_creds(binding: CourseGitBinding, server: Optional[GitServer]) -> bool:
@@ -378,10 +374,11 @@ def _apply_course_git_binding(
     # token, so an external GitLab needs no shared managed registry server.
     gitlab_structure = None
     if data.delivery == "git" and server is not None and server.type == "gitlab":
+        from computor_backend.git_provider.token_resolution import resolve_binding_token
+
         gl_token = (
             (data.token or "").strip()
-            or (decrypt_secret(binding.token) if (binding is not None and binding.token) else None)
-            or (decrypt_secret(server.token) if (server.managed and server.token) else None)
+            or resolve_binding_token(binding, server, managed_only_server_token=True)
         )
         if gl_token:
             gl_server_props = (server.properties or {}).get("gitlab") or {}
