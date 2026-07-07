@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AuthUser, AuthResponse } from '../types/auth';
 import { UserScopes } from '../generated/types/users';
-import { ssoAuthService, authService } from '../services/authInstances';
+import { ssoAuthService } from '../services/authInstances';
 import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
@@ -16,7 +16,6 @@ interface AuthContextType {
   scopes: UserScopes | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<AuthResponse>;
   loginWithSSO: (provider?: string) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthResponse>;
@@ -74,40 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadPermissions();
         }
         // status === 'unreachable' (e.g. off VPN): keep the cached user as-is.
-
-        setIsLoading(false);
-        return;
-      }
-
-      // Fall back to auth service
-      const authUser = authService.getCurrentUser();
-      if (authUser) {
-        setUser(authUser);
-        setViews(authService.getCurrentViews());
-        await loadPermissions();
       }
 
       setIsLoading(false);
     };
 
     initAuth();
-  }, [loadPermissions]);
-
-  const login = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
-    setIsLoading(true);
-    try {
-      const response = await authService.login({ username, password });
-
-      if (response.success && response.user) {
-        setUser(response.user);
-        setViews(authService.getCurrentViews());
-        await loadPermissions();
-      }
-
-      return response;
-    } finally {
-      setIsLoading(false);
-    }
   }, [loadPermissions]);
 
   const loginWithSSO = useCallback((provider: string = 'keycloak') => {
@@ -117,11 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Try SSO logout first
       if (ssoAuthService.isAuthenticated()) {
         await ssoAuthService.logout();
-      } else if (authService.isAuthenticated()) {
-        await authService.logout();
       }
 
       setUser(null);
@@ -140,11 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         response = await ssoAuthService.refreshSession();
         if (response?.success) {
           setViews(ssoAuthService.getCurrentViews());
-        }
-      } else if (authService.isAuthenticated()) {
-        response = await authService.refreshSession();
-        if (response?.success) {
-          setViews(authService.getCurrentViews());
         }
       }
 
@@ -206,7 +169,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     scopes,
     isAuthenticated: !!user,
     isLoading,
-    login,
     loginWithSSO,
     logout,
     refreshSession,

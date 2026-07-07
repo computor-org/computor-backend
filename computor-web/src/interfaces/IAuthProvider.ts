@@ -52,17 +52,6 @@ export interface IAuthProvider {
 }
 
 /**
- * Extended authentication provider with login capabilities
- */
-export interface IAuthProviderWithLogin extends IAuthProvider {
-  /**
-   * Login with credentials
-   * Backend sets HttpOnly cookies on successful login
-   */
-  login(credentials: { username: string; password: string }): Promise<AuthResponse>;
-}
-
-/**
  * SSO authentication provider interface
  */
 export interface ISSOAuthProvider extends IAuthProvider {
