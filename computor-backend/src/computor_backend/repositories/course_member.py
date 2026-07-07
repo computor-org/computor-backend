@@ -11,7 +11,6 @@ all permission checks in the system.
 
 from typing import List, Optional, Set
 from sqlalchemy.orm import Session
-import asyncio
 import logging
 
 from .base import BaseRepository
@@ -53,17 +52,9 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
         This is CRITICAL for security - permission caches must be invalidated
         immediately when memberships change.
         """
-        from computor_backend.permissions.cache import invalidate_user_course_memberships
+        from computor_backend.permissions.cache import invalidate_user_course_memberships_sync
 
-        try:
-            # Invalidate permission cache for this user
-            asyncio.run(invalidate_user_course_memberships(str(entity.user_id)))
-            logger.info(f"Invalidated permission cache for user {entity.user_id} (course {entity.course_id})")
-        except Exception as e:
-            # Log but don't fail the operation
-            logger.warning(
-                f"Failed to invalidate permission cache for user {entity.user_id}: {e}"
-            )
+        invalidate_user_course_memberships_sync(str(entity.user_id))
 
     def create(self, entity: CourseMember) -> CourseMember:
         """
@@ -115,14 +106,9 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
         super().delete(entity)
 
         # Invalidate permission cache
-        from computor_backend.permissions.cache import invalidate_user_course_memberships
-        try:
-            asyncio.run(invalidate_user_course_memberships(str(user_id)))
-            logger.info(f"Invalidated permission cache for user {user_id} after deletion")
-        except Exception as e:
-            logger.warning(
-                f"Failed to invalidate permission cache for user {user_id}: {e}"
-            )
+        from computor_backend.permissions.cache import invalidate_user_course_memberships_sync
+
+        invalidate_user_course_memberships_sync(str(user_id))
 
     # ========================================================================
     # Cache configuration
