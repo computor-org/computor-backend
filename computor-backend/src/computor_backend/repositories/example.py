@@ -102,15 +102,6 @@ class ExampleRepository(BaseRepository[Example]):
         """
         return self.find_by(is_public=True)
 
-    def find_active_examples(self) -> List[Example]:
-        """
-        Find all non-archived examples (cached if enabled).
-
-        Returns:
-            List of active examples
-        """
-        return self.find_by(archived_at=None)
-
     def search_by_title(self, title_pattern: str) -> List[Example]:
         """
         Search examples by title pattern (cached with shorter TTL).

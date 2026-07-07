@@ -230,12 +230,3 @@ class SubmissionArtifactRepository(BaseRepository[SubmissionArtifact]):
             )
 
         return entity
-
-    def find_active_artifacts(self) -> List[SubmissionArtifact]:
-        """
-        Find all non-archived artifacts (cached if enabled).
-
-        Returns:
-            List of active artifacts
-        """
-        return self.find_by(archived_at=None)

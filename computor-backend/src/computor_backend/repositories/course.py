@@ -94,15 +94,6 @@ class CourseRepository(BaseRepository[Course]):
         """
         return self.find_by(course_family_id=course_family_id)
 
-    def find_active_courses(self) -> List[Course]:
-        """
-        Find all non-archived courses (cached if enabled).
-
-        Returns:
-            List of active courses
-        """
-        return self.find_by(archived_at=None)
-
     def find_by_number(self, number: str) -> Optional[Course]:
         """
         Find course by number/code (cached if enabled).

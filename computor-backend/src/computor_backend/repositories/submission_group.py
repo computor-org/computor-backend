@@ -138,12 +138,3 @@ class SubmissionGroupRepository(BaseRepository[SubmissionGroup]):
             )
 
         return entities
-
-    def find_active_groups(self) -> List[SubmissionGroup]:
-        """
-        Find all non-archived submission groups (cached if enabled).
-
-        Returns:
-            List of active submission groups
-        """
-        return self.find_by(archived_at=None)
