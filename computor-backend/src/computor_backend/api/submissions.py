@@ -70,8 +70,6 @@ import mimetypes
 # Import business logic functions
 from computor_backend.cache import Cache
 from computor_backend.redis_cache import get_cache
-from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
-from computor_backend.repositories.result import ResultRepository
 from computor_backend.business_logic.submissions import (
     upload_submission_artifact,
     check_artifact_access,
@@ -475,67 +473,16 @@ async def update_submission_artifact(
 ):
     """Update a submission artifact (e.g., change submit status)."""
 
-    can_update = _has_submission_artifact_permission(permissions, "update")
-    # Initialize repository with cache for automatic invalidation
-    artifact_repo = SubmissionArtifactRepository(db, cache)
+    artifact = update_artifact(
+        artifact_id=artifact_id,
+        submit=update_data.submit,
+        properties=update_data.properties,
+        permissions=permissions,
+        db=db,
+        cache=cache,
+    )
 
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
-    ).filter(
-        SubmissionArtifact.id == artifact_id
-    ).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check permissions - only group members or tutors/instructors can update
-    user_id = permissions.get_user_id()
-    if user_id and not can_update:
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to update this artifact")
-    elif not can_update:
-        raise ForbiddenException(detail="You don't have permission to update this artifact")
-
-    # Build updates dict
-    updates = {}
-    if update_data.submit is not None:
-        updates['submit'] = update_data.submit
-    if update_data.properties is not None:
-        updates['properties'] = update_data.properties
-
-    # CRITICAL: Use repository.update() for automatic cache invalidation
-    if updates:
-        artifact = artifact_repo.update(str(artifact_id), updates)
-
-    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
-
-    # Return updated artifact with computed fields
-    artifact_get = SubmissionArtifactGet.model_validate(artifact)
-    artifact_get.grades_count = len(artifact.grades) if hasattr(artifact, 'grades') else 0
-    artifact_get.reviews_count = len(artifact.reviews) if hasattr(artifact, 'reviews') else 0
-    artifact_get.test_results_count = len(artifact.test_results) if hasattr(artifact, 'test_results') else 0
-
-    if hasattr(artifact, 'grades') and artifact.grades:
-        grades = [g.grade for g in artifact.grades if g.grade is not None]
-        artifact_get.average_grade = sum(grades) / len(grades) if grades else None
-
-    return artifact_get
+    return get_artifact_with_details(artifact)
 
 @submissions_router.get(
     "/artifacts/{artifact_id}/download",
@@ -853,7 +800,7 @@ async def delete_artifact_grade(
 # ===============================
 
 @submissions_router.post("/artifacts/{artifact_id}/reviews", response_model=SubmissionReviewListItem, status_code=status.HTTP_201_CREATED)
-async def create_artifact_review(
+async def create_artifact_review_endpoint(
     artifact_id: str,
     review_data: SubmissionReviewCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -865,42 +812,13 @@ async def create_artifact_review(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    # Get the artifact
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
-    ).filter(SubmissionArtifact.id == artifact_id).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check if user is a course member (any role can review)
-    course = artifact.submission_group.course
-    principal_user_id = permissions.get_user_id()
-
-    # Use check_course_permissions to find the course member (works for any role)
-    course_member = check_course_permissions(
-        permissions, CourseMember, "_student", db  # _student is the minimum role
-    ).filter(
-        CourseMember.course_id == course.id,
-        CourseMember.user_id == principal_user_id
-    ).first()
-
-    if not course_member:
-        raise ForbiddenException(detail="You must be a course member to review artifacts")
-
-    # Create the review (use authenticated user's course member id)
-    review = SubmissionReview(
+    review = create_artifact_review(
         artifact_id=artifact_id,
-        reviewer_course_member_id=course_member.id,  # Use the authenticated reviewer's member ID
         body=review_data.body,
         review_type=review_data.review_type,
+        permissions=permissions,
+        db=db,
     )
-
-    db.add(review)
-    db.commit()
-    db.refresh(review)
-
-    logger.info(f"Created review {review.id} for artifact {artifact_id}")
 
     return SubmissionReviewListItem.model_validate(review)
 
@@ -958,26 +876,13 @@ async def update_artifact_review(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    review = db.query(SubmissionReview).options(
-        joinedload(SubmissionReview.reviewer)
-    ).filter(SubmissionReview.id == review_id).first()
-
-    if not review:
-        raise NotFoundException(detail="Review not found")
-
-    # Check if user is the reviewer
-    principal_user_id = permissions.get_user_id()
-    if str(review.reviewer.user_id) != str(principal_user_id):
-        raise ForbiddenException(detail="You can only update your own reviews")
-
-    # Update fields
-    if update_data.body is not None:
-        review.body = update_data.body
-    if update_data.review_type is not None:
-        review.review_type = update_data.review_type
-
-    db.commit()
-    db.refresh(review)
+    review = update_review(
+        review_id=review_id,
+        body=update_data.body,
+        review_type=update_data.review_type,
+        permissions=permissions,
+        db=db,
+    )
 
     return SubmissionReviewListItem.model_validate(review)
 
@@ -993,37 +898,18 @@ async def delete_artifact_review(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    review = db.query(SubmissionReview).filter(SubmissionReview.id == review_id).first()
-
-    if not review:
-        raise NotFoundException(detail="Review not found")
-
-    # Check permissions
-    principal_user_id = permissions.get_user_id()
-    if str(review.reviewer.user_id) != str(principal_user_id):
-        # Check if user is instructor (higher permission needed to delete others' reviews)
-        course = review.artifact.submission_group.course
-        is_instructor = check_course_permissions(
-            permissions, CourseMember, "_lecturer", db  # Use _lecturer for instructor role
-        ).filter(
-            CourseMember.course_id == course.id,
-            CourseMember.user_id == principal_user_id
-        ).first()
-
-        if not is_instructor:
-            raise ForbiddenException(detail="Only instructors can delete other people's reviews")
-
-    db.delete(review)
-    db.commit()
-
-    logger.info(f"Deleted review {review_id}")
+    delete_review(
+        review_id=review_id,
+        permissions=permissions,
+        db=db,
+    )
 
 # ===============================
 # Test Result Endpoints
 # ===============================
 
 @submissions_router.post("/artifacts/{artifact_id}/test", response_model=ResultList, status_code=status.HTTP_201_CREATED)
-async def create_test_result(
+async def create_test_result_endpoint(
     artifact_id: str,
     test_data: ResultCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -1035,102 +921,20 @@ async def create_test_result(
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
 
-    # Get the artifact
-    artifact = db.query(SubmissionArtifact).options(
-        joinedload(SubmissionArtifact.submission_group)
-    ).filter(SubmissionArtifact.id == artifact_id).first()
-
-    if not artifact:
-        raise NotFoundException(detail="Submission artifact not found")
-
-    # Check if user has permission to run tests (students can test their own, tutors/instructors can test any)
-    principal_user_id = permissions.get_user_id()
-    course = artifact.submission_group.course
-
-    # First check if user is a course member at all
-    course_member = check_course_permissions(
-        permissions, CourseMember, "_student", db
-    ).filter(
-        CourseMember.course_id == course.id,
-        CourseMember.user_id == principal_user_id
-    ).first()
-
-    if not course_member:
-        raise ForbiddenException(detail="You must be a course member to run tests")
-
-    # Check if student is testing their own submission
-    is_own_submission = db.query(SubmissionGroupMember).filter(
-        SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-        SubmissionGroupMember.course_member_id == course_member.id
-    ).first()
-
-    if not is_own_submission:
-        # If not their own submission, they need tutor or higher permissions
-        has_test_permission = check_course_permissions(
-            permissions, CourseMember, "_tutor", db
-        ).filter(
-            CourseMember.course_id == course.id,
-            CourseMember.user_id == principal_user_id
-        ).first()
-
-        if not has_test_permission:
-            raise ForbiddenException(detail="Students can only test their own submissions")
-
-    # Check test limitations (prevent multiple successful tests by same member)
-    existing_test = db.query(Result).filter(
-        and_(
-            Result.submission_artifact_id == artifact_id,
-            Result.course_member_id == test_data.course_member_id,
-            ~Result.status.in_([1, 2, 6])  # Not failed, cancelled, or crashed
-        )
-    ).first()
-
-    if existing_test:
-        raise BadRequestException(
-            detail="You have already run a test on this artifact. "
-                   "Multiple tests are not allowed unless the previous test crashed or was cancelled."
-        )
-
-    # Check max test runs limit if configured
-    submission_group = artifact.submission_group
-    if submission_group.max_test_runs is not None:
-        test_count = db.query(Result).filter(
-            Result.submission_artifact_id == artifact_id
-        ).count()
-
-        if test_count >= submission_group.max_test_runs:
-            raise BadRequestException(
-                detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact"
-            )
-
-    # Create the test result (use authenticated user's course member id)
-    from computor_types.tasks import map_task_status_to_int
-    from computor_backend.services.result_storage import store_result_json
-
-    # Extract result_json to store separately
-    result_json_data = test_data.result_json
-
-    result = Result(
-        submission_artifact_id=artifact_id,
-        course_member_id=course_member.id,  # Use authenticated user's course member ID
+    result = await create_test_result(
+        artifact_id=artifact_id,
+        course_member_id=test_data.course_member_id,
         testing_service_id=test_data.testing_service_id,
         test_system_id=test_data.test_system_id,
-        status=map_task_status_to_int(test_data.status),
+        status=test_data.status,
         grade=test_data.grade,
+        result_json=test_data.result_json,
         properties=test_data.properties,
         version_identifier=test_data.version_identifier,
         reference_version_identifier=test_data.reference_version_identifier,
+        permissions=permissions,
+        db=db,
     )
-
-    db.add(result)
-    db.commit()
-    db.refresh(result)
-
-    # Store result_json in MinIO if provided
-    if result_json_data is not None:
-        await store_result_json(result.id, result_json_data)
-
-    logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
     return ResultList.model_validate(result)
 
@@ -1239,7 +1043,7 @@ async def list_artifact_test_results(
     return paginated_list(result_list, len(result_list), response=response)
 
 @submissions_router.patch("/tests/{test_id}", response_model=ResultList)
-async def update_test_result(
+async def update_test_result_endpoint(
     test_id: str,
     update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -1248,54 +1052,16 @@ async def update_test_result(
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
 
-    # Initialize repository with cache for automatic invalidation
-    result_repo = ResultRepository(db, cache)
-
-    result = db.query(Result).filter(Result.id == test_id).first()
-
-    if not result:
-        raise NotFoundException(detail="Test result not found")
-
-    # Check permissions - either admin (service account) or the test runner
-    user_id = permissions.get_user_id()
-    is_admin = permissions.has_claim("_admin")
-
-    if not is_admin:
-        # Check if user is the one who ran the test
-        course_member = db.query(CourseMember).filter(
-            CourseMember.id == result.course_member_id
-        ).first()
-
-        if not course_member or str(course_member.user_id) != str(user_id):
-            raise ForbiddenException(detail="Only the test runner or admin can update test results")
-
-    # Build updates dict
-    from computor_backend.services.result_storage import store_result_json
-
-    updates = {}
-    result_json_update = None
-
-    if update_data.status is not None:
-        from computor_types.tasks import map_task_status_to_int
-        updates['status'] = map_task_status_to_int(update_data.status)
-    if update_data.grade is not None:
-        updates['grade'] = update_data.grade
-    if update_data.result_json is not None:
-        # Handle result_json separately - store in MinIO
-        result_json_update = update_data.result_json
-    if update_data.properties is not None:
-        updates['properties'] = update_data.properties
-    if update_data.finished_at is not None:
-        updates['finished_at'] = update_data.finished_at
-
-    # Store result_json in MinIO if provided
-    if result_json_update is not None:
-        await store_result_json(test_id, result_json_update)
-
-    # CRITICAL: Use repository.update() for automatic cache invalidation
-    if updates:
-        result = result_repo.update(str(test_id), updates)
-
-    logger.info("Updated test result %s (cache invalidated)", test_id)
+    result = await update_test_result(
+        test_id=test_id,
+        status=update_data.status,
+        grade=update_data.grade,
+        result_json=update_data.result_json,
+        properties=update_data.properties,
+        finished_at=update_data.finished_at,
+        permissions=permissions,
+        db=db,
+        cache=cache,
+    )
 
     return ResultList.model_validate(result)
