@@ -3,6 +3,7 @@ Temporal workflows for creating and managing student repositories.
 This workflow handles forking the student-template repository when students join a course.
 """
 import logging
+import asyncio
 import json
 from datetime import timedelta
 from typing import Dict, Any, Optional
@@ -21,180 +22,16 @@ from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGrou
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
 from computor_types.encryption import decrypt_secret
-from ..gitlab_utils import gitlab_fork_project, gitlab_unprotect_branches
+from ..git_provider.gitlab import (
+    fork_project_with_polling,
+    gitlab_unprotect_branches,
+    make_gitlab_client,
+)
+from ..git_provider.gitlab_members import add_course_members_to_project
 
 logger = logging.getLogger(__name__)
 
 
-async def fork_project_with_polling(
-    gitlab: Gitlab,
-    source_project_id: int,
-    dest_path: str,
-    dest_name: str,
-    namespace_id: int,
-    max_attempts: int = 10,
-    poll_interval: int = 5,
-    initial_wait: int = 2
-) -> Any:
-    """
-    Fork a GitLab project and poll for completion.
-    
-    Args:
-        gitlab: GitLab client instance
-        source_project_id: ID of the project to fork
-        dest_path: Path for the forked project
-        dest_name: Name for the forked project
-        namespace_id: GitLab namespace ID where to create the fork
-        max_attempts: Maximum number of polling attempts
-        poll_interval: Seconds between polling attempts
-        initial_wait: Initial wait before starting to poll
-        
-    Returns:
-        The forked GitLab project object
-        
-    Raises:
-        ValueError: If the fork is not found after max_attempts
-    """
-    import asyncio
-    
-    # Initiate the fork
-    gitlab_fork_project(
-        gitlab=gitlab,
-        fork_id=source_project_id,
-        dest_path=dest_path,
-        dest_name=dest_name,
-        namespace_id=namespace_id
-    )
-    
-    # Initial wait before polling
-    await asyncio.sleep(initial_wait)
-    
-    # Poll for fork completion
-    forked_project = None
-    for attempt in range(max_attempts):
-        # Find the forked project
-        projects = gitlab.groups.get(namespace_id).projects.list(search=dest_path)
-        for project in projects:
-            if project.path == dest_path:
-                forked_project = gitlab.projects.get(project.id)
-                break
-        
-        if forked_project:
-            logger.info(f"Fork completed after {attempt + 1} attempt(s)")
-            return forked_project
-            
-        if attempt < max_attempts - 1:
-            logger.info(f"Fork not ready yet, waiting {poll_interval} seconds (attempt {attempt + 1}/{max_attempts})")
-            await asyncio.sleep(poll_interval)
-            
-    raise ValueError(f"Forked project {dest_path} not found after {max_attempts} attempts")
-
-
-async def add_members_to_project(
-    gitlab: Gitlab,
-    project,
-    member_ids: list[str],
-    db: Session,
-    access_level: int = 40,
-    provider_url: str = None
-) -> None:
-    """
-    Add course members as maintainers to a GitLab project.
-
-    Uses the Account table to get GitLab usernames and resolve numeric user IDs.
-    Gracefully skips members who haven't registered their GitLab account yet.
-
-    Args:
-        gitlab: GitLab client instance
-        project: GitLab project object
-        member_ids: List of course member IDs to add
-        db: Database session
-        access_level: GitLab access level (40 = Maintainer, 30 = Developer)
-        provider_url: GitLab provider URL (e.g., "https://gitlab.com")
-    """
-    from ..model.auth import Account
-    from gitlab.exceptions import GitlabCreateError, GitlabGetError
-
-    for member_id in member_ids:
-        member = db.query(CourseMember).filter(CourseMember.id == member_id).first()
-        if not member or not member.user:
-            logger.warning(f"CourseMember {member_id} not found or has no user")
-            continue
-
-        # Look up GitLab account for this user
-        account = db.query(Account).filter(
-            Account.user_id == member.user_id,
-            Account.provider == provider_url,
-            Account.type == "gitlab"
-        ).first()
-
-        if not account:
-            # User hasn't registered their GitLab account yet - skip gracefully
-            logger.info(
-                f"User {member.user.email} (course_member {member_id}) has not registered "
-                f"GitLab account yet - skipping permission grant for project {project.id}"
-            )
-            continue
-
-        # Get GitLab username from Account
-        gitlab_username = account.provider_account_id
-
-        # Fetch numeric GitLab user ID by username
-        try:
-            users = gitlab.users.list(username=gitlab_username)
-            if not users:
-                logger.warning(
-                    f"GitLab user '{gitlab_username}' not found on GitLab instance "
-                    f"for user {member.user.email} (course_member {member_id})"
-                )
-                continue
-
-            gitlab_user_id = users[0].id
-
-        except Exception as e:
-            logger.warning(
-                f"Failed to fetch GitLab user ID for username '{gitlab_username}': {e}"
-            )
-            continue
-
-        # Add user to project
-        try:
-            project.members.create({
-                'user_id': gitlab_user_id,
-                'access_level': access_level
-            })
-            logger.info(
-                f"Added GitLab user '{gitlab_username}' (ID {gitlab_user_id}) "
-                f"to project {project.path_with_namespace} with access level {access_level}"
-            )
-        except GitlabCreateError as e:
-            # Check if already a member
-            if e.response_code == 409:
-                logger.info(
-                    f"User '{gitlab_username}' already member of project "
-                    f"{project.path_with_namespace} - ensuring access level"
-                )
-                try:
-                    existing_member = project.members.get(gitlab_user_id)
-                    if existing_member.access_level != access_level:
-                        existing_member.access_level = access_level
-                        existing_member.save()
-                        logger.info(
-                            f"Updated access level for '{gitlab_username}' to {access_level}"
-                        )
-                except Exception as update_error:
-                    logger.warning(
-                        f"Could not update member access level for '{gitlab_username}': {update_error}"
-                    )
-            else:
-                logger.warning(
-                    f"Could not add member '{gitlab_username}' (ID {gitlab_user_id}) "
-                    f"to project {project.path_with_namespace}: {e}"
-                )
-        except Exception as e:
-            logger.warning(
-                f"Unexpected error adding member '{gitlab_username}' to project: {e}"
-            )
 
 
 def get_gitlab_client(organization: Organization) -> Gitlab:
@@ -220,11 +57,7 @@ def get_gitlab_client(organization: Organization) -> Gitlab:
     
     gitlab_token = decrypt_secret(gitlab_token_encrypted)
 
-    # Transform URL for Docker environment if needed
-    from ..utils.docker_utils import transform_localhost_url
-    api_url = transform_localhost_url(gitlab_url)
-    
-    return Gitlab(api_url, private_token=gitlab_token)
+    return make_gitlab_client(gitlab_url, gitlab_token)
 
 
 def get_course_gitlab_config(course: Course, gitlab: Optional[Gitlab] = None) -> Dict[str, Any]:
@@ -523,12 +356,10 @@ async def create_student_repository(
             
             # Ensure student is maintainer even for existing repo
             try:
-                await add_members_to_project(
-                    gitlab=gitlab,
-                    project=forked_project,
-                    member_ids=[course_member_id],
-                    db=db,
-                    provider_url=provider_url
+                await asyncio.to_thread(
+                    add_course_members_to_project,
+                    gitlab, forked_project, [course_member_id], db,
+                    provider_url=provider_url,
                 )
             except Exception as e:
                 logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
@@ -536,12 +367,10 @@ async def create_student_repository(
             # Fork the student-template repository
             logger.info(f"Forking template {student_template_id} to {repo_path}")
             try:
-                forked_project = await fork_project_with_polling(
-                    gitlab=gitlab,
-                    source_project_id=student_template_id,
-                    dest_path=repo_path,
-                    dest_name=repo_name,
-                    namespace_id=gitlab_namespace_id
+                forked_project = await asyncio.to_thread(
+                    fork_project_with_polling,
+                    gitlab, student_template_id, repo_path, repo_name, gitlab_namespace_id,
+                    max_attempts=10, poll_interval=5, initial_wait=2,
                 )
             except Exception as fork_error:
                 # If fork fails with "already taken", try to find the existing repo
@@ -561,12 +390,10 @@ async def create_student_repository(
                     logger.debug(f"Could not unprotect {branch} branch: {e}")
                 
             # Add student as maintainer of the repository
-            await add_members_to_project(
-                gitlab=gitlab,
-                project=forked_project,
-                member_ids=[course_member_id],
-                db=db,
-                provider_url=provider_url
+            await asyncio.to_thread(
+                add_course_members_to_project,
+                gitlab, forked_project, [course_member_id], db,
+                provider_url=provider_url,
             )
         
         # Prepare repository information
@@ -659,13 +486,9 @@ async def create_team_repository(
         
         # Decrypt the GitLab token
         gitlab_token = decrypt_secret(gitlab_token_encrypted)
-        
-        # Transform URL for Docker environment if needed
-        from ..utils.docker_utils import transform_localhost_url
-        api_url = transform_localhost_url(gitlab_url)
-        
+
         # Initialize GitLab client with organization's credentials
-        gitlab = Gitlab(api_url, private_token=gitlab_token)
+        gitlab = make_gitlab_client(gitlab_url, gitlab_token)
             
         # Get GitLab properties
         course_properties = course.properties or {}
@@ -740,12 +563,10 @@ async def create_team_repository(
         logger.info(f"Creating team repository {repo_path} for {len(team_members)} members")
         
         # Fork the student-template repository with polling
-        team_project = await fork_project_with_polling(
-            gitlab=gitlab,
-            source_project_id=student_template_id,
-            dest_path=repo_path,
-            dest_name=repo_name,
-            namespace_id=gitlab_namespace_id
+        team_project = await asyncio.to_thread(
+            fork_project_with_polling,
+            gitlab, student_template_id, repo_path, repo_name, gitlab_namespace_id,
+            max_attempts=10, poll_interval=5, initial_wait=2,
         )
             
         # Unprotect branches
@@ -753,12 +574,10 @@ async def create_team_repository(
         gitlab_unprotect_branches(gitlab, team_project.id, "master")
 
         # Add team members as maintainers
-        await add_members_to_project(
-            gitlab=gitlab,
-            project=team_project,
-            member_ids=team_members,
-            db=db,
-            provider_url=gitlab_url
+        await asyncio.to_thread(
+            add_course_members_to_project,
+            gitlab, team_project, team_members, db,
+            provider_url=gitlab_url,
         )
                     
         # Get assignment directory from course content's example

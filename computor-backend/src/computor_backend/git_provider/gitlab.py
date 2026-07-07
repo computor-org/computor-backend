@@ -13,12 +13,11 @@ from computor_types.git_provider import (
 from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
+from gitlab.exceptions import GitlabHttpError
 from ..gitlab_utils import (
     construct_gitlab_http_url,
     construct_gitlab_ssh_url,
     construct_gitlab_web_url,
-    gitlab_fork_project,
-    gitlab_unprotect_branches,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +26,106 @@ logger = logging.getLogger(__name__)
 GITLAB_REPORTER = 20
 GITLAB_DEVELOPER = 30
 GITLAB_MAINTAINER = 40
+
+
+def make_gitlab_client(url: str, token: str) -> Gitlab:
+    """python-gitlab client factory: Docker-aware URL, stable base URL.
+
+    ``keep_base_url=True`` stops python-gitlab from following the instance's
+    advertised external URL, which is unreachable from inside containers.
+    """
+    from ..utils.docker_utils import transform_localhost_url
+
+    return Gitlab(
+        url=transform_localhost_url(url),
+        private_token=token,
+        keep_base_url=True,
+    )
+
+
+def gitlab_unprotect_branches(gitlab: Gitlab, id: str | int, branch_name) -> None:
+    """Remove branch protection; a 404 (already unprotected) is fine."""
+    try:
+        gitlab.http_delete(path=f"/projects/{id}/protected_branches/{branch_name}")
+        logger.info("Unprotected branch %s of project %s", branch_name, id)
+    except GitlabHttpError as e:
+        if e.response_code == 404:
+            logger.info("Branch '%s' already unprotected [projectId=%s]", branch_name, id)
+        else:
+            raise
+
+
+def gitlab_fork_project(gitlab: Gitlab, fork_id: str | int, dest_path: str, dest_name: str, namespace_id: str | int) -> None:
+    """Kick off an async GitLab fork; poll for the result separately."""
+    try:
+        gitlab.http_post(path=f"/projects/{fork_id}/fork",
+              post_data={
+                "path": dest_path,
+                "name": dest_name,
+                "namespace_id": namespace_id
+              })
+    except Exception as e:
+        logger.error("gitlab_fork_project failed: %s", e)
+        raise
+
+
+def fork_project_with_polling(
+    gl: Gitlab,
+    source_project_id: int | str,
+    dest_path: str,
+    dest_name: str,
+    namespace_id: int | str,
+    *,
+    max_attempts: int = 30,
+    poll_interval: float = 1.0,
+    initial_wait: float = 0.0,
+    sleep=time.sleep,
+):
+    """Fork a project and wait until the destination finished importing.
+
+    GitLab forks are asynchronous; this is the single implementation of
+    fork-then-poll (callers in async contexts should run it in a thread).
+    """
+    gitlab_fork_project(gl, source_project_id, dest_path, dest_name, namespace_id)
+
+    if initial_wait:
+        sleep(initial_wait)
+
+    namespace_full_path = gl.groups.get(namespace_id).full_path
+    ref = f"{namespace_full_path}/{dest_path}"
+    last = None
+    for _ in range(max_attempts):
+        try:
+            project = gl.projects.get(ref)
+            status = getattr(project, "import_status", "finished")
+            if status in (None, "none", "finished"):
+                return project
+            last = status
+        except GitlabGetError:
+            last = "404"
+        sleep(poll_interval)
+    raise RuntimeError(f"GitLab fork {ref} not ready (last status: {last})")
+
+
+def add_member_idempotent(target, gitlab_user_id: int, access_level: int) -> bool:
+    """Add (or raise to) a member on an already-fetched project/group object.
+
+    Never lowers an existing higher access level. Returns True on success.
+    """
+    try:
+        target.members.create({"user_id": gitlab_user_id, "access_level": access_level})
+        return True
+    except GitlabCreateError as e:
+        if getattr(e, "response_code", None) == 409:
+            member = target.members.get(gitlab_user_id)
+            if member.access_level < access_level:
+                member.access_level = access_level
+                member.save()
+            return True
+        logger.warning(
+            "GitLab: could not add member %s to %s (%s)", gitlab_user_id, target, e
+        )
+        return False
 
 
 class GitLabProviderClient:
@@ -134,13 +233,7 @@ class GitLabProviderClient:
 
     def _gl(self) -> Gitlab:
         """python-gitlab client on the registry's group token (Docker-aware URL)."""
-        from ..utils.docker_utils import transform_localhost_url
-
-        return Gitlab(
-            url=transform_localhost_url(self._url),
-            private_token=self._token,
-            keep_base_url=True,
-        )
+        return make_gitlab_client(self._url, self._token)
 
     def _get_or_create_subgroup(self, gl, parent_id, path, name, description=""):
         parent = gl.groups.get(parent_id)
@@ -208,23 +301,6 @@ class GitLabProviderClient:
             "students_group_path": students.full_path,
         }
 
-    def _poll_for_project(self, gl, namespace_full_path, path, attempts=30, delay=1.0):
-        """GitLab forks are async; wait until the destination project exists and
-        finished importing."""
-        ref = f"{namespace_full_path}/{path}"
-        last = None
-        for _ in range(attempts):
-            try:
-                project = gl.projects.get(ref)
-                status = getattr(project, "import_status", "finished")
-                if status in (None, "none", "finished"):
-                    return project
-                last = status
-            except GitlabGetError:
-                last = "404"
-            time.sleep(delay)
-        raise RuntimeError(f"GitLab fork {ref} not ready (last status: {last})")
-
     def provision_student_fork(self, template_project_id, students_group_id, new_name, new_path=None) -> StudentRepoResult:
         """Fork the course ``template`` project into the ``students`` subgroup as
         the student's repository. Idempotent (returns the existing fork if present).
@@ -232,11 +308,11 @@ class GitLabProviderClient:
         """
         gl = self._gl()
         dest_path = new_path or new_name
-        students_group = gl.groups.get(students_group_id)
         project = self._find_project_in_namespace(gl, students_group_id, dest_path)
         if project is None:
-            gitlab_fork_project(gl, template_project_id, dest_path, new_name, students_group_id)
-            project = self._poll_for_project(gl, students_group.full_path, dest_path)
+            project = fork_project_with_polling(
+                gl, template_project_id, dest_path, new_name, students_group_id
+            )
         for branch in ("main", "master"):
             gitlab_unprotect_branches(gl, project.id, branch)
         full_path = project.path_with_namespace
@@ -257,17 +333,4 @@ class GitLabProviderClient:
         user id, using the backend's group token. Returns True on success."""
         gl = self._gl()
         target = gl.groups.get(target_id) if is_group else gl.projects.get(target_id)
-        try:
-            target.members.create({"user_id": gitlab_user_id, "access_level": access_level})
-            return True
-        except GitlabCreateError as e:
-            if getattr(e, "response_code", None) == 409:
-                member = target.members.get(gitlab_user_id)
-                if member.access_level < access_level:
-                    member.access_level = access_level
-                    member.save()
-                return True
-            logger.warning(
-                "GitLab: could not add member %s to %s (%s)", gitlab_user_id, target_id, e
-            )
-            return False
+        return add_member_idempotent(target, gitlab_user_id, access_level)

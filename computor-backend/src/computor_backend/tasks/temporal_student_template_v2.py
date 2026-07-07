@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url, make_provider_auth_url
+from .temporal_base import BaseWorkflow, WorkflowResult, make_provider_auth_url
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -571,45 +571,14 @@ async def generate_student_template_activity_v2(
         
         # Resolve the push token + provider. Managed courses keep the token on the
         # bound GitServer (registry); legacy org-level GitLab keeps it in
-        # organization.properties.gitlab.
-        gitlab_token = None
-        server_type = "gitlab"
-        if organization.properties and 'gitlab' in organization.properties:
-            gitlab_config = organization.properties.get('gitlab', {})
-            gitlab_token = decrypt_gitlab_token(gitlab_config.get('token'))
-            if gitlab_token:
-                logger.info(f"Using decrypted GitLab token from organization {organization.title}")
+        # organization.properties.gitlab (which wins here so mid-migration
+        # courses keep releasing).
+        from computor_backend.git_provider.token_resolution import resolve_course_push_credentials
 
-        if not gitlab_token:
-            from computor_backend.model.git_server import CourseGitBinding
-            from computor_types.encryption import decrypt_secret
-            from computor_backend.git_provider import backend_reachable_base_url
-            binding = db.query(CourseGitBinding).filter(CourseGitBinding.course_id == course_id).first()
-            if binding is not None and binding.git_server is not None:
-                # External-GitLab courses carry the group token on the BINDING (the
-                # git_server is a tokenless instance pointer); managed Forgejo and
-                # legacy managed GitLab keep it on the git_server. Prefer the binding.
-                token_source = binding.token or binding.git_server.token
-                if token_source:
-                    gitlab_token = decrypt_secret(token_source)
-                    server_type = (binding.git_server.type or "gitlab").lower()
-                    if gitlab_token:
-                        logger.info(
-                            "Using %s token for git server %s (%s)",
-                            "binding" if binding.token else "git server",
-                            binding.git_server.base_url, server_type,
-                        )
-                # The stored template_url uses the public base_url (student-facing).
-                # A backend component must clone/push via the address it can reach
-                # (service-DNS in docker, localhost on host) — swap only the origin,
-                # keeping the repo path. No-op when they're the same (host API / prod).
-                public_base = (binding.git_server.base_url or "").rstrip("/")
-                reachable_base = backend_reachable_base_url(binding.git_server)
-                if public_base and reachable_base != public_base and student_template_url.startswith(public_base):
-                    student_template_url = reachable_base + student_template_url[len(public_base):]
-
-        if not gitlab_token:
-            logger.warning(f"No git push token found for course {course_id} (org properties or git server)")
+        creds = resolve_course_push_credentials(db, course_id, prefer_org_token=True)
+        gitlab_token = creds.token
+        server_type = creds.server_type
+        student_template_url = creds.rewrite_to_reachable(student_template_url)
 
         logger.info(f"Using student template URL: {student_template_url}")
 
