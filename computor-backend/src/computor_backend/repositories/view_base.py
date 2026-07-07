@@ -85,27 +85,6 @@ class ViewRepository(ABC):
         """Check if caching is enabled."""
         return self.cache is not None
 
-    def _build_cache_key(self, user_id: str, view_type: str, view_id: Optional[str] = None, **kwargs) -> str:
-        """
-        Build a cache key for user views.
-
-        Args:
-            user_id: User ID
-            view_type: Type of view (e.g., "courses", "course_content")
-            view_id: Optional specific ID
-            **kwargs: Additional parameters for cache key (e.g., params hash)
-
-        Returns:
-            Cache key string
-        """
-        if view_id:
-            return f"user:{user_id}:{view_type}:{view_id}"
-        elif kwargs:
-            suffix = ":".join(f"{k}:{v}" for k, v in sorted(kwargs.items()))
-            return f"user:{user_id}:{view_type}:{suffix}"
-        else:
-            return f"user:{user_id}:{view_type}"
-
     def _get_cached_view(
         self,
         user_id: str,

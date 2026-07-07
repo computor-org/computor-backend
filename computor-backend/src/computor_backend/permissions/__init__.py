@@ -50,12 +50,6 @@ from .auth import (
     get_permissions_from_mockup,
 )
 
-from .cache import (
-    permission_cache,
-    course_permission_cache,
-    cached_permission_check,
-)
-
 from .handlers import (
     PermissionHandler,
     PermissionRegistry,
@@ -93,11 +87,6 @@ __all__ = [
     "AuthenticationService",
     "PrincipalBuilder",
     "get_auth_credentials",
-
-    # Caching
-    "permission_cache",
-    "course_permission_cache",
-    "cached_permission_check",
 
     # Handlers
     "PermissionHandler",
