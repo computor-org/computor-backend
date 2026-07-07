@@ -35,6 +35,10 @@ from computor_backend.storage_security import perform_full_file_validation, sani
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_course_permissions
+from computor_backend.permissions.course_access import (
+    get_course_member_or_403,
+    require_submission_group_access,
+)
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.roles import TUTOR_AND_ABOVE
 from computor_types.artifacts import (
@@ -223,25 +227,11 @@ async def list_submission_artifacts(
             raise NotFoundException(detail="Submission group not found")
 
         # Check if user is a member of the submission group or has elevated permissions
-        if user_id and not can_list_all:
-            is_group_member = db.query(SubmissionGroupMember).join(
-                CourseMember
-            ).filter(
-                SubmissionGroupMember.submission_group_id == params.submission_group_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not is_group_member:
-                # Check for tutor/instructor permissions in the course
-                has_elevated_perms = check_course_permissions(
-                    permissions, CourseMember, "_tutor", db
-                ).filter(
-                    CourseMember.course_id == submission_group.course_id,
-                    CourseMember.user_id == user_id
-                ).first()
-
-                if not has_elevated_perms:
-                    raise ForbiddenException(detail="You don't have permission to view these artifacts")
+        if not can_list_all:
+            require_submission_group_access(
+                permissions, params.submission_group_id, submission_group.course_id, db,
+                detail="You don't have permission to view these artifacts",
+            )
         query = query.filter(SubmissionArtifact.submission_group_id == params.submission_group_id)
 
     # Filter by course content if provided
@@ -391,29 +381,11 @@ async def download_latest_submission(
 
     # Check permissions
     can_download = _has_submission_artifact_permission(permissions, ["get", "list"])
-    user_id = permissions.get_user_id()
-    if user_id and not can_download:
-        # Check if user is a member of the submission group
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == submission_group.id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to download this submission")
-    elif not can_download:
-        raise ForbiddenException(detail="You don't have permission to download this submission")
+    if not can_download:
+        require_submission_group_access(
+            permissions, submission_group.id, submission_group.course_id, db,
+            detail="You don't have permission to download this submission",
+        )
 
     # Build query for artifacts
     query = db.query(SubmissionArtifact).filter(
@@ -568,27 +540,10 @@ async def list_artifact_grades(
         raise NotFoundException(detail="Submission artifact not found")
 
     # Check permissions - students can only see grades for their own submissions
-    user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
-        # Check if user is a member of the submission group or has tutor/instructor permissions
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to view these grades")
+    require_submission_group_access(
+        permissions, artifact.submission_group_id, artifact.submission_group.course_id, db,
+        detail="You don't have permission to view these grades",
+    )
 
     # Build query for grades
     query = db.query(SubmissionGrade).options(
@@ -842,17 +797,11 @@ async def list_artifact_reviews(
         raise NotFoundException(detail="Submission artifact not found")
 
     # Check if user is a course member (any role can view reviews)
-    user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
-        is_course_member = check_course_permissions(
-            permissions, CourseMember, "_student", db  # _student is minimum role
-        ).filter(
-            CourseMember.course_id == artifact.submission_group.course_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_course_member:
-            raise ForbiddenException(detail="You must be a course member to view reviews")
+    if not permissions.is_admin:
+        get_course_member_or_403(
+            permissions, artifact.submission_group.course_id, db,
+            detail="You must be a course member to view reviews",
+        )
 
     # Get reviews for this artifact
     reviews = db.query(SubmissionReview).options(
@@ -964,27 +913,10 @@ async def list_artifact_test_results(
         raise NotFoundException(detail="Submission artifact not found")
 
     # Check permissions
-    user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
-        # Check if user is a member of the submission group
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # If not in the group, check for tutor/instructor permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You can only view test results for your own submissions")
+    require_submission_group_access(
+        permissions, artifact.submission_group_id, artifact.submission_group.course_id, db,
+        detail="You can only view test results for your own submissions",
+    )
 
     # Build query for test results
     query = db.query(Result).filter(Result.submission_artifact_id == artifact_id)
