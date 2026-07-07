@@ -26,7 +26,7 @@ from computor_backend.model.auth import Account
 from computor_backend.model.course import Course, CourseFamily, CourseMember
 from computor_backend.model.git_server import (
     CourseGitBinding,
-    CourseMemberRepository,
+    CourseMemberGitRepository,
     GitServer,
 )
 from computor_backend.utils.forgejo_naming import (
@@ -231,8 +231,8 @@ def _binding_lock_state(binding: Optional[CourseGitBinding], db: Session) -> tup
     if binding is None:
         return False, None
     student_repos = (
-        db.query(CourseMemberRepository)
-        .join(CourseMember, CourseMemberRepository.course_member_id == CourseMember.id)
+        db.query(CourseMemberGitRepository)
+        .join(CourseMember, CourseMemberGitRepository.course_member_id == CourseMember.id)
         .filter(CourseMember.course_id == binding.course_id)
         .count()
     )
@@ -493,7 +493,7 @@ def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
 
 
 def _maybe_heal_forgejo_collaborator(
-    rec: CourseMemberRepository, user_id: str, db: Session
+    rec: CourseMemberGitRepository, user_id: str, db: Session
 ) -> None:
     """Retry granting the Forgejo write-collaborator when it failed at first
     provision (the student's Forgejo account didn't exist yet). No-op once the
@@ -550,8 +550,8 @@ def get_student_repository(
         raise NotFoundException("You are not a member of this course")
 
     rec = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == member.id)
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == member.id)
         .first()
     )
     return _member_repo_to_get(rec) if rec is not None else None
@@ -685,7 +685,7 @@ def _maybe_grant_forgejo_staff_access(
 
 
 def _provisioned_response(
-    rec: CourseMemberRepository, user_id: str, db: Session
+    rec: CourseMemberGitRepository, user_id: str, db: Session
 ) -> StudentRepositoryProvisioned:
     """Wrap a repo record with a freshly-minted one-time clone credential.
 
@@ -712,7 +712,7 @@ def _provisioned_response(
     return StudentRepositoryProvisioned(**base, clone_token=clone_token, clone_username=clone_username)
 
 
-def _member_repo_to_get(rec: CourseMemberRepository) -> CourseMemberRepositoryGet:
+def _member_repo_to_get(rec: CourseMemberGitRepository) -> CourseMemberRepositoryGet:
     return CourseMemberRepositoryGet(
         id=str(rec.id),
         course_member_id=str(rec.course_member_id),
@@ -732,7 +732,7 @@ def _provision_forgejo(
     server: GitServer,
     user_id: str,
     db: Session,
-) -> CourseMemberRepository:
+) -> CourseMemberGitRepository:
     """Fork the Forgejo student-template into a repo for the student and record
     it. The student is added as a write collaborator (best-effort, self-healing)."""
     if not binding.template_repo:
@@ -758,10 +758,10 @@ def _provision_forgejo(
     # the course_org layout, but this + the DB unique index make any residual
     # clash a loud error instead of silent repo-sharing.
     clash = (
-        db.query(CourseMemberRepository)
+        db.query(CourseMemberGitRepository)
         .filter(
-            CourseMemberRepository.repo_ref == repo_ref,
-            CourseMemberRepository.course_member_id != member.id,
+            CourseMemberGitRepository.repo_ref == repo_ref,
+            CourseMemberGitRepository.course_member_id != member.id,
         )
         .first()
     )
@@ -771,7 +771,7 @@ def _provision_forgejo(
         )
     client = get_provider_client_for_server(server)
     result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
-    rec = CourseMemberRepository(
+    rec = CourseMemberGitRepository(
         course_member_id=member.id,
         mode="managed",
         git_server_id=server.id,
@@ -796,7 +796,7 @@ def _provision_gitlab_managed(
     server: GitServer,
     user_id: str,
     db: Session,
-) -> CourseMemberRepository:
+) -> CourseMemberGitRepository:
     """Fork the managed-GitLab ``template`` project into the course's ``students``
     subgroup as the student's repo and record it. Access is granted separately,
     when the student registers their GLPAT — the backend cannot add them until it
@@ -813,7 +813,7 @@ def _provision_gitlab_managed(
     client = get_gitlab_client_for_binding(binding, server)
     result = client.provision_student_fork(template_project_id, students_group_id, slug)
     full_path = (result.properties.get("gitlab") or {}).get("full_path")
-    rec = CourseMemberRepository(
+    rec = CourseMemberGitRepository(
         course_member_id=member.id,
         mode="managed",
         git_server_id=server.id,
@@ -889,8 +889,8 @@ def provision_student_repository(
     # time (member hadn't logged into Forgejo yet) and (re)grant staff access for
     # _lecturer+ on the canonical template/reference repos.
     existing = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == member.id)
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == member.id)
         .first()
     )
     if existing is not None:
@@ -953,12 +953,12 @@ def register_byo_repository(
         )
 
     rec = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == member.id)
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == member.id)
         .first()
     )
     if rec is None:
-        rec = CourseMemberRepository(course_member_id=member.id, created_by=user_id)
+        rec = CourseMemberGitRepository(course_member_id=member.id, created_by=user_id)
         db.add(rec)
 
     rec.mode = data.mode
@@ -1089,8 +1089,8 @@ def register_gitlab_managed_access(
 
     # Ensure the student's repo exists (fork), then grant membership.
     rec = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == member.id)
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == member.id)
         .first()
     )
     if rec is None:

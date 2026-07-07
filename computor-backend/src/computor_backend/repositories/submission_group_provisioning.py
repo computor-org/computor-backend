@@ -17,6 +17,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
+from computor_backend.model.git_server import CourseMemberGitRepository
 from computor_backend.exceptions import NotImplementedException
 
 logger = logging.getLogger(__name__)
@@ -38,17 +39,15 @@ def _assignment_directory(course_content) -> str | None:
 def member_course_repo_git_block(course_member, db, directory: str | None = None) -> dict | None:
     """Provider-agnostic git location for a member's *course-level* repo, or None.
 
-    Reads the new ``CourseMemberRepository`` (the course-level git model — Forgejo
+    Reads the new ``CourseMemberGitRepository`` (the course-level git model — Forgejo
     or managed GitLab). Returns None for legacy GitLab courses, which instead
     carry repo info in ``course_member.properties['gitlab']`` (handled separately).
     ``directory`` is the assignment's subfolder within the repo, stamped per
     submission group so the same course repo can back many assignments.
     """
-    from computor_backend.model.git_server import CourseMemberRepository
-
     rec = (
-        db.query(CourseMemberRepository)
-        .filter(CourseMemberRepository.course_member_id == course_member.id)
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == course_member.id)
         .first()
     )
     if rec is None or not rec.repo_ref:
@@ -69,7 +68,7 @@ def member_course_repo_git_block(course_member, db, directory: str | None = None
 
 def stamp_member_repo_on_submission_groups(course_member, db) -> int:
     """Back-fill ``properties['git']`` on a member's existing individual submission
-    groups from their ``CourseMemberRepository``. Idempotent; returns how many were
+    groups from their ``CourseMemberGitRepository``. Idempotent; returns how many were
     updated. (Team groups — ``max_group_size > 1`` — are left for the team repo.)"""
     from sqlalchemy.orm.attributes import flag_modified
 

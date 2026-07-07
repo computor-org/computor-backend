@@ -8,7 +8,7 @@ model is kept for now and converted by an external migration script.
 Invariant: none of this is in the grading path. Submissions are uploaded
 over the API; the backend never reads a student's git repository. Git is
 only template delivery + the student's own working copy, which is why a
-student repo may live anywhere and ``CourseMemberRepository`` is purely a
+student repo may live anywhere and ``CourseMemberGitRepository`` is purely a
 tracking record for the "do you already have a repo?" babysitting check.
 """
 from sqlalchemy import (
@@ -114,7 +114,7 @@ class CourseGitBinding(Base):
     git_server = relationship('GitServer', back_populates='course_bindings')
 
 
-class CourseMemberRepository(Base):
+class CourseMemberGitRepository(Base):
     """A student's working repository for a course (1:1 with course_member).
 
     Tracking only — answers "does this student already have a repo for this
