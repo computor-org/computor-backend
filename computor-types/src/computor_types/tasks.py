@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any, Dict, Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -11,6 +11,23 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
     DEFERRED = "deferred"
     CANCELLED = "cancelled"
+
+
+class ResultStatus(IntEnum):
+    """Legacy integer vocabulary stored in ``Result.status``.
+
+    Kept in sync with ``map_task_status_to_int``/``map_int_to_task_status``
+    below; replaces the bare 0/1/2/3/4/5/6/7 literals scattered through the
+    testing endpoints.
+    """
+    FINISHED = 0
+    FAILED = 1
+    CANCELLED = 2
+    SCHEDULED = 3
+    PENDING = 4
+    RUNNING = 5
+    CRASHED = 6
+    PAUSED = 7
 
 def map_task_status_to_int(status: TaskStatus) -> int:
     """Map TaskStatus enum to legacy integer for database storage."""

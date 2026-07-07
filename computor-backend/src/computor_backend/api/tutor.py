@@ -42,6 +42,11 @@ from computor_types.tutor_submission_groups import (
 )
 
 # Import business logic
+from computor_backend.business_logic.testing_orchestration import (
+    build_testing_submission,
+    resolve_task_queue,
+    service_type_config_payload,
+)
 from computor_backend.business_logic.tutor import (
     get_tutor_course_content,
     list_tutor_course_contents,
@@ -649,37 +654,22 @@ async def create_tutor_test(
     )
 
     # Start Temporal workflow
-    from computor_backend.tasks import get_task_executor, TaskSubmission
+    from computor_backend.tasks import get_task_executor
 
     workflow_id = f"tutor-testing-{test_id}"
 
     # Get task queue from service config (must be in temporal.task_queue, same as student testing)
-    task_queue = None
-    if service.config and isinstance(service.config, dict):
-        temporal_config = service.config.get("temporal", {})
-        if isinstance(temporal_config, dict):
-            task_queue = temporal_config.get("task_queue")
-
-    if not task_queue:
-        raise BadRequestException(
-            detail=f"Testing service '{service.name}' is missing required temporal.task_queue configuration. "
-                   f'Configure it in service.config: {{"temporal": {{"task_queue": "testing"}}}}'
-        )
+    task_queue = resolve_task_queue(service, service_type, require_testing_path=False)
 
     # Prepare workflow parameters
     # Note: api_config is read from environment in the workflow (same as StudentTestingWorkflow)
-    task_submission = TaskSubmission(
+    task_submission = build_testing_submission(
         task_name="tutor_testing",
         workflow_id=workflow_id,
         parameters={
             "test_id": test_id,
             "example_version_id": example_version_id,
-            "service_type_config": {
-                "id": str(service_type.id),
-                "path": str(service_type.path),
-                "schema": service_type.schema or {},
-                "properties": service_type.properties or {},
-            },
+            "service_type_config": service_type_config_payload(service_type),
             "test_config": {
                 "testing_service_slug": service.slug,
                 "testing_service_id": str(service.id),
