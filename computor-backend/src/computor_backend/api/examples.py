@@ -691,6 +691,9 @@ async def delete_example_version_endpoint(
 # Example Dependencies Endpoints
 # ==============================================================================
 
+# Dependencies are a sub-resource of an example: adding/removing them requires
+# the example "update" permission; reading them requires "list".
+
 @examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
 async def add_dependency(
     example_id: str,
@@ -724,6 +727,11 @@ async def add_dependency(
     if dependency.depends_id == example_id:
         raise BadRequestException("An example cannot depend on itself")
 
+    # Check if dependency already exists
+    existing = dependency_repo.find_dependency_between(example_id, dependency.depends_id)
+    if existing:
+        raise BadRequestException(f"Dependency already exists between {example_id} and {dependency.depends_id}")
+
     # Check for circular dependencies (advanced)
     if dependency_repo.has_circular_dependency(example_id, dependency.depends_id):
         raise BadRequestException("Adding this dependency would create a circular dependency")
@@ -745,6 +753,11 @@ async def list_dependencies(
     if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view dependencies")
 
+    # Verify example exists
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise NotFoundException(f"Example {example_id} not found")
+
     # Initialize repository
     dependency_repo = ExampleDependencyRepository(db, get_cache())
 
@@ -753,13 +766,14 @@ async def list_dependencies(
 
     return [ExampleDependencyGet.model_validate(d) for d in dependencies]
 
-@examples_router.delete("/dependencies/{dependency_id}")
+@examples_router.delete("/{example_id}/dependencies/{dependency_id}")
 async def remove_dependency(
+    example_id: str,
     dependency_id: str,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_principal),
 ):
-    """Remove a dependency."""
+    """Remove a dependency from an example."""
     # Check permissions
     if not permissions.permitted("example", "update"):
         raise ForbiddenException("You don't have permission to modify dependencies")
@@ -767,11 +781,11 @@ async def remove_dependency(
     # Initialize repository
     dependency_repo = ExampleDependencyRepository(db, get_cache())
 
-    # Get dependency
+    # Get dependency and verify it belongs to the example
     dependency = dependency_repo.get_by_id(dependency_id)
 
-    if not dependency:
-        raise NotFoundException(f"Dependency {dependency_id} not found")
+    if not dependency or str(dependency.example_id) != example_id:
+        raise NotFoundException(f"Dependency {dependency_id} not found for example {example_id}")
 
     # Delete dependency via repository (cache invalidation automatic)
     dependency_repo.delete(dependency)
@@ -1275,103 +1289,6 @@ async def download_example_version(
         test=main_test,
         dependencies=dependency_files if with_dependencies else None,
     )
-
-@examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
-async def get_example_dependencies(
-    example_id: str,
-    db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_principal),
-):
-    """Get all dependencies for an example with version constraints."""
-    # Check permissions
-    if not permissions.permitted("example", "list"):
-        raise ForbiddenException("You don't have permission to read example dependencies")
-
-    # Check if example exists
-    example = db.query(Example).filter(Example.id == example_id).first()
-    if not example:
-        raise NotFoundException(f"Example {example_id} not found")
-
-    # Initialize repository
-    dependency_repo = ExampleDependencyRepository(db, get_cache())
-
-    # Get dependencies via repository
-    dependencies = dependency_repo.find_dependencies_of(example_id)
-
-    return dependencies
-
-@examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
-async def create_example_dependency(
-    example_id: str,
-    dependency_data: ExampleDependencyCreate,
-    db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_principal),
-):
-    """Create a new dependency relationship between examples."""
-    # Check permissions
-    if not permissions.permitted("example", "create"):
-        raise ForbiddenException("You don't have permission to create example dependencies")
-
-    # Initialize repository
-    dependency_repo = ExampleDependencyRepository(db, get_cache())
-
-    # Validate example exists
-    example = db.query(Example).filter(Example.id == example_id).first()
-    if not example:
-        raise NotFoundException(f"Example {example_id} not found")
-
-    # Validate dependency example exists
-    dependency_example = db.query(Example).filter(Example.id == dependency_data.depends_id).first()
-    if not dependency_example:
-        raise NotFoundException(f"Dependency example {dependency_data.depends_id} not found")
-
-    # Check if dependency already exists
-    existing = dependency_repo.find_dependency_between(example_id, dependency_data.depends_id)
-
-    if existing:
-        raise BadRequestException(f"Dependency already exists between {example_id} and {dependency_data.depends_id}")
-
-    # Check for circular dependencies
-    if dependency_repo.has_circular_dependency(example_id, dependency_data.depends_id):
-        raise BadRequestException("Adding this dependency would create a circular dependency")
-
-    # Create dependency via repository (cache invalidation automatic)
-    dependency = ExampleDependency(
-        example_id=example_id,
-        depends_id=dependency_data.depends_id,
-        version_constraint=dependency_data.version_constraint
-    )
-
-    dependency = dependency_repo.create(dependency)
-
-    return dependency
-
-@examples_router.delete("/{example_id}/dependencies/{dependency_id}")
-async def delete_example_dependency(
-    example_id: str,
-    dependency_id: str,
-    db: Session = Depends(get_db),
-    permissions: Principal = Depends(get_current_principal),
-):
-    """Delete a dependency relationship between examples."""
-    # Check permissions
-    if not permissions.permitted("example", "delete"):
-        raise ForbiddenException("You don't have permission to delete example dependencies")
-
-    # Initialize repository
-    dependency_repo = ExampleDependencyRepository(db, get_cache())
-
-    # Find dependency
-    dependency = dependency_repo.get_by_id(dependency_id)
-
-    if not dependency or dependency.example_id != example_id:
-        raise NotFoundException(f"Dependency {dependency_id} not found for example {example_id}")
-
-    # Delete dependency via repository (cache invalidation automatic)
-    dependency_repo.delete(dependency)
-
-    return {"message": "Dependency deleted successfully"}
-
 
 @examples_router.delete(
     "/by-pattern",
