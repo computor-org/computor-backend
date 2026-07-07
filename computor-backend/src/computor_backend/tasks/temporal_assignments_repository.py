@@ -17,7 +17,8 @@ from pathlib import Path
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token, make_git_auth_url
+from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
+from .git_ops import clone_or_init, commit_and_push, configure_identity
 from .registry import register_task
 
 logger = logging.getLogger(__name__)
@@ -118,36 +119,9 @@ async def generate_assignments_repository_activity(
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_path = os.path.join(temp_dir, 'assignments')
 
-            # Authenticated URL if HTTP + token
-            auth_url = make_git_auth_url(assignments_url, gitlab_token) if gitlab_token else assignments_url
-
-            # Clone or initialize repository
-            try:
-                if gitlab_token and 'http' in assignments_url:
-                    repo = git.Repo.clone_from(auth_url, repo_path)
-                else:
-                    repo = git.Repo.clone_from(assignments_url, repo_path)
-                logger.info(f"Successfully cloned assignments repository")
-            except Exception as e:
-                logger.info(f"Could not clone assignments repo, creating new: {e}")
-                os.makedirs(repo_path, exist_ok=True)
-                repo = git.Repo.init(repo_path)
-
-                # Set default branch to main
-                repo.git.checkout('-b', 'main')
-
-                # Add remote with auth URL if we have a token
-                if 'http' in assignments_url:
-                    if gitlab_token:
-                        repo.create_remote('origin', auth_url)
-                    else:
-                        repo.create_remote('origin', assignments_url)
-
-            # Configure git for commits (required in worker container)
-            git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
-            git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
-            repo.git.config('user.email', git_email)
-            repo.git.config('user.name', git_name)
+            # Clone or initialize repository (docker-aware auth URL inside)
+            repo = clone_or_init(assignments_url, gitlab_token, "gitlab", repo_path)
+            configure_identity(repo)
 
             processed = 0
             errors: List[str] = []
@@ -218,28 +192,16 @@ async def generate_assignments_repository_activity(
                     errors.append(f"{str(content.path)}: {str(e)}")
                     # Do not fail the entire run; continue
 
-            # Commit/push if changed
+            # Commit/push if changed (rebase-retry handles concurrent pushes;
+            # -u fallback covers the first push into an empty remote)
             pushed = False
             try:
-                repo.git.add(A=True)
-                if repo.is_dirty() or repo.untracked_files:
-                    message = commit_message or f"Initialize/update assignments ({processed} items)"
-                    repo.index.commit(message)
-
-                    # Push to remote - use -u flag to set upstream on first push
-                    if 'origin' in [remote.name for remote in repo.remotes]:
-                        try:
-                            repo.git.push('origin', 'main')
-                        except Exception as push_error:
-                            # If normal push fails, try with -u flag (for first push)
-                            logger.info(f"Normal push failed, trying with -u flag: {push_error}")
-                            repo.git.push('-u', 'origin', 'main')
-                        pushed = True
-                    else:
-                        logger.warning("No remote 'origin' found, skipping push")
-                        pushed = False
-                else:
-                    pushed = True  # Nothing to do counts as success
+                message = commit_message or f"Initialize/update assignments ({processed} items)"
+                pushed = commit_and_push(
+                    repo, message,
+                    set_upstream_fallback=True,
+                    success_without_remote=False,
+                )
             except Exception as e:
                 errors.append(f"Push failed: {str(e)}")
                 pushed = False
