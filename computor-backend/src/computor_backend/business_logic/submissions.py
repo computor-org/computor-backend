@@ -575,26 +575,30 @@ def check_artifact_access(
 
     # Check permissions
     user_id = permissions.get_user_id()
-    if user_id and not permissions.is_admin:
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
+    if not user_id:
+        # Principals without a user identity (and without the general claim
+        # above) must not fall through to access.
+        raise ForbiddenException(detail="You don't have permission to access this artifact")
+
+    is_group_member = db.query(SubmissionGroupMember).join(
+        CourseMember
+    ).filter(
+        SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+        CourseMember.user_id == user_id
+    ).first()
+
+    if not is_group_member:
+        # Check for tutor/instructor permissions
+        role_required = "_tutor" if require_tutor else "_student"
+        has_elevated_perms = check_course_permissions(
+            permissions, CourseMember, role_required, db
         ).filter(
-            SubmissionGroupMember.submission_group_id == artifact.submission_group_id,
+            CourseMember.course_id == artifact.submission_group.course_id,
             CourseMember.user_id == user_id
         ).first()
 
-        if not is_group_member:
-            # Check for tutor/instructor permissions
-            role_required = "_tutor" if require_tutor else "_student"
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, role_required, db
-            ).filter(
-                CourseMember.course_id == artifact.submission_group.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(detail="You don't have permission to access this artifact")
+        if not has_elevated_perms:
+            raise ForbiddenException(detail="You don't have permission to access this artifact")
 
     return artifact
 
@@ -624,21 +628,26 @@ def update_artifact(
     properties: Optional[dict],
     permissions: Principal,
     db: Session,
+    cache: Cache | None = None,
 ) -> SubmissionArtifact:
-    """Update a submission artifact."""
-    artifact = check_artifact_access(artifact_id, permissions, db, action="update", require_tutor=False)
+    """Update a submission artifact.
 
-    # Apply updates
+    Non-members need at least the tutor role; group members may update
+    their own artifact.
+    """
+    artifact = check_artifact_access(artifact_id, permissions, db, action="update", require_tutor=True)
+
+    updates = {}
     if submit is not None:
-        artifact.submit = submit
-
+        updates['submit'] = submit
     if properties is not None:
-        artifact.properties = properties
+        updates['properties'] = properties
 
-    db.commit()
-    db.refresh(artifact)
+    # Repository update for automatic cache invalidation
+    if updates:
+        artifact = SubmissionArtifactRepository(db, cache).update(str(artifact_id), updates)
 
-    logger.info("Updated submission artifact %s", artifact_id)
+    logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
 
     return artifact
 
@@ -1008,6 +1017,7 @@ async def update_test_result(
     finished_at: Optional[datetime],
     permissions: Principal,
     db: Session,
+    cache: Cache | None = None,
 ) -> Result:
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
 
@@ -1029,23 +1039,28 @@ async def update_test_result(
         if not course_member or str(course_member.user_id) != str(user_id):
             raise ForbiddenException(detail="Only the test runner or admin can update test results")
 
-    # Update fields
+    # Build updates dict
+    updates = {}
     if status is not None:
         from computor_types.tasks import map_task_status_to_int
-        result.status = map_task_status_to_int(status)
+        updates['status'] = map_task_status_to_int(status)
     if grade is not None:
-        result.grade = grade
+        updates['grade'] = grade
     if properties is not None:
-        result.properties = properties
+        updates['properties'] = properties
     if finished_at is not None:
-        result.finished_at = finished_at
-
-    db.commit()
-    db.refresh(result)
+        updates['finished_at'] = finished_at
 
     # Store/update result_json in MinIO if provided
     if result_json is not None:
         from computor_backend.services.result_storage import store_result_json
         await store_result_json(result.id, result_json)
+
+    # Repository update for automatic cache invalidation
+    if updates:
+        from computor_backend.repositories.result import ResultRepository
+        result = ResultRepository(db, cache).update(str(test_id), updates)
+
+    logger.info("Updated test result %s (cache invalidated)", test_id)
 
     return result
