@@ -14,6 +14,7 @@ from computor_backend.exceptions import BadRequestException, NotFoundException, 
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
+from computor_backend.permissions.course_access import require_submission_group_access
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.cache import Cache
@@ -516,34 +517,11 @@ async def get_test_status(
 
     # Check permissions
     can_view_all = _has_result_permission(permissions, "get")
-    user_id = permissions.get_user_id()
-    if user_id and not can_view_all:
-        # Check if user is a member of the submission group (for students)
-        is_group_member = db.query(SubmissionGroupMember).join(
-            CourseMember
-        ).filter(
-            SubmissionGroupMember.submission_group_id == result_data.submission_group_id,
-            CourseMember.user_id == user_id
-        ).first()
-
-        if not is_group_member:
-            # Not a group member, check for tutor or higher permissions
-            has_elevated_perms = check_course_permissions(
-                permissions, CourseMember, "_tutor", db
-            ).filter(
-                CourseMember.course_id == result_data.course_id,
-                CourseMember.user_id == user_id
-            ).first()
-
-            if not has_elevated_perms:
-                raise ForbiddenException(
-                    error_code="AUTHZ_003",
-                    detail="You don't have permission to view this test result"
-                )
-    elif not can_view_all:
-        raise ForbiddenException(
+    if not can_view_all:
+        require_submission_group_access(
+            permissions, result_data.submission_group_id, result_data.course_id, db,
+            detail="You don't have permission to view this test result",
             error_code="AUTHZ_003",
-            detail="You don't have permission to view this test result"
         )
 
     # If test has a workflow ID, check Temporal status for running tests
