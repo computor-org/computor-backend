@@ -1,7 +1,7 @@
 import base64
 from collections import defaultdict
 from typing import Optional, Dict, List, Set, Tuple
-from pydantic import BaseModel, model_validator, Field, PrivateAttr
+from pydantic import BaseModel, model_validator, Field
 from computor_backend.exceptions import NotFoundException
 from functools import lru_cache
 
@@ -185,10 +185,7 @@ class Principal(BaseModel):
 
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
-    
-    # Cache for permission checks (using private attribute)
-    _permission_cache: Dict[str, bool] = PrivateAttr(default_factory=dict)
-    
+
     class Config:
         arbitrary_types_allowed = True
     
@@ -212,14 +209,6 @@ class Principal(BaseModel):
         if self.user_id is None:
             raise NotFoundException("User ID not found")
         return self.user_id
-    
-    def clear_permission_cache(self):
-        """Clear the permission cache"""
-        self._permission_cache.clear()
-    
-    def _cache_key(self, resource: str, action: str, resource_id: Optional[str] = None) -> str:
-        """Generate cache key for permission check"""
-        return f"{resource}:{action}:{resource_id or ''}"
     
     def has_general_permission(self, resource: str, action: str) -> bool:
         """Check if principal has general permission for resource and action"""
@@ -424,32 +413,20 @@ class Principal(BaseModel):
         # Handle multiple actions
         if isinstance(action, list):
             return any(self.permitted(resource, a, resource_id, course_role) for a in action)
-        
-        # Check cache
-        cache_key = self._cache_key(resource, action, resource_id)
-        if cache_key in self._permission_cache:
-            return self._permission_cache[cache_key]
-        
-        # Perform permission check
-        result = False
-        
+
         # Check general permission
         if self.has_general_permission(resource, action):
-            result = True
-        
+            return True
+
         # Check dependent permission
-        elif resource_id:
+        if resource_id:
             if course_role:
                 # Course-based permission check
-                result = self.has_course_role(resource_id, course_role)
-            else:
-                # Regular dependent permission check
-                result = self.has_dependent_permission(resource, resource_id, action)
-        
-        # Cache result
-        self._permission_cache[cache_key] = result
-        
-        return result
+                return self.has_course_role(resource_id, course_role)
+            # Regular dependent permission check
+            return self.has_dependent_permission(resource, resource_id, action)
+
+        return False
 
 
 # Backward compatibility functions
