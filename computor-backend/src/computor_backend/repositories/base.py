@@ -139,6 +139,29 @@ class BaseRepository(ABC, Generic[T]):
         """Check if caching is enabled and entity_type is defined."""
         return self.cache is not None and self.entity_type is not None
 
+    def _filter_column(self, key: str):
+        """Resolve a filter keyword to a model attribute, or fail loudly.
+
+        Unknown criteria used to be silently skipped, which turned typos
+        into queries that returned unfiltered data.
+        """
+        if not hasattr(self.model, key):
+            raise ValueError(f"{self.model.__name__} has no column {key!r}")
+        return getattr(self.model, key)
+
+    # ========================================================================
+    # Post-write hooks (override in subclasses if needed)
+    # ========================================================================
+
+    def _after_create(self, entity: T) -> None:
+        """Hook invoked after a successful create."""
+
+    def _after_update(self, entity: T) -> None:
+        """Hook invoked after a successful update."""
+
+    def _after_delete(self, entity: T) -> None:
+        """Hook invoked after a successful delete."""
+
     def _serialize_entity(self, entity: T) -> Optional[Dict[str, Any]]:
         """Serialize entity to dictionary for caching."""
         if entity is None:
@@ -294,8 +317,7 @@ class BaseRepository(ABC, Generic[T]):
 
         # Apply filters
         for key, value in filters.items():
-            if hasattr(self.model, key):
-                query = query.filter(getattr(self.model, key) == value)
+            query = query.filter(self._filter_column(key) == value)
 
         # Apply pagination
         if offset is not None:
@@ -340,16 +362,18 @@ class BaseRepository(ABC, Generic[T]):
                 if tags:
                     self.cache.invalidate_tags(*tags)
 
+            self._after_create(entity)
+
             return entity
         except IntegrityError as e:
             self.db.rollback()
             raise DuplicateError(
                 self.model.__name__,
                 self._extract_entity_dict(entity)
-            )
+            ) from e
         except SQLAlchemyError as e:
             self.db.rollback()
-            raise RepositoryError(f"Failed to create {self.model.__name__}: {str(e)}")
+            raise RepositoryError(f"Failed to create {self.model.__name__}: {str(e)}") from e
     
     def update(self, entity_id: Any, updates: Dict[str, Any]) -> T:
         """
@@ -384,10 +408,12 @@ class BaseRepository(ABC, Generic[T]):
                 if tags:
                     self.cache.invalidate_tags(*tags)
 
+            self._after_update(entity)
+
             return entity
         except SQLAlchemyError as e:
             self.db.rollback()
-            raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}")
+            raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}") from e
 
     def update_entity(self, entity: T, updates: Dict[str, Any]) -> T:
         """
@@ -426,10 +452,12 @@ class BaseRepository(ABC, Generic[T]):
                 if tags:
                     self.cache.invalidate_tags(*tags)
 
+            self._after_update(entity)
+
             return entity
         except SQLAlchemyError as e:
             self.db.rollback()
-            raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}")
+            raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}") from e
     
     def delete(self, entity_id: Any) -> bool:
         """
@@ -461,10 +489,12 @@ class BaseRepository(ABC, Generic[T]):
             if tags:
                 self.cache.invalidate_tags(*tags)
 
+            self._after_delete(entity)
+
             return True
         except SQLAlchemyError as e:
             self.db.rollback()
-            raise RepositoryError(f"Failed to delete {self.model.__name__}: {str(e)}")
+            raise RepositoryError(f"Failed to delete {self.model.__name__}: {str(e)}") from e
     
     def exists(self, entity_id: Any) -> bool:
         """
@@ -501,8 +531,7 @@ class BaseRepository(ABC, Generic[T]):
         query = self.db.query(self.model)
 
         for key, value in criteria.items():
-            if hasattr(self.model, key):
-                query = query.filter(getattr(self.model, key) == value)
+            query = query.filter(self._filter_column(key) == value)
 
         entities = query.all()
 
@@ -536,8 +565,7 @@ class BaseRepository(ABC, Generic[T]):
         query = self.db.query(self.model)
 
         for key, value in criteria.items():
-            if hasattr(self.model, key):
-                query = query.filter(getattr(self.model, key) == value)
+            query = query.filter(self._filter_column(key) == value)
 
         entity = query.first()
 
@@ -567,8 +595,7 @@ class BaseRepository(ABC, Generic[T]):
         query = self.db.query(self.model)
         
         for key, value in criteria.items():
-            if hasattr(self.model, key):
-                query = query.filter(getattr(self.model, key) == value)
+            query = query.filter(self._filter_column(key) == value)
         
         return query.count()
     

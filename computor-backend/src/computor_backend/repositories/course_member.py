@@ -56,59 +56,14 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
 
         invalidate_user_course_memberships_sync(str(entity.user_id))
 
-    def create(self, entity: CourseMember) -> CourseMember:
-        """
-        Create a course member and invalidate permission caches.
+    def _after_create(self, entity: CourseMember) -> None:
+        self._invalidate_permission_cache(entity)
 
-        Args:
-            entity: CourseMember to create
+    def _after_update(self, entity: CourseMember) -> None:
+        self._invalidate_permission_cache(entity)
 
-        Returns:
-            Created CourseMember with ID populated
-        """
-        # Create via base repository (handles cache tags)
-        result = super().create(entity)
-
-        # Invalidate permission cache
-        self._invalidate_permission_cache(result)
-
-        return result
-
-    def update(self, entity: CourseMember) -> CourseMember:
-        """
-        Update a course member and invalidate permission caches.
-
-        Args:
-            entity: CourseMember to update
-
-        Returns:
-            Updated CourseMember
-        """
-        # Update via base repository (handles cache tags)
-        result = super().update(entity)
-
-        # Invalidate permission cache
-        self._invalidate_permission_cache(result)
-
-        return result
-
-    def delete(self, entity: CourseMember) -> None:
-        """
-        Delete a course member and invalidate permission caches.
-
-        Args:
-            entity: CourseMember to delete
-        """
-        # Store user_id before deletion
-        user_id = entity.user_id
-
-        # Delete via base repository (handles cache tags)
-        super().delete(entity)
-
-        # Invalidate permission cache
-        from computor_backend.permissions.cache import invalidate_user_course_memberships_sync
-
-        invalidate_user_course_memberships_sync(str(user_id))
+    def _after_delete(self, entity: CourseMember) -> None:
+        self._invalidate_permission_cache(entity)
 
     # ========================================================================
     # Cache configuration
@@ -224,12 +179,3 @@ class CourseMemberRepository(BaseRepository[CourseMember]):
             List of members with the specified role
         """
         return self.find_by(course_id=course_id, course_role_id=role)
-
-    def find_active_members(self) -> List[CourseMember]:
-        """
-        Find all non-archived course members (cached if enabled).
-
-        Returns:
-            List of active course members
-        """
-        return self.find_by(archived_at=None)
