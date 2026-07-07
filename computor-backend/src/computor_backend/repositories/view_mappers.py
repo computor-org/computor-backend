@@ -38,17 +38,6 @@ from computor_backend.services.result_storage import retrieve_result_json, list_
 logger = logging.getLogger(__name__)
 
 
-# Stored as ints in ``SubmissionGrade.status``; the student-facing DTO
-# carries the string form. Module-level so the dict isn't rebuilt on
-# every call. Adding a new GradingStatus member requires extending here.
-_GRADING_STATUS_LOOKUP = {
-    GradingStatus.NOT_REVIEWED.value: "not_reviewed",
-    GradingStatus.CORRECTED.value: "corrected",
-    GradingStatus.CORRECTION_NECESSARY.value: "correction_necessary",
-    GradingStatus.IMPROVEMENT_POSSIBLE.value: "improvement_possible",
-}
-
-
 def _build_repository(submission_group) -> Optional[SubmissionGroupRepository]:
     """Materialise the GitLab repository handle from ``submission_group.properties``.
 
@@ -306,11 +295,13 @@ async def course_member_course_content_result_mapper(
         graded_by_course_member_payload = None
 
     submission_status = (
-        _GRADING_STATUS_LOOKUP.get(int(latest_status_value), "not_reviewed")
+        GradingStatus.from_int(int(latest_status_value)).to_slug()
         if latest_status_value is not None else None
     )
-    # ``dict.get(None)`` is None, no need for an extra None-check guard.
-    latest_grade_status = _GRADING_STATUS_LOOKUP.get(qr.latest_grade_status_int)
+    latest_grade_status = (
+        GradingStatus.from_int(qr.latest_grade_status_int).to_slug()
+        if qr.latest_grade_status_int is not None else None
+    )
 
     submission_group_payload, submission_group_detail = _build_submission_group_payloads(
         submission_group,

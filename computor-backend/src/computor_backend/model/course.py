@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING, List
-from enum import IntEnum
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Float, ForeignKey, ForeignKeyConstraint, Index, 
@@ -22,14 +21,6 @@ if TYPE_CHECKING:
 
 from computor_backend.model.result import Result
 from computor_backend.model.artifact import SubmissionArtifact
-class GradingStatus(IntEnum):
-    """Enumeration for grading status values."""
-    NOT_REVIEWED = 0
-    CORRECTED = 1
-    CORRECTION_NECESSARY = 2
-    IMPROVEMENT_POSSIBLE = 3
-
-
 class CourseContentKind(Base):
     __tablename__ = 'course_content_kind'
 

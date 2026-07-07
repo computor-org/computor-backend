@@ -657,7 +657,11 @@ class ViewRepository(ABC):
         Returns:
             Tuple of (aggregated_status, total_unreviewed_count)
         """
-        from computor_backend.repositories.course_content_queries import user_course_content_list_query
+        from computor_backend.repositories.course_content_queries import (
+            CourseMemberCourseContentQueryResult,
+            user_course_content_list_query,
+        )
+        from computor_types.grading import GradingStatus
         from sqlalchemy import text
 
         unit_path = str(course_content.path)
@@ -674,33 +678,22 @@ class ViewRepository(ABC):
         # Use the status from the query result tuple which is already user-specific
         descendant_statuses: List[str] = []
         total_unreviewed_count = 0
-        status_lookup = {
-            0: "not_reviewed",
-            1: "corrected",
-            2: "correction_necessary",
-            3: "improvement_possible"
-        }
 
         for row in all_contents:
-            course_content_obj = row[0]
-            row_path = str(course_content_obj.path)
+            qr = CourseMemberCourseContentQueryResult.from_tuple(row)
+            row_path = str(qr.course_content.path)
 
             # Skip self and non-descendants
             if row_path == unit_path or not row_path.startswith(unit_path + '.'):
                 continue
 
-            # row[3] is submission_group, row[5] is submission_status_int from the query
-            # row[10] is is_unreviewed from the query
-            submission_group = row[3]
-            submission_status_int = row[5] if len(row) > 5 else None
-            is_unreviewed = row[10] if len(row) > 10 else 0
-
             # Only collect from submittable contents (those with submission_group)
             # If submission_group exists but status is None, treat as not_reviewed
-            if submission_group is not None:
-                status_str = status_lookup.get(submission_status_int, "not_reviewed") if submission_status_int is not None else "not_reviewed"
-                descendant_statuses.append(status_str)
-                total_unreviewed_count += is_unreviewed or 0
+            if qr.submission_group is not None:
+                descendant_statuses.append(
+                    GradingStatus.from_int(qr.submission_status_int).to_slug()
+                )
+                total_unreviewed_count += qr.is_latest_unreviewed or 0
 
         if descendant_statuses:
             return (_aggregate_grading_status(descendant_statuses), total_unreviewed_count)
