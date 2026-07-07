@@ -1,7 +1,4 @@
-import { IAuthProvider } from '../interfaces/IAuthProvider';
-import { API_BASE_URL, isConsentRequired, redirectToConsent } from '../utils/apiClient';
-import { refreshOnce } from '../utils/tokenRefresh';
-import { clearStoredSession } from '../services/authStorage';
+import { API_BASE_URL, apiFetch } from '../utils/apiClient';
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
@@ -14,40 +11,26 @@ interface RequestOptions extends RequestInit {
  */
 interface APIClientConfig {
   baseURL?: string;
-  authProviders?: IAuthProvider[];
-  onAuthError?: () => void;
 }
 
 /**
- * HTTP Client for API requests with HttpOnly cookie-based authentication
+ * Typed HTTP client for API requests with HttpOnly cookie-based authentication.
+ *
+ * The network round-trip — credentials, 401→refresh→retry, and the consent-gate
+ * 403 interception — is delegated to `apiFetch` (the single low-level transport).
+ * This class adds param serialization, body encoding, and typed response parsing
+ * on top; it backs the generated clients under src/generated/clients.
  *
  * SECURITY:
  * - Uses HttpOnly cookies for authentication (set by backend)
  * - Tokens are NOT accessible to JavaScript (XSS protection)
- * - All requests include credentials: 'include' for cookie transmission
  * - CSRF protection via SameSite cookie attribute (backend responsibility)
  */
 class APIClient {
   private baseURL: string;
-  private authProviders: IAuthProvider[];
-  private onAuthError: () => void;
 
   constructor(config: APIClientConfig = {}) {
     this.baseURL = config.baseURL || API_BASE_URL;
-    this.authProviders = config.authProviders || [];
-    this.onAuthError = config.onAuthError || (() => {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
-    });
-  }
-
-  /**
-   * Set authentication providers
-   * Used for session management (user data), not tokens
-   */
-  setAuthProviders(providers: IAuthProvider[]): void {
-    this.authProviders = providers;
   }
 
   /**
@@ -61,15 +44,12 @@ class APIClient {
   }
 
   /**
-   * Handle HTTP response and potential auth errors
+   * Parse a response into the typed payload, throwing on a non-2xx status.
+   * The consent-gate interception and 401 refresh already happened inside
+   * `apiFetch`, so this only decodes the body.
    */
   private async handleResponse<T>(response: Response, method?: string): Promise<T> {
     if (!response.ok) {
-      // Consent gate: route to /consent, remembering the current route.
-      if (await isConsentRequired(response)) {
-        redirectToConsent();
-      }
-
       const error = await response.text();
       throw new Error(error || `HTTP error! status: ${response.status}`);
     }
@@ -93,52 +73,6 @@ class APIClient {
     }
 
     return text as unknown as T;
-  }
-
-  /**
-   * Attempt to refresh the access token after a 401.
-   * Returns 'refreshed' on success, 'unreachable' if the backend could not be
-   * reached (network error — the caller must NOT log out), or 'failed' if the
-   * backend refused the refresh (the session is genuinely dead).
-   */
-  private async tryRefresh(): Promise<'refreshed' | 'failed' | 'unreachable'> {
-    // Prefer a wired auth provider so cached user data is refreshed in step.
-    for (const provider of this.authProviders) {
-      if (provider.isAuthenticated()) {
-        try {
-          const result = await provider.refreshSession();
-          if (result.success) return 'refreshed';
-          if (result.error === 'unreachable') return 'unreachable';
-          return 'failed';
-        } catch {
-          // Fall through to the direct refresh below.
-        }
-      }
-    }
-
-    // Fallback: hit the refresh endpoint directly (providers may be unset/stale).
-    try {
-      const response = await fetch(`${this.baseURL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      return response.ok ? 'refreshed' : 'failed';
-    } catch {
-      return 'unreachable';
-    }
-  }
-
-  /**
-   * Clear cached session data and notify the app of an auth failure.
-   * Also clears the shared session storage directly so the UI cannot keep
-   * showing a logged-in state even when no providers were wired in.
-   */
-  private handleAuthFailure(): void {
-    this.authProviders.forEach((p) => {
-      try { p.clearSession(); } catch { /* ignore */ }
-    });
-    try { clearStoredSession(); } catch { /* ignore */ }
-    this.onAuthError();
   }
 
   async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
@@ -200,29 +134,13 @@ class APIClient {
         ...(customHeaders ?? {}),
       },
       body: ['GET', 'HEAD'].includes(methodUpper) ? undefined : body,
-      // CRITICAL: Include credentials (cookies) in all requests
-      credentials: 'include',
     };
 
-    let response = await fetch(url, fetchInit);
-
-    // On 401, refresh the access token once and retry the original request.
-    // A thrown network error never reaches here — it propagates to the caller,
-    // so an offline / VPN-down state surfaces as an inline error in the page
-    // rather than a logout or a redirect.
-    if (response.status === 401 && !skipAuth) {
-      // Coalesced app-wide (see tokenRefresh): concurrent 401s from any HTTP
-      // layer share one /auth/refresh call.
-      const outcome = await refreshOnce(() => this.tryRefresh());
-      if (outcome === 'refreshed') {
-        response = await fetch(url, fetchInit);
-      } else if (outcome === 'failed') {
-        // Genuine auth failure: clear the cached session and notify the app.
-        this.handleAuthFailure();
-      }
-      // outcome === 'unreachable': fall through and let the 401 be thrown below;
-      // the session stays intact so a network blip never forces a logout.
-    }
+    // Delegate the network round-trip to the single low-level transport:
+    // credentials, the coalesced 401→refresh→retry, and the consent-gate
+    // interception all live in apiFetch. A thrown network error propagates to
+    // the caller (offline / VPN-down surfaces as an inline error, not a logout).
+    const response = await apiFetch(url, fetchInit, !skipAuth);
 
     return this.handleResponse<T>(response, methodUpper);
   }

@@ -1,29 +1,32 @@
 /**
  * API Configuration Module
  *
- * Configures the API client with authentication providers.
- * This module should be imported early in the application lifecycle.
+ * Wires the SSO auth service's refresh into the shared token-refresh strategy
+ * so every HTTP layer, on a 401, refreshes the cached SSO user data in step
+ * with the HttpOnly cookies. Imported early in the app lifecycle.
  */
 
-import { apiClient } from '../api/client';
 import { ssoAuthService } from '../services/authInstances';
+import { setRefreshStrategy, directRefresh, type RefreshOutcome } from '../utils/tokenRefresh';
 
 /**
- * Initialize API client with the SSO authentication provider.
- *
- * Keycloak SSO is the only identity provider; the client refreshes its
- * HttpOnly cookies through this provider on a 401.
+ * Install the provider-aware refresh strategy shared by all HTTP layers.
+ * Falls back to the direct backend refresh when no SSO session is present.
  */
 export function configureAPIClient() {
-  apiClient.setAuthProviders([ssoAuthService]);
-}
-
-/**
- * Get the configured API client singleton
- * Should only be called after configureAPIClient()
- */
-export function getAPIClient() {
-  return apiClient;
+  setRefreshStrategy(async (): Promise<RefreshOutcome> => {
+    if (ssoAuthService.isAuthenticated()) {
+      try {
+        const result = await ssoAuthService.refreshSession();
+        if (result.success) return 'refreshed';
+        if (result.error === 'unreachable') return 'unreachable';
+        return 'failed';
+      } catch {
+        // Fall through to the direct refresh below.
+      }
+    }
+    return directRefresh();
+  });
 }
 
 // Auto-configure if in browser environment

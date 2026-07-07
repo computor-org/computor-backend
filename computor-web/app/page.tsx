@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../src/contexts/AuthContext';
-import { API_BASE_URL } from '../src/utils/apiClient';
+import { API_BASE_URL, apiFetch } from '../src/utils/apiClient';
 
 export default function Home() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function Home() {
   useEffect(() => {
     async function fetchExtensionUrl() {
       try {
-        const response = await fetch(`${API_BASE_URL}/extensions-public`);
+        const response = await apiFetch(`${API_BASE_URL}/extensions-public`);
         if (response.ok) {
           const url = await response.text();
           setExtensionUrl(url.replace(/^"|"$/g, '')); // Remove quotes if present
@@ -35,7 +35,7 @@ export default function Home() {
 
     async function fetchGettingStartedUrl() {
       try {
-        const response = await fetch(`${API_BASE_URL}/extensions-getting-started`);
+        const response = await apiFetch(`${API_BASE_URL}/extensions-getting-started`);
         if (response.ok) {
           const url = await response.text();
           setGettingStartedUrl(url.replace(/^"|"$/g, '')); // Remove quotes if present
