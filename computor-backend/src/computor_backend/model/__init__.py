@@ -28,7 +28,7 @@ from .deployment import CourseContentDeployment, DeploymentHistory
 from .artifact import SubmissionArtifact, ResultArtifact, SubmissionGrade, SubmissionReview
 from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
-from .git_server import GitServer, CourseGitBinding, CourseMemberRepository
+from .git_server import GitServer, CourseGitBinding, CourseMemberGitRepository
 from .consent import PolicyVersion, UserConsent
 
 # Import all models to ensure relationships are properly set up
@@ -121,7 +121,7 @@ __all__ = [
     # Course-level git: server registry + per-course binding + student repo
     'GitServer',
     'CourseGitBinding',
-    'CourseMemberRepository',
+    'CourseMemberGitRepository',
     # GDPR consent
     'PolicyVersion',
     'UserConsent',
