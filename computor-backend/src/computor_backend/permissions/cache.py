@@ -9,11 +9,16 @@ import json
 from typing import Dict, List
 from sqlalchemy.orm import Session
 
-from computor_backend.redis_cache import get_redis_client
+from computor_backend.redis_cache import get_redis_client, get_sync_redis_client
 from computor_backend.model.course import CourseMember
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _membership_cache_key(user_id: str) -> str:
+    """Redis key holding a user's cached course memberships."""
+    return f"permission:user:{user_id}:course_memberships"
 
 
 # ==============================================================================
@@ -42,7 +47,7 @@ async def get_user_course_memberships(user_id: str, db: Session) -> Dict[str, st
         >>> memberships
         {"course-1": "_student", "course-2": "_lecturer"}
     """
-    cache_key = f"permission:user:{user_id}:course_memberships"
+    cache_key = _membership_cache_key(user_id)
     redis_client = await get_redis_client()
 
     # Try cache first
@@ -136,6 +141,28 @@ async def get_user_courses_with_role(
     ]
 
 
+def invalidate_user_course_memberships_sync(user_id: str) -> None:
+    """
+    Invalidate cached course memberships for a user (sync variant).
+
+    Safe to call from sync code regardless of whether an event loop is
+    running in the thread (unlike wrapping the async variant in
+    ``asyncio.run()``, which raises inside a running loop).
+
+    Call this when:
+    - CourseMember is created/updated/deleted for this user
+    - User's role changes in any course
+
+    Args:
+        user_id: User identifier
+    """
+    try:
+        get_sync_redis_client().delete(_membership_cache_key(user_id))
+        logger.info(f"Invalidated course memberships cache for user {user_id}")
+    except Exception as e:
+        logger.warning(f"Failed to invalidate cache: {e}")
+
+
 async def invalidate_user_course_memberships(user_id: str) -> None:
     """
     Invalidate cached course memberships for a user.
@@ -147,11 +174,10 @@ async def invalidate_user_course_memberships(user_id: str) -> None:
     Args:
         user_id: User identifier
     """
-    cache_key = f"permission:user:{user_id}:course_memberships"
     redis_client = await get_redis_client()
 
     try:
-        await redis_client.delete(cache_key)
+        await redis_client.delete(_membership_cache_key(user_id))
         logger.info(f"Invalidated course memberships cache for user {user_id}")
     except Exception as e:
         logger.warning(f"Failed to invalidate cache: {e}")
@@ -180,8 +206,7 @@ async def invalidate_course_all_memberships(course_id: str, db: Session) -> None
 
     # Invalidate each user's cache
     for (user_id,) in members:
-        cache_key = f"permission:user:{user_id}:course_memberships"
         try:
-            await redis_client.delete(cache_key)
+            await redis_client.delete(_membership_cache_key(user_id))
         except Exception:
             continue

@@ -67,6 +67,19 @@ async def get_redis_client() -> aioredis.Redis:
     return _async_redis_client
 
 
+def get_sync_redis_client() -> redis.Redis:
+    """
+    Get sync Redis client for direct access from sync code.
+
+    Use this for operations not covered by the Cache abstraction when no
+    event loop is available (repositories, scripts, Temporal activities).
+
+    Returns:
+        Sync Redis client instance
+    """
+    return _sync_redis_client
+
+
 def get_cache() -> Cache:
     """
     Get write-through cache instance.
