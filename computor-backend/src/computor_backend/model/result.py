@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
 from typing import TYPE_CHECKING
 
-from .base import Base
+from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
 if TYPE_CHECKING:
     from .artifact import SubmissionArtifact, ResultArtifact
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .auth import User
 
 
-class Result(Base):
+class Result(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'result'
     __table_args__ = (
         # Partial unique indexes - allow multiple results with same version_identifier when status is FAILED(1), CANCELLED(2), or CRASHED(6)
@@ -31,12 +31,6 @@ class Result(Base):
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
 
     # Foreign keys
@@ -72,8 +66,6 @@ class Result(Base):
     course_content_type = relationship('CourseContentType', back_populates='results')
     course_member = relationship('CourseMember', back_populates='results')
     submission_group = relationship('SubmissionGroup', back_populates='results')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     testing_service = relationship('Service', foreign_keys=[testing_service_id])
     # Gradings moved to SubmissionGrade tied to artifacts
 

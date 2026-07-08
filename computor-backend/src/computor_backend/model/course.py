@@ -7,13 +7,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, column_property, Mapped
 from sqlalchemy.ext.hybrid import hybrid_property
-try:
-    from ..custom_types import LtreeType
-except ImportError:
-    # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+from computor_backend.custom_types import LtreeType
 
-from .base import Base
+from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
 if TYPE_CHECKING:
     from .result import Result
@@ -51,18 +47,12 @@ class CourseRole(Base):
     course_members = relationship('CourseMember', back_populates='course_role')
 
 
-class CourseFamily(Base):
+class CourseFamily(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_family'
     __table_args__ = (
         Index('course_family_path_key', 'organization_id', 'path', unique=True),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
@@ -70,8 +60,6 @@ class CourseFamily(Base):
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     # Relationships
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     organization = relationship('Organization', back_populates='course_families')
     courses = relationship('Course', back_populates='course_family')
     course_family_members = relationship(
@@ -106,7 +94,7 @@ class CourseFamilyRole(Base):
     )
 
 
-class CourseFamilyMember(Base):
+class CourseFamilyMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     """Membership linking a user to a course_family with a scoped role.
 
     Independent of ``organization_member`` and ``course_member`` — does
@@ -123,16 +111,6 @@ class CourseFamilyMember(Base):
         ),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
 
     user_id = Column(
@@ -158,22 +136,14 @@ class CourseFamilyMember(Base):
     course_family_role = relationship(
         'CourseFamilyRole', back_populates='course_family_members'
     )
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
-class Course(Base):
+class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course'
     __table_args__ = (
         Index('course_path_key', 'course_family_id', 'path', unique=True),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
@@ -184,8 +154,6 @@ class Course(Base):
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     organization = relationship('Organization', back_populates='courses')
     language = relationship('Language', back_populates='courses')
     course_members = relationship("CourseMember", back_populates="course", uselist=True, lazy="select")
@@ -195,7 +163,7 @@ class Course(Base):
     submission_groups = relationship("SubmissionGroup", back_populates="course", uselist=True)
 
 
-class CourseContentType(Base):
+class CourseContentType(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_content_type'
     __table_args__ = (
         CheckConstraint("(slug)::text ~* '^[A-Za-z0-9_-]+$'::text"),
@@ -203,12 +171,6 @@ class CourseContentType(Base):
         Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True)
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
@@ -221,24 +183,16 @@ class CourseContentType(Base):
     course_contents = relationship("CourseContent", back_populates="course_content_type", foreign_keys="CourseContent.course_content_type_id", uselist=True, lazy="select")
     course_content_kind = relationship('CourseContentKind', back_populates='course_content_types')
     course = relationship("Course", back_populates="course_content_types", lazy="select")
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     results = relationship('Result', back_populates='course_content_type')
 
 
-class CourseGroup(Base):
+class CourseGroup(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_group'
     __table_args__ = (
         Index('course_group_course_id_key', 'course_id', 'id', unique=True),
         Index('course_group_title_key', 'course_id', 'title', unique=True)
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
@@ -246,12 +200,10 @@ class CourseGroup(Base):
 
     # Relationships
     course = relationship('Course', back_populates='course_groups')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     course_members = relationship('CourseMember', back_populates='course_group', foreign_keys='CourseMember.course_group_id')
 
 
-class CourseContent(Base):
+class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_content'
     __table_args__ = (
         ForeignKeyConstraint(['course_id', 'course_content_type_id'],
@@ -263,12 +215,6 @@ class CourseContent(Base):
         # validate_course_content_example_submittable_trigger
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     archived_at = Column(DateTime(timezone=True))
     title = Column(String(255))
@@ -309,8 +255,6 @@ class CourseContent(Base):
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
     course = relationship('Course', foreign_keys=[course_id], back_populates='course_contents')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     testing_service = relationship('Service', foreign_keys=[testing_service_id])
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     submission_groups = relationship('SubmissionGroup', back_populates='course_content', passive_deletes=True)
@@ -347,7 +291,7 @@ class CourseContent(Base):
         return None
 
 
-class CourseMember(Base):
+class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_member'
     __table_args__ = (
         CheckConstraint("""
@@ -361,12 +305,6 @@ class CourseMember(Base):
         Index('course_member_key', 'user_id', 'course_id', unique=True)
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
@@ -378,8 +316,6 @@ class CourseMember(Base):
     course = relationship("Course", foreign_keys=[course_id], back_populates="course_members", lazy="select")
     course_role = relationship('CourseRole', back_populates='course_members')
     user = relationship("User", foreign_keys=[user_id], back_populates="course_members", uselist=False, lazy="select")
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     comments_written = relationship("CourseMemberComment", foreign_keys="CourseMemberComment.transmitter_id", 
                                   back_populates="transmitter", uselist=True, lazy="select")
     comments_received = relationship("CourseMemberComment", foreign_keys="CourseMemberComment.course_member_id", 
@@ -399,15 +335,9 @@ class CourseMember(Base):
                                           foreign_keys='SubmissionReview.reviewer_course_member_id')
 
 
-class SubmissionGroup(Base):
+class SubmissionGroup(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'submission_group'
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)  # Should contain gitlab/git repository info
     # Removed: status and grading - moved to SubmissionGrade
     display_name = Column(String(255), nullable=True)  # Team name or auto-generated from student name
@@ -420,8 +350,6 @@ class SubmissionGroup(Base):
     # Relationships
     course_content = relationship('CourseContent', back_populates='submission_groups')
     course = relationship('Course', back_populates='submission_groups')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     members = relationship("SubmissionGroupMember", back_populates="group", uselist=True)
     results = relationship('Result', back_populates='submission_group')
     # Gradings moved to SubmissionGrade tied to artifacts
@@ -478,19 +406,13 @@ class SubmissionGroup(Base):
         return subq
 
 
-class SubmissionGroupMember(Base):
+class SubmissionGroupMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'submission_group_member'
     __table_args__ = (
         # Only keep the constraint that makes sense: unique member per submission group
         Index('submission_group_member_key', 'submission_group_id', 'course_member_id', unique=True),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     # Removed: grading - moved to SubmissionGrade
     course_id = Column(ForeignKey('course.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
@@ -503,21 +425,13 @@ class SubmissionGroupMember(Base):
     course = relationship('Course')
     course_member = relationship('CourseMember', back_populates='submission_group_members')
     group = relationship("SubmissionGroup", back_populates="members", uselist=False)
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
 # SubmissionGroupGrading removed - replaced by SubmissionGrade in artifact.py
 
-class CourseMemberComment(Base):
+class CourseMemberComment(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course_member_comment'
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     message = Column(String(4096), nullable=False)
     transmitter_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, index=True)
@@ -525,8 +439,6 @@ class CourseMemberComment(Base):
     # Relationships
     transmitter = relationship("CourseMember", foreign_keys=[transmitter_id], back_populates="comments_written", lazy="select")
     course_member = relationship("CourseMember", foreign_keys=[course_member_id], back_populates="comments_received", lazy="select")
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
 # =============================================================================

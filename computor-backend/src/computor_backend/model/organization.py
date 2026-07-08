@@ -4,16 +4,12 @@ from sqlalchemy import (
 , func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-try:
-    from ..custom_types import LtreeType
-except ImportError:
-    # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+from computor_backend.custom_types import LtreeType
 
-from .base import Base
+from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
 
-class Organization(Base):
+class Organization(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'organization'
     __table_args__ = (
         CheckConstraint("((organization_type = 'user'::organization_type) AND (title IS NULL)) OR ((organization_type <> 'user'::organization_type) AND (title IS NOT NULL))"),
@@ -22,12 +18,6 @@ class Organization(Base):
         Index('organization_number_key', 'organization_type', 'number', unique=True)
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     number = Column(String(255))
     title = Column(String(255))
@@ -53,8 +43,6 @@ class Organization(Base):
     ''', persisted=True))
 
     # Relationships
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     user = relationship('User', foreign_keys=[user_id], back_populates='organization')
     course_families = relationship('CourseFamily', back_populates='organization', uselist=True, lazy='select')
     courses = relationship('Course', back_populates='organization', uselist=True, lazy='select')
@@ -92,7 +80,7 @@ class OrganizationRole(Base):
     )
 
 
-class OrganizationMember(Base):
+class OrganizationMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     """Membership linking a user to an organization with a scoped role.
 
     Independent of ``course_member`` — does not cascade up or down. Used
@@ -109,16 +97,6 @@ class OrganizationMember(Base):
         ),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
 
     user_id = Column(
@@ -142,5 +120,3 @@ class OrganizationMember(Base):
     organization_role = relationship(
         'OrganizationRole', back_populates='organization_members'
     )
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])

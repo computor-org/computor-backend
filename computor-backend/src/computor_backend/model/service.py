@@ -20,15 +20,12 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
-try:
-    from ..custom_types import LtreeType
-except ImportError:
-    from computor_backend.custom_types import LtreeType
+from computor_backend.custom_types import LtreeType
 
-from .base import Base
+from .base import Base, UUIDPkMixin, AuditMixin
 
 
-class ServiceType(Base):
+class ServiceType(UUIDPkMixin, AuditMixin, Base):
     """
     Service type definitions with hierarchical organization.
 
@@ -67,8 +64,7 @@ class ServiceType(Base):
         Index('idx_service_type_plugin_module', 'plugin_module', postgresql_where=text("plugin_module IS NOT NULL")),
     )
 
-    # Primary key (UUID for stable FK references)
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
+    # Versioning
     version = Column(BigInteger, nullable=False, server_default=text("0"))
 
     # Unique hierarchical path (Ltree for organization and queries)
@@ -101,27 +97,17 @@ class ServiceType(Base):
     # CourseMember post-create hook skips workspace provisioning entirely.
     requires_workspace = Column(Boolean, nullable=False, server_default=text("false"))
 
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    # Audit fields
-    created_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
-
     # Additional properties
     properties = Column(JSONB, server_default=text("'{}'::jsonb"), nullable=False)
 
     # Relationships
     services = relationship('Service', foreign_keys='Service.service_type_id', back_populates='service_type')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
     def __repr__(self):
         return f"<ServiceType(id={self.id}, path='{self.path}', name='{self.name}')>"
 
 
-class Service(Base):
+class Service(UUIDPkMixin, AuditMixin, Base):
     """
     Service account metadata for automated workers and integrations.
 
@@ -145,16 +131,7 @@ class Service(Base):
     )
 
     # Primary key and versioning
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, nullable=False, server_default=text("0"))
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    # Audit fields
-    created_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
 
     # Soft delete
     archived_at = Column(DateTime(timezone=True))
@@ -193,11 +170,9 @@ class Service(Base):
     # Relationships
     service_type = relationship('ServiceType', foreign_keys=[service_type_id], back_populates='services')
     user = relationship('User', foreign_keys=[user_id], back_populates='service')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
-class ApiToken(Base):
+class ApiToken(UUIDPkMixin, AuditMixin, Base):
     """
     API tokens for authentication with scoped permissions.
 
@@ -222,16 +197,7 @@ class ApiToken(Base):
     )
 
     # Primary key and versioning
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     version = Column(BigInteger, nullable=False, server_default=text("0"))
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    # Audit fields
-    created_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(UUID, ForeignKey('user.id', ondelete='SET NULL'))
 
     # Token identification
     name = Column(String(255), nullable=False)
@@ -267,5 +233,3 @@ class ApiToken(Base):
 
     # Relationships
     user = relationship('User', foreign_keys=[user_id], back_populates='api_tokens')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])

@@ -5,10 +5,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
 
-class Message(Base):
+class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'message'
     __table_args__ = (
         Index('msg_parent_archived_idx', 'parent_id', 'archived_at'),
@@ -23,12 +23,6 @@ class Message(Base):
         Index('msg_user_archived_idx', 'user_id', 'archived_at'),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     archived_at = Column(DateTime(timezone=True))
 
@@ -56,9 +50,7 @@ class Message(Base):
 
     # Relationships
     author = relationship('User', foreign_keys=[author_id])
-    parent = relationship('Message', remote_side=[id], backref='replies')
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
+    parent = relationship('Message', remote_side="Message.id", backref='replies')
 
     organization = relationship('Organization', foreign_keys=[organization_id])
     course_family = relationship('CourseFamily', foreign_keys=[course_family_id])
@@ -92,18 +84,12 @@ class Message(Base):
         return self.properties.get('deleted_by', 'author')
 
 
-class MessageRead(Base):
+class MessageRead(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'message_read'
     __table_args__ = (
         Index('msg_read_unique_idx', 'message_id', 'reader_user_id', unique=True),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
 
     message_id = Column(ForeignKey('message.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -112,8 +98,6 @@ class MessageRead(Base):
     # Relationships
     message = relationship('Message', back_populates='message_reads')
     reader_user = relationship('User', foreign_keys=[reader_user_id])
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
 
 
 class MessageMention(Base):
