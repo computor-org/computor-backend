@@ -10,7 +10,7 @@ Test coverage:
 """
 
 import pytest
-from computor_types.password_utils import (
+from computor_backend.utils.password_utils import (
     hash_password,
     verify_password,
     needs_rehash,

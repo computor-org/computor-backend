@@ -113,7 +113,7 @@ def decrypt_gitlab_token(encrypted_token: Optional[str]) -> Optional[str]:
     if not encrypted_token:
         return None
     try:
-        from computor_types.encryption import decrypt_secret
+        from computor_backend.utils.encryption import decrypt_secret
         return decrypt_secret(encrypted_token)
     except Exception as e:
         logger.warning(f"Could not decrypt GitLab token: {e}")

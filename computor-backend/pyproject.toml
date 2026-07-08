@@ -45,6 +45,7 @@ dependencies = [
     "junit-xml==1.9",
     "psycopg2-binary==2.9.9",
     "keycove==0.3.5",
+    "argon2-cffi>=23.1.0",  # Secure password hashing (Argon2id)
     "fastapi==0.109.0",
     "sqlalchemy_utils==0.41.2",
     "click==8.1.7",

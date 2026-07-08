@@ -45,7 +45,7 @@ def get_provider_client_for_server(git_server) -> GitProviderClient:
     (``clone_url``/``html_url``, built from Forgejo's ``ROOT_URL``), so they stay
     public regardless of how we connect.
     """
-    from computor_types.encryption import decrypt_secret
+    from computor_backend.utils.encryption import decrypt_secret
 
     token = decrypt_secret(git_server.token) if git_server.token else ""
     base_url = backend_reachable_base_url(git_server)

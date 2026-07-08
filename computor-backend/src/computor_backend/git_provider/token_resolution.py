@@ -18,7 +18,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from computor_types.encryption import decrypt_secret
+from computor_backend.utils.encryption import decrypt_secret
 
 logger = logging.getLogger(__name__)
 
