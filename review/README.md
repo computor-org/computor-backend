@@ -90,7 +90,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 312 | print() → logging; list_tasks error contract | P3 | S | todo |
 | 313 | task_tracker duplicate accessible-ID logic | P3 | S | todo |
 | 401 | Consolidate four HTTP layers into one transport | P1 | M | done (merged; apiFetch is the single transport, APIClient delegates to it, one pluggable refresh strategy in tokenRefresh; tsc+build clean) |
-| 402 | Adopt generated clients over hand-typed endpoints | P1 | M | done (merged; ~50 call sites across 24 files → generated clients. api.ts retained + documented for the ~10 endpoints with no usable generated client: /consent/*, /user + /user/* (UserClient name collision), ambiguous dual-route org/family deletes, /examples/{id} delete. Full api.ts deletion + ESLint ban deferred to codegen regen — TASK-502/510.) |
+| 402 | Adopt generated clients over hand-typed endpoints | P1 | M | done (merged; ~55 call sites → generated clients, incl. /consent/* after the codegen regen added ConsentClient. api.ts now retained only for genuine codegen gaps: /user + /user/* (TS UserClient name collision with /user-roles), the two ambiguous dual-route org/family deletes, /examples/{id} (no single-id backend delete). Full api.ts deletion + ESLint ban blocked only on fixing the UserClient name collision in the TS generator — TASK-510/511.) |
 | 403 | Retire dead password-login path / dual auth providers | P1 | M | done (merged; deleted authService + IAuthProviderWithLogin + login(); tsc+build clean) |
 | 404 | Split 641-line members/add page | P2 | M | todo |
 | 405 | Decompose Sidebar.tsx | P2 | S | todo |
@@ -103,7 +103,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 412 | Stop hand-mirroring backend schemas (workspaces.ts) | P3 | M | todo |
 | 413 | Normalize import-alias schemes | P3 | S | todo |
 | 501 | CLI sync-shim sprawl → sync facade in computor-client | P1 | L | done (merged; SyncComputorClient facade + shared raise_for_response; both SyncHTTPWrapper classes, _verify_token, delete.py raw _http calls, and 2 inline httpx blocks removed; ComputorClient.timeout/auth_headers accessors; +10 tests. Sweeping get_computor_client→sync + run_async removal left as a follow-up — run_async is still the legit async bridge.) |
-| 502 | Offline codegen; stop hand-editing generated client | P1 | M | done (merged; generate_python_clients.py builds spec via app.openapi() offline by default, --url fallback, DO NOT EDIT header; verified end-to-end to a temp dir, 53 clients. The one-time full drift-regen commit of checked-in endpoints is left as a review-gated follow-up per the plan's risk note.) |
+| 502 | Offline codegen; stop hand-editing generated client | P1 | M | done (merged; generate_python_clients.py builds spec via app.openapi() offline by default, --url fallback, DO NOT EDIT header; verified end-to-end to a temp dir, 53 clients. Full regen (`bash generate.sh`) run + committed as chore(codegen): the drift was small/clean — just the DO-NOT-EDIT headers, the TASK-201/203/204 backend changes, and the previously-missing ConsentClient/InstanceClient.) |
 | 503 | Split computor-cli/deployment.py (2,149 LOC) | P2 | M | todo |
 | 504 | Move crypto out of computor-types | P2 | M | todo |
 | 505 | Rename deployments_refactored.py; decouple CLI config | P2 | M | todo |
