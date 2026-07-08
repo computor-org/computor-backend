@@ -165,10 +165,10 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Artifact Review
+   * Create Artifact Review Endpoint
    * Create a review for an artifact.
    */
-  async createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost({ artifactId, userId, body }: { artifactId: string; userId?: string | null; body: SubmissionReviewCreate }): Promise<SubmissionReviewListItem> {
+  async createArtifactReviewEndpointSubmissionsArtifactsArtifactIdReviewsPost({ artifactId, userId, body }: { artifactId: string; userId?: string | null; body: SubmissionReviewCreate }): Promise<SubmissionReviewListItem> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
@@ -176,10 +176,10 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Test Result
+   * Create Test Result Endpoint
    * Create a test result for an artifact. Checks for test limitations.
    */
-  async createTestResultSubmissionsArtifactsArtifactIdTestPost({ artifactId, userId, body }: { artifactId: string; userId?: string | null; body: ResultCreate }): Promise<ResultList> {
+  async createTestResultEndpointSubmissionsArtifactsArtifactIdTestPost({ artifactId, userId, body }: { artifactId: string; userId?: string | null; body: ResultCreate }): Promise<ResultList> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
@@ -274,10 +274,10 @@ export class SubmissionsClient extends BaseEndpointClient {
   }
 
   /**
-   * Update Test Result
+   * Update Test Result Endpoint
    * Update a test result (e.g., when test completes). Only the test runner or admin can update.
    */
-  async updateTestResultSubmissionsTestsTestIdPatch({ testId, userId, body }: { testId: string; userId?: string | null; body: ResultUpdate }): Promise<ResultList> {
+  async updateTestResultEndpointSubmissionsTestsTestIdPatch({ testId, userId, body }: { testId: string; userId?: string | null; body: ResultUpdate }): Promise<ResultList> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };

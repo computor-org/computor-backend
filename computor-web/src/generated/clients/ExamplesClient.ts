@@ -55,17 +55,6 @@ export class ExamplesClient extends BaseEndpointClient {
   }
 
   /**
-   * Remove Dependency
-   * Remove a dependency.
-   */
-  async removeDependencyExamplesDependenciesDependencyIdDelete({ dependencyId, userId }: { dependencyId: string; userId?: string | null }): Promise<void> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.delete<void>(this.buildPath('dependencies', dependencyId), { params: queryParams });
-  }
-
-  /**
    * Download Example Version
    * Download a specific example version from storage, optionally with all dependencies.
    */
@@ -123,10 +112,10 @@ export class ExamplesClient extends BaseEndpointClient {
   }
 
   /**
-   * Get Example Dependencies
-   * Get all dependencies for an example with version constraints.
+   * List Dependencies
+   * List all dependencies of an example.
    */
-  async getExampleDependenciesExamplesExampleIdDependenciesGet({ exampleId, userId }: { exampleId: string; userId?: string | null }): Promise<ExampleDependencyGet[]> {
+  async listDependenciesExamplesExampleIdDependenciesGet({ exampleId, userId }: { exampleId: string; userId?: string | null }): Promise<ExampleDependencyGet[]> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
@@ -134,10 +123,10 @@ export class ExamplesClient extends BaseEndpointClient {
   }
 
   /**
-   * Create Example Dependency
-   * Create a new dependency relationship between examples.
+   * Add Dependency
+   * Add a dependency to an example.
    */
-  async createExampleDependencyExamplesExampleIdDependenciesPost({ exampleId, userId, body }: { exampleId: string; userId?: string | null; body: ExampleDependencyCreate }): Promise<ExampleDependencyGet> {
+  async addDependencyExamplesExampleIdDependenciesPost({ exampleId, userId, body }: { exampleId: string; userId?: string | null; body: ExampleDependencyCreate }): Promise<ExampleDependencyGet> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
@@ -145,10 +134,10 @@ export class ExamplesClient extends BaseEndpointClient {
   }
 
   /**
-   * Delete Example Dependency
-   * Delete a dependency relationship between examples.
+   * Remove Dependency
+   * Remove a dependency from an example.
    */
-  async deleteExampleDependencyExamplesExampleIdDependenciesDependencyIdDelete({ dependencyId, exampleId, userId }: { dependencyId: string; exampleId: string; userId?: string | null }): Promise<void> {
+  async removeDependencyExamplesExampleIdDependenciesDependencyIdDelete({ dependencyId, exampleId, userId }: { dependencyId: string; exampleId: string; userId?: string | null }): Promise<void> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };

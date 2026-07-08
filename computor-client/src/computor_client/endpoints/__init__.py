@@ -1,13 +1,14 @@
 """
 Auto-generated endpoint clients.
 
-This module is auto-generated from the OpenAPI specification.
+DO NOT EDIT: this module is auto-generated from the OpenAPI specification.
+Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
 from computor_client.endpoints.accounts import AccountsClient
 from computor_client.endpoints.authentication import AuthenticationClient
-from computor_client.endpoints.coder import CoderClient
+from computor_client.endpoints.consent import ConsentClient
 from computor_client.endpoints.course_content_kinds import CourseContentKindsClient
 from computor_client.endpoints.course_content_types import CourseContentTypesClient
 from computor_client.endpoints.course_contents import CourseContentsClient
@@ -29,6 +30,7 @@ from computor_client.endpoints.examples import ExamplesClient
 from computor_client.endpoints.extensions import ExtensionsClient
 from computor_client.endpoints.git_servers import GitServersClient
 from computor_client.endpoints.groups import GroupsClient
+from computor_client.endpoints.instance import InstanceClient
 from computor_client.endpoints.invites import InvitesClient
 from computor_client.endpoints.languages import LanguagesClient
 from computor_client.endpoints.lecturers import LecturersClient
@@ -60,7 +62,7 @@ from computor_client.endpoints.workspaces import WorkspacesClient
 __all__ = [
     "AccountsClient",
     "AuthenticationClient",
-    "CoderClient",
+    "ConsentClient",
     "CourseContentKindsClient",
     "CourseContentTypesClient",
     "CourseContentsClient",
@@ -82,6 +84,7 @@ __all__ = [
     "ExtensionsClient",
     "GitServersClient",
     "GroupsClient",
+    "InstanceClient",
     "InvitesClient",
     "LanguagesClient",
     "LecturersClient",

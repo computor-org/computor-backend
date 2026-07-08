@@ -10,8 +10,10 @@ import ConfirmDialog from '@/src/components/ConfirmDialog';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useNotify } from '@/src/contexts/NotificationContext';
-import { api } from '@/src/utils/api';
+import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import type { PolicyVersionGet, PolicyVersionCreate } from 'types/generated';
+
+const consentClient = new ConsentClient();
 
 type LangRow = { lang: string; text: string; filename?: string };
 
@@ -40,7 +42,7 @@ export default function PrivacyNoticesPage() {
 
   const fetchVersions = useCallback(async () => {
     try {
-      const data = await api.get<PolicyVersionGet[]>('/consent/policy-versions');
+      const data = await consentClient.listPolicyVersionsConsentPolicyVersionsGet({});
       setVersions(data);
       setError(null);
     } catch (err) {
@@ -102,7 +104,7 @@ export default function PrivacyNoticesPage() {
       for (const l of filledLangs) texts[l.lang.trim()] = l.text;
       const body: PolicyVersionCreate = { version: version.trim(), texts };
       if (effectiveFrom) body.effective_from = new Date(effectiveFrom).toISOString();
-      const created = await api.post<PolicyVersionGet>('/consent/policy-versions', body);
+      const created = await consentClient.publishPolicyVersionConsentPolicyVersionsPost({ body });
       notify(`Published privacy notice version ${created.version}`, 'success');
       setVersion('');
       setEffectiveFrom('');

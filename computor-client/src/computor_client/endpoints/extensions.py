@@ -1,7 +1,8 @@
 """
 Auto-generated endpoint client.
 
-This module is auto-generated from the OpenAPI specification.
+DO NOT EDIT: this module is auto-generated from the OpenAPI specification.
+Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 

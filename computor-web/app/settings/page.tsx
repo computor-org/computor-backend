@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { TokensClient } from '@/src/generated/clients/TokensClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -14,7 +13,8 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { inputCls } from '@/src/components/FormPanel';
 import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
-import type { ConsentStatus } from '@/src/types/consent';
+import type { ConsentStatusGet } from '@/src/generated/types/common';
+import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
@@ -50,6 +50,8 @@ function fmtDate(s?: string | null): string {
   return s ? new Date(s).toLocaleDateString() : '—';
 }
 
+
+const consentClient = new ConsentClient();
 export default function SettingsPage() {
   const router = useRouter();
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -61,7 +63,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Consent / privacy
-  const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
+  const [consentStatus, setConsentStatus] = useState<ConsentStatusGet | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
   const [withdrawing, setWithdrawing] = useState(false);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
@@ -127,7 +129,7 @@ export default function SettingsPage() {
   useEffect(() => {
     async function fetchConsentStatus() {
       try {
-        setConsentStatus(await api.get<ConsentStatus>('/consent/status'));
+        setConsentStatus(await consentClient.getConsentStatusConsentStatusGet({}));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load consent status');
       } finally {
@@ -141,7 +143,7 @@ export default function SettingsPage() {
     setWithdrawing(true);
     setError(null);
     try {
-      await api.post('/consent/withdraw');
+      await consentClient.withdrawConsentConsentWithdrawPost({});
       // Access is gated again; the consent page is the only place left to go.
       router.push('/consent');
     } catch (err) {

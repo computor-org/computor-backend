@@ -51,6 +51,19 @@
 | `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
 | `ssoLogoutAuthProviderLogoutGet` | GET | `/auth/{provider}/logout` | — | `void` |
 
+## ConsentClient
+- Base path: `/consent`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `giveConsentConsentPost` | POST | `/consent` | `ConsentCreate` | `ConsentStatusGet` |
+| `getPolicyTextConsentPolicyGet` | GET | `/consent/policy` | — | `PolicyTextGet` |
+| `listPolicyVersionsConsentPolicyVersionsGet` | GET | `/consent/policy-versions` | — | `PolicyVersionGet[]` |
+| `publishPolicyVersionConsentPolicyVersionsPost` | POST | `/consent/policy-versions` | `PolicyVersionCreate` | `PolicyVersionGet` |
+| `getConsentStatusConsentStatusGet` | GET | `/consent/status` | — | `ConsentStatusGet` |
+| `withdrawConsentConsentWithdrawPost` | POST | `/consent/withdraw` | — | `ConsentStatusGet` |
+
 ## CourseContentKindsClient
 - Base path: `/course-content-kinds`
 - Note: custom operations discovered from OpenAPI schema
@@ -241,15 +254,14 @@
 | --- | --- | --- | --- | --- |
 | `listExamplesExamplesGet` | GET | `/examples` | — | `ExampleList[]` |
 | `deleteExamplesByPatternEndpointExamplesByPatternDelete` | DELETE | `/examples/by-pattern` | — | `ExampleBulkDeleteResult` |
-| `removeDependencyExamplesDependenciesDependencyIdDelete` | DELETE | `/examples/dependencies/{dependency_id}` | — | `void` |
 | `downloadExampleVersionExamplesDownloadVersionIdGet` | GET | `/examples/download/{version_id}` | — | `ExampleDownloadResponse` |
 | `uploadExampleExamplesUploadPost` | POST | `/examples/upload` | `ExampleUploadRequest` | `ExampleVersionGet` |
 | `deleteExampleVersionEndpointExamplesVersionsVersionIdDelete` | DELETE | `/examples/versions/{version_id}` | — | `ExampleVersionDeleteResult` |
 | `getVersionExamplesVersionsVersionIdGet` | GET | `/examples/versions/{version_id}` | — | `ExampleVersionGet` |
 | `getExampleExamplesExampleIdGet` | GET | `/examples/{example_id}` | — | `ExampleGet` |
-| `getExampleDependenciesExamplesExampleIdDependenciesGet` | GET | `/examples/{example_id}/dependencies` | — | `ExampleDependencyGet[]` |
-| `createExampleDependencyExamplesExampleIdDependenciesPost` | POST | `/examples/{example_id}/dependencies` | `ExampleDependencyCreate` | `ExampleDependencyGet` |
-| `deleteExampleDependencyExamplesExampleIdDependenciesDependencyIdDelete` | DELETE | `/examples/{example_id}/dependencies/{dependency_id}` | — | `void` |
+| `listDependenciesExamplesExampleIdDependenciesGet` | GET | `/examples/{example_id}/dependencies` | — | `ExampleDependencyGet[]` |
+| `addDependencyExamplesExampleIdDependenciesPost` | POST | `/examples/{example_id}/dependencies` | `ExampleDependencyCreate` | `ExampleDependencyGet` |
+| `removeDependencyExamplesExampleIdDependenciesDependencyIdDelete` | DELETE | `/examples/{example_id}/dependencies/{dependency_id}` | — | `void` |
 | `downloadExampleLatestExamplesExampleIdDownloadGet` | GET | `/examples/{example_id}/download` | — | `ExampleDownloadResponse` |
 | `listVersionsExamplesExampleIdVersionsGet` | GET | `/examples/{example_id}/versions` | — | `ExampleVersionList[]` |
 | `createVersionExamplesExampleIdVersionsPost` | POST | `/examples/{example_id}/versions` | `ExampleVersionCreate` | `ExampleVersionGet` |
@@ -306,6 +318,14 @@
 | `deleteGroupsGroupsIdDelete` | DELETE | `/groups/{id}` | — | `void` |
 | `getGroupsGroupsIdGet` | GET | `/groups/{id}` | — | `GroupGet` |
 | `updateGroupsGroupsIdPatch` | PATCH | `/groups/{id}` | `GroupUpdate` | `GroupGet` |
+
+## InstanceClient
+- Base path: `/instance-info`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getInstanceInfoInstanceInfoGet` | GET | `/instance-info` | — | `InstanceInfoGet` |
 
 ## InvitesClient
 - Base path: `/invites`
@@ -567,15 +587,15 @@
 | `listArtifactGradesSubmissionsArtifactsArtifactIdGradesGet` | GET | `/submissions/artifacts/{artifact_id}/grades` | — | `SubmissionGradeList[]` |
 | `createArtifactGradeEndpointSubmissionsArtifactsArtifactIdGradesPost` | POST | `/submissions/artifacts/{artifact_id}/grades` | `SubmissionGradeCreate` | `SubmissionGradeDetail` |
 | `listArtifactReviewsSubmissionsArtifactsArtifactIdReviewsGet` | GET | `/submissions/artifacts/{artifact_id}/reviews` | — | `SubmissionReviewListItem[]` |
-| `createArtifactReviewSubmissionsArtifactsArtifactIdReviewsPost` | POST | `/submissions/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
-| `createTestResultSubmissionsArtifactsArtifactIdTestPost` | POST | `/submissions/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
+| `createArtifactReviewEndpointSubmissionsArtifactsArtifactIdReviewsPost` | POST | `/submissions/artifacts/{artifact_id}/reviews` | `SubmissionReviewCreate` | `SubmissionReviewListItem` |
+| `createTestResultEndpointSubmissionsArtifactsArtifactIdTestPost` | POST | `/submissions/artifacts/{artifact_id}/test` | `ResultCreate` | `ResultList` |
 | `listArtifactTestResultsSubmissionsArtifactsArtifactIdTestsGet` | GET | `/submissions/artifacts/{artifact_id}/tests` | — | `ResultGet[]` |
 | `listGradesSubmissionsGradesGet` | GET | `/submissions/grades` | — | `SubmissionGradeList[]` |
 | `deleteArtifactGradeSubmissionsGradesGradeIdDelete` | DELETE | `/submissions/grades/{grade_id}` | — | `void` |
 | `updateArtifactGradeSubmissionsGradesGradeIdPatch` | PATCH | `/submissions/grades/{grade_id}` | `SubmissionGradeUpdate` | `SubmissionGradeDetail` |
 | `deleteArtifactReviewSubmissionsReviewsReviewIdDelete` | DELETE | `/submissions/reviews/{review_id}` | — | `void` |
 | `updateArtifactReviewSubmissionsReviewsReviewIdPatch` | PATCH | `/submissions/reviews/{review_id}` | `SubmissionReviewUpdate` | `SubmissionReviewListItem` |
-| `updateTestResultSubmissionsTestsTestIdPatch` | PATCH | `/submissions/tests/{test_id}` | `ResultUpdate` | `ResultList` |
+| `updateTestResultEndpointSubmissionsTestsTestIdPatch` | PATCH | `/submissions/tests/{test_id}` | `ResultUpdate` | `ResultList` |
 
 ## SystemClient
 - Base path: `/system`

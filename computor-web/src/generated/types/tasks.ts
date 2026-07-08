@@ -108,3 +108,5 @@ export interface TaskResponse {
 
 
 export type TaskStatus = "queued" | "started" | "finished" | "failed" | "deferred" | "cancelled";
+
+export type ResultStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;

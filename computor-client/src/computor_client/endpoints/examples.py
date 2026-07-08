@@ -1,7 +1,8 @@
 """
 Auto-generated endpoint client.
 
-This module is auto-generated from the OpenAPI specification.
+DO NOT EDIT: this module is auto-generated from the OpenAPI specification.
+Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
@@ -104,7 +105,7 @@ class ExamplesClient:
         data: Union[ExampleDependencyCreate, Dict[str, Any]],
         **kwargs: Any,
     ) -> ExampleDependencyGet:
-        """Create Example Dependency"""
+        """Add Dependency"""
         response = await self._http.post(f"/examples/{example_id}/dependencies", json_data=data, params=kwargs)
         return ExampleDependencyGet.model_validate(response.json())
 
@@ -113,7 +114,7 @@ class ExamplesClient:
         example_id: str,
         **kwargs: Any,
     ) -> List[ExampleDependencyGet]:
-        """Get Example Dependencies"""
+        """List Dependencies"""
         response = await self._http.get(f"/examples/{example_id}/dependencies", params=kwargs)
         data = response.json()
         if isinstance(data, list):
@@ -122,11 +123,12 @@ class ExamplesClient:
 
     async def delete_dependencies(
         self,
+        example_id: str,
         dependency_id: str,
         **kwargs: Any,
     ) -> None:
         """Remove Dependency"""
-        await self._http.delete(f"/examples/dependencies/{dependency_id}", params=kwargs)
+        await self._http.delete(f"/examples/{example_id}/dependencies/{dependency_id}", params=kwargs)
         return
 
     async def upload(
@@ -155,16 +157,6 @@ class ExamplesClient:
         """Download Example Version"""
         response = await self._http.get(f"/examples/download/{version_id}", params=kwargs)
         return ExampleDownloadResponse.model_validate(response.json())
-
-    async def delete_delete_dependencies(
-        self,
-        example_id: str,
-        dependency_id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete Example Dependency"""
-        await self._http.delete(f"/examples/{example_id}/dependencies/{dependency_id}", params=kwargs)
-        return
 
     async def by_pattern(
         self,
