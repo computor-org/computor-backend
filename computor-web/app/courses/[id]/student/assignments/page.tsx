@@ -12,7 +12,13 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import type { CourseContentStudentList } from 'types/generated';
+import { lastSegment } from '@/src/utils/ltree';
 
+// NOTE: this page keeps its own tree builder (below) rather than the shared
+// utils/ltree buildTree because it SYNTHESISES missing container nodes from the
+// path segments (a bare assignment at a.b.c renders under synthetic a / a.b
+// units) and uses a label/content node shape — the shared buildTree only nests
+// items that are actually present. It shares the ltree path primitives.
 interface TreeNode {
   label: string;
   path: string;
@@ -76,7 +82,7 @@ export default function StudentCourseContentsPage() {
 
         if (!nodeMap.has(currentPath)) {
           const node: TreeNode = {
-            label: part,
+            label: lastSegment(currentPath),
             path: part,
             fullPath: currentPath,
             children: [],
