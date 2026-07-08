@@ -322,14 +322,10 @@ class GitLabBuilder:
                             result["gitlab_created"] = True
                             
                             # Create child-specific config WITHOUT token
-                            gitlab_config = self._create_child_gitlab_config(gitlab_group)
+                            gitlab_config = self._build_gitlab_config(gitlab_group)
                             
                             # Update properties
-                            self._update_course_gitlab_properties(
-                                existing_course,
-                                gitlab_group,
-                                gitlab_config
-                            )
+                            self._set_gitlab_properties(existing_course, gitlab_config)
                         else:
                             result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
                     else:
@@ -345,14 +341,10 @@ class GitLabBuilder:
                         result["gitlab_created"] = True
                         
                         # Create child-specific config WITHOUT token
-                        gitlab_config = self._create_child_gitlab_config(gitlab_group)
+                        gitlab_config = self._build_gitlab_config(gitlab_group)
                         
                         # Update properties
-                        self._update_course_gitlab_properties(
-                            existing_course,
-                            gitlab_group,
-                            gitlab_config
-                        )
+                        self._set_gitlab_properties(existing_course, gitlab_config)
                 else:
                     # Create GitLab group
                     gitlab_group, _ = self._create_gitlab_group(
@@ -366,21 +358,14 @@ class GitLabBuilder:
                     result["gitlab_created"] = True
                     
                     # Create child-specific config WITHOUT token
-                    gitlab_config = self._create_child_gitlab_config(gitlab_group)
+                    gitlab_config = self._build_gitlab_config(gitlab_group)
                     
                     # Update properties
-                    self._update_course_gitlab_properties(
-                        existing_course,
-                        gitlab_group,
-                        gitlab_config
-                    )
+                    self._set_gitlab_properties(existing_course, gitlab_config)
                 
                 # Ensure students group exists for existing course
                 if result.get("gitlab_group"):
-                    students_group_result = self._create_students_group(
-                        course=existing_course,
-                        parent_group=result["gitlab_group"],
-                        )
+                    students_group_result = self._ensure_subgroup(existing_course, result["gitlab_group"], "students", "Students", "students_group")
                     
                     if not students_group_result["success"]:
                         logger.warning(f"Failed to create students group: {students_group_result['error']}")
@@ -388,10 +373,7 @@ class GitLabBuilder:
                         logger.info(f"Ensured students group exists: {students_group_result['gitlab_group'].full_path}")
                     
                     # Ensure tutors group exists for existing course
-                    tutors_group_result = self._create_tutors_group(
-                        course=existing_course,
-                        parent_group=result["gitlab_group"],
-                        )
+                    tutors_group_result = self._ensure_subgroup(existing_course, result["gitlab_group"], "tutors", "Tutors", "tutors_group")
                     
                     if not tutors_group_result["success"]:
                         logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
@@ -441,7 +423,7 @@ class GitLabBuilder:
             result["gitlab_created"] = True
             
             # Create child-specific config WITHOUT token
-            gitlab_config = self._create_child_gitlab_config(gitlab_group)
+            gitlab_config = self._build_gitlab_config(gitlab_group)
             
             # Create course in database
             course_data = CourseCreate(
@@ -470,10 +452,7 @@ class GitLabBuilder:
             result["db_created"] = True
             
             # Create students group under the course
-            students_group_result = self._create_students_group(
-                course=new_course,
-                parent_group=gitlab_group,
-            )
+            students_group_result = self._ensure_subgroup(new_course, gitlab_group, "students", "Students", "students_group")
 
             if not students_group_result["success"]:
                 logger.warning(f"Failed to create students group: {students_group_result['error']}")
@@ -482,10 +461,7 @@ class GitLabBuilder:
                 logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
 
             # Create tutors group under the course
-            tutors_group_result = self._create_tutors_group(
-                course=new_course,
-                parent_group=gitlab_group,
-            )
+            tutors_group_result = self._ensure_subgroup(new_course, gitlab_group, "tutors", "Tutors", "tutors_group")
 
             if not tutors_group_result["success"]:
                 logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
@@ -595,13 +571,11 @@ class GitLabBuilder:
                     return group, {}
             raise
     
-    def _create_organization_gitlab_config(self, group: Group) -> Dict[str, Any]:
-        """Create GitLab configuration for organization WITH encrypted token."""
-        from computor_types.encryption import encrypt_secret
-
+    def _build_gitlab_config(self, group: Group, include_token: bool = False) -> Dict[str, Any]:
+        """GitLab connection config for a group. Only organizations carry a
+        token (course families/courses inherit it from the parent org)."""
         config = {
             "url": self.gitlab_url,
-            "token": encrypt_secret(self.gitlab_token),  # Only organizations get tokens
             "group_id": int(group.id) if group.id is not None else None,
             "full_path": group.full_path,
             "parent": int(group.parent_id) if group.parent_id is not None else None,
@@ -610,25 +584,11 @@ class GitLabBuilder:
             "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,
             "web_url": f"{self.gitlab_url}/groups/{group.full_path}",
             "visibility": group.visibility,
-            "last_synced_at": datetime.now(timezone.utc).isoformat()
+            "last_synced_at": datetime.now(timezone.utc).isoformat(),
         }
-        return config
-    
-    def _create_child_gitlab_config(self, group: Group) -> Dict[str, Any]:
-        """Create GitLab configuration for course families and courses WITHOUT token."""
-        config = {
-            "url": self.gitlab_url,
-            # NO TOKEN - course families and courses get token from parent organization
-            "group_id": int(group.id) if group.id is not None else None,
-            "full_path": group.full_path,
-            "parent": int(group.parent_id) if group.parent_id is not None else None,
-            "parent_id": int(group.parent_id) if group.parent_id is not None else None,
-            "namespace_id": group.namespace.get('id') if hasattr(group, 'namespace') else None,
-            "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,
-            "web_url": f"{self.gitlab_url}/groups/{group.full_path}",
-            "visibility": group.visibility,
-            "last_synced_at": datetime.now(timezone.utc).isoformat()
-        }
+        if include_token:
+            from computor_types.encryption import encrypt_secret
+            config["token"] = encrypt_secret(self.gitlab_token)
         return config
     
     def _validate_gitlab_group(self, group_id: int, expected_path: str) -> bool:
@@ -644,203 +604,70 @@ class GitLabBuilder:
             logger.warning(f"Error validating GitLab group {group_id}: {e}")
             return False
 
-    def _update_organization_gitlab_properties(
-        self,
-        organization: Organization,
-        gitlab_group: Group,
-        gitlab_config: Dict[str, Any]
-    ):
-        """Update organization with enhanced GitLab properties."""
-        if not organization.properties:
-            organization.properties = {}
-        
-        organization.properties["gitlab"] = gitlab_config
-        flag_modified(organization, "properties")
+    def _set_gitlab_properties(self, entity, gitlab_config: Dict[str, Any]):
+        """Write the gitlab config block onto any hierarchy entity's properties."""
+        if not entity.properties:
+            entity.properties = {}
+        entity.properties["gitlab"] = gitlab_config
+        flag_modified(entity, "properties")
         self.db.flush()
-        
-        # Refresh the object to ensure in-memory state matches database
-        self.db.refresh(organization)
-        
-        logger.info(f"Updated organization {organization.path} with GitLab properties")
+        self.db.refresh(entity)
+        logger.info(f"Updated {type(entity).__name__} {entity.path} with GitLab properties")
     
-    def _update_course_family_gitlab_properties(
-        self,
-        course_family: CourseFamily,
-        gitlab_group: Group,
-        gitlab_config: Dict[str, Any]
-    ):
-        """Update course family with enhanced GitLab properties."""
-        if not course_family.properties:
-            course_family.properties = {}
-        
-        course_family.properties["gitlab"] = gitlab_config
-        flag_modified(course_family, "properties")
-        self.db.flush()
-        
-        # Refresh the object to ensure in-memory state matches database
-        self.db.refresh(course_family)
-        
-        logger.info(f"Updated course family {course_family.path} with GitLab properties")
-    
-    def _update_course_gitlab_properties(
-        self,
-        course: Course,
-        gitlab_group: Group,
-        gitlab_config: Dict[str, Any]
-    ):
-        """Update course with enhanced GitLab properties."""
-        if not course.properties:
-            course.properties = {}
-        
-        course.properties["gitlab"] = gitlab_config
-        flag_modified(course, "properties")
-        self.db.flush()
-        
-        # Refresh the object to ensure in-memory state matches database
-        self.db.refresh(course)
-        
-        logger.info(f"Updated course {course.path} with GitLab properties")
-    
-    def _create_students_group(
+    def _ensure_subgroup(
         self,
         course: Course,
         parent_group: Group,
+        path: str,
+        name: str,
+        prop_key: str,
     ) -> Dict[str, Any]:
-        """Create students group under a course."""
-        result = {
-            "success": False,
-            "gitlab_group": None,
-            "error": None
-        }
-        
+        """Idempotently create a ``path`` subgroup (e.g. students/tutors) under a
+        course group, recording it on ``course.properties['gitlab'][prop_key]``."""
+        result = {"success": False, "gitlab_group": None, "error": None}
+
         try:
-            # Check if students group already exists
-            students_path = "students"
-            full_path = f"{parent_group.full_path}/{students_path}"
-            
-            # Try to find existing students group
-            existing_groups = parent_group.subgroups.list(search=students_path)
-            students_group = None
-            
+            existing_groups = parent_group.subgroups.list(search=path)
             for group in existing_groups:
-                if group.path == students_path:
-                    students_group = self.gitlab.groups.get(group.id)
-                    logger.info(f"Students group already exists: {students_group.full_path}")
-                    result["gitlab_group"] = students_group
+                if group.path == path:
+                    subgroup = self.gitlab.groups.get(group.id)
+                    logger.info(f"{name} group already exists: {subgroup.full_path}")
+                    result["gitlab_group"] = subgroup
                     result["success"] = True
                     return result
-            
-            # Create students group
-            group_data = {
-                'name': 'Students',
-                'path': students_path,
+
+            subgroup = self.gitlab.groups.create({
+                'name': name,
+                'path': path,
                 'parent_id': parent_group.id,
-                'description': f'Students group for {course.title}',
-                'visibility': 'private'  # Students group should be private
-            }
-            
-            students_group = self.gitlab.groups.create(group_data)
-            logger.info(f"Created students group: {students_group.full_path}")
-            
-            # Update course properties to include students group info
+                'description': f'{name} group for {course.title}',
+                'visibility': 'private',
+            })
+            logger.info(f"Created {name.lower()} group: {subgroup.full_path}")
+
             if not course.properties:
                 course.properties = {}
-            
             if "gitlab" not in course.properties:
                 course.properties["gitlab"] = {}
-            
-            course.properties["gitlab"]["students_group"] = {
-                "group_id": students_group.id,
-                "full_path": students_group.full_path,
-                "web_url": f"{self.gitlab_url}/groups/{students_group.full_path}",
-                "created_at": datetime.now(timezone.utc).isoformat()
+            course.properties["gitlab"][prop_key] = {
+                "group_id": subgroup.id,
+                "full_path": subgroup.full_path,
+                "web_url": f"{self.gitlab_url}/groups/{subgroup.full_path}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
-            
             flag_modified(course, "properties")
             self.db.flush()
             self.db.refresh(course)
-            
-            result["gitlab_group"] = students_group
+
+            result["gitlab_group"] = subgroup
             result["success"] = True
-            
         except GitlabCreateError as e:
-            logger.error(f"Failed to create students group: {e}")
+            logger.error(f"Failed to create {name.lower()} group: {e}")
             result["error"] = str(e)
         except Exception as e:
-            logger.error(f"Unexpected error creating students group: {e}")
+            logger.error(f"Unexpected error creating {name.lower()} group: {e}")
             result["error"] = str(e)
-        
-        return result
-    
-    def _create_tutors_group(
-        self,
-        course: Course,
-        parent_group: Group,
-    ) -> Dict[str, Any]:
-        """Create tutors group under a course."""
-        result = {
-            "success": False,
-            "gitlab_group": None,
-            "error": None
-        }
-        
-        try:
-            # Check if tutors group already exists
-            tutors_path = "tutors"
-            full_path = f"{parent_group.full_path}/{tutors_path}"
-            
-            # Try to find existing tutors group
-            existing_groups = parent_group.subgroups.list(search=tutors_path)
-            tutors_group = None
-            
-            for group in existing_groups:
-                if group.path == tutors_path:
-                    tutors_group = self.gitlab.groups.get(group.id)
-                    logger.info(f"Tutors group already exists: {tutors_group.full_path}")
-                    result["gitlab_group"] = tutors_group
-                    result["success"] = True
-                    return result
-            
-            # Create tutors group
-            group_data = {
-                'name': 'Tutors',
-                'path': tutors_path,
-                'parent_id': parent_group.id,
-                'description': f'Tutors group for {course.title}',
-                'visibility': 'private'  # Tutors group should be private
-            }
-            
-            tutors_group = self.gitlab.groups.create(group_data)
-            logger.info(f"Created tutors group: {tutors_group.full_path}")
-            
-            # Update course properties to include tutors group info
-            if not course.properties:
-                course.properties = {}
-            
-            if "gitlab" not in course.properties:
-                course.properties["gitlab"] = {}
-            
-            course.properties["gitlab"]["tutors_group"] = {
-                "group_id": tutors_group.id,
-                "full_path": tutors_group.full_path,
-                "web_url": f"{self.gitlab_url}/groups/{tutors_group.full_path}",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            flag_modified(course, "properties")
-            self.db.flush()
-            self.db.refresh(course)
-            
-            result["gitlab_group"] = tutors_group
-            result["success"] = True
-            
-        except GitlabCreateError as e:
-            logger.error(f"Failed to create tutors group: {e}")
-            result["error"] = str(e)
-        except Exception as e:
-            logger.error(f"Unexpected error creating tutors group: {e}")
-            result["error"] = str(e)
-        
+
         return result
     
     def _create_course_projects(

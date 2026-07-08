@@ -94,9 +94,8 @@ def test_course_family_refresh_fix(mock_flag_modified):
     }
     
     # Call the update method
-    builder._update_course_family_gitlab_properties(
+    builder._set_gitlab_properties(
         mock_course_family,
-        mock_gitlab_group,
         gitlab_config
     )
     
@@ -133,9 +132,8 @@ def test_course_family_refresh_fix(mock_flag_modified):
     mock_db_session.refresh.reset_mock()
     
     # Call the course update method
-    builder._update_course_gitlab_properties(
+    builder._set_gitlab_properties(
         mock_course,
-        mock_gitlab_group,
         gitlab_config
     )
     
