@@ -717,7 +717,7 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                 results.append(result)
                     
             return WorkflowResult(
-                status="success",
+                status="completed",
                 result={"message": f"Created {len(results)} repositories", "repositories": results},
                 metadata={"repository_count": len(results)}
             )
@@ -730,10 +730,6 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={"error_details": str(e)}
             )
-
-WORKFLOWS = [
-    StudentRepositoryCreationWorkflow,
-]
 
 ACTIVITIES = [
     create_student_repository,

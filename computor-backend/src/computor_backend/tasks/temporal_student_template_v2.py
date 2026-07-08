@@ -7,7 +7,6 @@ from datetime import timedelta
 from typing import Dict, Any, List
 
 from temporalio import workflow, activity
-from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .git_ops import clone_or_init, commit_and_push, configure_identity
@@ -623,32 +622,14 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         student_template_url = params.get('student_template_url')
         assignments_url = params.get('assignments_url')  # Get assignments URL
         force_redeploy = params.get('force_redeploy', False)  # Default to False if not provided
-        
-        if not course_id:
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error="course_id is required"
-            )
-        
-        if not student_template_url:
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error="student_template_url is required"
-            )
-        
+
+        invalid = self.require_params(params, 'course_id', 'student_template_url')
+        if invalid:
+            return invalid
+
         # Get workflow ID for tracking
         workflow_id = workflow.info().workflow_id
-        
-        # Execute the activity with retry policy
-        retry_policy = RetryPolicy(
-            initial_interval=timedelta(seconds=5),
-            maximum_interval=timedelta(minutes=1),
-            maximum_attempts=3,
-            backoff_coefficient=2.0
-        )
-        
+
         try:
             # Build release selection/options from params
             release = params.get('release') or {
@@ -660,13 +641,12 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
                 'overrides': params.get('overrides'),
             }
 
-            result = await workflow.execute_activity(
+            result = await self.run_single_activity(
                 generate_student_template_activity_v2,
                 args=[course_id, student_template_url, assignments_url, workflow_id, force_redeploy, release],
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=retry_policy
+                timeout=timedelta(minutes=30),
             )
-            
+
             return WorkflowResult(
                 status="completed" if result.get('success', False) else "failed",
                 result=result,
@@ -682,10 +662,6 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
                 error=str(e)
             )
 
-
-WORKFLOWS = [
-    GenerateStudentTemplateWorkflowV2,
-]
 
 ACTIVITIES = [
     generate_student_template_activity_v2,

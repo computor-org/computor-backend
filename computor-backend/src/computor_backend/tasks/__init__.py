@@ -6,43 +6,27 @@ that handles operations exceeding FastAPI's request-response cycle.
 """
 
 from .temporal_executor import TemporalTaskExecutor as TaskExecutor, get_task_executor
-from .registry import task_registry, register_task
+from .registry import (
+    task_registry,
+    register_task,
+    import_task_modules,
+    TEMPORAL_TASK_MODULES,
+)
 from computor_types.tasks import TaskResult, TaskSubmission, TaskInfo, TaskStatus
 from .temporal_client import (
-    get_temporal_client, 
+    get_temporal_client,
     close_temporal_client,
     get_task_queue_name,
     DEFAULT_TASK_QUEUE
 )
 from .temporal_base import BaseWorkflow, WorkflowResult
 
-# Demo/example workflows (example_long_running, …) auto-register on import and
-# are then submittable through the public task API. Keep them OUT of production
-# unless explicitly enabled, so nobody can launch an arbitrary long-running job.
-import os as _os
-if _os.environ.get("COMPUTOR_ENABLE_EXAMPLE_TASKS") == "1":
-    from . import temporal_examples  # noqa: F401
-
-# Import Temporal hierarchy management tasks to auto-register
-from . import temporal_hierarchy_management
-
-# Import Temporal student testing tasks to auto-register
-from . import temporal_student_testing
-
-# Import Temporal student template tasks to auto-register
-from . import temporal_student_template_v2
-
-# Import Temporal student repository tasks to auto-register
-from . import temporal_student_repository
-
-# Import Assignments repository tasks to auto-register
-from . import temporal_assignments_repository
-
-# Import Tutor testing tasks to auto-register
-from . import temporal_tutor_testing
-
-# Import Coder setup tasks to auto-register (image building, template push)
-from . import temporal_coder_setup
+# Import every Temporal task module so its workflows/activities auto-register
+# and become submittable through the public task API. This is the single place
+# the module list lives (TEMPORAL_TASK_MODULES in registry.py). Demo/example
+# workflows are only imported when COMPUTOR_ENABLE_EXAMPLE_TASKS=1, so nobody
+# can launch an arbitrary long-running job in production.
+import_task_modules()
 
 __all__ = [
     'TaskExecutor',
@@ -53,6 +37,8 @@ __all__ = [
     'TaskInfo',
     'task_registry',
     'register_task',
+    'import_task_modules',
+    'TEMPORAL_TASK_MODULES',
     'get_temporal_client',
     'close_temporal_client',
     'get_task_queue_name',

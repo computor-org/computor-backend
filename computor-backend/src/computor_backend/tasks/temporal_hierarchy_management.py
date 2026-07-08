@@ -325,11 +325,6 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
             )
 
 
-WORKFLOWS = [
-    CreateCourseWorkflow,
-    DeployComputorHierarchyWorkflow,
-]
-
 ACTIVITIES = [
     create_course_activity,
 ]
