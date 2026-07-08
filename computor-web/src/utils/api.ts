@@ -9,6 +9,16 @@ import { apiFetch, API_BASE_URL } from './apiClient';
  * Resolves the parsed JSON body, throws an Error with the server's message on a
  * non-2xx response (so callers just try/catch), and handles 204 No Content.
  * `path` is relative to API_BASE_URL.
+ *
+ * PREFER the generated clients in `src/generated/clients/*` for new code — this
+ * helper is retained only for the handful of endpoints that currently have no
+ * usable generated client: `/consent/*` (no ConsentClient generated), `/user`
+ * + `/user/*` (the generated `UserClient` collides with the `/user-roles`
+ * client and overwrites those methods on disk), the ambiguous dual-route
+ * `DELETE /organizations/{id}` and `DELETE /course-families/{id}`, and
+ * `DELETE /examples/{id}` (no single-id delete emitted). Regenerating the
+ * clients (see backend generate_python_clients / the TS generator) will unblock
+ * migrating these and deleting this module.
  */
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {

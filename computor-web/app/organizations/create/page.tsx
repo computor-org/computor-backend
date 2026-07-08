@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
+import type { OrganizationType } from '@/src/generated/types/organizations';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+
+const organizationsClient = new OrganizationsClient();
 
 const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
@@ -28,11 +30,13 @@ export default function OrganizationCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const org = await api.post<OrganizationGet>('/organizations', {
-        path: path.trim(),
-        organization_type: orgType,
-        title: title.trim() || null,
-        description: description.trim() || null,
+      const org = await organizationsClient.createOrganizationsOrganizationsPost({
+        body: {
+          path: path.trim(),
+          organization_type: orgType,
+          title: title.trim() || null,
+          description: description.trim() || null,
+        },
       });
       router.push(`/organizations/${org.id}`);
     } catch (e) {

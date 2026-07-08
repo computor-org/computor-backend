@@ -1,24 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import type { CourseFamilyList } from '@/src/generated/types/courses';
-import type { OrganizationList } from '@/src/generated/types/organizations';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+
+const organizationsClient = new OrganizationsClient();
+const courseFamiliesClient = new CourseFamiliesClient();
+const coursesClient = new CoursesClient();
 
 export default function CourseFamiliesPage() {
   const { canCreateCourseFamily } = usePermissions();
 
   const { data, loading, error } = useResource(async () => {
     const [families, orgs, courses] = await Promise.all([
-      api.get<CourseFamilyList[]>('/course-families'),
-      api.get<OrganizationList[]>('/organizations'),
-      api.get<Array<{ course_family_id?: string | null }>>('/courses'),
+      courseFamiliesClient.listCourseFamiliesCourseFamiliesGet({}),
+      organizationsClient.listOrganizationsOrganizationsGet({}),
+      coursesClient.listCoursesCoursesGet({}),
     ]);
     const courseCounts: Record<string, number> = {};
     for (const c of courses) {

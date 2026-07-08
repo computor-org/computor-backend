@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { GitServerGet } from '@/src/generated/types/common';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+
+const gitServersClient = new GitServersClient();
 
 type GitServerType = 'forgejo' | 'gitlab';
 
@@ -29,12 +30,14 @@ export default function GitServerCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const server = await api.post<GitServerGet>('/git-servers', {
-        type,
-        base_url: baseUrl.trim(),
-        name: name.trim() || null,
-        managed,
-        token: token.trim() || null,
+      const server = await gitServersClient.createGitServerEndpointGitServersPost({
+        body: {
+          type,
+          base_url: baseUrl.trim(),
+          name: name.trim() || null,
+          managed,
+          token: token.trim() || null,
+        },
       });
       router.push(`/admin/git-servers/${server.id}`);
     } catch (e) {

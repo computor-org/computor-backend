@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { ExampleRepositoryGet } from 'types/generated';
+
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExampleRepositoryCreatePage() {
   const router = useRouter();
@@ -26,11 +27,13 @@ export default function ExampleRepositoryCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      const repo = await api.post<ExampleRepositoryGet>('/example-repositories', {
-        name: name.trim(),
-        description: description.trim() || null,
-        source_type: sourceType,
-        source_url: sourceUrl.trim(),
+      const repo = await exampleRepositoriesClient.createExampleRepositoriesExampleRepositoriesPost({
+        body: {
+          name: name.trim(),
+          description: description.trim() || null,
+          source_type: sourceType,
+          source_url: sourceUrl.trim(),
+        },
       });
       router.push(`/example-repositories/${repo.id}`);
     } catch (e) {

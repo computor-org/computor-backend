@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -11,13 +10,15 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
 import Forbidden from '@/src/components/Forbidden';
-import type { GitServerGet } from '@/src/generated/types/common';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+
+const gitServersClient = new GitServersClient();
 
 export default function GitServersPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageHierarchy: canManage } = usePermissions();
 
-  const { data, loading, error } = useResource(() => api.get<GitServerGet[]>('/git-servers'), [], { enabled: canManage });
+  const { data, loading, error } = useResource(() => gitServersClient.listGitServersEndpointGitServersGet({}), [], { enabled: canManage });
   const servers = data ?? [];
 
   if (!authLoading && isAuthenticated && !canManage) {

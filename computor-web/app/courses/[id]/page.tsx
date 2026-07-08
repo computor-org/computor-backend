@@ -4,6 +4,9 @@ import { useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/src/utils/api';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -11,13 +14,13 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import type {
-  CourseGet,
-  CourseFamilyGet,
-  CourseGitBindingGet,
   CourseMemberRepositoryGet,
-  OrganizationGet,
   StudentRepositoryProvisioned,
 } from 'types/generated';
+
+const coursesClient = new CoursesClient();
+const courseFamiliesClient = new CourseFamiliesClient();
+const organizationsClient = new OrganizationsClient();
 
 interface ViewCard {
   view: string;
@@ -34,14 +37,14 @@ export default function CoursePage() {
 
   const { data, loading, error, reload } = useResource(
     async () => {
-      const course = await api.get<CourseGet>(`/courses/${courseId}`);
+      const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
       const [courseViews, organization, courseFamily, gitBinding, myRepo] = await Promise.all([
         api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
-        api.get<OrganizationGet>(`/organizations/${course.organization_id}`).catch(() => null),
-        api.get<CourseFamilyGet>(`/course-families/${course.course_family_id}`).catch(() => null),
+        organizationsClient.getOrganizationsOrganizationsIdGet({ id: course.organization_id }).catch(() => null),
+        courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: course.course_family_id }).catch(() => null),
         // Git binding is lecturer-cohort only; fetch it only for managers.
         canManageMembers
-          ? api.get<CourseGitBindingGet>(`/courses/${courseId}/git`).catch(() => null)
+          ? coursesClient.getCourseGitBindingEndpointCoursesCourseIdGitGet({ courseId }).catch(() => null)
           : Promise.resolve(null),
         // The caller's own repository. 404s (→ null) when they aren't a member.
         api.get<CourseMemberRepositoryGet>(`/user/courses/${courseId}/repository`).catch(() => null),

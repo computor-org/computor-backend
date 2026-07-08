@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -15,10 +14,12 @@ import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { UserClient } from '@/src/generated/clients/UserClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
 
 const usersClient = new UsersClient();
+const userClient = new UserClient();
 const accountsClient = new AccountsClient();
 
 export default function UserDetailPage() {
@@ -84,10 +85,10 @@ export default function UserDetailPage() {
     const toRemove = current.filter((r) => !roles.includes(r));
     try {
       for (const roleId of toAdd) {
-        await api.post('/user-roles', { user_id: userId, role_id: roleId });
+        await userClient.createUserRoleUserRolesPost({ body: { user_id: userId, role_id: roleId } });
       }
       for (const roleId of toRemove) {
-        await api.del(`/user-roles/users/${userId}/roles/${roleId}`);
+        await userClient.deleteUserRoleEndpointUserRolesUsersUserIdRolesRoleIdDelete({ userId, roleId });
       }
       notify('Roles updated.', 'success');
       await load();

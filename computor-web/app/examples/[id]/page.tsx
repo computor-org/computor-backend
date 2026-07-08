@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/src/utils/api';
+import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -13,7 +14,9 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
-import type { ExampleGet, ExampleVersionList } from 'types/generated';
+import type { ExampleVersionList } from 'types/generated';
+
+const examplesClient = new ExamplesClient();
 
 export default function ExampleDetailPage() {
   const exampleId = useParams().id as string;
@@ -24,8 +27,8 @@ export default function ExampleDetailPage() {
 
   const { data, loading, error } = useResource(
     async () => ({
-      example: await api.get<ExampleGet>(`/examples/${exampleId}`),
-      versions: await api.get<ExampleVersionList[]>(`/examples/${exampleId}/versions?limit=200`).catch(() => [] as ExampleVersionList[]),
+      example: await examplesClient.getExampleExamplesExampleIdGet({ exampleId }),
+      versions: await examplesClient.listVersionsExamplesExampleIdVersionsGet({ exampleId, limit: 200 }).catch(() => [] as ExampleVersionList[]),
     }),
     [exampleId],
     { enabled: canViewExamples },

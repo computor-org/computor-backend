@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -11,7 +10,8 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import StatCards from './StatCards';
 import ProgressBar from './ProgressBar';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
-import type { CourseGet, CourseMemberGradingsList } from 'types/generated';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import type { CourseMemberGradingsList } from 'types/generated';
 
 // Charts pull in recharts (~large) — load them only when this view renders
 // instead of shipping the library in the shared bundle.
@@ -26,6 +26,7 @@ const ContentTypeChart = dynamic(() => import('./ContentTypeChart'), {
 });
 
 const gradingsClient = new CourseMemberGradingsClient();
+const coursesClient = new CoursesClient();
 
 function daysSince(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -87,7 +88,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
     if (authLoading || !isAuthenticated) return;
     fetchData();
     // Course title is best-effort — the breadcrumb falls back to "Course".
-    api.get<CourseGet>(`/courses/${courseId}`).then(
+    coursesClient.getCoursesCoursesIdGet({ id: courseId }).then(
       (c) => setCourseTitle(c.title || c.path || 'Course'),
       () => {},
     );

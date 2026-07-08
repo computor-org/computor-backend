@@ -12,6 +12,11 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { OrganizationGet, CourseFamilyList } from 'types/generated';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+
+const organizationsClient = new OrganizationsClient();
+const courseFamiliesClient = new CourseFamiliesClient();
 
 export default function OrganizationDetailPage() {
   const orgId = useParams().id as string;
@@ -21,8 +26,8 @@ export default function OrganizationDetailPage() {
 
   const { data, loading, error } = useResource(
     async () => ({
-      org: await api.get<OrganizationGet>(`/organizations/${orgId}`),
-      families: await api.get<CourseFamilyList[]>(`/course-families?organization_id=${orgId}`),
+      org: await organizationsClient.getOrganizationsOrganizationsIdGet({ id: orgId }),
+      families: await courseFamiliesClient.listCourseFamiliesCourseFamiliesGet({ organizationId: orgId }),
     }),
     [orgId],
   );

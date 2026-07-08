@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
+import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -13,7 +14,10 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
-import type { ExampleRepositoryGet, ExampleList } from 'types/generated';
+import type { ExampleList } from 'types/generated';
+
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
+const examplesClient = new ExamplesClient();
 
 export default function ExampleRepositoryDetailPage() {
   const repoId = useParams().id as string;
@@ -24,8 +28,8 @@ export default function ExampleRepositoryDetailPage() {
 
   const { data, loading, error } = useResource(
     async () => ({
-      repo: await api.get<ExampleRepositoryGet>(`/example-repositories/${repoId}`),
-      examples: await api.get<ExampleList[]>(`/examples?repository_id=${repoId}&limit=500`).catch(() => [] as ExampleList[]),
+      repo: await exampleRepositoriesClient.getExampleRepositoriesExampleRepositoriesIdGet({ id: repoId }),
+      examples: await examplesClient.listExamplesExamplesGet({ repositoryId: repoId, limit: 500 }).catch(() => [] as ExampleList[]),
     }),
     [repoId],
     { enabled: canViewExamples },
@@ -34,7 +38,7 @@ export default function ExampleRepositoryDetailPage() {
   const examples = data?.examples ?? [];
 
   async function doDelete() {
-    await api.del(`/example-repositories/${repoId}`);
+    await exampleRepositoriesClient.deleteExampleRepositoriesExampleRepositoriesIdDelete({ id: repoId });
     router.push('/example-repositories');
   }
 

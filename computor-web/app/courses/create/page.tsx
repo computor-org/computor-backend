@@ -2,15 +2,23 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+import { SystemClient } from '@/src/generated/clients/SystemClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { CourseFamilyList, CourseGet } from '@/src/generated/types/courses';
+import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
+
+const coursesClient = new CoursesClient();
+const courseFamiliesClient = new CourseFamiliesClient();
+const gitServersClient = new GitServersClient();
+const systemClient = new SystemClient();
 
 const ALL_MODES = ['managed', 'external', 'download'];
 const MODE_LABELS: Record<string, string> = {
@@ -66,12 +74,12 @@ function CreateInner() {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
     (async () => {
-      const fams = await api.get<CourseFamilyList[]>('/course-families');
+      const fams = await courseFamiliesClient.listCourseFamiliesCourseFamiliesGet({});
       const creatable = fams.filter((f) => canCreateCourse(f.organization_id, f.id));
       setFamilies(creatable);
       if (!familyIdParam && creatable.length === 1) setFamilyId(creatable[0].id);
       if (canConfigureGit) {
-        const srv = await api.get<GitServerGet[]>('/git-servers');
+        const srv = await gitServersClient.listGitServersEndpointGitServersGet({});
         setServers(srv);
         const def = srv.find((s) => s.managed)?.id ?? srv[0]?.id ?? '';
         setServerId(def);
@@ -109,10 +117,10 @@ function CreateInner() {
     setError(null);
     setCreatedCourseId(null);
     try {
-      const res = await api.post<DeployResult>(`/course-families/${familyId}/deploy-course`, {
-        yaml: fileText,
-        validate_only: true,
-      });
+      const res = (await courseFamiliesClient.deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({
+        courseFamilyId: familyId,
+        body: { yaml: fileText, validate_only: true },
+      })) as unknown as DeployResult;
       setCheck(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Validation failed');
@@ -124,7 +132,7 @@ function CreateInner() {
   async function configureGit(courseId: string) {
     if (canConfigureGit && gitEnabled && serverId) {
       const selected = servers.find((s) => s.id === serverId);
-      const body: Record<string, unknown> = {
+      const body: CourseGitBindingUpsert = {
         delivery,
         git_server_id: serverId,
         student_repo_modes: modes,
@@ -136,7 +144,7 @@ function CreateInner() {
         if (token.trim()) body.token = token.trim();
       }
       try {
-        await api.put(`/courses/${courseId}/git`, body);
+        await coursesClient.upsertCourseGitBindingEndpointCoursesCourseIdGitPut({ courseId, body });
       } catch (e) {
         throw new Error('Course created, but git setup failed: ' + (e instanceof Error ? e.message : ''));
       }
@@ -149,7 +157,10 @@ function CreateInner() {
   async function triggerDeploy(courseId: string) {
     if (!deployNow) return;
     try {
-      await api.post(`/system/courses/${courseId}/generate-student-template`, {});
+      await systemClient.generateStudentTemplateSystemCoursesCourseIdGenerateStudentTemplatePost({
+        courseId,
+        body: {},
+      });
     } catch {
       /* best-effort; ignore */
     }
@@ -160,10 +171,10 @@ function CreateInner() {
     setError(null);
     try {
       if (hasFile) {
-        const res = await api.post<DeployResult>(`/course-families/${familyId}/deploy-course`, {
-          yaml: fileText,
-          validate_only: false,
-        });
+        const res = (await courseFamiliesClient.deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({
+          courseFamilyId: familyId,
+          body: { yaml: fileText, validate_only: false },
+        })) as unknown as DeployResult;
         if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
         // Git comes from the uploaded file's `git:` block (applied server-side by
         // deploy-course). Do NOT also call configureGit here — that would clobber
@@ -182,11 +193,13 @@ function CreateInner() {
         router.push(`/courses/${res.course_id}`);
         return;
       }
-      const course = await api.post<CourseGet>('/courses', {
-        path: path.trim(),
-        course_family_id: familyId,
-        title: title.trim() || null,
-        description: description.trim() || null,
+      const course = await coursesClient.createCoursesCoursesPost({
+        body: {
+          path: path.trim(),
+          course_family_id: familyId,
+          title: title.trim() || null,
+          description: description.trim() || null,
+        },
       });
       // One step: configure git immediately so a course is never left without it.
       await configureGit(course.id);

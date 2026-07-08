@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -11,7 +12,10 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { Field, inputCls } from '@/src/components/FormPanel';
-import type { CourseGet, CourseGitBindingGet, GitServerGet } from 'types/generated';
+import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
+
+const coursesClient = new CoursesClient();
+const gitServersClient = new GitServersClient();
 
 const ALL_MODES = ['managed', 'external', 'download'];
 const MODE_LABELS: Record<string, string> = {
@@ -56,15 +60,15 @@ export default function CourseEditPage() {
     setLoading(true);
     setError(null);
     try {
-      const c = await api.get<CourseGet>(`/courses/${courseId}`);
+      const c = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
       setCourse(c);
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
-      const srv = await api.get<GitServerGet[]>('/git-servers').catch(() => [] as GitServerGet[]);
+      const srv = await gitServersClient.listGitServersEndpointGitServersGet({}).catch(() => [] as GitServerGet[]);
       setServers(srv);
       // The binding endpoint 404s when a course has none yet — treat as null.
-      const b = await api.get<CourseGitBindingGet>(`/courses/${courseId}/git`).catch(() => null);
+      const b = await coursesClient.getCourseGitBindingEndpointCoursesCourseIdGitGet({ courseId }).catch(() => null);
       setBinding(b);
       if (b && b.delivery) {
         setDelivery(b.delivery === 'download' ? 'download' : 'git');
@@ -97,10 +101,13 @@ export default function CourseEditPage() {
     setSavingGeneral(true);
     setGeneralMsg(null);
     try {
-      const updated = await api.patch<CourseGet>(`/courses/${courseId}`, {
-        title: title.trim() || null,
-        description: description.trim() || null,
-        language_code: language.trim() || null,
+      const updated = await coursesClient.updateCoursesCoursesIdPatch({
+        id: courseId,
+        body: {
+          title: title.trim() || null,
+          description: description.trim() || null,
+          language_code: language.trim() || null,
+        },
       });
       setCourse(updated);
       setGeneralMsg('Saved.');
@@ -118,7 +125,7 @@ export default function CourseEditPage() {
     setGitMsg(null);
     try {
       const selected = servers.find((s) => s.id === gitServerId);
-      const body: Record<string, unknown> = {
+      const body: CourseGitBindingUpsert = {
         delivery,
         git_server_id: gitServerId || null,
         template_repo: templateRepo.trim() || null,
@@ -132,7 +139,7 @@ export default function CourseEditPage() {
         if (parentGroupId.trim()) body.parent_group_id = parentGroupId.trim();
         if (token.trim()) body.token = token.trim();
       }
-      await api.put(`/courses/${courseId}/git`, body);
+      await coursesClient.upsertCourseGitBindingEndpointCoursesCourseIdGitPut({ courseId, body });
       setGitMsg('Saved.');
       await load();
     } catch (e) {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/src/utils/api';
+import { TokensClient } from '@/src/generated/clients/TokensClient';
+import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -11,15 +13,18 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { inputCls } from '@/src/components/FormPanel';
-import type { ApiTokenGet, ApiTokenCreateResponse, AccountGet } from 'types/generated';
+import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
 import type { ConsentStatus } from '@/src/types/consent';
+
+const tokensClient = new TokensClient();
+const accountsClient = new AccountsClient();
 
 const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
 const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
 const accountConsoleUrl = KC_URL ? `${KC_URL.replace(/\/$/, '')}/realms/${KC_REALM}/account/` : null;
 
-// The generated AccountGet doesn't carry `builtin` until the types are regenerated.
-type AccountRow = AccountGet & { builtin?: boolean };
+// The accounts list endpoint returns AccountList, which already carries `builtin`.
+type AccountRow = AccountList;
 
 function Section({ title, description, children, actions }: {
   title: string;
@@ -76,8 +81,8 @@ export default function SettingsPage() {
     if (!authUser) return;
     try {
       const [tk, ac] = await Promise.all([
-        api.get<ApiTokenGet[]>('/api-tokens'),
-        api.get<AccountRow[]>(`/accounts?user_id=${authUser.id}`).catch(() => [] as AccountRow[]),
+        tokensClient.listTokensEndpointApiTokensGet({}),
+        accountsClient.listAccountsAccountsGet({ userId: authUser.id }).catch(() => [] as AccountRow[]),
       ]);
       setTokens(tk);
       setAccounts(ac);
@@ -99,9 +104,11 @@ export default function SettingsPage() {
     setCreating(true);
     setError(null);
     try {
-      const created = await api.post<ApiTokenCreateResponse>('/api-tokens', {
-        name: newName.trim(),
-        expires_at: newExpiry ? new Date(newExpiry).toISOString() : null,
+      const created = await tokensClient.createTokenEndpointApiTokensPost({
+        body: {
+          name: newName.trim(),
+          expires_at: newExpiry ? new Date(newExpiry).toISOString() : null,
+        },
       });
       setCreatedToken(created);
       setCopied(false);
@@ -242,7 +249,7 @@ export default function SettingsPage() {
                             message: `Revoking "${t.name}" immediately invalidates it. Anything using it will stop working.`,
                             confirmWord: t.name,
                             onConfirm: async () => {
-                              await api.del(`/api-tokens/${t.id}`);
+                              await tokensClient.revokeTokenEndpointApiTokensTokenIdDelete({ tokenId: t.id });
                               await load();
                             },
                           })
@@ -287,7 +294,7 @@ export default function SettingsPage() {
                               message: `Unlink ${a.provider} account "${a.provider_account_id}"?`,
                               confirmWord: a.provider_account_id,
                               onConfirm: async () => {
-                                await api.del(`/accounts/${a.id}`);
+                                await accountsClient.deleteAccountsAccountsIdDelete({ id: a.id });
                                 await load();
                               },
                             })

@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
@@ -14,6 +15,9 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { discoverExamplesInZip, type DiscoveredExample } from '@/src/utils/exampleZip';
 import type { ExampleRepositoryList } from 'types/generated';
+
+const examplesClient = new ExamplesClient();
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 const DIR_OK = /^[a-zA-Z0-9._-]+$/;
 
@@ -40,7 +44,7 @@ function UploadInner() {
 
   const load = useCallback(async () => {
     try {
-      const all = await api.get<ExampleRepositoryList[]>('/example-repositories?limit=200');
+      const all = await exampleRepositoriesClient.listExampleRepositoriesExampleRepositoriesGet({ limit: 200 });
       const uploadable = all.filter((r) => r.source_type === 'minio' || r.source_type === 's3');
       setRepos(uploadable);
       if (!initialRepo && uploadable.length === 1) setRepoId(uploadable[0].id);
@@ -80,10 +84,12 @@ function UploadInner() {
       const row = rows[i];
       setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'uploading', message: undefined } : r)));
       try {
-        const v = await api.post<{ version_tag?: string }>('/examples/upload', {
-          repository_id: repoId,
-          directory: row.directory,
-          files: row.files,
+        const v = await examplesClient.uploadExampleExamplesUploadPost({
+          body: {
+            repository_id: repoId,
+            directory: row.directory,
+            files: row.files,
+          },
         });
         setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'ok', message: `v${v.version_tag ?? ''}` } : r)));
       } catch (e) {

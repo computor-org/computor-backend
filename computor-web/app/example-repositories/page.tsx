@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -11,13 +11,14 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import Badge from '@/src/components/Badge';
-import type { ExampleRepositoryList } from 'types/generated';
+
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExampleRepositoriesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canViewExamples, canManageExamples } = usePermissions();
 
-  const { data, loading, error } = useResource(() => api.get<ExampleRepositoryList[]>('/example-repositories?limit=200'), [], { enabled: canViewExamples });
+  const { data, loading, error } = useResource(() => exampleRepositoriesClient.listExampleRepositoriesExampleRepositoriesGet({ limit: 200 }), [], { enabled: canViewExamples });
   const repos = data ?? [];
 
   if (!authLoading && isAuthenticated && !canViewExamples) {
