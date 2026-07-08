@@ -58,7 +58,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 109 | Split handlers_impl.py; merge scoped-handler clones | P2 | M | todo |
 | 110 | Decide repository-layer direction (bypassed by codebase) | P2 | L | todo |
 | 111 | Model mixins for 19× audit-column boilerplate | P2 | M | todo |
-| 112 | Keycloak: remove prints + secret-bearing logs | P2 | S | todo |
+| 112 | Keycloak: remove prints + secret-bearing logs | P2 | S | done (merged) |
 | 113 | Consolidate config (8 modules, import-time side effects) | P3 | M | todo |
 | 114 | course_member_gradings: dedupe/delete parallel stats | P3 | M | todo |
 | 115 | Fix stale permission docs; role-string literals → enums | P3 | S | todo |
@@ -66,9 +66,9 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 202 | Extract ~10× copy-pasted permission ladder | P1 | M | done (merged; helpers in permissions/course_access.py + matrix tests) |
 | 203 | examples.py duplicate route registrations | P1 | S | done (merged) |
 | 204 | Consolidate triplicated testing orchestration | P1 | L | done (merged; helpers in business_logic/testing_orchestration.py + ResultStatus enum; tutor endpoint body kept in api/tutor.py) |
-| 205 | Dead router api/deployment.py | P2 | S | todo |
+| 205 | Dead router api/deployment.py | P2 | S | done (merged; deleted api/deployment.py + 3 orphaned BL fns; business_logic/deployment.py kept for precreate_hierarchy_and_collect_courses) |
 | 206 | Merge profiles vs student_profiles CRUD stacks | P2 | M | todo |
-| 207 | Clean generic CRUD core (prints, special-cases, UnboundLocalError) | P2 | M | todo |
+| 207 | Clean generic CRUD core (prints, special-cases, UnboundLocalError) | P2 | M | done (merged; fixed update_entity UnboundLocalError (id now required), stopped get_entity_by_id masking 500s as 404, 6 prints→logger. CourseContent pre_delete-guard relocation + IntegrityError regex extraction left as follow-up — behavior-timing sensitive.) |
 | 208 | GitLab provisioning engine out of users.py | P2 | M | todo |
 | 209 | Unify 404-vs-403 semantics | P2 | M | todo |
 | 210 | Split business_logic/messages.py | P3 | M | todo |
@@ -81,10 +81,10 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 303 | Extract shared git plumbing (clone/identity/push-retry) | P1 | M | done (merged; tasks/git_ops.py + functional tests; assignments repo gained rebase-retry) |
 | 304 | Dedupe legacy temporal_student_repository clones | P2 | M | todo |
 | 305 | CoderClient boilerplate + bypassing caller | P2 | M | todo |
-| 306 | gitlab_builder copy-pasted group/config trios | P2 | M | todo |
-| 307 | Dedupe student/tutor testing activities | P2 | S | todo |
+| 306 | gitlab_builder copy-pasted group/config trios | P2 | M | done (merged; _ensure_subgroup + _build_gitlab_config(include_token) + _set_gitlab_properties; 231→58 lines; test_course_creation passes) |
+| 307 | Dedupe student/tutor testing activities | P2 | S | done (merged; tasks/api_client.py: resolve_api_config + open_computor_client + upload_artifacts_zip; both artifact activities + env-override blocks rewired; activity arity kept for Temporal history) |
 | 308 | Reduce workflow-module boilerplate (registration ×4) | P2 | M | todo |
-| 309 | Delete dead task code (analytics, demo workflows) | P2 | S | todo |
+| 309 | Delete dead task code (analytics, demo workflows) | P2 | S | done (merged; analytics/ already gone; demo workflows gated behind COMPUTOR_ENABLE_EXAMPLE_TASKS=1; commented blocks removed) |
 | 310 | Centralize task-layer config into pydantic settings | P2 | M | todo |
 | 311 | Fix blocking I/O in async Temporal activities | P2 | M | todo |
 | 312 | print() → logging; list_tasks error contract | P3 | S | todo |
@@ -93,11 +93,11 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 402 | Adopt generated clients over hand-typed endpoints | P1 | M | done (merged; ~55 call sites → generated clients, incl. /consent/* after the codegen regen added ConsentClient. api.ts now retained only for genuine codegen gaps: /user + /user/* (TS UserClient name collision with /user-roles), the two ambiguous dual-route org/family deletes, /examples/{id} (no single-id backend delete). UserClient name collision since FIXED at the source (server.py: /user-roles tagged distinctly so codegen emits UserRolesClient; /user calls now migrated). api.ts now down to 3 hand-typed calls: the two intentional ambiguous org/family dual-route deletes + /examples/{id} (no single-id backend delete).) |
 | 403 | Retire dead password-login path / dual auth providers | P1 | M | done (merged; deleted authService + IAuthProviderWithLogin + login(); tsc+build clean) |
 | 404 | Split 641-line members/add page | P2 | M | todo |
-| 405 | Decompose Sidebar.tsx | P2 | S | todo |
+| 405 | Decompose Sidebar.tsx | P2 | S | done (merged; src/config/navigation.ts + src/components/icons.tsx + src/hooks/useCourseViews.ts; Sidebar 540→306 lines; active-highlight logic untouched) |
 | 406 | Finish useResource migration (~20 pages) | P2 | M | todo |
-| 407 | Shared ltree tree-building (3 implementations) | P2 | S | todo |
+| 407 | Shared ltree tree-building (3 implementations) | P2 | S | done (merged; src/utils/ltree.ts: depthOf/lastSegment/parentPath + generic buildTree; ContentTree + lecturer rebased; student keeps its ancestor-synthesising builder (documented) but shares the primitives) |
 | 408 | Adopt or delete UI primitives (Button, useNotify, tables) | P2 | M | todo |
-| 409 | Dedupe workspace tables | P2 | S | todo |
+| 409 | Dedupe workspace tables | P2 | S | done (merged; admin/[userId] now reuses WorkspaceTable. Note: workspaces/admin/page.tsx is a USER-role table, not a workspace table — left as-is.) |
 | 410 | Unify loading/error presentation | P3 | S | todo |
 | 411 | Delete dead components; config redirects for stubs | P3 | S | todo |
 | 412 | Stop hand-mirroring backend schemas (workspaces.ts) | P3 | M | todo |
@@ -107,7 +107,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 503 | Split computor-cli/deployment.py (2,149 LOC) | P2 | M | todo |
 | 504 | Move crypto out of computor-types | P2 | M | todo |
 | 505 | Rename deployments_refactored.py; decouple CLI config | P2 | M | todo |
-| 506 | Remove computor-coder dead package shell | P2 | S | todo |
+| 506 | Remove computor-coder dead package shell | P2 | S | done (merged; deployment/ → ops/coder/, startup.sh + docs + .gitignore updated, empty computor-coder/ removed, dangling editable install uninstalled) |
 | 507 | Packaging hygiene (local deps, pins, py.typed) | P2 | M | todo |
 | 508 | Give computor-utils a purpose (or fold it away) | P3 | S | todo |
 | 509 | Dedupe per-command CLI boilerplate | P3 | S | todo |
