@@ -5,6 +5,7 @@ Keycloak authentication provider implementation.
 import os
 import logging
 import asyncio
+from urllib.parse import urlencode
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import httpx
@@ -200,9 +201,8 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if state:
             params["state"] = state
         
-        # Build URL with query parameters
-        query_string = "&".join(f"{k}={v}" for k, v in params.items())
-        return f"{auth_endpoint}?{query_string}"
+        # Build URL with properly percent-encoded query parameters
+        return f"{auth_endpoint}?{urlencode(params)}"
     
     async def handle_callback(self, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
@@ -215,10 +215,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         
         try:
             # Exchange code for tokens
-            print(f"[DEBUG] Starting token exchange for code: {code[:20]}...")
             tokens = await self._exchange_code_for_tokens(code, redirect_uri)
-            print(f"[DEBUG] Token exchange completed")
-            
             return await self._build_auth_result_from_tokens(tokens)
             
         except Exception as e:
@@ -304,40 +301,37 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if redirect_uri:
             data["redirect_uri"] = redirect_uri
         
-        # Debug logging - using print to ensure visibility
-        print(f"[DEBUG] Token exchange request to: {token_endpoint}")
-        print(f"[DEBUG] Request data: {data}")
-        print(f"[DEBUG] Redirect URI being sent: {data.get('redirect_uri', 'NOT SET')}")
-        logger.info(f"Token exchange request to: {token_endpoint}")
-        logger.info(f"Request data: {data}")
-        logger.info(f"Redirect URI being sent: {data.get('redirect_uri', 'NOT SET')}")
-        
-        print("[DEBUG] Creating HTTP client...")
+        # Never log `data` — it carries client_secret and the auth code.
+        logger.debug(
+            "Token exchange request to %s (grant_type=%s, client_id=%s, redirect_uri=%s)",
+            token_endpoint,
+            data.get("grant_type"),
+            data.get("client_id"),
+            "set" if data.get("redirect_uri") else "unset",
+        )
+
         async with httpx.AsyncClient(
-            verify=self.keycloak_config.verify_ssl, 
+            verify=self.keycloak_config.verify_ssl,
             timeout=httpx.Timeout(30.0, connect=10.0),
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=0)
         ) as client:
-            print("[DEBUG] HTTP client created, sending token exchange request...")
             try:
                 response = await client.post(
                     token_endpoint,
                     data=data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
                 )
-                print(f"[DEBUG] Token exchange response received: {response.status_code}")
-                
+                logger.debug("Token exchange response received: %s", response.status_code)
+
                 # Enhanced error handling
                 if response.status_code != 200:
                     logger.error(f"Token exchange failed with status {response.status_code}")
                     logger.error(f"Response body: {response.text}")
                     response.raise_for_status()
-                
-                result = response.json()
-                print(f"[DEBUG] Token exchange successful, received tokens")
-                return result
+
+                return response.json()
             except Exception as e:
-                print(f"[DEBUG] Token exchange error: {type(e).__name__}: {e}")
+                logger.debug("Token exchange error: %s: %s", type(e).__name__, e)
                 raise
     
     async def _verify_and_decode_token(self, token: str) -> Dict[str, Any]:
