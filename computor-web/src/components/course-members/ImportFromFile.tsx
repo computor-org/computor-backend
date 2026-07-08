@@ -7,6 +7,7 @@ import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberIm
 import { fileToBase64 } from '@/src/utils/file';
 import type { CourseMemberImportRow } from 'types/generated';
 import type { CourseRoleId } from '@/src/utils/courseRoles';
+import { Table, Tbody, Th } from '@/src/components/ui/Table';
 
 const importClient = new CourseMemberImportClient();
 
@@ -128,17 +129,17 @@ export default function ImportFromFile({
       ) : parsedRows.length > 0 ? (
         <>
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
+            <Table>
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-3 w-8" />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <Th>User</Th>
+                  <Th>Role</Th>
+                  <Th>Group</Th>
+                  <Th>Status</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <Tbody>
                 {parsedRows.map((r, i) => {
                   const res = fileResults[i];
                   const name = `${r.given_name ?? ''} ${r.family_name ?? ''}`.trim() || r.email;
@@ -184,8 +185,8 @@ export default function ImportFromFile({
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </div>
           <div className="flex items-center gap-3">
             <button

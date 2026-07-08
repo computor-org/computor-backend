@@ -6,9 +6,6 @@ import ListPageLayout, { ScrollArea } from './ListPageLayout';
 import PageHeader from './PageHeader';
 import ErrorBanner from './ErrorBanner';
 
-export const inputCls =
-  'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
-
 export function Field({
   label,
   required,

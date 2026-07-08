@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { CoderWorkspace } from '@/src/types/workspaces';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 
 interface WorkspaceTableProps {
@@ -12,8 +13,6 @@ interface WorkspaceTableProps {
   onViewDetails: (owner: string, name: string) => void;
 }
 
-const thCls =
-  'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
 const actionBtn =
   'px-2.5 py-1 text-xs font-medium rounded-md transition-colors disabled:opacity-50';
 
@@ -45,18 +44,18 @@ function WorkspaceRow({
   };
 
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-4 py-3">
+    <Tr className="hover:bg-gray-50">
+      <Td>
         <span className="font-medium text-gray-900 text-sm">{workspace.name}</span>
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-600">{workspace.template_name || '—'}</td>
-      <td className="px-4 py-3">
+      </Td>
+      <Td className="text-sm text-gray-600">{workspace.template_name || '—'}</Td>
+      <Td>
         <WorkspaceStatusBadge status={workspace.latest_build_status} size="sm" />
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+      </Td>
+      <Td className="text-sm text-gray-500 whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}
-      </td>
-      <td className="px-4 py-3">
+      </Td>
+      <Td>
         <div className="flex items-center justify-end gap-1.5">
           {category === 'running' && (
             <>
@@ -102,8 +101,8 @@ function WorkspaceRow({
             Delete
           </button>
         </div>
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   );
 }
 
@@ -116,17 +115,17 @@ export default function WorkspaceTable({
   onViewDetails,
 }: WorkspaceTableProps) {
   return (
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50 sticky top-0 z-10">
+    <Table>
+      <Thead>
         <tr>
-          <th className={thCls}>Name</th>
-          <th className={thCls}>Template</th>
-          <th className={thCls}>Status</th>
-          <th className={thCls}>Created</th>
-          <th className={`${thCls} text-right`}>Actions</th>
+          <Th>Name</Th>
+          <Th>Template</Th>
+          <Th>Status</Th>
+          <Th>Created</Th>
+          <Th className="text-right">Actions</Th>
         </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-100">
+      </Thead>
+      <Tbody>
         {workspaces.map((ws) => (
           <WorkspaceRow
             key={ws.id}
@@ -137,7 +136,7 @@ export default function WorkspaceTable({
             onViewDetails={onViewDetails}
           />
         ))}
-      </tbody>
-    </table>
+      </Tbody>
+    </Table>
   );
 }

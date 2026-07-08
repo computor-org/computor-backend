@@ -17,6 +17,7 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
+import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 
 const invitesClient = new InviteLinkClient();
 
@@ -137,18 +138,18 @@ export default function InvitesPage() {
           <ErrorBanner>{error}</ErrorBanner>
         ) : (
           <ScrollPanel>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note / Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uses</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <Th>Note / Email</Th>
+                  <Th>Uses</Th>
+                  <Th>Expires</Th>
+                  <Th>Roles</Th>
+                  <Th>Status</Th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+              </Thead>
+              <Tbody>
                 {invites.map(inv => (
                   <tr key={inv.id}>
                     <td className="px-4 py-3">
@@ -193,8 +194,8 @@ export default function InvitesPage() {
                     <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">No invite links yet. Create one to get started.</td>
                   </tr>
                 )}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </ScrollPanel>
         )}
       </ListPageLayout>

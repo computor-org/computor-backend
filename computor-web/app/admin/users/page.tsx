@@ -12,6 +12,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
 import Forbidden from '@/src/components/Forbidden';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 
 const PAGE_SIZE = 50;
 const usersClient = new UsersClient();
@@ -94,16 +95,16 @@ export default function UsersPage() {
           <ListLoading>Loading users…</ListLoading>
         ) : (
           <ScrollPanel>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                  <Th>User</Th>
+                  <Th>Status</Th>
+                  <Th>Created</Th>
                   <th className="px-4 py-3" />
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+              </Thead>
+              <Tbody>
                 {users.map((u) => (
                   <tr key={u.id} className={`hover:bg-gray-50 ${u.archived_at ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3">
@@ -129,8 +130,8 @@ export default function UsersPage() {
                     <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">No users found</td>
                   </tr>
                 )}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </ScrollPanel>
         )}
 

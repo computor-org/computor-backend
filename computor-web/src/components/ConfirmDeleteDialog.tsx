@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Modal from './Modal';
-import Button from './Button';
+import Button from './ui/Button';
 
 /**
  * Deliberate, type-to-confirm dialog for destructive deletes. The user must type

@@ -10,7 +10,8 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
-import { Field, inputCls } from '@/src/components/FormPanel';
+import { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import type { UserGet } from 'types/generated';
 
 const usersClient = new UsersClient();
