@@ -1041,7 +1041,7 @@ def register_gitlab_managed_access(
     template, so they can pull upstream). Provisions the repo first if needed.
     Idempotent.
     """
-    from computor_backend.business_logic.users import _fetch_gitlab_user_profile
+    from computor_backend.services.gitlab_account_sync import _fetch_gitlab_user_profile
 
     user_id = permissions.get_user_id()
     if not user_id:

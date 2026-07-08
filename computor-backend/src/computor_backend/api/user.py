@@ -30,6 +30,8 @@ from computor_backend.business_logic.users import (
     get_user_scopes_from_principal,
     get_course_views_for_user,
     get_course_views_for_user_by_course,
+)
+from computor_backend.business_logic.course_accounts import (
     validate_user_course,
     register_user_course_account,
 )
