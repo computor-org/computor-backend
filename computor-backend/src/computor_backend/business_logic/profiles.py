@@ -1,29 +1,46 @@
-"""Business logic for user profiles management."""
-import logging
+"""Business logic for user profiles management.
+
+Thin wrapper over the shared owner-scoped CRUD skeleton (TASK-206). The
+permission decisions are BIT-IDENTICAL to the pre-refactor implementation:
+the manage capability is ``profile:list`` (or admin), owners may read/write
+their own profile, and non-owners without that capability get a 404 on
+get/update/delete.
+"""
 from uuid import UUID
 from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from computor_backend.exceptions import ForbiddenException, BadRequestException
 from computor_backend.model.auth import Profile
 from computor_backend.permissions.principal import Principal
 from computor_types.profiles import ProfileQuery
 from computor_backend.interfaces import ProfileInterface
+from computor_backend.business_logic.ownership import (
+    has_manage_permission,
+    is_owner_or_manager,
+)
+from computor_backend.business_logic._owned_crud import (
+    list_owned,
+    get_owned_or_404,
+    persist_new,
+    apply_update,
+    delete_owned,
+)
 
-logger = logging.getLogger(__name__)
+# General-claim resource gating "manage all profiles". Kept distinct from the
+# student-profile resource on purpose (see ownership.py).
+_RESOURCE = "profile"
 
 
 def has_profile_permission(permissions: Principal) -> bool:
     """Check if user has general permission to manage all profiles."""
-    return permissions.is_admin or permissions.has_general_permission("profile", "list")
+    return has_manage_permission(permissions, _RESOURCE)
 
 
 def can_access_profile(permissions: Principal, profile: Profile) -> bool:
     """Check if user can access a specific profile."""
-    if has_profile_permission(permissions):
-        return True
-    return str(profile.user_id) == str(permissions.user_id)
+    return is_owner_or_manager(permissions, profile.user_id, _RESOURCE)
 
 
 def list_profiles(
@@ -32,27 +49,14 @@ def list_profiles(
     db: Session,
 ) -> Tuple[List[Profile], int]:
     """List profiles - admins/_user_manager see all, users see only their own."""
-
-    query = db.query(Profile)
-
-    # Apply permission filtering
-    if not has_profile_permission(permissions):
-        query = query.filter(Profile.user_id == permissions.user_id)
-
-    # Apply search filters using the interface search function
-    query = ProfileInterface.search(db, query, params)
-
-    # Get total count
-    total = query.count()
-
-    # Apply pagination
-    if params.limit:
-        query = query.limit(params.limit)
-    if params.skip:
-        query = query.offset(params.skip)
-
-    profiles = query.all()
-    return profiles, total
+    return list_owned(
+        db=db,
+        model=Profile,
+        interface=ProfileInterface,
+        permissions=permissions,
+        params=params,
+        resource=_RESOURCE,
+    )
 
 
 def get_profile(
@@ -61,16 +65,14 @@ def get_profile(
     db: Session,
 ) -> Profile:
     """Get a profile by ID - users can only get their own, admins/_user_manager can get any."""
-
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
-
-    if not profile:
-        raise NotFoundException(detail="Profile not found")
-
-    if not can_access_profile(permissions, profile):
-        raise NotFoundException(detail="Profile not found")
-
-    return profile
+    return get_owned_or_404(
+        db=db,
+        model=Profile,
+        entity_id=profile_id,
+        permissions=permissions,
+        resource=_RESOURCE,
+        not_found_detail="Profile not found",
+    )
 
 
 def create_profile(
@@ -91,16 +93,12 @@ def create_profile(
     if existing:
         raise BadRequestException(detail="Profile already exists for this user")
 
-    try:
-        profile = Profile(**profile_data)
-        db.add(profile)
-        db.commit()
-        db.refresh(profile)
-        return profile
-    except Exception as e:
-        db.rollback()
-        logger.exception("Error creating profile")
-        raise BadRequestException(detail="Failed to create profile") from e
+    return persist_new(
+        db=db,
+        factory=lambda: Profile(**profile_data),
+        error_detail="Failed to create profile",
+        log_context="Error creating profile",
+    )
 
 
 def update_profile(
@@ -110,26 +108,21 @@ def update_profile(
     db: Session,
 ) -> Profile:
     """Update a profile - users can only update their own, admins/_user_manager can update any."""
-
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
-
-    if not profile:
-        raise NotFoundException(detail="Profile not found")
-
-    if not can_access_profile(permissions, profile):
-        raise NotFoundException(detail="Profile not found")
-
-    try:
-        for key, value in update_data.items():
-            setattr(profile, key, value)
-
-        db.commit()
-        db.refresh(profile)
-        return profile
-    except Exception as e:
-        db.rollback()
-        logger.exception("Error updating profile")
-        raise BadRequestException(detail="Failed to update profile") from e
+    profile = get_owned_or_404(
+        db=db,
+        model=Profile,
+        entity_id=profile_id,
+        permissions=permissions,
+        resource=_RESOURCE,
+        not_found_detail="Profile not found",
+    )
+    return apply_update(
+        db=db,
+        obj=profile,
+        update_data=update_data,
+        error_detail="Failed to update profile",
+        log_context="Error updating profile",
+    )
 
 
 def delete_profile(
@@ -138,19 +131,17 @@ def delete_profile(
     db: Session,
 ) -> None:
     """Delete a profile - users can only delete their own, admins/_user_manager can delete any."""
-
-    profile = db.query(Profile).filter(Profile.id == profile_id).first()
-
-    if not profile:
-        raise NotFoundException(detail="Profile not found")
-
-    if not can_access_profile(permissions, profile):
-        raise NotFoundException(detail="Profile not found")
-
-    try:
-        db.delete(profile)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.exception("Error deleting profile")
-        raise BadRequestException(detail="Failed to delete profile") from e
+    profile = get_owned_or_404(
+        db=db,
+        model=Profile,
+        entity_id=profile_id,
+        permissions=permissions,
+        resource=_RESOURCE,
+        not_found_detail="Profile not found",
+    )
+    delete_owned(
+        db=db,
+        obj=profile,
+        error_detail="Failed to delete profile",
+        log_context="Error deleting profile",
+    )
