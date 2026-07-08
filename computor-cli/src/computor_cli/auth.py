@@ -31,12 +31,16 @@ def read_active_profile() -> CLIAuthConfig | None:
 
 def _verify_token(base_url: str, token: str) -> bool:
     """Verify an API token via GET /user with X-API-Token header."""
-    from httpx import Client
+    from computor_client import SyncComputorClient
+    from computor_client.exceptions import ComputorClientError
 
     try:
-        with Client(base_url=base_url, headers={"X-API-Token": token}) as client:
-            response = client.get("/user")
-            return response.status_code == 200
+        with SyncComputorClient(base_url, headers={"X-API-Token": token}) as client:
+            client.get("/user")
+            return True
+    except ComputorClientError:
+        # A 4xx (e.g. invalid/expired token) means the token is not valid.
+        return False
     except Exception as e:
         click.echo(e)
         return False

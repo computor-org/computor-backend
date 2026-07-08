@@ -32,6 +32,7 @@ __version__ = "0.2.0"
 
 # Main client
 from computor_client.client import ComputorClient
+from computor_client.sync import SyncComputorClient
 
 # HTTP client components (for advanced usage)
 from computor_client.http import (
@@ -89,6 +90,7 @@ __all__ = [
     "__version__",
     # Main client
     "ComputorClient",
+    "SyncComputorClient",
     # HTTP components
     "AsyncHTTPClient",
     "AuthProvider",

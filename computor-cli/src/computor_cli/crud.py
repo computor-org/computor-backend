@@ -1,5 +1,6 @@
 import click
 from httpx import ConnectError, HTTPStatusError
+from computor_client.exceptions import ComputorClientError
 from computor_cli.auth import authenticate, get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
@@ -93,6 +94,12 @@ def handle_api_exceptions(func):
       except:
         message = e.response.text or str(e)
       click.echo(f"[{click.style(str(e.response.status_code),fg='red')}] {message}")
+    except ComputorClientError as e:
+      # Typed errors raised by the sync facade / async endpoint clients carry
+      # the status code + server detail directly.
+      status = e.status_code or 500
+      message = e.args[0] if e.args else str(e)
+      click.echo(f"[{click.style(str(status),fg='red')}] {message}")
     except Exception as e:
       click.echo(f"[{click.style('500',fg='red')}] {e.args if e.args != () else 'Internal Server Error'}")
 

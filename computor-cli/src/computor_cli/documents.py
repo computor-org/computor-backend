@@ -10,6 +10,7 @@ import re
 from functools import wraps
 from httpx import ConnectError, HTTPStatusError
 from computor_cli.auth import authenticate, get_computor_client
+from computor_client import SyncComputorClient
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
 
@@ -34,29 +35,6 @@ def handle_api_exceptions(func):
 
     return wrapper
 
-
-class SyncHTTPWrapper:
-    """Wrapper to make sync HTTP calls using ComputorClient's httpx client configuration."""
-
-    def __init__(self, computor_client):
-        """Initialize with a ComputorClient instance."""
-        import httpx
-        self._client = httpx.Client(
-            base_url=str(computor_client._client.base_url),
-            headers=dict(computor_client._client.headers),
-            timeout=computor_client._client.timeout
-        )
-
-    def post(self, path: str, data: dict = None, params: dict = None):
-        """POST request."""
-        response = self._client.post(path, json=data or {}, params=params)
-        response.raise_for_status()
-        return response.json() if response.content else None
-
-    def __del__(self):
-        """Close client on deletion."""
-        if hasattr(self, '_client'):
-            self._client.close()
 
 
 @click.group()
@@ -133,7 +111,7 @@ def sync(course_family_identifier: str, force: bool, auth: CLIAuthConfig):
             click.echo("⚠️  Force mode enabled - will delete and re-clone")
 
         # Use sync wrapper for POST request
-        sync_wrapper = SyncHTTPWrapper(computor_client)
+        sync_wrapper = SyncComputorClient.from_client(computor_client)
 
         try:
             response = sync_wrapper.post(
