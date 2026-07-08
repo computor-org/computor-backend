@@ -2,42 +2,13 @@
 
 import { useState } from 'react';
 import type { CourseMemberGradingNode } from 'types/generated';
+import { buildTree, type TreeNode as LtreeNode } from '@/src/utils/ltree';
 
 interface ContentTreeProps {
   nodes: CourseMemberGradingNode[];
 }
 
-interface TreeNode extends CourseMemberGradingNode {
-  children: TreeNode[];
-  depth: number;
-}
-
-function buildTree(flatNodes: CourseMemberGradingNode[]): TreeNode[] {
-  // Sort by position, then path
-  const sorted = [...flatNodes].sort((a, b) => {
-    const posA = a.position ?? 0;
-    const posB = b.position ?? 0;
-    if (posA !== posB) return posA - posB;
-    return a.path.localeCompare(b.path);
-  });
-
-  const nodeMap = new Map<string, TreeNode>();
-  const roots: TreeNode[] = [];
-
-  for (const node of sorted) {
-    const treeNode: TreeNode = { ...node, children: [], depth: node.path.split('.').length - 1 };
-    nodeMap.set(node.path, treeNode);
-
-    const parentPath = node.path.includes('.') ? node.path.substring(0, node.path.lastIndexOf('.')) : null;
-    if (parentPath && nodeMap.has(parentPath)) {
-      nodeMap.get(parentPath)!.children.push(treeNode);
-    } else {
-      roots.push(treeNode);
-    }
-  }
-
-  return roots;
-}
+type TreeNode = LtreeNode<CourseMemberGradingNode>;
 
 function statusColor(status: string | null | undefined): string {
   switch (status) {

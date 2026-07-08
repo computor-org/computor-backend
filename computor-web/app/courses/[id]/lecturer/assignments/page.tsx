@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { depthOf, lastSegment } from '@/src/utils/ltree';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
@@ -32,9 +33,6 @@ function deploymentBadge(c: CourseContentLecturerList): { label: string; color: 
   return STATUS_STYLES[status] ?? { label: status, color: 'gray' };
 }
 
-// ltree depth: "week1.assignment2" → 1 (indent), "week1" → 0
-const depthOf = (path: string) => Math.max(0, path.split('.').length - 1);
-const lastSegment = (path: string) => path.split('.').slice(-1)[0];
 
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
