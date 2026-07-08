@@ -56,7 +56,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 107 | Dedupe Principal-cache logic (3 modules) | P2 | M | done (merged; `principal_cache_key()` + `_get_cached_principal`/`_store_principal`; middleware imports the key fn; optional-auth `except` split with `ForbiddenException` at debug; keys proven byte-identical; consent tests pass) |
 | 108 | permitted() cache key ignores course_role | P1 | S | done (merged) |
 | 109 | Split handlers_impl.py; merge scoped-handler clones | P2 | M | done (merged; `_ScopedEntityPermissionHandler` base for org/family; handlers_impl split into handlers_user/course/scoped/misc + re-export shim; core.py unchanged; 60-case `can_perform_action` characterization matrix identical before/after) |
-| 110 | Decide repository-layer direction (bypassed by codebase) | P2 | L | todo |
+| 110 | Decide repository-layer direction (bypassed by codebase) | P2 | L | won't-do (owner decision 2026-07-08: leave the repository layer as-is for now; revisit if cache-staleness bites) |
 | 111 | Model mixins for 19× audit-column boilerplate | P2 | M | done (merged; UUIDPk/Versioned/Audit mixins in model/base.py; 18 classes → all 3, +3 UUIDPk/Audit-only; alembic env.py src-root sys.path fix; 5 LtreeType try/except fallbacks dropped; normalized schema diff EMPTY; auth.py/deployment/example left inline as divergent. Live-DB alembic autogenerate empty-diff still recommended.) |
 | 112 | Keycloak: remove prints + secret-bearing logs | P2 | S | done (merged) |
 | 113 | Consolidate config (8 modules, import-time side effects) | P3 | M | todo |
