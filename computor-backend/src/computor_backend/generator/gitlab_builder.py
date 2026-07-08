@@ -112,7 +112,7 @@ class GitLabBuilder:
                 result["organization"] = existing_org
                 # Course-group-only model: never create/validate a GitLab group for
                 # the org. Refresh the recorded connection + hand-made parent, return.
-                from computor_types.encryption import encrypt_secret
+                from computor_backend.utils.encryption import encrypt_secret
                 from sqlalchemy.orm.attributes import flag_modified
                 props = existing_org.properties or {}
                 props["gitlab"] = {
@@ -132,7 +132,7 @@ class GitLabBuilder:
             # organization — the lecturer builds the org/family group structure by
             # hand. We only record the connection (url + token) and the hand-made
             # ``parent`` group under which course groups are created (_create_course).
-            from computor_types.encryption import encrypt_secret
+            from computor_backend.utils.encryption import encrypt_secret
             logger.info(
                 "Skipping GitLab org group creation (course-group-only model); "
                 "recording hand-made parent group %s", org_config.gitlab.parent,
@@ -587,7 +587,7 @@ class GitLabBuilder:
             "last_synced_at": datetime.now(timezone.utc).isoformat(),
         }
         if include_token:
-            from computor_types.encryption import encrypt_secret
+            from computor_backend.utils.encryption import encrypt_secret
             config["token"] = encrypt_secret(self.gitlab_token)
         return config
     

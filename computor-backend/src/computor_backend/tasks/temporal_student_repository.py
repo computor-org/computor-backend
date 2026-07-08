@@ -35,7 +35,7 @@ from ..database import get_db_session
 from ..model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from ..gitlab_utils import construct_gitlab_http_url, construct_gitlab_ssh_url, construct_gitlab_web_url
 from ..model.organization import Organization
-from computor_types.encryption import decrypt_secret
+from computor_backend.utils.encryption import decrypt_secret
 from ..git_provider.gitlab import (
     fork_project_with_polling,
     gitlab_unprotect_branches,

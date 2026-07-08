@@ -5,10 +5,9 @@ hashed (see ``password_utils`` / Argon2) and never decrypted. A git service
 token, by contrast, MUST be recoverable so the backend can authenticate to the
 remote git server — so it is symmetrically encrypted with ``TOKEN_SECRET``.
 
-Wire-compatible with the legacy ``computor_types.tokens.encrypt_api_key`` /
-``decrypt_api_key`` (same ``keycove`` primitive, same ``TOKEN_SECRET`` key), so
-secrets encrypted by either round-trip through both — but without importing that
-deprecated, password-oriented module (which is slated for removal).
+Wire-compatible with the legacy ``encrypt_api_key`` / ``decrypt_api_key``
+encryption (same ``keycove`` primitive, same ``TOKEN_SECRET`` key), so secrets
+encrypted by either round-trip through both.
 """
 import os
 

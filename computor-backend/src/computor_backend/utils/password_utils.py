@@ -19,7 +19,7 @@ Security Notes:
 - Hashing is intentionally slow to prevent brute-force attacks
 
 Example Usage:
-    >>> from computor_types.password_utils import hash_password, verify_password
+    >>> from computor_backend.utils.password_utils import hash_password, verify_password
     >>>
     >>> # Hash a password
     >>> hashed = hash_password("MySecure123!")
@@ -29,7 +29,7 @@ Example Usage:
     ...     print("Password correct!")
     >>>
     >>> # Validate password strength before hashing
-    >>> from computor_types.password_utils import validate_password_strength
+    >>> from computor_backend.utils.password_utils import validate_password_strength
     >>> validate_password_strength("weak")  # Raises PasswordValidationError
 """
 

@@ -23,7 +23,7 @@ from computor_backend.exceptions import (
 from computor_backend.model.git_server import GitServer
 from computor_backend.permissions.principal import Principal
 from computor_types.git_registry import GitServerCreate, GitServerGet, GitServerUpdate
-from computor_types.encryption import encrypt_secret
+from computor_backend.utils.encryption import encrypt_secret
 
 logger = logging.getLogger(__name__)
 

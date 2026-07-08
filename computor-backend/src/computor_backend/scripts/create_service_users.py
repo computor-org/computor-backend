@@ -38,7 +38,7 @@ from database import get_db_session
 from model.auth import User
 from model.service import Service, ApiToken, ServiceType
 from utils.api_token import generate_api_token, prepare_predefined_token
-from computor_types.password_utils import create_password_hash
+from computor_backend.utils.password_utils import create_password_hash
 import secrets
 
 

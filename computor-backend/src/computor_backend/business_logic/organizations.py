@@ -8,7 +8,7 @@ from computor_backend.exceptions import BadRequestException, NotImplementedExcep
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_types.organizations import OrganizationProperties
-from computor_types.encryption import encrypt_secret
+from computor_backend.utils.encryption import encrypt_secret
 from computor_backend.model.organization import Organization
 
 logger = logging.getLogger(__name__)

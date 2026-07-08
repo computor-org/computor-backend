@@ -44,7 +44,7 @@ from computor_types.course_git import (
     GitTemplateRef,
     StudentRepositoryProvisioned,
 )
-from computor_types.encryption import decrypt_secret, encrypt_secret
+from computor_backend.utils.encryption import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
 
