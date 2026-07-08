@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/src/utils/api';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { UserClient } from '@/src/generated/clients/UserClient';
 import { ProfilesClient } from '@/src/generated/clients/ProfilesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -22,6 +22,8 @@ function roleLabel(role: string): string {
   return role.replace(/^_/, '').replace(/_/g, ' ');
 }
 
+
+const userClient = new UserClient();
 export default function ProfilePage() {
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -59,7 +61,7 @@ export default function ProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const u = await api.get<UserGet>('/user');
+        const u = await userClient.getCurrentUserEndpointUserGet({});
         if (!cancelled) hydrate(u);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load profile');
@@ -104,7 +106,7 @@ export default function ProfilePage() {
       }
 
       // Re-read so the header + avatar reflect what was saved.
-      hydrate(await api.get<UserGet>('/user'));
+      hydrate(await userClient.getCurrentUserEndpointUserGet({}));
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');

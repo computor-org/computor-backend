@@ -56,6 +56,6 @@ export * from './TestsClient';
 export * from './TokensClient';
 export * from './TutorsClient';
 export * from './UserClient';
-export * from './UserClient';
+export * from './UserRolesClient';
 export * from './UsersClient';
 export * from './WorkspacesClient';

@@ -500,7 +500,10 @@ app.include_router(
 app.include_router(
     user_roles_router,
     prefix="/user-roles",
-    tags=["user","roles"]
+    # First tag drives the generated client class name — keep it distinct from
+    # the "user" tag (/user endpoints) so codegen emits UserRolesClient rather
+    # than colliding on UserClient and overwriting the /user methods.
+    tags=["user-roles"]
 )
 
 app.include_router(

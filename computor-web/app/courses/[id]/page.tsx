@@ -3,10 +3,10 @@
 import { useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { UserClient } from '@/src/generated/clients/UserClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -30,6 +30,8 @@ interface ViewCard {
   icon: ReactNode;
 }
 
+
+const userClient = new UserClient();
 export default function CoursePage() {
   const courseId = useParams().id as string;
   const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
@@ -39,7 +41,7 @@ export default function CoursePage() {
     async () => {
       const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
       const [courseViews, organization, courseFamily, gitBinding, myRepo] = await Promise.all([
-        api.get<string[]>(`/user/views/${courseId}`).catch(() => [] as string[]),
+        userClient.getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet({ courseId }).catch(() => [] as string[]),
         organizationsClient.getOrganizationsOrganizationsIdGet({ id: course.organization_id }).catch(() => null),
         courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: course.course_family_id }).catch(() => null),
         // Git binding is lecturer-cohort only; fetch it only for managers.
@@ -47,7 +49,7 @@ export default function CoursePage() {
           ? coursesClient.getCourseGitBindingEndpointCoursesCourseIdGitGet({ courseId }).catch(() => null)
           : Promise.resolve(null),
         // The caller's own repository. 404s (→ null) when they aren't a member.
-        api.get<CourseMemberRepositoryGet>(`/user/courses/${courseId}/repository`).catch(() => null),
+        userClient.getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet({ courseId }).catch(() => null),
       ]);
       return { course, courseViews, organization, courseFamily, gitBinding, myRepo };
     },
@@ -71,9 +73,8 @@ export default function CoursePage() {
     setEnsureErr(false);
     setProvisioned(null);
     try {
-      const r = await api.post<StudentRepositoryProvisioned>(
-        `/user/courses/${courseId}/provision-repository`,
-        {},
+      const r = await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
+        { courseId },
       );
       setProvisioned(r);
       setEnsureMsg('Git access ensured.');

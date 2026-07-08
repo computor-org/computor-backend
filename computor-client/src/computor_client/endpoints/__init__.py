@@ -56,6 +56,7 @@ from computor_client.endpoints.tests import TestsClient
 from computor_client.endpoints.tokens import TokensClient
 from computor_client.endpoints.tutors import TutorsClient
 from computor_client.endpoints.user import UserClient
+from computor_client.endpoints.user_roles import UserRolesClient
 from computor_client.endpoints.users import UsersClient
 from computor_client.endpoints.workspaces import WorkspacesClient
 
@@ -110,6 +111,7 @@ __all__ = [
     "TokensClient",
     "TutorsClient",
     "UserClient",
+    "UserRolesClient",
     "UsersClient",
     "WorkspacesClient",
 ]

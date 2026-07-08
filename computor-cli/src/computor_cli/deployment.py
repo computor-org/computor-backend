@@ -201,8 +201,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Assign system roles if provided
             if user_dep.roles:
                 role_client = client.roles
-                # user_roles methods are on client.user, not a separate client
-                user_client_current = client.user
+                user_roles_client = client.user_roles
 
                 for role_id in user_dep.roles:
                     try:
@@ -213,8 +212,8 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                             continue
 
                         # Check if user already has this role
-                        # Use kwargs to pass query params since user_roles() uses **kwargs
-                        existing_user_roles = run_async(user_client_current.user_roles(
+                        # kwargs are passed through as query params by list()
+                        existing_user_roles = run_async(user_roles_client.list(
                             user_id=str(user.id),
                             role_id=role_id
                         ))
@@ -227,7 +226,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                 user_id=str(user.id),
                                 role_id=role_id
                             )
-                            run_async(user_client_current.post_user_roles(user_role_create))
+                            run_async(user_roles_client.create(user_role_create))
                             click.echo(f"  ✅ Assigned role: {role_id}")
                     except Exception as e:
                         click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
