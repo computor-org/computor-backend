@@ -266,9 +266,9 @@ if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
     # Seed default templates from repo (only copies missing ones, never overwrites)
-    if [ -d "${SCRIPT_DIR}/computor-coder/deployment/templates" ]; then
+    if [ -d "${SCRIPT_DIR}/ops/coder/templates" ]; then
         echo -e "  ${GREEN}Seeding Coder templates...${NC}"
-        for tpl_dir in "${SCRIPT_DIR}/computor-coder/deployment/templates"/*/; do
+        for tpl_dir in "${SCRIPT_DIR}/ops/coder/templates"/*/; do
             tpl_name=$(basename "$tpl_dir")
             if [ ! -d "${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}" ]; then
                 echo "    Copying template: ${tpl_name}"
