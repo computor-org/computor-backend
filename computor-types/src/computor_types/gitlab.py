@@ -2,7 +2,7 @@
 GitLab configuration models.
 
 Single source of truth for GitLab-related deployment configurations.
-Used by deployments.py, deployments_refactored.py, and entity DTOs.
+Used by deployments.py, deployment_config.py, and entity DTOs.
 
 GitLabConfigGet: All GitLab properties WITHOUT the token (safe for API responses)
 GitLabConfig: Extends GitLabConfigGet WITH the token (for internal/write operations)

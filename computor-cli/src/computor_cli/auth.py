@@ -18,13 +18,13 @@ def get_profile_path() -> str:
 
 
 def read_active_profile() -> CLIAuthConfig | None:
-    from computor_types.deployments_refactored import DeploymentFactory
+    from computor_types.yaml_config import read_model_from_yaml_file
 
     path = get_profile_path()
     if not os.path.exists(path):
         return None
     try:
-        return DeploymentFactory.read_deployment_from_file(CLIAuthConfig, path)
+        return read_model_from_yaml_file(CLIAuthConfig, path)
     except Exception:
         return None
 
@@ -49,7 +49,7 @@ def _verify_token(base_url: str, token: str) -> bool:
 def _save_profile(config: CLIAuthConfig):
     """Save profile to disk."""
     init_filesystem()
-    config.write_deployment(get_profile_path())
+    config.write_yaml(get_profile_path())
     clear_client_cache()
 
 
@@ -104,7 +104,7 @@ def authenticate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         from click import get_current_context
-        from computor_types.deployments_refactored import DeploymentFactory
+        from computor_types.yaml_config import read_model_from_yaml_file
 
         ctx = get_current_context()
 
@@ -125,7 +125,7 @@ def authenticate(func):
                 click.echo("Not logged in. Run 'computor login' to authenticate.")
                 raise click.Abort()
 
-        auth: CLIAuthConfig = DeploymentFactory.read_deployment_from_file(CLIAuthConfig, file)
+        auth: CLIAuthConfig = read_model_from_yaml_file(CLIAuthConfig, file)
         kwargs["auth"] = auth
         return func(*args, **kwargs)
 

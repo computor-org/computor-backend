@@ -35,7 +35,7 @@ def test_gitlab_deploy_creates_only_course_group(db_session, gitlab_cfg):
     from sqlalchemy import text
 
     from computor_backend.generator.gitlab_builder import GitLabBuilder
-    from computor_types.deployments_refactored import (
+    from computor_types.deployment_config import (
         CourseConfig,
         CourseFamilyConfig,
         OrganizationConfig,

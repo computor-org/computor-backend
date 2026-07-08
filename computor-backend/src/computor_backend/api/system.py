@@ -554,7 +554,7 @@ async def create_hierarchy(
         )
     
     # Validate the configuration structure
-    from computor_types.deployments_refactored import ComputorDeploymentConfig
+    from computor_types.deployment_config import ComputorDeploymentConfig
     try:
         config = ComputorDeploymentConfig(**deployment_config)
     except Exception as e:

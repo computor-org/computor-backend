@@ -7,7 +7,7 @@ from computor_types.git_provider import (
     CourseProviderResult,
     StudentRepoResult,
 )
-from computor_types.deployments_refactored import OrganizationConfig, CourseFamilyConfig, CourseConfig
+from computor_types.deployment_config import OrganizationConfig, CourseFamilyConfig, CourseConfig
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
 

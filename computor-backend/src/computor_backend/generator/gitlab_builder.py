@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 
 from computor_types.gitlab import GitLabConfig
-from computor_types.deployments_refactored import (
+from computor_types.deployment_config import (
     OrganizationConfig,
     CourseFamilyConfig,
     CourseConfig,
