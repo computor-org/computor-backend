@@ -11,7 +11,8 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
-import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import FormPanel, { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
 

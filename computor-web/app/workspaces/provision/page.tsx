@@ -9,7 +9,7 @@ import { CoderClient } from '@/src/clients/CoderClient';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import { inputCls } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import type {
   CoderTemplate,
   ProvisionResult,

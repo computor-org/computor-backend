@@ -11,8 +11,9 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import { inputCls } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import type { WorkspaceTemplate } from '@/src/types/workspaces';
+import { Thead, Tbody, Th } from '@/src/components/ui/Table';
 
 const coderClient = new CoderClient();
 const rolesClient = new WorkspaceRolesClient();
@@ -243,17 +244,17 @@ export default function WorkspaceAdminPage() {
         {data && !error && (
           <ScrollPanel>
               <table className="w-full text-sm divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0 z-10">
+                <Thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workspace</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <Th>Name</Th>
+                    <Th>Email</Th>
+                    <Th>Username</Th>
+                    <Th>Roles</Th>
+                    <Th>Workspace</Th>
+                    <Th>Actions</Th>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
+                </Thead>
+                <Tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -338,7 +339,7 @@ export default function WorkspaceAdminPage() {
                       );
                     })
                   )}
-                </tbody>
+                </Tbody>
               </table>
           </ScrollPanel>
         )}

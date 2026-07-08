@@ -9,11 +9,12 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
-import { inputCls } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { TaskStatus } from '@/src/types/workspaces';
 import type { CoderWorkspace, CoderTemplate, TaskInfo } from '@/src/types/workspaces';
+import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 
 const coderClient = new CoderClient();
 
@@ -198,17 +199,17 @@ export default function WorkspaceFleetPage() {
           <ListLoading>Loading fleet…</ListLoading>
         ) : (
           <ScrollPanel>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workspace</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Template</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <Th>Owner</Th>
+                  <Th>Workspace</Th>
+                  <Th>Template</Th>
+                  <Th>Version</Th>
+                  <Th>Status</Th>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+              </Thead>
+              <Tbody>
                 {workspaces.map((w) => {
                   const outdated = isOutdated(w);
                   return (
@@ -239,8 +240,8 @@ export default function WorkspaceFleetPage() {
                     </td>
                   </tr>
                 )}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </ScrollPanel>
         )}
 

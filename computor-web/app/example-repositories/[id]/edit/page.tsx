@@ -8,7 +8,8 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
-import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import FormPanel, { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 

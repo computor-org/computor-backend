@@ -17,6 +17,7 @@ import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseMemberList, CourseGroupList } from 'types/generated';
+import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 import {
   assignableRoles,
   canManageMemberRole,
@@ -167,16 +168,16 @@ export default function CourseMembersPage() {
           <ListLoading>Loading members…</ListLoading>
         ) : (
           <ScrollPanel>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
+                  <Th>Member</Th>
+                  <Th>Role</Th>
+                  <Th>Group</Th>
                   <th className="px-4 py-3" />
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+              </Thead>
+              <Tbody>
                 {members.map((m) => {
                   const isSelf = user?.id === m.user_id;
                   const manageable = !isSelf && canManageMemberRole(ceiling, m.course_role_id);
@@ -253,8 +254,8 @@ export default function CourseMembersPage() {
                     </td>
                   </tr>
                 )}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </ScrollPanel>
         )}
 

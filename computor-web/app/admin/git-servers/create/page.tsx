@@ -6,7 +6,8 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
-import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
+import FormPanel, { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
 
 const gitServersClient = new GitServersClient();

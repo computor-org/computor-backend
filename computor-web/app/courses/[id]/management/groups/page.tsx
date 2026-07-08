@@ -16,6 +16,7 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGroupList } from 'types/generated';
+import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
@@ -106,15 +107,15 @@ export default function CourseGroupsPage() {
           <ListLoading>Loading groups…</ListLoading>
         ) : (
           <ScrollPanel>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
+                  <Th>Group</Th>
+                  <Th>Members</Th>
                   <th className="px-4 py-3" />
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+              </Thead>
+              <Tbody>
                 {groups.map((g) => {
                   const count = memberCount.get(g.id) ?? 0;
                   return (
@@ -161,8 +162,8 @@ export default function CourseGroupsPage() {
                     </td>
                   </tr>
                 )}
-              </tbody>
-            </table>
+              </Tbody>
+            </Table>
           </ScrollPanel>
         )}
       </ListPageLayout>

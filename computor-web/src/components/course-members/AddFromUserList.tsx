@@ -10,6 +10,7 @@ import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { CourseGroupList, UserList } from 'types/generated';
 import type { CourseRoleId } from '@/src/utils/courseRoles';
+import { Table, Tbody, Th } from '@/src/components/ui/Table';
 
 const PAGE_SIZE = 10;
 const membersClient = new CourseMembersClient();
@@ -149,16 +150,16 @@ export default function AddFromUserList({
         <div className="text-gray-500 py-8 text-center">Loading users…</div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
+          <Table>
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
+                <Th>User</Th>
+                <Th>Role</Th>
+                <Th>Group</Th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <Tbody>
               {visibleUsers.map((u) => {
                 const isAdded = added.has(u.id);
                 return (
@@ -209,8 +210,8 @@ export default function AddFromUserList({
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
         </div>
       )}
 

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import { Field, inputCls } from '@/src/components/FormPanel';
+import { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import RoleSelect from '@/src/components/course-members/RoleSelect';
 import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberImportClient';
 import type { CourseRoleId } from '@/src/utils/courseRoles';

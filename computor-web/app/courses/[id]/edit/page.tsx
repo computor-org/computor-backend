@@ -11,7 +11,8 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
-import { Field, inputCls } from '@/src/components/FormPanel';
+import { Field } from '@/src/components/FormPanel';
+import { inputCls } from '@/src/components/ui/tokens';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
 
 const coursesClient = new CoursesClient();
