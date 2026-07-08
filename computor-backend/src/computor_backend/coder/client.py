@@ -158,19 +158,7 @@ class CoderClient:
         if self._org_id:
             return self._org_id
 
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.get(
-            "/api/v2/organizations",
-            headers={"Coder-Session-Token": token},
-        )
-
-        if resp.status_code != 200:
-            raise CoderAPIError(
-                "Failed to get organizations",
-                status_code=resp.status_code,
-            )
+        resp = await self._request("GET", "/api/v2/organizations", ok=(200,))
 
         orgs = resp.json()
         if not orgs:
@@ -189,6 +177,72 @@ class CoderClient:
         if self.settings.admin_api_secret:
             headers["X-Admin-Secret"] = self.settings.admin_api_secret
         return headers
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any = None,
+        params: Optional[dict] = None,
+        ok: Optional[tuple[int, ...]] = (200,),
+        admin_headers: bool = False,
+        timeout: Optional[float] = None,
+    ) -> httpx.Response:
+        """Issue an authenticated request against the Coder API.
+
+        Collapses the ``token = await self._get_session_token(); client =
+        await self._ensure_client()`` boilerplate plus header building that
+        every endpoint used to repeat.
+
+        Args:
+            method: HTTP method (GET/POST/PUT/PATCH/DELETE).
+            path: API path relative to the configured base URL.
+            json: Optional JSON request body.
+            params: Optional query parameters.
+            ok: Status codes treated as success. If the response status is not
+                in ``ok`` a ``CoderAPIError`` is raised. Pass a wider tuple to
+                let the caller special-case a status (e.g. ``409``/``404``);
+                pass ``None`` to skip the check entirely when the caller handles
+                every status itself (e.g. best-effort ``bool``-returning ops).
+            admin_headers: When ``True`` the request carries the full admin
+                header set from :meth:`_get_headers` (adds ``X-Admin-Secret``
+                when configured). When ``False`` only ``Coder-Session-Token`` is
+                sent. This preserves the exact per-endpoint header set each call
+                site used before this refactor.
+            timeout: Optional per-request timeout override (else the client's
+                configured default is used).
+
+        Returns:
+            The (already status-checked, unless ``ok is None``) response.
+
+        Raises:
+            CoderAPIError: If ``ok`` is not ``None`` and the response status is
+                not contained in it.
+        """
+        token = await self._get_session_token()
+        client = await self._ensure_client()
+
+        headers = self._get_headers(token) if admin_headers else {"Coder-Session-Token": token}
+
+        kwargs: dict[str, Any] = {"headers": headers}
+        if json is not None:
+            kwargs["json"] = json
+        if params is not None:
+            kwargs["params"] = params
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+
+        resp = await client.request(method, path, **kwargs)
+
+        if ok is not None and resp.status_code not in ok:
+            raise CoderAPIError(
+                f"Coder API request failed: {method} {path}",
+                status_code=resp.status_code,
+                detail=resp.text,
+            )
+
+        return resp
 
     @staticmethod
     def _safe_json(resp: httpx.Response) -> Optional[dict]:
@@ -251,25 +305,14 @@ class CoderClient:
         Raises:
             CoderUserNotFoundError: If user not found
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        # Try by username first
-        resp = await client.get(
-            f"/api/v2/users/{username_or_email}",
-            headers={"Coder-Session-Token": token},
+        # Try by username first. ``ok=None`` preserves the original behavior of
+        # treating every non-200 (not just 404) as "not found".
+        resp = await self._request(
+            "GET", f"/api/v2/users/{username_or_email}", ok=None
         )
 
         if resp.status_code == 200:
-            data = resp.json()
-            return CoderUser(
-                id=data["id"],
-                username=data["username"],
-                email=data["email"],
-                name=data.get("name"),
-                created_at=data.get("created_at"),
-                status=data.get("status"),
-            )
+            return CoderUser.from_api(resp.json())
 
         # If not found and looks like email, search by email
         if resp.status_code == 404 and "@" in username_or_email:
@@ -279,35 +322,17 @@ class CoderClient:
 
     async def _find_user_by_email(self, email: str) -> CoderUser:
         """Find user by email address."""
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
         # List users and filter by email
-        resp = await client.get(
-            "/api/v2/users",
-            headers={"Coder-Session-Token": token},
-            params={"q": email},
+        resp = await self._request(
+            "GET", "/api/v2/users", params={"q": email}, ok=(200,)
         )
-
-        if resp.status_code != 200:
-            raise CoderAPIError(
-                "Failed to search users",
-                status_code=resp.status_code,
-            )
 
         data = resp.json()
         users = data.get("users", [])
 
         for user in users:
             if user.get("email", "").lower() == email.lower():
-                return CoderUser(
-                    id=user["id"],
-                    username=user["username"],
-                    email=user["email"],
-                    name=user.get("name"),
-                    created_at=user.get("created_at"),
-                    status=user.get("status"),
-                )
+                return CoderUser.from_api(user)
 
         raise CoderUserNotFoundError(email)
 
@@ -341,9 +366,7 @@ class CoderClient:
             CoderUserExistsError: If user already exists
             CoderAPIError: If creation fails
         """
-        token = await self._get_session_token()
         org_id = await self._get_org_id()
-        client = await self._ensure_client()
 
         payload: dict[str, Any] = {
             "username": user_data.username,
@@ -356,34 +379,21 @@ class CoderClient:
         if user_data.full_name:
             payload["name"] = user_data.full_name
 
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             "/api/v2/users",
-            headers=self._get_headers(token),
             json=payload,
+            admin_headers=True,
+            ok=(200, 201, 409),
         )
 
         if resp.status_code == 409:
             raise CoderUserExistsError(user_data.email)
 
-        if resp.status_code not in (200, 201):
-            logger.error(f"Coder API user creation failed: status={resp.status_code}, response={resp.text}")
-            raise CoderAPIError(
-                f"Failed to create user '{user_data.username}': {resp.text}",
-                status_code=resp.status_code,
-                detail=resp.text,
-            )
-
         data = resp.json()
         logger.info(f"Created Coder user: {user_data.username}")
 
-        return CoderUser(
-            id=data["id"],
-            username=data["username"],
-            email=data["email"],
-            name=data.get("name"),
-            created_at=data.get("created_at"),
-            status=data.get("status"),
-        )
+        return CoderUser.from_api(data)
 
     async def update_user_password(self, username: str, new_password: str) -> bool:
         """
@@ -396,14 +406,13 @@ class CoderClient:
         Returns:
             True if password was updated successfully
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
         # Try the standard password update endpoint
-        resp = await client.put(
+        resp = await self._request(
+            "PUT",
             f"/api/v2/users/{username}/password",
-            headers=self._get_headers(token),
             json={"password": new_password, "old_password": ""},
+            admin_headers=True,
+            ok=None,
         )
 
         if resp.status_code in (200, 204):
@@ -451,13 +460,12 @@ class CoderClient:
         Returns:
             API key if successful, None otherwise
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/users/{username}/keys",
-            headers=self._get_headers(token),
             json={"lifetime_seconds": 86400 * 7},  # 7 days
+            admin_headers=True,
+            ok=None,
         )
 
         if resp.status_code in (200, 201):
@@ -499,12 +507,11 @@ class CoderClient:
         Returns:
             True if deleted successfully
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.delete(
+        resp = await self._request(
+            "DELETE",
             f"/api/v2/users/{username}",
-            headers=self._get_headers(token),
+            admin_headers=True,
+            ok=None,
         )
 
         if resp.status_code in (200, 204):
@@ -524,19 +531,7 @@ class CoderClient:
         Returns:
             List of CoderTemplate instances
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.get(
-            "/api/v2/templates",
-            headers={"Coder-Session-Token": token},
-        )
-
-        if resp.status_code != 200:
-            raise CoderAPIError(
-                "Failed to list templates",
-                status_code=resp.status_code,
-            )
+        resp = await self._request("GET", "/api/v2/templates", ok=(200,))
 
         templates = resp.json()
         return [
@@ -589,6 +584,42 @@ class CoderClient:
                 return tpl.active_version_id
         raise CoderTemplateNotFoundError(template_name)
 
+    async def get_template(self, name: str) -> dict:
+        """Get a template's raw record by name from the default organization.
+
+        Uses the org-scoped ``GET /organizations/default/templates/{name}``
+        endpoint (unlike :meth:`list_templates`, which returns typed summaries),
+        and returns the parsed JSON so callers can read fields such as ``id``.
+
+        Raises:
+            CoderAPIError: If the template cannot be fetched.
+        """
+        resp = await self._request(
+            "GET",
+            f"/api/v2/organizations/default/templates/{name}",
+            ok=(200,),
+        )
+        return resp.json()
+
+    async def patch_template_ttl(
+        self,
+        template_id: str,
+        ttl_ms: int,
+        activity_bump_ms: int,
+    ) -> dict:
+        """Patch a template's TTL settings and return the updated record.
+
+        Raises:
+            CoderAPIError: If the patch is rejected.
+        """
+        resp = await self._request(
+            "PATCH",
+            f"/api/v2/templates/{template_id}",
+            json={"default_ttl_ms": ttl_ms, "activity_bump_ms": activity_bump_ms},
+            ok=(200,),
+        )
+        return resp.json()
+
     # -------------------------------------------------------------------------
     # Workspace operations
     # -------------------------------------------------------------------------
@@ -618,20 +649,9 @@ class CoderClient:
         Uses the same /workspaces endpoint as ``get_user_workspaces`` but with
         no owner filter, so an admin session sees all users' workspaces.
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.get(
-            "/api/v2/workspaces",
-            headers={"Coder-Session-Token": token},
-            params={"limit": limit},
+        resp = await self._request(
+            "GET", "/api/v2/workspaces", params={"limit": limit}, ok=(200,)
         )
-
-        if resp.status_code != 200:
-            raise CoderAPIError(
-                "Failed to list all workspaces",
-                status_code=resp.status_code,
-            )
 
         return [self._parse_workspace_summary(ws) for ws in resp.json().get("workspaces", [])]
 
@@ -653,14 +673,14 @@ class CoderClient:
         Raises:
             CoderWorkspaceNotFoundError: If workspace not found
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
         workspace_name = workspace_name or f"{username}-workspace"
 
-        resp = await client.get(
+        # ``ok=None`` preserves the original behavior of mapping every non-200
+        # to CoderWorkspaceNotFoundError.
+        resp = await self._request(
+            "GET",
             f"/api/v2/users/{username}/workspace/{workspace_name}",
-            headers={"Coder-Session-Token": token},
+            ok=None,
         )
 
         if resp.status_code != 200:
@@ -678,20 +698,12 @@ class CoderClient:
         Returns:
             List of CoderWorkspace instances
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.get(
-            f"/api/v2/workspaces",
-            headers={"Coder-Session-Token": token},
+        resp = await self._request(
+            "GET",
+            "/api/v2/workspaces",
             params={"q": f"owner:{username}"},
+            ok=(200,),
         )
-
-        if resp.status_code != 200:
-            raise CoderAPIError(
-                f"Failed to list workspaces for user {username}",
-                status_code=resp.status_code,
-            )
 
         data = resp.json()
         return [self._parse_workspace_summary(ws) for ws in data.get("workspaces", [])]
@@ -736,9 +748,7 @@ class CoderClient:
             CoderWorkspaceExistsError: If workspace already exists
             CoderAPIError: If creation fails
         """
-        token = await self._get_session_token()
         template_id = await self.get_template_id(workspace_data.template.value)
-        client = await self._ensure_client()
 
         workspace_name = workspace_data.name or f"{username}-workspace"
 
@@ -766,23 +776,17 @@ class CoderClient:
             payload["rich_parameter_values"] = rich_params
             logger.info(f"Sending rich_parameter_values: {[p['name'] for p in rich_params]}")
 
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/organizations/default/members/{username}/workspaces",
-            headers=self._get_headers(token),
             json=payload,
+            admin_headers=True,
+            ok=(200, 201, 409),
             timeout=self.settings.workspace_timeout,
         )
 
         if resp.status_code == 409:
             raise CoderWorkspaceExistsError(workspace_name)
-
-        if resp.status_code not in (200, 201):
-            logger.error(f"Coder API workspace creation failed: status={resp.status_code}, response={resp.text}")
-            raise CoderAPIError(
-                f"Failed to create workspace '{workspace_name}': {resp.text}",
-                status_code=resp.status_code,
-                detail=resp.text,
-            )
 
         data = resp.json()
         logger.info(f"Created workspace: {workspace_name} for user {username}")
@@ -813,9 +817,6 @@ class CoderClient:
         Returns:
             True if deleted successfully
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
         workspace_name = workspace_name or f"{username}-workspace"
         logger.info(f"delete_workspace called: username={username}, workspace_name={workspace_name}")
 
@@ -831,10 +832,12 @@ class CoderClient:
             return False
 
         # Coder deletes workspaces by creating a build with transition="delete"
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/workspaces/{details.workspace.id}/builds",
-            headers=self._get_headers(token),
             json={"transition": "delete"},
+            admin_headers=True,
+            ok=None,
         )
 
         if resp.status_code in (200, 201, 202):
@@ -892,13 +895,9 @@ class CoderClient:
         transition: str,
     ) -> bool:
         """Execute workspace state transition (start/stop)."""
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
         # Get workspace to find template version
-        resp = await client.get(
-            f"/api/v2/workspaces/{workspace_id}",
-            headers={"Coder-Session-Token": token},
+        resp = await self._request(
+            "GET", f"/api/v2/workspaces/{workspace_id}", ok=None
         )
 
         if resp.status_code != 200:
@@ -908,13 +907,14 @@ class CoderClient:
         template_version_id = workspace["latest_build"]["template_version_id"]
 
         # Create transition build
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/workspaces/{workspace_id}/builds",
-            headers={"Coder-Session-Token": token},
             json={
                 "template_version_id": template_version_id,
                 "transition": transition,
             },
+            ok=None,
             timeout=self.settings.workspace_timeout,
         )
 
@@ -1059,13 +1059,9 @@ class CoderClient:
         Returns:
             True if update was initiated successfully
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        # Get workspace to find template version
-        resp = await client.get(
-            f"/api/v2/workspaces/{workspace_id}",
-            headers={"Coder-Session-Token": token},
+        # Get workspace to find template version (no admin secret, as before)
+        resp = await self._request(
+            "GET", f"/api/v2/workspaces/{workspace_id}", ok=None
         )
 
         if resp.status_code != 200:
@@ -1081,14 +1077,16 @@ class CoderClient:
             "value": computor_auth_token,
         }]
 
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/workspaces/{workspace_id}/builds",
-            headers=self._get_headers(token),
             json={
                 "template_version_id": template_version_id,
                 "transition": "start",
                 "rich_parameter_values": rich_params,
             },
+            admin_headers=True,
+            ok=None,
             timeout=self.settings.workspace_timeout,
         )
 
@@ -1100,14 +1098,15 @@ class CoderClient:
         return success
 
     async def _get_build_param(
-        self, build_id: str, name: str, token: str
+        self, build_id: str, name: str
     ) -> Optional[str]:
         """Read one rich-parameter value from a workspace build so it can be
         preserved across a new build (omitted params reset to their default)."""
-        client = await self._ensure_client()
-        resp = await client.get(
+        resp = await self._request(
+            "GET",
             f"/api/v2/workspacebuilds/{build_id}/parameters",
-            headers=self._get_headers(token),
+            admin_headers=True,
+            ok=None,
         )
         if resp.status_code != 200:
             return None
@@ -1121,12 +1120,12 @@ class CoderClient:
     ) -> bool:
         """Set a workspace's automatic-updates policy so it adopts the template's
         active version on its next start. Best-effort."""
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-        resp = await client.put(
+        resp = await self._request(
+            "PUT",
             f"/api/v2/workspaces/{workspace_id}/autoupdates",
-            headers=self._get_headers(token),
             json={"automatic_updates": "always" if always else "never"},
+            admin_headers=True,
+            ok=None,
         )
         return resp.status_code in (200, 204)
 
@@ -1143,12 +1142,11 @@ class CoderClient:
         so they adopt the new version on next start rather than being
         force-started.
         """
-        token = await self._get_session_token()
-        client = await self._ensure_client()
-
-        resp = await client.get(
+        resp = await self._request(
+            "GET",
             f"/api/v2/workspaces/{workspace_id}",
-            headers=self._get_headers(token),
+            admin_headers=True,
+            ok=None,
         )
         if resp.status_code != 200:
             logger.error(
@@ -1162,18 +1160,20 @@ class CoderClient:
         rich_params: list[dict] = []
         build_id = latest.get("id")
         if build_id:
-            current_token = await self._get_build_param(build_id, "computor_auth_token", token)
+            current_token = await self._get_build_param(build_id, "computor_auth_token")
             if current_token is not None:
                 rich_params.append({"name": "computor_auth_token", "value": current_token})
 
-        resp = await client.post(
+        resp = await self._request(
+            "POST",
             f"/api/v2/workspaces/{workspace_id}/builds",
-            headers=self._get_headers(token),
             json={
                 "template_version_id": template_version_id,
                 "transition": "start",
                 "rich_parameter_values": rich_params,
             },
+            admin_headers=True,
+            ok=None,
             timeout=self.settings.workspace_timeout,
         )
         success = resp.status_code in (200, 201)

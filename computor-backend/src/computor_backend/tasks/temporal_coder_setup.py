@@ -198,7 +198,8 @@ async def push_coder_template(
     of the registry (matches the template's default host), NOT the worker's push
     host, so it is intentionally not overridden by CODER_REGISTRY_HOST.
     """
-    import httpx
+    from computor_backend.coder.client import CoderClient
+    from computor_backend.coder.config import CoderSettings
 
     # Discover template from filesystem
     discovered = _discover_templates(templates_dir)
@@ -219,83 +220,72 @@ async def push_coder_template(
     # parameter passed from the backend (which may be localhost).
     coder_url = os.environ.get("CODER_URL", coder_url)
 
-    # Step 1: get session token via API login
-    logger.info(f"Logging in to Coder at {coder_url} as {coder_admin_email}")
-    try:
-        async with httpx.AsyncClient(timeout=30) as http:
-            login_resp = await http.post(
-                f"{coder_url}/api/v2/users/login",
-                json={"email": coder_admin_email, "password": coder_admin_password},
-            )
-            login_resp.raise_for_status()
-            session_token = login_resp.json()["session_token"]
-    except Exception as e:
-        return {"success": False, "template": template_key, "error": f"Coder login failed: {e}"}
-
-    # Step 2: push template via coder CLI
-    env = os.environ.copy()
-    env["CODER_SESSION_TOKEN"] = session_token
-    env["CODER_URL"] = coder_url
-
     image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
 
-    cmd = [
-        "coder", "templates", "push", coder_template_name,
-        "--directory", template_dir,
-        "--variable", f"computor_backend_internal={backend_internal_url}",
-        "--variable", f"computor_backend_url={backend_external_url}",
-        "--variable", f"dev_forward_ports={dev_forward_ports}",
-        "--variable", f"workspace_image={image_ref}",
-        "--yes",
-    ]
-    logger.info(f"Running: {' '.join(cmd)}")
+    # Route login and template GET/PATCH through CoderClient instead of raw
+    # httpx. The client is configured with this activity's resolved url and
+    # admin credentials (its default org-scoped template endpoints match the
+    # raw calls this used to make, and carry only the Coder-Session-Token
+    # header — no X-Admin-Secret — exactly as before).
+    settings = CoderSettings(
+        url=coder_url,
+        admin_email=coder_admin_email,
+        admin_password=coder_admin_password,
+    )
 
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=300, env=env
-        )
-        if result.returncode != 0:
-            logger.error(f"coder templates push failed: {result.stderr}")
-            return {
-                "success": False,
-                "template": template_key,
-                "error": f"coder templates push failed (rc={result.returncode}): {result.stderr}",
-            }
-        logger.info(f"Template {coder_template_name} pushed successfully")
-    except subprocess.TimeoutExpired:
-        return {"success": False, "template": template_key, "error": "coder templates push timed out"}
-    except FileNotFoundError:
-        return {"success": False, "template": template_key, "error": "coder CLI not found on PATH"}
+    async with CoderClient(settings=settings) as client:
+        # Step 1: get session token via API login
+        logger.info(f"Logging in to Coder at {coder_url} as {coder_admin_email}")
+        try:
+            session_token = await client._get_session_token()
+        except Exception as e:
+            return {"success": False, "template": template_key, "error": f"Coder login failed: {e}"}
 
-    # Step 3: set TTL via REST API
-    try:
-        async with httpx.AsyncClient(timeout=30) as http:
-            headers = {"Coder-Session-Token": session_token}
+        # Step 2: push template via coder CLI (needs the raw session token)
+        env = os.environ.copy()
+        env["CODER_SESSION_TOKEN"] = session_token
+        env["CODER_URL"] = coder_url
 
-            # Get template ID
-            tmpl_resp = await http.get(
-                f"{coder_url}/api/v2/organizations/default/templates/{coder_template_name}",
-                headers=headers,
+        cmd = [
+            "coder", "templates", "push", coder_template_name,
+            "--directory", template_dir,
+            "--variable", f"computor_backend_internal={backend_internal_url}",
+            "--variable", f"computor_backend_url={backend_external_url}",
+            "--variable", f"dev_forward_ports={dev_forward_ports}",
+            "--variable", f"workspace_image={image_ref}",
+            "--yes",
+        ]
+        logger.info(f"Running: {' '.join(cmd)}")
+
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300, env=env
             )
-            tmpl_resp.raise_for_status()
-            template_id = tmpl_resp.json()["id"]
+            if result.returncode != 0:
+                logger.error(f"coder templates push failed: {result.stderr}")
+                return {
+                    "success": False,
+                    "template": template_key,
+                    "error": f"coder templates push failed (rc={result.returncode}): {result.stderr}",
+                }
+            logger.info(f"Template {coder_template_name} pushed successfully")
+        except subprocess.TimeoutExpired:
+            return {"success": False, "template": template_key, "error": "coder templates push timed out"}
+        except FileNotFoundError:
+            return {"success": False, "template": template_key, "error": "coder CLI not found on PATH"}
 
-            # PATCH TTL settings
-            patch_resp = await http.patch(
-                f"{coder_url}/api/v2/templates/{template_id}",
-                headers=headers,
-                json={"default_ttl_ms": ttl_ms, "activity_bump_ms": activity_bump_ms},
-            )
-            patch_resp.raise_for_status()
+        # Step 3: set TTL via REST API (through the client)
+        try:
+            template_id = (await client.get_template(coder_template_name))["id"]
+            await client.patch_template_ttl(template_id, ttl_ms, activity_bump_ms)
             logger.info(f"TTL set for {coder_template_name}: default={ttl_ms}ms, bump={activity_bump_ms}ms")
-
-    except Exception as e:
-        logger.warning(f"Template pushed but TTL update failed for {template_key}: {e}")
-        return {
-            "success": True,
-            "template": template_key,
-            "warning": f"Template pushed but TTL update failed: {e}",
-        }
+        except Exception as e:
+            logger.warning(f"Template pushed but TTL update failed for {template_key}: {e}")
+            return {
+                "success": True,
+                "template": template_key,
+                "warning": f"Template pushed but TTL update failed: {e}",
+            }
 
     return {
         "success": True,
