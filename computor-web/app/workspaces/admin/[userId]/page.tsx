@@ -7,7 +7,7 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
-import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
+import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
@@ -207,77 +207,17 @@ export default function UserDetailPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Template</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {workspaces.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                        No workspaces found for this user
-                      </td>
-                    </tr>
-                  ) : (
-                    workspaces.map((ws) => {
-                      const status = ws.latest_build_status;
-                      const isRunning = status === 'running' || status === 'succeeded';
-                      const isStopped = status === 'stopped' || status === 'canceled';
-
-                      return (
-                        <tr key={ws.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-900 font-medium">{ws.name}</td>
-                          <td className="px-4 py-3 text-gray-600">{ws.template_name || '-'}</td>
-                          <td className="px-4 py-3"><WorkspaceStatusBadge status={status} size="sm" /></td>
-                          <td className="px-4 py-3 text-gray-600 text-xs">
-                            {ws.created_at ? new Date(ws.created_at).toLocaleDateString() : '-'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {isRunning && (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenWorkspace(ws.owner_name || '', ws.name)}
-                                    className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
-                                  >
-                                    Open
-                                  </button>
-                                  <button
-                                    onClick={() => handleStop(ws.owner_name || '', ws.name)}
-                                    className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                                  >
-                                    Stop
-                                  </button>
-                                </>
-                              )}
-                              {isStopped && (
-                                <button
-                                  onClick={() => handleStart(ws.owner_name || '', ws.name)}
-                                  className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100"
-                                >
-                                  Start
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setDeleteTarget({ owner: ws.owner_name || '', name: ws.name })}
-                                className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+              {workspaces.length === 0 ? (
+                <p className="px-6 py-8 text-center text-gray-500 text-sm">No workspaces found for this user</p>
+              ) : (
+                <WorkspaceTable
+                  workspaces={workspaces}
+                  onStart={handleStart}
+                  onStop={handleStop}
+                  onDelete={(owner, name) => setDeleteTarget({ owner, name })}
+                  onViewDetails={handleOpenWorkspace}
+                />
+              )}
             </div>
           </div>
         )}
