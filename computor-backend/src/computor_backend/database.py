@@ -1,7 +1,8 @@
+import logging
 import os
 from contextlib import contextmanager
-from typing import Generator, Callable, TYPE_CHECKING
-from sqlalchemy import create_engine, text
+from typing import Callable, Generator, TYPE_CHECKING
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 import sqlalchemy.exc as sa_exc
@@ -9,6 +10,8 @@ from fastapi import Depends
 
 if TYPE_CHECKING:
     from computor_backend.permissions.principal import Principal
+
+logger = logging.getLogger(__name__)
 
 POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.environ.get("POSTGRES_PORT", "5432")
@@ -40,6 +43,42 @@ SessionLocal: Callable[[], Session] = sessionmaker(
     autoflush=False,         # prevents "accidental" DB touching
     class_=Session
 )
+
+
+# ---------------------------------------------------------------------------
+# Deferred post-commit side effects (cache invalidation).
+#
+# Repositories flush (not commit) inside a request, so the request is a single
+# unit of work committed once by ``get_db``/``get_db_session``. Cache
+# invalidation must therefore run only when the write actually lands: callbacks
+# registered via ``register_post_commit`` fire on the session's ``after_commit``
+# event (works for the request-end commit AND any explicit mid-request commit)
+# and are dropped on rollback so a rolled-back write never evicts a live entry.
+# ---------------------------------------------------------------------------
+
+_POST_COMMIT_KEY = "post_commit_callbacks"
+
+
+def register_post_commit(db: Session, callback: Callable[[], None]) -> None:
+    """Queue ``callback`` to run after the session's next successful commit."""
+    db.info.setdefault(_POST_COMMIT_KEY, []).append(callback)
+
+
+@event.listens_for(SessionLocal, "after_commit")
+def _run_post_commit_callbacks(session: Session) -> None:
+    callbacks = session.info.pop(_POST_COMMIT_KEY, None)
+    if not callbacks:
+        return
+    for callback in callbacks:
+        try:
+            callback()
+        except Exception:  # cache invalidation must never break the request
+            logger.warning("post-commit callback failed", exc_info=True)
+
+
+@event.listens_for(SessionLocal, "after_rollback")
+def _drop_post_commit_callbacks(session: Session) -> None:
+    session.info.pop(_POST_COMMIT_KEY, None)
 
 def _get_db(user_id: str | None = None) -> Generator[Session, None, None]:
     """
