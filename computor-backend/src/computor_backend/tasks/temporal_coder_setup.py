@@ -640,12 +640,6 @@ async def discover_template_keys(
     return [t["dir_name"] for t in templates]
 
 
-WORKFLOWS = [
-    BuildWorkspaceImagesWorkflow,
-    PushCoderTemplatesWorkflow,
-    RolloutWorkspacesWorkflow,
-]
-
 ACTIVITIES = [
     build_workspace_image,
     discover_template_keys,

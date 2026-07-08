@@ -15,7 +15,6 @@ import logging
 from pathlib import Path
 
 from temporalio import workflow, activity
-from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult, decrypt_gitlab_token
 from .git_ops import clone_or_init, commit_and_push, configure_identity
@@ -288,31 +287,20 @@ class GenerateAssignmentsRepositoryWorkflow(BaseWorkflow):
         overwrite = params.get('overwrite_strategy', 'force_update')
         commit_message = params.get('commit_message')
 
-        if not course_id:
-            return WorkflowResult(status="failed", result=None, error="course_id is required")
-
-        retry_policy = RetryPolicy(
-            initial_interval=timedelta(seconds=5),
-            maximum_interval=timedelta(minutes=1),
-            maximum_attempts=3,
-            backoff_coefficient=2.0,
-        )
+        invalid = self.require_params(params, 'course_id')
+        if invalid:
+            return invalid
 
         try:
-            result = await workflow.execute_activity(
+            result = await self.run_single_activity(
                 generate_assignments_repository_activity,
                 args=[course_id, assignments_url, selection, overwrite, commit_message],
-                start_to_close_timeout=timedelta(minutes=20),
-                retry_policy=retry_policy,
+                timeout=timedelta(minutes=20),
             )
             return WorkflowResult(status="completed" if result.get('success') else "failed", result=result)
         except Exception as e:
             return WorkflowResult(status="failed", result=None, error=str(e))
 
-
-WORKFLOWS = [
-    GenerateAssignmentsRepositoryWorkflow,
-]
 
 ACTIVITIES = [
     generate_assignments_repository_activity,

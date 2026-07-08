@@ -4,7 +4,6 @@ Temporal worker implementation for running workflows and activities.
 
 import asyncio
 import logging
-import os
 import signal
 import sys
 from datetime import datetime
@@ -27,40 +26,11 @@ from .temporal_client import (
     DEFAULT_TASK_QUEUE
 )
 
-# Import all temporal modules — each exports WORKFLOWS and ACTIVITIES lists.
-# Adding a new workflow/activity only requires updating the defining module.
-from . import (
-    temporal_student_testing,
-    temporal_hierarchy_management,
-    temporal_student_template_v2,
-    temporal_assignments_repository,
-    temporal_student_repository,
-    temporal_tutor_testing,
-    temporal_coder_setup,
-)
-
-_TEMPORAL_MODULES = [
-    temporal_student_testing,
-    temporal_hierarchy_management,
-    temporal_student_template_v2,
-    temporal_assignments_repository,
-    temporal_student_repository,
-    temporal_tutor_testing,
-    temporal_coder_setup,
-]
-
-# Demo/example workflows only when explicitly enabled (see tasks/__init__.py).
-if os.environ.get("COMPUTOR_ENABLE_EXAMPLE_TASKS") == "1":
-    from . import temporal_examples
-    _TEMPORAL_MODULES.append(temporal_examples)
-
-
-def _collect_from_modules(attr: str) -> list:
-    """Collect WORKFLOWS or ACTIVITIES from all temporal modules."""
-    items = []
-    for mod in _TEMPORAL_MODULES:
-        items.extend(getattr(mod, attr, []))
-    return items
+# Workflow/activity registration is derived from the task registry, which is
+# populated by importing the modules listed in TEMPORAL_TASK_MODULES (the
+# single source of truth). Example workflows are gated by the env flag inside
+# import_task_modules(). Adding a new module only requires editing that list.
+from .registry import task_registry, import_task_modules
 
 
 class TemporalWorker:
@@ -101,9 +71,11 @@ class TemporalWorker:
         # Get client
         self.client = await get_temporal_client()
 
-        # Collect workflows and activities from all temporal modules
-        workflows = _collect_from_modules("WORKFLOWS")
-        activities = _collect_from_modules("ACTIVITIES")
+        # Ensure all task modules are imported (auto-registers workflows and
+        # records their activities), then derive registration from the registry.
+        import_task_modules()
+        workflows = task_registry.list_workflows()
+        activities = task_registry.list_activities()
 
         # Create a worker for each task queue
         for task_queue in self.task_queues:

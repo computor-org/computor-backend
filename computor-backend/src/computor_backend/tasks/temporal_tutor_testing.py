@@ -423,10 +423,6 @@ class TutorTestingWorkflow(BaseWorkflow):
             )
 
 
-WORKFLOWS = [
-    TutorTestingWorkflow,
-]
-
 ACTIVITIES = [
     fetch_tutor_test_input,
     store_tutor_test_artifacts_activity,

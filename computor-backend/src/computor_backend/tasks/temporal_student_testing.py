@@ -802,10 +802,6 @@ class StudentTestingWorkflow(BaseWorkflow):
             )
 
 
-WORKFLOWS = [
-    StudentTestingWorkflow,
-]
-
 ACTIVITIES = [
     fetch_example_version_with_dependencies,
     fetch_submission_artifact,

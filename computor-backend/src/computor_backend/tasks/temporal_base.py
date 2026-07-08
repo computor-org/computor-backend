@@ -6,9 +6,10 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 from urllib.parse import urlparse, urlunparse
 
+from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,56 @@ class BaseWorkflow(ABC):
             backoff_coefficient=2.0,
             maximum_interval=timedelta(seconds=100),
             maximum_attempts=3,
+        )
+
+    @staticmethod
+    def require_params(params: Dict[str, Any], *names: str) -> Optional["WorkflowResult"]:
+        """
+        Validate that required params are present.
+
+        Returns a failed ``WorkflowResult`` for the first named param that is
+        missing/None (treats any falsy value as absent, matching the historical
+        ``if not param`` checks), otherwise ``None``.
+        """
+        for name in names:
+            if not params.get(name):
+                return WorkflowResult(
+                    status="failed",
+                    result=None,
+                    error=f"{name} is required",
+                )
+        return None
+
+    @staticmethod
+    def default_activity_retry_policy() -> RetryPolicy:
+        """
+        The standard activity retry policy (5s initial, 1m max interval, 2.0
+        backoff, 3 attempts) used verbatim by several single-activity workflows.
+        """
+        return RetryPolicy(
+            initial_interval=timedelta(seconds=5),
+            maximum_interval=timedelta(minutes=1),
+            backoff_coefficient=2.0,
+            maximum_attempts=3,
+        )
+
+    @staticmethod
+    async def run_single_activity(
+        activity_fn: Callable,
+        args: Sequence[Any],
+        timeout: timedelta,
+        retry_policy: Optional[RetryPolicy] = None,
+    ) -> Any:
+        """
+        Execute a single activity with a start-to-close timeout and the default
+        activity retry policy (unless one is supplied). Convenience wrapper for
+        the common single-activity workflow shape.
+        """
+        return await workflow.execute_activity(
+            activity_fn,
+            args=list(args),
+            start_to_close_timeout=timeout,
+            retry_policy=retry_policy or BaseWorkflow.default_activity_retry_policy(),
         )
 
 

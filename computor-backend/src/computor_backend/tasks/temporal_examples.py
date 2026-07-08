@@ -275,12 +275,6 @@ class ExampleErrorHandlingWorkflow(BaseWorkflow):
         )
 
 
-WORKFLOWS = [
-    ExampleLongRunningWorkflow,
-    ExampleDataProcessingWorkflow,
-    ExampleErrorHandlingWorkflow,
-]
-
 ACTIVITIES = [
     simulate_processing_activity,
     process_data_chunk_activity,
