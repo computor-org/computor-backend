@@ -428,10 +428,6 @@ app.include_router(
 CrudRouter(CourseContentKindInterface).register_routes(app)
 CrudRouter(CourseContentTypeInterface).register_routes(app)
 
-# ProfileInterface and StudentProfileInterface use custom routers (see below)
-# CrudRouter(StudentProfileInterface).register_routes(app)
-# CrudRouter(ProfileInterface).register_routes(app)
-
 course_content_router.register_routes(app)
 
 app.include_router(result_router)
