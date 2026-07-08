@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
-import type { GitServerGet, GitServerUpdate } from '@/src/generated/types/common';
+import type { GitServerUpdate } from '@/src/generated/types/common';
 
 const gitServersClient = new GitServersClient();
 
@@ -18,35 +19,28 @@ export default function GitServerEditPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageHierarchy: canManage } = usePermissions();
 
-  const [server, setServer] = useState<GitServerGet | null>(null);
   const [name, setName] = useState('');
   const [managed, setManaged] = useState(false);
   const [token, setToken] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: server, loading, error: loadError } = useResource(
+    () => gitServersClient.getGitServerEndpointGitServersServerIdGet({ serverId }),
+    [serverId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the git server loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    gitServersClient
-      .getGitServerEndpointGitServersServerIdGet({ serverId })
-      .then((s) => {
-        if (cancelled) return;
-        setServer(s);
-        setName(s.name || '');
-        setManaged(!!s.managed);
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [serverId, authLoading, isAuthenticated, canManage]);
+    if (!server) return;
+    setName(server.name || '');
+    setManaged(!!server.managed);
+  }, [server]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       // Only send token when touched: undefined keeps the existing one; "" would clear it.
       const body: GitServerUpdate = { name: name.trim() || null, managed };
@@ -55,7 +49,7 @@ export default function GitServerEditPage() {
       router.push(`/admin/git-servers/${serverId}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -75,7 +69,7 @@ export default function GitServerEditPage() {
             { label: 'Edit' },
           ]}
           title={`Edit ${server?.name || server?.base_url || 'git server'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/admin/git-servers/${serverId}`)}
           onSubmit={save}

@@ -21,36 +21,51 @@ interface UseResourceResult<T> {
  *     async () => ({ org: await api.get(...), families: await api.get(...) }),
  *     [orgId],
  *   );
+ *
+ * Pass `refetchInterval` (ms) to poll: `fetcher` re-runs on that cadence in the
+ * background WITHOUT toggling `loading` (so the page doesn't flash its loading
+ * state on every tick). Explicit `reload()` still shows `loading` as usual.
  */
 export function useResource<T>(
   fetcher: () => Promise<T>,
   deps: DependencyList = [],
-  opts: { enabled?: boolean } = {},
+  opts: { enabled?: boolean; refetchInterval?: number } = {},
 ): UseResourceResult<T> {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const enabled = opts.enabled ?? true;
+  const refetchInterval = opts.refetchInterval;
 
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  // `silent` runs power background polling: refresh data/error without flipping
+  // `loading`. Explicit reloads (silent === false) behave exactly as before.
+  const run = useCallback(async (silent: boolean) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       setData(await fetcher());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An error occurred');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+
+  const reload = useCallback(() => run(false), [run]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !enabled) return;
     reload();
   }, [authLoading, isAuthenticated, enabled, reload]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !enabled || !refetchInterval) return;
+    const id = setInterval(() => run(true), refetchInterval);
+    return () => clearInterval(id);
+  }, [authLoading, isAuthenticated, enabled, refetchInterval, run]);
 
   return { data, loading, error, reload, setData };
 }

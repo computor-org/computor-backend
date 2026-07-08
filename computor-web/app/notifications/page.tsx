@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -29,39 +28,20 @@ function fmtWhen(s?: string | null): string {
 }
 
 export default function NotificationsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-
-  const [messages, setMessages] = useState<MessageList[]>([]);
-  const [seenUnread, setSeenUnread] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const items = await messagesClient.listMessagesMessagesGet({ scope: 'global', limit: 100 });
-        if (cancelled) return;
-        items.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
-        setMessages(items);
-        // Snapshot which were unread so this view keeps the "new" accent,
-        // then mark them read so the bell badge clears on next navigation.
-        const unread = items.filter((m) => !m.is_read);
-        setSeenUnread(new Set(unread.map((m) => m.id)));
-        if (unread.length > 0) {
-          await Promise.allSettled(unread.map((m) => messagesClient.markMessageReadMessagesIdReadsPost({ id: m.id })));
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load notifications');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, isAuthenticated]);
+  const { data, loading, error } = useResource(async () => {
+    const items = await messagesClient.listMessagesMessagesGet({ scope: 'global', limit: 100 });
+    items.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+    // Snapshot which were unread so this view keeps the "new" accent, then mark
+    // them read so the bell badge clears on next navigation.
+    const unread = items.filter((m) => !m.is_read);
+    const seenUnread = new Set(unread.map((m) => m.id));
+    if (unread.length > 0) {
+      await Promise.allSettled(unread.map((m) => messagesClient.markMessageReadMessagesIdReadsPost({ id: m.id })));
+    }
+    return { messages: items, seenUnread };
+  }, []);
+  const messages = data?.messages ?? [];
+  const seenUnread = data?.seenUnread ?? new Set<string>();
 
   return (
     <AuthenticatedLayout>

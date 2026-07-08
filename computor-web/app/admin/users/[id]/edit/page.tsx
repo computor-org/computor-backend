@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
-import type { UserGet } from 'types/generated';
 
 const usersClient = new UsersClient();
 
@@ -19,39 +19,29 @@ export default function UserEditPage() {
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
 
-  const [user, setUser] = useState<UserGet | null>(null);
   const [email, setEmail] = useState('');
   const [givenName, setGivenName] = useState('');
   const [familyName, setFamilyName] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: user, loading, error: loadError } = useResource(
+    () => usersClient.getUsersUsersIdGet({ id: userId }),
+    [userId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the user loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const u = await usersClient.getUsersUsersIdGet({ id: userId });
-        if (cancelled) return;
-        setUser(u);
-        setEmail(u.email || '');
-        setGivenName(u.given_name || '');
-        setFamilyName(u.family_name || '');
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load user');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, authLoading, isAuthenticated, canManage]);
+    if (!user) return;
+    setEmail(user.email || '');
+    setGivenName(user.given_name || '');
+    setFamilyName(user.family_name || '');
+  }, [user]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       await usersClient.updateUsersUsersIdPatch({
         id: userId,
@@ -60,7 +50,7 @@ export default function UserEditPage() {
       router.push(`/admin/users/${userId}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -80,7 +70,7 @@ export default function UserEditPage() {
             { label: 'Edit' },
           ]}
           title={`Edit ${user?.email || 'user'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/admin/users/${userId}`)}
           onSubmit={save}

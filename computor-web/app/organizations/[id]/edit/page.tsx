@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
@@ -20,36 +21,29 @@ export default function OrganizationEditPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageHierarchy: canManage } = usePermissions();
 
-  const [org, setOrg] = useState<OrganizationGet | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [orgType, setOrgType] = useState<OrganizationType>('organization');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: org, loading, error: loadError } = useResource(
+    () => organizationsClient.getOrganizationsOrganizationsIdGet({ id: orgId }),
+    [orgId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the organization loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    organizationsClient
-      .getOrganizationsOrganizationsIdGet({ id: orgId })
-      .then((o) => {
-        if (cancelled) return;
-        setOrg(o);
-        setTitle(o.title || '');
-        setDescription(o.description || '');
-        setOrgType((o.organization_type as OrganizationType) || 'organization');
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, authLoading, isAuthenticated, canManage]);
+    if (!org) return;
+    setTitle(org.title || '');
+    setDescription(org.description || '');
+    setOrgType((org.organization_type as OrganizationType) || 'organization');
+  }, [org]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       await organizationsClient.updateOrganizationsOrganizationsIdPatch({
         id: orgId,
@@ -62,7 +56,7 @@ export default function OrganizationEditPage() {
       router.push(`/organizations/${orgId}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -82,7 +76,7 @@ export default function OrganizationEditPage() {
             { label: 'Edit' },
           ]}
           title={`Edit ${org?.title || org?.path || 'organization'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/organizations/${orgId}`)}
           onSubmit={save}

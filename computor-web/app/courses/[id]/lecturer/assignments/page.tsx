@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { depthOf, lastSegment } from '@/src/utils/ltree';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -36,67 +36,38 @@ function deploymentBadge(c: CourseContentLecturerList): { label: string; color: 
 
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const [course, setCourse] = useState<CourseGet | null>(null);
-  const [contents, setContents] = useState<CourseContentLecturerList[]>([]);
-  const [typeMap, setTypeMap] = useState<Record<string, CourseContentTypeList>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // reload re-fetches everything (badges move pending → deploying → deployed as
+  // the release workflow runs).
+  const { data, loading, error, reload } = useResource(async () => {
+    const [cRes, ccRes, ctRes] = await Promise.all([
+      apiFetch(`${API_BASE_URL}/courses/${courseId}`),
+      apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`),
+      apiFetch(`${API_BASE_URL}/course-content-types?course_id=${courseId}&limit=200`),
+    ]);
+    if (!cRes.ok) throw new Error('Failed to load course');
+    const course: CourseGet = await cRes.json();
+    let contents: CourseContentLecturerList[] = [];
+    if (ccRes.ok) {
+      contents = await ccRes.json();
+      // Tree order: lexicographic by ltree path keeps each parent directly
+      // above its descendants; position orders siblings within a level.
+      contents.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.position - b.position));
+    }
+    let typeMap: Record<string, CourseContentTypeList> = {};
+    if (ctRes.ok) {
+      const types: CourseContentTypeList[] = await ctRes.json();
+      typeMap = Object.fromEntries(types.map((t) => [t.id, t]));
+    }
+    return { course, contents, typeMap };
+  }, [courseId]);
+
+  const course = data?.course ?? null;
+  const contents = data?.contents ?? [];
+  const typeMap = data?.typeMap ?? {};
+
   const [releasing, setReleasing] = useState<string | null>(null);
   const [releaseMsg, setReleaseMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [cRes, ccRes, ctRes] = await Promise.all([
-          apiFetch(`${API_BASE_URL}/courses/${courseId}`),
-          apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`),
-          apiFetch(`${API_BASE_URL}/course-content-types?course_id=${courseId}&limit=200`),
-        ]);
-        if (cancelled) return;
-        if (!cRes.ok) throw new Error('Failed to load course');
-        setCourse(await cRes.json());
-        if (ccRes.ok) {
-          const list: CourseContentLecturerList[] = await ccRes.json();
-          // Tree order: lexicographic by ltree path keeps each parent directly
-          // above its descendants; position orders siblings within a level.
-          list.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.position - b.position));
-          setContents(list);
-        }
-        if (ctRes.ok) {
-          const types: CourseContentTypeList[] = await ctRes.json();
-          setTypeMap(Object.fromEntries(types.map((t) => [t.id, t])));
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'An error occurred');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [courseId, authLoading, isAuthenticated]);
-
-  // Re-fetch just the content list (badges move pending → deploying → deployed as
-  // the release workflow runs).
-  const reload = useCallback(async () => {
-    try {
-      const ccRes = await apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`);
-      if (ccRes.ok) {
-        const list: CourseContentLecturerList[] = await ccRes.json();
-        list.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.position - b.position));
-        setContents(list);
-      }
-    } catch {
-      /* ignore refresh errors */
-    }
-  }, [courseId]);
 
   // "Release" == deploy the assigned example(s) into the student-template repo via
   // the course-git-aware generate-student-template workflow. No ids => all pending.

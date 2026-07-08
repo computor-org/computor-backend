@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -9,9 +9,10 @@ import Badge from '@/src/components/Badge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
-import type { PolicyVersionGet, PolicyVersionCreate } from 'types/generated';
+import type { PolicyVersionCreate } from 'types/generated';
 
 const consentClient = new ConsentClient();
 
@@ -25,13 +26,15 @@ function fmtDate(s?: string | null): string {
 }
 
 export default function PrivacyNoticesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
   const notify = useNotify();
 
-  const [versions, setVersions] = useState<PolicyVersionGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, reload } = useResource(
+    () => consentClient.listPolicyVersionsConsentPolicyVersionsGet({}),
+    [],
+  );
+  const versions = data ?? [];
 
   // Publish form
   const [version, setVersion] = useState('');
@@ -39,23 +42,6 @@ export default function PrivacyNoticesPage() {
   const [langs, setLangs] = useState<LangRow[]>([{ lang: 'en', text: '' }]);
   const [publishing, setPublishing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  const fetchVersions = useCallback(async () => {
-    try {
-      const data = await consentClient.listPolicyVersionsConsentPolicyVersionsGet({});
-      setVersions(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load policy versions');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    fetchVersions();
-  }, [authLoading, isAuthenticated, fetchVersions]);
 
   // The current version = latest already-effective version; anything with a
   // future effective_from is "scheduled".
@@ -109,7 +95,7 @@ export default function PrivacyNoticesPage() {
       setVersion('');
       setEffectiveFrom('');
       setLangs([{ lang: 'en', text: '' }]);
-      await fetchVersions();
+      await reload();
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Failed to publish policy version', 'error');
     } finally {
