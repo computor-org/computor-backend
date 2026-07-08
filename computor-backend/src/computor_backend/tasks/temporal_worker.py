@@ -30,7 +30,6 @@ from .temporal_client import (
 # Import all temporal modules — each exports WORKFLOWS and ACTIVITIES lists.
 # Adding a new workflow/activity only requires updating the defining module.
 from . import (
-    temporal_examples,
     temporal_student_testing,
     temporal_hierarchy_management,
     temporal_student_template_v2,
@@ -41,7 +40,6 @@ from . import (
 )
 
 _TEMPORAL_MODULES = [
-    temporal_examples,
     temporal_student_testing,
     temporal_hierarchy_management,
     temporal_student_template_v2,
@@ -50,6 +48,11 @@ _TEMPORAL_MODULES = [
     temporal_tutor_testing,
     temporal_coder_setup,
 ]
+
+# Demo/example workflows only when explicitly enabled (see tasks/__init__.py).
+if os.environ.get("COMPUTOR_ENABLE_EXAMPLE_TASKS") == "1":
+    from . import temporal_examples
+    _TEMPORAL_MODULES.append(temporal_examples)
 
 
 def _collect_from_modules(attr: str) -> list:
