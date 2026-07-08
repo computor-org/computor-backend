@@ -11,14 +11,12 @@ import { apiFetch, API_BASE_URL } from './apiClient';
  * `path` is relative to API_BASE_URL.
  *
  * PREFER the generated clients in `src/generated/clients/*` for new code — this
- * helper is retained only for the handful of endpoints that currently have no
- * usable generated client: `/user` + `/user/*` (the generated `UserClient`
- * collides with the `/user-roles` client and overwrites those methods on disk
- * — a generator naming bug), the ambiguous dual-route `DELETE /organizations/{id}`
- * and `DELETE /course-families/{id}`, and `DELETE /examples/{id}` (the backend
- * emits no single-id example delete). Fixing the `UserClient` name collision in
- * the TS generator will unblock the `/user` calls and shrink this to the two
- * intentional dual-route deletes.
+ * helper is retained only for the three endpoints without a usable generated
+ * method: the two ambiguous dual-route deletes `DELETE /organizations/{id}` and
+ * `DELETE /course-families/{id}` (left hand-typed to preserve the exact route
+ * the backend matches), and `DELETE /examples/{id}` (the backend emits no
+ * single-id example delete). Everything else — including all `/user*` and
+ * `/consent/*` calls — now uses generated clients.
  */
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
