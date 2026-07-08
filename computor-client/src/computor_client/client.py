@@ -115,6 +115,26 @@ class ComputorClient:
         return self._base_url
 
     @property
+    def timeout(self) -> float:
+        """Request timeout in seconds."""
+        return self._timeout
+
+    @property
+    def auth_headers(self) -> Dict[str, str]:
+        """Headers to authenticate a request made outside the async client.
+
+        Returns the configured headers (e.g. ``X-API-Token`` for CLI token
+        auth) plus a ``Bearer`` header when a session access token is present.
+        Lets the sync facade authenticate without reaching into private attrs.
+        """
+        headers = dict(self._headers)
+        if self._auth_provider.is_authenticated():
+            token = self._auth_provider._access_token
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+        return headers
+
+    @property
     def is_authenticated(self) -> bool:
         """Check if the client is authenticated."""
         return self._auth_provider.is_authenticated()

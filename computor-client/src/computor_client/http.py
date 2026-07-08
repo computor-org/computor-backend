@@ -182,39 +182,9 @@ class AsyncHTTPClient:
 
     def _handle_error_response(self, response: httpx.Response) -> None:
         """Convert HTTP error responses to appropriate exceptions."""
-        status_code = response.status_code
+        from computor_client.exceptions import raise_for_response
 
-        # Try to parse error details from response body
-        try:
-            error_data = response.json()
-            detail = error_data.get("detail") or error_data.get("message") or str(error_data)
-            error_code = error_data.get("error_code")
-        except Exception:
-            detail = response.text or f"HTTP {status_code}"
-            error_code = None
-
-        if status_code == 401:
-            raise AuthenticationError(detail, status_code=status_code, error_code=error_code)
-        elif status_code == 403:
-            raise AuthorizationError(detail, status_code=status_code, error_code=error_code)
-        elif status_code == 404:
-            raise NotFoundError(detail, status_code=status_code, error_code=error_code)
-        elif status_code == 400:
-            raise ValidationError(detail, status_code=status_code, error_code=error_code)
-        elif status_code == 409:
-            raise ConflictError(detail, status_code=status_code, error_code=error_code)
-        elif status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            raise RateLimitError(
-                detail,
-                status_code=status_code,
-                error_code=error_code,
-                retry_after=int(retry_after) if retry_after else None,
-            )
-        elif 500 <= status_code < 600:
-            raise ServerError(detail, status_code=status_code, error_code=error_code)
-        else:
-            raise ComputorClientError(detail, status_code=status_code, error_code=error_code)
+        raise_for_response(response)
 
     async def _request(
         self,

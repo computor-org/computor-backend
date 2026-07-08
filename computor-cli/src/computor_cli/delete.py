@@ -11,6 +11,7 @@ Provides commands to delete:
 import json
 import click
 from computor_cli.auth import authenticate, get_computor_client
+from computor_client import SyncComputorClient
 from computor_cli.config import CLIAuthConfig
 from computor_cli.crud import handle_api_exceptions
 from computor_cli.utils import run_async
@@ -64,14 +65,11 @@ def delete_organization(organization_id: str, dry_run: bool, force: bool, auth: 
     Users and accounts are NOT deleted - only organization-specific data.
     """
     client = run_async(get_computor_client(auth))
+    sync = SyncComputorClient.from_client(client)
 
     # Make the API request
     params = {"dry_run": "true" if dry_run else "false"}
-    response = run_async(
-        client._http.delete(f"/organizations/{organization_id}", params=params)
-    )
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete(f"/organizations/{organization_id}", params=params)
 
     if dry_run:
         click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - Preview of deletion for organization {organization_id}:")
@@ -84,11 +82,7 @@ def delete_organization(organization_id: str, dry_run: bool, force: bool, auth: 
     if not confirm_deletion("organization", organization_id, result.get("deleted_counts", {}), force):
         # Do a dry run to show counts, then abort
         params = {"dry_run": "true"}
-        response = run_async(
-            client._http.delete(f"/organizations/{organization_id}", params=params)
-        )
-        response.raise_for_status()
-        preview = response.json()
+        preview = sync.delete(f"/organizations/{organization_id}", params=params)
         click.echo(f"\nWould have deleted:")
         click.echo(format_counts(preview.get("deleted_counts", {})))
         click.echo("\nAborted.")
@@ -96,11 +90,7 @@ def delete_organization(organization_id: str, dry_run: bool, force: bool, auth: 
 
     # Perform actual deletion
     params = {"dry_run": "false"}
-    response = run_async(
-        client._http.delete(f"/organizations/{organization_id}", params=params)
-    )
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete(f"/organizations/{organization_id}", params=params)
 
     click.echo(f"\n{click.style('SUCCESS', fg='green', bold=True)} - Deleted organization {organization_id}")
     click.echo(f"\nDeleted entities:")
@@ -126,14 +116,11 @@ def delete_course_family(course_family_id: str, dry_run: bool, force: bool, auth
     This includes all courses, members, submissions, results, and messages.
     """
     client = run_async(get_computor_client(auth))
+    sync = SyncComputorClient.from_client(client)
 
     if dry_run:
         params = {"dry_run": "true"}
-        response = run_async(
-            client._http.delete(f"/course-families/{course_family_id}", params=params)
-        )
-        response.raise_for_status()
-        result = response.json()
+        result = sync.delete(f"/course-families/{course_family_id}", params=params)
 
         click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - Preview of deletion for course family {course_family_id}:")
         click.echo(f"\nEntities that would be deleted:")
@@ -143,11 +130,7 @@ def delete_course_family(course_family_id: str, dry_run: bool, force: bool, auth
 
     # Get preview for confirmation
     params = {"dry_run": "true"}
-    response = run_async(
-        client._http.delete(f"/course-families/{course_family_id}", params=params)
-    )
-    response.raise_for_status()
-    preview = response.json()
+    preview = sync.delete(f"/course-families/{course_family_id}", params=params)
 
     if not confirm_deletion("course family", course_family_id, preview.get("deleted_counts", {}), force):
         click.echo("Aborted.")
@@ -155,11 +138,7 @@ def delete_course_family(course_family_id: str, dry_run: bool, force: bool, auth
 
     # Perform actual deletion
     params = {"dry_run": "false"}
-    response = run_async(
-        client._http.delete(f"/course-families/{course_family_id}", params=params)
-    )
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete(f"/course-families/{course_family_id}", params=params)
 
     click.echo(f"\n{click.style('SUCCESS', fg='green', bold=True)} - Deleted course family {course_family_id}")
     click.echo(f"\nDeleted entities:")
@@ -186,14 +165,11 @@ def delete_course(course_id: str, dry_run: bool, force: bool, auth: CLIAuthConfi
     Users are NOT deleted - only course-specific data.
     """
     client = run_async(get_computor_client(auth))
+    sync = SyncComputorClient.from_client(client)
 
     if dry_run:
         params = {"dry_run": "true"}
-        response = run_async(
-            client._http.delete(f"/courses/{course_id}", params=params)
-        )
-        response.raise_for_status()
-        result = response.json()
+        result = sync.delete(f"/courses/{course_id}", params=params)
 
         click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - Preview of deletion for course {course_id}:")
         click.echo(f"\nEntities that would be deleted:")
@@ -203,11 +179,7 @@ def delete_course(course_id: str, dry_run: bool, force: bool, auth: CLIAuthConfi
 
     # Get preview for confirmation
     params = {"dry_run": "true"}
-    response = run_async(
-        client._http.delete(f"/courses/{course_id}", params=params)
-    )
-    response.raise_for_status()
-    preview = response.json()
+    preview = sync.delete(f"/courses/{course_id}", params=params)
 
     if not confirm_deletion("course", course_id, preview.get("deleted_counts", {}), force):
         click.echo("Aborted.")
@@ -215,11 +187,7 @@ def delete_course(course_id: str, dry_run: bool, force: bool, auth: CLIAuthConfi
 
     # Perform actual deletion
     params = {"dry_run": "false"}
-    response = run_async(
-        client._http.delete(f"/courses/{course_id}", params=params)
-    )
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete(f"/courses/{course_id}", params=params)
 
     click.echo(f"\n{click.style('SUCCESS', fg='green', bold=True)} - Deleted course {course_id}")
     click.echo(f"\nDeleted entities:")
@@ -259,6 +227,7 @@ def delete_examples(identifier_pattern: str, repository_id: str, dry_run: bool, 
       --force-all   - Deletes even if actively deployed (orphans deployments)
     """
     client = run_async(get_computor_client(auth))
+    sync = SyncComputorClient.from_client(client)
 
     # Determine force level
     if force_all:
@@ -278,11 +247,7 @@ def delete_examples(identifier_pattern: str, repository_id: str, dry_run: bool, 
         params["repository_id"] = repository_id
 
     # Make the API request
-    response = run_async(
-        client._http.delete("/examples/by-pattern", params=params)
-    )
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete("/examples/by-pattern", params=params)
 
     if dry_run:
         click.echo(f"\n{click.style('DRY RUN', fg='cyan', bold=True)} - Preview of deletion for pattern '{identifier_pattern}':")
@@ -397,19 +362,14 @@ def delete_example_version(
     No force flag — references must be cleared first.
     """
     client = run_async(get_computor_client(auth))
+    sync = SyncComputorClient.from_client(client)
 
     # Resolve to a UUID. If a version_tag was provided, look up the example
     # by identifier and then find the matching version. The DELETE endpoint
     # itself is UUID-only by design.
     if version_tag:
-        examples_resp = run_async(
-            client._http.get(
-                "/examples",
-                params={"identifier": identifier_or_uuid, "limit": 10},
-            )
-        )
-        examples_resp.raise_for_status()
-        examples = examples_resp.json() or []
+        examples = sync.get("/examples",
+                params={"identifier": identifier_or_uuid, "limit": 10}) or []
         if not examples:
             click.echo(
                 f"{click.style('Not found:', fg='red')} no example with identifier "
@@ -427,11 +387,7 @@ def delete_example_version(
             return
         example_id = examples[0].get("id")
 
-        versions_resp = run_async(
-            client._http.get(f"/examples/{example_id}/versions")
-        )
-        versions_resp.raise_for_status()
-        versions = versions_resp.json() or []
+        versions = sync.get(f"/examples/{example_id}/versions") or []
         match = next(
             (v for v in versions if str(v.get("version_tag")) == str(version_tag)),
             None,
@@ -448,14 +404,8 @@ def delete_example_version(
 
     # Step 1: always do a dry-run preview so we can show references before
     # asking for confirmation.
-    preview = run_async(
-        client._http.delete(
-            f"/examples/versions/{resolved_uuid}",
-            params={"dry_run": "true"},
-        )
-    )
-    preview.raise_for_status()
-    preview_data = preview.json()
+    preview_data = sync.delete(f"/examples/versions/{resolved_uuid}",
+            params={"dry_run": "true"})
 
     identifier_resolved = preview_data.get("example_identifier") or "?"
     tag_resolved = preview_data.get("version_tag") or "?"
@@ -494,9 +444,7 @@ def delete_example_version(
             return
 
     # Step 2: actually delete.
-    response = run_async(client._http.delete(f"/examples/versions/{resolved_uuid}"))
-    response.raise_for_status()
-    result = response.json()
+    result = sync.delete(f"/examples/versions/{resolved_uuid}")
 
     if not result.get("deleted"):
         # Belt-and-braces: a deployment may have been created between the

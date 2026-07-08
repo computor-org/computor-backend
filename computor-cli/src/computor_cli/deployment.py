@@ -32,6 +32,7 @@ from computor_types.deployments_refactored import (
     EXAMPLE_MULTI_DEPLOYMENT
 )
 from computor_cli.auth import authenticate, get_computor_client
+from computor_client import SyncComputorClient
 from computor_cli.config import CLIAuthConfig
 from computor_types.users import UserCreate, UserQuery
 from computor_types.accounts import AccountCreate, AccountQuery
@@ -59,76 +60,6 @@ from computor_types.exceptions import VsixManifestError
 # Deployment is handled through course-contents API, not a separate deployment endpoint
 
 from computor_cli.utils import run_async
-
-
-class SyncHTTPWrapper:
-    """Wrapper to make sync HTTP calls using ComputorClient's httpx client configuration."""
-
-    def __init__(self, computor_client):
-        """Initialize with a ComputorClient instance."""
-        import httpx
-
-        # Build headers including auth token if available
-        headers = dict(computor_client._http._default_headers)
-        headers["Content-Type"] = "application/json"
-        headers["Accept"] = "application/json"
-        if computor_client._auth_provider.is_authenticated():
-            token = computor_client._auth_provider._access_token
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
-
-        self._client = httpx.Client(
-            base_url=computor_client._http.base_url,
-            headers=headers,
-            timeout=httpx.Timeout(computor_client._http.timeout)
-        )
-
-    def get(self, path: str, params: dict = None):
-        """GET request."""
-        response = self._client.get(path, params=params)
-        response.raise_for_status()
-        return response.json() if response.content else None
-
-    def list(self, path: str, params: dict = None):
-        """GET request (alias for get) with optional query parameters."""
-        return self.get(path, params=params)
-
-    def create(self, path: str, data: dict = None):
-        """POST request."""
-        response = self._client.post(path, json=data or {})
-        try:
-            response.raise_for_status()
-        except Exception as e:
-            # Include response body in error for better debugging
-            if response.content:
-                try:
-                    error_detail = response.json()
-                    raise Exception(f"{e}\nAPI Response: {error_detail}")
-                except:
-                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
-            raise
-        return response.json() if response.content else None
-
-    def update(self, path: str, data: dict = None):
-        """PATCH request."""
-        response = self._client.patch(path, json=data or {})
-        try:
-            response.raise_for_status()
-        except Exception as e:
-            # Include response body in error for better debugging
-            if response.content:
-                try:
-                    error_detail = response.json()
-                    raise Exception(f"{e}\nAPI Response: {error_detail}")
-                except:
-                    raise Exception(f"{e}\nAPI Response (raw): {response.text}")
-            raise
-        return response.json() if response.content else None
-
-    def __del__(self):
-        """Close client on deletion."""
-        if hasattr(self, '_client'):
-            self._client.close()
 
 
 @click.group()
@@ -304,21 +235,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             # Set password if provided
             if user_dep.password:
                 try:
-                    import httpx
-                    password_payload = {
-                        "password": user_dep.password
-                    }
-                    # Use direct HTTP call since client doesn't have this method
-                    # Build headers with auth token
-                    headers = dict(client._http._default_headers)
-                    headers["Content-Type"] = "application/json"
-                    if client._auth_provider.is_authenticated():
-                        token = client._auth_provider._access_token
-                        if token:
-                            headers["Authorization"] = f"Bearer {token}"
-                    with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
-                        response = sync_client.post("user/password", json=password_payload)
-                        response.raise_for_status()
+                    # Endpoint has no generated client method; use the sync facade.
+                    SyncComputorClient.from_client(client).create(
+                        "user/password", {"password": user_dep.password}
+                    )
                     click.echo(f"  ✅ Set password for user: {user.display_name}")
                 except Exception as e:
                     click.echo(f"  ⚠️  Failed to set password: {e}")
@@ -503,7 +423,7 @@ def _deploy_services(config: ComputorDeploymentConfig, auth: CLIAuthConfig) -> d
     user_client = client.user
     api_token_client = client.api_tokens
     service_type_client = client.service_types
-    custom_client = SyncHTTPWrapper(client)
+    custom_client = SyncComputorClient.from_client(client)
 
     # API clients for course_members processing
     course_member_client = client.course_members
@@ -878,7 +798,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
     content_kind_client = client.course_content_kinds
     example_client = client.examples
     # backend_client = client.execution_backends  # REMOVED: execution_backends deprecated
-    custom_client = SyncHTTPWrapper(client)
+    custom_client = SyncComputorClient.from_client(client)
     
     for content_config in course_config.contents:
         try:
@@ -1193,7 +1113,7 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
     org_client = client.organizations
     family_client = client.course_families
     course_client = client.courses
-    custom_client = SyncHTTPWrapper(client)
+    custom_client = SyncComputorClient.from_client(client)
     
     generated_count = 0
     failed_count = 0
@@ -1723,16 +1643,14 @@ def _upload_extensions_from_config(entries: list, config_dir: Path, auth: CLIAut
                 "file": (resolved_path.name, file_obj, "application/octet-stream")
             }
 
-            # Build headers with auth token, but remove Content-Type to let httpx set it for multipart
-            headers = dict(client._http._default_headers)
-            if client._auth_provider.is_authenticated():
-                token = client._auth_provider._access_token
-                if token:
-                    headers["Authorization"] = f"Bearer {token}"
+            # Multipart upload: the sync facade only sends JSON, so use raw
+            # httpx here, but take auth headers from the public accessor and
+            # drop Content-Type so httpx sets the multipart boundary.
+            headers = dict(client.auth_headers)
             headers.pop('content-type', None)
             headers.pop('Content-Type', None)
 
-            with httpx.Client(base_url=client._http.base_url, headers=headers) as sync_client:
+            with httpx.Client(base_url=client.base_url, headers=headers) as sync_client:
                 response = sync_client.post(
                     f"extensions/{identity}/versions",
                     data=form_data,
@@ -1759,7 +1677,7 @@ def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CL
     """
 
     client = run_async(get_computor_client(auth))
-    custom_client = SyncHTTPWrapper(client)
+    custom_client = SyncComputorClient.from_client(client)
 
     if not examples_dir.exists() or not examples_dir.is_dir():
         click.echo(f"⚠️  Examples directory not found or not a directory: {examples_dir}")
@@ -1917,7 +1835,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         sys.exit(1)
     
     # Setup client with authentication
-    custom_client = SyncHTTPWrapper(client)
+    custom_client = SyncComputorClient.from_client(client)
 
     # Services will be deployed AFTER hierarchy creation (so courses exist for course_members)
     deployed_services = {}
