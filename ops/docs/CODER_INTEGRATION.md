@@ -18,9 +18,9 @@ The Computor platform supports Coder in two different ways:
 - Single Traefik instance for routing (workspaces reachable at `/coder/{user}/{workspace}/`)
 
 ### 2. Standalone Coder
-**Location**: `computor-coder/deployment/`
-**Config**: `computor-coder/deployment/.env`
-**Usage**: `cd computor-coder/deployment && ./install.sh`
+**Location**: `ops/coder/`
+**Config**: `ops/coder/.env`
+**Usage**: `cd ops/coder && ./install.sh`
 
 - Independent Coder installation
 - Own PostgreSQL database
@@ -48,9 +48,9 @@ Key variables:
 
 ### For Standalone Deployment
 
-Create `.env` in `computor-coder/deployment/`:
+Create `.env` in `ops/coder/`:
 ```bash
-cd computor-coder/deployment
+cd ops/coder
 cp .env.example .env
 vim .env
 ```
@@ -82,7 +82,7 @@ gets its own dedicated postgres container (`coder-postgres`).
 
 ### From Standalone to Integrated:
 1. Backup Coder data from standalone PostgreSQL
-2. Stop standalone Coder: `cd computor-coder/deployment && ./stop.sh`
+2. Stop standalone Coder: `cd ops/coder && ./stop.sh`
 3. Setup integrated: `./setup-env.sh` and configure `.env.coder`
 4. Set `CODER_ENABLED=true` in `.env` and start: `./startup.sh dev -d`
 5. Restore data to shared PostgreSQL `coder` database
@@ -90,7 +90,7 @@ gets its own dedicated postgres container (`coder-postgres`).
 ### From Integrated to Standalone:
 1. Backup Coder data from shared PostgreSQL `coder` database
 2. Stop integrated: `./stop.sh dev`
-3. Setup standalone: `cd computor-coder/deployment && ./install.sh`
+3. Setup standalone: `cd ops/coder && ./install.sh`
 4. Restore data to standalone PostgreSQL
 
 ## Environment Variable Mapping
@@ -124,7 +124,7 @@ gets its own dedicated postgres container (`coder-postgres`).
 ### Standalone Coder
 ```bash
 # Navigate to deployment directory
-cd computor-coder/deployment
+cd ops/coder
 
 # Configure
 cp .env.example .env
@@ -156,7 +156,7 @@ The backend uses these environment variables:
 ### Port Conflicts
 If running both modes on the same machine, ensure different ports:
 - Integrated uses ports from `.env.coder`
-- Standalone uses ports from `computor-coder/deployment/.env`
+- Standalone uses ports from `ops/coder/.env`
 
 ### Database Issues
 - Integrated: Check `computor-coder-postgres` container (port 5439) is running
