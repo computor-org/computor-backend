@@ -35,6 +35,7 @@ from computor_backend.exceptions.exceptions import (
 
     # Not found exceptions (404)
     NotFoundException,
+    PermissionDeniedAsNotFound,
     UserNotFoundException,
     CourseNotFoundException,
     EndpointNotFoundException,
@@ -108,6 +109,7 @@ __all__ = [
 
     # Not Found
     "NotFoundException",
+    "PermissionDeniedAsNotFound",
     "UserNotFoundException",
     "CourseNotFoundException",
     "EndpointNotFoundException",

@@ -57,6 +57,7 @@ from computor_backend.business_logic.cascade_deletion import delete_examples_by_
 from ..exceptions import (
     NotFoundException,
     ForbiddenException,
+    PermissionDeniedAsNotFound,
     BadRequestException,
     NotImplementedException,
 )
@@ -465,7 +466,9 @@ async def create_version(
     permissions: Principal = Depends(get_current_principal),
 ):
     """Create a new version for an example."""
-    # Check permissions
+    # Check permissions — ``example:create`` is a write/action capability. A
+    # reader (example:get) can see the example but is denied this action, so
+    # keep 403 (action-denial on a visible resource), not a 404 hide (TASK-209).
     if not permissions.permitted("example", "create"):
         raise ForbiddenException("You don't have permission to create versions")
 
@@ -518,9 +521,11 @@ async def list_versions(
     redis_client=Depends(get_redis_client),
 ):
     """List all versions of an example."""
-    # Check permissions
+    # Check permissions — ``example:list`` is a visibility gate (it travels
+    # with example:get/download in the reader role). A caller lacking it
+    # cannot see the example at all, so hide its existence with a 404 (TASK-209).
     if not permissions.permitted("example", "list"):
-        raise ForbiddenException("You don't have permission to view versions")
+        raise PermissionDeniedAsNotFound("You don't have permission to view versions")
 
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -553,9 +558,10 @@ async def get_version(
     redis_client=Depends(get_redis_client),
 ):
     """Get a specific version."""
-    # Check permissions
+    # Check permissions — ``example:get`` is a visibility gate; a caller
+    # lacking it cannot see the example, so hide existence with a 404 (TASK-209).
     if not permissions.permitted("example", "get"):
-        raise ForbiddenException("You don't have permission to view versions")
+        raise PermissionDeniedAsNotFound("You don't have permission to view versions")
 
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -589,6 +595,8 @@ async def delete_example_version_endpoint(
     db: Session = Depends(get_db),
     dry_run: bool = Query(default=False, description="If true, only returns preview without deleting"),
 ) -> ExampleVersionDeleteResult:
+    # ``example:delete`` is a write/action capability; a reader can see the
+    # version but is denied deletion → keep 403 (action-denial), not a 404 hide.
     if not permissions.permitted("example", "delete"):
         raise ForbiddenException("Deletion requires the _example_manager role or admin")
 
@@ -702,7 +710,8 @@ async def add_dependency(
     permissions: Principal = Depends(get_current_principal),
 ):
     """Add a dependency to an example."""
-    # Check permissions
+    # Check permissions — ``example:update`` is a write/action capability; a
+    # reader can see the example but is denied modifying it → keep 403 (TASK-209).
     if not permissions.permitted("example", "update"):
         raise ForbiddenException("You don't have permission to modify dependencies")
 
@@ -749,9 +758,10 @@ async def list_dependencies(
     permissions: Principal = Depends(get_current_principal),
 ):
     """List all dependencies of an example."""
-    # Check permissions
+    # Check permissions — ``example:list`` is a visibility gate; a caller
+    # lacking it cannot see the example, so hide existence with a 404 (TASK-209).
     if not permissions.permitted("example", "list"):
-        raise ForbiddenException("You don't have permission to view dependencies")
+        raise PermissionDeniedAsNotFound("You don't have permission to view dependencies")
 
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
@@ -774,7 +784,8 @@ async def remove_dependency(
     permissions: Principal = Depends(get_current_principal),
 ):
     """Remove a dependency from an example."""
-    # Check permissions
+    # Check permissions — ``example:update`` is a write/action capability; a
+    # reader can see the example but is denied modifying it → keep 403 (TASK-209).
     if not permissions.permitted("example", "update"):
         raise ForbiddenException("You don't have permission to modify dependencies")
 
@@ -806,7 +817,8 @@ async def upload_example(
     """Upload an example to storage (MinIO)."""
     from computor_backend.database import set_db_user
 
-    # Check permissions
+    # Check permissions — ``example:upload`` is a write/action capability; a
+    # reader can see examples but is denied uploading → keep 403 (TASK-209).
     if not permissions.permitted("example", "upload"):
         raise ForbiddenException("You don't have permission to upload examples")
 
@@ -1071,9 +1083,11 @@ async def download_example_latest(
     storage_service=Depends(get_storage_service),
 ):
     """Download the latest version of an example from storage, optionally with all dependencies."""
-    # Check permissions
+    # Check permissions — ``example:download`` belongs to the reader bundle
+    # (get/list/download); a caller lacking it cannot see the example, so hide
+    # existence with a 404 (TASK-209).
     if not permissions.permitted("example", "download"):
-        raise ForbiddenException("You don't have permission to download examples")
+        raise PermissionDeniedAsNotFound("You don't have permission to download examples")
     
     # Get example with repository relationship
     example = db.query(Example).filter(Example.id == example_id).first()
@@ -1141,9 +1155,11 @@ async def download_example_version(
     storage_service=Depends(get_storage_service),
 ):
     """Download a specific example version from storage, optionally with all dependencies."""
-    # Check permissions
+    # Check permissions — ``example:download`` belongs to the reader bundle
+    # (get/list/download); a caller lacking it cannot see the example, so hide
+    # existence with a 404 (TASK-209).
     if not permissions.permitted("example", "download"):
-        raise ForbiddenException("You don't have permission to download examples")
+        raise PermissionDeniedAsNotFound("You don't have permission to download examples")
     
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -1330,6 +1346,8 @@ async def delete_examples_by_pattern_endpoint(
     ),
 ) -> ExampleBulkDeleteResult:
     """Delete examples matching an identifier pattern."""
+    # ``example:delete`` is a write/action capability; a reader can see the
+    # examples but is denied deletion → keep 403 (action-denial), not a 404 hide.
     if not permissions.permitted("example", "delete"):
         raise ForbiddenException("Deletion requires the _example_manager role or admin")
 

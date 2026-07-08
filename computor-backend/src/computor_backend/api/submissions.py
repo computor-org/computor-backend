@@ -16,6 +16,7 @@ from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
+    PermissionDeniedAsNotFound,
 )
 from computor_backend.database import get_db
 from computor_backend.model.artifact import (
@@ -796,11 +797,14 @@ async def list_artifact_reviews(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user is a course member (any role can view reviews)
+    # Check if user is a course member (any role can view reviews). A non-member
+    # could not otherwise see this artifact, so hide its existence with a 404
+    # rather than confirming it with a 403 (TASK-209).
     if not permissions.is_admin:
         get_course_member_or_403(
             permissions, artifact.submission_group.course_id, db,
             detail="You must be a course member to view reviews",
+            exception=PermissionDeniedAsNotFound,
         )
 
     # Get reviews for this artifact
