@@ -10,11 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
-try:
-    from ..custom_types import LtreeType
-except ImportError:
-    # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+from computor_backend.custom_types import LtreeType
 
 from .base import Base
 

@@ -27,10 +27,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
 
-class GitServer(Base):
+class GitServer(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     """A git server instance Computor knows about (our Forgejo, an external
     GitLab, ...).
 
@@ -46,13 +46,6 @@ class GitServer(Base):
         CheckConstraint("type IN ('forgejo', 'gitlab')", name='git_server_type_check'),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-
     type = Column(String(50), nullable=False)        # 'forgejo' | 'gitlab'
     base_url = Column(String(2048), nullable=False)
     name = Column(String(255))                        # human-readable label
@@ -60,12 +53,10 @@ class GitServer(Base):
     token = Column(String(4096))                      # encrypted service token; managed instances only
     properties = Column(JSONB)
 
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     course_bindings = relationship('CourseGitBinding', back_populates='git_server')
 
 
-class CourseGitBinding(Base):
+class CourseGitBinding(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     """Per-course git binding (1:1 with course).
 
     Declares where the course's ``student-template`` lives and which
@@ -80,13 +71,6 @@ class CourseGitBinding(Base):
         UniqueConstraint('course_id', name='course_git_binding_course_key'),
         CheckConstraint("delivery IN ('git', 'download')", name='course_git_binding_delivery_check'),
     )
-
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
 
     course_id = Column(
         ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'),
@@ -108,13 +92,11 @@ class CourseGitBinding(Base):
     student_repo_modes = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     properties = Column(JSONB)
 
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     course = relationship('Course', foreign_keys=[course_id])
     git_server = relationship('GitServer', back_populates='course_bindings')
 
 
-class CourseMemberGitRepository(Base):
+class CourseMemberGitRepository(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     """A student's working repository for a course (1:1 with course_member).
 
     Tracking only — answers "does this student already have a repo for this
@@ -141,13 +123,6 @@ class CourseMemberGitRepository(Base):
         ),
     )
 
-    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
-    version = Column(BigInteger, server_default=text("0"))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-
     course_member_id = Column(
         ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False,
@@ -163,7 +138,5 @@ class CourseMemberGitRepository(Base):
     web_url = Column(String(2048))
     properties = Column(JSONB)
 
-    created_by_user = relationship('User', foreign_keys=[created_by])
-    updated_by_user = relationship('User', foreign_keys=[updated_by])
     course_member = relationship('CourseMember', foreign_keys=[course_member_id])
     git_server = relationship('GitServer')

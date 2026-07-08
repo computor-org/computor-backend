@@ -13,11 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-try:
-    from ..custom_types import LtreeType
-except ImportError:
-    # Fallback for Alembic context
-    from computor_backend.custom_types import LtreeType
+from computor_backend.custom_types import LtreeType
 from sqlalchemy.sql import func
 
 from .base import Base

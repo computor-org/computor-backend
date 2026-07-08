@@ -19,8 +19,11 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from model import Base
+# Put the package root (the directory that CONTAINS the ``computor_backend``
+# package) on sys.path so models can be imported under their real package name
+# and use unconditional absolute imports (e.g. ``computor_backend.custom_types``).
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from computor_backend.model import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
