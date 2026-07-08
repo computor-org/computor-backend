@@ -19,7 +19,7 @@ from computor_types.courses import CourseProperties
 from computor_types.organizations import OrganizationProperties
 from computor_types.lecturer_gitlab_sync import GitLabSyncResult
 
-from .users import (
+from computor_backend.services.gitlab_account_sync import (
     _get_gitlab_client,
     _fetch_gitlab_user_id,
     _sync_gitlab_memberships,
