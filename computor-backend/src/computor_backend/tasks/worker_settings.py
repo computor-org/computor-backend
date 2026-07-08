@@ -85,6 +85,19 @@ class WorkerSettings(BaseSettings):
         default=None, validation_alias="TEMPORAL_TLS_CA"
     )
 
+    # --- Temporal worker activity thread pool (tasks/temporal_worker.py) ---
+    # Blocking activities (GitPython clone/push, sync SQLAlchemy, sync
+    # python-gitlab, docker image build, subprocess test execution) are plain
+    # ``def`` activities that Temporal runs in a ThreadPoolExecutor instead of on
+    # the worker's asyncio event loop, so a multi-minute clone/build no longer
+    # stalls heartbeats or starves other activities. ``max_workers`` is sized
+    # from this field. The default 100 matches the SDK's
+    # ``max_concurrent_activities`` default so the executor is never smaller than
+    # it (the SDK warns otherwise) and activity concurrency is unchanged.
+    activity_executor_max_workers: int = Field(
+        default=100, validation_alias="TEMPORAL_ACTIVITY_EXECUTOR_MAX_WORKERS"
+    )
+
     # --- Coder image / template build (tasks/temporal_coder_setup.py) -----
     # Old: os.environ.get("CODER_REGISTRY_HOST", registry_host)  -- env overrides
     #      a runtime parameter, so None == unset and the call site keeps the param.

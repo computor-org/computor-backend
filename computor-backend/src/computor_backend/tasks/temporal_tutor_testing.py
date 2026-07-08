@@ -15,6 +15,7 @@ Reuses activities from temporal_student_testing where possible.
 """
 
 import os
+import asyncio
 import zipfile
 import tempfile
 import logging
@@ -244,10 +245,13 @@ async def run_tutor_test_activity(
             tutor_path = tutor_data["tutor_path"]
             logger.info(f"Tutor input at: {tutor_path}")
 
-            # Step 3: Execute tests
+            # Step 3: Execute tests. execute_tests_activity is now a blocking
+            # (sync) function; offload it to a thread so its subprocess does not
+            # stall this orchestrator's event loop.
             logger.info("Executing tests")
             store_graphics_artifacts = test_config.get("store_graphics_artifacts", True)
-            test_results = await execute_tests_activity(
+            test_results = await asyncio.to_thread(
+                execute_tests_activity,
                 reference_path=reference_path,
                 student_path=tutor_path,  # Tutor files act as "student" in test
                 test_config=test_config,

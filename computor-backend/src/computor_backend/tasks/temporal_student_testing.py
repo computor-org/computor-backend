@@ -313,7 +313,7 @@ async def fetch_submission_artifact(
 
 
 @activity.defn(name="execute_tests_with_backend")
-async def execute_tests_activity(
+def execute_tests_activity(
     reference_path: str,
     student_path: str,
     test_config: Dict[str, Any],
@@ -324,6 +324,14 @@ async def execute_tests_activity(
 ) -> Dict[str, Any]:
     """
     Execute tests comparing student and reference implementations.
+
+    BLOCKING activity: runs the test backend, whose work is a synchronous
+    ``subprocess.run`` (up to 5 min) plus local file I/O. A plain ``def`` — the
+    orchestrators (run_complete_student_test / run_tutor_test) invoke it via
+    ``asyncio.to_thread`` so the subprocess never stalls the event loop, and if
+    Temporal ever dispatched it directly it would run in the worker thread pool.
+    The backend helper is async-by-convention (no real awaits), so it is driven
+    with ``asyncio.run`` here (no running loop in this thread).
 
     Args:
         reference_path: Path to reference example (from cache)
@@ -449,16 +457,18 @@ async def execute_tests_activity(
         "reference_path": reference_path,
     }
 
-    # Execute tests
+    # Execute tests. execute_tests_with_backend is async-by-convention (its work
+    # is a blocking subprocess); this activity is sync, so drive it with
+    # asyncio.run in the current thread.
     try:
-        backend_result = await execute_tests_with_backend(
+        backend_result = asyncio.run(execute_tests_with_backend(
             service_slug=service_slug,
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
             service_config=service_config,
             service_type_config=service_type_config,
-        )
+        ))
 
         # Check if backend returned an error/timeout directly
         # This happens for MATLAB timeout, communication errors, etc.
@@ -649,10 +659,13 @@ async def run_complete_student_test_activity(
             # the identifier-aliased paths in the examples cache produced by
             # fetch_example_version_with_dependencies.
 
-            # Step 3: Execute tests
+            # Step 3: Execute tests. execute_tests_activity is now a blocking
+            # (sync) function; offload it to a thread so its subprocess does not
+            # stall this orchestrator's event loop.
             logger.info("Executing tests")
             store_graphics_artifacts = test_job.get("store_graphics_artifacts", True)
-            test_results = await execute_tests_activity(
+            test_results = await asyncio.to_thread(
+                execute_tests_activity,
                 reference_path=reference_path,
                 student_path=student_path,
                 test_config=test_job,

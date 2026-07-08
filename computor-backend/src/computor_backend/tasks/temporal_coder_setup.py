@@ -10,6 +10,7 @@ directory must contain a `template.json` manifest with:
   - image_name: Docker image name (e.g. "computor-workspace-python3.13")
   - build_args_env: List of env var names to pass as Docker build args (optional)
 """
+import asyncio
 import json
 import logging
 import os
@@ -86,7 +87,7 @@ def _resolve_templates(
 
 
 @activity.defn(name="build_workspace_image")
-async def build_workspace_image(
+def build_workspace_image(
     template_key: str,
     templates_dir: str,
     registry_host: str,
@@ -94,6 +95,10 @@ async def build_workspace_image(
 ) -> Dict[str, Any]:
     """
     Build a workspace Docker image and push it to the local registry.
+
+    BLOCKING activity: the Docker SDK build/push is a synchronous, multi-minute
+    operation, so this is a plain ``def`` that Temporal runs in the worker's
+    thread pool (Worker(activity_executor=...)) instead of on the event loop.
 
     Pushes two tags: the moving ``:latest`` and an immutable ``:<image_tag>``.
     The versioned tag is what a Coder template version pins to, so rebuilt
@@ -200,6 +205,11 @@ async def push_coder_template(
     changes the running image). ``registry_host`` here is the provisioner's view
     of the registry (matches the template's default host), NOT the worker's push
     host, so it is intentionally not overridden by CODER_REGISTRY_HOST.
+
+    MIXED activity: the network I/O (Coder login + template GET/PATCH via
+    CoderClient) stays on the event loop; only the bounded-but-blocking
+    ``coder templates push`` subprocess is offloaded with asyncio.to_thread so
+    it does not stall the loop while the CLI runs (up to 300s).
     """
     from computor_backend.coder.client import CoderClient
     from computor_backend.coder.config import CoderSettings
@@ -263,7 +273,10 @@ async def push_coder_template(
         logger.info(f"Running: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(
+            # Offload the blocking coder CLI subprocess to a thread so the
+            # worker's event loop keeps servicing other activities/heartbeats.
+            result = await asyncio.to_thread(
+                subprocess.run,
                 cmd, capture_output=True, text=True, timeout=300, env=env
             )
             if result.returncode != 0:
