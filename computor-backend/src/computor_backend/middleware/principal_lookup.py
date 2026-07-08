@@ -95,10 +95,16 @@ async def _resolve_sso_token(token: str) -> Optional[dict]:
 
 
 async def _check_principal_cache(prefix: str, token: str) -> Optional[dict]:
-    """Same cache key format as permissions/auth.py: sha256(f"{prefix}:{token}")."""
-    from computor_backend.redis_cache import get_redis_client
+    """Look up a cached Principal dict by credential prefix + token.
 
-    cache_key = hashlib.sha256(f"{prefix}:{token}".encode()).hexdigest()
+    The cache key is derived via permissions/auth.py:principal_cache_key so the
+    shared principal cache stays byte-identical across this middleware and the
+    auth dependency (a divergence here would silently miss every warm entry).
+    """
+    from computor_backend.redis_cache import get_redis_client
+    from computor_backend.permissions.auth import principal_cache_key
+
+    cache_key = principal_cache_key(prefix, token)
     redis = await get_redis_client()
     cached_data = await redis.get(cache_key)
     if not cached_data:

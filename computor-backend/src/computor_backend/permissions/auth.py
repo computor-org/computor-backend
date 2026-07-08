@@ -82,6 +82,62 @@ async def is_user_banned_cached(user_id: str) -> bool:
         return False
 
 
+def principal_cache_key(kind: str, token: str) -> str:
+    """Redis key for a Principal cached from a credential.
+
+    Cross-module contract: ``middleware/principal_lookup.py`` imports and uses
+    this so the shared principal cache is keyed byte-identically. ``kind`` is the
+    credential-class prefix, currently ``"sso_permissions"`` or
+    ``"api_token_permissions"``. The output must remain
+    ``sha256(f"{kind}:{token}").hexdigest()`` — do not change without migrating
+    every reader of the cache.
+    """
+    return hashlib.sha256(f"{kind}:{token}".encode()).hexdigest()
+
+
+async def _get_cached_principal(cache_key: str) -> Optional[Principal]:
+    """Fetch + deserialize a cached Principal, enforcing the ban kill-switch.
+
+    Returns the Principal on a cache hit for a non-banned user, or ``None`` on a
+    cache miss or a deserialization/Redis error (fail-open to the DB path).
+    Raises ``ForbiddenException`` when the cached user has been banned — the DB
+    ban gate in ``PrincipalBuilder.build`` never runs on a cache hit, so the
+    per-user kill-switch flag is honoured here so a ban takes effect immediately
+    instead of waiting out ``AUTH_CACHE_TTL``.
+    """
+    cache = await get_redis_client()
+    try:
+        cached_data = await cache.get(cache_key)
+        if cached_data:
+            logger.debug(f"Principal cache hit for {cache_key[:16]}...")
+            principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
+            if await is_user_banned_cached(principal.user_id):
+                raise ForbiddenException(
+                    error_code="AUTHZ_002",
+                    detail="User account is banned",
+                )
+            return principal
+    except ForbiddenException:
+        raise
+    except Exception as e:
+        logger.warning(f"Cache retrieval error: {e}")
+    return None
+
+
+async def _store_principal(cache_key: str, principal: Principal) -> None:
+    """Serialize + cache a Principal under ``cache_key`` with the auth TTL.
+
+    Best-effort: any Redis error is logged and swallowed (the caller already has
+    a freshly built Principal to return).
+    """
+    try:
+        cache = await get_redis_client()
+        await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
+        logger.debug(f"Cached Principal for {cache_key[:16]}...")
+    except Exception as e:
+        logger.warning(f"Cache storage error: {e}")
+
+
 class AuthenticationResult:
     """Result of authentication containing user info and roles"""
     
@@ -300,39 +356,18 @@ class PrincipalBuilder:
         )
     
     @staticmethod
-    async def build_with_cache(auth_result: AuthenticationResult, 
+    async def build_with_cache(auth_result: AuthenticationResult,
                               cache_key: str, db: Session) -> Principal:
         """Build Principal with caching support"""
-        
-        cache = await get_redis_client()
-        
-        # Try to get from cache
-        try:
-            cached_data = await cache.get(cache_key)
-            if cached_data:
-                logger.debug(f"Principal cache hit for {cache_key}")
-                principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
-                if await is_user_banned_cached(principal.user_id):
-                    raise ForbiddenException(
-                        error_code="AUTHZ_002",
-                        detail="User account is banned",
-                    )
-                return principal
-        except ForbiddenException:
-            raise
-        except Exception as e:
-            logger.warning(f"Cache retrieval error: {e}")
-        
-        # Build new Principal
+
+        # Try to get from cache (raises ForbiddenException for a banned user)
+        cached = await _get_cached_principal(cache_key)
+        if cached is not None:
+            return cached
+
+        # Build new Principal and cache it
         principal = PrincipalBuilder.build(auth_result, db)
-        
-        # Cache it
-        try:
-            await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
-            logger.debug(f"Cached Principal for {cache_key}")
-        except Exception as e:
-            logger.warning(f"Cache storage error: {e}")
-        
+        await _store_principal(cache_key, principal)
         return principal
 
 
@@ -394,35 +429,16 @@ async def get_current_principal(
     # For cacheable auth methods, check cache FIRST before creating DB connection
     cache_key = None
     if isinstance(credentials, ApiTokenCredentials):
-        cache_key = hashlib.sha256(
-            f"api_token_permissions:{credentials.token}".encode()
-        ).hexdigest()
+        cache_key = principal_cache_key("api_token_permissions", credentials.token)
     elif isinstance(credentials, SSOAuthCredentials):
-        cache_key = hashlib.sha256(
-            f"sso_permissions:{credentials.token}".encode()
-        ).hexdigest()
+        cache_key = principal_cache_key("sso_permissions", credentials.token)
 
-    # Try cache first (no DB connection!)
+    # Try cache first (no DB connection!). Raises ForbiddenException for a
+    # banned user; returns None on a cache miss.
     if cache_key:
-        cache = await get_redis_client()
-        try:
-            cached_data = await cache.get(cache_key)
-            if cached_data:
-                logger.debug(f"Principal cache HIT for {cache_key[:16]}... (no DB connection)")
-                principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
-                # The DB ban gate in PrincipalBuilder.build never runs on a cache
-                # hit; honour the per-user kill-switch flag so a ban takes effect
-                # immediately instead of waiting out AUTH_CACHE_TTL.
-                if await is_user_banned_cached(principal.user_id):
-                    raise ForbiddenException(
-                        error_code="AUTHZ_002",
-                        detail="User account is banned",
-                    )
-                return principal
-        except ForbiddenException:
-            raise
-        except Exception as e:
-            logger.warning(f"Cache retrieval error: {e}")
+        cached = await _get_cached_principal(cache_key)
+        if cached is not None:
+            return cached
 
     # Cache miss or non-cacheable auth - create DB connection
     logger.debug(f"Principal cache MISS, creating DB connection")
@@ -445,12 +461,7 @@ async def get_current_principal(
 
         # Cache the result (if cacheable)
         if cache_key:
-            try:
-                cache = await get_redis_client()
-                await cache.set(cache_key, principal.model_dump_json(), ex=AUTH_CACHE_TTL)
-                logger.debug(f"Cached Principal for {cache_key[:16]}...")
-            except Exception as e:
-                logger.warning(f"Cache storage error: {e}")
+            await _store_principal(cache_key, principal)
 
         return principal
 
@@ -486,16 +497,26 @@ async def get_current_principal_optional(
                 auth_result = await AuthenticationService.authenticate_sso(
                     credentials.token, db
                 )
-                cache_key = hashlib.sha256(
-                    f"sso_permissions:{credentials.token}".encode()
-                ).hexdigest()
+                cache_key = principal_cache_key("sso_permissions", credentials.token)
                 return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
 
             else:
                 return None
-    except (UnauthorizedException, Exception) as e:
-        # If authentication fails (e.g., expired token), return None
+    except UnauthorizedException as e:
+        # Expected on a not-required endpoint: invalid/expired credentials.
+        # Degrade to anonymous — an optional endpoint must never 401.
         logger.debug(f"Optional authentication failed: {e}")
+        return None
+    except ForbiddenException as e:
+        # Expected: a banned user. Degrade to anonymous quietly on the optional
+        # path (same effect as before this refactor — no 403, no log noise).
+        logger.debug(f"Optional authentication forbidden: {e}")
+        return None
+    except Exception:
+        # Unexpected error (programming bug, Redis/DB outage). Still degrade to
+        # anonymous so an optional endpoint never 500s, but no longer swallow it
+        # silently — log with a traceback.
+        logger.warning("Optional authentication error", exc_info=True)
         return None
 
 
