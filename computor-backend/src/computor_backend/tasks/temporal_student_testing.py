@@ -575,47 +575,11 @@ async def store_test_artifacts(
     Returns:
         Number of artifacts stored
     """
-    import zipfile
-    from io import BytesIO
+    from computor_backend.tasks.api_client import upload_artifacts_zip
 
-    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
-    api_token = api_config.get("token")
-
-    if not api_token:
-        raise ApplicationError("API token is required for artifact upload")
-
-    # Create ZIP in memory
-    zip_buffer = BytesIO()
-    file_count = 0
-
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        for root, dirs, files in os.walk(artifacts_path):
-            for filename in files:
-                file_path = os.path.join(root, filename)
-                rel_path = os.path.relpath(file_path, artifacts_path)
-                zip_file.write(file_path, rel_path)
-                file_count += 1
-                logger.info(f"Added artifact '{rel_path}' to ZIP")
-
-    if file_count == 0:
-        logger.info("No artifacts to upload")
-        return 0
-
-    zip_buffer.seek(0)
-    zip_data = zip_buffer.read()
-
-    logger.info(f"Uploading {file_count} artifacts as ZIP ({len(zip_data)} bytes)")
-
-    # Upload via API
-    async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
-        response = await client._http.post(
-            f"/results/{result_id}/artifacts/upload",
-            files={"file": ("artifacts.zip", zip_data, "application/zip")},
-        )
-        response.raise_for_status()
-
-    logger.info(f"Uploaded {file_count} artifacts via API for result {result_id}")
-    return file_count
+    return await upload_artifacts_zip(
+        api_config, f"/results/{result_id}/artifacts/upload", artifacts_path
+    )
 
 
 @activity.defn(name="run_complete_student_test")
@@ -642,15 +606,10 @@ async def run_complete_student_test_activity(
     """
     logger.info(f"Starting complete student test for result {result_id}")
 
-    # Read API config from activity's worker environment (not workflow)
-    # This ensures the activity uses the token from the worker it runs on
-    api_url = os.environ.get("API_URL", api_config.get("url", "http://localhost:8000"))
-    api_token = os.environ.get("API_TOKEN") or api_config.get("token")
-    api_config = {
-        "url": api_url,
-        "token": api_token,
-    }
-    logger.info(f"[ACTIVITY API CONFIG] url={api_url}, token_present={bool(api_token)}")
+    # Env-first API config: the worker's env overrides the workflow-passed value.
+    from computor_backend.tasks.api_client import resolve_api_config
+    api_config = resolve_api_config(api_config)
+    logger.info("[ACTIVITY API CONFIG] url=%s, token_present=%s", api_config["url"], bool(api_config["token"]))
 
     # Create temporary work directory for this test run.
     # TemporaryDirectory cleans up automatically — submissions are not cached.
