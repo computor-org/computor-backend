@@ -53,11 +53,11 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 104 | Grading-status vocabulary ×5 → one enum | P1 | M | done (merged) |
 | 105 | Delete dead/broken permission-caching layer | P1 | S | done (merged) |
 | 106 | Remove asyncio.run() from sync cache invalidation | P1 | M | done (merged) |
-| 107 | Dedupe Principal-cache logic (3 modules) | P2 | M | todo |
+| 107 | Dedupe Principal-cache logic (3 modules) | P2 | M | done (merged; `principal_cache_key()` + `_get_cached_principal`/`_store_principal`; middleware imports the key fn; optional-auth `except` split with `ForbiddenException` at debug; keys proven byte-identical; consent tests pass) |
 | 108 | permitted() cache key ignores course_role | P1 | S | done (merged) |
-| 109 | Split handlers_impl.py; merge scoped-handler clones | P2 | M | todo |
+| 109 | Split handlers_impl.py; merge scoped-handler clones | P2 | M | done (merged; `_ScopedEntityPermissionHandler` base for org/family; handlers_impl split into handlers_user/course/scoped/misc + re-export shim; core.py unchanged; 60-case `can_perform_action` characterization matrix identical before/after) |
 | 110 | Decide repository-layer direction (bypassed by codebase) | P2 | L | todo |
-| 111 | Model mixins for 19× audit-column boilerplate | P2 | M | todo |
+| 111 | Model mixins for 19× audit-column boilerplate | P2 | M | done (merged; UUIDPk/Versioned/Audit mixins in model/base.py; 18 classes → all 3, +3 UUIDPk/Audit-only; alembic env.py src-root sys.path fix; 5 LtreeType try/except fallbacks dropped; normalized schema diff EMPTY; auth.py/deployment/example left inline as divergent. Live-DB alembic autogenerate empty-diff still recommended.) |
 | 112 | Keycloak: remove prints + secret-bearing logs | P2 | S | done (merged) |
 | 113 | Consolidate config (8 modules, import-time side effects) | P3 | M | todo |
 | 114 | course_member_gradings: dedupe/delete parallel stats | P3 | M | todo |
@@ -67,9 +67,9 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 203 | examples.py duplicate route registrations | P1 | S | done (merged) |
 | 204 | Consolidate triplicated testing orchestration | P1 | L | done (merged; helpers in business_logic/testing_orchestration.py + ResultStatus enum; tutor endpoint body kept in api/tutor.py) |
 | 205 | Dead router api/deployment.py | P2 | S | done (merged; deleted api/deployment.py + 3 orphaned BL fns; business_logic/deployment.py kept for precreate_hierarchy_and_collect_courses) |
-| 206 | Merge profiles vs student_profiles CRUD stacks | P2 | M | todo |
+| 206 | Merge profiles vs student_profiles CRUD stacks | P2 | M | done (merged; business_logic/ownership.py `require_owner_or_role` + _owned_crud.py shared skeleton; parameterized by `resource` not a `_user_manager` role — no such role exists, the "manager" gate is a `has_general_permission(resource,"list")` claim; 403-vs-404 asymmetry + student create-owner-resolution preserved; 9 unit tests, 0 matrix mismatches. Full CRUD permission-matrix still needs a live-DB pass.) |
 | 207 | Clean generic CRUD core (prints, special-cases, UnboundLocalError) | P2 | M | done (merged; fixed update_entity UnboundLocalError (id now required), stopped get_entity_by_id masking 500s as 404, 6 prints→logger. CourseContent pre_delete-guard relocation + IntegrityError regex extraction left as follow-up — behavior-timing sensitive.) |
-| 208 | GitLab provisioning engine out of users.py | P2 | M | todo |
+| 208 | GitLab provisioning engine out of users.py | P2 | M | done (merged; services/gitlab_account_sync.py engine (9 fns) + business_logic/course_accounts.py entry points; users.py 1058→156; 27 print→logger.debug; importers repointed incl. lecturer_gitlab_sync + course_git; server import OK. Coordinated after 301.) |
 | 209 | Unify 404-vs-403 semantics | P2 | M | todo |
 | 210 | Split business_logic/messages.py | P3 | M | todo |
 | 211 | Pagination on the other half of list endpoints | P3 | S | todo |
@@ -79,20 +79,20 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 301 | Unify three GitLab integration layers | P1 | L | done (merged; git_provider/{gitlab,gitlab_members,token_resolution}.py; users.py/organizations.py client sites left for 208) |
 | 302 | Split 890-line generate_student_template_activity_v2 | P1 | L | done (merged; tasks/student_template/ package; activity 890→346 lines; unit tests for selection/status helpers) |
 | 303 | Extract shared git plumbing (clone/identity/push-retry) | P1 | M | done (merged; tasks/git_ops.py + functional tests; assignments repo gained rebase-retry) |
-| 304 | Dedupe legacy temporal_student_repository clones | P2 | M | todo |
-| 305 | CoderClient boilerplate + bypassing caller | P2 | M | todo |
+| 304 | Dedupe legacy temporal_student_repository clones | P2 | M | done (merged; `_resolve_template_project`/`_build_repository_info(team=)`/`_unprotect_and_grant`; repository_info key sets byte-verified per variant; activity names/arity unchanged; LEGACY-scope docstring. Noted intentional convergences: team now honors stored project_id + failure-tolerant unprotect.) |
+| 305 | CoderClient boilerplate + bypassing caller | P2 | M | done (merged; `_request()` helper collapses ~15 sites; per-endpoint header behavior preserved via `admin_headers=`; `CoderUser.from_api`; coder-setup routed through client + `get_template`/`patch_template_ttl`. Flagged pre-existing X-Admin-Secret inconsistency (left as-is).) |
 | 306 | gitlab_builder copy-pasted group/config trios | P2 | M | done (merged; _ensure_subgroup + _build_gitlab_config(include_token) + _set_gitlab_properties; 231→58 lines; test_course_creation passes) |
 | 307 | Dedupe student/tutor testing activities | P2 | S | done (merged; tasks/api_client.py: resolve_api_config + open_computor_client + upload_artifacts_zip; both artifact activities + env-override blocks rewired; activity arity kept for Temporal history) |
-| 308 | Reduce workflow-module boilerplate (registration ×4) | P2 | M | todo |
+| 308 | Reduce workflow-module boilerplate (registration ×4) | P2 | M | done (merged; single `TEMPORAL_TASK_MODULES` + registry-derived worker registration; BaseWorkflow `require_params`/`default_activity_retry_policy`/`run_single_activity`; status "success"→"completed" (no consumer reads it); set-equality gate identical modules/workflows/activities+order.) |
 | 309 | Delete dead task code (analytics, demo workflows) | P2 | S | done (merged; analytics/ already gone; demo workflows gated behind COMPUTOR_ENABLE_EXAMPLE_TASKS=1; commented blocks removed) |
-| 310 | Centralize task-layer config into pydantic settings | P2 | M | todo |
-| 311 | Fix blocking I/O in async Temporal activities | P2 | M | todo |
+| 310 | Centralize task-layer config into pydantic settings | P2 | M | done (merged; tasks/worker_settings.py `WorkerSettings(BaseSettings)`, 17 fields exact env-name/default, case_sensitive no env_file; lazy cached `get_worker_settings()`; reads kept inside activities (determinism); TESTING_EXECUTABLE two-default divergence preserved; event_publisher left as-is (redis_cache has no reusable settings).) |
+| 311 | Fix blocking I/O in async Temporal activities | P2 | M | todo (DEFERRED — correctness is a runtime property: worker health / heartbeats / no deadlock under load, plus Temporal's thread-sensitive activity context. Not validatable without a live Temporal worker + DB; do with a worker up rather than merge blind.) |
 | 312 | print() → logging; list_tasks error contract | P3 | S | todo |
 | 313 | task_tracker duplicate accessible-ID logic | P3 | S | todo |
 | 401 | Consolidate four HTTP layers into one transport | P1 | M | done (merged; apiFetch is the single transport, APIClient delegates to it, one pluggable refresh strategy in tokenRefresh; tsc+build clean) |
 | 402 | Adopt generated clients over hand-typed endpoints | P1 | M | done (merged; ~55 call sites → generated clients, incl. /consent/* after the codegen regen added ConsentClient. api.ts now retained only for genuine codegen gaps: /user + /user/* (TS UserClient name collision with /user-roles), the two ambiguous dual-route org/family deletes, /examples/{id} (no single-id backend delete). UserClient name collision since FIXED at the source (server.py: /user-roles tagged distinctly so codegen emits UserRolesClient; /user calls now migrated). api.ts now down to 3 hand-typed calls: the two intentional ambiguous org/family dual-route deletes + /examples/{id} (no single-id backend delete).) |
 | 403 | Retire dead password-login path / dual auth providers | P1 | M | done (merged; deleted authService + IAuthProviderWithLogin + login(); tsc+build clean) |
-| 404 | Split 641-line members/add page | P2 | M | todo |
+| 404 | Split 641-line members/add page | P2 | M | done (merged; AddFromUserList/AddByEmail/ImportFromFile + RoleSelect/GroupSelect; fileToBase64→src/utils/file.ts; page 641→123 lines shell; tsc + webpack build clean. Per-tab flows now unmount on switch (reset local state) — intended.) |
 | 405 | Decompose Sidebar.tsx | P2 | S | done (merged; src/config/navigation.ts + src/components/icons.tsx + src/hooks/useCourseViews.ts; Sidebar 540→306 lines; active-highlight logic untouched) |
 | 406 | Finish useResource migration (~20 pages) | P2 | M | todo |
 | 407 | Shared ltree tree-building (3 implementations) | P2 | S | done (merged; src/utils/ltree.ts: depthOf/lastSegment/parentPath + generic buildTree; ContentTree + lecturer rebased; student keeps its ancestor-synthesising builder (documented) but shares the primitives) |
@@ -108,7 +108,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 504 | Move crypto out of computor-types | P2 | M | todo |
 | 505 | Rename deployments_refactored.py; decouple CLI config | P2 | M | todo |
 | 506 | Remove computor-coder dead package shell | P2 | S | done (merged; deployment/ → ops/coder/, startup.sh + docs + .gitignore updated, empty computor-coder/ removed, dangling editable install uninstalled) |
-| 507 | Packaging hygiene (local deps, pins, py.typed) | P2 | M | todo |
+| 507 | Packaging hygiene (local deps, pins, py.typed) | P2 | M | done (merged; backend declares local deps computor-types/utils/client (bare names, cross-satisfied in the one-shot Docker pip install); py.typed + package-data for types/cli/utils; cli gains [tool.setuptools]/packages.find; httpx==0.27.0 + pydantic==2.11.0 aligned across five pyprojects. Did NOT do the optional uv-workspace/ruff-hoist steps.) |
 | 508 | Give computor-utils a purpose (or fold it away) | P3 | S | todo |
 | 509 | Dedupe per-command CLI boilerplate | P3 | S | todo |
 | 510 | Harden computor_types get_all_dtos (silent failures) | P3 | M | todo |
