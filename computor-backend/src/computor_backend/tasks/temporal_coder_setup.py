@@ -22,6 +22,7 @@ from temporalio.common import RetryPolicy
 
 from .registry import register_task
 from .temporal_base import BaseWorkflow, WorkflowResult
+from .worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,9 @@ async def build_workspace_image(
         return {"success": False, "template": template_key, "error": f"Unknown template: {template_key}"}
 
     # Prefer the worker's own env vars (docker network) over parameters from the backend
-    registry_host = os.environ.get("CODER_REGISTRY_HOST", registry_host)
+    settings = get_worker_settings()
+    if settings.coder_registry_host is not None:
+        registry_host = settings.coder_registry_host
 
     build_dir = os.path.join(templates_dir, info["dir_name"])
     dockerfile_path = os.path.join(build_dir, "Dockerfile")
@@ -139,7 +142,7 @@ async def build_workspace_image(
     )
 
     try:
-        client = docker_sdk.DockerClient(base_url="unix://" + os.environ.get("DOCKER_SOCKET_PATH", "/var/run/docker.sock"))
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
 
         # Build (tagged with the first tag), then apply the remaining tags to the
         # same image id so every tag is byte-identical.
@@ -218,7 +221,9 @@ async def push_coder_template(
 
     # Prefer the worker's own CODER_URL env var (docker network) over the
     # parameter passed from the backend (which may be localhost).
-    coder_url = os.environ.get("CODER_URL", coder_url)
+    coder_url_override = get_worker_settings().coder_url
+    if coder_url_override is not None:
+        coder_url = coder_url_override
 
     image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
 

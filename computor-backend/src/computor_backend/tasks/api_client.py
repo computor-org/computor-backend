@@ -15,6 +15,7 @@ from temporalio.exceptions import ApplicationError
 
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
+from computor_backend.tasks.worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,18 @@ def resolve_api_config(api_config: Optional[Dict[str, Any]] = None) -> Dict[str,
     activity works regardless of which worker picks it up.
     """
     api_config = api_config or {}
+    settings = get_worker_settings()
+    # ``API_URL`` env overrides the workflow-passed url; else fall back to the
+    # passed url, then to the static default (== settings.api_url's default).
+    # model_fields_set tells us whether API_URL was actually in the environment,
+    # preserving the old os.environ.get("API_URL", api_config[...]) precedence.
+    if "api_url" in settings.model_fields_set:
+        url = settings.api_url
+    else:
+        url = api_config.get("url", settings.api_url)
     return {
-        "url": os.environ.get("API_URL", api_config.get("url", _DEFAULT_API_URL)),
-        "token": os.environ.get("API_TOKEN") or api_config.get("token"),
+        "url": url,
+        "token": settings.api_token or api_config.get("token"),
     }
 
 

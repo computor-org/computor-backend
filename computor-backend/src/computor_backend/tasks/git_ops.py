@@ -11,6 +11,7 @@ import os
 import git
 
 from .temporal_base import make_provider_auth_url
+from .worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,9 @@ def configure_identity(repo: git.Repo) -> tuple[str, str]:
     Required in the worker container (no global git config). Returns the
     (email, name) pair for callers that need it elsewhere.
     """
-    git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
-    git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
+    settings = get_worker_settings()
+    git_email = settings.system_git_email
+    git_name = settings.system_git_name
     repo.git.config('user.email', git_email)
     repo.git.config('user.name', git_name)
     return git_email, git_name

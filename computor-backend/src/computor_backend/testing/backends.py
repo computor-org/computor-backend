@@ -3,7 +3,6 @@ Testing backend implementations for different programming languages and testing 
 Provides a flexible system to execute tests using different approaches (subprocess, Pyro RPC, etc.)
 """
 
-import os
 import json
 import socket
 import subprocess
@@ -12,6 +11,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import Pyro5.api
 import Pyro5.errors
+
+from computor_backend.tasks.worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +56,19 @@ class PythonTestingBackend(TestingBackend):
     ) -> Dict[str, Any]:
         """Execute Python tests using subprocess."""
         logging.basicConfig(level=logging.INFO)
-        # Get configuration from backend properties
+        # Get configuration from backend properties (env-var fallbacks live in
+        # worker_settings; TESTING_EXECUTABLE has no static default so this
+        # site keeps its own "/tmp/engine/catester/testing.py run" fallback).
+        settings = get_worker_settings()
         testing_executable = backend_properties.get(
             "testing_executable",
-            os.environ.get("TESTING_EXECUTABLE", "/tmp/engine/catester/testing.py run")
+            settings.testing_executable
+            if settings.testing_executable is not None
+            else "/tmp/engine/catester/testing.py run",
         )
         runtime_environment = backend_properties.get(
             "runtime_environment",
-            os.environ.get("RUNTIME_ENVIRONMENT", "python3")
+            settings.runtime_environment,
         )
         
         # Build command
@@ -132,7 +138,7 @@ class MatlabTestingBackend(TestingBackend):
         pyro_object_id = backend_properties.get("pyro_object_id", "matlab_server")
         
         # If running in Docker, use container hostname
-        if os.environ.get("RUNNING_IN_DOCKER"):
+        if get_worker_settings().running_in_docker:
             hostname = socket.gethostname()
             ip_address = socket.gethostbyname(hostname)
             pyro_address = f"PYRO:{pyro_object_id}@{ip_address}:{pyro_port}"
@@ -282,10 +288,14 @@ class ComputorTestingBackend(TestingBackend):
                 f"{test_job_config.get('testing_service_slug')}"
             )
 
-        # Get configuration with fallbacks
+        # Get configuration with fallbacks. TESTING_EXECUTABLE has no static
+        # default in worker_settings, so this site keeps its own "computor-test".
+        settings = get_worker_settings()
         testing_executable = backend_properties.get(
             "testing_executable",
-            os.environ.get("TESTING_EXECUTABLE", "computor-test")
+            settings.testing_executable
+            if settings.testing_executable is not None
+            else "computor-test",
         )
 
         # Build command: computor-test <language> run -T <test.yaml> -s <spec.yaml>
