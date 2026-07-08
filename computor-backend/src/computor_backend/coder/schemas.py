@@ -92,6 +92,18 @@ class CoderUser(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     status: Optional[str] = Field(None, description="User status")
 
+    @classmethod
+    def from_api(cls, data: dict[str, Any]) -> "CoderUser":
+        """Build a CoderUser from a Coder API user payload."""
+        return cls(
+            id=data["id"],
+            username=data["username"],
+            email=data["email"],
+            name=data.get("name"),
+            created_at=data.get("created_at"),
+            status=data.get("status"),
+        )
+
 
 class CoderWorkspace(BaseModel):
     """Coder workspace information."""
