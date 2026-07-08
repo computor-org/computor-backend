@@ -191,33 +191,7 @@ async def download_example_files(repository: Any, version: Any) -> Dict[str, byt
 
 
 async def download_example_from_git(repository: Any, version: Any) -> Dict[str, bytes]:
-    # """Download example files from Git repository."""
-    # import os
-    # import tempfile
-    # import shutil
-    # import git
-    
-    # files = {}
-    # temp_dir = tempfile.mkdtemp()
-    
-    # try:
-    #     repo = git.Repo.clone_from(repository.url, temp_dir, branch=version.version_tag)
-        
-    #     for root, dirs, file_list in os.walk(temp_dir):
-    #         # Skip .git directory
-    #         if '.git' in dirs:
-    #             dirs.remove('.git')
-            
-    #         for file_name in file_list:
-    #             file_path = os.path.join(root, file_name)
-    #             relative_path = os.path.relpath(file_path, temp_dir)
-                
-    #             with open(file_path, 'rb') as f:
-    #                 files[relative_path] = f.read()
-        
-    #     return files
-    # finally:
-    #     shutil.rmtree(temp_dir, ignore_errors=True)
+    """Not implemented: examples are served from MinIO/S3, not git."""
     logger.error(f"Git source type not implemented for repository {repository.name}")
     raise NotImplementedError(f"Git source type is not yet implemented for repository '{repository.name}'")
 
@@ -338,12 +312,7 @@ async def generate_student_template_activity_v2(
             raise ValueError(f"Course {course_id} not found")
         
         organization = course.organization
-        
-        # # Get organization directly using the foreign key relationship
-        # organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
-        # if not organization:
-        #     raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
-        
+
         # Resolve the push token + provider. Managed courses keep the token on the
         # bound GitServer (registry); legacy org-level GitLab keeps it in
         # organization.properties.gitlab (which wins here so mid-migration

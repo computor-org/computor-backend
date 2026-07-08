@@ -16,8 +16,12 @@ from .temporal_client import (
 )
 from .temporal_base import BaseWorkflow, WorkflowResult
 
-# Import Temporal examples to auto-register tasks
-from . import temporal_examples
+# Demo/example workflows (example_long_running, …) auto-register on import and
+# are then submittable through the public task API. Keep them OUT of production
+# unless explicitly enabled, so nobody can launch an arbitrary long-running job.
+import os as _os
+if _os.environ.get("COMPUTOR_ENABLE_EXAMPLE_TASKS") == "1":
+    from . import temporal_examples  # noqa: F401
 
 # Import Temporal hierarchy management tasks to auto-register
 from . import temporal_hierarchy_management

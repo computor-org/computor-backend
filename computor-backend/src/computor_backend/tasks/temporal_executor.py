@@ -278,25 +278,7 @@ class TemporalTaskExecutor:
         # This would need to be queried through the Temporal server's system workflows
         # or monitoring endpoints
         return []
-    
-    # async def get_queue_stats(self) -> Dict[str, Any]:
-    #     """
-    #     Get queue statistics.
-        
-    #     Note: Temporal doesn't provide direct queue stats through the client.
-    #     This would need to be implemented through the Temporal web UI or metrics.
-        
-    #     Returns:
-    #         Queue statistics
-    #     """
-    #     # Temporal doesn't expose queue statistics directly through the client
-    #     # This would need to be queried through Temporal's metrics endpoints
-    #     return {
-    #         "queues": {
-    #             "computor-tasks": {"pending": 0, "active": 0},
-    #         }
-    #     }
-    
+
     async def list_tasks(self, limit: int = 100, offset: int = 0, status: Optional[str] = None) -> Dict[str, Any]:
         """
         List tasks with pagination and filtering.
