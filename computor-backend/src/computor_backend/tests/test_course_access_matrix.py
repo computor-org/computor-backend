@@ -15,7 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import Ltree
 
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException, PermissionDeniedAsNotFound
 from computor_backend.model.auth import User
 from computor_backend.model.course import (
     Course,
@@ -179,6 +179,9 @@ def _principal(user=None, admin=False) -> Principal:
 
 
 class TestRequireSubmissionGroupAccess:
+    # TASK-209: denial now hides existence, so the ladder raises
+    # PermissionDeniedAsNotFound (a 404 NotFoundException subclass) by default
+    # rather than a 403 ForbiddenException. The allow/deny DECISION is unchanged.
     def _call(self, graph, db, principal, **kw):
         require_submission_group_access(
             principal,
@@ -198,15 +201,15 @@ class TestRequireSubmissionGroupAccess:
         self._call(graph, db, _principal(graph["tutor"]))
 
     def test_other_student_denied(self, graph, db):
-        with pytest.raises(ForbiddenException):
+        with pytest.raises(PermissionDeniedAsNotFound):
             self._call(graph, db, _principal(graph["other_student"]))
 
     def test_outsider_denied(self, graph, db):
-        with pytest.raises(ForbiddenException):
+        with pytest.raises(PermissionDeniedAsNotFound):
             self._call(graph, db, _principal(graph["outsider"]))
 
     def test_userless_principal_denied(self, graph, db):
-        with pytest.raises(ForbiddenException):
+        with pytest.raises(PermissionDeniedAsNotFound):
             self._call(graph, db, _principal())
 
     def test_student_floor_allows_other_student(self, graph, db):
@@ -215,8 +218,14 @@ class TestRequireSubmissionGroupAccess:
         self._call(graph, db, _principal(graph["other_student"]), min_course_role="_student")
 
     def test_student_floor_still_denies_outsider(self, graph, db):
-        with pytest.raises(ForbiddenException):
+        with pytest.raises(PermissionDeniedAsNotFound):
             self._call(graph, db, _principal(graph["outsider"]), min_course_role="_student")
+
+    def test_denial_status_code_is_404(self, graph, db):
+        # The hide surface must be a real 404 (indistinguishable from not-found).
+        with pytest.raises(PermissionDeniedAsNotFound) as exc:
+            self._call(graph, db, _principal(graph["outsider"]))
+        assert exc.value.status_code == 404
 
 
 class TestGetCourseMemberOr403:
@@ -254,3 +263,21 @@ class TestGetCourseMemberOr403:
             get_course_member_or_403(
                 _principal(graph["outsider"], admin=True), graph["course"].id, db
             )
+
+    def test_default_denial_stays_403(self, graph, db):
+        # Back-compat: without an explicit exception, denial is still a 403.
+        with pytest.raises(ForbiddenException) as exc:
+            get_course_member_or_403(_principal(graph["outsider"]), graph["course"].id, db)
+        assert exc.value.status_code == 403
+
+    def test_hide_existence_opt_in_raises_404(self, graph, db):
+        # TASK-209: call sites that hide existence pass exception=
+        # PermissionDeniedAsNotFound and get a 404 without changing who is allowed.
+        with pytest.raises(PermissionDeniedAsNotFound) as exc:
+            get_course_member_or_403(
+                _principal(graph["outsider"]),
+                graph["course"].id,
+                db,
+                exception=PermissionDeniedAsNotFound,
+            )
+        assert exc.value.status_code == 404

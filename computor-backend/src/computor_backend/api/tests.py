@@ -375,10 +375,12 @@ async def get_test_status(
     # Check permissions
     can_view_all = _has_result_permission(permissions, "get")
     if not can_view_all:
+        # Denial hides the result's existence (default PermissionDeniedAsNotFound,
+        # a 404). Drop the old AUTHZ_003 error_code so the response is an
+        # indistinguishable not-found rather than leaking an authz code (TASK-209).
         require_submission_group_access(
             permissions, result_data.submission_group_id, result_data.course_id, db,
             detail="You don't have permission to view this test result",
-            error_code="AUTHZ_003",
         )
 
     # If test has a workflow ID, check Temporal status for running tests

@@ -18,6 +18,7 @@ from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
+    PermissionDeniedAsNotFound,
 )
 from computor_backend.model.artifact import (
     SubmissionArtifact,
@@ -654,7 +655,10 @@ def create_artifact_grade(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user has grading permissions (must be at least tutor)
+    # Check if user has grading permissions (must be at least tutor). This is a
+    # pure action-denial: a group-member student can already SEE this artifact
+    # (it is their own submission) but is not allowed to grade it, so keep the
+    # descriptive 403 rather than hiding existence (TASK-209).
     grader_member = get_course_member_or_403(
         permissions, artifact.submission_group.course_id, db,
         min_course_role="_tutor",
@@ -773,10 +777,13 @@ def create_artifact_review(
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
 
-    # Check if user is a course member (any role can review)
+    # Check if user is a course member (any role can review). Denial here means
+    # the caller is not in the course at all and could not otherwise see this
+    # artifact, so hide its existence with a 404 (TASK-209).
     course_member = get_course_member_or_403(
         permissions, artifact.submission_group.course_id, db,
         detail="You must be a course member to review artifacts",
+        exception=PermissionDeniedAsNotFound,
     )
 
     # Create the review (use authenticated user's course member id)
@@ -844,7 +851,10 @@ def delete_review(
     # Check permissions
     principal_user_id = permissions.get_user_id()
     if str(review.reviewer.user_id) != str(principal_user_id):
-        # Check if user is instructor (higher permission needed to delete others' reviews)
+        # Check if user is instructor (higher permission needed to delete others'
+        # reviews). Reviews are visible to any course member (see the list-reviews
+        # endpoint), so this is action-denial on an already-visible resource →
+        # keep the descriptive 403, not a 404 hide (TASK-209).
         get_course_member_or_403(
             permissions, review.artifact.submission_group.course_id, db,
             min_course_role="_lecturer",
@@ -882,10 +892,13 @@ async def create_test_result(
         raise NotFoundException(detail="Submission artifact not found")
 
     # Check if user has permission to run tests (students can test their own,
-    # tutors/instructors can test any)
+    # tutors/instructors can test any). Denial here means the caller is not in
+    # the course at all and could not otherwise see this artifact, so hide its
+    # existence with a 404 (TASK-209).
     course_member = get_course_member_or_403(
         permissions, artifact.submission_group.course_id, db,
         detail="You must be a course member to run tests",
+        exception=PermissionDeniedAsNotFound,
     )
 
     # Check if student is testing their own submission
@@ -895,11 +908,15 @@ async def create_test_result(
     ).first()
 
     if not is_own_submission:
-        # If not their own submission, they need tutor or higher permissions
+        # If not their own submission, they need tutor or higher permissions.
+        # Group members are already short-circuited above (is_own_submission), so
+        # anyone reaching here is a non-group, non-tutor member who could NOT
+        # otherwise see this artifact — hide its existence with a 404 (TASK-209).
         get_course_member_or_403(
             permissions, artifact.submission_group.course_id, db,
             min_course_role="_tutor",
             detail="Students can only test their own submissions",
+            exception=PermissionDeniedAsNotFound,
         )
 
     # Check test limitations (prevent multiple successful tests by same member)

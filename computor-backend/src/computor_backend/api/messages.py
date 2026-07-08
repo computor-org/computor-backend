@@ -43,7 +43,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories import MessageRepository
 from computor_backend.model.message import Message
-from computor_backend.exceptions import BadRequestException, ForbiddenException
+from computor_backend.exceptions import BadRequestException, PermissionDeniedAsNotFound
 
 # Import business logic
 from computor_backend.business_logic.messages import (
@@ -154,13 +154,15 @@ async def list_mentionable_users_endpoint(
         )
 
     audience = message_audience_user_ids(message_like, db)
-    # Don't let anyone enumerate the membership of a scope they can't see.
+    # Don't let anyone enumerate the membership of a scope they can't see. The
+    # caller is outside this scope's audience and could not otherwise see it, so
+    # hide its existence with a 404 rather than confirming it with a 403 (TASK-209).
     if (
         audience is not None
         and not permissions.is_admin
         and str(permissions.user_id).lower() not in {a.lower() for a in audience}
     ):
-        raise ForbiddenException(detail="You cannot list mentionable users for this scope")
+        raise PermissionDeniedAsNotFound(detail="You cannot list mentionable users for this scope")
     # Global scope (no target) would otherwise dump the whole user table.
     if audience is None and not params.search:
         return []

@@ -3,6 +3,34 @@ Enhanced exception handling with error codes and rich metadata.
 
 This module provides custom HTTP exceptions that integrate with the error registry
 to provide consistent, informative error responses with unique error codes.
+
+-------------------------------------------------------------------
+404-vs-403 authorization convention (existence hiding) — TASK-209
+-------------------------------------------------------------------
+
+When a caller is *denied* access, the response must not accidentally
+leak whether the resource exists. The rule for the deny branch is:
+
+- **Default → 404 (hide existence).** When the caller is being denied
+  access to a *specific object they would NOT otherwise be able to
+  see*, respond as if the resource simply does not exist. Use
+  :class:`PermissionDeniedAsNotFound` (a 404) rather than
+  :class:`ForbiddenException` (a 403). This matches the behaviour of
+  the generated ``CrudRouter`` routes and of
+  ``business_logic.crud`` (whose permission-filtered queries raise a
+  bare ``NotFoundException`` on a miss). An unauthorized caller must
+  not be able to confirm that a resource/endpoint target exists.
+
+- **403 (descriptive) ONLY for action-denial on an already-visible
+  object.** When the caller can *already legitimately see* the
+  resource and is merely denied one specific *action* on it (e.g. a
+  course member who can view a submission but isn't allowed to grade
+  it), existence is not a secret, so :class:`ForbiddenException`
+  (403) is appropriate and a 404 would be confusing.
+
+When in doubt, prefer 404 (hiding). Note that this convention only
+governs the *status code / response shape* on the deny branch — it
+never changes the authorization *decision* (who is allowed).
 """
 
 from typing import Any, Dict, Optional, Union
@@ -300,6 +328,29 @@ class NotFoundException(ComputorException):
     ):
         super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
         self.status_code = status.HTTP_404_NOT_FOUND
+
+
+class PermissionDeniedAsNotFound(NotFoundException):
+    """Authorization denial deliberately surfaced as 404 to hide existence.
+
+    Semantically this is an *authorization* failure, but it is rendered as a
+    404 so an unauthorized caller cannot confirm that the target resource
+    exists. Raise this — instead of :class:`ForbiddenException` — whenever the
+    caller is being denied access to a specific object they would NOT
+    otherwise be able to see. See the "404-vs-403 authorization convention"
+    in this module's docstring.
+
+    On the wire this is **indistinguishable** from a genuine
+    :class:`NotFoundException`: it inherits the same 404 status and the same
+    default ``NF_001`` error code, which is exactly the point. The distinct
+    class name exists only so the *intent* is explicit and greppable at each
+    call site (a genuine "row missing" 404 vs. a deliberate permission hide).
+    """
+
+    # No behavioural override: inherit NotFoundException.__init__ verbatim so
+    # the rendered response (status + error_code + body shape) matches a real
+    # not-found exactly. Subclassing keeps it a NotFoundException for any
+    # ``except NotFoundException`` handlers, too.
 
 
 class UserNotFoundException(ComputorException):
