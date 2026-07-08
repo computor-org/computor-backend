@@ -2,6 +2,7 @@
 Temporal workflows for generating student templates from Example Library.
 Version 2: Fixed deployment status handling and sandbox restrictions.
 """
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Dict, Any, List
@@ -30,7 +31,7 @@ from .student_template.status import failed_event
 logger = logging.getLogger(__name__)
 
 
-async def process_example_for_student_template_v2(
+def process_example_for_student_template_v2(
     example_files: Dict[str, bytes],
     target_path: Any,  # Path object
     course_content: Any,
@@ -40,6 +41,9 @@ async def process_example_for_student_template_v2(
     Process example files for student template generation.
     File lists come from the ExampleVersion DB row (typed columns), not
     from re-parsing the workspace meta.yaml.
+
+    Pure synchronous file I/O (no awaits): a plain ``def`` so the now-sync
+    release activity can call it directly.
     """
     from pathlib import Path
 
@@ -250,7 +254,7 @@ async def download_example_from_object_storage(
 
 # Activities
 @activity.defn(name="generate_student_template_activity_v2")
-async def generate_student_template_activity_v2(
+def generate_student_template_activity_v2(
     course_id: str,
     student_template_url: str,
     assignments_url: str = None,
@@ -260,7 +264,16 @@ async def generate_student_template_activity_v2(
 ) -> Dict[str, Any]:
     """
     Generate student template repository from examples assigned to course content.
-    
+
+    BLOCKING activity: GitPython clone/commit/push and synchronous SQLAlchemy
+    session work spanning the whole body. Runs as a plain ``def`` in the worker's
+    thread pool (Worker(activity_executor=...)) so a multi-minute clone/push never
+    stalls the event loop, heartbeats, or other activities. The one
+    genuinely-async helper (``download_example_files``, async object-storage I/O)
+    is driven with ``asyncio.run`` inside this thread (no running loop here); the
+    sync helpers (status transitions, README, reference push, and the sync
+    ``publish_deployment_status_changed`` broadcast) are called directly.
+
     This activity:
     1. Sets all assigned deployments to 'deploying' status (or resets deployed if force_redeploy)
     2. Clones/creates the student-template repository
@@ -407,7 +420,8 @@ async def generate_student_template_activity_v2(
                             example_repo = content.deployment.example_version.example.repository
                             # download_example_files returns files already scoped to the example version
                             # No filtering needed - the storage_path in MinIO already isolates this example
-                            files = await download_example_files(example_repo, content.deployment.example_version)
+                            # async object-storage helper driven via asyncio.run (this activity is sync)
+                            files = asyncio.run(download_example_files(example_repo, content.deployment.example_version))
                     except Exception as e:
                         logger.warning(f"Failed to load files from example repository for {content.path}: {e}")
                         files = {}
@@ -444,7 +458,7 @@ async def generate_student_template_activity_v2(
                     # release fell through to the no-meta fallback and shipped
                     # the full example bundle minus things prefixed "test"
                     # (i.e. localTests/ leaked).
-                    process_result = await process_example_for_student_template_v2(
+                    process_result = process_example_for_student_template_v2(
                         example_files=files,
                         target_path=Path(full_target_path),
                         course_content=content,

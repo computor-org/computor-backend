@@ -8,6 +8,7 @@ pushing, it records the HEAD commit SHA into CourseContentDeployment.version_ide
 """
 from datetime import timedelta, datetime, timezone
 from typing import Any, Dict, List, Optional
+import asyncio
 import os
 import tempfile
 import shutil
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="generate_assignments_repository")
-async def generate_assignments_repository_activity(
+def generate_assignments_repository_activity(
     course_id: str,
     assignments_url: Optional[str] = None,
     selection: Optional[Dict[str, Any]] = None,
@@ -33,6 +34,13 @@ async def generate_assignments_repository_activity(
 ) -> Dict[str, Any]:
     """
     Populate the assignments repository from Example Library for selected contents.
+
+    BLOCKING activity: GitPython clone/commit/push and synchronous SQLAlchemy
+    session work. Runs as a plain ``def`` in the worker's thread pool
+    (Worker(activity_executor=...)) so the multi-minute clone/push never stalls
+    the event loop. The one genuinely-async helper it needs
+    (``download_example_files``, async object-storage I/O) is driven with
+    ``asyncio.run`` inside this thread (no running loop here).
 
     Args:
         course_id: Course ID
@@ -171,7 +179,7 @@ async def generate_assignments_repository_activity(
 
                     # Download full example content
                     logger.info(f"Downloading files for {content.path} from repository {example.repository.name}")
-                    files = await download_example_files(example.repository, ev)
+                    files = asyncio.run(download_example_files(example.repository, ev))
                     logger.info(f"Downloaded {len(files)} files for {content.path}")
 
                     if not files:

@@ -16,7 +16,6 @@ This module handles forking the student-template repository when students join a
 course, for both individual and team repositories.
 """
 import logging
-import asyncio
 import json
 import re
 from datetime import timedelta
@@ -141,7 +140,7 @@ def get_course_gitlab_config(course: Course, gitlab: Optional[Gitlab] = None) ->
     }
 
 
-async def find_existing_repository(
+def find_existing_repository(
     gitlab: Gitlab,
     namespace_id: int,
     repo_path: str
@@ -182,7 +181,7 @@ async def find_existing_repository(
     return None
 
 
-async def update_submission_groups(
+def update_submission_groups(
     db: Session,
     submission_group_ids: list[str],
     repository_info: Dict[str, Any]
@@ -388,7 +387,7 @@ def _build_repository_info(
     }
 
 
-async def _unprotect_and_grant(
+def _unprotect_and_grant(
     gitlab: Gitlab,
     db: Session,
     project: Any,
@@ -409,15 +408,14 @@ async def _unprotect_and_grant(
         except Exception as e:
             logger.debug(f"Could not unprotect {branch} branch: {e}")
 
-    await asyncio.to_thread(
-        add_course_members_to_project,
+    add_course_members_to_project(
         gitlab, project, member_ids, db,
         provider_url=provider_url,
     )
 
 
 @activity.defn(name="create_student_repository")
-async def create_student_repository(
+def create_student_repository(
     course_member_id: str,
     course_id: str,
     submission_group_ids: list[str] = None
@@ -425,12 +423,17 @@ async def create_student_repository(
     """
     Create a single student repository by forking the student-template.
     Updates all submission groups with the same repository information.
-    
+
+    BLOCKING activity: synchronous python-gitlab HTTP (fork/poll/unprotect/add
+    members) and synchronous SQLAlchemy session work throughout. Runs as a plain
+    ``def`` in the worker's thread pool (Worker(activity_executor=...)) so the
+    minutes-long fork+poll never stalls the event loop or other activities.
+
     Args:
         course_member_id: ID of the course member (student)
         course_id: ID of the course
         submission_group_ids: List of submission group IDs to update with repository info
-        
+
     Returns:
         Dict containing repository information
     """
@@ -472,17 +475,16 @@ async def create_student_repository(
         logger.info(f"Checking for existing repository {repo_path} in namespace {gitlab_namespace_id}")
         
         # Check if repository already exists
-        existing_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
-        
+        existing_project = find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
+
         # If repository exists, use it; otherwise fork
         if existing_project:
             forked_project = existing_project
             logger.info(f"Using existing repository {repo_path} for {username}")
-            
+
             # Ensure student is maintainer even for existing repo
             try:
-                await asyncio.to_thread(
-                    add_course_members_to_project,
+                add_course_members_to_project(
                     gitlab, forked_project, [course_member_id], db,
                     provider_url=provider_url,
                 )
@@ -492,8 +494,7 @@ async def create_student_repository(
             # Fork the student-template repository
             logger.info(f"Forking template {student_template_id} to {repo_path}")
             try:
-                forked_project = await asyncio.to_thread(
-                    fork_project_with_polling,
+                forked_project = fork_project_with_polling(
                     gitlab, student_template_id, repo_path, repo_name, gitlab_namespace_id,
                     max_attempts=10, poll_interval=5, initial_wait=2,
                 )
@@ -501,14 +502,14 @@ async def create_student_repository(
                 # If fork fails with "already taken", try to find the existing repo
                 if "has already been taken" in str(fork_error):
                     logger.warning(f"Repository already exists, searching for it...")
-                    forked_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
+                    forked_project = find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
                     if not forked_project:
                         raise ValueError(f"Repository {repo_path} exists but cannot be accessed")
                 else:
                     raise fork_error
 
             # Unprotect default branches and grant the student maintainer access
-            await _unprotect_and_grant(gitlab, db, forked_project, [course_member_id], provider_url)
+            _unprotect_and_grant(gitlab, db, forked_project, [course_member_id], provider_url)
 
         # Prepare repository information (student variant: flat dict)
         repository_info = _build_repository_info(gitlab_url, forked_project, gitlab_namespace_id)
@@ -522,7 +523,7 @@ async def create_student_repository(
         db.commit()
         
         # Update submission groups
-        updated_submission_groups = await update_submission_groups(
+        updated_submission_groups = update_submission_groups(
             db, submission_group_ids, repository_info
         )
         
@@ -541,19 +542,24 @@ async def create_student_repository(
 
 
 @activity.defn(name="create_team_repository")
-async def create_team_repository(
+def create_team_repository(
     submission_group_id: str,
     course_id: str,
     team_members: list[str]
 ) -> Dict[str, Any]:
     """
     Create a team repository for group assignments.
-    
+
+    BLOCKING activity: synchronous python-gitlab HTTP (fork/poll/unprotect/add
+    members) and synchronous SQLAlchemy session work. Runs as a plain ``def`` in
+    the worker's thread pool (Worker(activity_executor=...)) so the minutes-long
+    fork+poll never stalls the event loop or other activities.
+
     Args:
         submission_group_id: ID of the submission group
         course_id: ID of the course
         team_members: List of course member IDs in the team
-        
+
     Returns:
         Dict containing repository information
     """
@@ -607,14 +613,13 @@ async def create_team_repository(
         logger.info(f"Creating team repository {repo_path} for {len(team_members)} members")
         
         # Fork the student-template repository with polling
-        team_project = await asyncio.to_thread(
-            fork_project_with_polling,
+        team_project = fork_project_with_polling(
             gitlab, student_template_id, repo_path, repo_name, gitlab_namespace_id,
             max_attempts=10, poll_interval=5, initial_wait=2,
         )
 
         # Unprotect default branches and grant the team maintainer access
-        await _unprotect_and_grant(gitlab, db, team_project, team_members, gitlab_url)
+        _unprotect_and_grant(gitlab, db, team_project, team_members, gitlab_url)
 
         # Get assignment directory from course content's example
         course_content = submission_group.course_content

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import signal
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List, Optional
 from temporalio.worker import Worker
@@ -31,6 +32,7 @@ from .temporal_client import (
 # single source of truth). Example workflows are gated by the env flag inside
 # import_task_modules(). Adding a new module only requires editing that list.
 from .registry import task_registry, import_task_modules
+from .worker_settings import get_worker_settings
 
 
 class TemporalWorker:
@@ -46,6 +48,9 @@ class TemporalWorker:
         """
         self.task_queues = task_queues or [DEFAULT_TASK_QUEUE]
         self.workers: List[Worker] = []
+        # Thread pools that run the blocking (sync ``def``) activities off the
+        # event loop; one per worker, shut down in ``shutdown()``.
+        self._activity_executors: List[ThreadPoolExecutor] = []
         self.client: Optional[Client] = None
         self._shutdown = False
         self._heartbeat_interval = heartbeat_interval
@@ -77,17 +82,36 @@ class TemporalWorker:
         workflows = task_registry.list_workflows()
         activities = task_registry.list_activities()
 
+        # Blocking activities are registered as sync ``def`` functions; Temporal
+        # requires an activity_executor to run them (and would error at Worker
+        # construction otherwise). They run in this thread pool instead of on the
+        # asyncio event loop, so a multi-minute clone/build/subprocess no longer
+        # stalls heartbeats or starves other activities. Async activities keep
+        # running on the loop. max_workers matches max_concurrent_activities
+        # (SDK default 100) so the executor is never undersized (the SDK warns
+        # otherwise) and activity concurrency is unchanged.
+        max_workers = get_worker_settings().activity_executor_max_workers
+
         # Create a worker for each task queue
         for task_queue in self.task_queues:
             logger.info(f"Creating worker for queue: {task_queue}")
+            activity_executor = ThreadPoolExecutor(
+                max_workers=max_workers,
+                thread_name_prefix=f"activity-{task_queue}",
+            )
+            self._activity_executors.append(activity_executor)
             worker = Worker(
                 self.client,
                 task_queue=task_queue,
                 workflows=workflows,
                 activities=activities,
+                activity_executor=activity_executor,
             )
             self.workers.append(worker)
-            logger.info(f"Worker created for queue: {task_queue}")
+            logger.info(
+                f"Worker created for queue: {task_queue} "
+                f"(activity thread pool max_workers={max_workers})"
+            )
 
         # Setup signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -128,6 +152,10 @@ class TemporalWorker:
         # Close client connection
         if self.client:
             await self.client.close()
+
+        # Release the activity thread pools.
+        for executor in self._activity_executors:
+            executor.shutdown(wait=False)
 
         uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
         logger.info(f"Workers shut down - uptime: {uptime}")

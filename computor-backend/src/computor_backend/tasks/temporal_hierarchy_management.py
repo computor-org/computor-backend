@@ -23,11 +23,14 @@ logger = logging.getLogger(__name__)
 # effects, so they run synchronously via ``business_logic.deployment`` (CRUD).
 # Only course creation stays here — it still provisions git / student templates.
 @activity.defn(name="create_course_activity")
-async def create_course_activity(
+def create_course_activity(
     course_config: Dict[str, Any],
     course_family_id: str,
     user_id: str,
 ) -> Dict[str, Any]:
+    # BLOCKING activity: synchronous SQLAlchemy session work plus git-binding
+    # provisioning. Runs as a sync ``def`` in the worker's thread pool
+    # (Worker(activity_executor=...)) so it never stalls the event loop.
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
     try:
         config = CourseConfig(
