@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -11,6 +11,7 @@ import Forbidden from '@/src/components/Forbidden';
 import Modal from '@/src/components/Modal';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { useSystemRoles } from '@/src/hooks/useSystemRoles';
+import { useResource } from '@/src/hooks/useResource';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -46,9 +47,6 @@ interface CreateModal {
 
 export default function InvitesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [invites, setInvites] = useState<InviteLinkList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
 
@@ -65,23 +63,12 @@ export default function InvitesPage() {
 
   const notify = useNotify();
 
-  const fetchInvites = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await invitesClient.list();
-      setInvites(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load invites');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !isUserManager) return;
-    fetchInvites();
-  }, [authLoading, isAuthenticated, isUserManager, fetchInvites]);
+  const { data, loading, error, reload } = useResource(
+    () => invitesClient.list(),
+    [],
+    { enabled: isUserManager },
+  );
+  const invites = data ?? [];
 
   if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
@@ -110,7 +97,7 @@ export default function InvitesPage() {
       await invitesClient.create(payload);
       setCreateModal(m => ({ ...m, open: false, email: '', maxUses: 1, expiresInDays: 7, roles: [], note: '', saving: false }));
       notify('Invite link created', 'success');
-      fetchInvites();
+      reload();
     } catch (e) {
       setCreateModal(m => ({ ...m, error: e instanceof Error ? e.message : 'Failed to create invite', saving: false }));
     }
@@ -120,7 +107,7 @@ export default function InvitesPage() {
     try {
       await invitesClient.delete(id);
       notify('Invite revoked', 'success');
-      fetchInvites();
+      reload();
     } catch (e) {
       notify(e instanceof Error ? e.message : 'Failed to revoke invite', 'error');
     }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
@@ -23,30 +24,25 @@ export default function CourseGroupEditPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: group, loading, error: loadError } = useResource(
+    () => groupsClient.getCourseGroupsCourseGroupsIdGet({ id: groupId }),
+    [groupId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the group loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    groupsClient
-      .getCourseGroupsCourseGroupsIdGet({ id: groupId })
-      .then((g) => {
-        if (cancelled) return;
-        setTitle(g.title || '');
-        setDescription(g.description || '');
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, authLoading, isAuthenticated, canManage]);
+    if (!group) return;
+    setTitle(group.title || '');
+    setDescription(group.description || '');
+  }, [group]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       await groupsClient.updateCourseGroupsCourseGroupsIdPatch({
         id: groupId,
@@ -55,7 +51,7 @@ export default function CourseGroupEditPage() {
       router.push(`/courses/${courseId}/management/groups`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -75,7 +71,7 @@ export default function CourseGroupEditPage() {
             { label: title || 'Group' },
           ]}
           title={`Edit ${title || 'group'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           disabled={!title.trim()}
           onCancel={() => router.push(`/courses/${courseId}/management/groups`)}

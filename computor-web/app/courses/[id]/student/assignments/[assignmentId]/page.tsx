@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
@@ -42,41 +41,15 @@ interface TestRunResult {
 }
 
 export default function AssignmentDetailPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const params = useParams();
   const courseId = params.id as string;
   const assignmentId = params.assignmentId as string;
-  const [assignment, setAssignment] = useState<CourseContentStudentGet | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Don't fetch until authentication is confirmed
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-
-    async function fetchAssignment() {
-      try {
-        const response = await apiFetch(
-          `${API_BASE_URL}/students/course-contents/${assignmentId}`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch assignment');
-        }
-
-        const data = await response.json();
-        setAssignment(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchAssignment();
-  }, [assignmentId, authLoading, isAuthenticated]);
+  const { data: assignment, loading, error } = useResource(async () => {
+    const response = await apiFetch(`${API_BASE_URL}/students/course-contents/${assignmentId}`);
+    if (!response.ok) throw new Error('Failed to fetch assignment');
+    return (await response.json()) as CourseContentStudentGet;
+  }, [assignmentId]);
 
   if (loading) {
     return (

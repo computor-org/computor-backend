@@ -1,19 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import ProgressBar from '@/src/components/progress/ProgressBar';
 import ContentTree from '@/src/components/progress/ContentTree';
 import SubmissionCurve from '@/src/components/progress/SubmissionCurve';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
-import type { CourseMemberGradingsGet } from 'types/generated';
 
 // Pulls in recharts — load only when this page renders (keeps the shared
 // bundle free of the charting library).
@@ -48,37 +47,22 @@ export default function StudentProgressPage() {
   const params = useParams();
   const courseId = params.id as string;
   const memberId = params.memberId as string;
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const [data, setData] = useState<CourseMemberGradingsGet | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, reload } = useResource(
+    () =>
+      gradingsClient.getCourseMemberGradingsEndpointCourseMemberGradingsCourseMemberIdGet({
+        courseMemberId: memberId,
+        courseId,
+      }),
+    [courseId, memberId],
+  );
+
   // Start/due dates persist in localStorage — scoped per course, with a global
   // "last-used" fallback so a not-yet-configured course pre-fills with the last
   // dates set anywhere. The start date windows the curve; the due date is drawn
   // as a guide and flags late work.
   const [startDate, onStartDateChange] = usePersistedCourseDate(courseId, 'start-date');
   const [dueDate, onDueDateChange] = usePersistedCourseDate(courseId, 'due-date');
-
-  const fetchData = useCallback(async () => {
-    try {
-      const result = await gradingsClient.getCourseMemberGradingsEndpointCourseMemberGradingsCourseMemberIdGet({
-        courseMemberId: memberId,
-        courseId,
-      });
-      setData(result);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load student progress');
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId, memberId]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    fetchData();
-  }, [authLoading, isAuthenticated, fetchData]);
 
   const studentName = data
     ? `${data.given_name || ''} ${data.family_name || ''}`.trim() || data.username || 'Unknown'
@@ -167,7 +151,7 @@ export default function StudentProgressPage() {
                   Print
                 </button>
                 <button
-                  onClick={fetchData}
+                  onClick={() => reload()}
                   disabled={loading}
                   className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >

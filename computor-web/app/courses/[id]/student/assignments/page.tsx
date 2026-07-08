@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
@@ -29,41 +29,15 @@ interface TreeNode {
 }
 
 export default function StudentCourseContentsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const params = useParams();
-  const courseId = params.id as string;
-  const [courseContents, setCourseContents] = useState<CourseContentStudentList[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const courseId = useParams().id as string;
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    // Don't fetch until authentication is confirmed
-    if (authLoading || !isAuthenticated) {
-      return;
-    }
-
-    async function fetchCourseContents() {
-      try {
-        const response = await apiFetch(
-          `${API_BASE_URL}/students/course-contents?course_id=${courseId}`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch course contents');
-        }
-
-        const data = await response.json();
-        setCourseContents(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCourseContents();
-  }, [courseId, authLoading, isAuthenticated]);
+  const { data, loading, error } = useResource(async () => {
+    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
+    if (!response.ok) throw new Error('Failed to fetch course contents');
+    return (await response.json()) as CourseContentStudentList[];
+  }, [courseId]);
+  const courseContents = data ?? [];
 
   // Build tree structure from Ltree paths
   const buildTree = (contents: CourseContentStudentList[]): TreeNode[] => {
@@ -269,29 +243,6 @@ export default function StudentCourseContentsPage() {
 
   const tree = buildTree(courseContents);
 
-  if (loading) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </AuthenticatedLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-6">
-          <ErrorBanner>{error}</ErrorBanner>
-        </div>
-      </AuthenticatedLayout>
-    );
-  }
-
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
@@ -302,31 +253,39 @@ export default function StudentCourseContentsPage() {
           ]}
           title="Assignments"
           subtitle={
-            <>
-              {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units ·{' '}
-              {courseContents.filter(c => c.course_content_kind_id === 'assignment').length} assignments
-            </>
+            loading ? undefined : (
+              <>
+                {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units ·{' '}
+                {courseContents.filter(c => c.course_content_kind_id === 'assignment').length} assignments
+              </>
+            )
           }
         />
 
-        <ScrollArea>
-          {/* Tree View */}
-          {tree.length > 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              {renderTree(tree)}
-            </div>
-          ) : (
-            <EmptyState
-              icon={
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              }
-              title="No assignments yet"
-              description="Assignments will appear here once they are published by your instructor."
-            />
-          )}
-        </ScrollArea>
+        <ErrorBanner>{error}</ErrorBanner>
+
+        {loading ? (
+          <ListLoading />
+        ) : (
+          <ScrollArea>
+            {/* Tree View */}
+            {tree.length > 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {renderTree(tree)}
+              </div>
+            ) : (
+              <EmptyState
+                icon={
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                }
+                title="No assignments yet"
+                description="Assignments will appear here once they are published by your instructor."
+              />
+            )}
+          </ScrollArea>
+        )}
       </ListPageLayout>
     </AuthenticatedLayout>
   );

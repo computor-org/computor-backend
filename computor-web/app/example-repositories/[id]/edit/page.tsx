@@ -5,10 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { ExampleRepositoryGet } from 'types/generated';
 
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
@@ -18,40 +18,33 @@ export default function ExampleRepositoryEditPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageExamples: canManage } = usePermissions();
 
-  const [repo, setRepo] = useState<ExampleRepositoryGet | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: repo, loading, error: loadError } = useResource(
+    () => exampleRepositoriesClient.getExampleRepositoriesExampleRepositoriesIdGet({ id: repoId }),
+    [repoId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the repository loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    exampleRepositoriesClient
-      .getExampleRepositoriesExampleRepositoriesIdGet({ id: repoId })
-      .then((r) => {
-        if (cancelled) return;
-        setRepo(r);
-        setName(r.name || '');
-        setDescription(r.description || '');
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [repoId, authLoading, isAuthenticated, canManage]);
+    if (!repo) return;
+    setName(repo.name || '');
+    setDescription(repo.description || '');
+  }, [repo]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       await exampleRepositoriesClient.updateExampleRepositoriesExampleRepositoriesIdPatch({ id: repoId, body: { name: name.trim(), description: description.trim() || null } });
       router.push(`/example-repositories/${repoId}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -71,7 +64,7 @@ export default function ExampleRepositoryEditPage() {
             { label: 'Edit' },
           ]}
           title={`Edit ${repo?.name || 'repository'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           disabled={!name.trim()}
           onCancel={() => router.push(`/example-repositories/${repoId}`)}

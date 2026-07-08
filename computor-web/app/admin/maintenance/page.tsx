@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -8,19 +8,25 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
+import { useResource } from '@/src/hooks/useResource';
+import { MaintenanceClient } from '@/src/clients/MaintenanceClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 
 const maintenanceClient = new MaintenanceClient();
 
 export default function MaintenancePage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
   const notify = useNotify();
-  const [status, setStatus] = useState<MaintenanceStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Poll the maintenance status every 10s in the background (silent — no loading
+  // flash). Mutations below refresh it immediately via `fetchStatus`.
+  const { data: status, loading, error, reload: fetchStatus } = useResource(
+    () => maintenanceClient.getStatus(),
+    [],
+    { refetchInterval: 10000 },
+  );
 
   // Activate form
   const [activateMessage, setActivateMessage] = useState('The system is undergoing scheduled maintenance.');
@@ -39,26 +45,6 @@ export default function MaintenancePage() {
   // Cancel schedule confirm
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-
-  const fetchStatus = useCallback(async () => {
-    try {
-      const data = await maintenanceClient.getStatus();
-      setStatus(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch maintenance status');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    fetchStatus();
-
-    const interval = setInterval(fetchStatus, 10000);
-    return () => clearInterval(interval);
-  }, [authLoading, isAuthenticated, fetchStatus]);
 
   const handleActivate = async () => {
     setShowActivateConfirm(false);

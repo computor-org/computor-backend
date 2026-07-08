@@ -1,32 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import type { CourseList } from '@/src/generated/types/courses';
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { showManagement, isWorkspaceUser, isUserManager, isAdmin, courseRole } = usePermissions();
-  const [courses, setCourses] = useState<CourseList[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      const localCourses = await fetchLocalCourses();
-      if (cancelled) return;
-      setCourses(localCourses);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, isAuthenticated]);
+  const { data, loading } = useResource(() => fetchLocalCourses(), []);
+  const courses = data ?? [];
 
   const actions = [
     { label: 'Browse Courses', href: '/courses', show: true },

@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { CourseFamilyGet } from '@/src/generated/types/courses';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -18,34 +18,27 @@ export default function CourseFamilyEditPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageHierarchy: canManage } = usePermissions();
 
-  const [family, setFamily] = useState<CourseFamilyGet | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { data: family, loading, error: loadError } = useResource(
+    () => courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: familyId }),
+    [familyId],
+    { enabled: canManage },
+  );
+
+  // Seed the form once the course family loads.
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
-    let cancelled = false;
-    courseFamiliesClient
-      .getCourseFamiliesCourseFamiliesIdGet({ id: familyId })
-      .then((f) => {
-        if (cancelled) return;
-        setFamily(f);
-        setTitle(f.title || '');
-        setDescription(f.description || '');
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'An error occurred'))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [familyId, authLoading, isAuthenticated, canManage]);
+    if (!family) return;
+    setTitle(family.title || '');
+    setDescription(family.description || '');
+  }, [family]);
 
   async function save() {
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
       await courseFamiliesClient.updateCourseFamiliesCourseFamiliesIdPatch({
         id: familyId,
@@ -54,7 +47,7 @@ export default function CourseFamilyEditPage() {
       router.push(`/course-families/${familyId}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
     }
   }
 
@@ -74,7 +67,7 @@ export default function CourseFamilyEditPage() {
             { label: 'Edit' },
           ]}
           title={`Edit ${family?.title || family?.path || 'course family'}`}
-          error={error}
+          error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/course-families/${familyId}`)}
           onSubmit={save}
