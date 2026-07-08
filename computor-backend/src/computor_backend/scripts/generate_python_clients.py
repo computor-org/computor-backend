@@ -22,8 +22,22 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
-def fetch_openapi_spec(url: str = "http://localhost:8000/openapi.json") -> Dict[str, Any]:
-    """Fetch OpenAPI spec from the running server."""
+def load_openapi_spec_offline() -> Dict[str, Any]:
+    """Build the OpenAPI spec in-process from the FastAPI app (no server needed).
+
+    This is the default: it imports ``computor_backend.server`` and calls
+    ``app.openapi()``, so codegen works offline and always matches the current
+    routers. Note that env-gated routers (e.g. the Coder API, mounted only when
+    ``CODER_ENABLED=true``) follow the process env, exactly as the served spec
+    would.
+    """
+    from computor_backend.server import app
+
+    return app.openapi()
+
+
+def fetch_openapi_spec_from_url(url: str = "http://localhost:8000/openapi.json") -> Dict[str, Any]:
+    """Fetch the OpenAPI spec from a running server (fallback mode)."""
     try:
         with urllib.request.urlopen(url, timeout=10) as response:
             return json.loads(response.read().decode())
@@ -31,6 +45,27 @@ def fetch_openapi_spec(url: str = "http://localhost:8000/openapi.json") -> Dict[
         print(f"Error fetching OpenAPI spec from {url}: {e}")
         print("Make sure the API server is running.")
         return {}
+
+
+def load_openapi_spec(url: Optional[str] = None) -> Dict[str, Any]:
+    """Load the OpenAPI spec offline by default, or over HTTP when ``url`` is set."""
+    if url:
+        print(f"Fetching OpenAPI spec from {url}")
+        return fetch_openapi_spec_from_url(url)
+    print("Building OpenAPI spec offline from computor_backend.server:app")
+    try:
+        return load_openapi_spec_offline()
+    except Exception as e:
+        print(f"Error building OpenAPI spec offline: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
+# Backwards-compatible alias (older callers imported this name).
+def fetch_openapi_spec(url: str = "http://localhost:8000/openapi.json") -> Dict[str, Any]:
+    """Deprecated: use ``load_openapi_spec``. Kept for import compatibility."""
+    return fetch_openapi_spec_from_url(url)
 
 
 def snake_to_pascal(name: str) -> str:
@@ -831,7 +866,8 @@ def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]
         '"""',
         'Auto-generated endpoint client.',
         '',
-        'This module is auto-generated from the OpenAPI specification.',
+        'DO NOT EDIT: this module is auto-generated from the OpenAPI specification.',
+        'Hand edits are silently overwritten on the next regeneration.',
         'Run `bash generate.sh python-client` to regenerate.',
         '"""',
         '',
@@ -862,8 +898,12 @@ def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]
     return "\n".join(lines), class_name
 
 
-def main(output_dir: Optional[Path] = None, spec_url: str = "http://localhost:8000/openapi.json"):
-    """Main generator entry point."""
+def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
+    """Main generator entry point.
+
+    ``spec_url=None`` (default) builds the spec offline from the FastAPI app;
+    pass a URL to fetch it from a running server instead.
+    """
     if output_dir is None:
         script_dir = Path(__file__).parent
         project_root = script_dir.parent.parent.parent.parent
@@ -873,9 +913,9 @@ def main(output_dir: Optional[Path] = None, spec_url: str = "http://localhost:80
     print(f"Output directory: {output_dir}")
     print()
 
-    spec = fetch_openapi_spec(spec_url)
+    spec = load_openapi_spec(spec_url)
     if not spec:
-        print("Failed to fetch OpenAPI spec.")
+        print("Failed to load OpenAPI spec.")
         return []
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -918,7 +958,8 @@ def main(output_dir: Optional[Path] = None, spec_url: str = "http://localhost:80
         '"""',
         'Auto-generated endpoint clients.',
         '',
-        'This module is auto-generated from the OpenAPI specification.',
+        'DO NOT EDIT: this module is auto-generated from the OpenAPI specification.',
+        'Hand edits are silently overwritten on the next regeneration.',
         'Run `bash generate.sh python-client` to regenerate.',
         '"""',
         '',
@@ -948,4 +989,24 @@ def main(output_dir: Optional[Path] = None, spec_url: str = "http://localhost:80
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Generate Python HTTP clients from the OpenAPI spec (offline by default)."
+    )
+    parser.add_argument(
+        "--url",
+        default=None,
+        help="Fetch the spec from a running server at this URL instead of "
+             "building it offline (e.g. http://localhost:8000/openapi.json).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Override the endpoints output directory.",
+    )
+    args = parser.parse_args()
+    main(
+        output_dir=Path(args.output_dir) if args.output_dir else None,
+        spec_url=args.url,
+    )
