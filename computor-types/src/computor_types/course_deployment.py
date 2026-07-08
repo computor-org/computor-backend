@@ -1,7 +1,7 @@
 """DTOs for deploying a single course from an uploaded ``course_deployment.yaml``.
 
 The web "create course" page can optionally upload a course-level deployment
-file — a top-level :class:`~computor_types.deployments_refactored.HierarchicalCourseConfig`
+file — a top-level :class:`~computor_types.deployment_config.HierarchicalCourseConfig`
 (``name``, ``path``, ``services``, ``content_types`` and a nested ``contents``
 tree), with no organization/git/users keys. The file is first *validated*
 (``validate_only=True``) and then *applied* under an existing course family.

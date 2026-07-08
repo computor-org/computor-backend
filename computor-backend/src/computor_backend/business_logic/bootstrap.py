@@ -30,7 +30,7 @@ from pathlib import Path
 import yaml
 
 from computor_types.api_tokens import ApiTokenAdminCreate
-from computor_types.deployments_refactored import (
+from computor_types.deployment_config import (
     ComputorDeploymentConfig,
     ExampleRepositoryConfig,
     ServiceConfig,

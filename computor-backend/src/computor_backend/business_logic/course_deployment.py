@@ -29,7 +29,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from computor_types.deployments_refactored import HierarchicalCourseConfig
+from computor_types.deployment_config import HierarchicalCourseConfig
 from computor_types.course_deployment import (
     CourseDeployResult,
     CourseDeploySummary,

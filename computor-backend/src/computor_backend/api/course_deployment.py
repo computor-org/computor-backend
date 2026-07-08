@@ -20,7 +20,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.business_logic.course_deployment import deploy_course_from_config
 
 from computor_types.course_deployment import CourseDeployRequest, CourseDeployResult
-from computor_types.deployments_refactored import HierarchicalCourseConfig
+from computor_types.deployment_config import HierarchicalCourseConfig
 
 course_deployment_router = APIRouter()
 

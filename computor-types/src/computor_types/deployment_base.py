@@ -1,25 +1,29 @@
 """
 Base deployment classes (dependency-free).
 
-Extracted to avoid circular imports between gitlab.py and deployments_refactored.py.
+Extracted to avoid circular imports between gitlab.py and deployment_config.py.
+The generic YAML read/write plumbing now lives in ``yaml_config``; the classes
+here delegate to it so deployment consumers see no behavior change.
 """
 
-import yaml
-from pydantic import BaseModel
-from pydantic_yaml import to_yaml_str
+from .yaml_config import (
+    YamlConfig,
+    read_model_from_yaml_file,
+    read_model_from_yaml_string,
+    read_yaml_file,
+)
 
 
-class BaseDeployment(BaseModel):
+class BaseDeployment(YamlConfig):
     """Base class for all deployment configurations."""
 
     def get_deployment(self) -> str:
         """Get YAML representation of the deployment configuration."""
-        return to_yaml_str(self, exclude_none=True, exclude_unset=True)
+        return self.to_yaml()
 
     def write_deployment(self, filename: str) -> None:
         """Write deployment configuration to a YAML file."""
-        with open(filename, "w") as file:
-            file.write(self.get_deployment())
+        self.write_yaml(filename)
 
 
 class DeploymentFactory:
@@ -28,19 +32,14 @@ class DeploymentFactory:
     @staticmethod
     def read_deployment_from_string(classname, yamlstring: str):
         """Create deployment configuration from YAML string."""
-        return classname(**yaml.safe_load(yamlstring))
+        return read_model_from_yaml_string(classname, yamlstring)
 
     @staticmethod
     def read_deployment_from_file(classname, filename: str):
         """Create deployment configuration from YAML file."""
-        with open(filename, "r") as file:
-            if classname is not None:
-                return classname(**yaml.safe_load(file))
-            else:
-                return yaml.safe_load(file)
+        return read_model_from_yaml_file(classname, filename)
 
     @staticmethod
     def read_deployment_from_file_raw(filename: str) -> dict:
         """Read raw YAML data from file."""
-        with open(filename, "r") as file:
-            return yaml.safe_load(file)
+        return read_yaml_file(filename)

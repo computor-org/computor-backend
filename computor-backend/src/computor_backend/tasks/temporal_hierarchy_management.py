@@ -8,7 +8,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from computor_types.deployments_refactored import CourseConfig
+from computor_types.deployment_config import CourseConfig
 from ..database import get_db_session
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course

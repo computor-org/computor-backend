@@ -15,7 +15,7 @@ import click
 from pathlib import Path
 from typing import Any
 
-from computor_types.deployments_refactored import (
+from computor_types.deployment_config import (
     ComputorDeploymentConfig,
     HierarchicalOrganizationConfig,
     HierarchicalCourseFamilyConfig,
@@ -121,7 +121,7 @@ def init(output: str, format: str):
         # Use the multi-organization example
         config = EXAMPLE_MULTI_DEPLOYMENT
     else:  # tutorial
-        # Use the example from deployments_refactored.py
+        # Use the example from deployment_config.py
         config = EXAMPLE_DEPLOYMENT
     
     # Write to file

@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Optional
 from pydantic import BaseModel, Field
-from computor_types.deployments_refactored import BaseDeployment
+from computor_types.deployment_config import BaseDeployment
 
 class AuthConfig(ABC, BaseDeployment):
     pass

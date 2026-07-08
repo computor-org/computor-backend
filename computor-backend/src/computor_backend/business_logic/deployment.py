@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from computor_types.deployments_refactored import ComputorDeploymentConfig
+from computor_types.deployment_config import ComputorDeploymentConfig
 from computor_backend.database import get_db_session
 from computor_backend.permissions.principal import Principal
 from computor_backend.tasks import get_task_executor, TaskSubmission
