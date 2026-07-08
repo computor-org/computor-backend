@@ -187,10 +187,14 @@ async def get_entity_by_id(
         raise e
 
     except exc.StatementError as e:
+        # Malformed input (e.g. bad UUID) — a client error, not a 404.
         raise BadRequestException(detail=e.args) from e
 
-    except Exception as e:
-        raise NotFoundException(detail=e.args) from e
+    except Exception:
+        # Do NOT mask unexpected errors as 404 — let them surface as 500 so
+        # real failures are visible instead of looking like a missing row.
+        logger.exception("Unhandled exception in get_entity_by_id")
+        raise
 
 
 async def list_entities(
@@ -247,7 +251,7 @@ async def list_entities(
 async def update_entity(
     permissions: Principal,
     db: Session,
-    id: UUID | str | None,
+    id: UUID | str,
     entity: Any,
     db_type: Any,
     response_type: BaseModel,
@@ -282,20 +286,21 @@ async def update_entity(
 
     # Wrap blocking database operations in threadpool
     def _update_entity():
-        if id is not None:
-            # Use custom permission check if provided, otherwise fall back to generic
-            if custom_permissions is not None:
-                query = custom_permissions(permissions, db, id, entity)
-            else:
-                query = check_permissions(permissions, db_type, "update", db)
+        # id is always provided; the lookup below binds db_item unconditionally
+        # (a former `if id is not None` guard left db_item unbound for id=None,
+        # which raised UnboundLocalError further down).
+        if custom_permissions is not None:
+            query = custom_permissions(permissions, db, id, entity)
+        else:
+            query = check_permissions(permissions, db_type, "update", db)
 
-            if query is None:
-                raise NotFoundException()
+        if query is None:
+            raise NotFoundException()
 
-            db_item = query.filter(db_type.id == id).first()
+        db_item = query.filter(db_type.id == id).first()
 
-            if db_item is None:
-                raise NotFoundException()
+        if db_item is None:
+            raise NotFoundException()
 
         if isinstance(entity, BaseModel):
             entity_dict = entity.model_dump(exclude_unset=True)
@@ -500,11 +505,11 @@ async def delete_entity(
             db.rollback()
             # Handle other SQLAlchemy errors
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-            print(f"SQLAlchemyError in delete_entity: {error_msg}")
+            logger.error("SQLAlchemyError in delete_entity: %s", error_msg)
             raise InternalServerException(detail="An unexpected database error occurred while deleting") from e
         except Exception as e:
             db.rollback()
-            print(f"Unexpected error in delete_entity: {e}")
+            logger.exception("Unexpected error in delete_entity")
             raise InternalServerException(detail="An unexpected error occurred while deleting") from e
 
         return {"ok": True}
@@ -563,11 +568,11 @@ async def archive_entity(
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-            print(f"SQLAlchemyError in archive_entity: {error_msg}")
+            logger.error("SQLAlchemyError in archive_entity: %s", error_msg)
             raise InternalServerException(detail="An unexpected database error occurred while archiving") from e
         except Exception as e:
             db.rollback()
-            print(f"Unexpected error in archive_entity: {e}")
+            logger.exception("Unexpected error in archive_entity")
             raise InternalServerException(detail="An unexpected error occurred while archiving") from e
 
         return {"ok": True}
@@ -619,11 +624,11 @@ async def unarchive_entity(
         except exc.SQLAlchemyError as e:
             db.rollback()
             error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-            print(f"SQLAlchemyError in unarchive_entity: {error_msg}")
+            logger.error("SQLAlchemyError in unarchive_entity: %s", error_msg)
             raise InternalServerException(detail="An unexpected database error occurred while unarchiving") from e
         except Exception as e:
             db.rollback()
-            print(f"Unexpected error in unarchive_entity: {e}")
+            logger.exception("Unexpected error in unarchive_entity")
             raise InternalServerException(detail="An unexpected error occurred while unarchiving") from e
 
         return {"ok": True}
