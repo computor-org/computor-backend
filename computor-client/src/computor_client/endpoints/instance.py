@@ -14,20 +14,19 @@ from pydantic import BaseModel
 from computor_client.http import AsyncHTTPClient
 
 
-class CourseDeploymentClient:
+class InstanceClient:
     """
-    Client for course deployment endpoints.
+    Client for instance endpoints.
     """
 
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_families_deploy_course(
+    async def instance_info(
         self,
-        course_family_id: str,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Deploy Course"""
-        response = await self._http.post(f"/course-families/{course_family_id}/deploy-course", params=kwargs)
+        """Get Instance Info"""
+        response = await self._http.get(f"/instance-info", params=kwargs)
         return response.json()
 

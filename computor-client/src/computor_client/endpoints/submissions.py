@@ -1,7 +1,8 @@
 """
 Auto-generated endpoint client.
 
-This module is auto-generated from the OpenAPI specification.
+DO NOT EDIT: this module is auto-generated from the OpenAPI specification.
+Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
@@ -153,7 +154,7 @@ class SubmissionsClient:
         data: Union[SubmissionReviewCreate, Dict[str, Any]],
         **kwargs: Any,
     ) -> SubmissionReviewListItem:
-        """Create Artifact Review"""
+        """Create Artifact Review Endpoint"""
         response = await self._http.post(f"/submissions/artifacts/{artifact_id}/reviews", json_data=data, params=kwargs)
         return SubmissionReviewListItem.model_validate(response.json())
 
@@ -194,7 +195,7 @@ class SubmissionsClient:
         data: Union[ResultCreate, Dict[str, Any]],
         **kwargs: Any,
     ) -> ResultList:
-        """Create Test Result"""
+        """Create Test Result Endpoint"""
         response = await self._http.post(f"/submissions/artifacts/{artifact_id}/test", json_data=data, params=kwargs)
         return ResultList.model_validate(response.json())
 
@@ -216,7 +217,7 @@ class SubmissionsClient:
         data: Union[ResultUpdate, Dict[str, Any]],
         **kwargs: Any,
     ) -> ResultList:
-        """Update Test Result"""
+        """Update Test Result Endpoint"""
         response = await self._http.patch(f"/submissions/tests/{test_id}", json_data=data, params=kwargs)
         return ResultList.model_validate(response.json())
 
